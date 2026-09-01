@@ -459,10 +459,23 @@ class CapabilityBroker:
             if callable(effects_for)
             else resolution.adapter.manifest.effects
         )
-        checkpoint_id: str | None = None
-        if self.checkpoint_store is not None and any(
-            effect is not ToolEffect.WORKSPACE_READ for effect in effects
+        mutating = any(effect is not ToolEffect.WORKSPACE_READ for effect in effects)
+        if (
+            mutating
+            and context.execution_id is not None
+            and self.checkpoint_store is None
         ):
+            raise PowdrrExecutionError(
+                "Mutating capability execution requires a checkpoint store.",
+                error_code="capability_checkpoint_required",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Run the action through an ExecutionRuntime with checkpoints "
+                    "enabled."
+                ),
+            )
+        checkpoint_id: str | None = None
+        if self.checkpoint_store is not None and mutating:
             encoded = json.dumps(
                 {
                     "execution_id": context.execution_id,
@@ -486,7 +499,41 @@ class CapabilityBroker:
                     else None
                 ),
             )
-        result = resolution.adapter.execute(context, resolution.arguments)
+        try:
+            result = resolution.adapter.execute(context, resolution.arguments)
+        except Exception as error:
+            changed_paths: tuple[str, ...] = ()
+            if checkpoint_id is not None and self.checkpoint_store is not None:
+                changed_paths_method = getattr(
+                    self.checkpoint_store, "changed_paths", None
+                )
+                if callable(changed_paths_method):
+                    load_checkpoint = getattr(self.checkpoint_store, "load", None)
+                    if callable(load_checkpoint):
+                        checkpoint = load_checkpoint(checkpoint_id)
+                        changed_paths = tuple(
+                            changed_paths_method(checkpoint, context.worktree_root)
+                        )
+            partial = bool(changed_paths)
+            raise PowdrrExecutionError(
+                f"Capability {request.tool_name!r} failed: {error}",
+                error_code=(
+                    "capability_partial_mutation"
+                    if partial
+                    else "capability_execution_failed"
+                ),
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Restore the associated checkpoint before retrying."
+                    if partial
+                    else (
+                        "Correct the capability request or adapter failure "
+                        "before retrying."
+                    )
+                ),
+                details={"changed_paths": json.dumps(changed_paths)},
+                cause_error=error,
+            ) from error
         if self._decision_log:
             self._decision_log[-1] = replace(
                 self._decision_log[-1], checkpoint_id=checkpoint_id

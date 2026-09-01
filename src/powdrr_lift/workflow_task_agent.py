@@ -957,17 +957,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 and action.parameters.get("operation") == "pr_create"
                 and self.runtime is not None
             ):
-                readiness = self.runtime.publish_readiness()
-                if not readiness.ready:
-                    raise PowdrrExecutionError(
-                        "Pull-request creation is blocked by execution readiness: "
-                        + "; ".join(readiness.reasons),
-                        error_code="readiness_blocked",
-                        action_kind=action.kind,
-                        remediation=(
-                            "satisfy all obligations and validation requirements"
-                        ),
-                    )
+                self.runtime.require_publish_readiness()
             result = invoke_intrinsic_capability(
                 action.tool,
                 action.parameters,

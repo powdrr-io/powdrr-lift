@@ -34,6 +34,7 @@ class PublishRequirements:
     plan_fingerprint: str | None = None
     proposed_pr_fingerprint: str | None = None
     require_independent_review: bool = False
+    author_id: str | None = None
     reviewer_findings: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
@@ -96,6 +97,13 @@ class ReadinessEvaluator:
                 if fingerprint is not None and fingerprint not in accepted_refs:
                     reasons.append(f"current accepted {label} fingerprint is missing")
             if publish.require_independent_review:
+                if publish.author_id is not None and any(
+                    reviewer_id == publish.author_id
+                    for reviewer_id, _ in publish.reviewer_findings
+                ):
+                    reasons.append(
+                        "review agreement: author cannot provide independent review"
+                    )
                 agreement = evaluate_review_agreement(publish.reviewer_findings)
                 if not agreement.sufficient:
                     reasons.extend(

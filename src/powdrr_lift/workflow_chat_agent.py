@@ -5874,15 +5874,7 @@ def _handle_workflow_action_invoke_tool(
             and action.parameters.get("operation") == "pr_create"
             and state.runtime is not None
         ):
-            readiness = state.runtime.publish_readiness()
-            if not readiness.ready:
-                raise PowdrrExecutionError(
-                    "Pull-request creation is blocked by execution readiness: "
-                    + "; ".join(readiness.reasons),
-                    error_code="readiness_blocked",
-                    action_kind=action.kind,
-                    remediation="satisfy all obligations and validation requirements",
-                )
+            state.runtime.require_publish_readiness()
         tool_result = invoke_intrinsic_capability(
             action.tool,
             action.parameters,

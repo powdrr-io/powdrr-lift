@@ -57,6 +57,47 @@ def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> 
     assert not runtime.readiness().ready
 
 
+def test_runtime_invalidates_evidence_through_durable_events(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-evidence-invalidation",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.record_evidence(
+        evidence_id="evidence-1",
+        producer_action_instance_id="action-1",
+        evidence_type="pytest",
+        input_fingerprint="fingerprint-1",
+        successful=True,
+    )
+
+    runtime.invalidate_evidence(frozenset({"fingerprint-1"}))
+
+    assert not runtime.state.evidence[0].fresh
+    assert any(
+        event.event_type is ExecutionEventType.EVIDENCE_INVALIDATED
+        for event in runtime.state_store.load_events("run-evidence-invalidation")
+    )
+
+
+def test_runtime_publish_gate_returns_typed_remediation(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-publish-gate",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.kernel.propose({"kind": "change"}, semantic_action="change_mutable_row")
+    runtime.sync_kernel(phase_type="build", actor_id="engineer")
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.require_publish_readiness()
+
+    assert raised.value.error_code == "readiness_blocked"
+    assert raised.value.remediation
+
+
 def test_runtime_does_not_duplicate_kernel_events(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-2",
@@ -384,6 +425,9 @@ def test_runtime_restores_workspace_and_typed_state_atomically(tmp_path: Path) -
     assert runtime.state_store.load_events("run-checkpoint")[-1].event_type is (
         ExecutionEventType.CHECKPOINT_REVERTED
     )
+    assert runtime.state_store.load_events("run-checkpoint")[-1].payload[
+        "changed_paths"
+    ]
 
 
 def test_runtime_rejects_mismatched_checkpoint_before_mutating_workspace(

@@ -418,6 +418,10 @@ class ExecutionRuntime:
                     relationship_id=plan.plan_id,
                 ).to_data(),
             )
+        if not actions_by_phase:
+            # Plan validation and decision-obligation creation are also useful
+            # before an execution workflow has been materialized.
+            return ()
         return compile_execution_plan(profile, plan, actions_by_phase=actions_by_phase)
 
     def resolve_plan_decision(self, plan_id: str, decision: str) -> ExecutionState:

@@ -30,7 +30,22 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     )
     | BASEDPYRIGHT_TOOLS
 )
-SUPPORTED_PROMPT_CATALOGS = frozenset({"context_types", "skills", "actions"})
+SUPPORTED_PROMPT_CATALOGS = frozenset(
+    {
+        "context_types",
+        "skills",
+        "actions",
+        # Delivery profiles may attach durable persona responsibility catalogs
+        # to generated workflow tasks.  Keep these names in the same validated
+        # namespace as the original prompt catalogs so compiled tasks can be
+        # loaded again without losing persona context.
+        "architect-responsibilities",
+        "engineering-manager-responsibilities",
+        "engineer-responsibilities",
+        "specification-reviewer-responsibilities",
+        "code-reviewer-responsibilities",
+    }
+)
 SUPPORTED_STEP_ACTIONS = frozenset(
     {
         "gather_context",

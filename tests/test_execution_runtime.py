@@ -396,6 +396,119 @@ def test_compile_plan_to_workflow_uses_runtime_validation_boundary(
 
     assert isinstance(workflow, WorkflowInstance)
     assert runtime.load_plan(plan.plan_id) == plan
+    generated = workflow.tasks[0]
+    assert generated.input_state["execution_plan_id"] == plan.plan_id
+    assert generated.input_state["proposed_pr_fingerprint"] == (
+        plan.proposed_pr_fingerprint
+    )
+    assert generated.input_state["persona_id"] == generated.persona_id
+    assert generated.output_state["acceptance_criteria"] == [
+        "The implementation is validated."
+    ]
+
+
+def test_compile_plan_requires_one_action_contract_per_phase(tmp_path: Path) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+    from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-missing-actions",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "runtime",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    plan = ExecutionPlan(
+        "plan-missing-actions",
+        "fingerprint",
+        (
+            ExecutionUnit(
+                "unit-1",
+                "Implement the change",
+                ("src/app.py",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("tests pass",),
+            ),
+        ),
+        ("src",),
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="action contract"):
+        runtime.compile_plan_to_workflow(
+            profile,
+            plan,
+            actions_by_phase={},
+            workflow_directory=tmp_path / "workflow",
+        )
+
+
+def test_compiled_workflow_preserves_multi_unit_dependencies_and_personas(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+    from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-multi-unit-plan",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "runtime",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    plan = ExecutionPlan(
+        "plan-multi-unit",
+        "multi-fingerprint",
+        (
+            ExecutionUnit(
+                "foundation",
+                "Build the foundation",
+                ("src/foundation.py",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("foundation is tested",),
+            ),
+            ExecutionUnit(
+                "feature",
+                "Build the feature",
+                ("src/feature.py",),
+                dependencies=("foundation",),
+                validation_profiles=("repository-validation",),
+                acceptance_criteria=("feature is tested",),
+            ),
+        ),
+        ("src",),
+    )
+    actions: dict[PhaseType, tuple[str, ...]] = {
+        phase.phase_type: ("read_document", "next_step") for phase in profile.phases
+    }
+
+    workflow = runtime.compile_plan_to_workflow(
+        profile,
+        plan,
+        actions_by_phase=actions,
+        workflow_directory=tmp_path / "workflow",
+    )
+    feature_build = next(
+        task for task in workflow.tasks if task.task_id == "feature-build"
+    )
+
+    assert feature_build.upstream_task_ids == (
+        "feature-await_plan_decision",
+        "foundation-build",
+    )
+    assert feature_build.input_state["execution_unit_id"] == "feature"
+    assert feature_build.phase_type is PhaseType.BUILD
+    assert feature_build.persona_id
+    assert feature_build.actions == ("read_document", "next_step")
+    reloaded = workflow.__class__.from_directory(tmp_path / "workflow")
+    assert {task.task_id: task for task in reloaded.tasks} == {
+        task.task_id: task for task in workflow.tasks
+    }
 
 
 def test_runtime_restores_workspace_and_typed_state_atomically(tmp_path: Path) -> None:

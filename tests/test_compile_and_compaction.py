@@ -32,7 +32,7 @@ def test_compiler_preserves_actions_personas_and_dependencies() -> None:
     tasks = compile_execution_plan(
         profile,
         plan,
-        actions_by_phase={PhaseType.BUILD: ("edit",)},
+        actions_by_phase={phase.phase_type: ("edit",) for phase in profile.phases},
     )
     build_tasks = [task for task in tasks if task.phase_type is PhaseType.BUILD]
     assert build_tasks[0].actions == ("edit",)

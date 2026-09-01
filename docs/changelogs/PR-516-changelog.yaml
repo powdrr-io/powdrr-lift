@@ -1,0 +1,55 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 516
+title: Document typed resource identifier proposal
+intent:
+  problem: Powdrr currently uses several ad hoc identifier formats, including composite strings that mix resource identity with relationships or execution structure.
+  goal: Define one futureproof, hierarchical `<type>:<id>` convention and a migration approach that makes durable references explicit without creating unnecessary state.
+human-decisions:
+  - id: typed-resource-identifiers
+    action: added
+    summary: Use canonical identifiers in the form `powdrr/<domain>/<resource>:<opaque-id>`, with relationships, versions, and state represented separately.
+structured_files: []
+files:
+  - path: docs/plans/typed-resource-identifiers.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 200
+    summary: Document the proposed typed identifier hierarchy, reference model, migration stages, and acceptance criteria.
+    rationale: Give the project a single vocabulary for durable execution, intent, workflow, specification, repository, artifact, and control references before implementing the migration.
+    related:
+      decisions:
+        - typed-resource-identifiers
+      invariants:
+        - inv-typed-resource-reference
+        - inv-opaque-resource-id
+        - inv-single-intent-source
+      guidance:
+        - guide-use-resource-ref
+        - guide-runtime-allocates-ids
+entities: []
+entity_relationships: []
+invariants:
+  - id: inv-typed-resource-reference
+    action: added
+    description: Every durable resource reference must identify both its Powdrr resource type and opaque resource ID in canonical form.
+    rationale: Type information prevents ambiguous strings and enables reference validation across execution, intent, and workflow state.
+  - id: inv-opaque-resource-id
+    action: added
+    description: Resource IDs must not encode parent relationships, versions, status, or retry attempts.
+    rationale: Structured relationships and metadata must remain stable when execution topology or resource state changes.
+  - id: inv-single-intent-source
+    action: added
+    description: Original user intent should receive one durable source identity and be referenced by derived clauses and execution context rather than duplicated as new state.
+    rationale: Preserve cross-session intent retrieval without causing state explosion.
+guidance:
+  - id: guide-use-resource-ref
+    action: added
+    description: Use one ResourceRef value object and the canonical `<type>:<id>` serialization at persistence, CLI, MCP, logging, and prompt boundaries.
+    rationale: A single parser and registry prevent call sites from inventing incompatible identifier formats.
+  - id: guide-runtime-allocates-ids
+    action: added
+    description: Runtime code allocates and validates durable IDs; the LLM may refer to known IDs but must not invent resource identifiers.
+    rationale: Runtime ownership provides collision prevention, replay stability, and actionable validation errors.
+features: []
+proposed_prs: []

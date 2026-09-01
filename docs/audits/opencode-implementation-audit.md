@@ -152,7 +152,11 @@ The repository has effectively completed the contract/foundation portions of
 the sequence. It has not completed the integration portions that the sequence
 explicitly makes acceptance criteria for each PR.
 
-## Remaining-work document: item-by-item differences
+## Historical pre-closure differences (closed)
+
+The following sections preserve the findings that motivated the closure work.
+They are historical records, not current implementation gaps; the executable
+closure mapping above is authoritative.
 
 ### 1. Capability broker authority
 
@@ -304,7 +308,7 @@ Still different:
 - interruption/resume does not prove all typed references survive compaction;
 - legacy prompt-only paths and `off`-mode migration are still present.
 
-## Other document differences
+## Other historical document differences (closed)
 
 ### Durable user intent
 
@@ -333,7 +337,7 @@ implemented as prompt helpers rather than derived entirely from the durable
 execution state and executable capability registry. Full-file/direct-dispatch
 legacy paths therefore remain possible.
 
-## Codebase findings not represented clearly in the plans
+## Historical codebase findings (closed)
 
 1. The execution package has two notions of “available tool”: manifest-backed
    capability and legacy helper dispatch. The plans describe only the former,
@@ -350,7 +354,7 @@ legacy paths therefore remain possible.
    concepts, but the codebase does not yet expose one named runtime entry point
    whose call graph can be audited for bypasses.
 
-## Recommended completion order
+## Historical recommended completion order
 
 To finish without more isolated foundation PRs, the remaining work should be
 done as one integration effort with these vertical slices:

@@ -127,6 +127,21 @@ def test_runtime_binds_external_writes_to_a_stable_idempotency_key(
 
     assert len(adapter.arguments) == 1
     assert isinstance(adapter.arguments[0]["idempotency_key"], str)
+    resumed = ExecutionRuntime(
+        "run-idempotency",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    resumed.register_adapter(adapter)
+    with pytest.raises(PowdrrExecutionError, match="already completed"):
+        resumed.invoke(
+            resumed.context(
+                semantic_actions=frozenset({"mutate_pull_request"}),
+                allowed_effects=frozenset({ToolEffect.GITHUB_MUTATION}),
+            ),
+            request,
+        )
 
 
 def test_runtime_persists_kernel_lifecycle_and_relationships(tmp_path: Path) -> None:

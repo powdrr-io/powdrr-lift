@@ -61,6 +61,10 @@ class ExecutionStateStore(Protocol):
 
     def load_events(self, execution_id: str) -> tuple[ExecutionEvent, ...]: ...
 
+    def append_transaction(
+        self, execution_id: str, expected_version: int, events: Sequence[ExecutionEvent]
+    ) -> ExecutionState: ...
+
 
 class FileExecutionStateStore:
     """Persist one execution below ``workflow_directory/execution``.
@@ -132,6 +136,8 @@ class FileExecutionStateStore:
             )
             self._write_json(directory / "state.json", next_state.to_data())
             return next_state
+
+    append_transaction = append
 
     def verify(self, execution_id: str) -> ExecutionState:
         state = self.load(execution_id)

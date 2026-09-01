@@ -13,6 +13,16 @@ def test_final_acceptance_scenario_passes_without_an_llm(tmp_path: Path) -> None
 
     assert report.passed
     assert {check.name for check in report.checks} == {
+        "vertical-structured-delivery",
+        "durable-guidance-changes-behavior",
+        "effective-action-intersection",
+        "transaction-boundary",
+        "enforce-mode-runtime-authority",
+        "legacy-runner-isolation",
+        "normal-adapter-exception-flow",
+        "interruption-retrieval",
+        "phase-boundary-retrieval",
+        "typed-error-boundary",
         "compiled-task-graph",
         "runtime-contract",
         "persona-phase-assignments",

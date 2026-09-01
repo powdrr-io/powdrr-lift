@@ -90,6 +90,10 @@ class CapabilityExceptionStore(Protocol):
 
     def save_request(self, exception: CapabilityExceptionRequest) -> None: ...
 
+    def load_request(self, exception_id: str) -> CapabilityExceptionRequest | None: ...
+
+    def pending(self) -> tuple[CapabilityExceptionRequest, ...]: ...
+
 
 class CapabilityCheckpointStore(Protocol):
     def create(
@@ -227,6 +231,24 @@ class CapabilityBroker:
             expires_at=expires_at,
             max_uses=max_uses,
         )
+        existing = self._exceptions.get(exception.exception_id)
+        if existing is None and self.exception_store is not None:
+            existing = self.exception_store.load_request(exception.exception_id)
+        if existing is not None:
+            if existing.arguments == exception.arguments:
+                return existing
+            exception = replace(
+                exception,
+                exception_id=(
+                    exception.exception_id
+                    + ":"
+                    + hashlib.sha256(
+                        json.dumps(
+                            exception.arguments, sort_keys=True, default=str
+                        ).encode()
+                    ).hexdigest()[:12]
+                ),
+            )
         self._exceptions[exception.exception_id] = exception
         save_request = getattr(self.exception_store, "save_request", None)
         if callable(save_request):
@@ -338,12 +360,27 @@ class CapabilityBroker:
                 if ToolEffect.SECRET_READ in missing_effects
                 else CapabilityResolutionKind.EXCEPTION_REQUIRED
             )
-            decision = self._decisions.get(
-                f"{context.execution_id}:{request.tool_name}:{request.semantic_action}"
-            )
             exception_id = (
                 f"{context.execution_id}:{request.tool_name}:{request.semantic_action}"
             )
+            decision = self._decisions.get(exception_id)
+            exception = self._exceptions.get(exception_id)
+            if exception is None and self.exception_store is not None:
+                pending = getattr(self.exception_store, "pending", lambda: ())()
+                exception = next(
+                    (
+                        item
+                        for item in pending
+                        if item.execution_id == context.execution_id
+                        and item.tool_name == request.tool_name
+                        and item.semantic_action == request.semantic_action
+                        and item.arguments == dict(request.arguments)
+                    ),
+                    None,
+                )
+                if exception is not None:
+                    self._exceptions[exception.exception_id] = exception
+                    exception_id = exception.exception_id
             if decision is None and self.exception_store is not None:
                 stored = self.exception_store.load(exception_id)
                 if stored is not None:

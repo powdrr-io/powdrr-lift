@@ -15,7 +15,13 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Protocol, TypeVar, cast
 
-from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.errors import (
+    ExecutionCancelled,
+    PersistenceCorruptionError,
+    PowdrrExecutionError,
+    ProgrammerInvariantError,
+    ProviderExecutionError,
+)
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workflow_execution import (
@@ -31,11 +37,11 @@ class WorkflowLLMClient(Protocol):
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
 
 
-class WorkflowLLMTimeoutExhausted(PowdrrExecutionError):
+class WorkflowLLMTimeoutExhausted(ProviderExecutionError):
     """Raised when a provider request keeps timing out after its retry budget."""
 
 
-class WorkflowLLMHTTPError(PowdrrExecutionError):
+class WorkflowLLMHTTPError(ProviderExecutionError):
     """A provider response that includes an HTTP status code."""
 
     def __init__(self, provider: str, status_code: int, detail: str) -> None:
@@ -43,7 +49,7 @@ class WorkflowLLMHTTPError(PowdrrExecutionError):
         super().__init__(f"{provider} request failed with HTTP {status_code}: {detail}")
 
 
-class WorkflowLLMExecutionAborted(PowdrrExecutionError):
+class WorkflowLLMExecutionAborted(ExecutionCancelled):
     """Stop a shared execution loop after its adapter aborts a request."""
 
     def __init__(self, exit_code: int) -> None:
@@ -383,6 +389,7 @@ class WorkflowStepRunner:
         observer: WorkflowExecutionObserver | None = None,
         shadow_recorder: WorkflowShadowRecorder | None = None,
         runtime: ExecutionRuntime | None = None,
+        legacy_compatibility: bool = False,
         phase_type: str = "build",
         actor_id: str = "workflow-agent",
     ) -> None:
@@ -394,6 +401,15 @@ class WorkflowStepRunner:
         self.runtime = runtime
         self.phase_type = phase_type
         self.actor_id = actor_id
+        if runtime is None and not legacy_compatibility:
+            raise ProgrammerInvariantError(
+                "WorkflowStepRunner requires an ExecutionRuntime for normal execution.",
+                error_code="execution_runtime_required",
+                remediation=(
+                    "Create an ExecutionRuntime, or explicitly opt into the "
+                    "legacy compatibility runner."
+                ),
+            )
         self.kernel = runtime.kernel if runtime is not None else ActionKernel()
 
     def run(
@@ -445,6 +461,14 @@ class WorkflowStepRunner:
                 raise
             except WorkflowLLMExecutionAborted as exc:
                 return exc.exit_code
+            except (
+                ProviderExecutionError,
+                PersistenceCorruptionError,
+                ProgrammerInvariantError,
+                ExecutionCancelled,
+            ):
+                # These failures are not model-correctable action errors.
+                raise
             except RuntimeError as exc:
                 if self.observer is not None:
                     try:

@@ -1400,6 +1400,13 @@ def run_workflow_task(
                 persona_actions={task.persona_id: frozenset(task.actions)},
                 allowed_effects=frozenset(),
             )
+            runtime.set_execution_scope(
+                declared_actions=frozenset(task.actions),
+                phase_actions=frozenset(task.actions),
+                persona_actions=frozenset(task.actions),
+                unit_actions=frozenset(task.actions),
+                adapter_actions=runtime.available_adapter_actions(),
+            )
         if client_was_provided:
             assert client is not None
             task_client = client
@@ -1424,8 +1431,7 @@ def run_workflow_task(
             compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
 
         driver_events: list[dict[str, Any]] = []
-        runtime.set_action_contract(None)
-        try:
+        with runtime.without_action_contract():
             deterministic_output_state, requires_deterministic_output_state = (
                 _run_task_deterministic_pre_step(
                     task,
@@ -1435,11 +1441,10 @@ def run_workflow_task(
                     runtime=runtime,
                 )
             )
-        finally:
-            runtime.set_action_contract(
-                frozenset(task.actions),
-                enforce_empty=task.actions_declared,
-            )
+        runtime.set_action_contract(
+            frozenset(task.actions),
+            enforce_empty=task.actions_declared,
+        )
         driver = WorkflowStepRunner(
             max_stalled_roundtrips=config.max_stalled_roundtrips,
             runtime=runtime,

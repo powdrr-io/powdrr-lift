@@ -65,6 +65,30 @@ class ExternalWriteTool:
         return ToolResult(observed_effects=frozenset({ToolEffect.GITHUB_MUTATION}))
 
 
+class CountingExecutionStore:
+    def __init__(self, directory: Path) -> None:
+        from powdrr_lift.execution.store import FileExecutionStateStore
+
+        self.delegate = FileExecutionStateStore(directory)
+        self.transaction_count = 0
+
+    def create(self, *args: object, **kwargs: object) -> object:
+        return self.delegate.create(*args, **kwargs)  # type: ignore[arg-type]
+
+    def load(self, execution_id: str) -> object:
+        return self.delegate.load(execution_id)
+
+    def load_events(self, execution_id: str) -> object:
+        return self.delegate.load_events(execution_id)
+
+    def append(self, *args: object, **kwargs: object) -> object:
+        return self.delegate.append(*args, **kwargs)  # type: ignore[arg-type]
+
+    def append_transaction(self, *args: object, **kwargs: object) -> object:
+        self.transaction_count += 1
+        return self.delegate.append(*args, **kwargs)  # type: ignore[arg-type]
+
+
 def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-default-registry",
@@ -93,6 +117,47 @@ def test_runtime_owns_the_default_builtin_capability_registry(tmp_path: Path) ->
             runtime.capability_manifests(), key=lambda item: item.tool_name
         )
     ]
+
+
+def test_effective_action_contract_intersects_registered_adapter_scope(
+    tmp_path: Path,
+) -> None:
+    runtime = ExecutionRuntime(
+        "run-effective-actions",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.set_execution_scope(
+        declared_actions=frozenset({"edit", "shell"}),
+        phase_actions=frozenset({"edit", "shell"}),
+        persona_actions=frozenset({"edit", "shell"}),
+        unit_actions=frozenset({"edit", "shell"}),
+        adapter_actions=frozenset({"edit"}),
+    )
+
+    assert runtime.effective_action_contract() == frozenset({"edit"})
+
+
+def test_runtime_invocation_commits_one_transaction(tmp_path: Path) -> None:
+    store = CountingExecutionStore(tmp_path / "workflow")
+    runtime = ExecutionRuntime(
+        "run-transaction",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        state_store=store,  # type: ignore[arg-type]
+        adapters=(MutableRowTool(),),
+    )
+    runtime.invoke(
+        runtime.context(
+            semantic_actions=frozenset({"change_mutable_row"}),
+            allowed_effects=frozenset({ToolEffect.WORKSPACE_WRITE}),
+        ),
+        CapabilityRequest("mutable-row", "change_mutable_row", {"row": "users:1"}),
+    )
+
+    assert store.transaction_count == 1
 
 
 def test_runtime_binds_external_writes_to_a_stable_idempotency_key(

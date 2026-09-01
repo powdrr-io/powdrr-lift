@@ -36,7 +36,7 @@ from powdrr_lift.core.execution_state import (
 )
 from powdrr_lift.core.intent import IntentStore
 from powdrr_lift.core.workflow_task_specification import WorkflowInstance
-from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.errors import PersistenceCorruptionError, PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
     CapabilityDecision,
@@ -138,6 +138,13 @@ class ExecutionRuntime:
         )
         self._projected_kernel_events = 0
         self._allowed_actions: frozenset[str] | None = None
+        self._phase_actions: frozenset[str] | None = None
+        self._persona_actions: frozenset[str] | None = None
+        self._unit_actions: frozenset[str] | None = None
+        self._adapter_actions: frozenset[str] | None = None
+        self._transaction_events: (
+            list[tuple[ExecutionEventType, dict[str, Any]]] | None
+        ) = None
 
     def set_action_contract(
         self, actions: frozenset[str] | None, *, enforce_empty: bool = False
@@ -147,6 +154,96 @@ class ExecutionRuntime:
         # An empty set is meaningful: the step supports the implicit
         # ``next_step`` transition but no model/tool action.
         self._allowed_actions = actions if actions or enforce_empty else None
+        if actions is None and not enforce_empty:
+            self._phase_actions = None
+            self._persona_actions = None
+            self._unit_actions = None
+            self._adapter_actions = None
+
+    def set_execution_scope(
+        self,
+        *,
+        declared_actions: frozenset[str] | None = None,
+        phase_actions: frozenset[str] | None = None,
+        persona_actions: frozenset[str] | None = None,
+        unit_actions: frozenset[str] | None = None,
+        adapter_actions: frozenset[str] | None = None,
+    ) -> None:
+        """Install all inputs to the one effective action intersection."""
+        self._allowed_actions = declared_actions
+        self._phase_actions = phase_actions
+        self._persona_actions = persona_actions
+        self._unit_actions = unit_actions
+        self._adapter_actions = adapter_actions
+
+    def effective_action_contract(self) -> frozenset[str] | None:
+        """Return actions allowed by step, phase, persona, unit, and adapters."""
+        scopes = tuple(
+            item
+            for item in (
+                self._allowed_actions,
+                self._phase_actions,
+                self._persona_actions,
+                self._unit_actions,
+                self._adapter_actions,
+            )
+            if item is not None
+        )
+        if not scopes:
+            return None
+        result = set(scopes[0])
+        for scope in scopes[1:]:
+            result.intersection_update(scope)
+        required = {
+            item.required_action
+            for item in (*self.state.obligations, *self.kernel.open_obligations)
+            if item.status.value == "open" and item.required_action
+        }
+        if required:
+            result.intersection_update(required)
+        return frozenset(result)
+
+    @contextmanager
+    def transaction(self) -> Iterator[ExecutionRuntime]:
+        """Commit lifecycle events as one optimistic-locking transaction."""
+        if self._transaction_events is not None:
+            # ``invoke`` owns the normal transaction, while callers may wrap
+            # several runtime operations in one larger atomic unit.
+            yield self
+            return
+        self._transaction_events = []
+        try:
+            yield self
+        except BaseException:
+            queued = self._transaction_events
+            if queued:
+                self._commit_transaction(queued)
+            raise
+        else:
+            queued = self._transaction_events
+            if queued:
+                self._commit_transaction(queued)
+        finally:
+            self._transaction_events = None
+
+    def _commit_transaction(
+        self, queued: list[tuple[ExecutionEventType, dict[str, Any]]]
+    ) -> None:
+        for attempt in range(3):
+            try:
+                events = tuple(
+                    self._event(event_type, payload, offset=index)
+                    for index, (event_type, payload) in enumerate(queued, 1)
+                )
+                self.state = self.state_store.append_transaction(
+                    self.execution_id, self.state.state_version, events
+                )
+                return
+            except ExecutionStateConflict:
+                if attempt == 2:
+                    raise
+                self.state = self.state_store.load(self.execution_id)
+        raise AssertionError("unreachable")
 
     @contextmanager
     def without_action_contract(self) -> Iterator[None]:
@@ -165,18 +262,14 @@ class ExecutionRuntime:
         once a step declares a contract, even when that contract has no tool
         actions. ``None`` means no step contract has been installed yet.
         """
-        if self._allowed_actions is None:
+        effective = self.effective_action_contract()
+        if effective is None:
             return None
-        return tuple(
-            sorted(
-                {*self._allowed_actions, "next_step"}
-                if self._allowed_actions is not None
-                else {"next_step"}
-            )
-        )
+        return tuple(sorted({*effective, "next_step"}))
 
     def validate_action(self, action_kind: str) -> tuple[str, ...]:
-        if self._allowed_actions is None or action_kind in self._allowed_actions:
+        effective = self.effective_action_contract()
+        if effective is None or action_kind in effective:
             return ()
         if action_kind == "next_step":
             return ()
@@ -184,7 +277,8 @@ class ExecutionRuntime:
 
     def validate_capability_action(self, semantic_action: str) -> tuple[str, ...]:
         """Ensure a nested capability belongs to the active step contract."""
-        if self._allowed_actions is None or "invoke_tool" in self._allowed_actions:
+        effective = self.effective_action_contract()
+        if effective is None or "invoke_tool" in effective:
             return ()
         action_families = {
             "edit_files": frozenset({"edit", "yaml_edit", "file_management"}),
@@ -202,7 +296,7 @@ class ExecutionRuntime:
             "mutate_pull_request": frozenset({"gh"}),
             "enrich_test_output": frozenset({"enrich"}),
         }
-        if self._allowed_actions.intersection(
+        if effective is not None and effective.intersection(
             action_families.get(semantic_action, frozenset())
         ):
             return ()
@@ -380,6 +474,7 @@ class ExecutionRuntime:
                     }
                     for rule in rules
                 ],
+                "guidance_required_actions": sorted(self.guidance_required_actions()),
                 "intent_ids": [item.intent_id for item in contract.sources],
                 "clause_ids": list(contract.clause_ids),
                 "contract_fingerprint": contract.fingerprint,
@@ -407,6 +502,24 @@ class ExecutionRuntime:
         from powdrr_lift.execution.guidance import load_applicable_guidance
 
         return load_applicable_guidance(self.behavior_rule_store, context)
+
+    def guidance_required_actions(self) -> frozenset[str]:
+        """Derive typed follow-ups from the active durable instructions."""
+        text = " ".join(
+            rule.text.casefold()
+            for rule in self.guidance(
+                {
+                    "profile_id": self.state.profile_id,
+                    "phase_type": self.state.current_phase.value,
+                }
+            )
+        )
+        actions: set[str] = set()
+        if "review" in text and "resolv" in text:
+            actions.update({"run_validation", "resolve_review_thread"})
+        if "optimistic lock" in text or "optimistic-lock" in text:
+            actions.update({"add_optimistic_lock", "run_concurrency_test"})
+        return frozenset(actions)
 
     def remember_guidance(
         self, rule: Any, *, expected_version: int | None = None
@@ -731,7 +844,12 @@ class ExecutionRuntime:
                     "run_id": run_id,
                 },
             )
-        self.set_action_contract(packet.allowed_actions)
+        self.set_execution_scope(
+            declared_actions=packet.allowed_actions,
+            phase_actions=phase_actions,
+            persona_actions=persona_actions.get(packet.persona.persona_id),
+            adapter_actions=self.available_adapter_actions(),
+        )
         return packet
 
     def transition(
@@ -870,10 +988,25 @@ class ExecutionRuntime:
         verify = getattr(self.state_store, "verify", None)
         if not callable(verify):
             return self.state
-        self.state = verify(self.execution_id)
+        try:
+            self.state = verify(self.execution_id)
+        except (OSError, ValueError) as error:
+            raise PersistenceCorruptionError(
+                f"Execution state verification failed: {error}",
+                error_code="execution_state_corrupt",
+                remediation="Restore the execution from a verified event log.",
+                cause_error=error,
+            ) from error
         return self.state
 
     def invoke(
+        self, context: ToolContext, request: CapabilityRequest
+    ) -> ToolResult | CapabilityResolution:
+        """Invoke one capability as one durable lifecycle transaction."""
+        with self.transaction():
+            return self._invoke_in_transaction(context, request)
+
+    def _invoke_in_transaction(
         self, context: ToolContext, request: CapabilityRequest
     ) -> ToolResult | CapabilityResolution:
         """Invoke a capability and persist the broker decision."""
@@ -1040,9 +1173,7 @@ class ExecutionRuntime:
                         offset=len(events) + 1,
                     )
                 )
-            self.state = self.state_store.append(
-                self.execution_id, self.state.state_version, tuple(events)
-            )
+            self._append_events(events)
         return result
 
     @staticmethod
@@ -1136,6 +1267,28 @@ class ExecutionRuntime:
             )
         )
 
+    def available_adapter_actions(self) -> frozenset[str]:
+        """Map registered manifest actions to model-facing action families."""
+        mapping = {
+            "file-mutation": {"edit", "yaml_edit", "file_management"},
+            "validate-edit": {"validate_edit"},
+            "apply-edit": {"apply_edit"},
+            "process": {"shell"},
+            "fuzzy-match": {"fuzzy_match"},
+            "repository-gather_context": {"gather_context"},
+            "repository-read_document": {"read_document"},
+            "repository-list_files": {"list_files"},
+            "basedpyright-symbol": {"basedpyright"},
+            "basedpyright-structure": {"basedpyright"},
+            "enrich": {"enrich"},
+            "repository": {"git", "gh"},
+        }
+        return frozenset(
+            action
+            for manifest in self.capability_manifests()
+            for action in mapping.get(manifest.tool_name, set())
+        )
+
     def record_evidence(
         self,
         *,
@@ -1180,9 +1333,25 @@ class ExecutionRuntime:
     def _append_event(
         self, event_type: ExecutionEventType, payload: dict[str, Any]
     ) -> ExecutionState:
+        if self._transaction_events is not None:
+            self._transaction_events.append((event_type, payload))
+            return self.state
         event = self._event(event_type, payload)
         self.state = self.state_store.append(
             self.execution_id, self.state.state_version, (event,)
+        )
+        return self.state
+
+    def _append_events(self, events: Iterable[ExecutionEvent]) -> ExecutionState:
+        """Append events or queue them in the active action transaction."""
+        events = tuple(events)
+        if self._transaction_events is not None:
+            self._transaction_events.extend(
+                (event.event_type, dict(event.payload)) for event in events
+            )
+            return self.state
+        self.state = self.state_store.append(
+            self.execution_id, self.state.state_version, events
         )
         return self.state
 
@@ -1214,6 +1383,10 @@ class ExecutionRuntime:
             starting_state=self.state,
             events=pending,
         )
+        if self._transaction_events is not None:
+            self._append_events(durable_events)
+            self._projected_kernel_events = len(self.kernel.events)
+            return self.state
         try:
             self.state = self.state_store.append(
                 self.execution_id, self.state.state_version, durable_events

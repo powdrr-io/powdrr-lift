@@ -31,7 +31,12 @@ class ExecutionStateConflict(PowdrrExecutionError):
         self.actual_version = actual
         super().__init__(
             f"Execution {execution_id!r} expected state version {expected}, "
-            f"but current version is {actual}."
+            f"but current version is {actual}.",
+            error_code="execution_state_conflict",
+            remediation=(
+                "Reload the latest execution state and retry the append against "
+                "its current version."
+            ),
         )
 
 

@@ -15,6 +15,7 @@ from powdrr_lift.core.execution_state import (
     initial_execution_state,
     reduce_execution_event,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.phases import PhaseController
 from powdrr_lift.execution.shadow import ShadowExecutionRecorder
 from powdrr_lift.execution.store import ExecutionStateConflict, FileExecutionStateStore
@@ -176,8 +177,10 @@ def test_file_store_rejects_stale_append_without_writing(tmp_path: Path) -> None
     )
     store.append("execution-1", 0, [event])
 
-    with pytest.raises(ExecutionStateConflict):
+    with pytest.raises(ExecutionStateConflict) as raised:
         store.append("execution-1", 0, [event])
+    assert isinstance(raised.value, PowdrrExecutionError)
+    assert raised.value.error_code == "execution_state_conflict"
 
     assert len(store.load_events("execution-1")) == 1
 

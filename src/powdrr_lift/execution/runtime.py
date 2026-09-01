@@ -581,7 +581,7 @@ class ExecutionRuntime:
                 error_code="persona_actions_missing",
                 remediation="Include actions for the persona assigned to this phase.",
             )
-        return build_persona_packet(
+        packet = build_persona_packet(
             profile,
             execution_id=self.execution_id,
             run_id=run_id,
@@ -599,6 +599,8 @@ class ExecutionRuntime:
                 }
             ),
         )
+        self.set_action_contract(packet.allowed_actions)
+        return packet
 
     def transition(
         self,

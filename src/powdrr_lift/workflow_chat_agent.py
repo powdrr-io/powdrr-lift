@@ -9968,18 +9968,42 @@ def _action_repair_prompt(
         "this corrective response is also empty, the system will interpret it "
         "as next_step.\n"
         'Return exactly one JSON object with a top-level "action" field and the '
-        "fields required by that action. Use "
-        "file_path and edits or file_edits for edit, operation and file_path "
-        "for file_management (plus destination_path for move or rename), file_path "
-        "and operations for yaml_edit, tool and "
-        "parameters.command for invoke_tool, skill for invoke_skill, file_path "
-        "with positive start_line "
-        "and end_line for read_document, non-empty types for gather_context, "
-        'and text containing a clear English question ending in "?" for '
-        "prompt_user. Do not "
-        "combine actions or output markdown. For yaml_edit, combine all "
-        "independent corrections for the same file in one operations array."
+        "fields required by that action. Do not combine actions or output "
+        "markdown."
     )
+    action_names = (
+        {name for name, _ in _step_actions(current_step)}
+        if current_step is not None
+        else set(_DEFAULT_ACTION_INSTRUCTIONS)
+    )
+    action_requirements = {
+        "edit": "Use file_path and edits or file_edits for edit.",
+        "file_management": (
+            "Use operation and file_path for file_management; move and rename "
+            "also require destination_path."
+        ),
+        "yaml_edit": (
+            "Use file_path and operations for yaml_edit; combine independent "
+            "corrections for the same file in one operations array."
+        ),
+        "invoke_tool": "Use tool and parameters.command for invoke_tool.",
+        "invoke_skill": "Use skill for invoke_skill.",
+        "read_document": (
+            "Use file_path with positive start_line and end_line for read_document."
+        ),
+        "gather_context": "Use non-empty types for gather_context.",
+        "prompt_user": (
+            'Use text containing a clear English question ending in "?" for '
+            "prompt_user."
+        ),
+    }
+    requirements = [
+        action_requirements[name]
+        for name in action_names
+        if name in action_requirements
+    ]
+    if requirements:
+        prompt += " " + " ".join(requirements)
     if current_step is not None:
         interaction_style = (
             getattr(current_step, "interaction_style", None)

@@ -4215,6 +4215,7 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
     step = SkillStep(
         description="Ask for the missing success criteria.",
         details="Collect the answer before continuing.",
+        actions=("prompt_user",),
     )
     prompt = _action_repair_prompt(
         SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
@@ -4229,6 +4230,7 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
     assert '"action":"next_step"' in prompt
     assert 'rename "prompt" to "text"' in prompt
     assert "This step declares no tool invocations; do not return invoke_tool" in prompt
+    assert "file_path and edits or file_edits for edit" not in prompt
 
 
 def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:

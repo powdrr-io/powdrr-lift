@@ -278,7 +278,7 @@ def run_final_acceptance(
     mutable_actions = {item.required_action for item in mutable_kernel.open_obligations}
     chat_sequence = _run_shared_runner(workflow_directory, root, "chat")
     task_sequence = _run_shared_runner(workflow_directory, root, "task")
-    production_task = _run_production_task_adapter(root)
+    production_task = _run_production_task_adapter(Path(workflow_directory), root)
     production_chat = _run_production_chat_adapter(Path(workflow_directory), root)
     compacted = runtime.compact_prompt_context(
         {
@@ -430,8 +430,8 @@ def run_final_acceptance(
     return AcceptanceReport(checks)
 
 
-def _run_production_task_adapter(repo_root: Path) -> Any:
-    scenario_root = repo_root / ".acceptance-task-scenario"
+def _run_production_task_adapter(workflow_directory: Path, repo_root: Path) -> Any:
+    scenario_root = workflow_directory / "production-task"
     scenario_root.mkdir(parents=True, exist_ok=True)
     fixture_path = (
         repo_root / "workflow-evals/scenarios/execute-proposed-pr/fixtures/task-001"

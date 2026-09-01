@@ -122,3 +122,21 @@ def test_publish_gate_requires_current_accepted_artifacts_and_agreement() -> Non
         ),
     )
     assert ready.ready
+
+
+def test_publish_rejects_author_as_independent_reviewer() -> None:
+    state = initial_execution_state("run-author-review", profile_id="profile")
+    report = ReadinessEvaluator().evaluate(
+        state,
+        publish=PublishRequirements(
+            require_independent_review=True,
+            author_id="author",
+            reviewer_findings=(("author", ("no-findings",)),),
+        ),
+    )
+
+    assert not report.ready
+    assert any(
+        "author cannot provide independent review" in reason
+        for reason in report.reasons
+    )

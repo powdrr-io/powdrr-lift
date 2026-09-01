@@ -400,6 +400,43 @@ def test_persona_packet_installs_the_same_action_contract_used_for_validation(
     assert resumed.prompt_context()["persona"]["persona_type"] == "architect"
 
 
+def test_runtime_rejects_capability_context_from_another_persona(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.core.delivery_profile import load_delivery_profile
+
+    profile = load_delivery_profile(
+        Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"
+    )
+    runtime = ExecutionRuntime(
+        "run-persona-owner",
+        profile_id=profile.profile_id,
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+        profile=profile,
+    )
+    runtime.persona_packet(
+        profile,
+        run_id="persona-owner",
+        phase_type=PhaseType.INTAKE,
+        phase_actions=frozenset({"next_step"}),
+        persona_actions={"architect": frozenset({"next_step"})},
+        allowed_effects=frozenset(),
+    )
+    context = runtime.context(
+        semantic_actions=frozenset({"inspect_repository"}),
+        allowed_effects=frozenset(),
+    )
+    mismatched = replace(context, active_persona_id="engineer")
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        runtime.invoke(
+            mismatched, CapabilityRequest("missing", "inspect_repository", {})
+        )
+
+    assert raised.value.error_code == "capability_persona_mismatch"
+
+
 def test_runtime_phase_controller_is_durable_and_closed_topology(
     tmp_path: Path,
 ) -> None:

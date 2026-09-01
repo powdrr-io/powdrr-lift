@@ -180,6 +180,7 @@ class ExecutionRuntime:
             allowed_effects,
             execution_id=self.execution_id,
             active_unit_id=active_unit_id,
+            active_persona_id=self.state.current_persona_id,
         )
 
     def readiness(self) -> ReadinessReport:
@@ -843,6 +844,16 @@ class ExecutionRuntime:
                     "worktree context."
                 ),
             )
+        if context.active_persona_id != self.state.current_persona_id:
+            raise PowdrrExecutionError(
+                "capability context is not bound to the active persona",
+                error_code="capability_persona_mismatch",
+                action_kind=request.semantic_action,
+                remediation=(
+                    "Create the capability context through the active runtime "
+                    "persona envelope."
+                ),
+            )
         if (
             request.tool_name == "repository"
             and request.arguments.get("operation") == "pr_create"
@@ -994,8 +1005,15 @@ class ExecutionRuntime:
     ) -> ToolResult | CapabilityResolution:
         """Run a context-bound adapter through this runtime's broker."""
         self.register_adapter(adapter)
-        if context.execution_id is None:
-            context = replace(context, execution_id=self.execution_id)
+        context = replace(
+            context,
+            execution_id=context.execution_id or self.execution_id,
+            active_persona_id=(
+                context.active_persona_id
+                if context.active_persona_id is not None
+                else self.state.current_persona_id
+            ),
+        )
         return self.invoke(context, request)
 
     def register_adapter(self, adapter: ToolAdapter) -> None:

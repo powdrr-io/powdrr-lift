@@ -27,6 +27,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowActionRequest,
     WorkflowStepRunner,
 )
+from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
 
 REQUIRED_BUILTIN_MANIFESTS = frozenset(
     {
@@ -277,6 +278,7 @@ def run_final_acceptance(
     mutable_actions = {item.required_action for item in mutable_kernel.open_obligations}
     chat_sequence = _run_shared_runner(workflow_directory, root, "chat")
     task_sequence = _run_shared_runner(workflow_directory, root, "task")
+    production_task = _run_production_task_adapter(root)
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
@@ -357,6 +359,15 @@ def run_final_acceptance(
             "chat and durable-task adapters use the same durable typed lifecycle",
         ),
         AcceptanceCheck(
+            "production-task-adapter",
+            production_task.status == "passed"
+            and any(
+                item["name"] == "task_status" and item["passed"]
+                for item in production_task.assertions
+            ),
+            "the production workflow-task adapter completes a persisted task handoff",
+        ),
+        AcceptanceCheck(
             "stale-evidence-gate",
             evidence_ready.ready and stale_evidence_blocked,
             (
@@ -407,6 +418,18 @@ def run_final_acceptance(
         ),
     )
     return AcceptanceReport(checks)
+
+
+def _run_production_task_adapter(repo_root: Path) -> Any:
+    scenario_path = (
+        repo_root / "workflow-evals/scenarios/execute-proposed-pr/task-001-context.yaml"
+    )
+    scenario = load_workflow_scenario(scenario_path)
+    return run_workflow_scenario(
+        scenario,
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+    )
 
 
 def _walk_profile(

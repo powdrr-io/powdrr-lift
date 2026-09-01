@@ -489,10 +489,15 @@ class ExecutionRuntime:
                 error_code="checkpoint_execution_mismatch",
                 remediation="Restore a checkpoint created by this execution.",
             )
+        changed_paths = self.checkpoint_store.changed_paths(checkpoint, workspace_root)
         self.checkpoint_store.restore(checkpoint, workspace_root)
         self.state = self._append_event(
             ExecutionEventType.CHECKPOINT_REVERTED,
-            {"checkpoint_id": checkpoint_id, "state": restored.to_data()},
+            {
+                "checkpoint_id": checkpoint_id,
+                "changed_paths": list(changed_paths),
+                "state": restored.to_data(),
+            },
         )
         self.kernel.restore_obligations(self.state.obligations)
         self._projected_kernel_events = len(self.kernel.events)
@@ -630,6 +635,22 @@ class ExecutionRuntime:
             if publish_phase is not None:
                 kwargs["required_artifact_types"] = publish_phase.input_artifacts
         return self.readiness_evaluator.evaluate(self.state, **kwargs)
+
+    def require_publish_readiness(self, **kwargs: Any) -> ReadinessReport:
+        """Enforce the publish gate and return the successful report."""
+        report = self.publish_readiness(**kwargs)
+        if not report.ready:
+            raise PowdrrExecutionError(
+                "Pull-request publication is blocked by execution readiness: "
+                + "; ".join(report.reasons),
+                error_code="readiness_blocked",
+                action_kind="publish_pr",
+                remediation=(
+                    "Satisfy every open obligation, finding, evidence, artifact, "
+                    "review, and fingerprint requirement before publishing."
+                ),
+            )
+        return report
 
     def diagnose(
         self,
@@ -776,6 +797,16 @@ class ExecutionRuntime:
         self.state = self.state_store.append(
             self.execution_id, self.state.state_version, (event,)
         )
+        return self.state
+
+    def invalidate_evidence(self, input_fingerprints: frozenset[str]) -> ExecutionState:
+        """Invalidate affected evidence through the durable event stream."""
+        for evidence in self.state.evidence:
+            if evidence.input_fingerprint in input_fingerprints and evidence.fresh:
+                self._append_event(
+                    ExecutionEventType.EVIDENCE_INVALIDATED,
+                    {"evidence_id": evidence.evidence_id},
+                )
         return self.state
 
     def _append_event(

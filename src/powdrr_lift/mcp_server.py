@@ -112,17 +112,37 @@ def build_server() -> Any:
                 )
             request = store.load_request(exception_id)
             if request is None:
-                raise ValueError(f"Unknown exception: {exception_id}")
+                raise PowdrrExecutionError(
+                    f"Unknown exception: {exception_id}",
+                    error_code="capability_exception_unknown",
+                    remediation=(
+                        "Inspect pending exception requests and use an exact ID."
+                    ),
+                )
             return json.dumps(request.decision_packet(), ensure_ascii=False)
         if decision not in {"approve", "deny"} or exception_id is None:
-            raise ValueError("decision must be approve/deny and include exception_id")
+            raise PowdrrExecutionError(
+                "decision must be approve/deny and include exception_id",
+                error_code="capability_exception_decision_invalid",
+                remediation=(
+                    "Provide an exact exception_id and approve or deny decision."
+                ),
+            )
         request = store.load_request(exception_id)
         if request is None:
-            raise ValueError(f"Unknown pending exception: {exception_id}")
+            raise PowdrrExecutionError(
+                f"Unknown pending exception: {exception_id}",
+                error_code="capability_exception_pending_unknown",
+                remediation=("Inspect pending exception requests and use an exact ID."),
+            )
         secret = os.environ.get("POWDRR_CAPABILITY_SECRET")
         if not secret:
-            raise ValueError(
-                "POWDRR_CAPABILITY_SECRET is required to decide exceptions"
+            raise PowdrrExecutionError(
+                "POWDRR_CAPABILITY_SECRET is required to decide exceptions",
+                error_code="capability_exception_secret_missing",
+                remediation=(
+                    "Configure the capability decision secret before deciding."
+                ),
             )
         runtime = ExecutionRuntime(
             request.execution_id,

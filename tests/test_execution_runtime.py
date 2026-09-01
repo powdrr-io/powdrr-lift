@@ -322,6 +322,9 @@ def test_persona_packet_installs_the_same_action_contract_used_for_validation(
     assert packet.allowed_actions == frozenset({"next_step"})
     assert runtime.validate_action("edit")
     assert not runtime.validate_action("next_step")
+    assert runtime.state.current_persona_id == "architect"
+    assert runtime.prompt_context()["persona_id"] == "architect"
+    assert runtime.verify().current_persona_id == "architect"
 
 
 def test_runtime_phase_controller_is_durable_and_closed_topology(

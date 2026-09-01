@@ -632,6 +632,15 @@ class ExecutionRuntime:
                 }
             ),
         )
+        if self.state.current_persona_id != packet.persona.persona_id:
+            self.state = self._append_event(
+                ExecutionEventType.PERSONA_ASSIGNED,
+                {
+                    "phase_type": phase_type.value,
+                    "persona_id": packet.persona.persona_id,
+                    "run_id": run_id,
+                },
+            )
         self.set_action_contract(packet.allowed_actions)
         return packet
 

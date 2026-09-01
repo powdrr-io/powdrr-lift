@@ -26,6 +26,7 @@ class ExecutionMode(StrEnum):
 
 class ExecutionEventType(StrEnum):
     CREATED = "execution_created"
+    PERSONA_ASSIGNED = "persona_assigned"
     PHASE_ENTERED = "phase_entered"
     PHASE_EXITED = "phase_exited"
     ACTION_PROPOSED = "action_proposed"
@@ -336,7 +337,12 @@ def reduce_execution_event(
 
     payload = event.payload
     next_state = state
-    if event.event_type is ExecutionEventType.PHASE_ENTERED:
+    if event.event_type is ExecutionEventType.PERSONA_ASSIGNED:
+        next_state = replace(
+            state,
+            current_persona_id=_required_string(payload, "persona_id"),
+        )
+    elif event.event_type is ExecutionEventType.PHASE_ENTERED:
         next_state = replace(
             state,
             current_phase=PhaseType(_required_string(payload, "phase_type")),

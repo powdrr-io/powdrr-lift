@@ -70,6 +70,7 @@ from powdrr_lift.workflow_chat_agent import (
     _long_context_backup_for,
     _maybe_record_llm_exchanges,
     _model_limits_for,
+    _modular_action_system_prompt,
     _parse_action_response,
     _print_waiting_for_model,
     _record_skill_pull_request,
@@ -2202,6 +2203,7 @@ def _build_task_messages(
         {
             "role": "system",
             "content": _task_system_prompt(
+                task=task,
                 interaction_style=task.interaction_style,
             ),
         },
@@ -2560,9 +2562,16 @@ def _task_action_failure_reached(
     return True
 
 
-def _task_system_prompt(*, interaction_style: str | None = None) -> str:
+def _task_system_prompt(
+    *, task: WorkflowTask, interaction_style: str | None = None
+) -> str:
+    action_prompt = (
+        _modular_action_system_prompt(task, interaction_style=interaction_style)
+        if task.actions_declared
+        else _action_system_prompt()
+    )
     return (
-        _action_system_prompt()
+        action_prompt
         + "\nDurable workflow-task contract: this is one task that may contain "
         "multiple actions. Use `next_step` when this task is finished: it persists "
         "this task's declared output_state and advances the workflow to the next "
@@ -2571,11 +2580,11 @@ def _task_system_prompt(*, interaction_style: str | None = None) -> str:
         "the final task, `next_step` completes the workflow after persisting its "
         "output. For durable task completion, the result MUST be under "
         "the top-level `output_state` field; never put it under `outputs`. "
-        "Use `invoke_tool`, `invoke_skill`, `edit`, or another action only when "
-        "it advances this task. Every builtin tool accepts "
+        "Use only the actions listed for this task, and only when an action "
+        "advances this task. Every builtin tool accepts "
         "parameters.help = true without normal command arguments; this is the "
         "tool's conventional --help option. Invoke that form when you need "
-        "that form when you need detailed parameters, examples, or usage "
+        "detailed parameters, examples, or usage "
         "guidance. A help response does not count as a successful task tool "
         "invocation.\n" + _interaction_style_prompt(interaction_style)
     )

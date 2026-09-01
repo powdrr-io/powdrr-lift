@@ -53,6 +53,7 @@ from powdrr_lift.workflow_task_agent import (
     _read_task_document,
     _select_ready_workflow_git_state,
     _task_events_for_prompt,
+    _task_system_prompt,
     _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
@@ -87,6 +88,26 @@ def _workflow(tmp_path: Path) -> WorkflowInstance:
             ),
         ),
     )
+
+
+def test_explicit_task_prompt_contains_only_declared_action_guidance() -> None:
+    task = WorkflowTask(
+        task_id="scoped-task",
+        status=TaskStatus.OPEN,
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.LOW,
+        input_state={},
+        description="Read one document.",
+        actions=("read_document",),
+    )
+
+    prompt = _task_system_prompt(task=task)
+
+    assert "- read_document:" in prompt
+    assert "- next_step:" in prompt
+    assert "- invoke_skill:" not in prompt
+    assert "- edit:" not in prompt
 
 
 def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(

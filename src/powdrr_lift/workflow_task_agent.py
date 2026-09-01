@@ -1329,21 +1329,26 @@ def run_workflow_task(
             )
         model = mapping.model
         execution_phase = task.phase_type or PhaseType.BUILD
+        delivery_profile = (
+            load_delivery_profile(
+                repo_root / "delivery-profiles/default-software-delivery.yaml"
+            )
+            if (
+                repo_root / "delivery-profiles/default-software-delivery.yaml"
+            ).is_file()
+            else None
+        )
         runtime = ExecutionRuntime(
             task.task_id,
-            profile_id=task.persona_id or task.assignee_role.value,
+            profile_id=(
+                delivery_profile.profile_id
+                if delivery_profile is not None
+                else task.persona_id or task.assignee_role.value
+            ),
             workflow_directory=workflow_dir,
             repo_root=repo_root,
             phase=execution_phase,
-            profile=(
-                load_delivery_profile(
-                    repo_root / "delivery-profiles/default-software-delivery.yaml"
-                )
-                if (
-                    repo_root / "delivery-profiles/default-software-delivery.yaml"
-                ).is_file()
-                else None
-            ),
+            profile=delivery_profile,
         )
         runtime.set_action_contract(frozenset(task.actions))
         if client_was_provided:

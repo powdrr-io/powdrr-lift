@@ -2770,20 +2770,23 @@ def run_workflow_chat(
             f"{selection.selected_skill_path}:{user_request}".encode()
         ).hexdigest()[:24]
     )
+    delivery_profile = (
+        load_delivery_profile(
+            repo_root / "delivery-profiles/default-software-delivery.yaml"
+        )
+        if (repo_root / "delivery-profiles/default-software-delivery.yaml").is_file()
+        else None
+    )
     runtime = ExecutionRuntime(
         execution_id,
-        profile_id=selected_skill.skill.name,
+        profile_id=(
+            delivery_profile.profile_id
+            if delivery_profile is not None
+            else selected_skill.skill.name
+        ),
         workflow_directory=project_root / ".powdrr",
         repo_root=repo_root,
-        profile=(
-            load_delivery_profile(
-                repo_root / "delivery-profiles/default-software-delivery.yaml"
-            )
-            if (
-                repo_root / "delivery-profiles/default-software-delivery.yaml"
-            ).is_file()
-            else None
-        ),
+        profile=delivery_profile,
     )
     execution_state = _WorkflowExecutionState(
         selected_skill=selected_skill,

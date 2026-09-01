@@ -112,9 +112,14 @@ steps:
     result to confirm that the intended files remain staged, the worktree has
     no unintended leftovers, and the final commands and results are recorded
     for the upcoming pull request summary. After receiving that result, choose
-    `next_step` immediately; do not invoke `repository-state` again unless a
-    file or staging state changed after the first check. Do not create or
-    update the pull request in this skill.
+    `next_step` with both declared outputs: copy the repository-state result to
+    `final_repository_state` and emit `readiness_report` containing the exact
+    staged file set, every validation obligation and its current successful
+    result, and an explicit accepted/ready outcome. Do not invoke
+    `repository-state` again unless a file or staging state changed after the
+    first check. Do not create or update the pull request in this skill. A
+    readiness report is invalid when any check is missing, stale, failed, or
+    refers to a different staged file fingerprint.
   pre_step:
     action: invoke_tool
     template:
@@ -124,5 +129,8 @@ steps:
       - repository-state
   outputs:
   - name: final_repository_state
+    type: any
+    required_for_next_step: true
+  - name: readiness_report
     type: any
     required_for_next_step: true

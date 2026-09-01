@@ -309,7 +309,11 @@ steps:
     returning an invoke_skill action for the listed finish-pr-prep skill. Do not
     invoke it through the internal CLI tool. If cleanup changes files, restage
     only the validated specification artifacts before continuing. Do not begin
-    implementation in this skill.
+    implementation in this skill. Do not advance until the nested skill returns
+    both final_repository_state and an accepted readiness_report. The readiness
+    report must include the current staged-file scope and the complete results of
+    every validation obligation; do not synthesize it from memory or treat a
+    successful repository-state check as a substitute.
   uses_skills:
   - finish-pr-prep
 - id: create-feature-pull-request
@@ -322,7 +326,9 @@ steps:
     <work-item-name> feature specification`, and pull-request title
     `<pull-request-title>`. Pass a `files_to_publish` context list containing
     every validated specification document, along with the validated
-    specification documents and feature intent. The nested skill must stage
-    exactly that list. Do not begin implementation in this skill.
+    specification documents, feature intent, and the accepted readiness_report.
+    The nested skill must stage exactly that list. Do not begin implementation
+    in this skill, and do not invoke it if readiness_report is missing or not
+    accepted.
   uses_skills:
   - create-pull-request

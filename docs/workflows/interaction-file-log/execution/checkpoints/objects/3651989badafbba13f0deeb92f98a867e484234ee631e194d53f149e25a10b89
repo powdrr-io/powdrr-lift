@@ -1,0 +1,401 @@
+---
+name: spec-v1-design-review
+interaction_style: observational_review
+when_to_use:
+- When the user asks for a design review of a pull request containing spec v1
+  feature or proposed-PR documents.
+- When the review must compare the proposed design with the user's intent before
+  implementation begins.
+- When actionable design findings must be reported directly on GitHub as inline
+  pull-request comments.
+steps:
+- id: discover-design-scope
+  description: Discover the pull request and establish the authoritative design scope.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: long_context
+  details: >-
+    Inspect the referenced pull request's title, body, linked issues, labels,
+    commits, complete diff, changed files, base and head revisions, review
+    history, and current state. Read every changed design document and identify
+    the feature id, spec v1 document, proposed PR ids, dependencies, entity
+    changes, requirements, decisions, risks, and acceptance criteria. Resolve
+    the user's intent from explicit user or issue text first, then the feature
+    definition and related authoritative documents. Treat the spec v1 document
+    as the proposed design being reviewed, not as proof that the intent is
+    correct. If intent, feature linkage, or the target spec cannot be resolved,
+    record one clarification finding and do not invent missing scope.
+    The input `<pr-reference>` is the pull-request URL or number supplied to this
+    skill. From the `gh pr view` result, store `number` as `<number>`, parse
+    `url` as `<owner>/<repo>` for `<owner>` and `<repo>`, and store `headRefOid`
+    as `<current-head-sha>`. Preserve those values in design_review_ledger and
+    use them in every later GitHub action. A finding's `<changed-file>` must be
+    an exact path from the current PR diff, and `<changed-line>` must be the
+    positive integer line on that changed file used for the RIGHT-side anchor.
+    Use the declared GitHub tools with JSON actions such as
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_view","pr_reference":"<pr-reference>","json_fields":["number","title","body","url","baseRefName","headRefName","headRefOid","state","isDraft","labels","files","commits","reviews"]},"decisions_and_context":"Capture the canonical PR number, repository URL, and current head SHA."}
+    and
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_diff","pr_reference":"<pr-reference>"},"decisions_and_context":"..."}.
+    Preserve the complete returned metadata and diff in design_review_ledger.
+  prompt_catalogs: [context_types]
+  outputs:
+  - name: design_review_ledger
+    type: any
+    required_for_next_step: true
+  tool_invocations:
+  - tool: gh
+    command:
+    - pr
+    - view
+    - <pr-reference>
+    - --json
+    - number,title,body,url,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
+  - tool: gh
+    command:
+    - pr
+    - diff
+    - <pr-reference>
+    - --patch
+- id: gather-design-context
+  description: Gather the repository context needed to review the proposed design.
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    After identifying the feature id, invoke gather_context with exactly the
+    relevant spec v1 context types: features, requirements, entities,
+    entity-relationships, invariants, decisions, risks, guidance, and
+    proposed_prs, filtered by the feature id. Use the returned records to
+    establish the current entity model, existing constraints, proposed-PR
+    ordering, and documented intent. Keep the returned context and the source
+    paths in the review ledger. Do not treat absent context as permission to
+    assume behavior; record it as an uncertainty for the clarification review.
+    The `<feature-id>` is the exact feature id identified in
+    design_review_ledger, not a guessed slug. The action must use JSON in this
+    shape:
+    {"action":"gather_context","types":["features","requirements","entities","entity-relationships","invariants","decisions","risks","guidance","proposed_prs"],"keywords":["<feature-id>"],"decisions_and_context":"Resolved feature <feature-id> from the PR and authoritative documents."}.
+- id: review-user-intent
+  description: Ask whether the design properly captures the user's intent.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Compare every stated user goal, constraint, non-goal, and acceptance
+    criterion with the proposed feature and proposed PR changes. Trace each
+    intent item to the exact design section, entity change, relationship,
+    dependency, or proposed PR that addresses it. Identify omissions,
+    contradictions, accidental reinterpretations, and scope that solves a
+    different problem. Record one finding per root cause with the source,
+    changed-file anchor, user impact, confidence, and a concise correction.
+    Do not report a preference when the design satisfies the stated intent. For
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<intent-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the intent finding with its evidence and impact."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-assumptions
+  description: Ask whether the design contains assumptions requiring clarification.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Inspect the design for unstated assumptions about actors, inputs, entity
+    identity, lifecycle, ownership, ordering, defaults, failure behavior,
+    permissions, consistency, external systems, deployment, and backward
+    compatibility. Report an assumption only when different reasonable answers
+    would change the design, implementation, acceptance criteria, or risk. Ask
+    a precise clarification question and explain which design decision is
+    blocked. Do not turn ordinary implementation choices into questions. For
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<assumption-finding-and-question>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unresolved assumption and precise clarification question."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-traceability-and-completeness
+  description: Ask whether the spec v1 design is complete and internally traceable.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Build a matrix for every requirement, entity id, entity relationship,
+    invariant, proposed PR, dependency, and acceptance criterion. Confirm that
+    each is declared once where authoritative, assigned to a valid proposed PR,
+    represented consistently across sections, and covered by an observable
+    outcome. Check that every entity change is explicitly added or removed as
+    required by spec v1, every proposed PR id is defined before it is referenced,
+    dependencies are acyclic and ordered, and no change is orphaned. Report
+    missing, duplicated, contradictory, cyclic, or unassigned entries with
+    exact paths and a focused fix direction. For an issue found here, post an
+    inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<traceability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the exact missing, duplicated, cyclic, or unassigned path."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-existing-mechanisms
+  description: Ask whether existing repository mechanisms can implement the design.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Search the codebase, architecture documents, dependencies, and established
+    patterns for existing APIs, entities, stores, workflows, validation,
+    authorization, events, serializers, configuration, error handling, and
+    observability that satisfy part of the design. Compare each proposed new
+    mechanism with concrete existing evidence. Report a finding when the design
+    duplicates or bypasses an existing mechanism without a documented capability
+    gap, including the reuse or integration direction. Keep a new mechanism
+    when the design demonstrates a real gap or a necessary boundary. Use the
+    exact mechanism or symbol named in the proposed design as
+    `<mechanism-or-symbol>`; do not leave that placeholder literal. Search the
+    repository search tool with JSON such as
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["rg","-n","-i","<mechanism-or-symbol>","src","docs","tests"]},"decisions_and_context":"Search for existing mechanisms before deciding whether the design duplicates one."}
+    and after its result finish with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<existing-mechanism-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the repository evidence for the existing mechanism and reuse direction."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+  - tool: shell
+    command:
+    - rg
+    - -n
+    - -i
+    - <mechanism-or-symbol>
+    - src
+    - docs
+    - tests
+- id: review-refactoring-opportunities
+  description: Ask whether an existing area should be refactored first.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Identify existing seams where a small, well-scoped refactor would make the
+    feature simpler, safer, or more testable: duplicated logic, an unsuitable
+    ownership boundary, a missing extension point, tangled dependencies, or an
+    API that forces special cases. Recommend refactoring only when the current
+    design would create duplication, violate an invariant, or make correctness
+    materially harder to achieve. Separate a prerequisite refactor from an
+    optional cleanup and do not expand the feature for stylistic reasons. For
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<refactoring-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the prerequisite refactor and concrete correctness benefit."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-unnecessary-scope
+  description: Ask whether the design includes unnecessary changes.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Map every proposed entity, relationship, requirement, proposed PR, migration,
+    and documentation change to an explicit user goal, constraint, dependency,
+    safety requirement, or necessary implementation consequence. Identify changes
+    that do not contribute to the feature, duplicate another change, speculate
+    about future needs, or belong in a separate feature. Explain the cost or risk
+    and propose the smallest removal that preserves the intent. For an issue
+    found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<unnecessary-scope-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unsupported scope and smallest removal."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-security
+  description: Ask whether security concerns are addressed by the design.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Threat-model new trust boundaries, actors, inputs, outputs, data stores,
+    external integrations, and privileged operations. Check authentication,
+    authorization and ownership, tenant isolation, injection and parser safety,
+    secrets, privacy, data exposure, replay, abuse limits, auditability, secure
+    defaults, and failure behavior. Require a design-level mitigation or an
+    explicit out-of-scope decision for a plausible security risk. Report only
+    evidence-backed risks with an attack path, impact, and concrete design or
+    validation change. For an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<security-finding-with-attack-path>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the evidence-backed security risk and mitigation."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-performance
+  description: Ask whether performance and scale concerns are addressed.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Evaluate expected data size, request rate, fan-out, latency, memory, I/O,
+    concurrency, retries, queueing, indexing, pagination, caching, and external
+    service limits. Look for unbounded work, N+1 access, hot locks, duplicate
+    computation, synchronous calls on critical paths, and retry storms. Require
+    a bound, measurement, capacity assumption, or deliberate tradeoff when the
+    risk is material. Do not report performance concerns without a plausible
+    workload or a concrete design consequence. For an issue found here, post an
+    inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<performance-finding-with-workload>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the plausible workload and performance mitigation."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-entity-lifecycle
+  description: Ask whether entity lifecycle and removals are correct.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    For every existing entity touched by the feature, determine whether it is
+    still needed, whether an existing entity should be removed or retired, and
+    whether relationships, references, persistence, migrations, fixtures,
+    permissions, and documentation are updated consistently. Check creation,
+    update, deletion, archival, replacement, ownership transfer, and recovery
+    semantics. Report stale entities, missing removals, orphaned relationships,
+    or incompatible lifecycle transitions with exact spec v1 paths. For an issue
+    found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<entity-lifecycle-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the stale entity, missing removal, or orphaned relationship."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-dependencies-and-delivery
+  description: Ask whether proposed-PR dependencies and delivery sequencing are viable.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Validate that each proposed PR has a distinct intent and justification,
+    depends only on needed earlier work, and can be implemented and reviewed in
+    the declared order. Reject self-dependencies, cycles, hidden dependencies,
+    overly broad PRs, and plans that require a later PR to make an earlier PR
+    valid. Check that each proposed PR has a demonstrable completion boundary,
+    compatible intermediate state, and appropriate validation. Report the
+    smallest split, reorder, or dependency clarification that fixes the plan. For
+    an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<dependency-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the dependency graph evidence and smallest sequencing fix."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-compatibility-and-failure-modes
+  description: Ask whether compatibility, migration, and failure behavior are designed.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Review rollout, migration, versioning, backward and forward compatibility,
+    partial deployment, retries, idempotency, cancellation, timeouts, rollback,
+    partial failure, invalid data, and recovery. Check whether intermediate
+    proposed PRs leave the system valid and whether the design states what users
+    observe when dependencies are unavailable. Report missing behavior only when
+    it can cause data loss, outages, inconsistent state, or an unclear release
+    path. For an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<compatibility-or-failure-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the rollout or failure-mode risk and correction."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: review-testability-and-operability
+  description: Ask whether the design can be validated and operated safely.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Determine whether requirements have observable acceptance tests and whether
+    the design identifies unit, integration, migration, negative, boundary, and
+    regression coverage where appropriate. Check observability, metrics, logs,
+    traces, alerts, dashboards, runbooks, feature flags, and operational ownership
+    for new failure modes. Report missing evidence or operational controls when
+    they are necessary to distinguish success from silent corruption or outage.
+    For an issue found here, post an inline comment with
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<testability-or-operability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the missing validation or operational control."}.
+    Post every issue found in this question immediately; do not carry an
+    unposted finding into a later step.
+  tool_invocations:
+  - tool: gh
+    command: [pr, view, <number>, --comments]
+  - tool: gh
+    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
+      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
+      -F, line=<changed-line>, -f, side=RIGHT]
+- id: verify-review
+  description: Verify the review comments and report the design audit.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: >-
+    Re-read the target PR's inline comments and verify every intended finding is
+    attached to the current head SHA, a changed file, and the intended line.
+    Report the PR, authoritative intent sources, spec v1 documents examined,
+    proposed-PR and entity matrix counts, questions reviewed, findings rejected
+    as speculative or duplicate, and comments posted. If no actionable findings
+    remain, report zero findings and the evidence checked. If GitHub write access
+    or inline anchoring fails, report the exact prepared finding and posting
+    failure; never claim it was posted. Never merge the PR or resolve threads.
+    Verify with this JSON action:
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_comments","pr_reference":"<number>"},"decisions_and_context":"Verify every posted issue finding is present on the current head SHA and intended line."}.
+  tool_invocations:
+  - tool: gh
+    command:
+    - pr
+    - view
+    - <number>
+    - --comments

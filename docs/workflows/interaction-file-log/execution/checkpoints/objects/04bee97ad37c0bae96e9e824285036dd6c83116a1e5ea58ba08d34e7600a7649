@@ -1,0 +1,707 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 54
+title: Add transparent OpenAI proxy recorder
+intent:
+  problem: null
+  goal: Add a transparent proxy that sits between Codex and the OpenAI API and records all LLM input and output.
+human-decisions:
+  - id: openai-proxy-reverse-layer
+    action: added
+    summary: Implement the feature as a local reverse proxy in front of the OpenAI API instead of modifying Codex or the OpenAI client.
+  - id: openai-proxy-record-raw-exchanges
+    action: added
+    summary: Record the raw request and response bodies so the full model input and output can be inspected later.
+  - id: openai-proxy-stream-while-recording
+    action: added
+    summary: Preserve streamed responses to the client while buffering the response for on-disk exchange recording.
+  - id: relax-spec-v1-validation
+    action: added
+    summary: Relax the spec-v1 validators so sparse system, architecture, implementation, and PR specifications can validate when their present sections remain coherent.
+  - id: validate-structured-files-in-changelogs
+    action: added
+    summary: Validate every spec-v1 structured file listed in a PR changelog by running the corresponding spec validator for each listed file.
+features:
+  - id: feature-openai-proxy-recording
+    state: completed
+    description: Transparent local OpenAI proxy that records all request and response payloads.
+entities:
+  - id: openai-proxy-service
+    type: Service
+    action: added
+  - id: openai-upstream-api
+    type: Service
+    action: added
+  - id: openai-exchange-record
+    type: Audit log
+    action: added
+  - id: proxy-log-directory
+    type: File storage service
+    action: added
+  - id: openai-proxy-cli
+    type: Command
+    action: added
+entity_relationships:
+  - id: rel-cli-starts-proxy
+    source: openai-proxy-cli
+    target: openai-proxy-service
+    relationship: starts
+    description: The CLI command launches the local proxy server.
+    rationale: The operator needs a simple setup path to start recording traffic.
+  - id: rel-proxy-forwards-upstream
+    source: openai-proxy-service
+    target: openai-upstream-api
+    relationship: forwards_to
+    description: The proxy forwards every OpenAI request to the configured upstream service.
+    rationale: Preserve the normal OpenAI API workflow while inserting the recording layer.
+  - id: rel-proxy-writes-records
+    source: openai-proxy-service
+    target: openai-exchange-record
+    relationship: writes
+    description: The proxy writes one exchange record for every request and response it handles.
+    rationale: Keep the complete input/output history on disk.
+  - id: rel-records-live-in-logdir
+    source: openai-proxy-service
+    target: proxy-log-directory
+    relationship: writes_to
+    description: The proxy stores its exchange records in the configured log directory.
+    rationale: Make the recording location configurable and durable.
+invariants:
+  - id: inv-forward-verbatim
+    action: added
+    description: The proxy must forward the OpenAI request path, method, and body without altering the payload semantics.
+    rationale: Any request mutation would break transparency and undermine the recorded trace.
+  - id: inv-record-every-exchange
+    action: added
+    description: Every successful or failed proxied exchange must be recorded exactly once.
+    rationale: The proxy exists to preserve the full conversation history.
+  - id: inv-preserve-streaming
+    action: added
+    description: Streamed upstream responses must remain streamed to the client.
+    rationale: The proxy must not change the user-visible behavior after setup.
+guidance:
+  - id: guide-setup-env
+    action: added
+    description: Configure the client to point at the proxy base URL once, then keep using the normal OpenAI or Codex workflow.
+    rationale: The proxy should be invisible after initial setup.
+  - id: guide-recording-format
+    action: added
+    description: Store each exchange as a structured record with the request and response bodies available for later inspection.
+    rationale: The logs should be usable for auditing, debugging, and replay.
+acceptance_criteria:
+  - id: ac-proxy-starts
+    description: The CLI can start the proxy with an upstream OpenAI base URL, a bind host and port, and a writable log directory.
+  - id: ac-request-forwarding
+    description: A request sent to the proxy reaches a fake upstream OpenAI server with the same method, path, headers needed for the API call, and body content.
+  - id: ac-response-forwarding
+    description: The proxy returns the upstream response status and body unchanged to the client.
+  - id: ac-exchange-recording
+    description: Each proxied exchange writes a structured record to disk that contains the request body and the response body.
+  - id: ac-streaming
+    description: Streamed upstream responses are relayed to the client without waiting for the full response to finish first.
+expected_tests:
+  - id: test-proxy-cli
+    description: Verify the CLI parser and runner expose the new proxy command and its setup flags.
+  - id: test-proxy-forwarding
+    description: Exercise the proxy against a fake upstream server and assert the request and response bodies are preserved.
+  - id: test-proxy-recording
+    description: Assert that the proxy writes a structured exchange record for each request.
+  - id: test-proxy-streaming
+    description: Verify that streamed responses are relayed to the client while still being captured for logging.
+expected_outcomes:
+  - id: outcome-transparent-setup
+    description: After the one-time proxy setup, the user can keep using Codex with the proxy base URL without any additional workflow changes.
+  - id: outcome-auditable-traffic
+    description: The operator can inspect the recorded exchange history on disk to see exactly what was sent to and received from the LLM.
+non_goals:
+  - id: ng-auth-management
+    description: The proxy does not manage OpenAI API keys beyond forwarding the client-supplied authorization header to the upstream service.
+  - id: ng-prompt-rewriting
+    description: The proxy does not alter prompts, completions, or tool call payloads.
+  - id: ng-multi-provider-routing
+    description: The proxy does not route traffic across multiple model providers or vendor endpoints.
+risks:
+  - id: risk-secret-spillage
+    description: Recorded request bodies may contain sensitive content, so the log directory must be treated as sensitive data.
+  - id: risk-streaming-complexity
+    description: Streaming proxying is more complex than buffering a single JSON response and could regress if chunk handling is wrong.
+  - id: risk-api-drift
+    description: The OpenAI API surface may evolve, so the proxy should avoid hard-coding assumptions that are easy to break.
+structured_files:
+  - docs/specs/openai-proxy-recording/system-map-specification.yaml
+  - docs/specs/openai-proxy-recording/feature-pr-specification.yaml
+files:
+  - path: src/powdrr_lift/openai_proxy.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 422
+    summary: Add the reverse proxy implementation, exchange recording, and streaming relay logic.
+    rationale: The new command needs a local proxy layer that forwards requests to OpenAI and persists each exchange without changing the client workflow.
+    related:
+      entities:
+        - openai-proxy-service
+        - openai-exchange-record
+        - proxy-log-directory
+        - openai-proxy-cli
+      invariants:
+        - inv-forward-verbatim
+        - inv-record-every-exchange
+        - inv-preserve-streaming
+      guidance:
+        - guide-recording-format
+      non_goals:
+        - ng-auth-management
+        - ng-prompt-rewriting
+        - ng-multi-provider-routing
+      risks:
+        - risk-secret-spillage
+        - risk-streaming-complexity
+        - risk-api-drift
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 59
+      end_line: 65
+    summary: Import the OpenAI proxy server helpers into the CLI.
+    rationale: The CLI needs to expose the new proxy command and its configuration helpers.
+    related:
+      entities:
+        - openai-proxy-cli
+      acceptance_criteria:
+        - ac-proxy-starts
+      expected_tests:
+        - test-proxy-cli
+      expected_outcomes:
+        - outcome-transparent-setup
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 801
+      end_line: 843
+    summary: Add the openai-proxy command and its setup flags.
+    rationale: The operator needs a one-time setup command for binding the proxy and choosing where exchange records are stored.
+    related:
+      entities:
+        - openai-proxy-cli
+        - proxy-log-directory
+        - openai-proxy-service
+      guidance:
+        - guide-setup-env
+      acceptance_criteria:
+        - ac-proxy-starts
+      expected_tests:
+        - test-proxy-cli
+      expected_outcomes:
+        - outcome-transparent-setup
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span:
+      start_line: 1345
+      end_line: 1364
+    summary: Add the CLI runner that builds and serves the OpenAI proxy.
+    rationale: The command needs an execution path that resolves the log directory and starts the proxy server.
+    related:
+      entities:
+        - openai-proxy-cli
+        - openai-proxy-service
+      expected_outcomes:
+        - outcome-transparent-setup
+  - path: README.md
+    type: modified
+    span:
+      start_line: 107
+      end_line: 132
+    summary: Document how to start Codex through the local OpenAI recording proxy.
+    rationale: Operators need a one-time setup guide that explains how to launch the proxy, point Codex at it, and inspect recorded exchanges.
+    related:
+      entities:
+        - openai-proxy-cli
+        - openai-proxy-service
+        - proxy-log-directory
+      guidance:
+        - guide-setup-env
+      expected_outcomes:
+        - outcome-transparent-setup
+  - path: tests/test_openai_proxy.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 244
+    summary: Add end-to-end coverage for forwarding, recording, streaming, and CLI wiring.
+    rationale: The new proxy command needs regression tests that prove it behaves transparently against a fake upstream API.
+    related:
+      entities:
+        - openai-proxy-service
+        - openai-exchange-record
+      invariants:
+        - inv-forward-verbatim
+        - inv-record-every-exchange
+        - inv-preserve-streaming
+      acceptance_criteria:
+        - ac-proxy-starts
+        - ac-request-forwarding
+        - ac-response-forwarding
+        - ac-exchange-recording
+        - ac-streaming
+      expected_tests:
+        - test-proxy-cli
+        - test-proxy-forwarding
+        - test-proxy-recording
+        - test-proxy-streaming
+      expected_outcomes:
+        - outcome-transparent-setup
+        - outcome-auditable-traffic
+      non_goals:
+        - ng-auth-management
+        - ng-prompt-rewriting
+        - ng-multi-provider-routing
+      risks:
+        - risk-secret-spillage
+        - risk-streaming-complexity
+        - risk-api-drift
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 28
+      end_line: 30
+    summary: Import the architecture specification validator for structured-file checks.
+    rationale: The changelog validator needs to run the architecture spec rules for any listed architecture structured file.
+    related:
+      entities:
+        - openai-proxy-service
+      acceptance_criteria:
+        - ac-exchange-recording
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 32
+      end_line: 34
+    summary: Import the implementation specification validator for structured-file checks.
+    rationale: The changelog validator needs to run the implementation spec rules for any listed implementation structured file.
+    related:
+      entities:
+        - openai-proxy-service
+      acceptance_criteria:
+        - ac-exchange-recording
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 41
+      end_line: 43
+    summary: Import the PR specification validator for structured-file checks.
+    rationale: The changelog validator needs to run the proposed PR spec rules for any listed proposed PR structured file.
+    related:
+      entities:
+        - openai-proxy-service
+      acceptance_criteria:
+        - ac-exchange-recording
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 45
+      end_line: 47
+    summary: Import the system specification validator for structured-file checks.
+    rationale: The changelog validator needs to run the system spec rules for any listed system structured file.
+    related:
+      entities:
+        - openai-proxy-service
+      acceptance_criteria:
+        - ac-exchange-recording
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 656
+      end_line: 656
+    summary: Pass the cached entity taxonomy through to structured-file validation.
+    rationale: Structured-file validation for architecture specs must know the allowed entity types from the repository taxonomy.
+    related:
+      entities:
+        - openai-proxy-service
+      acceptance_criteria:
+        - ac-exchange-recording
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 1224
+      end_line: 1224
+    summary: Allow structured-file validation to receive the allowed entity types.
+    rationale: The architecture structured-file validator needs the entity taxonomy to validate allowed types coherently.
+    related:
+      entities:
+        - openai-proxy-service
+      acceptance_criteria:
+        - ac-exchange-recording
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    span:
+      start_line: 1282
+      end_line: 1410
+    summary: Validate every listed structured spec-v1 file with its matching spec validator.
+    rationale: Changelog validation now needs to ensure structured files are both listed and coherent against the corresponding spec rules.
+    related:
+      entities:
+        - openai-proxy-service
+      acceptance_criteria:
+        - ac-exchange-recording
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/system_specification.py
+    type: modified
+    span:
+      start_line: 187
+      end_line: 196
+    summary: Relax required section enforcement in the system-spec validator.
+    rationale: Sparse system specifications should validate as long as the sections that exist are coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/system_specification.py
+    type: modified
+    span:
+      start_line: 613
+      end_line: 614
+    summary: Treat a missing sequence as an empty sequence in system-spec validation.
+    rationale: Sparse system specifications should not fail just because requirements or approach are omitted.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span:
+      start_line: 225
+      end_line: 239
+    summary: Relax required section enforcement in the architecture-spec validator.
+    rationale: Sparse architecture specifications should validate when the present sections remain coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span:
+      start_line: 252
+      end_line: 259
+    summary: Remove the minimum-entity requirement from architecture validation.
+    rationale: Sparse architecture specifications should not require a minimum entity count.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 240
+      end_line: 255
+    summary: Relax required section enforcement in the implementation-spec validator.
+    rationale: Sparse implementation specifications should validate when the present sections remain coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 299
+      end_line: 307
+    summary: Remove the minimum-entity requirement from implementation validation.
+    rationale: Sparse implementation specifications should not require at least one entity to be declared.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 346
+      end_line: 354
+    summary: Remove the minimum-feature requirement from implementation validation.
+    rationale: Sparse implementation specifications should not require at least one feature to be declared.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/implementation_specification.py
+    type: modified
+    span:
+      start_line: 372
+      end_line: 380
+    summary: Remove the minimum-decision requirement from implementation validation.
+    rationale: Sparse implementation specifications should not require at least one decision to be declared.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 286
+      end_line: 305
+    summary: Relax required section enforcement in the PR-spec validator.
+    rationale: Sparse PR specifications should validate when the present sections remain coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 308
+      end_line: 308
+    summary: Keep feature-id collection tolerant of sparse PR specifications.
+    rationale: PR specs without feature ids should still parse cleanly while validation handles the missing content coherently.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 319
+      end_line: 330
+    summary: Make the PR intent section optional during validation.
+    rationale: Sparse proposed PR specifications should not fail just because the intent section is absent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 347
+      end_line: 353
+    summary: Allow sparse PR detail sections to validate.
+    rationale: PR detail sections should be validated only when present.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 763
+      end_line: 763
+    summary: Stop tracking whether PR detail sections had any items during validation.
+    rationale: Sparse PR specifications should not require the presence of detail items in every section.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 765
+      end_line: 765
+    summary: Keep PR detail item parsing tolerant of empty sections.
+    rationale: Sparse PR detail sections should parse as empty sequences instead of triggering a validation failure.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 816
+      end_line: 824
+    summary: Remove the minimum-item requirement from PR detail validation.
+    rationale: PR detail sections should be allowed to remain empty when the specification is sparse.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_system_specification.py
+    type: modified
+    span:
+      start_line: 214
+      end_line: 228
+    summary: Add sparse-system-spec coverage.
+    rationale: The system-spec validator should accept sparse specifications as long as the present content is coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_architecture_specification.py
+    type: modified
+    span:
+      start_line: 372
+      end_line: 393
+    summary: Add sparse-architecture-spec coverage.
+    rationale: The architecture-spec validator should accept sparse specifications as long as the present content is coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_implementation_specification.py
+    type: modified
+    span:
+      start_line: 200
+      end_line: 218
+    summary: Add sparse-implementation-spec coverage.
+    rationale: The implementation-spec validator should accept sparse specifications as long as the present content is coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 266
+      end_line: 287
+    summary: Add sparse-PR-spec coverage.
+    rationale: The PR-spec validator should accept sparse specifications as long as the present content is coherent.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 129
+      end_line: 156
+    summary: Seed structured system, architecture, and implementation specs for changelog validation coverage.
+    rationale: Changelog validation needs coherent structured spec fixtures to validate listed structured files end to end.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 174
+      end_line: 174
+    summary: Add the implementation-spec fixture setup for changelog validation coverage.
+    rationale: Changelog validation needs coherent structured spec fixtures to validate listed structured files end to end.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 204
+      end_line: 205
+    summary: Include the structured spec files in the changelog expectation set.
+    rationale: PR changelog validation should require every structured spec-v1 file in the diff to appear in structured_files.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 308
+      end_line: 308
+    summary: Assert the structured file expectations from the branch diff.
+    rationale: Changelog validation should report both the expected and proposed structured files for the updated PR.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 311
+      end_line: 311
+    summary: Assert the expected structured-file path set from the branch diff.
+    rationale: Changelog validation should report both the expected and proposed structured files for the updated PR.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 313
+      end_line: 313
+    summary: Assert the system-spec structured file appears in the branch diff.
+    rationale: Changelog validation should report both the expected and proposed structured files for the updated PR.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 316
+      end_line: 317
+    summary: Assert the proposed structured-file set from the branch diff.
+    rationale: Changelog validation should report both the expected and proposed structured files for the updated PR.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 320
+      end_line: 322
+    summary: Assert the architecture and implementation structured files appear in the branch diff.
+    rationale: Changelog validation should report both the expected and proposed structured files for the updated PR.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 325
+      end_line: 325
+    summary: Assert the final proposed structured-file set from the branch diff.
+    rationale: Changelog validation should report both the expected and proposed structured files for the updated PR.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording
+  - path: tests/test_change_log_validation.py
+    type: modified
+    span:
+      start_line: 1274
+      end_line: 1336
+    summary: Add a failure case for invalid structured spec contents.
+    rationale: Changelog validation should surface spec validator failures for structured files listed in structured_files.
+    related:
+      entities:
+        - openai-proxy-service
+      expected_tests:
+        - test-proxy-recording

@@ -1,0 +1,107 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: '2026-08-22'
+title: Interaction File Log Architecture
+entities:
+- id: interaction-log
+  name: Interaction Log
+  description: The JSON file at .powdrr/interaction-log.json that records all human
+    and LLM interaction inputs and outputs. Serves req-1.
+  type: Source file
+  rationale: The interaction log file must record all human and LLM interaction inputs
+    and outputs per "req-1".
+- id: interaction-entry
+  name: Interaction Entry
+  description: A single JSON object in the log capturing one interaction's input and
+    output. Serves req-1.
+  type: Log
+  rationale: Each interaction entry must capture the input and output of one human
+    or LLM interaction per "req-1".
+- id: log-writer
+  name: Log Writer
+  description: Component that appends interaction entries as JSON to the log file.
+    Implements app-1.
+  type: Module
+  rationale: The log writer must append entries to the log file per "app-1".
+- id: interaction-source
+  name: Interaction Source
+  description: Any human or LLM interaction boundary that produces inputs and outputs
+    to be logged. Serves req-1.
+  type: Module
+  rationale: Interaction sources must provide inputs and outputs to the log writer
+    per "req-1".
+modules:
+- id: mod-log-writer
+  action: added
+  relative_location: src/log_writer.py
+  purpose: Appends interaction entries as JSON to .powdrr/interaction-log.json. Implements
+    app-1.
+tools:
+- id: tool-log-writer
+  action: added
+  when_to_use: When a human or LLM interaction completes and its input and output
+    must be recorded. Serves req-1.
+  template: log_writer.append(input, output)
+  how_to_use: Call the log writer with the interaction input and output to append
+    a JSON entry to the log file. Implements app-1.
+entity_relationships:
+- id: rel-writer-appends
+  source: log-writer
+  target: interaction-log
+  relationship: appends
+  description: Log writer appends JSON entries to the interaction log file. Implements
+    app-1.
+  rationale: The log writer must write entries to the log file per "app-1".
+- id: rel-log-contains
+  source: interaction-log
+  target: interaction-entry
+  relationship: contains
+  description: The interaction log file contains multiple interaction entries. Serves
+    req-1.
+  rationale: The log file must store each interaction entry per "req-1".
+- id: rel-source-feeds
+  source: interaction-source
+  target: log-writer
+  relationship: feeds
+  description: Interaction sources feed inputs and outputs to the log writer. Serves
+    req-1.
+  rationale: Interaction sources must provide inputs and outputs to the log writer
+    per "req-1".
+invariants:
+- id: inv-json-format
+  description: Every interaction entry must be valid JSON. Serves req-1.
+  rationale: The log must be JSON format per req-1.
+- id: inv-hidden-directory
+  description: The log file must reside in the hidden .powdrr directory. Serves req-1.
+  rationale: The log must be in the hidden .powdrr directory per req-1.
+- id: inv-fixed-filename
+  description: The log file must be named interaction-log.json. Serves req-1.
+  rationale: The log must be named interaction-log.json per req-1.
+guidance:
+- id: guide-append-only
+  description: The log writer must append entries without modifying or deleting prior
+    entries. Implements app-1.
+  rationale: The log writer must append entries per app-1.
+- id: guide-capture-both
+  description: Each entry must capture both the input and output of every human or
+    LLM interaction. Serves req-1.
+  rationale: Each entry must capture both input and output per req-1.
+relationships:
+- id: rel-writer-appends
+  source: log-writer
+  target: interaction-log
+  description: Log writer appends JSON entries to the interaction log file. Implements
+    app-1.
+  rationale: The log writer must append entries to the log file per app-1.
+- id: rel-log-contains
+  source: interaction-log
+  target: interaction-entry
+  description: The interaction log file contains multiple interaction entries. Serves
+    req-1.
+  rationale: The log file must contain interaction entries per req-1.
+- id: rel-source-feeds
+  source: interaction-source
+  target: log-writer
+  description: Interaction sources feed inputs and outputs to the log writer. Serves
+    req-1.
+  rationale: Interaction sources must feed inputs and outputs to the log writer per
+    req-1.

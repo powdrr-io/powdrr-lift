@@ -1,0 +1,200 @@
+---
+name: bootstrap-code-structure
+when_to_use:
+- When implementation is about to begin and the project's code structure needs current codebase evidence.
+- When the workflow needs reliable application modules, test modules, tools, and validation commands for the whole repository.
+- When no project-structure artifact exists and a durable template should be created under docs/project_structure.
+steps:
+- description: Check whether the project-structure artifact already exists.
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
+  step_type: freeform
+  prompt_catalogs: [context_types]
+  llm_type: simple_task
+  details: >-
+    Use the gather_context workflow action with types [modules, tools] and no
+    keywords or filters. Inspect the returned match paths specifically for
+    docs/project_structure/project-structure.yaml. If that artifact exists,
+    preserve it, include its exact path and the reuse decision in
+    decisions_and_context, and choose complete immediately. Do not inspect the
+    source tree, run discovery commands, generate a template, edit the
+    artifact, validate it, stage it, or invoke any nested skill. If the artifact
+    does not exist, record that result and choose next_step so the discovery
+    step can begin.
+- description: Discover the project-wide modules, tools, tests, and development commands.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
+  step_type: freeform
+  llm_type: long_context
+  details: >-
+    Treat the repository as the scope. Do not ask the user to identify a
+    feature, work item, or target module. Inspect the complete source and test
+    layout, existing project-structure documents, configuration, build files,
+    CI workflows, scripts, and documentation. Identify application modules,
+    test modules, their relationships and locations, and the commands used for
+    tests, formatting, linting, type checking, packaging, and other repository
+    validation. Use basedpyright-symbol and basedpyright-structure for Python
+    source when available. Record paths, symbols, commands, and evidence in
+    decisions_and_context before continuing. The initial existence check has
+    already confirmed that no project-structure artifact exists. After
+    discovering each tool, try its command
+    with the smallest safe invocation that exercises its syntax and working
+    directory. For commands that require project inputs, use a read-only,
+    help, dry-run, or otherwise non-destructive invocation. If a discovered
+    tool fails because of command syntax, flags, paths, working directory, or
+    invocation shape, inspect the error, correct the command, and retry it
+    before recording the tool. Do not pass an untested or failing command to
+    the next step; record the successful command, required inputs, and
+    validation evidence in decisions_and_context.
+  tool_invocations:
+  - tool: shell
+    command:
+    - rg
+    - --files
+    - src
+    - tests
+    - scripts
+    - .github
+    - docs/project_structure
+  - tool: shell
+    command:
+    - rg
+    - -n
+    - "pytest|ruff|mypy|pyright|basedpyright|uv run|make |npm test|cargo test|go test"
+    - pyproject.toml
+    - Makefile
+    - .github
+    - scripts
+    - README.md
+- description: Reuse an existing project-structure artifact or create its template.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
+  step_type: freeform
+  prompt_catalogs: [context_types]
+  llm_type: simple_task
+  details: >-
+    If docs/project_structure contains an existing project-structure document,
+    inspect and reuse it without overwriting it. If it does not exist, invoke
+    the shell tool with command [powdrr-lift, project-structure]. The CLI
+    creates both the parent directory and the template. The template must
+    use the repository's `https://powdrr.io/schemas/specification-v1` schema.
+    Generate the template with the CLI and follow its instructions. Use only
+    the specification sections needed by the project structure; all sections
+    are optional.
+    Do not create a feature-specific architecture specification and do not ask
+    a question merely because the project-structure document is absent. Pass
+    the exact artifact path to the next step. Use the prior gather_context
+    result to decide whether the artifact exists.
+  tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - project-structure
+- description: Populate the project-structure artifact from codebase evidence.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Compare the discovered repository structure with the existing artifact or
+    template. Add or update project-wide module entries for application,
+    test, tooling, configuration, and integration areas, including stable ids,
+    paths, parent/related modules, and purpose. Add or update tool
+    entries for test, formatting, linting, type-check, build, and relevant
+    development commands, including stable ids, related modules, labels,
+    when_to_use, template, how_to_use, and evidence. Every tool entry MUST
+    include a non-empty `labels` list with at least one meaningful, stable
+    category label. Never leave `labels` out and never use `labels: []`.
+    Choose labels that describe the tool's role, such as `test`, `format`,
+    `lint`, `type-check`, `build`, or `development`; add all labels supported
+    by repository evidence. Include the `pr-prep` label on every testing,
+    linting, and formatting tool so finish-pr-prep can discover it. Omit only
+    `pr-prep` when repository evidence shows that the tool is intended for ad
+    hoc or one-off use, and record that rationale in the tool entry's
+    evidence. Preserve accurate existing ids and descriptions. Do not invent
+    modules or tools unsupported by repository evidence. Verify every tool
+    command against the successful invocation evidence from the discovery
+    step, including its working directory and required arguments. If a
+    command cannot be run safely, document the exact reason and the safest
+    verified syntax instead of guessing. Use the edit action to write the
+    artifact and pass the changed path and edit summary onward.
+- description: Validate the project-structure artifact and discovery evidence.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Run [powdrr-lift, validate-project-structure, --input,
+    docs/project_structure/project-structure.yaml] and require a successful
+    specification-v1 schema report. Confirm that the artifact contains the
+    discovered project-wide module and tool records, uses paths that exist or
+    are explicitly documented as generated, and has no conflict markers. Check
+    that every listed tool has a command, a non-empty `labels` list, and every
+    module has a purpose and location. Confirm that testing, linting, and
+    formatting tools have the `pr-prep` label unless their evidence explicitly
+    supports ad hoc or one-off use. Invoke the validator once for the current
+    artifact, then run the conflict-marker and diff checks once. If any check
+    fails, edit or restage the affected artifact before rerunning that check;
+    never repeat an unchanged command. After all checks succeed, record the
+    results and choose `next_step` immediately. Do not run a
+    feature-specific architecture validator or require a feature/work-item
+    name.
+  tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - validate-project-structure
+    - --input
+    - docs/project_structure/project-structure.yaml
+  - tool: shell
+    command:
+    - rg
+    - -n
+    - "^(<<<<<<<|=======|>>>>>>>)"
+    - docs/project_structure/project-structure.yaml
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --check
+  - tool: internal
+    command:
+    - powdrr-lift
+    - repository-state
+- description: Stage the validated project-structure artifact.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user]
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    Confirm that the validated project-structure artifact is the only intended
+    bootstrap output, inspect its diff, and stage the exact path under
+    docs/project_structure. Do not stage unrelated files, feature-specific
+    specifications, or generated caches. Do not commit here.
+  tool_invocations:
+  - tool: internal
+    command:
+    - powdrr-lift
+    - repository-state
+  - tool: git
+    command:
+    - add
+    - docs/project_structure/project-structure.yaml
+- description: Run finish-pr-prep on the validated project-structure artifact.
+  actions: [invoke_skill]
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Run finish-pr-prep after the validated project-structure artifact is
+    staged. If cleanup changes files, restage only
+    docs/project_structure/project-structure.yaml before continuing. Do not
+    include unrelated files or begin feature implementation.
+  uses_skills:
+  - finish-pr-prep
+- description: Commit the project-structure artifact and open a draft pull request.
+  actions: [invoke_skill]
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    Invoke create-pull-request with pr-kind `project-structure`, commit
+    message `Add project structure artifact`, and pull-request title
+    `<pull-request-title>`. Pass `files_to_publish` containing exactly
+    `docs/project_structure/project-structure.yaml`, along with the generated
+    artifact and its discovery evidence as context. The nested skill must
+    stage exactly that path.
+  uses_skills:
+  - create-pull-request

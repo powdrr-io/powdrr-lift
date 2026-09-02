@@ -1,0 +1,7 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: fixture-feature
+feature_ids: [fixture-feature]
+proposed_prs:
+  - id: fixture-pr
+    intent: Exercise deterministic proposed PR context handoff.
+    justification: Required by the isolated workflow task scenario.

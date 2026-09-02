@@ -1,0 +1,32 @@
+task_id: execute-proposed-pr-task-001
+status: completed
+upstream_task_ids: []
+dependent_state: [proposed-pr-context-gathered]
+complexity: high
+input_state:
+  proposed_pr: fixture-pr
+  feature_id: fixture-feature
+assignee_type: agent
+assignee_role: architect
+output_state_type: proposed-pr-context-state
+output_state:
+  proposed-pr-context-state:
+    types: [proposed_prs]
+    keywords: []
+    filters: {}
+    matches:
+    - item:
+        id: fixture-pr
+        intent: Exercise deterministic proposed PR context handoff.
+        justification: Required by the isolated workflow task scenario.
+      section: proposed_prs
+      specification_type: proposed
+      work_item_name: fixture-feature
+description: Gather context about the proposed PR
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+pre_step:
+  action: gather_context
+  template:
+    feature_id: fixture-feature
+    types: [proposed_prs]

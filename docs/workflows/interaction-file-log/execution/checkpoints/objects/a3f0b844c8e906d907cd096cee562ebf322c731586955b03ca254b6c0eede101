@@ -1,0 +1,1257 @@
+task_id: interaction-file-log-core-workflow-task-004
+status: completed
+upstream_task_ids:
+- interaction-file-log-core-workflow-task-001
+- interaction-file-log-core-workflow-task-002
+- interaction-file-log-core-workflow-task-003
+dependent_state:
+- product-code-generated
+complexity: high
+input_state:
+  proposed_pr_context:
+    proposed-pr-context-state:
+      repo_root: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core
+      types:
+      - proposed_prs
+      - requirements
+      - features
+      - acceptance_criteria
+      - expected_tests
+      - intent
+      - risks
+      - decisions
+      keywords: []
+      filters: {}
+      matches:
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: requirements
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-transparent-reverse-proxy
+          description: Forward OpenAI API traffic through a local reverse proxy without
+            changing the user workflow after initial setup.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: requirements
+        item_index: 1
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-record-exchanges
+          description: Record every request payload and response payload that passes
+            through the proxy.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: requirements
+        item_index: 2
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-preserve-streaming
+          description: Preserve streamed responses and response metadata so the proxy
+            stays transparent to Codex and other OpenAI clients.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: requirements
+        item_index: 3
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-configurable-log-storage
+          description: Allow the operator to choose where captured request and response
+            records are written on disk.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: requirements
+        item_index: 4
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-simple-setup
+          description: Make the initial setup a one-time configuration change that
+            can be reused for subsequent sessions.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: features
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-openai-proxy-recording
+          action: added
+          description: Transparent local OpenAI proxy that records all request and
+            response payloads.
+          supercedes: null
+          functional_requirements:
+          - req-transparent-reverse-proxy
+          - req-record-exchanges
+          - req-preserve-streaming
+          - req-configurable-log-storage
+          - req-simple-setup
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: intent
+        item_index: null
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          goal: Add a transparent proxy that sits between Codex and the OpenAI API
+            and records all LLM input and output.
+          reasoning: Keep the normal user workflow intact after one initial configuration
+            step while preserving a complete local audit trail of every proxied exchange.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: ac-proxy-starts
+          description: The CLI can start the proxy with an upstream OpenAI base URL,
+            a bind host and port, and a writable log directory.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 1
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: ac-request-forwarding
+          description: A request sent to the proxy reaches a fake upstream OpenAI
+            server with the same method, path, headers needed for the API call, and
+            body content.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 2
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: ac-response-forwarding
+          description: The proxy returns the upstream response status and body unchanged
+            to the client.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 3
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: ac-exchange-recording
+          description: Each proxied exchange writes a structured record to disk that
+            contains the request body and the response body.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 4
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: ac-streaming
+          description: Streamed upstream responses are relayed to the client without
+            waiting for the full response to finish first.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: expected_tests
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: test-proxy-cli
+          description: Verify the CLI parser and runner expose the new proxy command
+            and its setup flags.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: expected_tests
+        item_index: 1
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: test-proxy-forwarding
+          description: Exercise the proxy against a fake upstream server and assert
+            the request and response bodies are preserved.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: expected_tests
+        item_index: 2
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: test-proxy-recording
+          description: Assert that the proxy writes a structured exchange record for
+            each request.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: expected_tests
+        item_index: 3
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: test-proxy-streaming
+          description: Verify that streamed responses are relayed to the client while
+            still being captured for logging.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: risks
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: risk-secret-spillage
+          description: Recorded request bodies may contain sensitive content, so the
+            log directory must be treated as sensitive data.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: risks
+        item_index: 1
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: risk-streaming-complexity
+          description: Streaming proxying is more complex than buffering a single
+            JSON response and could regress if chunk handling is wrong.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/feature-pr-specification.yaml
+        section: risks
+        item_index: 2
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: risk-api-drift
+          description: The OpenAI API surface may evolve, so the proxy should avoid
+            hard-coding assumptions that are easy to break.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: requirements
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-agent-compatibility
+          description: Ensure the produced skills work in at least Claude Code, Codex,
+            Aider, Cursor, Antigravity, and OpenCode.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: requirements
+        item_index: 1
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-canonical-skill-bundle
+          description: Maintain a canonical set of skill bundles that can be rendered
+            into the agent-specific layouts required by Claude Code, Codex, Aider,
+            Cursor, Antigravity, and OpenCode.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: requirements
+        item_index: 2
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-cross-platform-cli-mcp
+          description: Provide adjoining CLI and MCP tooling that runs on macOS, Windows,
+            and Linux without platform-specific behavior leaks into the user workflow.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: requirements
+        item_index: 3
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-shared-validation
+          description: Validate generated skill packages, installer metadata, and
+            agent-facing outputs before publishing them.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: requirements
+        item_index: 4
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-single-command-install
+          description: Make the CLI and MCP installable with a single command on each
+            supported platform, including a Homebrew-based install path on macOS.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: requirements
+        item_index: 5
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: req-upgrade-path
+          description: Support repeatable updates so teams can refresh skill bundles
+            and the accompanying CLI or MCP without hand-editing every agent installation.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: features
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-context-graph
+          description: Add context endpoints that answer code-relationship questions
+            using the indexed graph of code and specs so agents can ask about code
+            used together, updated together, and linked to features, decisions, requirements,
+            entities, and lines.
+          functional_requirements:
+          - The platform must answer what code is used together and updated together.
+          - The platform must answer what code is related to a feature, decision,
+            requirement, or entity.
+          - The platform must answer intent and rationale questions for a file, range,
+            or line of code.
+          - The platform must source answers from the changelog and specification
+            graph, not just the source tree.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: features
+        item_index: 1
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-document-families
+          description: Add current-state, diff, and issues document families for system,
+            architecture, implementation, and proposed-PR specs so the platform can
+            represent the same state model across `specify-system`, `specify-architecture`,
+            `specify-implementation`, `specify-prs`, `synthesize-system`, `synthesize-architecture`,
+            `synthesize-implementation`, and review workflows.
+          functional_requirements:
+          - The platform must render a current-state document that represents a complete
+            coherent snapshot.
+          - The platform must render a diff document that can be applied to a parent
+            current state.
+          - The platform must render an issues document that explicitly records known
+            incoherence.
+          - The platform must validate each document family with the appropriate CLI
+            and MCP surface.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: features
+        item_index: 2
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-proposed-pr-discovery
+          description: Add fuzzy search and direct inspection endpoints for proposed
+            PR specifications so the implement-pr workflow can identify, inspect,
+            and validate the right proposal before coding.
+          functional_requirements:
+          - The platform must fuzzy-match proposed PR ids, feature ids, and intent
+            text.
+          - The platform must expose a direct inspection endpoint for a proposed PR
+            id or number.
+          - The platform must validate the selected proposed PR before implementation
+            begins.
+          - The implement-pr workflow must inspect every section of the proposed PR
+            before and after the code changes.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: features
+        item_index: 3
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-review-workflows
+          description: Add review workflows that produce diffs and inspect multiple
+            layers of the system for inconsistencies across `review-system`, `review-architecture`,
+            `review-implementation`, `review-pr`, and `review-pr-changelog`.
+          functional_requirements:
+          - Each review skill must produce a diff that describes the review target.
+          - Each review skill must surface inconsistencies, weaknesses, and missing
+            links.
+          - Review output must inspect the surrounding specification layers, not only
+            the changed file.
+          - Review output must remain explainable enough for an agent to fix the underlying
+            issue.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: features
+        item_index: 4
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-specified-template-workflows
+          description: Give each specify skill and `create-pr-changelog` a template-generation
+            and validation workflow.
+          functional_requirements:
+          - Each specify skill must expose a template generator endpoint.
+          - Each specify skill must expose a validation endpoint for the filled template.
+          - The template instructions must tell the agent how to fill the document
+            before validation.
+          - The workflow must fail closed until the filled document validates.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: features
+        item_index: 5
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-synthesis-workflows
+          description: Add synthesis workflows that derive start state, new state,
+            and diff from a parent branch and a PR for `synthesize-system`, `synthesize-architecture`,
+            and `synthesize-implementation`.
+          functional_requirements:
+          - Each synthesize skill must expose a parent-branch current-state endpoint.
+          - Each synthesize skill must expose a PR current-state endpoint.
+          - Each synthesize skill must expose a diff endpoint.
+          - The synthesized diff must be applicable to the parent current state to
+            produce the updated current state.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: features
+        item_index: 6
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: feature-unified-packaging
+          description: Keep the CLI, MCP, skill set, and install story aligned across
+            macOS, Windows, and Linux.
+          functional_requirements:
+          - The platform must install with a single command on each supported platform.
+          - The platform must preserve a Homebrew install path on macOS.
+          - The same package content must serve Claude Code, Codex, Aider, Cursor,
+            Antigravity, and OpenCode.
+          - The CLI and MCP must remain behaviorally aligned through shared core logic.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: decisions
+        item_index: 0
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: decision-explicit-incoherence
+          description: Record intentional incoherence in issues documents instead
+            of hiding it behind partial validation.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: decisions
+        item_index: 1
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: decision-first-class-diffs
+          description: Treat diff documents as first-class artifacts rather than opaque
+            implementation details.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: decisions
+        item_index: 2
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: decision-platform-install
+          description: Keep the package install story single-command and cross-platform,
+            with Homebrew for macOS.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: decisions
+        item_index: 3
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: decision-shared-surface
+          description: Keep the CLI and MCP surfaces mirrored so agents and operators
+            can use either one.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/openai-proxy-recording/system-map-specification.yaml
+        section: decisions
+        item_index: 4
+        work_item_name: openai-proxy-recording
+        specification_type: current-state
+        item:
+          id: decision-single-core
+          description: Keep rendering, validation, synthesis, and graph query logic
+            in a shared core module.
+          action: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: features
+        item_index: 0
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: feature-document-families
+          action: added
+          description: Add current-state, diff, and issues document families for system,
+            architecture, implementation, and proposed-PR specs so the platform can
+            represent the same state model across `specify-system`, `specify-architecture`,
+            `specify-implementation`, `specify-prs`, `synthesize-system`, `synthesize-architecture`,
+            `synthesize-implementation`, and review workflows.
+          functional_requirements:
+          - The platform must render a current-state document that represents a complete
+            coherent snapshot.
+          - The platform must render a diff document that can be applied to a parent
+            current state.
+          - The platform must render an issues document that explicitly records known
+            incoherence.
+          - The platform must validate each document family with the appropriate CLI
+            and MCP surface.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: features
+        item_index: 1
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: feature-specified-template-workflows
+          action: added
+          description: Give each specify skill and `create-pr-changelog` a template-generation
+            and validation workflow.
+          functional_requirements:
+          - Each specify skill must expose a template generator endpoint.
+          - Each specify skill must expose a validation endpoint for the filled template.
+          - The template instructions must tell the agent how to fill the document
+            before validation.
+          - The workflow must fail closed until the filled document validates.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: features
+        item_index: 2
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: feature-proposed-pr-discovery
+          action: added
+          description: Add fuzzy search and direct inspection endpoints for proposed
+            PR specifications so the implement-pr workflow can identify, inspect,
+            and validate the right proposal before coding.
+          functional_requirements:
+          - The platform must fuzzy-match proposed PR ids, feature ids, and intent
+            text.
+          - The platform must expose a direct inspection endpoint for a proposed PR
+            id or number.
+          - The platform must validate the selected proposed PR before implementation
+            begins.
+          - The implement-pr workflow must inspect every section of the proposed PR
+            before and after the code changes.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: features
+        item_index: 3
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: feature-synthesis-workflows
+          action: added
+          description: Add synthesis workflows that derive start state, new state,
+            and diff from a parent branch and a PR for `synthesize-system`, `synthesize-architecture`,
+            and `synthesize-implementation`.
+          functional_requirements:
+          - Each synthesize skill must expose a parent-branch current-state endpoint.
+          - Each synthesize skill must expose a PR current-state endpoint.
+          - Each synthesize skill must expose a diff endpoint.
+          - The synthesized diff must be applicable to the parent current state to
+            produce the updated current state.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: features
+        item_index: 4
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: feature-review-workflows
+          action: added
+          description: Add review workflows that produce diffs and inspect multiple
+            layers of the system for inconsistencies across `review-system`, `review-architecture`,
+            `review-implementation`, `review-pr`, and `review-pr-changelog`.
+          functional_requirements:
+          - Each review skill must produce a diff that describes the review target.
+          - Each review skill must surface inconsistencies, weaknesses, and missing
+            links.
+          - Review output must inspect the surrounding specification layers, not only
+            the changed file.
+          - Review output must remain explainable enough for an agent to fix the underlying
+            issue.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: features
+        item_index: 5
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: feature-context-graph
+          action: added
+          description: Add context endpoints that answer code-relationship questions
+            using the indexed graph of code and specs so agents can ask about code
+            used together, updated together, and linked to features, decisions, requirements,
+            entities, and lines.
+          functional_requirements:
+          - The platform must answer what code is used together and updated together.
+          - The platform must answer what code is related to a feature, decision,
+            requirement, or entity.
+          - The platform must answer intent and rationale questions for a file, range,
+            or line of code.
+          - The platform must source answers from the changelog and specification
+            graph, not just the source tree.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: features
+        item_index: 6
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: feature-unified-packaging
+          action: added
+          description: Keep the CLI, MCP, skill set, and install story aligned across
+            macOS, Windows, and Linux.
+          functional_requirements:
+          - The platform must install with a single command on each supported platform.
+          - The platform must preserve a Homebrew install path on macOS.
+          - The same package content must serve Claude Code, Codex, Aider, Cursor,
+            Antigravity, and OpenCode.
+          - The CLI and MCP must remain behaviorally aligned through shared core logic.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: decisions
+        item_index: 0
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: decision-single-core
+          action: added
+          description: Keep rendering, validation, synthesis, and graph query logic
+            in a shared core module.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: decisions
+        item_index: 1
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: decision-first-class-diffs
+          action: added
+          description: Treat diff documents as first-class artifacts rather than opaque
+            implementation details.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: decisions
+        item_index: 2
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: decision-explicit-incoherence
+          action: added
+          description: Record intentional incoherence in issues documents instead
+            of hiding it behind partial validation.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: decisions
+        item_index: 3
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: decision-shared-surface
+          action: added
+          description: Keep the CLI and MCP surfaces mirrored so agents and operators
+            can use either one.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/implementation-specification.yaml
+        section: decisions
+        item_index: 4
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: decision-platform-install
+          action: added
+          description: Keep the package install story single-command and cross-platform,
+            with Homebrew for macOS.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/system-specification.yaml
+        section: requirements
+        item_index: 0
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: req-canonical-skill-bundle
+          description: 'Maintain a canonical set of skill bundles that can be rendered
+            into the agent-specific layouts required by Claude Code, Codex, Aider,
+            Cursor, Antigravity, and OpenCode.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/system-specification.yaml
+        section: requirements
+        item_index: 1
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: req-cross-platform-cli-mcp
+          description: 'Provide adjoining CLI and MCP tooling that runs on macOS,
+            Windows, and Linux without platform-specific behavior leaks into the user
+            workflow.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/system-specification.yaml
+        section: requirements
+        item_index: 2
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: req-single-command-install
+          description: 'Make the CLI and MCP installable with a single command on
+            each supported platform, including a Homebrew-based install path on macOS.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/system-specification.yaml
+        section: requirements
+        item_index: 3
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: req-agent-compatibility
+          description: 'Ensure the produced skills work in at least Claude Code, Codex,
+            Aider, Cursor, Antigravity, and OpenCode.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/system-specification.yaml
+        section: requirements
+        item_index: 4
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: req-shared-validation
+          description: 'Validate generated skill packages, installer metadata, and
+            agent-facing outputs before publishing them.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/powdrr-lift/system-specification.yaml
+        section: requirements
+        item_index: 5
+        work_item_name: powdrr-lift
+        specification_type: current-state
+        item:
+          id: req-upgrade-path
+          description: 'Support repeatable updates so teams can refresh skill bundles
+            and the accompanying CLI or MCP without hand-editing every agent installation.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: requirements
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-proposed-pr-evidence
+          description: Proposed PR specs must include a required_test_cases section
+            that states the test evidence expected from the implementation.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: requirements
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-changelog-evidence-links
+          description: Changelog related sections must allow each changed source hunk
+            to reference the required test cases that prove it.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: requirements
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-validator-enforcement
+          description: Changelog validation must reject required test case references
+            that do not point at real proposed PR detail entries or real changed source
+            locations.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: requirements
+        item_index: 3
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-roundtrip-support
+          description: Parsing, template generation, and code indexing must preserve
+            required test case references when changelog artifacts are regenerated.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: requirements
+        item_index: 4
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-skill-loop-integrity
+          description: The plan-and-implement-feature workflow must continue to use
+            the changelog diff loop without changing the plan to hide implementation
+            mismatches.
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: features
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: feature-required-test-cases
+          action: added
+          description: Add a required_test_cases section to proposed PR specifications
+            and make changelog related sections point at those test cases.
+          supercedes: null
+          functional_requirements:
+          - The proposed PR template must render a required_test_cases section with
+            id and description entries.
+          - The changelog template must render related.required_test_cases when evidence
+            exists for a changed file hunk.
+          - The changelog parser must preserve required_test_cases when reading YAML
+            back in.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: features
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: feature-required-test-case-validation
+          action: added
+          description: Validate required test case references against the proposed
+            PR specification and the changed source locations they are meant to prove.
+          supercedes: null
+          functional_requirements:
+          - Validation must reject references to unknown required test case ids.
+          - Validation must reject changelogs whose required test case references
+            do not map to a real changed source location.
+          - Validation must keep the error messages specific enough for an agent to
+            fix the source code, not the plan.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: features
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: feature-roundtrip-evidence-preservation
+          action: added
+          description: Preserve required test case evidence through indexing and template
+            regeneration so the changelog remains stable across the workflow.
+          supercedes: null
+          functional_requirements:
+          - The code index must write required_test_cases back out when it regenerates
+            related sections.
+          - Regenerated changelog templates must keep existing required test case
+            references when they are still valid.
+          - The evidence field must not be lost during parser or template round-trips.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: decisions
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: decision-required-test-cases-are-plan-evidence
+          action: added
+          description: Treat required test cases as explicit proposed-PR evidence
+            rather than as a free-form note in the changelog.
+          supercedes: null
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: decisions
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: decision-validation-is-fail-closed
+          action: added
+          description: Make changelog validation fail closed when a required test
+            case reference is missing, stale, or disconnected from source.
+          supercedes: null
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: decisions
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: decision-preserve-workflow-order
+          action: added
+          description: Keep the plan, implementation, changelog, and diff workflow
+            order intact and use the diff only to drive code changes.
+          supercedes: null
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: intent
+        item_index: null
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          goal: Strengthen proposed PRs and changelogs so each change includes explicit
+            required test cases and validation proves the evidence points to real
+            changed code.
+          reasoning: The workflow should tell future agents what to test, where the
+            code changed, and how the changelog proves those outcomes without allowing
+            the plan itself to be rewritten to mask a mismatch.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: ac-required-test-cases
+          description: Proposed PR specifications include a required_test_cases section
+            with concrete ids and descriptions.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: ac-changelog-links
+          description: Changelog related sections can point at required test case
+            ids for the changed source hunks they document.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: ac-validation-rejects-stale-evidence
+          description: Validation rejects required test case references that do not
+            resolve to real proposed PR detail ids or real changed source locations.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: acceptance_criteria
+        item_index: 3
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: ac-roundtrip-preserves-evidence
+          description: Parser, template generation, and code indexing preserve required
+            test case references through a regenerate-and-validate cycle.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: expected_tests
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: test-pr-specification-required-test-cases
+          description: Add or update tests that prove the proposed PR template renders
+            and validates required_test_cases entries.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: expected_tests
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: test-changelog-required-test-cases
+          description: Add or update tests that prove changelog parsing, rendering,
+            and indexing preserve related.required_test_cases.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: expected_tests
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: test-validator-required-test-cases
+          description: Add or update tests that reject unknown required test case
+            ids and stale source-location references.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: risks
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: risk-legacy-changelogs
+          description: Existing changelog files may need regeneration before they
+            pass the stricter required test case validation.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/feature-pr-specification.yaml
+        section: risks
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: risk-overstrict-linking
+          description: The source-location check may become too strict if the changelog
+            template does not keep enough line-span detail.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: requirements
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-stronger-pr-evidence
+          description: 'Proposed PRs must describe the required test cases that prove
+            the change is delivered, not just the outcomes that should exist in the
+            final code.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: requirements
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-changelog-test-case-links
+          description: 'Changelog files must carry explicit references from changed
+            source hunks to the required test cases that cover them.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: requirements
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-validation-real-locations
+          description: 'Changelog validation must verify that every required test
+            case reference resolves to a real proposed-PR detail entry and a real
+            changed source location.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: requirements
+        item_index: 3
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-template-roundtrip
+          description: 'Template generation and code indexing must preserve required
+            test cases when changelog documents are regenerated or reindexed.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: requirements
+        item_index: 4
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: req-skill-flow-consistency
+          description: 'The plan-and-implement-feature workflow must keep the system
+            map, feature plan, implementation, changelog, and diff artifacts aligned.
+
+            '
+          state: added
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: features
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: feature-required-test-cases
+          action: added
+          description: Add a required_test_cases section to proposed PR specifications
+            and make changelog evidence links point at it.
+          functional_requirements:
+          - Proposed PR templates must include required_test_cases entries with ids
+            and descriptions.
+          - Changelog file related sections must be able to point at required test
+            case ids.
+          - Validation must reject required test case references that do not resolve.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: features
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: feature-required-test-case-validation
+          action: added
+          description: Validate that required test case evidence links resolve to
+            real source locations in the generated changelog.
+          functional_requirements:
+          - Validation must check required test case ids against the proposed PR specification
+            data.
+          - Validation must confirm referenced source locations exist in the branch
+            diff.
+          - Validation must report a clear error when a required test case reference
+            is missing or stale.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: features
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: feature-roundtrip-evidence-preservation
+          action: added
+          description: Preserve required test cases through parsing, template generation,
+            and code indexing.
+          functional_requirements:
+          - The parser must materialize required_test_cases from YAML.
+          - The changelog template generator must render required_test_cases when
+            present.
+          - The code index must write required_test_cases back out when it regenerates
+            related sections.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: decisions
+        item_index: 0
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: decision-required-test-cases-as-pr-detail
+          action: added
+          description: Keep required test cases as a proposed-PR detail section rather
+            than adding a new top-level changelog section.
+          supercedes: null
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: decisions
+        item_index: 1
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: decision-validator-is-authoritative
+          action: added
+          description: Treat changelog validation as the gate that decides whether
+            required test case evidence is real enough to ship.
+          supercedes: null
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/current/required-test-cases/system-map-specification.yaml
+        section: decisions
+        item_index: 2
+        work_item_name: required-test-cases
+        specification_type: current-state
+        item:
+          id: decision-preserve-existing-workflow
+          action: added
+          description: Extend the existing template, parser, and index flows instead
+            of introducing a second evidence pipeline.
+          supercedes: null
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/implementation-specification.yaml
+        section: features
+        item_index: 0
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          id: feat-interaction-log
+          action: added
+          description: Capture all human and LLM interaction inputs and outputs in
+            a JSON file log.
+          functional_requirements:
+          - Write interaction inputs and outputs to .powdrr/interaction-log.json in
+            JSON format.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/implementation-specification.yaml
+        section: decisions
+        item_index: 0
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          id: dec-json-format
+          action: added
+          description: Use JSON format for the interaction log file.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/proposed-pr-specification.yaml
+        section: proposed_prs
+        item_index: 0
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          id: interaction-file-log-core
+          intent: 'Implement the core interaction logging mechanism: define the interaction-log
+            and interaction-entry entities, the log-writer module and tool, and the
+            interaction-source entity, with the log-writer appending entries to the
+            log and the source feeding interactions into the writer.'
+          justification: This is the foundational PR that establishes the base logging
+            capability and file-writing behavior, enabling all subsequent formatting
+            and retention features to build on a stable core.
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/proposed-pr-specification.yaml
+        section: proposed_prs
+        item_index: 1
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          id: interaction-file-log-formatting
+          intent: Add structured output and formatting options to the interaction
+            log, including the JSON format decision and the rel-log-contains relationship
+            for structured entries.
+          justification: Structured formatting is required for machine-readable logs
+            and depends on the core logging mechanism being in place first.
+          dependent_prs:
+          - interaction-file-log-core
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/proposed-pr-specification.yaml
+        section: proposed_prs
+        item_index: 2
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          id: interaction-file-log-retention
+          intent: Implement rotation and cleanup policies for interaction log files
+            to manage disk usage over time.
+          justification: Retention policies prevent unbounded log growth and depend
+            on the formatted output from the formatting PR being available.
+          dependent_prs:
+          - interaction-file-log-formatting
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/proposed-pr-specification.yaml
+        section: features
+        item_index: 0
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          id: feat-interaction-log
+          action: added
+          proposed_pr_id: interaction-file-log-core
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/proposed-pr-specification.yaml
+        section: decisions
+        item_index: 0
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          id: dec-json-format
+          action: added
+          proposed_pr_id: interaction-file-log-formatting
+      - path: /Users/gregory/code/powdrr-lift/.worktrees/powdrr/interaction-file-log-core/docs/proposals/interaction-file-log/system-specification.yaml
+        section: requirements
+        item_index: 0
+        work_item_name: interaction-file-log
+        specification_type: proposed
+        item:
+          description: All human and LLM interaction inputs and outputs must be recorded
+            in a JSON file named interaction-log.json within a hidden .powdrr directory.
+          state: added
+          id: req-1
+  execution_plan:
+    detailed-execution-plan-state:
+      execution_plan:
+        criteria_to_tests:
+        - criterion_id: req-1
+          criterion_description: All human and LLM interaction inputs and outputs
+            must be recorded in a JSON file named interaction-log.json within a hidden
+            .powdrr directory.
+          test_ids:
+          - test-log-writer-appends-entry
+          - test-log-writer-creates-directory
+          - test-log-writer-json-format
+          - test-interaction-source-feeds-writer
+        implementation_files:
+        - src/powdrr_lift/interaction_log/entities.py
+        - src/powdrr_lift/interaction_log/log_writer.py
+        - src/powdrr_lift/interaction_log/interaction_source.py
+        - src/powdrr_lift/interaction_log/__init__.py
+        - src/powdrr_lift/tools/log_writer.py
+        - src/powdrr_lift/tools/interaction_source.py
+        - tests/interaction_log/test_log_writer.py
+        - tests/interaction_log/test_interaction_source.py
+        test_commands:
+        - pytest tests/interaction_log -v
+        validation_commands:
+        - pytest tests/interaction_log -v
+        - python -m compileall src/powdrr_lift/interaction_log src/powdrr_lift/tools
+        risks:
+        - risk_id: risk-secret-spillage
+          description: Interaction logs may contain sensitive content; the .powdrr
+            directory must be treated as sensitive data.
+          mitigation: Ensure the log directory is hidden and document that it contains
+            sensitive data.
+        - risk_id: risk-append-atomicity
+          description: Concurrent appends to the same JSON file could corrupt the
+            log.
+          mitigation: Use a single writer with file locking or serialize writes through
+            the log-writer tool.
+  generated_test_diffs:
+    generated-test-diffs-state:
+      test_files:
+      - tests/interaction_log/test_log_writer.py
+      - tests/interaction_log/test_interaction_source.py
+      test_names:
+      - test_log_writer_appends_entry
+      - test_log_writer_creates_directory
+      - test_log_writer_json_format
+      - test_interaction_source_feeds_writer
+      expected_failures:
+      - 'test_log_writer_appends_entry: log_writer module does not exist yet'
+      - 'test_log_writer_creates_directory: log_writer module does not exist yet'
+      - 'test_log_writer_json_format: log_writer module does not exist yet'
+      - 'test_interaction_source_feeds_writer: interaction_source module does not
+        exist yet'
+  implementation_diffs: {}
+assignee_type: agent
+assignee_role: coder
+output_state_type: generated-product-code-state
+description: Implement the planned product code
+output_state:
+  generated-product-code-state:
+    implementation_files:
+    - src/powdrr_lift/interaction_log/entities.py
+    - src/powdrr_lift/interaction_log/log_writer.py
+    - src/powdrr_lift/interaction_log/interaction_source.py
+    - src/powdrr_lift/interaction_log/__init__.py
+    - src/powdrr_lift/tools/log_writer.py
+    - src/powdrr_lift/tools/interaction_source.py
+    implementation_diffs: {}
+workflow_template: execute-proposed-pr
+step_type: freeform
+details: 'Perform exactly one action: edit the approved product files to implement
+  the proposed behavior and satisfy the failing tests. Make the smallest safe change;
+  do not weaken or delete tests, run validation, or clean unrelated files. Use one
+  edit action, with file_edits for multiple files. A valid response looks like: {"action":"edit","file_edits":[{"file_path":"src/feature.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"implementation
+  code"}]}],"decisions_and_context":"Implemented the planned behavior in the approved
+  product file."} After the edit result is returned, finish this task with next_step
+  and the declared output_state. Use this shape, replacing the example values with
+  the actual edit evidence: {"action":"next_step","output_state":{"generated-product-code-state":{"implementation_files":["src/feature.py"],"implementation_diffs":{}}},"decisions_and_context":"Implemented
+  the planned behavior in the approved product file."}
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-core-workflow''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: standard_reasoning

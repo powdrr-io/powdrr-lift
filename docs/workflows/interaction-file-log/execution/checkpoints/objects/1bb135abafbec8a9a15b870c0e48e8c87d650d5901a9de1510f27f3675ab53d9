@@ -1,0 +1,91 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install RTK
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify RTK
+        run: rtk --version
+
+      - name: Sync environment
+        run: uv sync --extra dev
+
+      - name: Run formatter check
+        run: uv run ruff format --check .
+
+      - name: Run linter
+        run: uv run ruff check .
+
+      - name: Run type checker
+        run: uv run mypy src tests
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Tune changed workflow definitions
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git diff --name-only "$BASE_REF...HEAD" -- skill-definitions templates \
+            | while IFS= read -r definition; do
+                [ -n "$definition" ] || continue
+                slug="$(basename "$definition" .yaml)"
+                set --
+                for replay in "workflow-evals/replays/$slug"/*.yaml; do
+                  [ -f "$replay" ] && set -- "$@" --replay "$replay"
+                done
+                for scenario in "workflow-evals/scenarios/$slug"/*.yaml; do
+                  [ -f "$scenario" ] && set -- "$@" --scenario "$scenario"
+                done
+                [ "$#" -gt 0 ] || continue
+                mkdir -p workflow-tuning-reports
+                uv run powdrr-lift tune-workflow --definition "$definition" \
+                  --baseline-ref "$BASE_REF" \
+                  --report "workflow-tuning-reports/$slug.json" "$@"
+              done
+
+      - name: Upload workflow tuning reports
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-tuning-reports
+          path: workflow-tuning-reports
+          if-no-files-found: ignore

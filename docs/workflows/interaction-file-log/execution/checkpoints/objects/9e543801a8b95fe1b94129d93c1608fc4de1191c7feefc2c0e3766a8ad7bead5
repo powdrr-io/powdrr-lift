@@ -1,0 +1,120 @@
+---
+name: finish-pr-prep
+when_to_use:
+- When staged changes must be validated immediately before creating or updating a
+  pull request.
+- When tests, formatting, lint, and type checks must be rerun after the final
+  staged file set is known.
+steps:
+- description: Deterministically inspect the staged file set.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    The deterministic pre-step records repository status for the next step.
+    An empty result is valid: `git status --short` returns success
+    even when no files are staged. Do not invoke the command again; use the
+    deterministic_context result and choose `next_step`.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: git
+      command:
+      - status
+      - --short
+- description: Confirm the staged pull request scope.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    Invoke the declared shell command exactly once. The action must use the
+    shell tool, not the structured Git intrinsic, because the intrinsic does
+    not support diff. Use this exact shape:
+    {"action":"invoke_tool","tool":"shell","parameters":{"command":["git","diff","--cached","--stat"]},"decisions_and_context":"Inspected the staged pull-request diff."}
+    Confirm from its result that the staged set is the intended pull-request
+    scope, then choose next_step. Do not invoke another Git command in this
+    step.
+  tool_invocations:
+  - tool: shell
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+- description: Discover validation tools for the staged languages.
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
+  step_type: freeform
+  prompt_catalogs: [context_types]
+  llm_type: high_reasoning
+  details: >-
+    Read the staged file names from deterministic_context and derive every
+    programming-language label they represent. Invoke gather_context exactly
+    once with types [tools] and a labels filter containing pr-prep plus those
+    language labels. If no language labels are present, use only pr-prep. Do
+    not hard-code a language, tool, or command. For example, the action shape
+    is {"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep","<language-label>"]}}.
+    After the gather_context result is returned, choose next_step and copy the
+    matching tool records into the required output. The next_step must include
+    an outputs object with the exact declared key, for example:
+    {"action":"next_step","outputs":{"validation_tool_obligations":[{"id":"ruff-check","validation_action":["ruff","check","."]}]},"decisions_and_context":"Recorded every discovered validation tool for the mandatory validation gate."}
+    If gather_context returns no matching tools, use an empty list:
+    {"action":"next_step","outputs":{"validation_tool_obligations":[]},"decisions_and_context":"No applicable validation tools were discovered; the empty obligation list is valid."}
+    Do not return next_step without outputs.validation_tool_obligations.
+  outputs:
+  - name: validation_tool_obligations
+    type: any
+    required_for_next_step: true
+- description: Run the final formatting, lint, type-check, and test passes.
+  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  step_type: freeform
+  inputs:
+  - name: validation_tool_obligations
+    type: any
+    required: true
+  validation_gate:
+    id: pr-prep-validation
+    discovery:
+      input_ref: validation_tool_obligations
+      output_ref: validation_tool_obligations
+      result_path: matches
+    obligations:
+      source: matches
+      filter:
+        section: tools
+      id: item.id
+      action: item.validation_action
+  llm_type: fast_iteration
+  details: >-
+    Use the validation_tool_obligations handoff input as the sole validation action list.
+    Invoke every listed action and satisfy its corresponding runtime obligation
+    before choosing next_step, goto_step, or complete. If an obligation fails,
+    apply its corrective action and rerun every listed action, including actions
+    that passed previously. An empty validation_tool_obligations list is a valid passing
+    result. If a formatter or cleanup action changes files, inspect the edits,
+    restage only the intended files, and rerun the complete validation_tool_obligations list.
+    Treat each failed result as a diagnosis, not as a reason to repeat the same command or
+    repair. Read the exact current file and full result, map the reported issue to its exact
+    path, and choose a materially different correction when the issue state is unchanged or
+    worse. Never claim progress from a whitespace-only or semantically equivalent edit;
+    preserve valid fields and do not alter unrelated files. After every correction, rerun
+    every obligation. Do not choose next_step, goto_step, or complete until the runtime gate
+    reports that every obligation passed in the current epoch.
+- description: Leave the branch ready for pull request creation.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the listed `powdrr-lift repository-state` tool exactly once. Use its
+    result to confirm that the intended files remain staged, the worktree has
+    no unintended leftovers, and the final commands and results are recorded
+    for the upcoming pull request summary. After receiving that result, choose
+    `next_step` immediately; do not invoke `repository-state` again unless a
+    file or staging state changed after the first check. Do not create or
+    update the pull request in this skill.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - repository-state

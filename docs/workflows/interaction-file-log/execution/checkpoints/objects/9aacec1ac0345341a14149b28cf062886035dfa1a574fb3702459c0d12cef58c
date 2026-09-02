@@ -1,0 +1,7 @@
+interface:
+  display_name: "Specify System"
+  short_description: "Create and validate system specs"
+  default_prompt: "Use $specify-system to generate and validate a system specification."
+
+policy:
+  allow_implicit_invocation: true

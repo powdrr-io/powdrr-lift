@@ -1,0 +1,95 @@
+---
+name: specify-system
+when_to_use:
+- When you need to define the system requirements and implementation approach for
+  a work item.
+- When the TUI should guide the user through a synchronous requirements-and-approach
+  flow.
+steps:
+- id: capture-system-context
+  description: Ask for the work item name and the minimum context needed to draft
+    the requirements and approach.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: Collect just enough context to make the template specific without overloading
+    the user with questions.
+- id: generate-system
+  description: Generate the system specification template.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared system-specification tool exactly once. The generator is
+    restart-safe: it overwrites an unreadable/invalid existing file and merges
+    readable existing values into the fresh template while restoring all
+    instructions and missing default fields. Pass its generated file to the next
+    step for completion; do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - system-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+- id: fill-system
+  description: Fill out the requirements and approach sections with concise, testable
+    statements.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: >-
+    Use the yaml_edit action for every YAML change. Its shape is
+    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}},{"op":"upsert_item","section":"approach","id":"approach-id","value":{"description":"...","state":"added"}}]}. Use set_value with a JSON path array for scalar or top-level list fields, and upsert_item with section, id, and a complete value mapping for list entries. Keep each statement concrete enough that it can be validated against the work item without interpretation.
+- id: evaluate-system
+  description: Deterministically evaluate the filled system specification.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared evaluator exactly once for the current file and pass its
+    complete result to the next step. Do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/system-specification.yaml
+- id: repair-system
+  description: Use yaml_edit to fix every issue reported by the system evaluator.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Review the deterministic evaluator result and correct every reported issue
+    with yaml_edit actions. Each action must include the YAML file_path and a
+    non-empty operations array. Use set_value with a JSON path array for scalar
+    or top-level list changes; use upsert_item with section, id, and a complete
+    value mapping for requirements or approach entries. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-system"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
+- id: gate-system
+  description: Confirm that system evaluation reports zero issues.
+  actions: [next_step]
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when the evaluator exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/system-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: evaluate-system
+    retry_context: >-
+      The gate failed because system evaluation still reports issues. Inspect the
+      latest evaluator result, use yaml_edit to fix every issue, and then allow
+      the deterministic evaluate-system step to run again.

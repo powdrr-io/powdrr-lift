@@ -1,0 +1,95 @@
+---
+name: specify-implementation
+when_to_use:
+- When an architecture specification already exists and you need implementation detail.
+- When the TUI should guide the user through a synchronous implementation flow.
+steps:
+- id: review-implementation-context
+  description: Review the system and architecture context first.
+  actions: [invoke_skill, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: Confirm the source architecture id and the relevant entities before drafting
+    implementation detail.
+  uses_skills:
+  - review-system
+  - review-architecture
+- id: generate-implementation
+  description: Generate the implementation specification template.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared implementation-specification tool exactly once. The
+    generator is restart-safe: it overwrites an unreadable/invalid existing
+    file and merges readable existing values into the fresh template while
+    restoring all instructions and missing default fields. Pass its generated
+    file to the next step for completion; do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - implementation-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+- id: fill-implementation
+  description: Fill out the feature and decision sections so they stay aligned with
+    the architecture id.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: >-
+    Use the yaml_edit action for every YAML change. Its shape is
+    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"<architecture-id>"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}},{"op":"upsert_item","section":"decisions","id":"decision-id","value":{"action":"added","description":"..."}}]}. Use set_value with a JSON path array for scalar fields and upsert_item with section, id, and a complete value mapping for list entries. Keep the implementation spec aligned with the source architecture version and do not invent new ids.
+- id: evaluate-implementation
+  description: Deterministically evaluate the filled implementation specification.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared evaluator exactly once for the current file and pass its
+    complete result to the next step. Do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/implementation-specification.yaml
+- id: repair-implementation
+  description: Use yaml_edit to fix every issue reported by the implementation evaluator.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Review the deterministic evaluator result and correct every reported issue
+    with yaml_edit actions. Each action must include the YAML file_path and a
+    non-empty operations array. Use set_value with a JSON path array for scalar
+    changes; use upsert_item with section, id, and a complete value mapping for
+    entities, relationships, modules, tools, features, or decisions. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"architecture-id"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-implementation"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
+- id: gate-implementation
+  description: Confirm that implementation evaluation reports zero issues.
+  actions: [next_step]
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when the evaluator exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/implementation-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: evaluate-implementation
+    retry_context: >-
+      The gate failed because implementation evaluation still reports issues.
+      Inspect the latest evaluator result, use yaml_edit to fix every issue, and
+      then allow the deterministic evaluate-implementation step to run again.

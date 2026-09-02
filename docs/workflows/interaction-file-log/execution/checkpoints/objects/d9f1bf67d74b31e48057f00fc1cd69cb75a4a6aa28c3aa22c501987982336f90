@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare PR Changelog"
+  short_description: "Guide PR changelog preparation"
+  default_prompt: "Use this skill when preparing a pull request. Follow the powdrr-lift CLI workflow exactly: run `powdrr-lift init --pr-number <num>` to generate `docs/changelogs/PR-<num>-changelog.yaml`, fill it out using the inline instructions, run `powdrr-lift evaluate-pr-against-changelog --pr-number <num>`, fix any issues, and only then include the validated changelog file in the PR."

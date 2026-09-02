@@ -1,0 +1,104 @@
+---
+name: review-system
+interaction_style: observational_review
+when_to_use:
+- When new needs may require updating the current system specification.
+- When the TUI should evaluate whether the system requirements and approach still
+  fit.
+steps:
+- description: Gather the requirements and approach context.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  prompt_catalogs: [context_types]
+  llm_type: simple_task
+  details: Use the requirements and approach context to understand the new needs before
+    judging the system specification.
+- description: Decide whether the current system specification needs to change.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Compare the gathered requirements and approach against the new needs. If
+    the existing specification already covers them, end this skill by returning
+    the complete action, for example {"action":"complete","text":"The existing
+    system covers the new needs."}; otherwise choose next_step.
+- id: generate-system
+  description: Deterministically generate the system specification template.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared generator exactly once; do not edit the generated file.
+    The generator overwrites an unreadable/invalid existing file and merges
+    readable values into the fresh template while restoring instructions and
+    missing default fields.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - system-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+- id: fill-system
+  description: Fill the system requirements and approach sections.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: standard_reasoning
+  details: >-
+    Use yaml_edit for every YAML change. Include complete operations using
+    set_value paths or upsert_item section, id, and value fields. Do not use
+    invoke_tool for YAML edits.
+- id: evaluate-system
+  description: Deterministically evaluate the updated system specification.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the evaluator exactly once; do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/system-specification.yaml
+- id: repair-system
+  description: Repair every reported system specification issue.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Use yaml_edit actions to fix every issue reported by evaluation. If there
+    are no issues, choose next_step without changing the file. Use only
+    set_value, upsert_item, and remove_item operations; never use remove or
+    replace. Use remove_item only for an existing item id from the current
+    document. Template comments and boilerplate are removed as a side effect of
+    any valid yaml_edit rewrite; do not treat comments as list items. Do not use
+    invoke_tool in this freeform repair step; the next deterministic step reruns
+    the evaluator. If evaluation reports invalid YAML/structure or you are
+    stuck, restart generation with {"action":"goto_step","step_id":"generate-system"}
+    instead of repeating the same repair.
+- id: gate-system
+  description: Confirm that system evaluation reports zero issues.
+  actions: [next_step]
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when evaluation exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/system-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: evaluate-system
+    retry_context: >-
+      The gate failed because evaluation still reports issues. Repair every
+      issue with yaml_edit, then let the deterministic evaluator run again.

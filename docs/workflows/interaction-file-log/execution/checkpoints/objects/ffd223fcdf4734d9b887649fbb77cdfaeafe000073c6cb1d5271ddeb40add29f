@@ -1,0 +1,13 @@
+task_id: execute-proposed-pr-task-005
+status: open
+upstream_task_ids: [execute-proposed-pr-task-003, execute-proposed-pr-task-004]
+dependent_state: [all-tests-passed]
+complexity: high
+input_state: {implementation_diffs: execute-proposed-pr-task-004.generated-product-code-state, generated_test_diffs: execute-proposed-pr-task-003.generated-test-diffs-state, test_results: {}}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: all-tests-results-state
+description: Run all tests and fix failures
+workflow_template: execute-proposed-pr
+step_type: freeform
+

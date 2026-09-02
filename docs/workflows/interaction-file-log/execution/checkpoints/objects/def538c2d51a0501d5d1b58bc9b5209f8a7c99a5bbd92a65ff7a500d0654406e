@@ -1,0 +1,108 @@
+---
+name: specify-architecture
+when_to_use:
+- When the work item already has requirements and approach and needs an architecture
+  specification.
+- When the TUI should guide the user through a synchronous architecture flow.
+steps:
+- id: review-system-context
+  description: Review the system context first.
+  actions: [invoke_skill, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: Use the system review flow to confirm the requirements, approach, and current
+    constraints.
+  uses_skills:
+  - review-system
+- id: generate-architecture
+  description: Generate the architecture specification template.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared architecture-specification tool exactly once with all
+    entity types. The generator is restart-safe: it overwrites an
+    unreadable/invalid existing file and merges readable existing values into
+    the fresh template while restoring all instructions and missing default
+    fields. Pass its generated file to the next step; do not edit the file in
+    this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - architecture-specification
+      - "--work-item-name"
+      - "<work-item-name>"
+      - "--all-entity-types"
+- id: fill-architecture
+  description: Fill out entities, relationships, invariants, and guidance using only
+    the allowed entity types.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Use the yaml_edit action for every YAML change. Its shape is
+    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"<allowed-type>","name":"...","description":"..."}},{"op":"upsert_item","section":"relationships","id":"relationship-id","value":{"source":"entity-id","target":"entity-id","relationship":"..."}},{"op":"upsert_item","section":"invariants","id":"invariant-id","value":{"description":"...","entity_ids":["entity-id"]}}]}. Use set_value with a JSON path array for scalar or top-level list fields. Keep references explicit and make sure every invariant or guidance item points at listed entities or relationships.
+  
+- id: evaluate-architecture
+  description: Deterministically evaluate the filled architecture specification.
+  actions: [next_step]
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Invoke the declared evaluator exactly once for the current file and pass its
+    complete result to the next step. Do not edit the file in this step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/architecture-specification.yaml
+- id: repair-architecture
+  description: Use yaml_edit to fix every issue reported by the architecture evaluator.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Review only the latest deterministic evaluator result and correct every
+    reported issue with one or more yaml_edit actions. Do not reuse an older LLM
+    explanation after the evaluator has rerun. Each yaml_edit action must include the
+    YAML file_path and a non-empty operations array. Use set_value with a JSON
+    path array for scalar or top-level list changes; use upsert_item with section,
+    id, and a complete value mapping for entity, relationship, invariant, or
+    guidance entries. For entity_type_not_allowed, use the evaluator's exact
+    allowed_entity_types list and edit only entities[].type. Entity type values
+    are independent from relationship source and target fields: source and target
+    must remain entity ids, never type names such as Source file. Matching is
+    case-insensitive for validation, but prefer the exact spelling from the
+    allowed list. Never alternate between two type values, repair a different
+    entity, or change a value that already matches the latest allowed list. After
+    applying the edit, choose next_step and let deterministic evaluation verify
+    it; do not claim that the edit passed validation yourself. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"architecture-id"},{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"Service","name":"Example","description":"..."}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-architecture"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
+- id: gate-architecture
+  description: Confirm that architecture evaluation reports zero issues.
+  actions: [next_step]
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when the evaluator exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/architecture-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: evaluate-architecture
+    retry_context: >-
+      The gate failed because architecture evaluation still reports issues.
+      Inspect the latest evaluator result, use yaml_edit to fix every issue, and
+      then allow the deterministic evaluate-architecture step to run again.

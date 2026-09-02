@@ -1,0 +1,26 @@
+---
+name: handle-ad-hoc
+when_to_use:
+- When the user asks for a small follow-up, comment, correction, explanation, or
+  other request that does not match a more specific skill.
+- When no other skill is currently running and no listed skill is a better match.
+steps:
+- description: Handle what the user asked for.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Handle what the user asked for in the current worktree. Treat the user's
+    message as the complete instruction, inspect the relevant context, and make
+    only the requested changes or response. If the request refers to the prior
+    skill, pull request, review, files, or worktree, continue from the persisted
+    workflow context and do not create a new worktree. Do not invent a larger
+    task or a new feature when the request is an ad-hoc follow-up.
+- description: Run finish-pr-prep when files changed.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: fast_iteration
+  details: >-
+    Inspect the worktree diff. If any files changed during this skill, invoke
+    finish-pr-prep and resolve its validation findings before completing. If no
+    files changed, complete this step without running finish-pr-prep.

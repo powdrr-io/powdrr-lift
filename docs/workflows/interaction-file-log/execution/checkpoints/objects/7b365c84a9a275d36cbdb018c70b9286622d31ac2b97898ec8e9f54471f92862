@@ -1,0 +1,3045 @@
+from __future__ import annotations
+
+import sqlite3
+import time
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
+from pathlib import Path
+
+from powdrr_lift.change_log_parser import (
+    ChangeEntity,
+    ChangeEntityRelationship,
+    ChangeFeatureState,
+    ChangeFile,
+    ChangeGuidance,
+    ChangeInvariant,
+    ChangeLog,
+    ChangeProposedPRState,
+    Decision,
+    Intent,
+    RelatedSection,
+    Span,
+    parse_change_log,
+)
+from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
+from powdrr_lift.core.index import (
+    ChangelogDocument,
+    EntityGraph,
+    EntityOccurrence,
+    ProvenanceRecord,
+    RelationshipOccurrence,
+    SourceIndex,
+    _apply_file_patch,
+    _backfill_line_state_from_blame,
+    _build_commit_changes,
+    _build_entity_graph,
+    _collect_file_patches,
+    _CommitRecord,
+    _document_entity_changes,
+    _file_change_entity_ids,
+    _git_output,
+    _load_branch_pr_description_document,
+    _normalize_entity_id,
+    _normalize_line_state,
+    _parse_commit_log_output,
+    load_specification_documents,
+)
+
+INDEX_CACHE_VERSION = 14
+
+
+@dataclass(frozen=True, slots=True)
+class BranchState:
+    branch_name: str
+    parent_branch: str
+    branch_head_sha: str
+    parent_head_sha: str
+    parent_index_version: int
+    index_version: int
+    indexed_at: int
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentDecisionRecord:
+    pr_number: int
+    decision_index: int
+    decision_id: str | None
+    decision_summary: str | None
+    decision_status: str
+    replaces_decision_id: str | None
+    commit_sha: str | None
+    commit_timestamp: int | None
+    changelog_path: str
+    title: str | None
+    change_id: str | None
+    intent_problem: str | None
+    intent_goal: str | None
+
+
+@dataclass(slots=True)
+class _DecisionState:
+    decision_index: int
+    decision_id: str | None
+    decision_summary: str | None
+    decision_status: str = "current"
+    replaces_decision_id: str | None = None
+
+
+def code_index_db_path(repo_root: str | Path | None = None) -> Path:
+    repo_root_path = _resolve_repo_root(repo_root)
+    return repo_root_path / ".powdrr-lift" / "state" / "code_index.db"
+
+
+def _collect_decision_states(
+    decisions: Sequence[Decision],
+) -> list[_DecisionState]:
+    decision_states: list[_DecisionState] = []
+    decision_state_index_by_id: dict[str, int] = {}
+
+    for decision_index, decision in enumerate(decisions):
+        decision_id = _normalize_text(decision.id)
+        decision_summary = _normalize_text(decision.summary)
+        replaces_decision_id = _normalize_text(decision.replaces)
+        decision_state = _DecisionState(
+            decision_index=decision_index,
+            decision_id=decision_id,
+            decision_summary=decision_summary,
+            replaces_decision_id=replaces_decision_id,
+        )
+        decision_states.append(decision_state)
+
+        if replaces_decision_id is not None:
+            replaced_index = decision_state_index_by_id.get(replaces_decision_id)
+            if replaced_index is not None:
+                decision_states[replaced_index].decision_status = "superseded"
+
+        if decision_id is not None:
+            decision_state_index_by_id[decision_id] = decision_index
+
+    return decision_states
+
+
+def _normalize_text(value: object | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized_value = str(value).strip()
+    return normalized_value or None
+
+
+def refresh_code_index(
+    branch_name: str | None = None,
+    *,
+    parent_branch: str,
+    repo_root: str | Path | None = None,
+) -> SourceIndex:
+    repo_root_path = _resolve_repo_root(repo_root)
+    store = CodeIndexStore(repo_root_path)
+    resolved_branch = branch_name or _current_branch(repo_root_path)
+    return store.refresh(resolved_branch, parent_branch)
+
+
+def lookup_code_provenance(
+    path: str,
+    line_number: int,
+    branch_name: str | None = None,
+    *,
+    parent_branch: str,
+    repo_root: str | Path | None = None,
+) -> ProvenanceRecord | None:
+    store = CodeIndexStore(_resolve_repo_root(repo_root))
+    resolved_branch = branch_name or _current_branch(store.repo_root)
+    source_index = store.refresh(resolved_branch, parent_branch)
+    return source_index.provenance_for(path, line_number)
+
+
+def lookup_code_provenance_span(
+    path: str,
+    start_line: int,
+    end_line: int,
+    branch_name: str | None = None,
+    *,
+    parent_branch: str,
+    repo_root: str | Path | None = None,
+) -> list[ProvenanceRecord]:
+    store = CodeIndexStore(_resolve_repo_root(repo_root))
+    resolved_branch = branch_name or _current_branch(store.repo_root)
+    source_index = store.refresh(resolved_branch, parent_branch)
+    seen_records: set[ProvenanceRecord] = set()
+    provenances: list[ProvenanceRecord] = []
+    for line_number in range(start_line, end_line + 1):
+        provenance = source_index.provenance_for(path, line_number)
+        if provenance is None or provenance in seen_records:
+            continue
+
+        seen_records.add(provenance)
+        provenances.append(provenance)
+
+    return provenances
+
+
+class CodeIndexStore:
+    def __init__(self, repo_root: Path, db_path: Path | None = None) -> None:
+        self.repo_root = repo_root
+        self.db_path = db_path or code_index_db_path(repo_root)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_schema()
+
+    def refresh(self, branch_name: str, parent_branch: str) -> SourceIndex:
+        branch_head_sha = _git_output(
+            self.repo_root,
+            "rev-parse",
+            branch_name,
+        ).strip()
+        parent_head_sha = _git_output(
+            self.repo_root,
+            "rev-parse",
+            parent_branch,
+        ).strip()
+        parent_index = self._ensure_parent_index(parent_branch)
+        parent_state = self._read_branch_state(parent_branch)
+        parent_index_version = (
+            INDEX_CACHE_VERSION if parent_state is None else parent_state.index_version
+        )
+        current_state = self._read_branch_state(branch_name)
+        if (
+            current_state is not None
+            and parent_state is not None
+            and current_state.index_version == INDEX_CACHE_VERSION
+            and current_state.parent_index_version == parent_index_version
+            and current_state.branch_head_sha == branch_head_sha
+            and current_state.parent_branch == parent_branch
+            and current_state.parent_head_sha == parent_head_sha
+        ):
+            return self._load_branch_index(branch_name)
+
+        branch_index = _build_branch_index(
+            self.repo_root,
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            parent_index=parent_index,
+        )
+        self._write_branch_index(
+            branch_name=branch_name,
+            parent_branch=parent_branch,
+            branch_head_sha=branch_head_sha,
+            parent_head_sha=parent_head_sha,
+            parent_index_version=parent_index_version,
+            index=branch_index,
+        )
+        return branch_index
+
+    def lookup(
+        self,
+        branch_name: str,
+        path: str,
+        line_number: int,
+    ) -> ProvenanceRecord | None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                SELECT
+                  pr.id,
+                  pr.kind,
+                  pr.pr_number,
+                  pr.commit_sha,
+                  pr.commit_timestamp,
+                  pr.changelog_path,
+                  pr.title,
+                  pr.change_id,
+                  pr.intent_problem,
+                  pr.intent_goal,
+                  pr.file_path,
+                  pr.span_start,
+                  pr.span_end,
+                  pr.summary,
+                  pr.rationale,
+                  pr.change_index
+                FROM file_line fl
+                JOIN provenance_record pr ON pr.id = fl.provenance_record_id
+                WHERE fl.branch_name = ?
+                  AND fl.file_path = ?
+                  AND fl.line_number = ?
+                """,
+                (branch_name, path, line_number),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            affects_by_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"]],
+            )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                [row],
+                _load_change_file_rows(connection, branch_name),
+            )
+
+        return _row_to_provenance_record(
+            row,
+            affects=affects_by_id.get(row["id"], ()),
+            coedited_files=coedited_files_by_id.get(row["id"], ()),
+        )
+
+    def lookup_span(
+        self,
+        branch_name: str,
+        path: str,
+        start_line: int,
+        end_line: int,
+    ) -> list[ProvenanceRecord]:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT DISTINCT
+                  pr.id,
+                  pr.kind,
+                  pr.pr_number,
+                  pr.commit_sha,
+                  pr.commit_timestamp,
+                  pr.changelog_path,
+                  pr.title,
+                  pr.change_id,
+                  pr.intent_problem,
+                  pr.intent_goal,
+                  pr.file_path,
+                  pr.span_start,
+                  pr.span_end,
+                  pr.summary,
+                  pr.rationale,
+                  pr.change_index
+                FROM file_line fl
+                JOIN provenance_record pr ON pr.id = fl.provenance_record_id
+                WHERE fl.branch_name = ?
+                  AND fl.file_path = ?
+                  AND fl.line_number BETWEEN ? AND ?
+                ORDER BY fl.line_number, pr.id
+                """,
+                (branch_name, path, start_line, end_line),
+            ).fetchall()
+
+        if not rows:
+            return []
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            affects_by_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"] for row in rows],
+            )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                rows,
+                _load_change_file_rows(connection, branch_name),
+            )
+
+        return [
+            _row_to_provenance_record(
+                row,
+                affects=affects_by_id.get(row["id"], ()),
+                coedited_files=coedited_files_by_id.get(row["id"], ()),
+            )
+            for row in rows
+        ]
+
+    def lookup_lines(
+        self,
+        branch_name: str,
+        path: str,
+        start_line: int,
+        end_line: int,
+    ) -> list[tuple[int, ProvenanceRecord | None]]:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT
+                  fl.line_number,
+                  fl.provenance_record_id,
+                  pr.id,
+                  pr.kind,
+                  pr.pr_number,
+                  pr.commit_sha,
+                  pr.commit_timestamp,
+                  pr.changelog_path,
+                  pr.title,
+                  pr.change_id,
+                  pr.intent_problem,
+                  pr.intent_goal,
+                  pr.file_path,
+                  pr.span_start,
+                  pr.span_end,
+                  pr.summary,
+                  pr.rationale,
+                  pr.change_index
+                FROM file_line fl
+                LEFT JOIN provenance_record pr ON pr.id = fl.provenance_record_id
+                WHERE fl.branch_name = ?
+                  AND fl.file_path = ?
+                  AND fl.line_number BETWEEN ? AND ?
+                ORDER BY fl.line_number
+                """,
+                (branch_name, path, start_line, end_line),
+            ).fetchall()
+
+            affects_by_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [
+                    row["provenance_record_id"]
+                    for row in rows
+                    if row["provenance_record_id"] is not None
+                ],
+            )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                [row for row in rows if row["provenance_record_id"] is not None],
+                _load_change_file_rows(connection, branch_name),
+            )
+
+        records_by_line: dict[int, ProvenanceRecord | None] = {
+            row["line_number"]: (
+                None
+                if row["provenance_record_id"] is None
+                else _row_to_provenance_record(
+                    row,
+                    affects=affects_by_id.get(row["provenance_record_id"], ()),
+                    coedited_files=coedited_files_by_id.get(
+                        row["provenance_record_id"], ()
+                    ),
+                )
+            )
+            for row in rows
+        }
+        return [
+            (line_number, records_by_line.get(line_number))
+            for line_number in range(start_line, end_line + 1)
+        ]
+
+    def _load_provenance_affects(
+        self,
+        connection: sqlite3.Connection,
+        branch_name: str,
+        provenance_ids: list[int],
+    ) -> dict[int, tuple[str, ...]]:
+        if not provenance_ids:
+            return {}
+
+        placeholders = ", ".join("?" for _ in provenance_ids)
+        rows = connection.execute(
+            f"""
+            SELECT provenance_record_id, entity_id
+            FROM provenance_affect
+            WHERE branch_name = ?
+              AND provenance_record_id IN ({placeholders})
+            ORDER BY provenance_record_id, entity_id
+            """,
+            [branch_name, *provenance_ids],
+        ).fetchall()
+
+        affects_by_id: dict[int, list[str]] = {}
+        for row in rows:
+            affects_by_id.setdefault(row["provenance_record_id"], []).append(
+                row["entity_id"]
+            )
+
+        return {
+            provenance_id: tuple(entities)
+            for provenance_id, entities in affects_by_id.items()
+        }
+
+    def lookup_entity_references(
+        self,
+        branch_name: str,
+        entity_name: str,
+    ) -> list[ProvenanceRecord]:
+        normalized_entity_name = _normalize_entity_id(entity_name)
+        if normalized_entity_name is None:
+            return []
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT
+                  pr.id,
+                  pr.kind,
+                  pr.pr_number,
+                  pr.commit_sha,
+                  pr.commit_timestamp,
+                  pr.changelog_path,
+                  pr.title,
+                  pr.change_id,
+                  pr.intent_problem,
+                  pr.intent_goal,
+                  pr.file_path,
+                  pr.span_start,
+                  pr.span_end,
+                  pr.summary,
+                  pr.rationale,
+                  pr.change_index
+                FROM provenance_record pr
+                JOIN provenance_affect pa ON pa.provenance_record_id = pr.id
+                WHERE pa.branch_name = ?
+                  AND pa.entity_id = ?
+                  AND pr.branch_name = ?
+                ORDER BY pr.commit_timestamp, pr.id
+                """,
+                (branch_name, normalized_entity_name, branch_name),
+            ).fetchall()
+
+            if not rows:
+                return []
+
+            affects_by_provenance_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"] for row in rows],
+            )
+            coedited_files_by_id = _load_coedited_file_paths_by_provenance_id(
+                rows,
+                _load_change_file_rows(connection, branch_name),
+            )
+
+        return [
+            _row_to_provenance_record(
+                row,
+                affects=affects_by_provenance_id.get(row["id"], ()),
+                coedited_files=coedited_files_by_id.get(row["id"], ()),
+            )
+            for row in rows
+        ]
+
+    def lookup_entity_relationships(
+        self,
+        branch_name: str,
+        entity_name: str,
+    ) -> tuple[list[EntityOccurrence], list[RelationshipOccurrence]]:
+        normalized_entity_name = _normalize_entity_id(entity_name)
+        if normalized_entity_name is None:
+            return [], []
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            entity_rows = connection.execute(
+                """
+                SELECT entity_id, entity_type, action, pr_number, commit_sha,
+                       commit_timestamp, changelog_path
+                FROM entity_occurrence
+                WHERE branch_name = ?
+                  AND entity_id = ?
+                ORDER BY id
+                """,
+                (branch_name, normalized_entity_name),
+            ).fetchall()
+            relationship_rows = connection.execute(
+                """
+                SELECT source_entity_id, target_entity_id, relationship, action,
+                       rationale, pr_number, commit_sha, commit_timestamp,
+                       changelog_path
+                FROM relationship_record
+                WHERE branch_name = ?
+                  AND (source_entity_id = ? OR target_entity_id = ?)
+                ORDER BY id
+                """,
+                (branch_name, normalized_entity_name, normalized_entity_name),
+            ).fetchall()
+
+        entity_occurrences = [
+            EntityOccurrence(
+                entity_id=row["entity_id"],
+                entity_type=row["entity_type"],
+                action=row["action"],
+                pr_number=row["pr_number"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+            )
+            for row in entity_rows
+        ]
+        relationship_occurrences = [
+            RelationshipOccurrence(
+                source=row["source_entity_id"],
+                target=row["target_entity_id"],
+                relationship=row["relationship"],
+                action=row["action"],
+                rationale=row["rationale"],
+                pr_number=row["pr_number"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+            )
+            for row in relationship_rows
+        ]
+        return entity_occurrences, relationship_occurrences
+
+    def lookup_current_decisions(
+        self,
+        branch_name: str,
+    ) -> list[CurrentDecisionRecord]:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT
+                  bd.pr_number,
+                  bd.decision_index,
+                  bd.decision_id,
+                  bd.decision_summary,
+                  bd.decision_status,
+                  bd.replaces_decision_id,
+                  doc.commit_sha,
+                  doc.commit_timestamp,
+                  doc.changelog_path,
+                  doc.title,
+                  doc.change_id,
+                  doc.intent_problem,
+                  doc.intent_goal
+                FROM branch_decision bd
+                JOIN branch_document doc
+                  ON doc.branch_name = bd.branch_name
+                 AND doc.pr_number = bd.pr_number
+                WHERE bd.branch_name = ?
+                  AND bd.decision_status = 'current'
+                ORDER BY doc.commit_timestamp, bd.decision_index
+                """,
+                (branch_name,),
+            ).fetchall()
+
+        return [
+            CurrentDecisionRecord(
+                pr_number=row["pr_number"],
+                decision_index=row["decision_index"],
+                decision_id=row["decision_id"],
+                decision_summary=row["decision_summary"],
+                decision_status=row["decision_status"],
+                replaces_decision_id=row["replaces_decision_id"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+                title=row["title"],
+                change_id=row["change_id"],
+                intent_problem=row["intent_problem"],
+                intent_goal=row["intent_goal"],
+            )
+            for row in rows
+        ]
+
+    def branch_state_for(self, branch_name: str) -> BranchState | None:
+        return self._read_branch_state(branch_name)
+
+    def _ensure_schema(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS branch_state (
+                  branch_name TEXT PRIMARY KEY,
+                  parent_branch TEXT NOT NULL,
+                  branch_head_sha TEXT NOT NULL,
+                  parent_head_sha TEXT NOT NULL,
+                  parent_index_version INTEGER NOT NULL DEFAULT 0,
+                  index_version INTEGER NOT NULL DEFAULT 0,
+                  indexed_at INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS branch_document (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  changelog_path TEXT NOT NULL,
+                  changelog_version INTEGER NOT NULL DEFAULT 1,
+                  commit_sha TEXT,
+                  commit_timestamp INTEGER,
+                  commit_subject TEXT,
+                  title TEXT,
+                  change_id TEXT,
+                  intent_problem TEXT,
+                  intent_goal TEXT,
+                  PRIMARY KEY (branch_name, pr_number)
+                );
+
+                CREATE TABLE IF NOT EXISTS branch_decision (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  decision_index INTEGER NOT NULL,
+                  decision_id TEXT,
+                  decision_summary TEXT,
+                  decision_status TEXT NOT NULL DEFAULT 'current',
+                  replaces_decision_id TEXT,
+                  PRIMARY KEY (branch_name, pr_number, decision_index)
+                );
+
+                CREATE TABLE IF NOT EXISTS provenance_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  kind TEXT NOT NULL,
+                  pr_number INTEGER,
+                  commit_sha TEXT,
+                  commit_timestamp INTEGER,
+                  changelog_path TEXT,
+                  title TEXT,
+                  change_id TEXT,
+                  intent_problem TEXT,
+                  intent_goal TEXT,
+                  file_path TEXT,
+                  span_start INTEGER,
+                  span_end INTEGER,
+                  summary TEXT,
+                  rationale TEXT,
+                  change_index INTEGER
+                );
+
+                CREATE TABLE IF NOT EXISTS provenance_affect (
+                  branch_name TEXT NOT NULL,
+                  provenance_record_id INTEGER NOT NULL,
+                  entity_id TEXT NOT NULL,
+                  PRIMARY KEY (branch_name, provenance_record_id, entity_id),
+                  FOREIGN KEY (provenance_record_id) REFERENCES provenance_record(id)
+                    ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_provenance_affect_lookup
+                  ON provenance_affect(branch_name, entity_id, provenance_record_id);
+
+                CREATE TABLE IF NOT EXISTS file_line (
+                  branch_name TEXT NOT NULL,
+                  file_path TEXT NOT NULL,
+                  line_number INTEGER NOT NULL,
+                  provenance_record_id INTEGER,
+                  PRIMARY KEY (branch_name, file_path, line_number),
+                  FOREIGN KEY (provenance_record_id) REFERENCES provenance_record(id)
+                    ON DELETE SET NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_file_line_lookup
+                  ON file_line(branch_name, file_path, line_number);
+
+                CREATE INDEX IF NOT EXISTS idx_provenance_lookup
+                  ON provenance_record(branch_name, file_path, span_start, span_end);
+
+                CREATE TABLE IF NOT EXISTS entity_occurrence (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  entity_id TEXT NOT NULL,
+                  entity_type TEXT,
+                  action TEXT,
+                  pr_number INTEGER,
+                  commit_sha TEXT,
+                  commit_timestamp INTEGER,
+                  changelog_path TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS relationship_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  source_entity_id TEXT NOT NULL,
+                  target_entity_id TEXT NOT NULL,
+                  relationship TEXT,
+                  action TEXT,
+                  rationale TEXT,
+                  pr_number INTEGER,
+                  commit_sha TEXT,
+                  commit_timestamp INTEGER,
+                  changelog_path TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS change_file_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  file_index INTEGER NOT NULL,
+                  path TEXT,
+                  type TEXT,
+                  span_start INTEGER,
+                  span_end INTEGER,
+                  summary TEXT,
+                  rationale TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_file_entity (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  file_index INTEGER NOT NULL,
+                  entity_index INTEGER NOT NULL,
+                  entity_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, file_index, entity_index
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_file_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  file_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, file_index,
+                    related_index, related_kind, related_id
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_entity_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  scope TEXT NOT NULL,
+                  change_index INTEGER,
+                  entity_index INTEGER NOT NULL,
+                  entity_id TEXT,
+                  entity_type TEXT,
+                  action TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_entity_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  scope TEXT NOT NULL,
+                  change_index INTEGER,
+                  entity_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, scope, change_index, entity_index,
+                    related_index, related_kind, related_id
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_invariant_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  invariant_index INTEGER NOT NULL,
+                  invariant_id TEXT,
+                  description TEXT,
+                  action TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_invariant_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  invariant_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, invariant_index,
+                    related_index, related_kind, related_id
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_guidance_record (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  guidance_index INTEGER NOT NULL,
+                  guidance_id TEXT,
+                  description TEXT,
+                  action TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS change_guidance_related (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  change_index INTEGER NOT NULL,
+                  guidance_index INTEGER NOT NULL,
+                  related_index INTEGER NOT NULL,
+                  related_kind TEXT NOT NULL,
+                  related_id TEXT NOT NULL,
+                  PRIMARY KEY (
+                    branch_name, pr_number, change_index, guidance_index,
+                    related_index, related_kind, related_id
+                  )
+                );
+
+                CREATE TABLE IF NOT EXISTS change_feature_record (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  feature_index INTEGER NOT NULL,
+                  feature_id TEXT,
+                  state TEXT,
+                  PRIMARY KEY (branch_name, pr_number, feature_index)
+                );
+
+                CREATE TABLE IF NOT EXISTS change_pr_record (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  proposed_pr_index INTEGER NOT NULL,
+                  proposed_pr_id TEXT,
+                  state TEXT,
+                  PRIMARY KEY (branch_name, pr_number, proposed_pr_index)
+                );
+                """
+            )
+            branch_state_info = connection.execute(
+                "PRAGMA table_info(branch_state)"
+            ).fetchall()
+            branch_state_columns = {row[1] for row in branch_state_info}
+            if "index_version" not in branch_state_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_state
+                    ADD COLUMN index_version INTEGER NOT NULL DEFAULT 0
+                    """
+                )
+            if "parent_index_version" not in branch_state_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_state
+                    ADD COLUMN parent_index_version INTEGER NOT NULL DEFAULT 0
+                    """
+                )
+            branch_document_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(branch_document)")
+            }
+            if "changelog_version" not in branch_document_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_document
+                    ADD COLUMN changelog_version INTEGER NOT NULL DEFAULT 1
+                    """
+                )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS branch_decision (
+                  branch_name TEXT NOT NULL,
+                  pr_number INTEGER NOT NULL,
+                  decision_index INTEGER NOT NULL,
+                  decision_id TEXT,
+                  decision_summary TEXT,
+                  decision_status TEXT NOT NULL DEFAULT 'current',
+                  replaces_decision_id TEXT,
+                  PRIMARY KEY (branch_name, pr_number, decision_index)
+                )
+                """
+            )
+            branch_decision_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(branch_decision)")
+            }
+            if "decision_status" not in branch_decision_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_decision
+                    ADD COLUMN decision_status TEXT NOT NULL DEFAULT 'current'
+                    """
+                )
+            if "replaces_decision_id" not in branch_decision_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE branch_decision
+                    ADD COLUMN replaces_decision_id TEXT
+                    """
+                )
+
+    def _ensure_parent_index(self, parent_branch: str) -> SourceIndex:
+        current_state = self._read_branch_state(parent_branch)
+        parent_head_sha = _git_output(
+            self.repo_root,
+            "rev-parse",
+            parent_branch,
+        ).strip()
+        if (
+            current_state is not None
+            and current_state.branch_head_sha == parent_head_sha
+            and current_state.index_version == INDEX_CACHE_VERSION
+        ):
+            return self._load_branch_index(parent_branch)
+
+        if parent_branch == _resolve_default_branch(self.repo_root):
+            index = _build_mainline_index_at_ref(self.repo_root, parent_branch)
+            parent_index_version = INDEX_CACHE_VERSION
+            self._write_branch_index(
+                branch_name=parent_branch,
+                parent_branch=parent_branch,
+                branch_head_sha=parent_head_sha,
+                parent_head_sha=parent_head_sha,
+                parent_index_version=parent_index_version,
+                index=index,
+            )
+            return index
+
+        # Fall back to refreshing the parent branch against the default branch.
+        resolved_parent = _resolve_default_branch(self.repo_root)
+        return self.refresh(parent_branch, resolved_parent)
+
+    def _read_branch_state(self, branch_name: str) -> BranchState | None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                SELECT branch_name, parent_branch, branch_head_sha,
+                       parent_head_sha, parent_index_version, index_version,
+                       indexed_at
+                FROM branch_state
+                WHERE branch_name = ?
+                """,
+                (branch_name,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return BranchState(
+            branch_name=row["branch_name"],
+            parent_branch=row["parent_branch"],
+            branch_head_sha=row["branch_head_sha"],
+            parent_head_sha=row["parent_head_sha"],
+            parent_index_version=row["parent_index_version"],
+            index_version=row["index_version"],
+            indexed_at=row["indexed_at"],
+        )
+
+    def _load_branch_index(self, branch_name: str) -> SourceIndex:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            branch_row = connection.execute(
+                """
+                SELECT branch_name, parent_branch, branch_head_sha, parent_head_sha,
+                       parent_index_version, index_version
+                FROM branch_state
+                WHERE branch_name = ?
+                """,
+                (branch_name,),
+            ).fetchone()
+            if branch_row is None:
+                raise RuntimeError(f"Missing branch state for {branch_name!r}.")
+            specification_documents = load_specification_documents(self.repo_root)
+
+            document_rows = connection.execute(
+                """
+                SELECT pr_number, changelog_path, commit_sha, commit_timestamp,
+                       commit_subject, title, change_id, intent_problem,
+                       intent_goal, changelog_version
+                FROM branch_document
+                WHERE branch_name = ?
+                ORDER BY pr_number
+                """,
+                (branch_name,),
+            ).fetchall()
+            decision_rows = connection.execute(
+                """
+                SELECT pr_number, decision_index, decision_id, decision_summary,
+                       decision_status, replaces_decision_id
+                FROM branch_decision
+                WHERE branch_name = ?
+                ORDER BY pr_number, decision_index
+                """,
+                (branch_name,),
+            ).fetchall()
+            entity_rows = connection.execute(
+                """
+                SELECT entity_id, entity_type, action, pr_number, commit_sha,
+                       commit_timestamp, changelog_path
+                FROM entity_occurrence
+                WHERE branch_name = ?
+                ORDER BY entity_id, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            relationship_rows = connection.execute(
+                """
+                SELECT source_entity_id, target_entity_id, relationship, action,
+                       rationale, pr_number, commit_sha, commit_timestamp,
+                       changelog_path
+                FROM relationship_record
+                WHERE branch_name = ?
+                ORDER BY id
+                """,
+                (branch_name,),
+            ).fetchall()
+            provenance_rows = connection.execute(
+                """
+                SELECT id, kind, pr_number, commit_sha, commit_timestamp,
+                       changelog_path, title, change_id, intent_problem,
+                       intent_goal, file_path, span_start, span_end, summary,
+                       rationale, change_index
+                FROM provenance_record
+                WHERE branch_name = ?
+                ORDER BY id
+                """,
+                (branch_name,),
+            ).fetchall()
+            line_rows = connection.execute(
+                """
+                SELECT line_number, file_path, provenance_record_id
+                FROM file_line
+                WHERE branch_name = ?
+                ORDER BY file_path, line_number
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_file_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, file_index, path, type, span_start,
+                       span_end, summary, rationale
+                FROM change_file_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, file_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_file_entity_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, file_index, entity_index, entity_id
+                FROM change_file_entity
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, file_index, entity_index
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_file_related_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, file_index, related_index,
+                       related_kind, related_id
+                FROM change_file_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, file_index, related_index,
+                         related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_entity_rows = connection.execute(
+                """
+                SELECT pr_number, scope, change_index, entity_index, entity_id,
+                       entity_type, action
+                FROM change_entity_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, scope, change_index, entity_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_entity_related_rows = connection.execute(
+                """
+                SELECT pr_number, scope, change_index, entity_index, related_index,
+                       related_kind, related_id
+                FROM change_entity_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, scope, change_index, entity_index,
+                         related_index, related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_invariant_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, invariant_index, invariant_id,
+                       description, action
+                FROM change_invariant_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, invariant_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_invariant_related_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, invariant_index, related_index,
+                       related_kind, related_id
+                FROM change_invariant_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, invariant_index,
+                         related_index, related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_guidance_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, guidance_index, guidance_id,
+                       description, action
+                FROM change_guidance_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, guidance_index, id
+                """,
+                (branch_name,),
+            ).fetchall()
+            change_guidance_related_rows = connection.execute(
+                """
+                SELECT pr_number, change_index, guidance_index, related_index,
+                       related_kind, related_id
+                FROM change_guidance_related
+                WHERE branch_name = ?
+                ORDER BY pr_number, change_index, guidance_index,
+                         related_index, related_kind, related_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            feature_rows = connection.execute(
+                """
+                SELECT pr_number, feature_index, feature_id, state
+                FROM change_feature_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, feature_index, feature_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            proposed_pr_rows = connection.execute(
+                """
+                SELECT pr_number, proposed_pr_index, proposed_pr_id, state
+                FROM change_pr_record
+                WHERE branch_name = ?
+                ORDER BY pr_number, proposed_pr_index, proposed_pr_id
+                """,
+                (branch_name,),
+            ).fetchall()
+            affects_by_provenance_id = self._load_provenance_affects(
+                connection,
+                branch_name,
+                [row["id"] for row in provenance_rows],
+            )
+            coedited_files_by_provenance_id = (
+                _load_coedited_file_paths_by_provenance_id(
+                    provenance_rows,
+                    change_file_rows,
+                )
+            )
+
+        entities_by_id = _group_entity_occurrences(entity_rows)
+        relationship_records = _build_relationship_occurrences(relationship_rows)
+        decisions_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in decision_rows:
+            decisions_by_pr.setdefault(row["pr_number"], []).append(row)
+
+        provenance_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in provenance_rows:
+            provenance_by_pr.setdefault(row["pr_number"], []).append(row)
+
+        provenance_by_id = {
+            row["id"]: _row_to_provenance_record(
+                row,
+                affects=affects_by_provenance_id.get(row["id"], ()),
+                coedited_files=coedited_files_by_provenance_id.get(row["id"], ()),
+            )
+            for row in provenance_rows
+        }
+        entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in entity_rows:
+            entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        file_lines: dict[str, list[ProvenanceRecord | None]] = {}
+        for row in line_rows:
+            file_lines.setdefault(row["file_path"], [])
+            lines = file_lines[row["file_path"]]
+            while len(lines) < row["line_number"]:
+                lines.append(None)
+
+            provenance_record: ProvenanceRecord | None = (
+                provenance_by_id.get(row["provenance_record_id"])
+                if row["provenance_record_id"] is not None
+                else None
+            )
+            lines[row["line_number"] - 1] = provenance_record
+
+        change_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_file_rows:
+            change_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        file_entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_file_entity_rows:
+            file_entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        file_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_file_related_rows:
+            file_related_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_entity_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_entity_rows:
+            change_entity_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_entity_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_entity_related_rows:
+            change_entity_related_rows_by_pr.setdefault(row["pr_number"], []).append(
+                row
+            )
+        change_invariant_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_invariant_rows:
+            change_invariant_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_invariant_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_invariant_related_rows:
+            change_invariant_related_rows_by_pr.setdefault(row["pr_number"], []).append(
+                row
+            )
+        change_guidance_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_guidance_rows:
+            change_guidance_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        change_guidance_related_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in change_guidance_related_rows:
+            change_guidance_related_rows_by_pr.setdefault(row["pr_number"], []).append(
+                row
+            )
+        feature_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in feature_rows:
+            feature_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+        proposed_pr_rows_by_pr: dict[int, list[sqlite3.Row]] = {}
+        for row in proposed_pr_rows:
+            proposed_pr_rows_by_pr.setdefault(row["pr_number"], []).append(row)
+
+        documents = [
+            _load_changelog_document_from_cache_row(
+                row,
+                affects_by_provenance_id=affects_by_provenance_id,
+                decision_rows=decisions_by_pr.get(row["pr_number"], ()),
+                entity_rows=entity_rows_by_pr.get(row["pr_number"], ()),
+                relationship_rows=[
+                    relationship_row
+                    for relationship_row in relationship_rows
+                    if relationship_row["pr_number"] == row["pr_number"]
+                ],
+                change_file_rows=change_rows_by_pr.get(row["pr_number"], ()),
+                change_file_entity_rows=file_entity_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_file_related_rows=file_related_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_entity_rows=change_entity_rows_by_pr.get(row["pr_number"], ()),
+                change_entity_related_rows=change_entity_related_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_invariant_rows=change_invariant_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_invariant_related_rows=change_invariant_related_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_guidance_rows=change_guidance_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                change_guidance_related_rows=change_guidance_related_rows_by_pr.get(
+                    row["pr_number"], ()
+                ),
+                feature_rows=feature_rows_by_pr.get(row["pr_number"], ()),
+                proposed_pr_rows=proposed_pr_rows_by_pr.get(row["pr_number"], ()),
+                provenance_rows=provenance_by_pr.get(row["pr_number"], ()),
+            )
+            for row in document_rows
+        ]
+        changes = [provenance_by_id[row["id"]] for row in provenance_rows]
+        return SourceIndex(
+            repo_root=self.repo_root,
+            default_branch_name=branch_row["parent_branch"],
+            documents=documents,
+            specification_documents=specification_documents,
+            entity_graph=EntityGraph(
+                entities={
+                    entity_id: tuple(occurrences)
+                    for entity_id, occurrences in entities_by_id.items()
+                },
+                relationships=tuple(relationship_records),
+            ),
+            changes=changes,
+            file_lines={path: tuple(lines) for path, lines in file_lines.items()},
+        )
+
+    def _write_branch_index(
+        self,
+        branch_name: str,
+        parent_branch: str,
+        branch_head_sha: str,
+        parent_head_sha: str,
+        parent_index_version: int,
+        index: SourceIndex,
+    ) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute(
+                "DELETE FROM branch_state WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM branch_document WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM branch_decision WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM provenance_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM file_line WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM entity_occurrence WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM relationship_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_file_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_file_entity WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_file_related WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_entity_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_entity_related WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_invariant_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_invariant_related WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_guidance_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_guidance_related WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_feature_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM change_pr_record WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                "DELETE FROM provenance_affect WHERE branch_name = ?",
+                (branch_name,),
+            )
+            connection.execute(
+                """
+                INSERT INTO branch_state (
+                  branch_name, parent_branch, branch_head_sha, parent_head_sha,
+                  parent_index_version, index_version, indexed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    parent_branch,
+                    branch_head_sha,
+                    parent_head_sha,
+                    parent_index_version,
+                    INDEX_CACHE_VERSION,
+                    int(time.time()),
+                ),
+            )
+
+            seen_branch_document_pr_numbers: set[int] = set()
+            seen_branch_decision_keys: set[tuple[int, int]] = set()
+            for document in index.documents:
+                if document.pr_number in seen_branch_document_pr_numbers:
+                    continue
+
+                seen_branch_document_pr_numbers.add(document.pr_number)
+                connection.execute(
+                    """
+                    INSERT INTO branch_document (
+                      branch_name, pr_number, changelog_path, changelog_version,
+                      commit_sha, commit_timestamp, commit_subject, title,
+                      change_id, intent_problem, intent_goal
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        branch_name,
+                        document.pr_number,
+                        str(document.changelog_path),
+                        int(str(document.changelog.version))
+                        if str(document.changelog.version).isdigit()
+                        else 1,
+                        document.commit_sha,
+                        document.commit_timestamp,
+                        document.commit_subject,
+                        document.changelog.title,
+                        document.changelog.change_id,
+                        document.changelog.intent.problem,
+                        document.changelog.intent.goal,
+                    ),
+                )
+                for decision_state in _collect_decision_states(
+                    document.changelog.decisions or []
+                ):
+                    decision_key = (document.pr_number, decision_state.decision_index)
+                    if decision_key in seen_branch_decision_keys:
+                        continue
+
+                    seen_branch_decision_keys.add(decision_key)
+                    connection.execute(
+                        """
+                        INSERT INTO branch_decision (
+                          branch_name, pr_number, decision_index, decision_id,
+                          decision_summary, decision_status, replaces_decision_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            decision_state.decision_index,
+                            decision_state.decision_id,
+                            decision_state.decision_summary,
+                            decision_state.decision_status,
+                            decision_state.replaces_decision_id,
+                        ),
+                    )
+
+                for feature_index, feature in enumerate(
+                    document.changelog.feature_changes or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_feature_record (
+                          branch_name, pr_number, feature_index, feature_id, state
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            feature_index,
+                            feature.id,
+                            feature.state,
+                        ),
+                    )
+
+                for proposed_pr_index, proposed_pr in enumerate(
+                    document.changelog.proposed_prs or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_pr_record (
+                          branch_name, pr_number, proposed_pr_index,
+                          proposed_pr_id, state
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            proposed_pr_index,
+                            proposed_pr.id,
+                            proposed_pr.state,
+                        ),
+                    )
+
+                for file_change_index, file_change in enumerate(
+                    document.changelog.file_changes
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_file_record (
+                          branch_name, pr_number, change_index, file_index, path,
+                          type, span_start, span_end, summary, rationale
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            file_change_index,
+                            0,
+                            file_change.path,
+                            file_change.type,
+                            file_change.span.start_line,
+                            file_change.span.end_line,
+                            file_change.summary,
+                            file_change.rationale,
+                        ),
+                    )
+
+                    for entity_index, entity_id in enumerate(
+                        _file_change_entity_ids(file_change)
+                    ):
+                        connection.execute(
+                            """
+                            INSERT INTO change_file_entity (
+                              branch_name, pr_number, change_index, file_index,
+                              entity_index, entity_id
+                            ) VALUES (?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                branch_name,
+                                document.pr_number,
+                                file_change_index,
+                                0,
+                                entity_index,
+                                entity_id,
+                            ),
+                        )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="file",
+                        change_index=file_change_index,
+                        file_index=0,
+                        related=file_change.related,
+                    )
+
+                for entity_change_index, entity_change in enumerate(
+                    _document_entity_changes(document)
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_entity_record (
+                          branch_name, pr_number, scope, change_index, entity_index,
+                          entity_id, entity_type, action
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            "document",
+                            None,
+                            entity_change_index,
+                            entity_change.id,
+                            entity_change.type,
+                            entity_change.action,
+                        ),
+                    )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="document",
+                        change_index=None,
+                        entity_index=entity_change_index,
+                        related=entity_change.related,
+                    )
+
+                for invariant_index, invariant in enumerate(
+                    document.changelog.invariant_changes or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_invariant_record (
+                          branch_name, pr_number, change_index, invariant_index,
+                          invariant_id, description, action
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            invariant_index,
+                            invariant_index,
+                            invariant.id,
+                            invariant.description,
+                            invariant.action,
+                        ),
+                    )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="invariant",
+                        change_index=invariant_index,
+                        item_index=invariant_index,
+                        related=invariant.related,
+                    )
+
+                for guidance_index, guidance in enumerate(
+                    document.changelog.guidance_changes or []
+                ):
+                    connection.execute(
+                        """
+                        INSERT INTO change_guidance_record (
+                          branch_name, pr_number, change_index, guidance_index,
+                          guidance_id, description, action
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            document.pr_number,
+                            guidance_index,
+                            guidance_index,
+                            guidance.id,
+                            guidance.description,
+                            guidance.action,
+                        ),
+                    )
+                    _write_related_section_rows(
+                        connection,
+                        branch_name=branch_name,
+                        pr_number=document.pr_number,
+                        scope="guidance",
+                        change_index=guidance_index,
+                        item_index=guidance_index,
+                        related=guidance.related,
+                    )
+
+            for entity_id, occurrences in index.entity_graph.entities.items():
+                for occurrence in occurrences:
+                    connection.execute(
+                        """
+                        INSERT INTO entity_occurrence (
+                          branch_name, entity_id, entity_type, action, pr_number,
+                          commit_sha, commit_timestamp, changelog_path
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            entity_id,
+                            occurrence.entity_type,
+                            occurrence.action,
+                            occurrence.pr_number,
+                            occurrence.commit_sha,
+                            occurrence.commit_timestamp,
+                            occurrence.changelog_path,
+                        ),
+                    )
+
+            for relationship in index.entity_graph.relationships:
+                connection.execute(
+                    """
+                    INSERT INTO relationship_record (
+                      branch_name, source_entity_id, target_entity_id, relationship,
+                      action, rationale, pr_number, commit_sha, commit_timestamp,
+                      changelog_path
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        branch_name,
+                        relationship.source,
+                        relationship.target,
+                        relationship.relationship,
+                        relationship.action,
+                        relationship.rationale,
+                        relationship.pr_number,
+                        relationship.commit_sha,
+                        relationship.commit_timestamp,
+                        relationship.changelog_path,
+                    ),
+                )
+
+            provenance_id_by_record: dict[int, int] = {}
+            for record in index.changes:
+                cursor = connection.execute(
+                    """
+                    INSERT INTO provenance_record (
+                      branch_name, kind, pr_number, commit_sha, commit_timestamp,
+                      changelog_path, title, change_id, intent_problem, intent_goal,
+                      file_path, span_start, span_end, summary, rationale, change_index
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        branch_name,
+                        record.kind,
+                        record.pr_number,
+                        record.commit_sha,
+                        record.commit_timestamp,
+                        record.changelog_path,
+                        record.title,
+                        record.change_id,
+                        record.intent_problem,
+                        record.intent_goal,
+                        record.file,
+                        None if record.span is None else record.span.start_line,
+                        None if record.span is None else record.span.end_line,
+                        record.summary,
+                        record.rationale,
+                        record.change_index,
+                    ),
+                )
+                provenance_id = cursor.lastrowid
+                if provenance_id is None:
+                    raise RuntimeError("Missing provenance row id after insert.")
+
+                provenance_id_by_record[id(record)] = provenance_id
+                for entity_id in record.affects:
+                    connection.execute(
+                        """
+                        INSERT INTO provenance_affect (
+                          branch_name, provenance_record_id, entity_id
+                        ) VALUES (?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            provenance_id,
+                            entity_id,
+                        ),
+                    )
+
+            for file_path, lines in index.file_lines.items():
+                for line_number, line_record_ref in enumerate(lines, start=1):
+                    line_record: ProvenanceRecord | None = line_record_ref
+                    line_provenance_id: int | None = None
+                    if line_record is not None:
+                        line_provenance_id = provenance_id_by_record.get(
+                            id(line_record)
+                        )
+                    connection.execute(
+                        """
+                        INSERT INTO file_line (
+                          branch_name, file_path, line_number, provenance_record_id
+                        ) VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            branch_name,
+                            file_path,
+                            line_number,
+                            line_provenance_id,
+                        ),
+                    )
+
+            connection.commit()
+
+
+def _build_branch_index(
+    repo_root: Path,
+    branch_name: str,
+    parent_branch: str,
+    parent_index: SourceIndex,
+) -> SourceIndex:
+    branch_document = _resolve_branch_document(repo_root, parent_branch, branch_name)
+    if branch_document is None:
+        branch_document = _load_branch_pr_description_document(
+            repo_root,
+            branch_name,
+            parent_branch,
+        )
+
+    line_state: dict[str, list[ProvenanceRecord | None]] = {
+        path: list(lines) for path, lines in parent_index.file_lines.items()
+    }
+    documents = list(parent_index.documents)
+    if branch_document is not None and all(
+        document.pr_number != branch_document.pr_number for document in documents
+    ):
+        documents.append(branch_document)
+    changes = list(parent_index.changes)
+    changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]] = {}
+
+    commits = _collect_branch_commits(repo_root, parent_branch, branch_name)
+    for commit in commits:
+        if branch_document is not None:
+            commit = replace(
+                commit,
+                pr_number=branch_document.pr_number,
+                changelog_document=branch_document,
+            )
+        file_patches = _collect_file_patches(repo_root, commit.sha, commit.parent_sha)
+        commit_changes = _build_commit_changes(
+            repo_root,
+            commit,
+            file_patches,
+        )
+        changes.extend(commit_changes)
+        for record in commit_changes:
+            if record.file is None:
+                continue
+
+            changes_by_commit_and_file.setdefault((commit.sha, record.file), []).append(
+                record
+            )
+        for file_patch in file_patches:
+            _apply_file_patch(
+                line_state=line_state,
+                commit=commit,
+                file_patch=file_patch,
+                commit_changes=commit_changes,
+            )
+
+    _normalize_line_state(repo_root, line_state)
+    _backfill_line_state_from_blame(
+        repo_root,
+        line_state,
+        changes_by_commit_and_file,
+    )
+    return SourceIndex(
+        repo_root=repo_root,
+        default_branch_name=parent_branch,
+        documents=documents,
+        specification_documents=load_specification_documents(repo_root),
+        entity_graph=_build_entity_graph(documents),
+        changes=changes,
+        file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
+    )
+
+
+def _build_mainline_index_at_ref(repo_root: Path, ref: str) -> SourceIndex:
+    documents = _load_changelog_documents_at_ref(repo_root, ref)
+    document_by_pr = {document.pr_number: document for document in documents}
+    commits = _load_mainline_commits_at_ref(repo_root, ref, document_by_pr)
+
+    changes: list[ProvenanceRecord] = []
+    line_state: dict[str, list[ProvenanceRecord | None]] = {}
+    changes_by_commit_and_file: dict[tuple[str, str], list[ProvenanceRecord]] = {}
+
+    for commit in commits:
+        file_patches = _collect_file_patches(
+            repo_root,
+            commit.sha,
+            commit.parent_sha,
+        )
+        commit_changes = _build_commit_changes(
+            repo_root,
+            commit,
+            file_patches,
+        )
+        changes.extend(commit_changes)
+        for record in commit_changes:
+            if record.file is None:
+                continue
+
+            changes_by_commit_and_file.setdefault((commit.sha, record.file), []).append(
+                record
+            )
+        for file_patch in file_patches:
+            _apply_file_patch(
+                line_state=line_state,
+                commit=commit,
+                file_patch=file_patch,
+                commit_changes=commit_changes,
+            )
+
+    _normalize_line_state(repo_root, line_state)
+    _backfill_line_state_from_blame(
+        repo_root,
+        line_state,
+        changes_by_commit_and_file,
+    )
+    documents = list(document_by_pr.values())
+    return SourceIndex(
+        repo_root=repo_root,
+        default_branch_name=ref,
+        documents=documents,
+        specification_documents=[],
+        entity_graph=_build_entity_graph(documents),
+        changes=changes,
+        file_lines={path: tuple(lines) for path, lines in sorted(line_state.items())},
+    )
+
+
+def _collect_branch_commits(
+    repo_root: Path,
+    parent_branch: str,
+    branch_name: str,
+) -> list[_CommitRecord]:
+    output = _git_output(
+        repo_root,
+        "log",
+        "--first-parent",
+        "--reverse",
+        "--format=%H%x1f%ct%x1f%s%x1f%b%x1f%P%x1e",
+        f"{parent_branch}..{branch_name}",
+    )
+    commits: list[_CommitRecord] = []
+    for sha, timestamp_text, subject, commit_body, parents in _parse_commit_log_output(
+        output
+    ):
+        parent_sha = parents.split(" ", maxsplit=1)[0] if parents else None
+        commits.append(
+            _CommitRecord(
+                sha=sha,
+                parent_sha=parent_sha,
+                timestamp=int(timestamp_text),
+                subject=subject,
+                commit_body=commit_body,
+                pr_number=None,
+                changelog_document=None,
+            )
+        )
+
+    return commits
+
+
+def _load_changelog_documents_at_ref(
+    repo_root: Path,
+    ref: str,
+    changelog_dir: str | Path = "docs/changelogs",
+) -> list[ChangelogDocument]:
+    changelog_root = Path(changelog_dir)
+    listed_paths = _git_output(
+        repo_root,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        ref,
+        str(changelog_root),
+    )
+    documents: list[ChangelogDocument] = []
+    for path_text in sorted(listed_paths.splitlines()):
+        if not path_text.startswith("docs/changelogs/PR-") or not path_text.endswith(
+            "-changelog.yaml"
+        ):
+            continue
+
+        pr_number_text = path_text.rsplit("/", maxsplit=1)[-1]
+        pr_number_text = pr_number_text.removeprefix("PR-").removesuffix(
+            "-changelog.yaml"
+        )
+        if not pr_number_text.isdigit():
+            continue
+
+        content = _git_output(repo_root, "show", f"{ref}:{path_text}")
+        documents.append(
+            ChangelogDocument(
+                pr_number=int(pr_number_text),
+                changelog_path=repo_root / path_text,
+                changelog=parse_change_log(content),
+                commit_sha=None,
+                commit_timestamp=None,
+                commit_subject=None,
+            )
+        )
+
+    return documents
+
+
+def _load_mainline_commits_at_ref(
+    repo_root: Path,
+    ref: str,
+    document_by_pr: dict[int, ChangelogDocument],
+) -> list[_CommitRecord]:
+    output = _git_output(
+        repo_root,
+        "log",
+        "--first-parent",
+        "--reverse",
+        "--format=%H%x1f%ct%x1f%s%x1f%b%x1f%P%x1e",
+        ref,
+    )
+    commits: list[_CommitRecord] = []
+    for sha, timestamp_text, subject, commit_body, parents in _parse_commit_log_output(
+        output
+    ):
+        parent_sha = parents.split(" ", maxsplit=1)[0] if parents else None
+        pr_number = None
+        match = _extract_pr_number_from_subject(subject)
+        if match is not None:
+            pr_number = match
+        changelog_document = (
+            document_by_pr.get(pr_number) if pr_number is not None else None
+        )
+        if changelog_document is not None and pr_number is not None:
+            changelog_document = ChangelogDocument(
+                pr_number=changelog_document.pr_number,
+                changelog_path=changelog_document.changelog_path,
+                changelog=changelog_document.changelog,
+                commit_sha=sha,
+                commit_timestamp=int(timestamp_text),
+                commit_subject=subject,
+            )
+            document_by_pr[pr_number] = changelog_document
+
+        commits.append(
+            _CommitRecord(
+                sha=sha,
+                parent_sha=parent_sha,
+                timestamp=int(timestamp_text),
+                subject=subject,
+                commit_body=commit_body,
+                pr_number=pr_number,
+                changelog_document=changelog_document,
+            )
+        )
+
+    return commits
+
+
+def _resolve_branch_document(
+    repo_root: Path,
+    parent_branch: str,
+    branch_name: str,
+) -> ChangelogDocument | None:
+    output = _git_output(
+        repo_root,
+        "diff",
+        "--name-only",
+        f"{parent_branch}...{branch_name}",
+    )
+    for path_text in output.splitlines():
+        if not path_text.startswith("docs/changelogs/PR-") or not path_text.endswith(
+            "-changelog.yaml"
+        ):
+            continue
+
+        changelog_path = repo_root / path_text
+        if not changelog_path.exists():
+            continue
+
+        match = path_text.rsplit("/", maxsplit=1)[-1]
+        pr_number_text = match.removeprefix("PR-").removesuffix("-changelog.yaml")
+        if not pr_number_text.isdigit():
+            continue
+
+        pr_number = int(pr_number_text)
+        content = changelog_path.read_text(encoding="utf-8")
+        changelog = parse_change_log(content)
+        return ChangelogDocument(
+            pr_number=pr_number,
+            changelog_path=changelog_path,
+            changelog=changelog,
+            commit_sha=None,
+            commit_timestamp=None,
+            commit_subject=None,
+        )
+
+    return None
+
+
+def _row_to_provenance_record(
+    row: sqlite3.Row,
+    *,
+    affects: tuple[str, ...] = (),
+    coedited_files: tuple[str, ...] = (),
+) -> ProvenanceRecord:
+    return ProvenanceRecord(
+        kind=row["kind"],
+        pr_number=row["pr_number"],
+        commit_sha=row["commit_sha"],
+        commit_timestamp=row["commit_timestamp"],
+        changelog_path=row["changelog_path"],
+        title=row["title"],
+        change_id=row["change_id"],
+        intent_problem=row["intent_problem"],
+        intent_goal=row["intent_goal"],
+        file=row["file_path"],
+        span=(
+            None
+            if row["span_start"] is None and row["span_end"] is None
+            else _span_from_row(row)
+        ),
+        summary=row["summary"],
+        rationale=row["rationale"],
+        affects=affects,
+        coedited_files=coedited_files,
+        change_index=row["change_index"],
+    )
+
+
+def _load_change_file_rows(
+    connection: sqlite3.Connection,
+    branch_name: str,
+) -> list[sqlite3.Row]:
+    connection.row_factory = sqlite3.Row
+    return connection.execute(
+        """
+        SELECT pr_number, change_index, file_index, path
+        FROM change_file_record
+        WHERE branch_name = ?
+        ORDER BY pr_number, change_index, file_index, id
+        """,
+        (branch_name,),
+    ).fetchall()
+
+
+def _load_coedited_file_paths_by_provenance_id(
+    provenance_rows: Sequence[sqlite3.Row],
+    change_file_rows: Sequence[sqlite3.Row],
+) -> dict[int, tuple[str, ...]]:
+    paths_by_pr: dict[int, list[str]] = {}
+    for row in change_file_rows:
+        pr_number = row["pr_number"]
+        path = row["path"]
+        if pr_number is None or path is None:
+            continue
+
+        normalized_path = str(path).strip()
+        if not normalized_path:
+            continue
+
+        paths = paths_by_pr.setdefault(pr_number, [])
+        if normalized_path not in paths:
+            paths.append(normalized_path)
+
+    coedited_files_by_provenance_id: dict[int, tuple[str, ...]] = {}
+    for row in provenance_rows:
+        provenance_id = row["id"]
+        pr_number = row["pr_number"]
+        change_index = row["change_index"]
+        file_path = row["file_path"]
+        if (
+            provenance_id is None
+            or pr_number is None
+            or change_index is None
+            or file_path is None
+        ):
+            continue
+
+        current_path = str(file_path).strip()
+        if not current_path:
+            continue
+
+        coedited_files_by_provenance_id[provenance_id] = tuple(
+            path for path in paths_by_pr.get(pr_number, []) if path != current_path
+        )
+
+    return coedited_files_by_provenance_id
+
+
+def _span_from_row(row: sqlite3.Row) -> Span:
+    return Span(start_line=row["span_start"], end_line=row["span_end"])
+
+
+def _load_changelog_document_from_cache_row(
+    row: sqlite3.Row,
+    *,
+    affects_by_provenance_id: dict[int, tuple[str, ...]],
+    decision_rows: Sequence[sqlite3.Row],
+    entity_rows: Sequence[sqlite3.Row],
+    relationship_rows: Sequence[sqlite3.Row],
+    change_file_rows: Sequence[sqlite3.Row],
+    change_file_entity_rows: Sequence[sqlite3.Row],
+    change_file_related_rows: Sequence[sqlite3.Row],
+    change_entity_rows: Sequence[sqlite3.Row],
+    change_entity_related_rows: Sequence[sqlite3.Row],
+    change_invariant_rows: Sequence[sqlite3.Row],
+    change_invariant_related_rows: Sequence[sqlite3.Row],
+    change_guidance_rows: Sequence[sqlite3.Row],
+    change_guidance_related_rows: Sequence[sqlite3.Row],
+    feature_rows: Sequence[sqlite3.Row],
+    proposed_pr_rows: Sequence[sqlite3.Row],
+    provenance_rows: Sequence[sqlite3.Row],
+) -> ChangelogDocument:
+    changelog_path = Path(row["changelog_path"])
+    decisions = [
+        Decision(
+            id=decision_row["decision_id"],
+            summary=decision_row["decision_summary"],
+        )
+        for decision_row in decision_rows
+    ]
+    document_entity_rows = [
+        entity_row
+        for entity_row in change_entity_rows
+        if entity_row["scope"] == "document"
+    ]
+
+    source_entity_rows = document_entity_rows if document_entity_rows else entity_rows
+
+    file_entities_by_change: dict[int, dict[int, list[str]]] = {}
+    for row_data in change_file_entity_rows:
+        file_entities_by_change.setdefault(row_data["change_index"], {}).setdefault(
+            row_data["file_index"],
+            [],
+        ).append(row_data["entity_id"])
+
+    file_related_by_change: dict[int, dict[int, RelatedSection]] = {}
+    for row_data in change_file_related_rows:
+        file_related = file_related_by_change.setdefault(
+            row_data["change_index"],
+            {},
+        ).setdefault(row_data["file_index"], RelatedSection())
+        _append_related_item(
+            file_related,
+            row_data["related_kind"],
+            row_data["related_id"],
+        )
+
+    file_changes: list[ChangeFile] = []
+    for file_row in change_file_rows:
+        entities_for_file = file_entities_by_change.get(
+            file_row["change_index"], {}
+        ).get(
+            file_row["file_index"],
+            [],
+        )
+        related_for_file = file_related_by_change.get(file_row["change_index"], {}).get(
+            file_row["file_index"],
+            RelatedSection(),
+        )
+        file_changes.append(
+            ChangeFile(
+                path=file_row["path"],
+                type=file_row["type"],
+                entities=list(entities_for_file),
+                span=Span(
+                    start_line=file_row["span_start"],
+                    end_line=file_row["span_end"],
+                ),
+                summary=file_row["summary"],
+                rationale=file_row["rationale"],
+                related=related_for_file,
+            )
+        )
+
+    entity_related_by_change: dict[int | None, dict[int, RelatedSection]] = {}
+    for scope_row in change_entity_related_rows:
+        if scope_row["scope"] == "document":
+            related = entity_related_by_change.setdefault(
+                scope_row["change_index"],
+                {},
+            ).setdefault(scope_row["entity_index"], RelatedSection())
+            _append_related_item(
+                related,
+                scope_row["related_kind"],
+                scope_row["related_id"],
+            )
+
+    entity_changes_with_related: list[ChangeEntity] = []
+    for entity_index, entity_row in enumerate(source_entity_rows):
+        related = entity_related_by_change.get(None, {}).get(
+            entity_index,
+            RelatedSection(),
+        )
+        entity_changes_with_related.append(
+            ChangeEntity(
+                id=entity_row["entity_id"],
+                type=entity_row["entity_type"],
+                action=entity_row["action"],
+                related=related,
+            )
+        )
+
+    invariant_changes: list[ChangeInvariant] = [
+        ChangeInvariant(
+            id=invariant_row["invariant_id"],
+            description=invariant_row["description"],
+            action=invariant_row["action"],
+        )
+        for invariant_row in change_invariant_rows
+    ]
+
+    guidance_changes: list[ChangeGuidance] = [
+        ChangeGuidance(
+            id=guidance_row["guidance_id"],
+            description=guidance_row["description"],
+            action=guidance_row["action"],
+        )
+        for guidance_row in change_guidance_rows
+    ]
+
+    feature_changes = [
+        ChangeFeatureState(
+            id=feature_row["feature_id"],
+            state=feature_row["state"],
+        )
+        for feature_row in feature_rows
+    ]
+
+    proposed_pr_changes = [
+        ChangeProposedPRState(
+            id=proposed_pr_row["proposed_pr_id"],
+            state=proposed_pr_row["state"],
+        )
+        for proposed_pr_row in proposed_pr_rows
+    ]
+
+    entity_relationship_changes = [
+        ChangeEntityRelationship(
+            action=relationship_row["action"],
+            source=relationship_row["source_entity_id"],
+            target=relationship_row["target_entity_id"],
+            relationship=relationship_row["relationship"],
+            rationale=relationship_row["rationale"],
+        )
+        for relationship_row in relationship_rows
+    ]
+
+    changelog = ChangeLog(
+        version=row["changelog_version"],
+        change_id=row["change_id"],
+        title=row["title"],
+        intent=Intent(
+            problem=row["intent_problem"],
+            goal=row["intent_goal"],
+        ),
+        decisions=decisions,
+        entity_changes=entity_changes_with_related,
+        file_changes=file_changes,
+        entity_relationship_changes=entity_relationship_changes,
+        invariant_changes=invariant_changes,
+        guidance_changes=guidance_changes,
+        feature_changes=feature_changes,
+        proposed_prs=proposed_pr_changes,
+    )
+
+    return ChangelogDocument(
+        pr_number=row["pr_number"],
+        changelog_path=changelog_path,
+        changelog=changelog,
+        commit_sha=row["commit_sha"],
+        commit_timestamp=row["commit_timestamp"],
+        commit_subject=row["commit_subject"],
+    )
+
+
+def _append_related_item(
+    related: RelatedSection,
+    related_kind: str,
+    related_id: str,
+) -> None:
+    if related_kind == "file":
+        related.files.append(related_id)
+    elif related_kind == "entity":
+        related.entities.append(related_id)
+    elif related_kind == "invariant":
+        related.invariants.append(related_id)
+    elif related_kind == "guidance":
+        related.guidance.append(related_id)
+    elif related_kind == "acceptance_criteria":
+        related.acceptance_criteria.append(related_id)
+    elif related_kind == "expected_tests":
+        related.expected_tests.append(related_id)
+    elif related_kind == "required_test_cases":
+        related.required_test_cases.append(related_id)
+    elif related_kind == "expected_outcomes":
+        related.expected_outcomes.append(related_id)
+    elif related_kind == "non_goals":
+        related.non_goals.append(related_id)
+    elif related_kind == "risks":
+        related.risks.append(related_id)
+
+
+def _write_related_section_rows(
+    connection: sqlite3.Connection,
+    *,
+    branch_name: str,
+    pr_number: int,
+    scope: str,
+    change_index: int | None,
+    entity_index: int | None = None,
+    item_index: int | None = None,
+    file_index: int | None = None,
+    related: RelatedSection | None = None,
+) -> None:
+    if related is None:
+        return
+
+    if scope == "file":
+        if file_index is None:
+            raise ValueError("File related rows require a file index.")
+
+        for related_index, related_id in enumerate(related.files):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "file",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.entities):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "entity",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.invariants):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "invariant",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.guidance):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "guidance",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.acceptance_criteria):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "acceptance_criteria",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_tests):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.required_test_cases):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "required_test_cases",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_outcomes):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "expected_outcomes",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.non_goals):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "non_goals",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.risks):
+            connection.execute(
+                """
+                INSERT INTO change_file_related (
+                  branch_name, pr_number, change_index, file_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    file_index,
+                    related_index,
+                    "risks",
+                    related_id,
+                ),
+            )
+        return
+
+    if scope in {"document", "change"}:
+        if entity_index is None:
+            raise ValueError("Entity related rows require an entity index.")
+
+        for related_index, related_id in enumerate(related.files):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "file",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.entities):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "entity",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.invariants):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "invariant",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.guidance):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "guidance",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.acceptance_criteria):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "acceptance_criteria",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_tests):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.required_test_cases):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "required_test_cases",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_outcomes):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "expected_outcomes",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.non_goals):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "non_goals",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.risks):
+            connection.execute(
+                """
+                INSERT INTO change_entity_related (
+                  branch_name, pr_number, scope, change_index, entity_index,
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    scope,
+                    change_index,
+                    entity_index,
+                    related_index,
+                    "risks",
+                    related_id,
+                ),
+            )
+        return
+
+    if scope in {"invariant", "guidance"}:
+        if item_index is None:
+            raise ValueError("Lifecycle related rows require an item index.")
+
+        table_name = (
+            "change_invariant_related"
+            if scope == "invariant"
+            else "change_guidance_related"
+        )
+        index_column = "invariant_index" if scope == "invariant" else "guidance_index"
+        for related_index, related_id in enumerate(related.files):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "file",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.entities):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "entity",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.invariants):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "invariant",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.guidance):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "guidance",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.acceptance_criteria):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "acceptance_criteria",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_tests):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "expected_tests",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.required_test_cases):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "required_test_cases",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.expected_outcomes):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "expected_outcomes",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.non_goals):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "non_goals",
+                    related_id,
+                ),
+            )
+        for related_index, related_id in enumerate(related.risks):
+            connection.execute(
+                f"""
+                INSERT INTO {table_name} (
+                  branch_name, pr_number, change_index, {index_column},
+                  related_index, related_kind, related_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch_name,
+                    pr_number,
+                    change_index,
+                    item_index,
+                    related_index,
+                    "risks",
+                    related_id,
+                ),
+            )
+
+
+def _group_entity_occurrences(
+    entity_rows: Sequence[sqlite3.Row],
+) -> dict[str, list[EntityOccurrence]]:
+    entities_by_id: dict[str, list[EntityOccurrence]] = {}
+    for row in entity_rows:
+        entities_by_id.setdefault(row["entity_id"], []).append(
+            EntityOccurrence(
+                entity_id=row["entity_id"],
+                entity_type=row["entity_type"],
+                action=row["action"],
+                pr_number=row["pr_number"],
+                commit_sha=row["commit_sha"],
+                commit_timestamp=row["commit_timestamp"],
+                changelog_path=row["changelog_path"],
+            )
+        )
+
+    return entities_by_id
+
+
+def _build_relationship_occurrences(
+    relationship_rows: Sequence[sqlite3.Row],
+) -> list[RelationshipOccurrence]:
+    return [
+        RelationshipOccurrence(
+            source=row["source_entity_id"],
+            target=row["target_entity_id"],
+            relationship=row["relationship"],
+            action=row["action"],
+            rationale=row["rationale"],
+            pr_number=row["pr_number"],
+            commit_sha=row["commit_sha"],
+            commit_timestamp=row["commit_timestamp"],
+            changelog_path=row["changelog_path"],
+        )
+        for row in relationship_rows
+    ]
+
+
+def _current_branch(repo_root: Path) -> str:
+    return _git_output(repo_root, "branch", "--show-current").strip()
+
+
+def _extract_pr_number_from_subject(subject: str) -> int | None:
+    marker = "(#"
+    if marker not in subject:
+        return None
+
+    start = subject.rfind(marker)
+    end = subject.find(")", start)
+    if start == -1 or end == -1:
+        return None
+
+    pr_text = subject[start + len(marker) : end]
+    if not pr_text.isdigit():
+        return None
+
+    return int(pr_text)

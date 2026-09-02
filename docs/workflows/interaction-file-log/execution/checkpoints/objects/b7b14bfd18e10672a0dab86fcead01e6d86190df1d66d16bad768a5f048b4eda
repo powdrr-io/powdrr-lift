@@ -1,0 +1,33 @@
+---
+name: independent-skill-workflow-review
+adversarial: true
+when_to_use:
+- When review-skill-workflow requests an independent completeness check of a
+  proposed skill or workflow rewrite.
+steps:
+- description: Compare the original and proposed definitions without bias.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Read the supplied target goal, original step text, proposed replacement,
+    preserved-requirement list, and inventory counts. Reconstruct the original
+    step's required behavior before judging the rewrite. Do not use the parent
+    review's findings as evidence and do not propose improvements merely because
+    your wording differs.
+- description: Report omissions and execution risks.
+  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Return one finding per omitted goal, dependency, input, output, safety
+    check, validation condition, tool argument, failure rule, hidden action, or
+    implicit data handoff between steps or skills.
+    Each finding must contain both a judgment and a directive: state what is
+    wrong, then state the smallest concrete correction. Also flag any proposed
+    step that still permits multiple tool calls, more than three independent
+    action clauses, or an ambiguous success condition. For example, judge
+    "This English references a tool without an invocation example" and direct
+    "Provide a targeted example for <tool-name> using <required-arguments>."
+    Cite the original requirement for every finding. If the rewrite is complete,
+    state that explicitly and list the requirements checked.

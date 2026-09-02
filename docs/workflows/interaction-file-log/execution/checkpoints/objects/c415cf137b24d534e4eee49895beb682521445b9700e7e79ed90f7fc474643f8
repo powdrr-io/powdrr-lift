@@ -1,0 +1,13 @@
+task_id: execute-proposed-pr-task-012
+status: open
+upstream_task_ids: [execute-proposed-pr-task-011]
+dependent_state: [final-scope-repair-complete]
+complexity: medium
+input_state: {scope_review: execute-proposed-pr-task-011.final-scope-review-state, scope_repair: {}}
+assignee_type: agent
+assignee_role: coder
+output_state_type: final-scope-repair-state
+description: Repair final diff scope issues
+workflow_template: execute-proposed-pr
+step_type: freeform
+

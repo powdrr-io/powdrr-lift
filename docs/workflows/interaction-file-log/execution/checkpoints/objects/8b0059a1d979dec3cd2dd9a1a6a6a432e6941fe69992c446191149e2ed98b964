@@ -1,0 +1,224 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: "required-test-cases"
+title: "Add required test case evidence to proposed PR changelogs"
+requirements:
+  - id: req-proposed-pr-evidence
+    description: Proposed PR specs must include a required_test_cases section that states the test evidence expected from the implementation.
+    state: added
+  - id: req-changelog-evidence-links
+    description: Changelog related sections must allow each changed source hunk to reference the required test cases that prove it.
+    state: added
+  - id: req-validator-enforcement
+    description: Changelog validation must reject required test case references that do not point at real proposed PR detail entries or real changed source locations.
+    state: added
+  - id: req-roundtrip-support
+    description: Parsing, template generation, and code indexing must preserve required test case references when changelog artifacts are regenerated.
+    state: added
+  - id: req-skill-loop-integrity
+    description: The plan-and-implement-feature workflow must continue to use the changelog diff loop without changing the plan to hide implementation mismatches.
+    state: added
+approach:
+  - id: app-spec-update
+    description: Extend the proposed PR specification template, validator, and search/reporting code so required_test_cases is treated as a first-class detail section.
+    state: added
+  - id: app-changelog-update
+    description: Extend the changelog parser, template generator, and code index so related file entries can carry required_test_cases references.
+    state: added
+  - id: app-validation-update
+    description: Extend changelog validation so required test cases are checked against the available proposed PR specification details and actual source spans.
+    state: added
+  - id: app-test-update
+    description: Update parser, template, validation, and PR specification tests so the new evidence path is covered end to end.
+    state: added
+entities:
+  - id: proposed-pr-specification
+    type: Template file
+    summary: Proposed PR template that now includes required test cases as an evidence section.
+    rationale: This is the source of truth for what evidence the changelog must cite.
+  - id: changelog-template
+    type: Template file
+    summary: Generated changelog template with related sections for changed files.
+    rationale: This template is where evidence links from changed hunks are recorded.
+  - id: changelog-validator
+    type: Module
+    summary: Validation engine for changelog YAML.
+    rationale: It must enforce the new required test case linkage rules.
+  - id: changelog-parser
+    type: Module
+    summary: Parser that loads changelog YAML into typed structures.
+    rationale: It must preserve required test case ids so validation and indexing can use them.
+  - id: changelog-code-index
+    type: Module
+    summary: Code index and round-trip helper for changelog metadata.
+    rationale: It must not drop required test case ids when it rewrites related sections.
+  - id: pr-specification-validator
+    type: Module
+    summary: Validator for proposed PR templates.
+    rationale: It must accept and validate the new required_test_cases section.
+entity_relationships:
+  - id: pr-specification-feeds-changelog-evidence
+    source: proposed-pr-specification
+    target: changelog-template
+    relationship: feeds
+    description: The proposed PR document tells the changelog generator which required tests should exist.
+    rationale: Evidence links in the changelog must trace back to the planned test cases.
+  - id: changelog-parser-feeds-validator
+    source: changelog-parser
+    target: changelog-validator
+    relationship: feeds
+    description: Parsed required test case ids are handed to validation.
+    rationale: Validation cannot check references if the parser drops them.
+  - id: changelog-code-index-preserves-related-evidence
+    source: changelog-code-index
+    target: changelog-template
+    relationship: supports
+    description: The code index carries required test case evidence through regeneration.
+    rationale: Regeneration should keep the evidence links already discovered in the branch.
+  - id: pr-validator-exposes-required-test-cases
+    source: pr-specification-validator
+    target: proposed-pr-specification
+    relationship: validates
+    description: The PR validator must require and validate required_test_cases entries.
+    rationale: The planned evidence should be checked before implementation starts.
+  - id: changelog-validator-checks-source-locations
+    source: changelog-validator
+    target: changelog-template
+    relationship: validates
+    description: The changelog validator must verify that required test case references map to real changed source locations.
+    rationale: A required test case reference without a real source span is not usable evidence.
+invariants:
+  - id: inv-required-test-cases-exist-in-pr-spec
+    description: Every required_test_cases entry in a proposed PR specification must have both an id and a description.
+    rationale: The changelog can only cite evidence that is explicitly described in the plan.
+    related:
+      entities:
+        - proposed-pr-specification
+        - pr-specification-validator
+  - id: inv-changelog-required-test-case-reference-valid
+    description: Every changelog related.required_test_cases entry must resolve to a required_test_cases id in the current proposed PR specifications.
+    rationale: The validator should reject stale or invented evidence references.
+    related:
+      entities:
+        - changelog-validator
+        - proposed-pr-specification
+  - id: inv-evidence-matches-changed-source
+    description: Every required test case reference in a changelog must be tied to a changed source file span that exists in the branch diff.
+    rationale: Evidence needs to point at the actual code that changed.
+    related:
+      entities:
+        - changelog-template
+        - changelog-validator
+  - id: inv-roundtrip-preserves-required-test-cases
+    description: Required test case ids must survive parser, template, and index round-trips unchanged.
+    rationale: Dropping evidence references would make regenerated changelogs incomplete.
+    related:
+      entities:
+        - changelog-parser
+        - changelog-code-index
+guidance:
+  - id: guide-use-new-section-first
+    description: Add the required_test_cases section to the proposed PR spec before wiring changelog validation against it.
+    rationale: The validator needs a source of truth before the changelog can cite it.
+    related:
+      entities:
+        - proposed-pr-specification
+        - changelog-validator
+  - id: guide-only-code-fixes
+    description: If the plan diff shows a mismatch, change the implementation code instead of rewriting the plan or changelog to make the mismatch disappear.
+    rationale: The workflow should close real gaps, not hide them.
+    related:
+      entities:
+        - changelog-validator
+        - changelog-code-index
+  - id: guide-test-the-evidence-path
+    description: Add tests that fail when required test case ids are missing, malformed, or disconnected from changed source hunks.
+    rationale: The new evidence path is only trustworthy if validation covers the failure modes.
+    related:
+      entities:
+        - pr-specification-validator
+        - changelog-parser
+features:
+  - id: feature-required-test-cases
+    action: added
+    description: Add a required_test_cases section to proposed PR specifications and make changelog related sections point at those test cases.
+    supercedes: null
+    functional_requirements:
+      - The proposed PR template must render a required_test_cases section with id and description entries.
+      - The changelog template must render related.required_test_cases when evidence exists for a changed file hunk.
+      - The changelog parser must preserve required_test_cases when reading YAML back in.
+  - id: feature-required-test-case-validation
+    action: added
+    description: Validate required test case references against the proposed PR specification and the changed source locations they are meant to prove.
+    supercedes: null
+    functional_requirements:
+      - Validation must reject references to unknown required test case ids.
+      - Validation must reject changelogs whose required test case references do not map to a real changed source location.
+      - Validation must keep the error messages specific enough for an agent to fix the source code, not the plan.
+  - id: feature-roundtrip-evidence-preservation
+    action: added
+    description: Preserve required test case evidence through indexing and template regeneration so the changelog remains stable across the workflow.
+    supercedes: null
+    functional_requirements:
+      - The code index must write required_test_cases back out when it regenerates related sections.
+      - Regenerated changelog templates must keep existing required test case references when they are still valid.
+      - The evidence field must not be lost during parser or template round-trips.
+decisions:
+  - id: decision-required-test-cases-are-plan-evidence
+    action: added
+    description: Treat required test cases as explicit proposed-PR evidence rather than as a free-form note in the changelog.
+    supercedes: null
+  - id: decision-validation-is-fail-closed
+    action: added
+    description: Make changelog validation fail closed when a required test case reference is missing, stale, or disconnected from source.
+    supercedes: null
+  - id: decision-preserve-workflow-order
+    action: added
+    description: Keep the plan, implementation, changelog, and diff workflow order intact and use the diff only to drive code changes.
+    supercedes: null
+feature_ids:
+  - feature-specified-template-workflows
+  - feature-review-workflows
+  - feature-context-graph
+intent:
+  goal: Strengthen proposed PRs and changelogs so each change includes explicit required test cases and validation proves the evidence points to real changed code.
+  reasoning: The workflow should tell future agents what to test, where the code changed, and how the changelog proves those outcomes without allowing the plan itself to be rewritten to mask a mismatch.
+acceptance_criteria:
+  - id: ac-required-test-cases
+    description: Proposed PR specifications include a required_test_cases section with concrete ids and descriptions.
+  - id: ac-changelog-links
+    description: Changelog related sections can point at required test case ids for the changed source hunks they document.
+  - id: ac-validation-rejects-stale-evidence
+    description: Validation rejects required test case references that do not resolve to real proposed PR detail ids or real changed source locations.
+  - id: ac-roundtrip-preserves-evidence
+    description: Parser, template generation, and code indexing preserve required test case references through a regenerate-and-validate cycle.
+expected_tests:
+  - id: test-pr-specification-required-test-cases
+    description: Add or update tests that prove the proposed PR template renders and validates required_test_cases entries.
+  - id: test-changelog-required-test-cases
+    description: Add or update tests that prove changelog parsing, rendering, and indexing preserve related.required_test_cases.
+  - id: test-validator-required-test-cases
+    description: Add or update tests that reject unknown required test case ids and stale source-location references.
+required_test_cases:
+  - id: rtc-pr-specification
+    description: Verify a proposed PR template can include a required_test_cases entry and still validate successfully.
+  - id: rtc-changelog-rendering
+    description: Verify the changelog template renders related.required_test_cases for a changed source hunk when evidence exists.
+  - id: rtc-validator-rejects-unknown
+    description: Verify changelog validation fails when a required test case id does not exist in the proposed PR specification.
+  - id: rtc-validator-rejects-stale-span
+    description: Verify changelog validation fails when a required test case reference does not correspond to a real changed source location.
+expected_outcomes:
+  - id: outcome-stronger-evidence
+    description: Proposed PRs and changelogs expose a stronger, explicit evidence trail for each implementation change.
+  - id: outcome-validation-proof
+    description: Validation can prove that the documented required test cases exist and point at real source changes.
+non_goals:
+  - id: ng-no-plan-rewrite
+    description: Do not rewrite the feature plan or the changelog to hide mismatches during the diff loop.
+  - id: ng-no-new-artifact-type
+    description: Do not add a new top-level changelog artifact type beyond the existing template, parser, and validation model.
+risks:
+  - id: risk-legacy-changelogs
+    description: Existing changelog files may need regeneration before they pass the stricter required test case validation.
+  - id: risk-overstrict-linking
+    description: The source-location check may become too strict if the changelog template does not keep enough line-span detail.

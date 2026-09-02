@@ -1,0 +1,264 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 37
+title: Add proposed PR specs for the platform expansion
+intent:
+  problem: The proposed PR specification was too focused on files and did not give authors a structured way to capture acceptance criteria, verification, outcomes, non-goals, and risks.
+  goal: Give each proposed PR a richer template and validation path so the spec can guide implementation work without relying on file spans.
+decisions:
+  -
+    id: pr-spec-detail-sections
+    summary: Replace file-path-centric proposed PR specs with structured detail sections and boilerplate-free validation.
+structured_files:
+  - docs/proposals/PR-40-proposed-pr-specification.yaml
+  - docs/proposals/PR-41-proposed-pr-specification.yaml
+  - docs/proposals/PR-42-proposed-pr-specification.yaml
+  - docs/proposals/PR-43-proposed-pr-specification.yaml
+files:
+  -
+    path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 65
+      end_line: 68
+    summary: Update the PR spec template instructions to require the new detail sections and removal of template boilerplate.
+    rationale: The proposed PR workflow now needs authors to describe acceptance criteria, expected tests, expected outcomes, non-goals, and risks instead of listing files.
+    related:
+      entities:
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance: []
+  -
+    path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 84
+      end_line: 98
+    summary: Render the richer PR specification sections in the generated template body.
+    rationale: The template body needs to expose the new detail lists directly so authors can fill them in before validation.
+    related:
+      entities:
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance: []
+  -
+    path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 160
+      end_line: 174
+    summary: Validate the required PR spec sections and reject any remaining template boilerplate.
+    rationale: The validator now enforces the richer proposed PR schema and prevents committing scaffolded instructions.
+    related:
+      entities:
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance: []
+  -
+    path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 243
+      end_line: 258
+    summary: Validate the new PR spec detail-list sections as structured items.
+    rationale: Acceptance criteria, expected tests, expected outcomes, non-goals, and risks all now need concrete id and description pairs.
+    related:
+      entities:
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance: []
+  -
+    path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 260
+      end_line: 260
+    summary: Remove the obsolete file-path validation helper from the PR spec validator.
+    rationale: Proposed PR specs no longer carry a files list, so the old repository-relative file-path validation is not used.
+    related:
+      entities:
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance: []
+  -
+    path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 357
+      end_line: 450
+    summary: Add shared helpers for boilerplate detection and detail-item validation.
+    rationale: The validator needs a reusable way to reject template instructions and to validate each new structured detail section consistently.
+    related:
+      entities:
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance: []
+  -
+    path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span:
+      start_line: 366
+      end_line: 420
+    summary: Add test coverage for the new PR spec template and validation rules.
+    rationale: The test suite needs to cover the new template output, boilerplate detection, and the new detail-list validation behavior.
+    related:
+      entities:
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance: []
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 50
+      end_line: 50
+    summary: Update the template assertions to match the richer proposed PR schema.
+    rationale: The template tests now need to verify the new section names instead of the removed files list.
+    related:
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 77
+      end_line: 77
+    summary: Update the validation fixture to exercise the new detail sections.
+    rationale: The validator test now checks the new acceptance criteria, expected tests, expected outcomes, non-goals, and risks lists instead of file paths.
+    related:
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 85
+      end_line: 89
+    summary: Assert that the generated template includes the boilerplate removal instruction.
+    rationale: The template should tell authors to delete the instructions once the spec is filled out.
+    related:
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 109
+      end_line: 123
+    summary: Add a dedicated rejection case for missing detail descriptions.
+    rationale: The validator must reject empty descriptions in the new detail sections just as it rejects other incomplete fields.
+    related:
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 122
+      end_line: 122
+    summary: Update the success-case fixture to include the new detail sections.
+    rationale: The valid PR specification example now needs the acceptance criteria, expected tests, expected outcomes, non-goals, and risks sections.
+    related:
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 158
+      end_line: 172
+    summary: Add coverage for boilerplate rejection and missing detail descriptions.
+    rationale: The validator should fail loudly when the template instructions are left in place or when a detail item omits its description.
+    related:
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 184
+      end_line: 282
+    summary: Update the CLI YAML fixture to match the richer proposed PR format.
+    rationale: The CLI-path test needs the same detail sections as the direct validator tests so it exercises the real user-facing workflow.
+    related:
+      entities:
+        - pr-specification-core
+        - pr-specification
+        - evaluate-pr-specification
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+  -
+    path: tests/test_pr_specification.py
+    type: modified
+    span:
+      start_line: 298
+      end_line: 312
+    summary: Update the CLI validation fixture to cover the richer proposed PR schema.
+    rationale: The CLI-facing validation path should exercise the same new detail sections as the direct validator tests.
+    related:
+      entities:
+        - evaluate-pr-specification
+        - pr-specification
+        - pr-specification-core
+      invariants:
+        - unique-proposed-pr-ids
+      guidance:
+        - one-template-per-pr
+        - validate-and-iterate
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+prs: []

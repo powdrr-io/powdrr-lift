@@ -1,0 +1,77 @@
+---
+when_to_use:
+- When a pull request needs a complete functionality, test-coverage, and security review.
+- When the three review perspectives must run in a fixed order against the same pull request.
+how_to_fill_this_out:
+- Provide the GitHub pull request identifier through the pull-request-id template value.
+- Keep the tasks in this order. Each review must finish before the next review starts.
+- Each nested review skill must post its findings as inline comments on the referenced pull request.
+task_templates:
+- description: Review feature functionality and completeness
+  actions: [invoke_skill, next_step]
+  step_type: freeform
+  complexity: high
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  uses_skills:
+  - feature-functionality-review
+  input_state:
+    pull_request: <pull-request-id>
+    functionality_review: {}
+  details: >-
+    Run feature-functionality-review for the pull request in pull_request.
+    Discover the feature and all related proposed and closed PRs, review the
+    implementation against the complete feature definition, and post every
+    finding as an inline pull-request comment. Record the review scope,
+    completeness matrix, posted comments, and final result in output_state so
+    the next review can use it.
+  output_state_type: functionality-review-state
+  dependent_state:
+  - functionality-review-complete
+- description: Review feature test coverage
+  actions: [invoke_skill, next_step]
+  step_type: freeform
+  complexity: high
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  uses_skills:
+  - feature-test-coverage-review
+  input_state:
+    pull_request: <pull-request-id>
+    functionality_review: <upstream-task-0>.functionality-review-state
+    test_coverage_review: {}
+  details: >-
+    Run feature-test-coverage-review for the same pull request after the
+    functionality review completes. Use the functionality review state as
+    context, reconcile the feature definition and all related proposed PRs
+    with the implementation and tests, and post every coverage finding as an
+    inline pull-request comment. Record the coverage matrix, posted comments,
+    and final result in output_state.
+  output_state_type: test-coverage-review-state
+  dependent_state:
+  - test-coverage-review-complete
+- description: Review pull request security
+  actions: [invoke_skill, next_step]
+  step_type: freeform
+  complexity: high
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: fast_iteration
+  uses_skills:
+  - security-review
+  input_state:
+    pull_request: <pull-request-id>
+    functionality_review: <upstream-task-0>.functionality-review-state
+    test_coverage_review: <upstream-task-1>.test-coverage-review-state
+    security_review: {}
+  details: >-
+    Run security-review for the same pull request after the functionality and
+    test-coverage reviews complete. Use both prior review states as context,
+    perform the complete security analysis, and post every security finding as
+    an inline pull-request comment. Record the threat model, review checks,
+    posted comments, and final result in output_state.
+  output_state_type: security-review-state
+  dependent_state:
+  - security-review-complete

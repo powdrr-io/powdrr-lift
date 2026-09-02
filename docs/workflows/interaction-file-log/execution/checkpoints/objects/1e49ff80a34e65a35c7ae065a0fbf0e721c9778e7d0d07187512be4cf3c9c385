@@ -1,0 +1,13 @@
+task_id: execute-proposed-pr-task-013
+status: open
+upstream_task_ids: [execute-proposed-pr-task-001, execute-proposed-pr-task-006, execute-proposed-pr-task-012]
+dependent_state: [current-state-documents-promoted]
+complexity: medium
+input_state: {proposed_pr_context: execute-proposed-pr-task-001.proposed-pr-context-state, completeness_review: execute-proposed-pr-task-006.specification-completeness-state, scope_repair: execute-proposed-pr-task-012.final-scope-repair-state, feature_id: fixture-feature}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: promoted-current-state-documents
+description: Promote the feature documents
+workflow_template: execute-proposed-pr
+step_type: invoke_tool
+pre_step: {action: invoke_tool, template: {tool: shell, command: ["true"]}}

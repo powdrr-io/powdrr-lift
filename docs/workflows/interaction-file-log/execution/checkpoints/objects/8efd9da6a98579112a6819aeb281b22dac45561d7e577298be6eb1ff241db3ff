@@ -1,0 +1,4 @@
+interface:
+  display_name: "Specify Architecture"
+  short_description: "Draft and validate architecture specs"
+  default_prompt: "Use $specify-architecture to create the architecture specification template, fill it with entities, relationships, invariants, and guidance, then validate and adjust until it passes."

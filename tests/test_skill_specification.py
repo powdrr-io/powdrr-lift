@@ -978,15 +978,8 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "origin",
         "HEAD",
     )
-    assert skill.steps[5].tool_invocations[0].command[:3] == (
-        "pr",
-        "create",
-        "--draft",
-    )
-    assert skill.steps[6].tool_invocations[0].command[:2] == (
-        "pr",
-        "edit",
-    )
+    assert skill.steps[5].tool_invocations[0].operation == "pr_create"
+    assert skill.steps[6].tool_invocations[0].operation == "pr_edit"
 
 
 def test_checked_in_handle_ad_hoc_skill_matches_flow() -> None:
@@ -1157,9 +1150,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert "directory's basename as the canonical feature_name" in select_details
     assert "docs/workflows/<canonical-feature-name>" in select_details
     assert "do not ask the user which workflow path to use" in select_details
-    assert step("bootstrap-project-structure").uses_skills == (
-        "bootstrap-code-structure",
-    )
+    assert step("bootstrap-project-structure").uses_skills == ()
+    assert step("bootstrap-project-structure").pre_step is not None
     assert step("generate-proposed-pr-specification").step_type == "invoke_tool"
     assert step("plan-proposed-prs").outputs[0].name == "proposed_pr_names"
     assert step("plan-proposed-prs").outputs[0].required_for_next_step

@@ -59,7 +59,11 @@ steps:
     Do not stage or preserve unintended diagnostic logs, generated artifacts,
     or other files in the pull request. Verify the staged names with `git
     diff --cached --name-only`; do not advance until every intended path is
-    staged and no unintended path is staged.
+    staged and no unintended path is staged. The name-only verification is a
+    declared shell action below; use that exact command shape, not a different
+    Git status or diff command. This verification is mandatory after every
+    staging or cleanup action, including file_management deletion; never choose
+    next_step immediately after deleting an unintended file.
   tool_invocations:
   - tool: git
     command:
@@ -127,39 +131,28 @@ steps:
     request. Confirm that the pushed `HEAD` contains every `files_to_publish`
     path. Use this step only when no pull request exists for the current
     branch.
-    Invoke `gh pr create --draft --title <pull-request-title> --body
-    <populated-pr-description>` using the completed body from the previous
-    steps. Do not print the body, edit an existing PR, or run any other tool.
+    Invoke the registered gh intrinsic with exactly
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_create","title":"Add <feature-name> implementation workflow","body":"<populated-pr-description>"}}.
+    The title must be the non-empty value `Add <feature-name> implementation
+    workflow`; never pass a placeholder or shell command array. Use the
+    completed body from the previous steps. Do not print the body, edit an
+    existing PR, or run any other tool.
     Do not report completion until the command succeeds and its output includes
     the pull request URL. Never merge the PR or push directly to main.
   tool_invocations:
   - tool: gh
-    command:
-    - pr
-    - create
-    - --draft
-    - --title
-    - <pull-request-title>
-    - --body
-    - <populated-pr-description>
+    operation: pr_create
 - description: Update the existing pull request.
   actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
     Use this step only when a pull request already exists for the current
-    branch. Invoke `gh pr edit <pr-reference> --title <pull-request-title>
-    --body <populated-pr-description>` using the completed body from the
-    previous steps. Do not print the body, create a second PR, or run any other
-    tool. Do not report completion until the command succeeds and its output
+    branch. Invoke the registered gh intrinsic with exactly
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_edit","pr_reference":"<pr-reference>","title":"Add <feature-name> implementation workflow","body":"<populated-pr-description>"}}.
+    Do not print the body, create a second PR, or run any other tool. Do not
+    report completion until the command succeeds and its output
     identifies the pull request. Never merge the PR or push directly to main.
   tool_invocations:
   - tool: gh
-    command:
-    - pr
-    - edit
-    - <pr-reference>
-    - --title
-    - <pull-request-title>
-    - --body
-    - <populated-pr-description>
+    operation: pr_edit

@@ -156,8 +156,28 @@ def _seed_feature_from_history(repo_root: Path, feature_name: str) -> bool:
             capture_output=True,
         ).stdout
         (destination / document).write_bytes(content)
+    workflow_prefix = f"docs/workflows/{feature_name}/"
+    workflow_files = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", commit, workflow_prefix],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    for relative_name in workflow_files:
+        workflow_destination = repo_root / relative_name
+        workflow_destination.parent.mkdir(parents=True, exist_ok=True)
+        workflow_destination.write_bytes(
+            subprocess.run(
+                ["git", "show", f"{commit}:{relative_name}"],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+            ).stdout
+        )
     print(
-        f"Seeded {destination} from historical commit {commit[:12]} for harness run.",
+        f"Seeded {destination} and {len(workflow_files)} workflow artifact(s) "
+        f"from historical commit {commit[:12]} for harness run.",
         file=sys.stderr,
     )
     return True
@@ -275,41 +295,42 @@ def _run_iteration(
         *args.workflow_arg,
     ]
     answers = args.answer or [DEFAULT_ANSWER] * args.max_turns
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    transcript_stream = transcript.open("w", encoding="utf-8")
     process = subprocess.Popen(
         command,
         cwd=repo_root,
         text=True,
         stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
+        stdout=transcript_stream,
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
     timed_out = False
     interrupted = False
     try:
-        output, _ = process.communicate(
-            input="\n".join([args.prompt, *answers]) + "\n",
-            timeout=args.timeout,
+        process.communicate(
+            input="\n".join([args.prompt, *answers]) + "\n", timeout=args.timeout
         )
-    except subprocess.TimeoutExpired as exc:
+        output = transcript.read_text(encoding="utf-8")
+    except subprocess.TimeoutExpired:
         timed_out = True
-        # workflow-chat may have a provider/helper descendant holding the
-        # transcript pipe open. Kill the whole session so communicate() cannot
-        # wait indefinitely after the configured timeout.
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        output, _ = process.communicate()
-        output = _text_output(exc.output) + _text_output(output)
+        process.wait()
+        output = transcript.read_text(encoding="utf-8")
     except KeyboardInterrupt:
         interrupted = True
         try:
             os.killpg(process.pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
-        output, _ = process.communicate()
-    transcript.write_text(output or "", encoding="utf-8")
+        process.wait()
+        output = transcript.read_text(encoding="utf-8")
+    finally:
+        transcript_stream.close()
     new_errors = _read_jsonl(error_log)[previous_errors:]
     lowered_output = (output or "").lower()
     corrections = [marker for marker in _FAILURE_MARKERS if marker in lowered_output]
@@ -320,6 +341,7 @@ def _run_iteration(
         status = "interrupted"
     elif new_errors or corrections or process.returncode != 0:
         status = "failed"
+    output_lines = (output or "").splitlines()
     return {
         "iteration": iteration,
         "status": status,
@@ -328,6 +350,11 @@ def _run_iteration(
         "error_count": len(new_errors),
         "errors": new_errors,
         "corrections": corrections,
+        "last_output": output_lines[-40:],
+        "last_roundtrip": next(
+            (line.strip() for line in reversed(output_lines) if "roundtrip " in line),
+            None,
+        ),
     }
 
 

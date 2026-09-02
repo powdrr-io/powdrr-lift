@@ -1110,10 +1110,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         }
                     )
                 continue
-            if (
-                self.current_step.step_type == "invoke_tool"
-                and self.current_step.pre_step is not None
-            ):
+            if self.current_step.pre_step is not None:
                 # A deterministic pre-step is engine-owned work declared by
                 # the step, not a model-proposed action. Temporarily remove
                 # the model action contract while executing it, then restore
@@ -4761,9 +4758,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "normal command arguments; use it to discover that tool's parameters, "
         "examples, and when to use it. A help response is informational and does "
         "not satisfy a required successful tool invocation. "
-        "a shell command. For git use operation status, add, or move; for gh "
-        "use pr_view, pr_diff, pr_checks, pr_create, pr_edit, pr_comments, or "
-        "pr_review_comment. "
+        "For git use a registered operation such as status, add, commit, or push; "
+        "for gh use only pr_view, pr_diff, pr_checks, pr_create, pr_edit, "
+        "pr_comments, or pr_review_comment. "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
         "and basedpyright-structure takes parameters.path; yaml_edit requires "
         "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "
@@ -5053,10 +5050,7 @@ def _modular_action_system_prompt(
             ',"decisions_and_context":"The nested skill should perform its '
             'declared work."}.\n'
         )
-    if (
-        getattr(current_step, "step_type", "freeform") == "invoke_tool"
-        and getattr(current_step, "pre_step", None) is not None
-    ):
+    if getattr(current_step, "pre_step", None) is not None:
         prompt += (
             "Deterministic context: the resolved pre_step template has already run. "
             "The deterministic_context field is the context for this step; do not "
@@ -5341,7 +5335,8 @@ def _worktree_relative_path(path: Path, worktree_root: Path) -> str:
 
 def _workflow_step_requires_pull_request(step: Any) -> bool:
     return any(
-        tuple(invocation.command[:3]) == ("gh", "pr", "create")
+        invocation.operation == "pr_create"
+        or tuple(invocation.command[:3]) == ("gh", "pr", "create")
         for invocation in step.tool_invocations
     )
 
@@ -7172,6 +7167,13 @@ def _validate_workflow_action_for_step_unwrapped(
         if invocation.tool == action.tool
     )
     if action.tool in {GIT_TOOL, GH_TOOL}:
+        operation = action.parameters.get("operation")
+        if any(
+            invocation.operation == operation
+            for invocation in matching_invocations
+            if invocation.operation is not None
+        ):
+            return
         intrinsic_items = intrinsic_command(action.parameters, tool=action.tool)
         if not matching_invocations or any(
             _intrinsic_command_matches(intrinsic_items, invocation.command)

@@ -94,6 +94,7 @@ class _SkillDirectoryContents:
 class SkillToolInvocation:
     tool: str
     command: tuple[str, ...] = field(default_factory=tuple)
+    operation: str | None = None
     label: str | None = None
     cwd: str | None = None
     env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
@@ -104,6 +105,8 @@ class SkillToolInvocation:
         }
         if self.command:
             data["command"] = list(self.command)
+        if self.operation is not None:
+            data["operation"] = self.operation
         if self.label is not None:
             data["label"] = self.label
         if self.cwd is not None:
@@ -628,9 +631,11 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "pre_step"),
                     )
                 )
-            elif normalized_step_type in {"invoke_tool", "gate"} and isinstance(
-                pre_step, Mapping
-            ):
+            elif normalized_step_type in {
+                "freeform",
+                "invoke_tool",
+                "gate",
+            } and isinstance(pre_step, Mapping):
                 _validate_gather_context_pre_step(pre_step, step_path, issues)
                 if pre_step.get("action") == "gather_context":
                     outputs = step_mapping.get("outputs")
@@ -653,9 +658,7 @@ def build_skill_validation_report(
                 issues.append(
                     SkillValidationIssue(
                         code="unexpected_pre_step",
-                        message=(
-                            "Only invoke_tool and gate steps may declare pre_step."
-                        ),
+                        message="Skill step pre_step must be an object.",
                         path=_child_path(step_path, "pre_step"),
                     )
                 )
@@ -976,7 +979,7 @@ def build_skill_validation_report(
                 tool_mapping = cast("Mapping[str, Any]", tool_invocation)
                 _validate_unknown_keys(
                     tool_mapping,
-                    {"tool", "command", "label", "cwd", "env"},
+                    {"tool", "command", "operation", "label", "cwd", "env"},
                     issues,
                     path=tool_path or "",
                     subject="skill tool invocation",
@@ -1004,6 +1007,7 @@ def build_skill_validation_report(
                     )
 
                 command = tool_mapping.get("command")
+                operation = _optional_string(tool_mapping.get("operation"))
                 label = tool_mapping.get("label")
                 if tool == "ref":
                     if _optional_string(label) is None:
@@ -1023,7 +1027,19 @@ def build_skill_validation_report(
                             )
                         )
                     continue
-                if not isinstance(command, Sequence) or isinstance(
+                if operation is not None:
+                    if command is not None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="unexpected_tool_command",
+                                message=(
+                                    "Structured tool invocations must not include "
+                                    "command."
+                                ),
+                                path=_child_path(tool_path, "command"),
+                            )
+                        )
+                elif not isinstance(command, Sequence) or isinstance(
                     command,
                     (str, bytes, bytearray),
                 ):
@@ -1511,8 +1527,9 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
             raise ValueError(
                 "invoke_tool steps must use pre_step instead of tool_invocations."
             )
-    if step_type == "freeform" and pre_step is not None:
-        raise ValueError("Only invoke_tool steps may declare pre_step.")
+    # Freeform steps may use a deterministic pre-step when the result controls
+    # whether the model performs optional work.  The runtime executes it before
+    # prompting, just as it does for invoke_tool steps.
     if step_type == "gate" and gate is None:
         raise ValueError("gate steps must declare a gate object.")
     if step_type != "gate" and gate is not None:
@@ -1779,7 +1796,7 @@ def _validate_gather_context_pre_step(
                 )
             )
             return
-        allowed_keys = {"tool", "command", "cwd", "env"}
+        allowed_keys = {"tool", "command", "operation", "cwd", "env"}
         if template.get("tool") == "enrich":
             allowed_keys = {"tool", "format", "tool_output"}
         elif template.get("tool") in {"validate_edit", "apply_edit"}:
@@ -1944,6 +1961,11 @@ def _parse_tool_invocation(raw_tool_invocation: object) -> SkillToolInvocation:
             raise ValueError("Tool references must not include a command.")
         return SkillToolInvocation(tool=tool, command=(), label=label)
     command_value = raw_mapping.get("command")
+    operation = _optional_string(raw_mapping.get("operation"))
+    if operation is not None:
+        if command_value is not None:
+            raise ValueError("Structured tool invocations must not include command.")
+        return SkillToolInvocation(tool=tool, operation=operation)
     if not isinstance(command_value, Sequence) or isinstance(
         command_value,
         (str, bytes, bytearray),

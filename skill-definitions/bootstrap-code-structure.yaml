@@ -6,7 +6,7 @@ when_to_use:
 - When no project-structure artifact exists and a durable template should be created under docs/project_structure.
 steps:
 - description: Check whether the project-structure artifact already exists.
-  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user, complete]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
@@ -179,8 +179,9 @@ steps:
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Run finish-pr-prep after the validated project-structure artifact is
-    staged. If cleanup changes files, restage only
+    Invoke finish-pr-prep after the validated project-structure artifact is
+    staged. After it returns, choose next_step only after its required
+    readiness outputs are present. If cleanup changes files, restage only
     docs/project_structure/project-structure.yaml before continuing. Do not
     include unrelated files or begin feature implementation.
   uses_skills:

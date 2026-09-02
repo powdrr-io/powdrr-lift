@@ -1690,7 +1690,7 @@ def test_workflow_action_progress_status_uses_action_specific_messages() -> None
                 }
             )
         )
-        == "Edited file"
+        == "Attempting file edit"
     )
     assert (
         _workflow_action_progress_status(

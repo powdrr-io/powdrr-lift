@@ -158,18 +158,20 @@ steps:
       create the artifact in the same worktree, then retry this gate.
 - id: plan-proposed-prs
   description: Plan the proposed PR implementation sequence.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Use only the exact specification document paths handed off by
+    This is a planning-only step. Do not create, edit, rename, or delete the
+    proposed PR specification; the following deterministic generation step owns
+    creation of that file. Use only the exact specification document paths handed off by
     select-feature-context; do not synthesize a filename from a schema,
     template id, or feature description. If the unified proposed-PR specification already exists in the selected
     feature context, inspect and reuse its ordered `proposed_prs` entries and
     pass their stable names and paths onward. Otherwise analyze the feature
     context and the project structure to define ordered proposed PRs
     with incremental validation, clear boundaries, low risk, dependencies, and
-    stable names in one proposed-pr-specification.yaml file. For each proposed
+    stable names for the later single proposed-pr-specification.yaml file. For each proposed
     PR, record its goal, scope, files, tests, acceptance criteria, validation
     commands, dependencies, and risks. Record every action-bearing id from the
     feature-wide specification-v1 sections after the proposed_prs section,

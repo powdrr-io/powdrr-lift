@@ -3202,7 +3202,7 @@ def _resolve_template_path(
 
 
 def _available_work_item_names(worktree_root: Path) -> tuple[str, ...]:
-    specifications_root = worktree_root / "docs" / "specs"
+    specifications_root = worktree_root / "docs" / "proposals"
     if not specifications_root.is_dir():
         return ()
     return tuple(
@@ -3218,7 +3218,7 @@ def _available_work_item_documents(
     worktree_root: Path,
     work_item_name: str,
 ) -> tuple[str, ...]:
-    work_item_root = worktree_root / "docs" / "specs" / work_item_name
+    work_item_root = worktree_root / "docs" / "proposals" / work_item_name
     if not work_item_root.is_dir():
         return ()
     return tuple(

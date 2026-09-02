@@ -7348,7 +7348,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
 def test_work_item_names_match_natural_language_feature_requests(
     tmp_path: Path,
 ) -> None:
-    specifications_root = tmp_path / "docs" / "specs"
+    specifications_root = tmp_path / "docs" / "proposals"
     (specifications_root / "interaction-file-log").mkdir(parents=True)
     (specifications_root / "other-feature").mkdir()
 
@@ -7368,7 +7368,7 @@ def test_work_item_names_match_natural_language_feature_requests(
 def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
     tmp_path: Path,
 ) -> None:
-    specifications_root = tmp_path / "docs" / "specs" / "interaction-file-log"
+    specifications_root = tmp_path / "docs" / "proposals" / "interaction-file-log"
     specifications_root.mkdir(parents=True)
     (specifications_root / "proposed-pr-specification.yaml").touch()
 
@@ -7376,7 +7376,7 @@ def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
     result = execute_fuzzy_match(
         [
             "fuzzy-match",
-            "docs/specs/interaction-file-log",
+            "docs/proposals/interaction-file-log",
             "-name",
             "proposed PR specification",
             "-type",
@@ -7391,7 +7391,7 @@ def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
     cached_result = execute_fuzzy_match(
         [
             "fuzzy-match",
-            "docs/specs/interaction-file-log",
+            "docs/proposals/interaction-file-log",
             "-name",
             "proposed PR specification",
             "-type",
@@ -7405,7 +7405,7 @@ def test_fuzzy_match_finds_existing_work_item_and_proposed_pr_specification(
     )
 
     assert [match["path"] for match in result["matches"]] == [
-        "docs/specs/interaction-file-log/proposed-pr-specification.yaml"
+        "docs/proposals/interaction-file-log/proposed-pr-specification.yaml"
     ]
     assert result["matches"][0]["score"] == 1.0
     assert cached_result == result
@@ -7438,7 +7438,7 @@ def test_fuzzy_match_missing_root_is_a_successful_empty_result(
 def test_selection_context_lists_matched_existing_specification_documents(
     tmp_path: Path,
 ) -> None:
-    specifications_root = tmp_path / "docs" / "specs" / "interaction-file-log"
+    specifications_root = tmp_path / "docs" / "proposals" / "interaction-file-log"
     specifications_root.mkdir(parents=True)
     (specifications_root / "system-specification.yaml").touch()
     (specifications_root / "implementation-specification.yaml").touch()
@@ -7452,8 +7452,8 @@ def test_selection_context_lists_matched_existing_specification_documents(
 
     assert payload["work_item_context"]["matches"] == ["interaction-file-log"]
     assert payload["work_item_context"]["documents"]["interaction-file-log"] == [
-        "docs/specs/interaction-file-log/implementation-specification.yaml",
-        "docs/specs/interaction-file-log/system-specification.yaml",
+        "docs/proposals/interaction-file-log/implementation-specification.yaml",
+        "docs/proposals/interaction-file-log/system-specification.yaml",
     ]
     assert _available_work_item_documents(
         tmp_path,

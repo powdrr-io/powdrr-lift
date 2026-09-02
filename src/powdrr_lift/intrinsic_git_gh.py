@@ -30,12 +30,9 @@ def execute_intrinsic_git_gh_tool(
         effective_parameters = dict(parameters)
         operation = effective_parameters.get("operation")
         if operation == "pr_create":
-            # GitHub infers the current head and repository, and chooses the
-            # repository default branch.  These are runtime-owned identities.
-            effective_parameters.pop("base", None)
-            effective_parameters.pop("head", None)
+            _reject_pr_identity_overrides(effective_parameters, ("base", "head"))
         elif operation == "pr_edit":
-            # A model must not be able to redirect an edit to an unrelated PR.
+            _reject_pr_identity_overrides(effective_parameters, ("pr_reference",))
             # gh accepts a branch name as the PR selector, so the current branch
             # is sufficient and avoids a separate number lookup race.
             effective_parameters["pr_reference"] = _current_branch(worktree_root)
@@ -60,6 +57,17 @@ def execute_intrinsic_git_gh_tool(
         "stdout": result.stdout,
         "stderr": result.stderr,
     }
+
+
+def _reject_pr_identity_overrides(
+    parameters: Mapping[str, Any], fields: tuple[str, ...]
+) -> None:
+    provided = tuple(field for field in fields if field in parameters)
+    if provided:
+        raise PowdrrExecutionError(
+            "Pull-request identity is runtime-owned; do not provide: "
+            + ", ".join(provided)
+        )
 
 
 def _current_branch(worktree_root: Path) -> str:

@@ -116,6 +116,8 @@ class ObserverExecutionContext:
     skill_or_workflow: str
     current_step_id: str
     current_step_intent: str
+    skill_definition: Mapping[str, object] = field(default_factory=dict)
+    error_state: Mapping[str, object] = field(default_factory=dict)
     validation_state: Mapping[str, object] = field(default_factory=dict)
     handoff_state: Mapping[str, object] = field(default_factory=dict)
 
@@ -134,6 +136,8 @@ class ObserverPacket:
     validation_state: Mapping[str, object]
     handoff_state: Mapping[str, object]
     progress_state: ObserverProgressState
+    skill_definition: Mapping[str, object] = field(default_factory=dict)
+    error_state: Mapping[str, object] = field(default_factory=dict)
     prior_decision: ObserverDecision | None = None
 
 
@@ -144,6 +148,7 @@ class ObserverDecision:
     guidance: tuple[str, ...] = ()
     expected_progress: str | None = None
     target_step_id: str | None = None
+    target_skill_name: str | None = None
 
 
 @dataclass(slots=True)
@@ -171,6 +176,8 @@ def observer_packet_fingerprint(packet: ObserverPacket, repo_root: Path) -> str:
         "trigger": packet.trigger.kind,
         "skill_or_workflow": packet.skill_or_workflow,
         "current_step_id": packet.current_step_id,
+        "skill_definition": packet.skill_definition,
+        "error_state": packet.error_state,
         "changed_file_hashes": changed_file_hashes,
         "validation_state": packet.validation_state,
         "handoff_state": packet.handoff_state,
@@ -189,7 +196,7 @@ def observer_packet_fingerprint(packet: ObserverPacket, repo_root: Path) -> str:
 
 
 def build_observer_messages(packet: ObserverPacket) -> list[dict[str, str]]:
-    """Build the deliberately compact shadow-observer prompt."""
+    """Build a read-only diagnostic prompt with the complete execution contract."""
     example = {
         "verdict": "coach",
         "reason": "The same failing edit was attempted twice without progress.",
@@ -199,16 +206,20 @@ def build_observer_messages(packet: ObserverPacket) -> list[dict[str, str]]:
         ],
         "expected_progress": "The next action changes state or reduces errors.",
         "target_step_id": None,
+        "target_skill_name": None,
     }
     return [
         {
             "role": "system",
             "content": (
-                "You are a read-only workflow observer. Diagnose whether the working "
-                "agent remains aligned and how it could recover. Do not invoke tools, "
-                "edit files, or claim that you did. Return exactly one JSON object. "
+                "You are a read-only workflow observer. Inspect the full skill, recent "
+                "errors, and repository evidence. Diagnose whether the working agent "
+                "remains aligned and how it could recover. Do not invoke tools, edit "
+                "files, or claim that you did. Return exactly one JSON object. "
                 "Allowed verdicts: continue, coach, redirect, block_transition, "
-                "request_human. Complete example:\n"
+                "request_human. For redirect, set target_step_id to a prior step or "
+                "target_skill_name to a catalog skill, and tell the agent to set "
+                "observer_override=true on the matching action. Complete example:\n"
                 + json.dumps(example, ensure_ascii=False)
             ),
         },
@@ -236,16 +247,20 @@ def parse_observer_decision(payload: Mapping[str, Any]) -> ObserverDecision:
         raise ValueError("Observer response guidance must be a list of strings.")
     expected_progress = payload.get("expected_progress")
     target_step_id = payload.get("target_step_id")
+    target_skill_name = payload.get("target_skill_name")
     if expected_progress is not None and not isinstance(expected_progress, str):
         raise ValueError("Observer expected_progress must be a string or null.")
     if target_step_id is not None and not isinstance(target_step_id, str):
         raise ValueError("Observer target_step_id must be a string or null.")
+    if target_skill_name is not None and not isinstance(target_skill_name, str):
+        raise ValueError("Observer target_skill_name must be a string or null.")
     return ObserverDecision(
         verdict=cast(ObserverVerdict, verdict),
         reason=reason.strip(),
         guidance=tuple(item.strip() for item in guidance),
         expected_progress=expected_progress,
         target_step_id=target_step_id,
+        target_skill_name=target_skill_name,
     )
 
 
@@ -672,6 +687,10 @@ class ShadowWorkflowObserver:
             skill_or_workflow=context.skill_or_workflow,
             current_step_id=context.current_step_id,
             current_step_intent=_compact_text(context.current_step_intent),
+            # The observer needs every step and contract to make a safe transfer;
+            # only heterogeneous runtime/error metadata is compacted.
+            skill_definition=context.skill_definition,
+            error_state=compact_observer_mapping(context.error_state),
             recent_actions=tuple(
                 (*self._actions, self._pending_action)
                 if self._pending_action is not None

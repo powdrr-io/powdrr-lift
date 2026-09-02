@@ -1,0 +1,67 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 531
+title: Enable observer-guided workflow recovery
+intent:
+  problem: The observer cannot inspect the complete active skill and error history, and its recovery advice cannot safely cross declared step or skill boundaries.
+  goal: Give the observer full diagnostic context and let the agent explicitly acknowledge a validated observer recommendation to revisit a prior step or run another skill before resuming.
+human-decisions:
+  - id: observer-guided-recovery
+    summary: Require explicit agent acknowledgement before observer-recommended step or skill transfers, while preserving normal workflow contracts otherwise.
+structured_files: []
+files:
+  - path: src/powdrr_lift/workflow_observer.py
+    type: modified
+    span:
+      start_line: 116
+      end_line: 700
+    summary: Include full skill definitions and bounded error evidence in observer packets, and parse skill transfer recommendations.
+    rationale: Let the read-only observer diagnose failures against the complete active contract and recommend a prior step or catalog skill.
+  - path: src/powdrr_lift/workflow_llm.py
+    type: modified
+    span:
+      start_line: 150
+      end_line: 530
+    summary: Add explicit observer override action metadata and allow only authorized overrides past runtime action scopes.
+    rationale: Make observer advice an explicit agent action rather than an implicit control transfer.
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    span:
+      start_line: 880
+      end_line: 1740
+    summary: Validate and execute observer-authorized prior-step and nested-skill transfers, returning to the current step after the nested skill.
+    rationale: Apply recovery advice while retaining prior-step and catalog-skill safety checks.
+  - path: src/powdrr_lift/workflow_task_agent.py
+    type: modified
+    span:
+      start_line: 330
+      end_line: 930
+    summary: Expose error and skill evidence to durable-task observers and support explicit observer-authorized nested skills.
+    rationale: Keep durable workflow tasks aligned with the shared observer recovery contract.
+  - path: src/powdrr_lift/execution/runtime.py
+    type: modified
+    span:
+      start_line: 630
+      end_line: 658
+    summary: Persist observer skill targets in the authoritative execution event stream.
+    rationale: Keep observer-guided control transfers auditable and resumable.
+  - path: tests/test_workflow_observer.py
+    type: modified
+    span:
+      start_line: 70
+      end_line: 115
+    summary: Test skill-target parsing and full observer evidence serialization.
+    rationale: Protect the new observer packet and decision contract.
+entities:
+  - id: workflow-observer
+    action: modified
+    summary: The read-only workflow observer now receives complete skill and error context and can recommend explicit recovery transfers.
+    rationale: Support evidence-based recovery without making observer failures execution-fatal.
+entity_relationships: []
+invariants:
+  - id: inv-observer-overrides-require-matching-advice
+    action: added
+    description: An observer_override action is accepted only when its step or skill target exactly matches a pending validated observer recommendation.
+    rationale: Prevent arbitrary model-proposed actions from bypassing workflow action contracts.
+guidance: []
+features: []
+proposed_prs: []

@@ -339,6 +339,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     compacted_context: dict[str, Any] | None = None
     observer_intervention: str | None = None
     observer_rejected_action_signature: str | None = None
+    observer_redirect_skill_name: str | None = None
 
     def next_request(self) -> WorkflowActionRequest:
         while True:
@@ -578,6 +579,15 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         self.response_correction = None
+        if action.observer_override:
+            if not self.observer_override_is_authorized(action):
+                raise PowdrrExecutionError(
+                    "observer_override must match a pending observer skill "
+                    "recommendation."
+                )
+            self.observer_redirect_skill_name = None
+            self.observer_rejected_action_signature = None
+            self.observer_intervention = None
         if workflow_action_signature(action) == self.observer_rejected_action_signature:
             raise PowdrrExecutionError(
                 "The observer rejected this exact action after it failed to "
@@ -857,18 +867,32 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.observer_intervention = "Observer intervention\n" + "\n".join(
             f"- {item}" for item in guidance
         )
+        if decision.target_skill_name:
+            self.observer_intervention += (
+                "\n- Follow this advice with invoke_skill "
+                f"skill={decision.target_skill_name!r} "
+                "and observer_override=true."
+            )
         if decision.verdict == "redirect" and decision.target_step_id:
             self.observer_intervention += (
                 "\n- Redirect ignored: durable workflow tasks do not expose "
                 "skill step ids."
             )
         self.observer_rejected_action_signature = workflow_action_signature(action)
+        if decision.verdict == "redirect" and decision.target_skill_name:
+            try:
+                _find_skill_by_name(self.skill_catalog, decision.target_skill_name)
+            except RuntimeError as error:
+                self.observer_intervention += f"\n- Skill redirect ignored: {error}"
+            else:
+                self.observer_redirect_skill_name = decision.target_skill_name
         self.events.append(
             {
                 "kind": "observer_intervention",
                 "verdict": decision.verdict,
                 "reason": decision.reason,
                 "target_step_id": decision.target_step_id,
+                "target_skill_name": decision.target_skill_name,
                 "action": json.loads(workflow_action_signature(action)),
                 "material_progress": (
                     observation.made_progress if observation is not None else None
@@ -885,12 +909,21 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     observation.made_progress if observation is not None else None
                 ),
                 target_step_id=decision.target_step_id,
+                target_skill_name=decision.target_skill_name,
             )
         return observation is None
+
+    def observer_override_is_authorized(self, action: WorkflowAction) -> bool:
+        return bool(
+            action.observer_override
+            and action.kind == "invoke_skill"
+            and action.skill_name == self.observer_redirect_skill_name
+        )
 
     def clear_observer_intervention(self) -> None:
         self.observer_intervention = None
         self.observer_rejected_action_signature = None
+        self.observer_redirect_skill_name = None
 
     def _handoff(
         self, human_input: dict[str, Any], reason_prefix: str
@@ -1504,6 +1537,23 @@ def run_workflow_task(
                     skill_or_workflow=_workflow.directory.name,
                     current_step_id=_task.task_id,
                     current_step_intent=_task.details or _task.description,
+                    skill_definition={
+                        "task": _task.to_data(),
+                        "skills": [entry.skill.to_data() for entry in skill_catalog],
+                    },
+                    error_state={
+                        "recent_errors": [
+                            event
+                            for event in _events
+                            if event.get("kind")
+                            in {"validation_error", "action_error", "tool_error"}
+                        ][-8:],
+                        "error_count": sum(
+                            event.get("kind")
+                            in {"validation_error", "action_error", "tool_error"}
+                            for event in _events
+                        ),
+                    },
                     validation_state={
                         "status": _task.status.value,
                         "output_state_type": _task.output_state_type,

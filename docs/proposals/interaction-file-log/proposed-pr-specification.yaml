@@ -1,0 +1,50 @@
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: interaction-file-log
+feature_ids:
+- interaction-log-json
+proposed_prs:
+- id: interaction-file-log-core
+  intent: Deliver the core interaction logging module, its unit tests, and the log
+    file writer.
+  justification: Establishes the foundational logging capability and its file output
+    in isolation, enabling independent review and testing before integration.
+- id: interaction-file-log-integration
+  intent: Wire the interaction logger into the human and LLM interaction paths and
+    add integration tests.
+  justification: Integrates the core logging module into the live interaction flows,
+    ensuring all human and LLM interactions are recorded end-to-end.
+  dependent_prs:
+  - interaction-file-log-core
+entities:
+- id: interaction-log
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: interaction-log-writer
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: interaction-log-file
+  action: added
+  proposed_pr_id: interaction-file-log-core
+modules:
+- id: interaction-log-writer
+  action: added
+  proposed_pr_id: interaction-file-log-core
+tools:
+- id: interaction-log-writer
+  action: added
+  proposed_pr_id: interaction-file-log-core
+entity_relationships:
+- id: interaction-log-has-writer
+  action: added
+  proposed_pr_id: interaction-file-log-core
+- id: interaction-log-writer-writes-file
+  action: added
+  proposed_pr_id: interaction-file-log-core
+features:
+- id: interaction-log-json
+  action: added
+  proposed_pr_id: interaction-file-log-integration
+decisions:
+- id: interaction-log-location
+  action: added
+  proposed_pr_id: interaction-file-log-core

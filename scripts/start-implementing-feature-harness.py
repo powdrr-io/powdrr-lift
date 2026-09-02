@@ -164,6 +164,14 @@ def _seed_feature_from_history(repo_root: Path, feature_name: str) -> bool:
         capture_output=True,
         text=True,
     ).stdout.splitlines()
+    # Task outputs are historical execution results, not reusable workflow
+    # metadata. Seeding them makes discovery falsely report existing workflows
+    # whose branches and dependency state no longer match the proposal.
+    workflow_files = [
+        relative_name
+        for relative_name in workflow_files
+        if relative_name.endswith("-workflow.yaml")
+    ]
     for relative_name in workflow_files:
         workflow_destination = repo_root / relative_name
         workflow_destination.parent.mkdir(parents=True, exist_ok=True)
@@ -179,6 +187,25 @@ def _seed_feature_from_history(repo_root: Path, feature_name: str) -> bool:
         f"Seeded {destination} and {len(workflow_files)} workflow artifact(s) "
         f"from historical commit {commit[:12]} for harness run.",
         file=sys.stderr,
+    )
+    # The workflow creates its own nested worktree from HEAD. Commit the
+    # disposable fixture so that nested worktree receives the seeded files.
+    seeded_paths = [f"docs/proposals/{feature_name}"]
+    if workflow_files:
+        seeded_paths.append(f"docs/workflows/{feature_name}")
+    subprocess.run(
+        ["git", "add", "--", *seeded_paths],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "commit", "--no-verify", "-m", "Seed harness feature fixture"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     return True
 
@@ -297,6 +324,9 @@ def _run_iteration(
     answers = args.answer or [DEFAULT_ANSWER] * args.max_turns
     transcript.parent.mkdir(parents=True, exist_ok=True)
     transcript_stream = transcript.open("w", encoding="utf-8")
+    child_environment = os.environ.copy()
+    child_environment.pop("VIRTUAL_ENV", None)
+    child_environment["UV_PROJECT_ENVIRONMENT"] = str(repo_root / ".venv")
     process = subprocess.Popen(
         command,
         cwd=repo_root,
@@ -305,6 +335,10 @@ def _run_iteration(
         stdout=transcript_stream,
         stderr=subprocess.STDOUT,
         start_new_session=True,
+        # Validation commands run inside the isolated worktree. Prevent uv
+        # from inheriting the harness worktree's environment and repeatedly
+        # resolving the wrong project environment.
+        env=child_environment,
     )
     timed_out = False
     interrupted = False

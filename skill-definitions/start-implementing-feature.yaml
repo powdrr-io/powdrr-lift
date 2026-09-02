@@ -104,7 +104,10 @@ steps:
     output is required for this step; emit it only when this step has actually
     selected a canonical feature. Pass the selected specification documents,
     workflow documents, canonical feature name, and missing-document findings
-    to the next step.
+    to the next step. The canonical specification filenames are exactly
+    system-specification.yaml, architecture-specification.yaml,
+    implementation-specification.yaml, and proposed-pr-specification.yaml;
+    never invent specification-v1.yaml or another filename from the schema name.
   outputs:
   - name: feature_name
     type: string
@@ -159,7 +162,9 @@ steps:
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    If the unified proposed-PR specification already exists in the selected
+    Use only the exact specification document paths handed off by
+    select-feature-context; do not synthesize a filename from a schema,
+    template id, or feature description. If the unified proposed-PR specification already exists in the selected
     feature context, inspect and reuse its ordered `proposed_prs` entries and
     pass their stable names and paths onward. Otherwise analyze the feature
     context and the project structure to define ordered proposed PRs

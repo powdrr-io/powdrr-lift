@@ -1,0 +1,86 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 526
+title: Refine typed resource identifier contract
+intent:
+  problem: The typed identifier proposal did not fully define the boundary between resource IDs and local keys, enumerate all current resource types, or specify human-authored workflow ID ownership and migration behavior.
+  goal: Make the identifier contract implementation-ready by defining canonical syntax, complete initial type coverage, person-derived workflow prefixes, and durable migration requirements.
+human-decisions:
+- id: typed-resource-prefix-and-complete-registry
+  summary: Give human-authored workflow IDs a configured person-derived prefix of no more than five characters and require every resource identity to map to a registered Powdrr type.
+structured_files: []
+files:
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 33
+    end_line: 38
+  summary: Distinguish typed resource identities from local keys and external references.
+  rationale: Prevent ordinary lookup keys and external system identifiers from being incorrectly promoted to Powdrr resources.
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 108
+    end_line: 126
+  summary: Complete the initial registry for existing durable resource fields.
+  rationale: Ensure plan, relationship, rule, workflow, profile, and actor identifiers have explicit Powdrr types.
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 132
+    end_line: 151
+  summary: Define canonical type and resource-ID grammar and human workflow prefixes.
+  rationale: Make parsing, canonical serialization, uniqueness, and ownership-prefix behavior deterministic before implementation.
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 155
+    end_line: 156
+  summary: Require runtime validation through the registered reference API.
+  rationale: Keep parsing and expected-type checks centralized instead of allowing ad hoc string operations at call sites.
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 175
+    end_line: 180
+  summary: Define registry metadata and boundary validation requirements.
+  rationale: Make uniqueness scope, generators, migration policy, sensitivity, and reference constraints explicit.
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 201
+    end_line: 205
+  summary: Require durable mappings and recoverable legacy migration.
+  rationale: Preserve lookup and replay behavior while converting legacy composite identifiers without heuristic parsing.
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 234
+    end_line: 238
+  summary: Preserve the migration stages and make legacy compatibility operationally testable.
+  rationale: Require an old-to-new mapping and interruption recovery at the persistence boundary.
+- path: docs/plans/typed-resource-identifiers.md
+  type: modified
+  span:
+    start_line: 252
+    end_line: 255
+  summary: Add acceptance criteria for complete registry coverage and workflow prefixes.
+  rationale: Make the human decisions directly verifiable in implementation and tests.
+entities: []
+entity_relationships: []
+invariants: []
+invariants:
+  - id: inv-resource-type-registry-complete
+    action: added
+    description: Every durable resource identity and persisted resource reference must map to a registered Powdrr resource type.
+    rationale: Prevent untyped identifier fields from reintroducing ambiguous resource semantics.
+  - id: inv-human-workflow-prefix-bounded
+    action: added
+    description: Human-authored workflow IDs must use configured person-derived prefixes of no more than five lowercase ASCII characters.
+    rationale: Keep readable workflow identities attributable without allowing unbounded or prompt-invented prefixes.
+guidance:
+  - id: guide-classify-identifiers-before-typing
+    action: added
+    description: Classify each identifier-bearing field as a Powdrr resource reference, local key, or external reference before assigning a type.
+    rationale: Ensure the complete registry covers resources without turning every implementation string into durable state.
+features: []
+proposed_prs: []

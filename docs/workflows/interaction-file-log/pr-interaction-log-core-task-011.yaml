@@ -1,0 +1,47 @@
+task_id: pr-interaction-log-core-task-011
+status: open
+upstream_task_ids:
+- pr-interaction-log-core-task-008
+- pr-interaction-log-core-task-009
+- pr-interaction-log-core-task-010
+dependent_state:
+- final-scope-reviewed
+complexity: medium
+input_state:
+  formatting_check: pr-interaction-log-core-task-008.formatting-check-state
+  lint_check: pr-interaction-log-core-task-009.lint-check-state
+  type_check: pr-interaction-log-core-task-010.type-check-state
+  scope_review: {}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: final-scope-review-state
+description: Review the final diff for scope
+workflow_template: execute-proposed-pr
+phase_type: review_pr
+persona_id: code-reviewer
+step_type: freeform
+details: 'Perform exactly one action: inspect the complete diff and identify debug
+  code, generated artifacts, secrets, unrelated edits, or missing intended files.
+  Do not edit or stage files. Use the structured Git intrinsic for status, never a
+  raw git command:  {"action":"invoke_tool","tool":"git","parameters":{"operation":"status"},"decisions_and_context":"Inspected
+  the repository status for the complete scope review."} After the status result,
+  return one next_step action with an explicit clean boolean and every finding, for
+  example: {"action":"next_step","output_state":{"final-scope-review-state":{"clean":true,"findings":[]}},"decisions_and_context":"Reviewed
+  the complete diff and found no out-of-scope changes."} A clean review requires an
+  empty findings list, not merely passing checks. Ignore workflow-llm-errors.jsonl
+  during this review: it is runtime observability state written outside the deliverable
+  and must not be treated as a scope finding or repaired by repeatedly deleting it.
+  Treat other diagnostic artifacts such as agent_error.txt as out of scope when present.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''pr-interaction-log-core''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: high_reasoning
+actions:
+- edit
+- yaml_edit
+- file_management
+- read_document
+- prompt_user
+- next_step

@@ -42,7 +42,7 @@ steps:
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
 - description: Stage the exact files that belong in the pull request.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -66,7 +66,7 @@ steps:
     - add
     - <files-to-publish>
 - description: Commit the validated changes.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, file_management, read_document, prompt_user, next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-

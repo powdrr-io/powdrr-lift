@@ -1,0 +1,37 @@
+task_id: interaction-file-log-mcp-task-008
+status: open
+upstream_task_ids:
+- interaction-file-log-mcp-task-007
+dependent_state:
+- formatting-checked
+complexity: medium
+input_state:
+  completeness_repair: interaction-file-log-mcp-task-007.completeness-repair-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: formatting-check-state
+description: Run formatting checks
+workflow_template: execute-proposed-pr
+phase_type: validate
+persona_id: engineer
+step_type: invoke_tool
+details: 'Assign the deterministic formatter result to formatting-check-state. Do
+  not fix files in this step. Finish with next_step and output_state exactly containing
+  that typed state, including the command, return code, and result.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-mcp''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: simple_task
+actions:
+- next_step
+pre_step:
+  action: invoke_tool
+  template:
+    tool: shell
+    command:
+    - ruff
+    - format
+    - --check
+    - .

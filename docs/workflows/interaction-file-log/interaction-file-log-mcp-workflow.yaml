@@ -1,0 +1,21 @@
+proposed_pr_id: interaction-file-log-mcp
+base_branch: main
+integration_branch: powdrr/interaction-file-log-mcp
+workflow_relative_directory: docs/workflows/interaction-file-log
+depends_on_workflows:
+- interaction-file-log-core
+invariants:
+- id: workflow-implements-target
+  relationship: implements
+  source_type: workflow
+  target_type: proposed_pr
+  target_id: interaction-file-log-mcp
+  cardinality: exactly_one
+relationships:
+- relationship: implements
+  source_type: workflow
+  target_type: proposed_pr
+  target_id: interaction-file-log-mcp
+  cardinality: exactly_one
+  invariant_id: workflow-implements-target
+  source_id: interaction-file-log-mcp

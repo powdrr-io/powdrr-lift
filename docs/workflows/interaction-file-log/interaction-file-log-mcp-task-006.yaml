@@ -1,0 +1,44 @@
+task_id: interaction-file-log-mcp-task-006
+status: open
+upstream_task_ids:
+- interaction-file-log-mcp-task-001
+- interaction-file-log-mcp-task-002
+- interaction-file-log-mcp-task-004
+- interaction-file-log-mcp-task-005
+dependent_state:
+- specification-complete
+complexity: high
+input_state:
+  proposed_pr_context: interaction-file-log-mcp-task-001.proposed-pr-context-state
+  execution_plan: interaction-file-log-mcp-task-002.detailed-execution-plan-state
+  implementation_diffs: interaction-file-log-mcp-task-004.generated-product-code-state
+  all_tests_results: interaction-file-log-mcp-task-005.all-tests-results-state
+  completeness_review: {}
+assignee_type: agent
+assignee_role: architect
+output_state_type: specification-completeness-state
+description: Review specification completeness
+workflow_template: execute-proposed-pr
+phase_type: review_specifications
+persona_id: specification-reviewer
+step_type: freeform
+details: 'Perform exactly one action: compare the implementation and test evidence
+  to every proposed PR requirement and acceptance criterion. Do not edit files or
+  run commands. Return a criterion-by-criterion review in one next_step action, using
+  the declared output_state field and this shape: {"action":"next_step","output_state":{"specification-completeness-state":{"complete":true,"criteria":[]}},"decisions_and_context":"Compared
+  every criterion with implementation and test evidence."} Set complete false and
+  list exact missing behavior or paths when anything is incomplete. Do not claim completeness
+  because tests pass alone.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-mcp''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: high_reasoning
+actions:
+- edit
+- yaml_edit
+- file_management
+- read_document
+- prompt_user
+- next_step

@@ -1,0 +1,39 @@
+task_id: interaction-file-log-mcp-task-005
+status: open
+upstream_task_ids:
+- interaction-file-log-mcp-task-004
+- interaction-file-log-mcp-task-003
+dependent_state:
+- all-tests-passed
+complexity: high
+input_state:
+  implementation_diffs: interaction-file-log-mcp-task-004.generated-product-code-state
+  generated_test_diffs: interaction-file-log-mcp-task-003.generated-test-diffs-state
+  test_results: {}
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: all-tests-results-state
+description: Run all tests and fix failures
+workflow_template: execute-proposed-pr
+phase_type: validate
+persona_id: engineer
+step_type: freeform
+details: 'Invoke run-tests-and-fix exactly once to run the complete test suite and
+  repair approved product and test files. If it reports a failure without repairing
+  it, do not invoke the skill again unchanged: inspect the reported failure, make
+  one focused edit to the approved product or test file, then invoke run-tests-and-fix
+  again. Repeat only after a new deterministic result and stop once the suite passes.
+  Never invoke this skill from inside itself or run a shell command named run-tests-and-fix.
+  Finish with next_step and all-tests-results-state containing the exact final command,
+  return code, and test summary.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-mcp''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: fast_iteration
+uses_skills:
+- run-tests-and-fix
+actions:
+- invoke_skill
+- next_step

@@ -90,12 +90,12 @@ steps:
   llm_type: fast_iteration
   details: >-
     Use the validation_tool_obligations handoff input as the sole validation action list.
-    The handoff list does not mark the runtime validation gate as discovered. Before
-    invoking any listed obligation, confirm that discovery has run in the current
-    gate epoch. If it has not, return to the preceding discovery step and run its
-    exact gather_context action first. Never invent a command such as
-    `powdrr-lift discover-validation-obligations`; no command may be used unless it
-    appears in the discovered obligation list.
+    A valid validation_tool_obligations handoff may initialize the runtime validation
+    gate automatically when a workflow resumes; malformed or stale handoffs do not.
+    If the gate cannot initialize from that handoff, return to the configured
+    discovery step and run its exact gather_context action first. Never invent a
+    command such as `powdrr-lift discover-validation-obligations`; no command may be
+    used unless it appears in the discovered obligation list.
     Invoke every listed action and satisfy its corresponding runtime obligation
     before choosing next_step, goto_step, or complete. If an obligation fails,
     apply its corrective action and rerun every listed action, including actions

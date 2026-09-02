@@ -114,9 +114,22 @@ steps:
   actions: [invoke_skill, next_step]
   step_type: freeform
   llm_type: standard_reasoning
-  uses_skills:
-  - bootstrap-code-structure
-  details: Invoke bootstrap-code-structure with the selected feature context. The nested skill is project-wide and must not ask for a feature or target module.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command:
+      - test
+      - -f
+      - docs/project_structure/project-structure.yaml
+  details: >-
+    Check the deterministic pre-step result. If the project-structure artifact
+    exists, choose next_step and reuse it; do not
+    invoke any nested skill. If the gate routed here because the artifact is
+    missing, invoke exactly the listed bootstrap-code-structure skill once,
+    then choose next_step after it returns. The nested skill is project-wide
+    and must not ask for a feature or target module. Never invoke bootstrap
+    merely because this step is present: the gate result is authoritative.
 - id: confirm-project-structure
   description: Confirm the project-structure artifact is available.
   actions: [next_step]
@@ -138,7 +151,8 @@ steps:
     goto_step: bootstrap-project-structure
     retry_context: >-
       The project-structure artifact is not available in the active worktree.
-      Rerun bootstrap-code-structure, then retry this gate.
+      Rerun bootstrap-project-structure so the nested bootstrap skill can
+      create the artifact in the same worktree, then retry this gate.
 - id: plan-proposed-prs
   description: Plan the proposed PR implementation sequence.
   actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
@@ -441,8 +455,9 @@ steps:
   llm_type: simple_task
   details: >-
     Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the
-    intrinsic git add action, review the staged paths, and do not commit or
-    create a pull request yet. Use
+    intrinsic git add action. Do not run another Git command in this step;
+    the following deterministic verify-staged-artifacts step reviews the staged
+    paths. Do not commit or create a pull request yet. Use
     {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["docs/proposals/<feature-name>","docs/workflows"]}}.
   tool_invocations:
   - tool: git
@@ -469,7 +484,7 @@ steps:
     required_for_next_step: true
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
-  actions: [invoke_skill, next_step]
+  actions: [next_step]
   step_type: freeform
   llm_type: fast_iteration
   details: Run finish-pr-prep after the validated planning artifacts are staged. If cleanup changes files, restage only those artifacts before continuing. Do not implement any proposed PR in this skill.
@@ -477,7 +492,7 @@ steps:
   - finish-pr-prep
 - id: create-feature-pull-request
   description: Commit the validated artifacts and open a draft pull request.
-  actions: [invoke_skill, next_step]
+  actions: [next_step]
   step_type: freeform
   llm_type: simple_task
   details: >-

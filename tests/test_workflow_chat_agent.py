@@ -5325,10 +5325,15 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ):
                     self._nested_invoked_steps.add(nested_key)
                     invocation = cast(dict[str, object], invocation)
+                    parameters = (
+                        {"operation": invocation["operation"]}
+                        if "operation" in invocation
+                        else {"command": invocation["command"]}
+                    )
                     return {
                         "action": "invoke_tool",
                         "tool": invocation["tool"],
-                        "parameters": {"command": invocation["command"]},
+                        "parameters": parameters,
                     }
                 return {
                     "action": "next_step",

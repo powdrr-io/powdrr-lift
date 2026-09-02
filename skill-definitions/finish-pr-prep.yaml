@@ -55,8 +55,12 @@ steps:
     programming-language label they represent. Invoke gather_context exactly
     once with types [tools] and a labels filter containing pr-prep plus those
     language labels. If no language labels are present, use only pr-prep. Do
-    not hard-code a language, tool, or command. For example, the action shape
-    is {"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep","<language-label>"]}}.
+    not hard-code a language, tool, or command. If the repository's tool index
+    has no matching language label, retry discovery is forbidden: use the
+    returned result as authoritative and emit an empty obligation list. Never
+    substitute tools remembered from an earlier step or from a project
+    structure document when the gather result is empty. For example, the
+    action shape is {"kind":"gather_context","types":["tools"],"filters":{"labels":["pr-prep","<language-label>"]}}.
     After the gather_context result is returned, choose next_step and copy the
     matching tool records into the required output. The next_step must include
     an outputs object with the exact declared key, for example:
@@ -90,6 +94,12 @@ steps:
   llm_type: fast_iteration
   details: >-
     Use the validation_tool_obligations handoff input as the sole validation action list.
+    Each list item is an exact action object: preserve its `tool` and its
+    `parameters` unchanged. In particular, a discovered shell obligation must
+    be returned as invoke_tool with tool `shell` and the listed command; never
+    convert it to the internal tool, the git intrinsic, or a different command
+    shape. Do not infer an obligation from a tool name, project structure, or
+    prior transcript.
     A valid validation_tool_obligations handoff may initialize the runtime validation
     gate automatically when a workflow resumes; malformed or stale handoffs do not.
     If the gate cannot initialize from that handoff, return to the configured

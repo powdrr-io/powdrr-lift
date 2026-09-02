@@ -576,7 +576,7 @@ def cleanup_workflow_run(
     *,
     report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Remove task artifacts while preserving the integration checkpoint."""
+    """Remove task artifacts and reset committed workflow progress."""
     repo_root_path = Path(repo_root).resolve()
     state_report = report or inspect_workflow_run(repo_root_path, proposed_pr_id)
     removed: list[str] = []
@@ -626,41 +626,13 @@ def cleanup_workflow_run(
                     f"{result.stderr.strip()}"
                 )
     elif integration_worktree.is_dir():
-        recovery = _restore_interrupted_workflow_checkpoint(
-            repo_root_path,
+        recovery = _restore_workflow_git_state(
             state_report,
             integration_worktree,
+            proposed_pr_id,
         )
         removed.extend(recovery["removed"])
         errors.extend(recovery["errors"])
-        relative_directory = (
-            state_data.get("workflow_relative_directory")
-            if isinstance(state_data, dict)
-            else None
-        )
-        if isinstance(relative_directory, str) and relative_directory:
-            restore = _git(
-                integration_worktree,
-                [
-                    "restore",
-                    "--source=HEAD",
-                    "--staged",
-                    "--worktree",
-                    "--",
-                    relative_directory,
-                ],
-            )
-            clean = _git(
-                integration_worktree,
-                ["clean", "-fd", "--", relative_directory],
-            )
-            if restore.returncode == 0 and clean.returncode == 0:
-                removed.append(f"incomplete-workflow-files:{relative_directory}")
-            else:
-                errors.append(
-                    "integration-worktree: could not restore workflow files: "
-                    f"{restore.stderr.strip() or clean.stderr.strip()}"
-                )
 
     for pull_request in state_report.get("pull_requests", []):
         if pull_request.get("state") != "OPEN":
@@ -721,6 +693,96 @@ def cleanup_workflow_run(
         "integration_checkpoint_preserved": bool(
             state_report["integration_branch_exists"] and checkpoint_valid
         ),
+    }
+
+
+def _restore_workflow_git_state(
+    report: Mapping[str, Any],
+    integration_worktree: Path,
+    proposed_pr_id: str,
+) -> dict[str, list[str]]:
+    """Restore committed workflow files to their initial generated version."""
+    state_data = report.get("workflow_git_state")
+    relative_directory = (
+        state_data.get("workflow_relative_directory")
+        if isinstance(state_data, dict)
+        else None
+    )
+    if not isinstance(relative_directory, str) or not relative_directory:
+        return {"removed": [], "errors": ["workflow state has no workflow directory"]}
+
+    history = _git(
+        integration_worktree,
+        ["log", "--reverse", "--format=%H", "--", relative_directory],
+    )
+    initial = next(iter(history.stdout.splitlines()), None)
+    if history.returncode != 0 or initial is None:
+        return {
+            "removed": [],
+            "errors": [
+                f"workflow:{proposed_pr_id}: could not identify initial generated state"
+            ],
+        }
+
+    changed = _git(
+        integration_worktree,
+        ["diff", "--name-only", f"{initial}..HEAD", "--", relative_directory],
+    )
+    errors: list[str] = []
+    for path in changed.stdout.splitlines():
+        exists = _git(integration_worktree, ["cat-file", "-e", f"{initial}:{path}"])
+        if exists.returncode != 0:
+            removed_file = _git(integration_worktree, ["rm", "-f", "--", path])
+            if removed_file.returncode != 0:
+                errors.append(f"workflow-file:{path}: {removed_file.stderr.strip()}")
+    if errors:
+        return {"removed": [], "errors": errors}
+
+    restore = _git(
+        integration_worktree,
+        [
+            "restore",
+            f"--source={initial}",
+            "--staged",
+            "--worktree",
+            "--",
+            relative_directory,
+        ],
+    )
+    clean = _git(integration_worktree, ["clean", "-fd", "--", relative_directory])
+    if restore.returncode != 0 or clean.returncode != 0:
+        return {
+            "removed": [],
+            "errors": [
+                "integration-worktree: could not restore initial workflow files: "
+                + (restore.stderr.strip() or clean.stderr.strip())
+            ],
+        }
+
+    status = _git(integration_worktree, ["status", "--porcelain"])
+    if status.stdout.strip():
+        commit = _git(
+            integration_worktree,
+            ["commit", "-m", f"Reset workflow progress: {proposed_pr_id}"],
+        )
+        if commit.returncode != 0:
+            return {
+                "removed": [],
+                "errors": [f"integration-branch: {commit.stderr.strip()}"],
+            }
+        push = _git(
+            integration_worktree,
+            ["push", "--set-upstream", "origin", report["integration_branch"]],
+        )
+        if push.returncode != 0:
+            return {
+                "removed": [],
+                "errors": [f"integration-branch: {push.stderr.strip()}"],
+            }
+
+    return {
+        "removed": [f"reset-workflow-state:{relative_directory}:{initial}"],
+        "errors": [],
     }
 
 

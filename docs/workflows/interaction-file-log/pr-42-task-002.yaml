@@ -1,0 +1,39 @@
+task_id: pr-42-task-002
+status: open
+upstream_task_ids:
+- pr-42-task-001
+dependent_state:
+- execution-plan-created
+complexity: high
+input_state:
+  proposed_pr_context: pr-42-task-001.proposed-pr-context-state
+  execution_plan: []
+assignee_type: agent
+assignee_role: architect
+output_state_type: detailed-execution-plan-state
+description: Create the execution plan
+workflow_template: execute-proposed-pr
+phase_type: plan_pr
+persona_id: engineer
+step_type: freeform
+details: 'Perform exactly one action: create the ordered execution plan. Read the
+  supplied proposed PR context, map every acceptance criterion to tests and implementation
+  work, and record exact paths and validation commands in the plan. Do not edit files,
+  run commands, or call gather_context in this step. If a required decision is missing,
+  use one prompt_user action instead of inventing it. When the plan is complete, return
+  exactly this next_step shape, replacing the example execution_plan with the ordered
+  plan: {"action":"next_step","output_state":{"detailed-execution-plan-state":{"execution_plan":{"criteria_to_tests":[],"implementation_files":[],"test_commands":[],"validation_commands":[],"risks":[]}}},"decisions_and_context":"Created
+  the ordered plan and mapped each acceptance criterion to validation."}
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''PR-42''. Use these values as search context and verify repository documents
+  before deciding what they identify.'
+llm_type: high_reasoning
+actions:
+- edit
+- yaml_edit
+- file_management
+- read_document
+- prompt_user
+- next_step

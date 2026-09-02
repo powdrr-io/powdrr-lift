@@ -1,0 +1,43 @@
+task_id: pr-42-task-001
+status: open
+upstream_task_ids: []
+dependent_state:
+- proposed-pr-context-gathered
+complexity: high
+input_state:
+  proposed_pr: PR-42
+  feature_id: interaction-file-log
+assignee_type: agent
+assignee_role: architect
+output_state_type: proposed-pr-context-state
+description: Gather context about the proposed PR
+workflow_template: execute-proposed-pr
+phase_type: intake
+persona_id: architect
+step_type: invoke_tool
+details: 'The deterministic pre-step already gathered the context. Assign that exact
+  result to proposed-pr-context-state. Do not search for, rediscover, or reinterpret
+  the proposed PR. Complete this task with a next_step action, for example: {"action":"next_step","output_state":{"proposed-pr-context-state":"the
+  exact gathered result"},"decisions_and_context":"Assigned the deterministic proposed
+  PR context for planning."}
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''PR-42''. Use these values as search context and verify repository documents
+  before deciding what they identify.'
+llm_type: long_context
+actions:
+- next_step
+pre_step:
+  action: gather_context
+  template:
+    feature_id: <feature_id>
+    types:
+    - proposed_prs
+    - requirements
+    - features
+    - acceptance_criteria
+    - expected_tests
+    - intent
+    - risks
+    - decisions

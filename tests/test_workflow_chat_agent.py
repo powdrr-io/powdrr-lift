@@ -1187,6 +1187,66 @@ def test_dynamic_validation_gate_rejects_commands_before_discovery() -> None:
         )
 
 
+def test_dynamic_validation_gate_registers_valid_handoff_before_invoking() -> None:
+    step = SkillStep(
+        description="Run discovered checks.",
+        validation_gate={
+            "id": "checks",
+            "discovery": {"input_ref": "validation_tool_obligations"},
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
+        },
+    )
+    selected_skill = SkillCatalogEntry(
+        Path("skill.yaml"), Skill(name="validation", when_to_use=(), steps=(step,))
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=selected_skill,
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+        handoff_records={
+            "validation_tool_obligations": {
+                "name": "validation_tool_obligations",
+                "value": [
+                    {
+                        "id": "pytest",
+                        "validation_action": {
+                            "kind": "invoke_tool",
+                            "tool": "shell",
+                            "parameters": {"command": ["uv", "run", "pytest"]},
+                        },
+                    }
+                ],
+            }
+        },
+    )
+
+    _validate_dynamic_validation_gate_action(
+        _parse_action_response(
+            {
+                "action": "invoke_tool",
+                "tool": "shell",
+                "parameters": {"command": ["uv", "run", "pytest"]},
+            }
+        ),
+        state,
+        step,
+    )
+
+    assert state.validation_gates["checks"].discovered is True
+    assert state.validation_gates["checks"].discovery_action == {
+        "kind": "handoff",
+        "name": "validation_tool_obligations",
+    }
+
+
 def test_dynamic_validation_gate_matches_shell_command_string_and_argument_list() -> (
     None
 ):

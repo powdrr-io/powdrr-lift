@@ -6420,6 +6420,59 @@ def _discover_validation_obligations(
         }
 
 
+def _auto_register_validation_handoff(
+    state: _WorkflowExecutionState,
+    *,
+    gate: Any,
+    gate_step_index: int,
+) -> bool:
+    """Register a valid discovered-obligation handoff when resuming a workflow."""
+    config = _validation_gate_config(gate)
+    if config is None:
+        return False
+    discovery = config.get("discovery")
+    if not isinstance(discovery, Mapping):
+        return False
+    input_ref = discovery.get("input_ref")
+    if not isinstance(input_ref, str) or not input_ref.strip():
+        return False
+    record = state.handoff_records.get(input_ref.strip())
+    if not isinstance(record, Mapping):
+        return False
+    raw_obligations = record.get("value")
+    if not isinstance(raw_obligations, Sequence) or isinstance(
+        raw_obligations, (str, bytes, bytearray)
+    ):
+        return False
+    matches: list[dict[str, Any]] = []
+    for item in raw_obligations:
+        if not isinstance(item, Mapping):
+            return False
+        obligation_id = item.get("id")
+        validation_action = item.get("validation_action")
+        if not isinstance(obligation_id, str) or not obligation_id.strip():
+            return False
+        if not isinstance(validation_action, Mapping) or not validation_action:
+            return False
+        matches.append(
+            {
+                "section": "tools",
+                "item": {
+                    "id": obligation_id.strip(),
+                    "validation_action": dict(validation_action),
+                },
+            }
+        )
+    _discover_validation_obligations(
+        {"matches": matches},
+        state=state,
+        gate=gate,
+        gate_step_index=gate_step_index,
+        discovery_action={"kind": "handoff", "name": input_ref.strip()},
+    )
+    return True
+
+
 def _register_validation_gate_discovery(
     action: SkillChatAction,
     state: _WorkflowExecutionState,
@@ -6545,19 +6598,25 @@ def _validate_dynamic_validation_gate_action(
         return
     gate_state = _validation_gate_state(state, step)
     if not gate_state.discovered:
-        raise _WorkflowToolValidationError(
-            ValidationError(
-                code="validation_discovery_required",
-                message=(
-                    "Validation obligations have not been discovered in the current "
-                    "gate epoch. Do not invoke a validation command or invent a "
-                    "discovery CLI command. Return to the configured discovery "
-                    "step and run its exact gather_context action before invoking "
-                    "any obligation."
-                ),
-                path="action",
+        if _auto_register_validation_handoff(
+            state, gate=step, gate_step_index=state.step_index
+        ):
+            gate_state = _validation_gate_state(state, step)
+        else:
+            raise _WorkflowToolValidationError(
+                ValidationError(
+                    code="validation_discovery_required",
+                    message=(
+                        "Validation obligations have not been discovered in the "
+                        "current "
+                        "gate epoch. Do not invoke a validation command or invent a "
+                        "discovery CLI command. Return to the configured discovery "
+                        "step and run its exact gather_context action before invoking "
+                        "any obligation."
+                    ),
+                    path="action",
+                )
             )
-        )
     if state.step_index != gate_state.step_index:
         return
     if gate_state.correction_required and action.kind != "gather_context":

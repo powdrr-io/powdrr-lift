@@ -5305,7 +5305,7 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
 
 def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
     if action.kind in {"edit", "yaml_edit"}:
-        return "Edited file"
+        return "Attempting file edit"
     if action.kind == "file_management":
         return f"Managing file: {action.file_operation} {action.file_path}"
     if action.kind == "read_document":
@@ -5492,8 +5492,11 @@ def _handle_workflow_action_yaml_edit(
     target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
     if not target_path.exists():
         raise _WorkflowYamlEditError(
-            f"yaml_edit target {action.file_path!r} does not exist. Read or "
-            "generate the YAML document before applying structural edits."
+            f"yaml_edit target {action.file_path!r} does not exist; no file was "
+            "changed. Do not retry this action. Choose next_step so the declared "
+            "generation step can create the document, or use file_management "
+            "create when this step explicitly owns file creation, then apply "
+            "yaml_edit only after the target exists."
         )
     state.current_file_path = target_path
     current_text = target_path.read_text(encoding="utf-8")

@@ -1696,7 +1696,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Remove dangling task branches, worktrees, claims, and task PRs; "
-            "preserve the integration branch as the last checkpoint."
+            "reset committed workflow files to their initial generated state, "
+            "and preserve the integration branch."
         ),
     )
     workflow_recovery_parser.add_argument(

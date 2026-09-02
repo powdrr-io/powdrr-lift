@@ -246,8 +246,17 @@ def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) 
         '{"task_id": "task-001", "status": "in_progress"}\n',
         encoding="utf-8",
     )
+    _git(integration_worktree, "add", "docs/workflows/feature-17")
+    _git(integration_worktree, "commit", "-m", "initialize workflow")
     task_worktree, task_branch = create_task_worktree(tmp_path, state, "task-001")
     claim_workflow_task(tmp_path, state, "task-001")
+    (workflow_dir / "task-001.json").write_text(
+        '{"task_id": "task-001", "status": "completed", '
+        '"output_state": {"result": "done"}}\n',
+        encoding="utf-8",
+    )
+    _git(integration_worktree, "add", "docs/workflows/feature-17")
+    _git(integration_worktree, "commit", "-m", "complete task")
 
     report = inspect_workflow_run(tmp_path, "feature-17")
 
@@ -260,6 +269,7 @@ def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) 
 
     assert cleaned["integration_checkpoint_preserved"] is True
     assert cleaned["integration_worktree_exists"] is True
+    assert '"status": "in_progress"' in (workflow_dir / "task-001.json").read_text()
     assert not task_worktree.exists()
     assert not any(
         line.strip() == task_branch

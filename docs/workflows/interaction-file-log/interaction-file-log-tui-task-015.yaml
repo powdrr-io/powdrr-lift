@@ -1,0 +1,51 @@
+task_id: interaction-file-log-tui-task-015
+status: open
+upstream_task_ids:
+- interaction-file-log-tui-task-001
+- interaction-file-log-tui-task-004
+- interaction-file-log-tui-task-005
+- interaction-file-log-tui-task-006
+- interaction-file-log-tui-task-008
+- interaction-file-log-tui-task-009
+- interaction-file-log-tui-task-010
+- interaction-file-log-tui-task-013
+- interaction-file-log-tui-task-014
+dependent_state:
+- pull-request-prep-complete
+complexity: medium
+input_state:
+  proposed_pr_context: interaction-file-log-tui-task-001.proposed-pr-context-state
+  implementation_diffs: interaction-file-log-tui-task-004.generated-product-code-state
+  all_tests_results: interaction-file-log-tui-task-005.all-tests-results-state
+  completeness_review: interaction-file-log-tui-task-006.specification-completeness-state
+  formatting_check: interaction-file-log-tui-task-008.formatting-check-state
+  lint_check: interaction-file-log-tui-task-009.lint-check-state
+  type_check: interaction-file-log-tui-task-010.type-check-state
+  promoted_documents: interaction-file-log-tui-task-013.promoted-current-state-documents
+  staged_changes: interaction-file-log-tui-task-014.staged-pull-request-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: pull-request-prep-state
+description: Finish pull request preparation
+workflow_template: execute-proposed-pr
+phase_type: publish_pr
+persona_id: engineering-manager
+step_type: freeform
+details: 'The listed finish-pr-prep skill runs automatically because it is declared
+  in uses_skills. Do not return invoke_skill for it; doing so is recursive and will
+  be rejected. Do not independently edit, stage, commit, push, or create a pull request
+  here; the attached skill owns its validation operations. After the attached skill
+  returns, pass its complete evidence to the next workflow boundary with a separate
+  next_step action, for example: {"action":"next_step","output_state":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep
+  completed with the recorded validation evidence."}
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-tui''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: fast_iteration
+uses_skills:
+- finish-pr-prep
+actions:
+- invoke_skill
+- next_step

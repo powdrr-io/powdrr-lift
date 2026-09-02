@@ -47,6 +47,7 @@ from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_task_messages,
     _build_workflow_client,
+    _durable_task_action_output_state,
     _handle_exhausted_timeout,
     _list_worktree_files,
     _publish_workflow_progress,
@@ -88,6 +89,13 @@ def _workflow(tmp_path: Path) -> WorkflowInstance:
             ),
         ),
     )
+
+
+def test_next_step_requires_top_level_output_state() -> None:
+    action = WorkflowAction(kind="next_step", outputs={"result": "claimed"})
+
+    with pytest.raises(Exception, match="top-level.*output_state"):
+        _durable_task_action_output_state(action)
 
 
 def test_explicit_task_prompt_contains_only_declared_action_guidance() -> None:

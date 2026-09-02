@@ -1,0 +1,146 @@
+# PR specification template.
+#
+# Instructions:
+# - Keep every proposed PR for this feature in this one file.
+# - Set the top-level `id` to the feature/work-item id.
+# - Add one ordered entry under `proposed_prs` for each proposed PR.
+# - Set each proposed PR `id` to a globally unique proposed PR id.
+# - List prerequisite proposed PR ids under each entry's `dependent_prs`.
+# - Dependency ids must identify another entry in this same file; cycles
+#   are not allowed.
+# - Reference one or more current feature ids from the codebase state
+#   listed below.
+# - Fill in each proposed PR's intent, justification, and dependencies.
+# - In the feature-wide specification-v1 sections below
+#   (`entities`, `modules`, `tools`, `entity_relationships`, `features`,
+#   and `decisions`), record every action-bearing id once and label each
+#   item with the proposed_pr_id that will deliver it.
+#   These IDs and actions are copied from the authoritative v1 proposal
+#   specs and must not be changed, omitted, or duplicated.
+# - Delete these instructions and replace them with this comment at the top:
+#   "# This file is read-only and should never be edited by a tool or agent."
+#
+# Current feature ids:
+# - BlameView (UI, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-14-changelog.yaml)
+# - Bootstrap skill (Skill, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-21-changelog.yaml)
+# - CLI (CLI, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-16-changelog.yaml)
+# - ChangeLogTemplate (Template, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-15-changelog.yaml)
+# - ChangeLogValidator (Function, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - ChangelogIndex (Indexer, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-13-changelog.yaml)
+# - ChangelogParser (Parser, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-13-changelog.yaml)
+# - ChangelogValidation (CLI, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-18-changelog.yaml)
+# - CodeIndexCache (Cache, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-16-changelog.yaml)
+# - CodeIndexStore (Class, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - CodeReviewWorkflow (Workflow, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-18-changelog.yaml)
+# - CodebaseStateDecisionReport (Class, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - CodebaseStateInvariantReport (Class, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - CurrentDecisionRecord (Class, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - EditContextLookup (Report, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-14-changelog.yaml)
+# - EntityDecisionOccurrence (Record, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-16-changelog.yaml)
+# - EntityDecisionReport (Report, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-16-changelog.yaml)
+# - EntityGraph (Graph, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-15-changelog.yaml)
+# - EntityLookup (Module, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-16-changelog.yaml)
+# - EntityReferenceReport (Report, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-14-changelog.yaml)
+# - EntityRelationshipReport (Report, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-14-changelog.yaml)
+# - MCPServer (MCP, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-16-changelog.yaml)
+# - PublicAPI (Public API, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - ReviewSkill (Skill, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-18-changelog.yaml)
+# - architecture-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-29-changelog.yaml)
+# - branch_decision (Table, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - changelog-code-index (Module, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-47-changelog.yaml)
+# - changelog-parser (Module, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-47-changelog.yaml)
+# - changelog-template (Template file, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-47-changelog.yaml)
+# - changelog-validator (Module, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-47-changelog.yaml)
+# - codebase-state (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-24-changelog.yaml)
+# - create_architecture_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-28-changelog.yaml)
+# - create_implementation_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-29-changelog.yaml)
+# - create_pr_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-30-changelog.yaml)
+# - create_system_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - current-decisions (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - decision_status (Column, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - evaluate-architecture-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-28-changelog.yaml)
+# - evaluate-implementation-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-29-changelog.yaml)
+# - evaluate-pr-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-30-changelog.yaml)
+# - evaluate-system-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - get_codebase_state (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-24-changelog.yaml)
+# - get_current_decisions (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - get_invariants (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - implementation-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-29-changelog.yaml)
+# - invariants (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - mcp-server-tests (Test suite, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - openai-exchange-record (Audit log, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-54-changelog.yaml)
+# - openai-proxy-cli (Command, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-54-changelog.yaml)
+# - openai-proxy-service (Service, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-54-changelog.yaml)
+# - openai-upstream-api (Service, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-54-changelog.yaml)
+# - powdrr-lift-cli (CLI, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-12-changelog.yaml)
+# - pr-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-30-changelog.yaml)
+# - pr-specification-core (Module, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-30-changelog.yaml)
+# - pr-specification-tests (Test suite, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-30-changelog.yaml)
+# - pr-specification-validator (Module, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-47-changelog.yaml)
+# - proposed-pr-specification (Template file, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-47-changelog.yaml)
+# - proxy-log-directory (File storage service, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-54-changelog.yaml)
+# - replaces_decision_id (Column, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-26-changelog.yaml)
+# - specify-architecture (Skill, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-29-changelog.yaml)
+# - specify-implementation (Skill, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-29-changelog.yaml)
+# - specify-prs (Skill, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-30-changelog.yaml)
+# - specify-system (Skill, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - synchronize-code-and-state (Skill, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-25-changelog.yaml)
+# - system-specification (Subcommand, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - system-specification-core (Module, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - system-specification-tests (Test suite, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - template-regression-tests (TestSuite, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-12-changelog.yaml)
+# - validate_architecture_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-28-changelog.yaml)
+# - validate_implementation_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-29-changelog.yaml)
+# - validate_pr_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-30-changelog.yaml)
+# - validate_system_specification (Request handler, /Users/gregory/code/powdrr-lift/.worktrees/workflow-chat-20260902-055143-811829/docs/changelogs/PR-32-changelog.yaml)
+# - feature-document-families (feature, docs/current/powdrr-lift/implementation-specification.yaml)
+# - feature-specified-template-workflows (feature, docs/current/powdrr-lift/implementation-specification.yaml)
+# - feature-proposed-pr-discovery (feature, docs/current/powdrr-lift/implementation-specification.yaml)
+# - feature-synthesis-workflows (feature, docs/current/powdrr-lift/implementation-specification.yaml)
+# - feature-review-workflows (feature, docs/current/powdrr-lift/implementation-specification.yaml)
+# - feature-context-graph (feature, docs/current/powdrr-lift/implementation-specification.yaml)
+# - feature-unified-packaging (feature, docs/current/powdrr-lift/implementation-specification.yaml)
+# - interaction-log-json (feature, docs/proposals/interaction-file-log/implementation-specification.yaml)
+# - feat-interactive-exploration (feature, docs/proposals/interactive-entity-exploration/implementation-specification.yaml)
+schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+id: null
+feature_ids:
+  - null
+proposed_prs:
+  - id: null
+    intent: null
+    justification: null
+    dependent_prs: []
+entities:
+  - id: interaction-log
+    action: added
+    proposed_pr_id: null
+  - id: interaction-log-writer
+    action: added
+    proposed_pr_id: null
+  - id: interaction-log-file
+    action: added
+    proposed_pr_id: null
+modules:
+  - id: interaction-log-writer
+    action: added
+    proposed_pr_id: null
+tools:
+  - id: interaction-log-writer
+    action: added
+    proposed_pr_id: null
+entity_relationships:
+  - id: interaction-log-has-writer
+    action: added
+    proposed_pr_id: null
+  - id: interaction-log-writer-writes-file
+    action: added
+    proposed_pr_id: null
+features:
+  - id: interaction-log-json
+    action: added
+    proposed_pr_id: null
+decisions:
+  - id: interaction-log-location
+    action: added
+    proposed_pr_id: null

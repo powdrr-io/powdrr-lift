@@ -133,6 +133,9 @@ steps:
     branch.
     Invoke the registered gh intrinsic with exactly
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_create","title":"Add <feature-name> implementation workflow","body":"<populated-pr-description>"}}.
+    For this operation, provide only the title and body. The runtime determines
+    the repository, current branch, base branch, and pull-request identity;
+    never provide `pr_reference`, `head`, or `base`.
     The title must be the non-empty value `Add <feature-name> implementation
     workflow`; never pass a placeholder or shell command array. Use the
     completed body from the previous steps. Do not print the body, edit an
@@ -149,7 +152,11 @@ steps:
   details: >-
     Use this step only when a pull request already exists for the current
     branch. Invoke the registered gh intrinsic with exactly
-    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_edit","pr_reference":"<pr-reference>","title":"Add <feature-name> implementation workflow","body":"<populated-pr-description>"}}.
+    {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_edit","title":"Add <feature-name> implementation workflow","body":"<populated-pr-description>"}}.
+    For this operation, provide only the title and body. The runtime resolves
+    the existing pull request from the current branch; never provide
+    `pr_reference`, `head`, or `base`, and never use a proposed PR id as a
+    GitHub pull-request reference.
     Do not print the body, create a second PR, or run any other tool. Do not
     report completion until the command succeeds and its output
     identifies the pull request. Never merge the PR or push directly to main.

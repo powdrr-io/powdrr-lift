@@ -6547,10 +6547,13 @@ def _validate_dynamic_validation_gate_action(
     if not gate_state.discovered:
         raise _WorkflowToolValidationError(
             ValidationError(
-                code="validation_obligations_not_discovered",
+                code="validation_discovery_required",
                 message=(
-                    "Validation obligations have not been discovered. Run the "
-                    "configured discovery action before invoking obligations."
+                    "Validation obligations have not been discovered in the current "
+                    "gate epoch. Do not invoke a validation command or invent a "
+                    "discovery CLI command. Return to the configured discovery "
+                    "step and run its exact gather_context action before invoking "
+                    "any obligation."
                 ),
                 path="action",
             )

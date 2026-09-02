@@ -1143,6 +1143,50 @@ def test_dynamic_validation_gate_cannot_be_bypassed() -> None:
         )
 
 
+def test_dynamic_validation_gate_rejects_commands_before_discovery() -> None:
+    step = SkillStep(
+        description="Run discovered checks.",
+        validation_gate={
+            "id": "checks",
+            "discovery": {"action": {"action": "gather_context"}},
+            "obligations": {
+                "source": "matches",
+                "filter": {"section": "tools"},
+                "id": "item.id",
+                "action": "item.validation_action",
+            },
+        },
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            Path("skill.yaml"), Skill(name="validation", when_to_use=(), steps=(step,))
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=Path("."),
+    )
+
+    with pytest.raises(RuntimeError, match="Do not invoke a validation command"):
+        _validate_dynamic_validation_gate_action(
+            _parse_action_response(
+                {
+                    "action": "invoke_tool",
+                    "tool": "internal",
+                    "parameters": {
+                        "command": [
+                            "powdrr-lift",
+                            "discover-validation-obligations",
+                        ]
+                    },
+                }
+            ),
+            state,
+            step,
+        )
+
+
 def test_dynamic_validation_gate_matches_shell_command_string_and_argument_list() -> (
     None
 ):

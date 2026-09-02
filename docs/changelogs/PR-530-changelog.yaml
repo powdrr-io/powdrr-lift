@@ -1,0 +1,31 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 530
+title: Explain obligation-based follow-through
+intent:
+  problem: The README describes Powdrr's safety and validation controls but does not explain how it ensures required follow-up work is completed.
+  goal: Explain durable obligations as the mechanism that tracks required follow-up actions, blocks unsafe completion, and survives interrupted execution.
+human-decisions:
+  -
+    id: explain-obligation-follow-through
+    summary: Present durable execution obligations as a reason Powdrr is more trustworthy and follows through on requested work.
+structured_files: []
+files:
+  -
+    path: README.md
+    type: modified
+    span:
+      start_line: 44
+      end_line: 56
+    summary: Explain durable obligations and their role in trustworthy follow-through.
+    rationale: Help readers understand that Powdrr tracks required validation, review, and evidence actions instead of relying on an agent's completion narrative.
+entities: []
+entity_relationships: []
+invariants:
+  -
+    id: inv-obligations-block-premature-completion
+    action: added
+    description: Open execution obligations must remain visible and may block dependent actions, phase transitions, or publication until satisfied.
+    rationale: Prevent an execution from being treated as complete while required follow-up work remains.
+guidance: []
+features: []
+proposed_prs: []

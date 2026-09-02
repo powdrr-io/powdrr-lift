@@ -41,6 +41,19 @@ again? Tired of needing a manager agent just to monitor your coding agent and ma
 it performs its basic duties? Powdrr does what you ask, doesn't report false success, and
 doesn't need a chaperone to keep it from running amok.
 
+## Your Agent Follows Through
+
+Most agents treat a request as a prompt and completion as a story they tell about what
+they did. Powdrr treats required follow-up work as an obligation. When a plan, action,
+or declared rule requires something else—run the validation, resolve the review thread,
+record the evidence—the execution kernel opens a durable obligation and tracks it until
+the exact required action satisfies it.
+
+Open obligations can block dependent actions, phase transitions, and the publish boundary.
+If the agent stops and resumes later, Powdrr restores the outstanding obligations with
+the execution state. That is the difference between an agent that sounds finished and a
+system that follows through on what you asked it to do.
+
 ## How Powdrr Lift Delivers It
 
 Powdrr turns an open-ended request into a controlled engineering process. The agent gets

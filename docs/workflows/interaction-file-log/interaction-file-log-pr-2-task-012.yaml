@@ -1,0 +1,38 @@
+task_id: interaction-file-log-pr-2-task-012
+status: open
+upstream_task_ids:
+- interaction-file-log-pr-2-task-011
+dependent_state:
+- final-scope-repair-complete
+complexity: medium
+input_state:
+  scope_review: interaction-file-log-pr-2-task-011.final-scope-review-state
+  scope_repair: {}
+assignee_type: agent
+assignee_role: coder
+output_state_type: final-scope-repair-state
+description: Repair final diff scope issues
+workflow_template: execute-proposed-pr
+phase_type: resolve_findings
+persona_id: engineer
+step_type: freeform
+details: 'Perform exactly one action only when the scope review identifies a finding:
+  edit or remove only the reported out-of-scope content. Do not run checks or stage
+  files here. If the review is clean, make no edit. For a file removal, use one file_management
+  action such as: {"action":"file_management","operation":"delete","file_path":"tmp/debug.log","decisions_and_context":"Removed
+  the reported generated artifact."} For a code correction, use one edit action. Record
+  the repair in the output_state and let the final checks rerun after this task. Finish
+  with next_step.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-pr-2''. Use these values as search context and verify
+  repository documents before deciding what they identify.'
+llm_type: standard_reasoning
+actions:
+- edit
+- yaml_edit
+- file_management
+- read_document
+- prompt_user
+- next_step

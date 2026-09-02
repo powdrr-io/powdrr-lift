@@ -1,0 +1,21 @@
+proposed_pr_id: interaction-file-log-pr-2
+base_branch: main
+integration_branch: powdrr/interaction-file-log-pr-2
+workflow_relative_directory: docs/workflows/interaction-file-log
+depends_on_workflows:
+- interaction-file-log-pr-1
+invariants:
+- id: workflow-implements-target
+  relationship: implements
+  source_type: workflow
+  target_type: proposed_pr
+  target_id: interaction-file-log-pr-2
+  cardinality: exactly_one
+relationships:
+- relationship: implements
+  source_type: workflow
+  target_type: proposed_pr
+  target_id: interaction-file-log-pr-2
+  cardinality: exactly_one
+  invariant_id: workflow-implements-target
+  source_id: interaction-file-log-pr-2

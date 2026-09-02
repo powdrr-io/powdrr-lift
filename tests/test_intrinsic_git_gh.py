@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -115,6 +116,66 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
         },
         tool="gh",
     )[-4:] == ["--base", "main", "--head", "workflow/demo"]
+
+
+def test_gh_edit_uses_the_current_branch_as_runtime_owned_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append(command)
+        if command[:3] == ["git", "branch", "--show-current"]:
+            return SimpleNamespace(returncode=0, stdout="workflow/current\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("powdrr_lift.intrinsic_git_gh.subprocess.run", fake_run)
+    execute_intrinsic_git_gh_tool(
+        "gh",
+        {
+            "operation": "pr_edit",
+            "pr_reference": "PR-40",
+            "title": "Update",
+            "body": "Body",
+        },
+        worktree_root=tmp_path,
+    )
+
+    assert calls[-1] == [
+        "gh",
+        "pr",
+        "edit",
+        "workflow/current",
+        "--title",
+        "Update",
+        "--body",
+        "Body",
+    ]
+
+
+def test_gh_create_does_not_use_model_branch_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("powdrr_lift.intrinsic_git_gh.subprocess.run", fake_run)
+    execute_intrinsic_git_gh_tool(
+        "gh",
+        {
+            "operation": "pr_create",
+            "title": "Create",
+            "body": "Body",
+            "base": "main",
+            "head": "PR-40",
+        },
+        worktree_root=tmp_path,
+    )
+
+    assert calls[-1][-4:] == ["--title", "Create", "--body", "Body"]
 
 
 def test_git_intrinsic_executes_only_inside_the_worktree(tmp_path: Path) -> None:

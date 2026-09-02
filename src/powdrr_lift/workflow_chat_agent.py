@@ -4761,6 +4761,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "For git use a registered operation such as status, add, commit, or push; "
         "for gh use only pr_view, pr_diff, pr_checks, pr_create, pr_edit, "
         "pr_comments, or pr_review_comment. "
+        "For pr_create and pr_edit, provide only title and body. The runtime "
+        "determines the repository, current branch, base branch, and edit target; "
+        "never provide pr_reference, head, or base for those operations. "
         "basedpyright-symbol takes parameters.query and optional parameters.limit "
         "and basedpyright-structure takes parameters.path; yaml_edit requires "
         "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "
@@ -7756,7 +7759,27 @@ def _parse_workflow_action_invoke_tool(
         )
     normalized_tool = tool.strip()
     if normalized_tool in {GIT_TOOL, GH_TOOL}:
-        intrinsic_command(parameters, tool=normalized_tool)
+        if normalized_tool == GH_TOOL and parameters.get("operation") in {
+            "pr_create",
+            "pr_edit",
+        }:
+            forbidden = {"pr_reference", "head", "base"}.intersection(parameters)
+            if forbidden:
+                names = ", ".join(sorted(forbidden))
+                raise PowdrrExecutionError(
+                    f"gh {parameters['operation']} does not accept model-owned "
+                    f"identity fields: {names}. Provide only title and body."
+                )
+            if parameters.get("operation") == "pr_edit":
+                validation_parameters = {
+                    **parameters,
+                    "pr_reference": "__current_branch__",
+                }
+            else:
+                validation_parameters = parameters
+        else:
+            validation_parameters = parameters
+        intrinsic_command(validation_parameters, tool=normalized_tool)
         return SkillChatAction(
             kind="invoke_tool",
             tool=normalized_tool,

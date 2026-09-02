@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ class Checkpoint:
     workspace_root: str
     objects: Mapping[str, str]
     state_ref: str | None = None
+    git_revision: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -24,6 +26,11 @@ class Checkpoint:
             "workspace_root": self.workspace_root,
             "objects": dict(self.objects),
             **({"state_ref": self.state_ref} if self.state_ref is not None else {}),
+            **(
+                {"git_revision": self.git_revision}
+                if self.git_revision is not None
+                else {}
+            ),
         }
 
 
@@ -41,6 +48,25 @@ class ContentAddressedCheckpointStore:
         state_json: str | None = None,
     ) -> Checkpoint:
         workspace = Path(workspace_root).resolve()
+        git_revision = _git_revision(workspace)
+        # Git is the durable workspace snapshot for real repositories.  Do not
+        # copy the worktree (which may contain this checkpoint directory) into
+        # another object store.  The file-copy path remains for callers that
+        # intentionally use a plain temporary directory in unit tests.
+        if git_revision is not None:
+            checkpoint = Checkpoint(
+                checkpoint_id,
+                str(workspace),
+                {},
+                None,
+                git_revision,
+            )
+            self.manifests.mkdir(parents=True, exist_ok=True)
+            (self.manifests / f"{checkpoint_id}.json").write_text(
+                json.dumps(checkpoint.to_data(), indent=2) + "\n",
+                encoding="utf-8",
+            )
+            return checkpoint
         objects: dict[str, str] = {}
         for path in _workspace_files(workspace):
             content = path.read_bytes()
@@ -73,6 +99,7 @@ class ContentAddressedCheckpointStore:
             data["workspace_root"],
             data["objects"],
             data.get("state_ref"),
+            data.get("git_revision"),
         )
 
     def load_state_json(self, checkpoint: Checkpoint) -> str | None:
@@ -109,6 +136,18 @@ class ContentAddressedCheckpointStore:
         workspace = Path(workspace_root or checkpoint.workspace_root).resolve()
         if workspace.is_symlink() or not workspace.is_dir():
             raise ValueError("checkpoint restore workspace must be a real directory")
+        if checkpoint.git_revision is not None:
+            _run_git(
+                workspace,
+                "restore",
+                "--source",
+                checkpoint.git_revision,
+                "--staged",
+                "--worktree",
+                "--",
+                ".",
+            )
+            return
         expected = set(checkpoint.objects)
         targets = {
             relative: _safe_restore_path(workspace, relative) for relative in expected
@@ -154,6 +193,17 @@ class ContentAddressedCheckpointStore:
     ) -> tuple[str, ...]:
         """Return workspace-relative files changed since a checkpoint."""
         workspace = Path(workspace_root or checkpoint.workspace_root).resolve()
+        if checkpoint.git_revision is not None:
+            status = _run_git(
+                workspace, "status", "--porcelain", "--untracked-files=all"
+            )
+            return tuple(
+                sorted(
+                    line[3:].strip()
+                    for line in status.splitlines()
+                    if len(line) >= 4 and line[3:].strip()
+                )
+            )
         current = {
             str(path.relative_to(workspace)): hashlib.sha256(
                 path.read_bytes()
@@ -202,6 +252,24 @@ def _workspace_files(workspace: Path) -> tuple[Path, ...]:
         for path in workspace.rglob("*")
         if path.is_file() and ".git" not in path.relative_to(workspace).parts
     )
+
+
+def _git_revision(workspace: Path) -> str | None:
+    try:
+        return _run_git(workspace, "rev-parse", "HEAD")
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _run_git(workspace: Path, *arguments: str) -> str:
+    result = subprocess.run(
+        ["git", *arguments],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
 
 
 def _safe_restore_path(workspace: Path, relative: str) -> Path:

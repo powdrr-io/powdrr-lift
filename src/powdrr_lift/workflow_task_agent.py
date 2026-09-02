@@ -2505,12 +2505,10 @@ def _task_action_material_state(
 def _durable_task_action_output_state(action: WorkflowAction) -> Any:
     """Return the typed state that a task-completing action must persist.
 
-    ``output_state`` is the canonical field.  ``outputs`` remains accepted for
-    older workflow documents whose examples used the interactive handoff shape.
+    ``output_state`` is the only accepted field.  A task transition must never
+    be inferred from a model's auxiliary output or prose summary.
     """
     output_state = action.output_state
-    if output_state is None and action.outputs:
-        output_state = action.outputs
     if output_state is None:
         raise PowdrrExecutionError(
             "The next_step action must include a non-null top-level "

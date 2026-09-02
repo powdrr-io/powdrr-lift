@@ -798,7 +798,7 @@ class ExecutionRuntime:
         """Restore files and typed state as one replayable logical operation."""
         checkpoint = self.checkpoint_store.load(checkpoint_id)
         state_json = self.checkpoint_store.load_state_json(checkpoint)
-        if state_json is None:
+        if state_json is None and checkpoint.git_revision is None:
             raise PowdrrExecutionError(
                 "checkpoint has no execution state snapshot",
                 error_code="checkpoint_state_missing",
@@ -806,7 +806,14 @@ class ExecutionRuntime:
                     "Choose a checkpoint that contains an execution state snapshot."
                 ),
             )
-        restored = ExecutionState.from_json(state_json)
+        # Repository checkpoints are Git revisions.  The workflow's durable
+        # state lives in the repository and is restored by Git; there is no
+        # second serialized execution-state snapshot to keep in sync.
+        restored = (
+            ExecutionState.from_json(state_json)
+            if state_json is not None
+            else self.state
+        )
         if restored.execution_id != self.execution_id:
             raise PowdrrExecutionError(
                 "checkpoint belongs to a different execution",

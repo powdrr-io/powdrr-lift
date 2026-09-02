@@ -78,6 +78,20 @@ def _decision_payload() -> dict[str, Any]:
     }
 
 
+def test_observer_can_request_a_skill_transfer_and_receives_full_evidence() -> None:
+    payload = {
+        **_decision_payload(),
+        "verdict": "redirect",
+        "target_step_id": "inspect",
+        "target_skill_name": "repair-skill",
+    }
+
+    decision = parse_observer_decision(payload)
+
+    assert decision.target_step_id == "inspect"
+    assert decision.target_skill_name == "repair-skill"
+
+
 def test_observer_prompt_is_compact_and_includes_complete_example(
     tmp_path: Path,
 ) -> None:
@@ -88,6 +102,21 @@ def test_observer_prompt_is_compact_and_includes_complete_example(
     assert '"verdict": "coach"' in messages[0]["content"]
     assert "complete agent prompt" not in messages[1]["content"]
     assert len(messages[1]["content"]) < 3_000
+
+
+def test_observer_prompt_includes_skill_definition_and_error_state(
+    tmp_path: Path,
+) -> None:
+    packet = replace(
+        _packet(tmp_path),
+        skill_definition={"steps": [{"id": "inspect"}]},
+        error_state={"recent_errors": [{"message": "bad edit"}]},
+    )
+
+    messages = build_observer_messages(packet)
+
+    assert '"skill_definition"' in messages[1]["content"]
+    assert '"error_state"' in messages[1]["content"]
 
 
 def test_parse_observer_decision_requires_declared_shape() -> None:

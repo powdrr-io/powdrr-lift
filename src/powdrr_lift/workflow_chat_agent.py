@@ -5493,10 +5493,8 @@ def _handle_workflow_action_yaml_edit(
     if not target_path.exists():
         raise _WorkflowYamlEditError(
             f"yaml_edit target {action.file_path!r} does not exist; no file was "
-            "changed. Do not retry this action. Choose next_step so the declared "
-            "generation step can create the document, or use file_management "
-            "create when this step explicitly owns file creation, then apply "
-            "yaml_edit only after the target exists."
+            "changed. Read or generate the YAML document before applying "
+            "structural edits."
         )
     state.current_file_path = target_path
     current_text = target_path.read_text(encoding="utf-8")

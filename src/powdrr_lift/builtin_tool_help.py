@@ -83,8 +83,11 @@ _HELP: dict[str, dict[str, Any]] = {
                 "pr_comments, or pr_review_comment."
             ),
             "pr_reference": (
-                "Pull-request number for operations that inspect or edit one."
+                "Pull-request number or branch for inspection operations only; "
+                "the runtime selects the target for pr_edit."
             ),
+            "title": "Pull-request title for pr_create or pr_edit.",
+            "body": "Pull-request body for pr_create or pr_edit.",
             "help": "Set true to request the tool's conventional --help guidance.",
         },
         "examples": [
@@ -94,6 +97,11 @@ _HELP: dict[str, dict[str, Any]] = {
                 "operation": "pr_create",
                 "title": "Fix validation",
                 "body": "Summary and tests.",
+            },
+            {
+                "operation": "pr_edit",
+                "title": "Fix validation",
+                "body": "Updated summary and tests.",
             },
         ],
     },

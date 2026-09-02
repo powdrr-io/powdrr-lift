@@ -117,6 +117,35 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
     )[-4:] == ["--base", "main", "--head", "workflow/demo"]
 
 
+def test_gh_edit_rejects_a_model_owned_target(tmp_path: Path) -> None:
+    with pytest.raises(PowdrrExecutionError, match="pr_reference"):
+        execute_intrinsic_git_gh_tool(
+            "gh",
+            {
+                "operation": "pr_edit",
+                "pr_reference": "PR-40",
+                "title": "Update",
+                "body": "Body",
+            },
+            worktree_root=tmp_path,
+        )
+
+
+def test_gh_create_rejects_model_branch_overrides(tmp_path: Path) -> None:
+    with pytest.raises(PowdrrExecutionError, match="base, head"):
+        execute_intrinsic_git_gh_tool(
+            "gh",
+            {
+                "operation": "pr_create",
+                "title": "Create",
+                "body": "Body",
+                "base": "main",
+                "head": "PR-40",
+            },
+            worktree_root=tmp_path,
+        )
+
+
 def test_git_intrinsic_executes_only_inside_the_worktree(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "old.yaml").write_text("value: true\n", encoding="utf-8")

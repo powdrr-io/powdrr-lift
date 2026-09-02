@@ -27,7 +27,16 @@ def execute_intrinsic_git_gh_tool(
         command = _git_command(parameters)
         executable = "git"
     elif tool == GH_TOOL:
-        command = _gh_command(parameters)
+        effective_parameters = dict(parameters)
+        operation = effective_parameters.get("operation")
+        if operation == "pr_create":
+            _reject_pr_identity_overrides(effective_parameters, ("base", "head"))
+        elif operation == "pr_edit":
+            _reject_pr_identity_overrides(effective_parameters, ("pr_reference",))
+            # gh accepts a branch name as the PR selector, so the current branch
+            # is sufficient and avoids a separate number lookup race.
+            effective_parameters["pr_reference"] = _current_branch(worktree_root)
+        command = _gh_command(effective_parameters)
         executable = "gh"
     else:
         raise PowdrrExecutionError(
@@ -48,6 +57,32 @@ def execute_intrinsic_git_gh_tool(
         "stdout": result.stdout,
         "stderr": result.stderr,
     }
+
+
+def _reject_pr_identity_overrides(
+    parameters: Mapping[str, Any], fields: tuple[str, ...]
+) -> None:
+    provided = tuple(field for field in fields if field in parameters)
+    if provided:
+        raise PowdrrExecutionError(
+            "Pull-request identity is runtime-owned; do not provide: "
+            + ", ".join(provided)
+        )
+
+
+def _current_branch(worktree_root: Path) -> str:
+    result = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise PowdrrExecutionError(
+            "Cannot determine the current branch for the pull-request operation."
+        )
+    return result.stdout.strip()
 
 
 def intrinsic_command(parameters: Mapping[str, Any], *, tool: str) -> list[str]:

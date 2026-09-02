@@ -1,0 +1,42 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 534
+title: Define repository ownership for shared durable work
+intent:
+  problem: Durable intent, behavior rules, plans, and tasks are currently split across execution-local and repository artifacts, which prevents multiple agents and people from sharing one work direction.
+  goal: Make repository-owned intent and work products the collaboration boundary while reserving .powdrr for state and history specific to one execution.
+human-decisions:
+  - id: repository-collaboration-boundary
+    summary: Keep typed intent, behavior rules, plans, and workflow tasks in reviewed repository files shared by all agents and people; keep single-execution materialization under .powdrr.
+structured_files: []
+files:
+  - path: docs/plans/repository-shared-durable-work.md
+    type: added
+    span: {start_line: 1, end_line: 63}
+    summary: Propose the repository as the collaboration boundary for typed intent, behavior rules, plans, and workflow tasks while reserving .powdrr for execution-local state and history.
+    rationale: Give multiple agents and people one reviewed, versioned place to share work direction without promoting run-specific state into shared artifacts.
+entities: []
+entity_relationships: []
+invariants:
+  - id: shared-intent-ownership-invariant
+    action: added
+    description: Typed intent sources, clauses, contracts, and repository behavior rules have one versioned repository-owned source of truth; plans and tasks reference them by stable IDs instead of copying their wording.
+    rationale: Prevent different agents or people from silently developing from different durable instructions.
+  - id: execution-locality-invariant
+    action: added
+    description: Transient context, event history, checkpoints, obligations, evidence, and other facts specific to one execution remain under .powdrr and are not promoted into shared intent, plans, or tasks unless deliberately authored as a reviewed repository change.
+    rationale: Keep collaboration state durable without polluting shared artifacts with run-specific noise.
+guidance:
+  - id: commit-shared-work-products
+    action: added
+    description: Commit shared intent, behavior rules, plans, and tasks to the repository so every agent and person can inspect and continue them.
+    rationale: Make the repository the collaboration boundary for durable work direction.
+  - id: keep-run-state-local
+    action: added
+    description: Keep .powdrr limited to state and history that belong to one execution, including materialized progress and transient context.
+    rationale: Prevent execution-specific details from becoming accidental shared policy.
+features:
+  - id: feature-repository-shared-durable-work
+    action: added
+    description: Make typed intent, behavior rules, plans, and workflow tasks repository-owned collaboration artifacts while keeping execution-specific materialized state under .powdrr.
+    rationale: Give the implementation a concrete, testable ownership boundary.
+proposed_prs: []

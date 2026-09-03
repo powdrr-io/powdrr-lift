@@ -13,6 +13,8 @@ from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
+    CodingLoopSpec,
+    CodingLoopVerification,
     SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
@@ -83,6 +85,7 @@ class WorkflowTaskTemplate:
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
+    coding_loop: CodingLoopSpec | None = None
     phase_type: PhaseType | None = None
     persona_id: str | None = None
 
@@ -125,6 +128,8 @@ class WorkflowTaskTemplate:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             step_data["gate"] = self.gate.to_data()
+        if self.coding_loop is not None:
+            step_data["coding_loop"] = self.coding_loop.to_data()
         if self.phase_type is not None:
             data["phase_type"] = self.phase_type.value
         if self.persona_id is not None:
@@ -350,6 +355,11 @@ def instantiate_workflow_template(
             output_state_type=task_template.output_state_type,
             step_type=task_template.step_type,
             pre_step=task_template.pre_step,
+            gate=task_template.gate,
+            coding_loop=_substitute_coding_loop(
+                task_template.coding_loop,
+                substitutions,
+            ),
             upstream_task_ids=tuple(
                 task_ids[upstream_index] for upstream_index in upstream_task_indexes
             ),
@@ -404,6 +414,55 @@ def _substitute_workflow_placeholders(
             _substitute_workflow_placeholders(item, substitutions) for item in value
         ]
     return value
+
+
+def _substitute_coding_loop(
+    coding_loop: CodingLoopSpec | None,
+    substitutions: Mapping[str, str],
+) -> CodingLoopSpec | None:
+    if coding_loop is None:
+        return None
+    verifications: list[CodingLoopVerification] = []
+    for verification in coding_loop.verification:
+        command = _substitute_workflow_placeholders(
+            verification.command,
+            substitutions,
+        )
+        if not isinstance(command, (str, tuple)):
+            raise ValueError(
+                f"Coding-loop verification {verification.id!r} command must be "
+                "a string or command array."
+            )
+        if isinstance(command, str) and "<verification-command>" in command:
+            raise ValueError(
+                "Missing required template value 'verification-command'; "
+                "discover the repository test command via gather_context tools "
+                "and pass it when instantiating the template."
+            )
+        verifications.append(
+            CodingLoopVerification(
+                id=verification.id,
+                command=command,
+                cwd=(
+                    _substitute_workflow_placeholders(verification.cwd, substitutions)
+                    if verification.cwd is not None
+                    else None
+                ),
+                env=tuple(
+                    (
+                        key,
+                        _substitute_workflow_placeholders(value, substitutions),
+                    )
+                    for key, value in verification.env
+                ),
+            )
+        )
+    return CodingLoopSpec(
+        goal=coding_loop.goal,
+        verification=tuple(verifications),
+        stopping_conditions=coding_loop.stopping_conditions,
+        max_iterations=coding_loop.max_iterations,
+    )
 
 
 def _substitute_tool_invocation(
@@ -617,6 +676,7 @@ def build_workflow_template_validation_report(
                 "dependent_state",
                 "generation",
                 "gate",
+                "coding_loop",
                 "phase_type",
                 "persona_id",
             },
@@ -656,7 +716,7 @@ def build_workflow_template_validation_report(
                     code="invalid_step_type_value",
                     message=(
                         "Workflow task template step_type must be "
-                        "freeform, invoke_tool, or gate."
+                        "freeform, invoke_tool, gate, or coding_loop."
                     ),
                     path=_child_path(task_template_path, "step_type"),
                 )
@@ -718,7 +778,7 @@ def build_workflow_template_validation_report(
                     path=_child_path(task_template_path, "tool_invocations"),
                 )
             )
-        elif step_type == "freeform" and pre_step is not None:
+        elif step_type in {"freeform", "coding_loop"} and pre_step is not None:
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="unexpected_pre_step",
@@ -1099,6 +1159,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         step_type=step.step_type,
         pre_step=step.pre_step,
         gate=step.gate,
+        coding_loop=step.coding_loop,
         output_state_type=output_state_type,
         dependent_state=dependent_state,
         generation=parsed_generation,

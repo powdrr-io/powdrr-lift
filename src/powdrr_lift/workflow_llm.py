@@ -362,6 +362,27 @@ class WorkflowExecutionObserver(Protocol):
     ) -> Any: ...
 
 
+def _coding_loop_spec(strategy: Any) -> Any | None:
+    step = getattr(strategy, "current_step", None)
+    if step is None:
+        step = getattr(strategy, "task", None)
+    return getattr(step, "coding_loop", None)
+
+
+def _coding_loop_limit(strategy: Any) -> int | None:
+    spec = _coding_loop_spec(strategy)
+    limit = getattr(spec, "max_iterations", None)
+    return limit if isinstance(limit, int) else None
+
+
+def _coding_loop_identity(strategy: Any) -> tuple[Any, ...]:
+    return (
+        getattr(strategy, "current_step_index", None),
+        getattr(getattr(strategy, "current_step", None), "id", None),
+        getattr(getattr(strategy, "task", None), "task_id", None),
+    )
+
+
 class WorkflowShadowRecorder(Protocol):
     """Optional best-effort event sink used while the kernel is in shadow mode."""
 
@@ -420,11 +441,24 @@ class WorkflowStepRunner:
         signature: Callable[[Any], str],
     ) -> int:
         roundtrips = 0
+        coding_loop_identity: tuple[Any, ...] | None = None
+        coding_loop_roundtrips = 0
         while max_roundtrips is None or roundtrips < max(1, max_roundtrips):
-            roundtrips += 1
+            coding_loop_limit = _coding_loop_limit(strategy)
+            if coding_loop_limit is not None:
+                identity = _coding_loop_identity(strategy)
+                if identity != coding_loop_identity:
+                    coding_loop_identity = identity
+                    coding_loop_roundtrips = 0
+                if coding_loop_roundtrips >= coding_loop_limit:
+                    exhausted = getattr(strategy, "coding_loop_exhausted", None)
+                    if callable(exhausted):
+                        return exhausted(coding_loop_limit)
+                    return 2
             request = strategy.next_request()
             if request is None:
                 return 0
+            roundtrips += 1
             try:
                 action = (
                     request.request_action()
@@ -461,6 +495,8 @@ class WorkflowStepRunner:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
+            if coding_loop_limit is not None:
+                coding_loop_roundtrips += 1
             if self.runtime is not None:
                 guidance = getattr(action, "decisions_and_context", None)
                 if isinstance(guidance, str):

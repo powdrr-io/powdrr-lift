@@ -1472,6 +1472,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_step_index=parent_step_index,
             )
         self.failure_kind = "validation_error"
+        if action.kind == "next_step":
+            _require_coding_loop_verification(
+                self.current_step,
+                self.state.execution_events,
+                step_index=self.state.step_index,
+            )
         _validate_workflow_step_transition(
             action,
             self.current_step,
@@ -1527,6 +1533,26 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
         _register_validation_gate_discovery(action, self.state)
         _record_dynamic_validation_result(action, self.state)
+        verification = (
+            _run_coding_loop_verification(
+                self.current_step,
+                worktree_root=self.state.worktree_root,
+                stdout=self.stdout,
+                stderr=self.stderr,
+                verbose=self.config.verbose,
+                runtime=self.driver.runtime,
+            )
+            if action.kind in {"edit", "yaml_edit", "file_management"}
+            else None
+        )
+        if verification is not None:
+            self.state.execution_events.append(
+                {
+                    "kind": "coding_loop_verification",
+                    "step_index": self.state.step_index,
+                    **verification,
+                }
+            )
         _reset_validation_gate_after_correction(action, self.state)
         self.last_failed_action = None
         self.last_validation_error = None
@@ -1835,6 +1861,22 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         return outcome
 
     def exhausted_roundtrips_exit_code(self) -> int:
+        return 2
+
+    def coding_loop_exhausted(self, limit: int) -> int:
+        message = (
+            f"Coding loop for step {self.current_step.id!r} stopped after "
+            f"{limit} model iterations without a completion transition."
+        )
+        self.state.execution_events.append(
+            {
+                "kind": "coding_loop_exhausted",
+                "step_id": self.current_step.id,
+                "max_iterations": limit,
+                "message": message,
+            }
+        )
+        print(message, file=self.stderr, flush=True)
         return 2
 
 
@@ -5140,6 +5182,23 @@ def _modular_action_system_prompt(
             "is unchanged or worse, change the target or repair strategy; do not keep "
             "retrying the same action.\n"
         )
+    coding_loop = getattr(current_step, "coding_loop", None)
+    if coding_loop is not None:
+        verification = json.dumps(
+            [item.to_data() for item in coding_loop.verification], ensure_ascii=False
+        )
+        stopping = json.dumps(list(coding_loop.stopping_conditions), ensure_ascii=False)
+        prompt += (
+            "Coding-loop protocol: work toward the declared goal "
+            f"{coding_loop.goal!r}, inspect the "
+            "current implementation, make the smallest justified edits, and run "
+            f"each declared verification item {verification}. Stop only when the "
+            f"declared stopping conditions {stopping} are satisfied. This loop is "
+            f"bounded to {coding_loop.max_iterations} model iterations; use the "
+            "latest verification result as evidence and repair failures before "
+            "choosing next_step. Do not claim verification passed without a tool "
+            "result.\n"
+        )
     if "goto_step" in action_names or "complete" in action_names:
         prompt += (
             "Transition rules are enforced by the runtime: "
@@ -7346,7 +7405,9 @@ def _command_token_matches(actual: str, expected: str) -> bool:
         pattern_parts.append(
             re.escape(expected[previous_end : placeholder_match.start()])
         )
-        pattern_parts.append(r"[^\s]+")
+        # One argv item may contain spaces when a placeholder is embedded in a
+        # token (for example ``verification-command=<command>``).
+        pattern_parts.append(r".+?")
         previous_end = placeholder_match.end()
     pattern_parts.append(re.escape(expected[previous_end:]))
     return re.fullmatch("".join(pattern_parts), actual) is not None
@@ -8292,6 +8353,87 @@ def _execute_shell_tool(
     return result
 
 
+def _run_coding_loop_verification(
+    step: Any,
+    *,
+    worktree_root: Path,
+    stdout: TextIO,
+    stderr: TextIO,
+    verbose: bool,
+    runtime: ExecutionRuntime | None,
+) -> dict[str, Any] | None:
+    coding_loop = getattr(step, "coding_loop", None)
+    if coding_loop is None or not coding_loop.verification:
+        return None
+    results: list[dict[str, Any]] = []
+    for verification in coding_loop.verification:
+        command = (
+            verification.command
+            if isinstance(verification.command, str)
+            else list(verification.command)
+        )
+        result = invoke_shell_capability(
+            {
+                "command": command,
+                "cwd": verification.cwd,
+                "env": dict(verification.env),
+                "_tool_name": "coding_loop_verification",
+            },
+            worktree_root=worktree_root,
+            executor=lambda parameters: _execute_shell_tool(
+                dict(parameters),
+                worktree_root=worktree_root,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=verbose,
+                announce=False,
+                print_stdout=False,
+            ),
+            runtime=runtime,
+        )
+        passed = isinstance(result, Mapping) and result.get("returncode") == 0
+        results.append(
+            {
+                "id": verification.id,
+                "command": command,
+                "passed": passed,
+                "result": result,
+            }
+        )
+    all_passed = all(item["passed"] for item in results)
+    return {
+        "results": results,
+        "all_passed": all_passed,
+        "error": None if all_passed else "One or more coding-loop checks failed.",
+    }
+
+
+def _require_coding_loop_verification(
+    step: Any,
+    events: Sequence[Mapping[str, Any]],
+    *,
+    step_index: int | None = None,
+) -> None:
+    coding_loop = getattr(step, "coding_loop", None)
+    if coding_loop is None or not coding_loop.verification:
+        return
+    latest = next(
+        (
+            event
+            for event in reversed(events)
+            if event.get("kind") == "coding_loop_verification"
+            and (step_index is None or event.get("step_index") == step_index)
+        ),
+        None,
+    )
+    if latest is None or latest.get("all_passed") is not True:
+        raise PowdrrExecutionError(
+            "This coding_loop step cannot choose next_step until its declared "
+            "verification commands pass. Make or repair the implementation, "
+            "then wait for the automatic verification result."
+        )
+
+
 def _structured_intrinsic_pre_step_parameters(
     tool: str, parameters: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -8430,6 +8572,8 @@ def _skill_step_to_data(step: Any) -> dict[str, Any]:
         ]
     if getattr(step, "pre_step", None) is not None:
         data["pre_step"] = step.pre_step.to_data()
+    if getattr(step, "coding_loop", None) is not None:
+        data["coding_loop"] = step.coding_loop.to_data()
     return data
 
 
@@ -10045,6 +10189,11 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     actions = _step_actions(step)
     return {
         "step_type": getattr(step, "step_type", "freeform"),
+        "coding_loop": (
+            step.coding_loop.to_data()
+            if getattr(step, "coding_loop", None) is not None
+            else None
+        ),
         "outputs": [
             output.to_data() for output in (getattr(step, "outputs", ()) or ())
         ],

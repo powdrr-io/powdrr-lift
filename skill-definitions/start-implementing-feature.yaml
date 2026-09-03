@@ -298,7 +298,7 @@ steps:
       rerun deterministic evaluation before continuing.
 - id: plan-workflow-instantiation
   description: Plan execution workflow instantiation.
-  actions: [edit, yaml_edit, file_management, read_document]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -309,6 +309,10 @@ steps:
     and prepare the complete instantiation
     values. Use the fixed template, canonical feature name, distinct workflow
     instance names, proposed-PR order, and dependency relationships. A persisted
+    Before finalizing the values, use gather_context with type `tools` for the
+    selected feature to discover the repository's authoritative test command.
+    Include that command as the `verification-command` template value for every
+    execute-proposed-pr workflow.
     workflow metadata file is named exactly
     `<proposed_pr_id>-workflow.yaml` inside
     `docs/workflows/<canonical-feature-name>/`; `<proposed_pr_id>` is the exact
@@ -324,6 +328,10 @@ steps:
     for a template path, leave a required placeholder empty, or overwrite an
     existing workflow without approval. Pass an invocation plan containing
     every created or reused workflow and its proposed-PR relationship onward.
+  outputs:
+  - name: verification-command
+    type: string
+    required_for_next_step: true
 - id: instantiate-execution-workflows
   description: Instantiate each missing execution workflow.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -354,6 +362,8 @@ steps:
     - <proposed-pr-name>
     - --template-value
     - proposed-pr-id=<proposed-pr-name>
+    - --template-value
+    - verification-command=<verification-command>
     - --template
     - templates/execute-proposed-pr.yaml
 - id: verify-workflow-dependencies

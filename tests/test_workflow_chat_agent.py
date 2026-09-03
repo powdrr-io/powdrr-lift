@@ -21,6 +21,8 @@ import yaml
 
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
+    CodingLoopSpec,
+    CodingLoopVerification,
     Skill,
     SkillStep,
     SkillStepGate,
@@ -49,6 +51,7 @@ from powdrr_lift.core.workflow_task_specification import (
     select_ready_workflow_tasks,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.test_failure_packet import build_test_failure_packet
@@ -109,6 +112,7 @@ from powdrr_lift.workflow_chat_agent import (
     _record_durable_fact,
     _record_dynamic_validation_result,
     _request_token_budget,
+    _require_coding_loop_verification,
     _resolve_api_key,
     _resolve_base_url,
     _resolve_llm_mapping,
@@ -121,6 +125,7 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
+    _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
     _serialize_messages,
@@ -508,6 +513,43 @@ def test_next_step_is_prompted_without_required_outputs() -> None:
     actions = _step_actions(SkillStep(description="Finish the step."))
 
     assert any(name == "next_step" for name, _ in actions)
+
+
+def test_coding_loop_runs_declared_verification_and_requires_pass(
+    tmp_path: Path,
+) -> None:
+    step = SkillStep(
+        description="Implement and verify.",
+        step_type="coding_loop",
+        coding_loop=CodingLoopSpec(
+            goal="Make the check pass.",
+            verification=(CodingLoopVerification(id="always-pass", command="true"),),
+        ),
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="verification commands pass"):
+        _require_coding_loop_verification(step, [])
+
+    verification = _run_coding_loop_verification(
+        step,
+        worktree_root=tmp_path,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        verbose=False,
+        runtime=ExecutionRuntime(
+            "coding-loop-test",
+            profile_id="default",
+            workflow_directory=tmp_path / "workflow",
+            repo_root=tmp_path,
+        ),
+    )
+
+    assert verification is not None
+    assert verification["all_passed"] is True
+    _require_coding_loop_verification(
+        step,
+        [{"kind": "coding_loop_verification", **verification}],
+    )
 
 
 def test_explicit_step_contract_rejects_undeclared_complete() -> None:
@@ -6081,6 +6123,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "display-related-photos",
                         "--template-value",
                         "proposed-pr-id=display-related-photos-pr-001",
+                        "--template-value",
+                        "verification-command=pytest -q",
                         "--template",
                         "templates/execute-proposed-pr.yaml",
                     ]
@@ -6145,6 +6189,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._finish_validation_index = 0
             self._finish_scope_invoked = False
             self._finish_context_gathered = False
+            self._workflow_tools_gathered = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -6367,6 +6412,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         .replace("<feature-name>", "display-related-photos")
                         .replace("<proposed-pr-name>", "display-related-photos-pr-001")
                         .replace("<feature-id>", "display-related-photos")
+                        .replace("<verification-command>", "pytest -q")
                         for part in invocation["command"]
                     ]
                     return {
@@ -6387,6 +6433,20 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "outputs": {
                             "proposed_pr_names": ["display-related-photos-pr-001"]
                         },
+                    }
+                if prompt["current_step"].get("id") == "plan-workflow-instantiation":
+                    if not self._workflow_tools_gathered:
+                        self._workflow_tools_gathered = True
+                        self._call_index += 1
+                        return {
+                            "action": "gather_context",
+                            "types": ["tools"],
+                            "filters": {"labels": ["test"]},
+                        }
+                    self._call_index += 1
+                    return {
+                        "action": "next_step",
+                        "outputs": {"verification-command": "pytest -q"},
                     }
                 if (
                     prompt["current_step"].get("id")
@@ -6605,7 +6665,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         for event in start_summary["execution_events"]
         if event["kind"] == "invoke_tool"
         and event.get("parameters", {}).get("command")
-        and event["parameters"]["command"][1] == "instantiate-workflow"
+        and "instantiate-workflow" in event["parameters"]["command"]
     )
     instantiate_result = cast(dict[str, object], instantiate_event["result"])
     assert instantiate_result["returncode"] == 0, instantiate_result.get("stderr", "")

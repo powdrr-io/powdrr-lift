@@ -63,7 +63,7 @@ SUPPORTED_STEP_ACTIONS = frozenset(
     }
 )
 UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step"})
-SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate"})
+SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate", "coding_loop"})
 SUPPORTED_INTERACTION_STYLES = frozenset(
     {"engineering", "observational_review", "devils_advocate"}
 )
@@ -176,6 +176,47 @@ class SkillStepGate:
 
 
 @dataclass(frozen=True, slots=True)
+class CodingLoopVerification:
+    """One deterministic command used to verify a coding-loop iteration."""
+
+    id: str
+    command: str | tuple[str, ...]
+    cwd: str | None = None
+    env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+
+    def to_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "id": self.id,
+            "command": (
+                self.command if isinstance(self.command, str) else list(self.command)
+            ),
+        }
+        if self.cwd is not None:
+            data["cwd"] = self.cwd
+        if self.env:
+            data["env"] = {key: value for key, value in self.env}
+        return data
+
+
+@dataclass(frozen=True, slots=True)
+class CodingLoopSpec:
+    """Harness policy for an inspect, edit, verify, and repair loop."""
+
+    goal: str
+    verification: tuple[CodingLoopVerification, ...] = field(default_factory=tuple)
+    stopping_conditions: tuple[str, ...] = field(default_factory=tuple)
+    max_iterations: int = 12
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "goal": self.goal,
+            "verification": [item.to_data() for item in self.verification],
+            "stopping_conditions": list(self.stopping_conditions),
+            "max_iterations": self.max_iterations,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
@@ -194,6 +235,7 @@ class SkillStep:
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
     validation_gate: Mapping[str, Any] | None = None
+    coding_loop: CodingLoopSpec | None = None
 
     def __post_init__(self) -> None:
         if self.actions:
@@ -228,6 +270,8 @@ class SkillStep:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             data["gate"] = self.gate.to_data()
+        if self.coding_loop is not None:
+            data["coding_loop"] = self.coding_loop.to_data()
         if self.validation_gate is not None:
             data["validation_gate"] = self.validation_gate
         if self.inputs:
@@ -531,6 +575,7 @@ def build_skill_validation_report(
                     "pre_step",
                     "gate",
                     "validation_gate",
+                    "coding_loop",
                     "inputs",
                     "outputs",
                 },
@@ -617,7 +662,7 @@ def build_skill_validation_report(
                         code="invalid_step_type_value",
                         message=(
                             "Skill step step_type must be freeform, invoke_tool, "
-                            "or gate."
+                            "gate, or coding_loop."
                         ),
                         path=_child_path(step_path, "step_type"),
                     )
@@ -741,6 +786,17 @@ def build_skill_validation_report(
                         code="unexpected_gate",
                         message="Only gate steps may declare gate.",
                         path=_child_path(step_path, "gate"),
+                    )
+                )
+            raw_coding_loop = step_mapping.get("coding_loop")
+            if normalized_step_type == "coding_loop":
+                _validate_coding_loop(raw_coding_loop, step_path, issues)
+            elif raw_coding_loop is not None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="unexpected_coding_loop",
+                        message="Only coding_loop steps may declare coding_loop.",
+                        path=_child_path(step_path, "coding_loop"),
                     )
                 )
             raw_validation_gate = step_mapping.get("validation_gate")
@@ -1447,6 +1503,92 @@ def _validate_step_contracts(
                 )
 
 
+def _validate_coding_loop(
+    value: object,
+    step_path: str,
+    issues: list[SkillValidationIssue],
+) -> None:
+    if not isinstance(value, Mapping):
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_coding_loop",
+                message="coding_loop must be an object.",
+                path=_child_path(step_path, "coding_loop"),
+            )
+        )
+        return
+    goal = value.get("goal")
+    if _optional_string(goal) is None:
+        issues.append(
+            SkillValidationIssue(
+                code="missing_coding_loop_goal",
+                message="coding_loop.goal must be a non-empty string.",
+                path=_child_path(step_path, "coding_loop.goal"),
+            )
+        )
+    verification = value.get("verification", [])
+    if (
+        isinstance(verification, Sequence)
+        and not isinstance(verification, (str, bytes, bytearray))
+        and not verification
+    ):
+        issues.append(
+            SkillValidationIssue(
+                code="missing_coding_loop_verification",
+                message="coding_loop.verification must contain at least one command.",
+                path=_child_path(step_path, "coding_loop.verification"),
+            )
+        )
+    if (
+        not isinstance(verification, Sequence)
+        or isinstance(verification, (str, bytes, bytearray))
+        or any(
+            not isinstance(item, Mapping)
+            or _optional_string(item.get("id")) is None
+            or _command_value(item.get("command")) is None
+            for item in verification
+        )
+    ):
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_coding_loop_verification",
+                message=(
+                    "coding_loop.verification must be an array of objects with "
+                    "non-empty id and command fields."
+                ),
+                path=_child_path(step_path, "coding_loop.verification"),
+            )
+        )
+    stopping_conditions = value.get("stopping_conditions", [])
+    if (
+        not isinstance(stopping_conditions, Sequence)
+        or isinstance(stopping_conditions, (str, bytes, bytearray))
+        or any(_optional_string(item) is None for item in stopping_conditions)
+    ):
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_coding_loop_stopping_conditions",
+                message=(
+                    "coding_loop.stopping_conditions must be an array of strings."
+                ),
+                path=_child_path(step_path, "coding_loop.stopping_conditions"),
+            )
+        )
+    max_iterations = value.get("max_iterations", 12)
+    if (
+        not isinstance(max_iterations, int)
+        or isinstance(max_iterations, bool)
+        or not (1 <= max_iterations <= 100)
+    ):
+        issues.append(
+            SkillValidationIssue(
+                code="invalid_coding_loop_max_iterations",
+                message="coding_loop.max_iterations must be an integer from 1 to 100.",
+                path=_child_path(step_path, "coding_loop.max_iterations"),
+            )
+        )
+
+
 def _parse_step(raw_step: object) -> SkillStep:
     if not isinstance(raw_step, Mapping):
         raise ValueError("Skill steps must be objects.")
@@ -1479,6 +1621,10 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     actions_declared = "actions" in data
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
+    raw_coding_loop = data.get("coding_loop")
+    coding_loop = (
+        _parse_coding_loop(raw_coding_loop) if raw_coding_loop is not None else None
+    )
     raw_validation_gate = data.get("validation_gate")
     if raw_validation_gate is not None and not isinstance(raw_validation_gate, Mapping):
         raise ValueError("Skill step validation_gate must be an object.")
@@ -1535,6 +1681,10 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         raise ValueError("gate steps must declare a gate object.")
     if step_type != "gate" and gate is not None:
         raise ValueError("Only gate steps may declare gate.")
+    if step_type == "coding_loop" and coding_loop is None:
+        raise ValueError("coding_loop steps must declare a coding_loop object.")
+    if step_type != "coding_loop" and coding_loop is not None:
+        raise ValueError("Only coding_loop steps may declare coding_loop.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
     return SkillStep(
@@ -1552,8 +1702,58 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         pre_step=pre_step,
         gate=gate,
         validation_gate=validation_gate,
+        coding_loop=coding_loop,
         inputs=inputs,
         outputs=outputs,
+    )
+
+
+def _parse_coding_loop(value: object) -> CodingLoopSpec:
+    if not isinstance(value, Mapping):
+        raise ValueError("Skill step coding_loop must be an object.")
+    goal = _required_string(value, "goal")
+    raw_verification = value.get("verification", [])
+    if (
+        not isinstance(raw_verification, Sequence)
+        or isinstance(raw_verification, (str, bytes, bytearray))
+        or not all(
+            isinstance(item, Mapping)
+            and _optional_string(item.get("id")) is not None
+            and _command_value(item.get("command")) is not None
+            for item in raw_verification
+        )
+    ):
+        raise ValueError(
+            "Skill step coding_loop.verification must contain objects with "
+            "non-empty id and command fields."
+        )
+    if not raw_verification:
+        raise ValueError(
+            "Skill step coding_loop.verification must contain at least one command."
+        )
+    raw_stopping = value.get("stopping_conditions", [])
+    stopping_conditions = _optional_string_sequence(raw_stopping)
+    max_iterations = value.get("max_iterations", 12)
+    if (
+        not isinstance(max_iterations, int)
+        or isinstance(max_iterations, bool)
+        or not (1 <= max_iterations <= 100)
+    ):
+        raise ValueError("Skill step coding_loop.max_iterations must be from 1 to 100.")
+    verification = tuple(
+        CodingLoopVerification(
+            id=_required_string(item, "id"),
+            command=_required_command_value(item["command"]),
+            cwd=_optional_string(item.get("cwd")),
+            env=tuple(sorted(_string_mapping(item.get("env"), "env").items())),
+        )
+        for item in raw_verification
+    )
+    return CodingLoopSpec(
+        goal=goal,
+        verification=verification,
+        stopping_conditions=stopping_conditions,
+        max_iterations=max_iterations,
     )
 
 
@@ -1686,6 +1886,44 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step uses_skills must be an array.")
     return tuple(_required_string({"value": item}, "value") for item in value)
+
+
+def _command_value(value: object) -> str | tuple[str, ...] | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return None
+    if not value or not all(isinstance(item, str) and item.strip() for item in value):
+        return None
+    return tuple(item.strip() for item in value)
+
+
+def _required_command_value(value: object) -> str | tuple[str, ...]:
+    command = _command_value(value)
+    if command is None:
+        raise ValueError(
+            "Skill step coding_loop verification command must be a non-empty "
+            "string or command array."
+        )
+    return command
+
+
+def _string_mapping(value: object, field_name: str) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError(
+            f"Skill step coding_loop verification {field_name} must be an object."
+        )
+    if any(
+        not isinstance(key, str) or not key.strip() or not isinstance(item, str)
+        for key, item in value.items()
+    ):
+        raise ValueError(
+            f"Skill step coding_loop verification {field_name} keys and values "
+            "must be strings."
+        )
+    return {key.strip(): item for key, item in value.items()}
 
 
 def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:

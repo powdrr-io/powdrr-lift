@@ -434,7 +434,17 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[1].input_state["proposed_pr_context"] == (
         "<upstream-task-0>.proposed-pr-context-state"
     )
-    assert template.task_templates[4].uses_skills == ("run-tests-and-fix",)
+    assert template.task_templates[4].uses_skills == ()
+    assert template.task_templates[4].step_type == "coding_loop"
+    assert template.task_templates[4].actions == (
+        "invoke_tool",
+        "edit",
+        "read_document",
+    )
+    assert template.task_templates[4].coding_loop is not None
+    assert template.task_templates[4].coding_loop.verification[0].command == (
+        "<verification-command>"
+    )
     assert template.task_templates[4].input_state["implementation_diffs"] == (
         "<upstream-task-3>.generated-product-code-state"
     )
@@ -466,6 +476,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
         template_path=template_path,
         work_item_name="Example Feature",
         output_root=tmp_path / "workflows",
+        template_values={"verification-command": "pytest -q"},
     )
 
     assert output_directory == tmp_path / "workflows" / "example-feature"
@@ -482,6 +493,8 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
         "file_management",
         "read_document",
     )
+    assert tasks[4].coding_loop is not None
+    assert tasks[4].coding_loop.verification[0].command == "pytest -q"
 
 
 def test_checked_in_execute_workflows_do_not_terminate_on_intermediate_tasks() -> None:
@@ -512,6 +525,7 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
         template_values={
             "proposed-pr-id": "interaction-file-log-pr-001",
             "feature-id": "feature-interaction-capture",
+            "verification-command": "pytest -q",
         },
         output_root=tmp_path / "workflows",
     )
@@ -581,12 +595,14 @@ def test_instantiate_workflow_template_namespaces_instances_in_shared_directory(
         work_item_name="Example Feature",
         workflow_instance_name="first-pr",
         output_root=output_root,
+        template_values={"verification-command": "pytest -q"},
     )
     second_directory, second_tasks = instantiate_workflow_template(
         template_path=template_path,
         work_item_name="Example Feature",
         workflow_instance_name="second-pr",
         output_root=output_root,
+        template_values={"verification-command": "pytest -q"},
     )
 
     assert first_directory == second_directory == output_root / "example-feature"
@@ -607,7 +623,10 @@ def test_instantiate_execute_proposed_pr_fills_proposed_pr_context(
         template_path=template_path,
         work_item_name="interaction-file-log",
         workflow_instance_name="interaction-file-log-pr",
-        template_values={"proposed-pr-id": "interaction-file-log-pr"},
+        template_values={
+            "proposed-pr-id": "interaction-file-log-pr",
+            "verification-command": "pytest -q",
+        },
         output_root=tmp_path / "workflows",
     )
 

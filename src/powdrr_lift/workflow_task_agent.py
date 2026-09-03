@@ -2481,6 +2481,7 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "must be a json object",
             "workflow task action must include",
             "file_edits entries must include file_path",
+            "add/replace edits must include text",
             "workflow action response must include action",
             "unknown workflow task action",
             "unknown workflow action",

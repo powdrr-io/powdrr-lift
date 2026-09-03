@@ -397,7 +397,7 @@ steps:
     type: any
     required_for_next_step: true
 - id: generate-proposal-template
-  description: Generate the specification-v1 proposal template from interview outputs.
+  description: Generate the specification-v1 proposal from the interview input.
   inputs:
   - name: work_item_name
     type: string
@@ -472,11 +472,11 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    The 20 preceding *_edits inputs are the complete interview result. Invoke
-    the feature-pr specification template generator exactly once for
-    <work-item-name>, passing it the JSON interview input pointer. It creates
-    docs/proposals/<work-item-name>/feature-pr-specification.yaml. Do not edit
-    the YAML in this step.
+    The 20 preceding *_edits inputs are stored in the JSON interview input.
+    Invoke the feature-pr specification generator exactly once for
+    <work-item-name>, passing it that JSON file. The generator creates the
+    complete docs/proposals/<work-item-name>/feature-pr-specification.yaml from
+    the interview edits. Do not edit the YAML in this step.
   pre_step:
     action: invoke_tool
     template:
@@ -486,86 +486,6 @@ steps:
   - name: proposal_template
     type: any
     required_for_next_step: true
-- id: apply-proposal-edits
-  description: Apply all interview outputs to the generated proposal YAML.
-  inputs:
-  - name: proposal_template
-    type: any
-    required: true
-  - name: interview_input
-    type: any
-    required: true
-  - name: feature_description
-    type: string
-    required: true
-  - name: requirements_edits
-    type: any
-    required: true
-  - name: approach_edits
-    type: any
-    required: true
-  - name: entities_edits
-    type: any
-    required: true
-  - name: entity_relationships_edits
-    type: any
-    required: true
-  - name: invariants_edits
-    type: any
-    required: true
-  - name: guidance_edits
-    type: any
-    required: true
-  - name: features_edits
-    type: any
-    required: true
-  - name: human_decisions_edits
-    type: any
-    required: true
-  - name: intent_edits
-    type: any
-    required: true
-  - name: intents_edits
-    type: any
-    required: true
-  - name: acceptance_criteria_edits
-    type: any
-    required: true
-  - name: expected_tests_edits
-    type: any
-    required: true
-  - name: required_test_cases_edits
-    type: any
-    required: true
-  - name: expected_outcomes_edits
-    type: any
-    required: true
-  - name: non_goals_edits
-    type: any
-    required: true
-  - name: risks_edits
-    type: any
-    required: true
-  - name: decisions_edits
-    type: any
-    required: true
-  - name: proposed_prs_edits
-    type: any
-    required: true
-  - name: modules_edits
-    type: any
-    required: true
-  - name: tools_edits
-    type: any
-    required: true
-  actions: [yaml_edit]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    Use interview_input and proposal_template. Return exactly one yaml_edit action
-    targeting docs/proposals/<work-item-name>/feature-pr-specification.yaml. Its
-    operations must apply every added and deleted item from the interview; do not
-    edit current-state documents and do not invent changes.
 - id: evaluate-proposal
   description: Deterministically validate the completed proposal.
   actions: []

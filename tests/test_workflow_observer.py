@@ -120,13 +120,16 @@ def test_observer_prompt_includes_skill_definition_and_error_state(
 
 
 def test_parse_observer_decision_requires_declared_shape() -> None:
-    decision = parse_observer_decision(_decision_payload())
+    payload = _decision_payload()
+    payload["target_action"] = "read_document"
+    decision = parse_observer_decision(payload)
 
     assert decision == ObserverDecision(
         verdict="coach",
         reason="The action is repeating.",
         guidance=("Choose a materially different action.",),
         expected_progress="The next action changes material state.",
+        target_action="read_document",
     )
 
 

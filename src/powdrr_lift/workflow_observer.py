@@ -147,6 +147,7 @@ class ObserverDecision:
     reason: str
     guidance: tuple[str, ...] = ()
     expected_progress: str | None = None
+    target_action: str | None = None
     target_step_id: str | None = None
     target_skill_name: str | None = None
 
@@ -205,6 +206,7 @@ def build_observer_messages(packet: ObserverPacket) -> list[dict[str, str]]:
             "Choose an action with a materially different target or operation.",
         ],
         "expected_progress": "The next action changes state or reduces errors.",
+        "target_action": "read_document",
         "target_step_id": None,
         "target_skill_name": None,
     }
@@ -217,9 +219,11 @@ def build_observer_messages(packet: ObserverPacket) -> list[dict[str, str]]:
                 "remains aligned and how it could recover. Do not invoke tools, edit "
                 "files, or claim that you did. Return exactly one JSON object. "
                 "Allowed verdicts: continue, coach, redirect, block_transition, "
-                "request_human. For redirect, set target_step_id to a prior step or "
-                "target_skill_name to a catalog skill, and tell the agent to set "
-                "observer_override=true on the matching action. Complete example:\n"
+                "request_human. For a recommendation outside the current step "
+                "contract, set target_action to the action kind the agent should "
+                "try. For redirect, "
+                "also set target_step_id to a prior step or target_skill_name to a "
+                "catalog skill. Complete example:\n"
                 + json.dumps(example, ensure_ascii=False)
             ),
         },
@@ -246,10 +250,15 @@ def parse_observer_decision(payload: Mapping[str, Any]) -> ObserverDecision:
     ):
         raise ValueError("Observer response guidance must be a list of strings.")
     expected_progress = payload.get("expected_progress")
+    target_action = payload.get("target_action")
     target_step_id = payload.get("target_step_id")
     target_skill_name = payload.get("target_skill_name")
     if expected_progress is not None and not isinstance(expected_progress, str):
         raise ValueError("Observer expected_progress must be a string or null.")
+    if target_action is not None and (
+        not isinstance(target_action, str) or not target_action.strip()
+    ):
+        raise ValueError("Observer target_action must be a non-empty string or null.")
     if target_step_id is not None and not isinstance(target_step_id, str):
         raise ValueError("Observer target_step_id must be a string or null.")
     if target_skill_name is not None and not isinstance(target_skill_name, str):
@@ -259,6 +268,7 @@ def parse_observer_decision(payload: Mapping[str, Any]) -> ObserverDecision:
         reason=reason.strip(),
         guidance=tuple(item.strip() for item in guidance),
         expected_progress=expected_progress,
+        target_action=target_action.strip() if target_action is not None else None,
         target_step_id=target_step_id,
         target_skill_name=target_skill_name,
     )

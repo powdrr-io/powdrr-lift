@@ -65,7 +65,7 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
         repo_root=repository_root,
     )
 
-    assert result.status == "passed", result.assertions
+    assert result.status == "passed", (result.assertions, result.stderr)
     assert any(
         event.get("kind") == "invoke_tool"
         and event.get("parameters", {}).get("command", [None])[-2:]

@@ -21,7 +21,15 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.core import load_skill, resolve_repo_root
+from powdrr_lift.core import (
+    AgentRole,
+    AssigneeType,
+    TaskComplexity,
+    TaskStatus,
+    WorkflowTask,
+    load_skill,
+    resolve_repo_root,
+)
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
@@ -44,6 +52,7 @@ from powdrr_lift.workflow_chat_agent import (
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_llm import WorkflowStepRunner
+from powdrr_lift.workflow_task_agent import _run_skill_for_agent
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
 
 WORKFLOW_SCENARIO_SCHEMA_VERSION = 1
@@ -304,7 +313,6 @@ def run_workflow_scenario(
                 guidance_runtime.capture_guidance(
                     rule, source_ref=f"scenario:{scenario_id}", scope={}
                 )
-        scenario_expect = _mapping(scenario.get("expect"), "scenario expect")
         scenario_inputs = _mapping(scenario.get("inputs", {}), "scenario inputs")
         provider_name = _optional_text(provider.get("provider")) or "auto"
         if provider_name == "auto":
@@ -312,7 +320,6 @@ def run_workflow_scenario(
         configured_model = _optional_text(provider.get("model")) or _DEFAULT_MODEL
         live_client = None
         execution_model = "scripted"
-        execution_provider = "local"
         if provider_mode == "live":
             credentials = _resolve_credentials(
                 provider_name,
@@ -327,23 +334,23 @@ def run_workflow_scenario(
                 model=execution_model,
                 model_cache_dir=temporary_root / "models",
             )
-            execution_provider = provider_name
-        execution = _run_scripted_skill(
-            definition_path=definition_path,
-            worktree_root=worktree_root,
-            root_intent=_required_text(scenario.get("request"), "scenario request"),
-            responses=responses,
-            max_roundtrips=_optional_positive_int(
-                scenario_expect.get("max_roundtrips"),
-                default=(
-                    128 if provider_mode == "live" else max(1, len(responses) + 1)
-                ),
-            ),
-            client=live_client,
-            provider=execution_provider,
-            model=execution_model,
-            initial_inputs=scenario_inputs,
-        )
+        if provider_mode == "live":
+            execution = _run_live_skill(
+                definition_path=definition_path,
+                worktree_root=worktree_root,
+                root_intent=_required_text(scenario.get("request"), "scenario request"),
+                client=live_client,
+                initial_inputs=scenario_inputs,
+            )
+        else:
+            execution = _run_scripted_skill(
+                definition_path=definition_path,
+                worktree_root=worktree_root,
+                root_intent=_required_text(scenario.get("request"), "scenario request"),
+                responses=responses,
+                max_roundtrips=max(1, len(responses) + 1),
+                initial_inputs=scenario_inputs,
+            )
         assertions = _evaluate_assertions(
             _mapping(scenario.get("expect"), "scenario expect"),
             skill=execution.skill,
@@ -364,6 +371,8 @@ def run_workflow_scenario(
             audit_events=tuple(execution.audit_events),
             roundtrips=execution.roundtrips,
             llm_exchanges=tuple(execution.llm_exchanges),
+            stdout=execution.stdout,
+            stderr=execution.stderr,
             worktree_root=retained_root,
         )
     finally:
@@ -381,6 +390,75 @@ class _ScriptedSkillExecution:
     audit_events: list[dict[str, Any]]
     roundtrips: int
     llm_exchanges: list[list[dict[str, str]]]
+    stdout: str = ""
+    stderr: str = ""
+
+
+def _run_live_skill(
+    *,
+    definition_path: Path,
+    worktree_root: Path,
+    root_intent: str,
+    client: Any,
+    initial_inputs: Mapping[str, Any],
+) -> _ScriptedSkillExecution:
+    catalog = tuple(
+        SkillCatalogEntry(path, load_skill(path))
+        for path in sorted(definition_path.parent.glob("*.yaml"))
+    )
+    task = WorkflowTask(
+        task_id="live-design-interview",
+        status=TaskStatus.OPEN,
+        description=root_intent,
+        complexity=TaskComplexity.MEDIUM,
+        input_state=dict(initial_inputs),
+        assignee_type=AssigneeType.AGENT,
+        assignee_role=AgentRole.CODER,
+    )
+    stdout = io.StringIO()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    runtime = ExecutionRuntime(
+        "live-design-interview",
+        profile_id="default",
+        workflow_directory=worktree_root.parent / ".powdrr-execution",
+        repo_root=worktree_root,
+    )
+    try:
+        outcome = _run_skill_for_agent(
+            "design-interview",
+            catalog=catalog,
+            client=client,
+            task=task,
+            repo_root=worktree_root,
+            stdout=stdout,
+            stderr=stderr,
+            max_timeout_retries=0,
+            timeout_backoff_seconds=0,
+            error_log_root=worktree_root,
+            runtime=runtime,
+        )
+    except RuntimeError:
+        return _ScriptedSkillExecution(
+            skill=load_skill(definition_path),
+            exit_code=1,
+            execution_events=[],
+            audit_events=[],
+            roundtrips=0,
+            llm_exchanges=[],
+            stdout=stdout.getvalue(),
+            stderr=stderr.getvalue(),
+        )
+    return _ScriptedSkillExecution(
+        skill=load_skill(definition_path),
+        exit_code=0,
+        execution_events=list(outcome.get("events", [])),
+        audit_events=[],
+        roundtrips=len(outcome.get("events", [])),
+        llm_exchanges=[],
+        stdout=stdout.getvalue(),
+        stderr=stderr.getvalue(),
+    )
 
 
 def _run_scripted_skill(
@@ -435,6 +513,7 @@ def _run_scripted_skill(
             for name, value in (initial_inputs or {}).items()
         },
     )
+    stdout = io.StringIO()
     stderr = io.StringIO()
     strategy = _ChatWorkflowExecutionStrategy(
         config=config,
@@ -448,7 +527,7 @@ def _run_scripted_skill(
         state=state,
         progress=_WorkflowProgressDisplay(stderr),
         input_func=lambda: _raise_human_input_requested(),
-        stdout=io.StringIO(),
+        stdout=stdout,
         stderr=stderr,
         client_for_model=lambda _model, _provider: execution_client,
         provider_roles=LLMProviderRoles(normal=provider),
@@ -486,6 +565,8 @@ def _run_scripted_skill(
         audit_events=state.audit_events,
         roundtrips=len(getattr(execution_client, "messages", [])),
         llm_exchanges=getattr(execution_client, "messages", []),
+        stdout=stdout.getvalue(),
+        stderr=stderr.getvalue(),
     )
 
 

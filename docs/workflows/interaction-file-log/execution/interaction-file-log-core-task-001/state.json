@@ -5,8 +5,8 @@
   "mode": "enforce",
   "current_phase": "intake",
   "phase_revision": 0,
-  "state_version": 5,
-  "event_sequence": 5,
+  "state_version": 48,
+  "event_sequence": 48,
   "current_persona_id": null,
   "active_unit_id": null,
   "artifacts": [],
@@ -17,12 +17,116 @@
       "status": "completed",
       "actor_id": "execution-runtime",
       "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-001:action:6",
+      "kind": "mutate_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-001:action:13",
+      "kind": "inspect_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-001:action:18",
+      "kind": "mutate_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-001:action:27",
+      "kind": "mutate_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-001:action:37",
+      "kind": "gather_context",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "action-18",
+      "kind": "next_step",
+      "status": "proposed",
+      "actor_id": "architect",
+      "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "action-19",
+      "kind": "next_step",
+      "status": "started",
+      "actor_id": "architect",
+      "phase_type": "intake"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-001:action:44",
+      "kind": "inspect_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "intake"
     }
   ],
   "obligations": [],
   "evidence": [
     {
       "evidence_id": "evidence-2",
+      "producer_action_instance_id": "inspect_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "6e210eb0942bb24f48e40fa7e26191e7f7aed2a77451ae44c8c6ba53b48f3103",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-9",
+      "producer_action_instance_id": "mutate_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "b07674af2b68be5a7b058154a0372a1c21d896da1ff7464613ed04b425d57ff0",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-14",
+      "producer_action_instance_id": "inspect_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "9b5050b8ed44ebd2d979b2f6402d5dd7a5fc2dae181a0db96c283dafb36efa40",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-23",
+      "producer_action_instance_id": "mutate_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "fc28e5bbe1c37ce9639f05cad7b81c78427cd431327b1df440fb20b242e3643a",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-33",
+      "producer_action_instance_id": "mutate_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "582caf0b57d2b3cd322721d842cff72557c9df7a5600a3d582d6953f22179184",
+      "successful": true,
+      "fresh": true
+    },
+    {
+      "evidence_id": "evidence-38",
+      "producer_action_instance_id": "gather_context",
+      "evidence_type": "capability:repository-gather_context",
+      "input_fingerprint": "817454f4d44916196cc60ee8438e7a37836600466366a838d84297ec0448a359",
+      "successful": true,
+      "fresh": true
+    },
+    {
+      "evidence_id": "evidence-45",
       "producer_action_instance_id": "inspect_repository",
       "evidence_type": "capability:repository",
       "input_fingerprint": "6e210eb0942bb24f48e40fa7e26191e7f7aed2a77451ae44c8c6ba53b48f3103",

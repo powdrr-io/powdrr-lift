@@ -1,19 +1,35 @@
 from __future__ import annotations
 
+import io
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
+    CodingLoopSpec,
+    CodingLoopVerification,
     TaskComplexity,
     TaskStatus,
     WorkflowInstance,
     WorkflowTask,
 )
 from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
+from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig, run_workflow_task
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
+
+
+class _CodingTaskClient:
+    def __init__(self, responses: list[dict[str, Any]]) -> None:
+        self.responses = iter(responses)
+        self.messages: list[list[dict[str, str]]] = []
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        self.messages.append(messages)
+        return next(self.responses)
 
 
 def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
@@ -45,6 +61,159 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
     assert result["exit_code"] == 0
     assert result["task_status"] == "completed"
     assert result["output_matches"] is True
+
+
+def test_coding_task_agent_changes_product_and_test_and_verifies_them(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    product_path = tmp_path / "src" / "greeting.py"
+    test_path = tmp_path / "tests" / "test_greeting.py"
+    product_path.write_text(
+        'def greeting(name: str) -> str:\n    return f"Hello {name}"\n',
+        encoding="utf-8",
+    )
+    test_path.write_text(
+        "from src.greeting import greeting\n\n\ndef test_greeting() -> None:\n"
+        '    assert greeting("Ada") == "Hello Ada"\n',
+        encoding="utf-8",
+    )
+    workflow = WorkflowInstance.create(
+        tmp_path / "workflow",
+        (
+            WorkflowTask(
+                task_id="coding-task",
+                status=TaskStatus.OPEN,
+                complexity=TaskComplexity.MEDIUM,
+                input_state={"goal": "Add punctuation to greetings."},
+                description=(
+                    "Update greeting and its test to return and assert "
+                    "Hello, <name>!, then verify the change."
+                ),
+                details=(
+                    "Inspect the product and test, make the smallest justified "
+                    "edits, run the coding-loop verification, and only then "
+                    "advance the task."
+                ),
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.CODER,
+                actions=("invoke_tool", "edit", "read_document"),
+                step_type="coding_loop",
+                coding_loop=CodingLoopSpec(
+                    goal="Make the greeting product code and test agree.",
+                    verification=(
+                        CodingLoopVerification(
+                            id="pytest",
+                            command=("python", "-m", "pytest", "-q"),
+                        ),
+                    ),
+                    stopping_conditions=("pytest passes",),
+                    max_iterations=3,
+                ),
+                output_state_type="coding-task-state",
+            ),
+        ),
+    )
+    client = _CodingTaskClient(
+        [
+            {
+                "action": "read_document",
+                "file_path": "src/greeting.py",
+                "start_line": 1,
+                "end_line": 5,
+            },
+            {
+                "action": "edit",
+                "file_edits": [
+                    {
+                        "file_path": "src/greeting.py",
+                        "edits": [
+                            {
+                                "kind": "replace",
+                                "start_line": 2,
+                                "end_line": 2,
+                                "text": '    return f"Hello, {name}!"\n',
+                            }
+                        ],
+                    },
+                    {
+                        "file_path": "tests/test_greeting.py",
+                        "edits": [
+                            {
+                                "kind": "replace",
+                                "start_line": 5,
+                                "end_line": 5,
+                                "text": '    assert greeting("Ada") == "Hello, Ada!"\n',
+                            }
+                        ],
+                    },
+                ],
+            },
+            {
+                "action": "next_step",
+                "output_state": {"verified": True},
+            },
+        ]
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+            allow_unmanaged_git=True,
+            max_roundtrips=5,
+        ),
+        client=client,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    assert product_path.read_text(encoding="utf-8") == (
+        'def greeting(name: str) -> str:\n    return f"Hello, {name}!"\n'
+    )
+    assert 'assert greeting("Ada") == "Hello, Ada!"' in test_path.read_text(
+        encoding="utf-8"
+    )
+    completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
+    assert completed.status is TaskStatus.COMPLETED
+    assert completed.output_state == {"verified": True}
+    durable_events = [
+        json.loads(line)
+        for line in (workflow.directory / "execution" / "coding-task" / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    event_kinds = [event["payload"].get("kind") for event in durable_events]
+    assert event_kinds.count("read_document") >= 1
+    assert event_kinds.count("edit") >= 1
+    assert event_kinds.count("run_process") >= 1
+    assert event_kinds.count("next_step") >= 1
+    verification_decision = next(
+        event
+        for event in durable_events
+        if event["event_type"] == "capability_decision"
+        and event["payload"].get("tool_name") == "process"
+    )
+    assert verification_decision["payload"]["arguments"]["command"] == [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+    ]
+    first_prompt = json.loads(client.messages[0][1]["content"])
+    assert first_prompt["task"]["step_type"] == "coding_loop"
+    assert first_prompt["task"]["coding_loop"]["verification"][0]["id"] == ("pytest")
+    assert "invoke_tool" in client.messages[0][0]["content"]
+    assert "edit" in client.messages[0][0]["content"]
+    final_prompt = json.loads(client.messages[2][1]["content"])
+    assert any(
+        event["kind"] == "coding_loop_verification"
+        for event in final_prompt["events"]["recent"]
+    )
 
 
 def test_workflow_scenario_dispatches_to_task_adapter(tmp_path: Path) -> None:

@@ -216,15 +216,11 @@ def render_feature_pr_specification_template(
         "features",
         "human-decisions",
         "intent",
-        "intents",
         "acceptance_criteria",
         "expected_tests",
-        "required_test_cases",
         "expected_outcomes",
         "non_goals",
         "risks",
-        "decisions",
-        "proposed_prs",
         "modules",
         "tools",
     )
@@ -238,14 +234,40 @@ def render_feature_pr_specification_template(
             raise ValueError(f"Interview input {key}_edits must contain lists.")
         items = [dict(item) for item in added if isinstance(item, dict)]
         items.extend(
-            {**dict(item), "action": "removed"}
+            {
+                **dict(item),
+                **(
+                    {"state": "removed"}
+                    if key in {"requirements", "approach"}
+                    else {"action": "removed"}
+                ),
+                "description": dict(item).get(
+                    "description", f"Remove existing {key} item {item.get('id')}."
+                ),
+            }
             for item in deleted
             if isinstance(item, dict)
         )
         if key in {"requirements", "approach"}:
             for item in items:
                 item.setdefault("state", "added")
-        document[key] = items
+        if key == "intent":
+            intent = items[0] if items else {}
+            document[key] = {
+                "problem": intent.get(
+                    "problem",
+                    interview.get("feature_description") or "Define the feature.",
+                ),
+                "goal": intent.get(
+                    "goal",
+                    interview.get("feature_description") or "Implement the feature.",
+                ),
+                "reasoning": intent.get(
+                    "reasoning", "The feature description defines the required outcome."
+                ),
+            }
+        else:
+            document[key] = items
     return yaml.safe_dump(document, sort_keys=False)
 
 

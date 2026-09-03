@@ -3353,6 +3353,8 @@ _SPECIFICATION_FILENAMES = {
     "implementation-specification.yml": "implementation",
     "proposed-pr-specification.yaml": "pr",
     "proposed-pr-specification.yml": "pr",
+    "feature-pr-specification.yaml": "pr",
+    "feature-pr-specification.yml": "pr",
 }
 _SPECIFICATION_FILENAME_SUFFIXES = tuple(
     (f"-{filename}", kind) for filename, kind in _SPECIFICATION_FILENAMES.items()

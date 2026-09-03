@@ -29,11 +29,15 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
+    _DEFAULT_MODEL,
     LLMProviderRoles,
     SkillCatalogEntry,
     SkillChatConfig,
     SkillChatSelection,
+    _build_chat_client,
     _ChatWorkflowExecutionStrategy,
+    _initial_model_for_provider,
+    _resolve_credentials,
     _workflow_action_signature,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
@@ -299,17 +303,43 @@ def run_workflow_scenario(
                 guidance_runtime.capture_guidance(
                     rule, source_ref=f"scenario:{scenario_id}", scope={}
                 )
+        scenario_expect = _mapping(scenario.get("expect"), "scenario expect")
+        scenario_inputs = _mapping(scenario.get("inputs", {}), "scenario inputs")
+        provider_name = _optional_text(provider.get("provider")) or "openai"
+        configured_model = _optional_text(provider.get("model")) or _DEFAULT_MODEL
+        live_client = None
+        execution_model = "scripted"
+        execution_provider = "local"
+        if provider_mode == "live":
+            credentials = _resolve_credentials(
+                provider_name,
+                _optional_text(provider.get("api_key")),
+                _optional_text(provider.get("base_url")),
+            )
+            execution_model = _initial_model_for_provider(
+                provider_name, configured_model
+            )
+            live_client = _build_chat_client(
+                credentials,
+                model=execution_model,
+                model_cache_dir=temporary_root / "models",
+            )
+            execution_provider = provider_name
         execution = _run_scripted_skill(
             definition_path=definition_path,
             worktree_root=worktree_root,
             root_intent=_required_text(scenario.get("request"), "scenario request"),
             responses=responses,
             max_roundtrips=_optional_positive_int(
-                _mapping(scenario.get("expect"), "scenario expect").get(
-                    "max_roundtrips"
+                scenario_expect.get("max_roundtrips"),
+                default=(
+                    128 if provider_mode == "live" else max(1, len(responses) + 1)
                 ),
-                default=max(1, len(responses) + 1),
             ),
+            client=live_client,
+            provider=execution_provider,
+            model=execution_model,
+            initial_inputs=scenario_inputs,
         )
         assertions = _evaluate_assertions(
             _mapping(scenario.get("expect"), "scenario expect"),
@@ -357,16 +387,21 @@ def _run_scripted_skill(
     root_intent: str,
     responses: Sequence[Mapping[str, Any]],
     max_roundtrips: int,
+    client: Any | None = None,
+    provider: str = "local",
+    model: str = "scripted",
+    initial_inputs: Mapping[str, Any] | None = None,
 ) -> _ScriptedSkillExecution:
     skill = load_skill(definition_path)
-    _validate_scripted_responses(responses)
+    if client is None:
+        _validate_scripted_responses(responses)
     entry = SkillCatalogEntry(definition_path, skill)
-    client = _ScriptedWorkflowClient(responses)
+    execution_client = client or _ScriptedWorkflowClient(responses)
     config = SkillChatConfig(
         skills_dir=definition_path.parent,
         repo_root=worktree_root,
-        provider="local",
-        model="scripted",
+        provider=provider,
+        model=model,
         max_stalled_roundtrips=2,
     )
     state = _WorkflowExecutionState(
@@ -385,6 +420,17 @@ def _run_scripted_skill(
             workflow_directory=worktree_root.parent / ".powdrr-execution",
             repo_root=worktree_root,
         ),
+        handoff_records={
+            name: {
+                "name": name,
+                "type": "string" if isinstance(value, str) else "any",
+                "value": value,
+                "source": "caller",
+                "produced_by": {"source": "caller"},
+                "scope": "skill",
+            }
+            for name, value in (initial_inputs or {}).items()
+        },
     )
     stderr = io.StringIO()
     strategy = _ChatWorkflowExecutionStrategy(
@@ -401,11 +447,11 @@ def _run_scripted_skill(
         input_func=lambda: _raise_human_input_requested(),
         stdout=io.StringIO(),
         stderr=stderr,
-        client_for_model=lambda _model, _provider: client,
-        provider_roles=LLMProviderRoles(normal="local"),
+        client_for_model=lambda _model, _provider: execution_client,
+        provider_roles=LLMProviderRoles(normal=provider),
         provider_role="normal",
-        current_model="scripted",
-        provider="local",
+        current_model=model,
+        provider=provider,
         driver=WorkflowStepRunner(
             max_stalled_roundtrips=2,
             runtime=state.runtime,
@@ -435,8 +481,8 @@ def _run_scripted_skill(
         exit_code=exit_code,
         execution_events=state.execution_events,
         audit_events=state.audit_events,
-        roundtrips=len(client.messages),
-        llm_exchanges=client.messages,
+        roundtrips=len(getattr(execution_client, "messages", [])),
+        llm_exchanges=getattr(execution_client, "messages", []),
     )
 
 
@@ -717,10 +763,6 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
         raise WorkflowScenarioError("scenario provider.mode must be scripted or live.")
     if provider_mode == "scripted":
         _mapping_sequence(provider.get("responses"), "scenario provider.responses")
-    elif mode != "workflow_task":
-        raise WorkflowScenarioError(
-            "live scenarios currently support execution_mode workflow_task only."
-        )
     if provider_mode == "live" and provider.get("provider") is not None:
         _required_text(provider.get("provider"), "scenario provider.provider")
     _mapping(scenario.get("expect"), "scenario expect")

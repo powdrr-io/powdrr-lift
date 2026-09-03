@@ -300,6 +300,7 @@ steps:
   - name: work_item_name
     type: string
     required: true
+    source: caller
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
@@ -322,6 +323,7 @@ steps:
   - name: feature_description
     type: string
     required: true
+    source: caller
   - name: requirements_edits
     type: any
     required: true
@@ -402,9 +404,11 @@ steps:
   - name: work_item_name
     type: string
     required: true
+    source: caller
   - name: feature_description
     type: string
     required: true
+    source: caller
   - name: requirements_edits
     type: any
     required: true

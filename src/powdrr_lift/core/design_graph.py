@@ -51,7 +51,7 @@ class DesignNode:
 
     @property
     def key(self) -> str:
-        return f"{self.kind}:{self.id}"
+        return f"{self.layer}:{self.kind}:{self.id}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -436,7 +436,15 @@ def _find(nodes: Mapping[str, DesignNode], target: object) -> DesignNode | None:
         return None
     if target in nodes:
         return nodes[target]
-    matches = [node for node in nodes.values() if node.id == target]
+    parts = target.split(":", 1)
+    if len(parts) == 2:
+        matches = [
+            node
+            for node in nodes.values()
+            if node.kind == parts[0] and node.id == parts[1]
+        ]
+    else:
+        matches = [node for node in nodes.values() if node.id == target]
     return matches[0] if len(matches) == 1 else None
 
 

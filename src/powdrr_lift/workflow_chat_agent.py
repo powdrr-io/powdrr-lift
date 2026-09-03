@@ -5185,7 +5185,7 @@ def _modular_action_system_prompt(
     coding_loop = getattr(current_step, "coding_loop", None)
     if coding_loop is not None:
         verification = json.dumps(
-            [dict(item) for item in coding_loop.verification], ensure_ascii=False
+            [item.to_data() for item in coding_loop.verification], ensure_ascii=False
         )
         stopping = json.dumps(list(coding_loop.stopping_conditions), ensure_ascii=False)
         prompt += (
@@ -7405,7 +7405,9 @@ def _command_token_matches(actual: str, expected: str) -> bool:
         pattern_parts.append(
             re.escape(expected[previous_end : placeholder_match.start()])
         )
-        pattern_parts.append(r"[^\s]+")
+        # One argv item may contain spaces when a placeholder is embedded in a
+        # token (for example ``verification-command=<command>``).
+        pattern_parts.append(r".+?")
         previous_end = placeholder_match.end()
     pattern_parts.append(re.escape(expected[previous_end:]))
     return re.fullmatch("".join(pattern_parts), actual) is not None
@@ -8365,9 +8367,14 @@ def _run_coding_loop_verification(
         return None
     results: list[dict[str, Any]] = []
     for verification in coding_loop.verification:
+        command = (
+            verification.command
+            if isinstance(verification.command, str)
+            else list(verification.command)
+        )
         result = invoke_shell_capability(
             {
-                "command": list(verification.command),
+                "command": command,
                 "cwd": verification.cwd,
                 "env": dict(verification.env),
                 "_tool_name": "coding_loop_verification",
@@ -8388,7 +8395,7 @@ def _run_coding_loop_verification(
         results.append(
             {
                 "id": verification.id,
-                "command": list(verification.command),
+                "command": command,
                 "passed": passed,
                 "result": result,
             }

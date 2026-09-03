@@ -180,14 +180,16 @@ class CodingLoopVerification:
     """One deterministic command used to verify a coding-loop iteration."""
 
     id: str
-    command: tuple[str, ...]
+    command: str | tuple[str, ...]
     cwd: str | None = None
     env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
             "id": self.id,
-            "command": list(self.command),
+            "command": (
+                self.command if isinstance(self.command, str) else list(self.command)
+            ),
         }
         if self.cwd is not None:
             data["cwd"] = self.cwd
@@ -1543,7 +1545,7 @@ def _validate_coding_loop(
         or any(
             not isinstance(item, Mapping)
             or _optional_string(item.get("id")) is None
-            or not _command_sequence(item.get("command"))
+            or _command_value(item.get("command")) is None
             for item in verification
         )
     ):
@@ -1717,7 +1719,7 @@ def _parse_coding_loop(value: object) -> CodingLoopSpec:
         or not all(
             isinstance(item, Mapping)
             and _optional_string(item.get("id")) is not None
-            and _command_sequence(item.get("command"))
+            and _command_value(item.get("command")) is not None
             for item in raw_verification
         )
     ):
@@ -1741,7 +1743,7 @@ def _parse_coding_loop(value: object) -> CodingLoopSpec:
     verification = tuple(
         CodingLoopVerification(
             id=_required_string(item, "id"),
-            command=tuple(str(part) for part in item["command"]),
+            command=_command_value(item["command"]),
             cwd=_optional_string(item.get("cwd")),
             env=tuple(sorted(_string_mapping(item.get("env"), "env").items())),
         )
@@ -1886,7 +1888,9 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     return tuple(_required_string({"value": item}, "value") for item in value)
 
 
-def _command_sequence(value: object) -> tuple[str, ...] | None:
+def _command_value(value: object) -> str | tuple[str, ...] | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         return None
     if not value or not all(isinstance(item, str) and item.strip() for item in value):

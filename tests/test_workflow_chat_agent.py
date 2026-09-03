@@ -523,7 +523,7 @@ def test_coding_loop_runs_declared_verification_and_requires_pass(
         step_type="coding_loop",
         coding_loop=CodingLoopSpec(
             goal="Make the check pass.",
-            verification=(CodingLoopVerification(id="always-pass", command=("true",)),),
+            verification=(CodingLoopVerification(id="always-pass", command="true"),),
         ),
     )
 
@@ -6123,6 +6123,8 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "display-related-photos",
                         "--template-value",
                         "proposed-pr-id=display-related-photos-pr-001",
+                        "--template-value",
+                        "verification-command=pytest -q",
                         "--template",
                         "templates/execute-proposed-pr.yaml",
                     ]
@@ -6187,6 +6189,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._finish_validation_index = 0
             self._finish_scope_invoked = False
             self._finish_context_gathered = False
+            self._workflow_tools_gathered = False
 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], start_captured["messages"]).append(
@@ -6409,6 +6412,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         .replace("<feature-name>", "display-related-photos")
                         .replace("<proposed-pr-name>", "display-related-photos-pr-001")
                         .replace("<feature-id>", "display-related-photos")
+                        .replace("<verification-command>", "pytest -q")
                         for part in invocation["command"]
                     ]
                     return {
@@ -6429,6 +6433,20 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "outputs": {
                             "proposed_pr_names": ["display-related-photos-pr-001"]
                         },
+                    }
+                if prompt["current_step"].get("id") == "plan-workflow-instantiation":
+                    if not self._workflow_tools_gathered:
+                        self._workflow_tools_gathered = True
+                        self._call_index += 1
+                        return {
+                            "action": "gather_context",
+                            "types": ["tools"],
+                            "filters": {"labels": ["test"]},
+                        }
+                    self._call_index += 1
+                    return {
+                        "action": "next_step",
+                        "outputs": {"verification-command": "pytest -q"},
                     }
                 if (
                     prompt["current_step"].get("id")
@@ -6647,7 +6665,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         for event in start_summary["execution_events"]
         if event["kind"] == "invoke_tool"
         and event.get("parameters", {}).get("command")
-        and event["parameters"]["command"][1] == "instantiate-workflow"
+        and "instantiate-workflow" in event["parameters"]["command"]
     )
     instantiate_result = cast(dict[str, object], instantiate_event["result"])
     assert instantiate_result["returncode"] == 0, instantiate_result.get("stderr", "")

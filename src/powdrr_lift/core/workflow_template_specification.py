@@ -14,6 +14,7 @@ from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
     CodingLoopSpec,
+    CodingLoopVerification,
     SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
@@ -355,7 +356,10 @@ def instantiate_workflow_template(
             step_type=task_template.step_type,
             pre_step=task_template.pre_step,
             gate=task_template.gate,
-            coding_loop=task_template.coding_loop,
+            coding_loop=_substitute_coding_loop(
+                task_template.coding_loop,
+                substitutions,
+            ),
             upstream_task_ids=tuple(
                 task_ids[upstream_index] for upstream_index in upstream_task_indexes
             ),
@@ -410,6 +414,55 @@ def _substitute_workflow_placeholders(
             _substitute_workflow_placeholders(item, substitutions) for item in value
         ]
     return value
+
+
+def _substitute_coding_loop(
+    coding_loop: CodingLoopSpec | None,
+    substitutions: Mapping[str, str],
+) -> CodingLoopSpec | None:
+    if coding_loop is None:
+        return None
+    verifications: list[CodingLoopVerification] = []
+    for verification in coding_loop.verification:
+        command = _substitute_workflow_placeholders(
+            verification.command,
+            substitutions,
+        )
+        if not isinstance(command, (str, tuple)):
+            raise ValueError(
+                f"Coding-loop verification {verification.id!r} command must be "
+                "a string or command array."
+            )
+        if isinstance(command, str) and "<verification-command>" in command:
+            raise ValueError(
+                "Missing required template value 'verification-command'; "
+                "discover the repository test command via gather_context tools "
+                "and pass it when instantiating the template."
+            )
+        verifications.append(
+            CodingLoopVerification(
+                id=verification.id,
+                command=command,
+                cwd=(
+                    _substitute_workflow_placeholders(verification.cwd, substitutions)
+                    if verification.cwd is not None
+                    else None
+                ),
+                env=tuple(
+                    (
+                        key,
+                        _substitute_workflow_placeholders(value, substitutions),
+                    )
+                    for key, value in verification.env
+                ),
+            )
+        )
+    return CodingLoopSpec(
+        goal=coding_loop.goal,
+        verification=tuple(verifications),
+        stopping_conditions=coding_loop.stopping_conditions,
+        max_iterations=coding_loop.max_iterations,
+    )
 
 
 def _substitute_tool_invocation(

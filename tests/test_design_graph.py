@@ -51,8 +51,8 @@ def test_canonical_graph_normalizes_current_yaml_and_preserves_provenance(
 
     graph = build_canonical_design_graph(tmp_path, feature_id="demo")
 
-    assert "requirement:req-log" in graph.nodes
-    assert graph.nodes["requirement:req-log"].source.endswith(
+    assert "system:requirement:req-log" in graph.nodes
+    assert graph.nodes["system:requirement:req-log"].source.endswith(
         "demo/system-specification.yaml"
     )
     assert graph.edges[0].id == "writer-writes-entry"
@@ -87,8 +87,10 @@ def test_proposal_resolves_without_mutating_canonical_graph(tmp_path: Path) -> N
 
     assert result.valid is True
     assert result.graph is not None
-    assert "component:writer" in result.graph.nodes
-    assert canonical.nodes["entity:log-entry"].data["summary"] == "One log entry."
+    assert "architecture:component:writer" in result.graph.nodes
+    assert canonical.nodes["architecture:entity:log-entry"].data["summary"] == (
+        "One log entry."
+    )
 
 
 def test_proposal_reports_stale_base_and_rendered_context_is_explicit(

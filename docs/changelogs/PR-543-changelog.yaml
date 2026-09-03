@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 542
+change_id: 543
 title: Align workflow actions with skill instructions
 intent:
   problem: Skill and workflow steps can request actions that their explicit action contracts do not permit, while universal prompt and advance actions are unnecessarily repeated in every definition.

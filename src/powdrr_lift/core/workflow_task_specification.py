@@ -643,6 +643,7 @@ def build_workflow_task_validation_report(
             "actions",
             "pre_step",
             "gate",
+            "coding_loop",
             "workflow_template",
             "phase_type",
             "persona_id",

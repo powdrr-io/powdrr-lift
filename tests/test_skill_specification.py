@@ -308,7 +308,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("run-tests-and-fix.yaml", 8),
             }
             expected_step_type = (
-                "invoke_tool"
+                "coding_loop"
+                if (path.name, index) == ("execute-proposed-pr.yaml", 4)
+                else "invoke_tool"
                 if (path.name, index) in expected_invoke_tool_steps
                 else "gate"
                 if (path.name, index) in expected_gate_steps

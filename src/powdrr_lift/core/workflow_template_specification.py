@@ -354,6 +354,8 @@ def instantiate_workflow_template(
             output_state_type=task_template.output_state_type,
             step_type=task_template.step_type,
             pre_step=task_template.pre_step,
+            gate=task_template.gate,
+            coding_loop=task_template.coding_loop,
             upstream_task_ids=tuple(
                 task_ids[upstream_index] for upstream_index in upstream_task_indexes
             ),
@@ -621,6 +623,7 @@ def build_workflow_template_validation_report(
                 "dependent_state",
                 "generation",
                 "gate",
+                "coding_loop",
                 "phase_type",
                 "persona_id",
             },

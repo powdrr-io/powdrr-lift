@@ -434,7 +434,13 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[1].input_state["proposed_pr_context"] == (
         "<upstream-task-0>.proposed-pr-context-state"
     )
-    assert template.task_templates[4].uses_skills == ("run-tests-and-fix",)
+    assert template.task_templates[4].uses_skills == ()
+    assert template.task_templates[4].step_type == "coding_loop"
+    assert template.task_templates[4].coding_loop is not None
+    assert template.task_templates[4].coding_loop.verification[0].command == (
+        "pytest",
+        "-q",
+    )
     assert template.task_templates[4].input_state["implementation_diffs"] == (
         "<upstream-task-3>.generated-product-code-state"
     )

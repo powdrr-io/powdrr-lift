@@ -155,28 +155,35 @@ task_templates:
 - description: Run all tests and fix failures
   phase_type: validate
   persona_id: engineer
-  actions: [invoke_skill]
-  step_type: freeform
+  actions: [edit, read_document]
+  step_type: coding_loop
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
-  uses_skills:
-  - run-tests-and-fix
+  coding_loop:
+    goal: Make the implementation and generated tests pass the complete test suite.
+    verification:
+    - id: full-test-suite
+      command: [pytest, -q]
+    stopping_conditions:
+    - The complete test suite passes.
+    - No approved implementation or test issue remains unresolved.
+    max_iterations: 12
   input_state:
     implementation_diffs: <upstream-task-3>.generated-product-code-state
     generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
     test_results: {}
   details: >-
-    Invoke run-tests-and-fix exactly once to run the complete test suite and
-    repair approved product and test files. If it reports a failure without
-    repairing it, do not invoke the skill again unchanged: inspect the reported
-    failure, make one focused edit to the approved product or test file, then
-    invoke run-tests-and-fix again. Repeat only after a new deterministic result
-    and stop once the suite passes. Never invoke this skill from inside itself
-    or run a shell command named run-tests-and-fix. Finish with next_step and
-    all-tests-results-state containing the exact final command, return code,
-    and test summary.
+    Work as a bounded inspect, edit, verify, and repair loop. Read the current
+    implementation and generated tests, then make focused edits only in the
+    approved product and test paths. After every edit, the harness automatically
+    runs the declared full-test-suite verification command and records its exact
+    result in the task context. Use that result to repair failures rather than
+    repeating an unchanged edit. Do not claim success from memory or prose.
+    Finish with next_step and all-tests-results-state containing the exact final
+    verification command, return code, and test summary; next_step is rejected
+    until the latest automatic verification passes.
   output_state_type: all-tests-results-state
   dependent_state:
   - all-tests-passed

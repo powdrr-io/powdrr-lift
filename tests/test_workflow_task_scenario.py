@@ -18,10 +18,10 @@ from powdrr_lift.core import (
     WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.workflow_chat_agent import LLMModelLimits, OpenAIChatClient
 from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
+    _build_workflow_client,
     run_workflow_task,
 )
 from powdrr_lift.workflow_task_scenario import (
@@ -62,21 +62,17 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
 
 
 @pytest.mark.real_coding_loop
-def test_coding_task_agent_changes_product_and_test_and_verifies_them(
+def test_coding_task_agent_reacts_to_failure_and_verifies_the_fix(
     tmp_path: Path,
 ) -> None:
     if os.environ.get("POWDRR_LIFT_RUN_LIVE_CODING_LOOP") != "1":
         pytest.skip("set POWDRR_LIFT_RUN_LIVE_CODING_LOOP=1 to run the live test")
-    provider = "zai" if os.environ.get("ZAI_API_KEY") else "openai"
-    api_key = (
-        os.environ.get("ZAI_API_KEY")
-        if provider == "zai"
-        else os.environ.get("OPENAI_API_KEY") or os.environ.get("CODEX_API_KEY")
+    provider = "deepinfra"
+    api_key = os.environ.get("DEEPINFRA_API_TOKEN") or os.environ.get(
+        "DEEPINFRA_API_KEY"
     )
     if not api_key:
-        pytest.skip(
-            "set ZAI_API_KEY, OPENAI_API_KEY, or CODEX_API_KEY to run the live test"
-        )
+        pytest.skip("set DEEPINFRA_API_TOKEN or DEEPINFRA_API_KEY to run the live test")
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "skill-definitions").mkdir()
@@ -88,7 +84,7 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
     )
     test_path.write_text(
         "from src.greeting import greeting\n\n\ndef test_greeting() -> None:\n"
-        '    assert greeting("Ada") == "Hello Ada"\n',
+        '    assert greeting("Ada") == "Hello, Ada!"\n',
         encoding="utf-8",
     )
     workflow = WorkflowInstance.create(
@@ -106,26 +102,34 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
                     "current_test": (
                         "from src.greeting import greeting\n\n\n"
                         "def test_greeting() -> None:\n"
-                        '    assert greeting("Ada") == "Hello Ada"\n'
+                        '    assert greeting("Ada") == "Hello, Ada!"\n'
                     ),
                 },
                 description=(
-                    "Update greeting and its test to return and assert "
-                    "Hello, <name>!, then verify the change."
+                    "Fix the greeting implementation to satisfy the existing "
+                    "punctuated assertion, then verify the change."
                 ),
                 details=(
                     "The input_state contains the exact current product and test "
                     "source. Make the smallest justified edits to "
-                    "both src/greeting.py and tests/test_greeting.py. Run the "
-                    "coding-loop verification and repair any failure before "
-                    "advancing the task. Return one edit action immediately; do "
-                    "not read files or use shell commands. "
+                    "src/greeting.py. The test is intentionally red before the "
+                    "first edit: preserve its expected punctuation. First return "
+                    "an invoke_tool action with tool shell and parameters "
+                    'command ["python", "-m", "pytest", "-q"] so you '
+                    "can observe the current failure. Then return an edit action "
+                    "for src/greeting.py and rerun the coding-loop verification "
+                    "until it passes before advancing the task. For the edit, "
+                    "return exactly one top-level file_edits entry with "
+                    'file_path "src/greeting.py"; do not nest it under '
+                    "parameters. "
                     "Return edits with top-level file_edits, each containing "
                     "file_path and line-based edits with kind replace, "
                     "start_line, end_line, and text; do not use old/new or "
                     "nest the edit under parameters. Return read_document "
                     "fields at the top level too, exactly as action, "
-                    "file_path, start_line, and end_line."
+                    "file_path, start_line, and end_line. After pytest passes, "
+                    'return next_step with top-level output_state {"verified": '
+                    "true}."
                 ),
                 assignee_type=AssigneeType.AGENT,
                 assignee_role=AgentRole.CODER,
@@ -141,7 +145,7 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
                         ),
                     ),
                     stopping_conditions=("pytest passes",),
-                    max_iterations=8,
+                    max_iterations=12,
                 ),
                 output_state_type="coding-task-state",
             ),
@@ -153,15 +157,12 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
         provider=provider,
         api_key=api_key,
         allow_unmanaged_git=True,
-        max_roundtrips=20,
+        max_roundtrips=30,
     )
+    # Build the production client through the same provider/mapping resolver as
+    # the task runner, so DeepInfra selects the model for standard_reasoning.
     client = LiveWorkflowTaskExchangeRecorder(
-        OpenAIChatClient(
-            model="glm-4.7-flash",
-            api_key=api_key,
-            base_url=os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/paas/v4/"),
-            limits=LLMModelLimits(context_window=200_000, max_output_tokens=16_384),
-        )
+        _build_workflow_client(config, workflow.tasks[0])
     )
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -177,9 +178,9 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
     product = product_path.read_text(encoding="utf-8")
     test = test_path.read_text(encoding="utf-8")
     assert product != 'def greeting(name: str) -> str:\n    return f"Hello {name}"\n'
-    assert test != (
+    assert test == (
         "from src.greeting import greeting\n\n\ndef test_greeting() -> None:\n"
-        '    assert greeting("Ada") == "Hello Ada"\n'
+        '    assert greeting("Ada") == "Hello, Ada!"\n'
     )
     subprocess.run(
         ["python", "-m", "pytest", "-q"],
@@ -198,10 +199,25 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
         .splitlines()
     ]
     event_kinds = [event["payload"].get("kind") for event in durable_events]
-    assert event_kinds.count("read_document") >= 1
     assert event_kinds.count("edit") >= 1
-    assert event_kinds.count("run_process") >= 1
+    assert event_kinds.count("run_process") >= 2
     assert event_kinds.count("next_step") >= 1
+    failed_process_evidence = [
+        event
+        for event in durable_events
+        if event["event_type"] == "evidence_recorded"
+        and event["payload"].get("evidence_type") == "capability:process"
+        and event["payload"].get("successful") is False
+    ]
+    assert failed_process_evidence, (
+        "the live agent must observe the initial pytest failure"
+    )
+    assert any(
+        event["payload"].get("evidence_type") == "capability:process"
+        and event["payload"].get("successful") is True
+        for event in durable_events
+        if event["event_type"] == "evidence_recorded"
+    )
     verification_decision = next(
         event
         for event in durable_events

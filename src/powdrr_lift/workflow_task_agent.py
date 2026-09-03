@@ -2480,6 +2480,7 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "was not valid json",
             "must be a json object",
             "workflow task action must include",
+            "file_edits entries must include file_path",
             "workflow action response must include action",
             "unknown workflow task action",
             "unknown workflow action",

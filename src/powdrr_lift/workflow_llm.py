@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from powdrr_lift.errors import (
@@ -427,24 +427,6 @@ class WorkflowStepRunner:
             request = strategy.next_request()
             if request is None:
                 return 0
-            if self.runtime is not None and request.request_action is None:
-                compacted = self.runtime.compact_prompt_context(
-                    {"messages": request.messages}
-                )
-                request = replace(
-                    request,
-                    messages=[
-                        *request.messages,
-                        {
-                            "role": "system",
-                            "content": (
-                                "Use this bounded execution context. The complete "
-                                "request is retrievable by full_context_ref: "
-                                + json.dumps(compacted, ensure_ascii=False)
-                            ),
-                        },
-                    ],
-                )
             try:
                 action = (
                     request.request_action()

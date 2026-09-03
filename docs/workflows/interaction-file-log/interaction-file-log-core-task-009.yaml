@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-task-009
-status: locked
+status: completed
 upstream_task_ids:
 - interaction-file-log-core-task-008
 dependent_state:
@@ -15,6 +15,11 @@ assignee_type: agent
 assignee_role: reviewer
 output_state_type: lint-check-state
 description: Run lint checks
+output_state:
+  lint-check-state:
+    command: ruff check .
+    return_code: 0
+    result: All checks passed.
 workflow_template: execute-proposed-pr
 phase_type: validate
 persona_id: engineer

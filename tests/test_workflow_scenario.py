@@ -45,7 +45,7 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
         },
         "provider": {
             "mode": "live",
-            "provider": os.environ.get("POWDRR_LIVE_LLM_PROVIDER", "openai"),
+            "provider": os.environ.get("POWDRR_LIVE_LLM_PROVIDER", "zai"),
             "model": os.environ.get("POWDRR_LIVE_LLM_MODEL"),
             "max_roundtrips": 128,
         },

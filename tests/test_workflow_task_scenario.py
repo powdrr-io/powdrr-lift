@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import subprocess
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -18,18 +19,15 @@ from powdrr_lift.core import (
     WorkflowTask,
 )
 from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
-from powdrr_lift.workflow_task_agent import WorkflowTaskAgentConfig, run_workflow_task
-from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
-
-
-class _CodingTaskClient:
-    def __init__(self, responses: list[dict[str, Any]]) -> None:
-        self.responses = iter(responses)
-        self.messages: list[list[dict[str, str]]] = []
-
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-        self.messages.append(messages)
-        return next(self.responses)
+from powdrr_lift.workflow_task_agent import (
+    WorkflowTaskAgentConfig,
+    _build_workflow_client,
+    run_workflow_task,
+)
+from powdrr_lift.workflow_task_scenario import (
+    LiveWorkflowTaskExchangeRecorder,
+    run_workflow_task_scenario,
+)
 
 
 def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
@@ -63,9 +61,15 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
     assert result["output_matches"] is True
 
 
+@pytest.mark.real_coding_loop
 def test_coding_task_agent_changes_product_and_test_and_verifies_them(
     tmp_path: Path,
 ) -> None:
+    if os.environ.get("POWDRR_LIFT_RUN_LIVE_CODING_LOOP") != "1":
+        pytest.skip("set POWDRR_LIFT_RUN_LIVE_CODING_LOOP=1 to run the live test")
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("CODEX_API_KEY")
+    if not api_key:
+        pytest.skip("set OPENAI_API_KEY or CODEX_API_KEY to run the live test")
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     product_path = tmp_path / "src" / "greeting.py"
@@ -115,46 +119,16 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
             ),
         ),
     )
-    client = _CodingTaskClient(
-        [
-            {
-                "action": "read_document",
-                "file_path": "src/greeting.py",
-                "start_line": 1,
-                "end_line": 5,
-            },
-            {
-                "action": "edit",
-                "file_edits": [
-                    {
-                        "file_path": "src/greeting.py",
-                        "edits": [
-                            {
-                                "kind": "replace",
-                                "start_line": 2,
-                                "end_line": 2,
-                                "text": '    return f"Hello, {name}!"\n',
-                            }
-                        ],
-                    },
-                    {
-                        "file_path": "tests/test_greeting.py",
-                        "edits": [
-                            {
-                                "kind": "replace",
-                                "start_line": 5,
-                                "end_line": 5,
-                                "text": '    assert greeting("Ada") == "Hello, Ada!"\n',
-                            }
-                        ],
-                    },
-                ],
-            },
-            {
-                "action": "next_step",
-                "output_state": {"verified": True},
-            },
-        ]
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow.directory,
+        repo_root=tmp_path,
+        provider="openai",
+        api_key=api_key,
+        allow_unmanaged_git=True,
+        max_roundtrips=12,
+    )
+    client = LiveWorkflowTaskExchangeRecorder(
+        _build_workflow_client(config, workflow.tasks[0])
     )
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -172,11 +146,19 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
     )
 
     assert exit_code == 0, stderr.getvalue()
-    assert product_path.read_text(encoding="utf-8") == (
-        'def greeting(name: str) -> str:\n    return f"Hello, {name}!"\n'
+    product = product_path.read_text(encoding="utf-8")
+    test = test_path.read_text(encoding="utf-8")
+    assert product != 'def greeting(name: str) -> str:\n    return f"Hello {name}"\n'
+    assert test != (
+        "from src.greeting import greeting\n\n\ndef test_greeting() -> None:\n"
+        '    assert greeting("Ada") == "Hello Ada"\n'
     )
-    assert 'assert greeting("Ada") == "Hello, Ada!"' in test_path.read_text(
-        encoding="utf-8"
+    subprocess.run(
+        ["python", "-m", "pytest", "-q"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
     assert completed.status is TaskStatus.COMPLETED
@@ -204,12 +186,13 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
         "pytest",
         "-q",
     ]
-    first_prompt = json.loads(client.messages[0][1]["content"])
+    assert len(client.exchanges) >= 2
+    first_prompt = json.loads(client.exchanges[0]["input"][1]["content"])
     assert first_prompt["task"]["step_type"] == "coding_loop"
     assert first_prompt["task"]["coding_loop"]["verification"][0]["id"] == ("pytest")
-    assert "invoke_tool" in client.messages[0][0]["content"]
-    assert "edit" in client.messages[0][0]["content"]
-    final_prompt = json.loads(client.messages[2][1]["content"])
+    assert "invoke_tool" in client.exchanges[0]["input"][0]["content"]
+    assert "edit" in client.exchanges[0]["input"][0]["content"]
+    final_prompt = json.loads(client.exchanges[-1]["input"][1]["content"])
     assert any(
         event["kind"] == "coding_loop_verification"
         for event in final_prompt["events"]["recent"]

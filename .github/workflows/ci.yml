@@ -56,7 +56,7 @@ jobs:
         run: uv run mypy src tests
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run pytest -m "not real_coding_loop"
 
       - name: Tune changed workflow definitions
         if: github.event_name == 'pull_request'

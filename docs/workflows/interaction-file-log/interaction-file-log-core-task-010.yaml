@@ -1,12 +1,16 @@
 task_id: interaction-file-log-core-task-010
-status: open
+status: locked
 upstream_task_ids:
 - interaction-file-log-core-task-009
 dependent_state:
 - type-checked
 complexity: medium
 input_state:
-  lint_check: interaction-file-log-core-task-009.lint-check-state
+  lint_check:
+    lint-check-state:
+      command: ruff check .
+      return_code: 0
+      result: All checks passed.
 assignee_type: agent
 assignee_role: reviewer
 output_state_type: type-check-state

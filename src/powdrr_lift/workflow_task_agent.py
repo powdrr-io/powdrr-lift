@@ -2488,6 +2488,8 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "intrinsic tool requires structured operation",
             "intrinsic tool only supports",
             "workflow edit action edit kind must be",
+            "workflow edit action must include file_path",
+            "workflow read_document action must include file_path",
             "workflow edit action edits must",
             "workflow edit action file_edits must",
             "workflow edit action start_line must be a positive integer",

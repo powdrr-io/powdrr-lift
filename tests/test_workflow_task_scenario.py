@@ -18,10 +18,10 @@ from powdrr_lift.core import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.workflow_chat_agent import LLMModelLimits, OpenAIChatClient
 from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
-    _build_workflow_client,
     run_workflow_task,
 )
 from powdrr_lift.workflow_task_scenario import (
@@ -67,11 +67,19 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
 ) -> None:
     if os.environ.get("POWDRR_LIFT_RUN_LIVE_CODING_LOOP") != "1":
         pytest.skip("set POWDRR_LIFT_RUN_LIVE_CODING_LOOP=1 to run the live test")
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("CODEX_API_KEY")
+    provider = "zai" if os.environ.get("ZAI_API_KEY") else "openai"
+    api_key = (
+        os.environ.get("ZAI_API_KEY")
+        if provider == "zai"
+        else os.environ.get("OPENAI_API_KEY") or os.environ.get("CODEX_API_KEY")
+    )
     if not api_key:
-        pytest.skip("set OPENAI_API_KEY or CODEX_API_KEY to run the live test")
+        pytest.skip(
+            "set ZAI_API_KEY, OPENAI_API_KEY, or CODEX_API_KEY to run the live test"
+        )
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
+    (tmp_path / "skill-definitions").mkdir()
     product_path = tmp_path / "src" / "greeting.py"
     test_path = tmp_path / "tests" / "test_greeting.py"
     product_path.write_text(
@@ -90,19 +98,39 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
                 task_id="coding-task",
                 status=TaskStatus.OPEN,
                 complexity=TaskComplexity.MEDIUM,
-                input_state={"goal": "Add punctuation to greetings."},
+                input_state={
+                    "goal": "Add punctuation to greetings.",
+                    "current_product": (
+                        'def greeting(name: str) -> str:\n    return f"Hello {name}"\n'
+                    ),
+                    "current_test": (
+                        "from src.greeting import greeting\n\n\n"
+                        "def test_greeting() -> None:\n"
+                        '    assert greeting("Ada") == "Hello Ada"\n'
+                    ),
+                },
                 description=(
                     "Update greeting and its test to return and assert "
                     "Hello, <name>!, then verify the change."
                 ),
                 details=(
-                    "Inspect the product and test, make the smallest justified "
-                    "edits, run the coding-loop verification, and only then "
-                    "advance the task."
+                    "The input_state contains the exact current product and test "
+                    "source. Make the smallest justified edits to "
+                    "both src/greeting.py and tests/test_greeting.py. Run the "
+                    "coding-loop verification and repair any failure before "
+                    "advancing the task. Return one edit action immediately; do "
+                    "not read files or use shell commands. "
+                    "Return edits with top-level file_edits, each containing "
+                    "file_path and line-based edits with kind replace, "
+                    "start_line, end_line, and text; do not use old/new or "
+                    "nest the edit under parameters. Return read_document "
+                    "fields at the top level too, exactly as action, "
+                    "file_path, start_line, and end_line."
                 ),
                 assignee_type=AssigneeType.AGENT,
                 assignee_role=AgentRole.CODER,
-                actions=("invoke_tool", "edit", "read_document"),
+                llm_type="standard_reasoning",
+                actions=("invoke_tool", "edit"),
                 step_type="coding_loop",
                 coding_loop=CodingLoopSpec(
                     goal="Make the greeting product code and test agree.",
@@ -113,7 +141,7 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
                         ),
                     ),
                     stopping_conditions=("pytest passes",),
-                    max_iterations=3,
+                    max_iterations=8,
                 ),
                 output_state_type="coding-task-state",
             ),
@@ -122,24 +150,24 @@ def test_coding_task_agent_changes_product_and_test_and_verifies_them(
     config = WorkflowTaskAgentConfig(
         workflow_dir=workflow.directory,
         repo_root=tmp_path,
-        provider="openai",
+        provider=provider,
         api_key=api_key,
         allow_unmanaged_git=True,
-        max_roundtrips=12,
+        max_roundtrips=20,
     )
     client = LiveWorkflowTaskExchangeRecorder(
-        _build_workflow_client(config, workflow.tasks[0])
+        OpenAIChatClient(
+            model="glm-4.7-flash",
+            api_key=api_key,
+            base_url=os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/paas/v4/"),
+            limits=LLMModelLimits(context_window=200_000, max_output_tokens=16_384),
+        )
     )
     stdout = io.StringIO()
     stderr = io.StringIO()
 
     exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow.directory,
-            repo_root=tmp_path,
-            allow_unmanaged_git=True,
-            max_roundtrips=5,
-        ),
+        config,
         client=client,
         stdout=stdout,
         stderr=stderr,

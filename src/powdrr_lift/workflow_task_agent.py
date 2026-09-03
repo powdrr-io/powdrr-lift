@@ -6,7 +6,7 @@ import os
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -124,10 +124,12 @@ from powdrr_lift.workflow_llm import (
     workflow_action_summary,
 )
 from powdrr_lift.workflow_observer import (
+    ObserverActionRecommendation,
     ObserverDecision,
     ObserverExecutionContext,
     ShadowWorkflowObserver,
     compact_observer_mapping,
+    observer_action_matches,
 )
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
@@ -338,8 +340,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     response_correction: str | None = None
     compacted_context: dict[str, Any] | None = None
     observer_intervention: str | None = None
+    observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
-    observer_redirect_skill_name: str | None = None
 
     def next_request(self) -> WorkflowActionRequest:
         while True:
@@ -579,13 +581,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         self.response_correction = None
-        if action.observer_override:
-            if not self.observer_override_is_authorized(action):
-                raise PowdrrExecutionError(
-                    "observer_override must match a pending observer skill "
-                    "recommendation."
-                )
-            self.observer_redirect_skill_name = None
+        if observer_action_matches(action, self.observer_allowed_action):
+            if self.runtime is not None:
+                self.runtime.consume_observer_action(action)
+            self.observer_allowed_action = None
             self.observer_rejected_action_signature = None
             self.observer_intervention = None
         if workflow_action_signature(action) == self.observer_rejected_action_signature:
@@ -864,14 +863,31 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         guidance = [f"Reason: {decision.reason}", *decision.guidance]
         if decision.expected_progress:
             guidance.append(f"Evidence expected: {decision.expected_progress}")
+        recommended_action = decision.target_action
+        if recommended_action is None and decision.target_step_id:
+            recommended_action = ObserverActionRecommendation(
+                kind="goto_step", step_id=decision.target_step_id
+            )
+        if recommended_action is None and decision.target_skill_name:
+            recommended_action = ObserverActionRecommendation(
+                kind="invoke_skill", skill_name=decision.target_skill_name
+            )
+        if recommended_action:
+            self.observer_allowed_action = recommended_action
+            if self.runtime is not None:
+                self.runtime.allow_observer_action(asdict(recommended_action))
+            guidance.append(
+                f"Observer recommends the {recommended_action.kind!r} action; "
+                "choose it "
+                "directly if it is the appropriate next action."
+            )
         self.observer_intervention = "Observer intervention\n" + "\n".join(
             f"- {item}" for item in guidance
         )
         if decision.target_skill_name:
             self.observer_intervention += (
-                "\n- Follow this advice with invoke_skill "
-                f"skill={decision.target_skill_name!r} "
-                "and observer_override=true."
+                "\n- If choosing invoke_skill, use "
+                f"skill={decision.target_skill_name!r}."
             )
         if decision.verdict == "redirect" and decision.target_step_id:
             self.observer_intervention += (
@@ -884,13 +900,14 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 _find_skill_by_name(self.skill_catalog, decision.target_skill_name)
             except RuntimeError as error:
                 self.observer_intervention += f"\n- Skill redirect ignored: {error}"
-            else:
-                self.observer_redirect_skill_name = decision.target_skill_name
         self.events.append(
             {
                 "kind": "observer_intervention",
                 "verdict": decision.verdict,
                 "reason": decision.reason,
+                "target_action": (
+                    asdict(recommended_action) if recommended_action else None
+                ),
                 "target_step_id": decision.target_step_id,
                 "target_skill_name": decision.target_skill_name,
                 "action": json.loads(workflow_action_signature(action)),
@@ -908,22 +925,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 material_progress=(
                     observation.made_progress if observation is not None else None
                 ),
+                target_action=(
+                    json.dumps(asdict(recommended_action), sort_keys=True)
+                    if recommended_action
+                    else None
+                ),
                 target_step_id=decision.target_step_id,
                 target_skill_name=decision.target_skill_name,
             )
         return observation is None
 
-    def observer_override_is_authorized(self, action: WorkflowAction) -> bool:
-        return bool(
-            action.observer_override
-            and action.kind == "invoke_skill"
-            and action.skill_name == self.observer_redirect_skill_name
-        )
-
     def clear_observer_intervention(self) -> None:
         self.observer_intervention = None
+        self.observer_allowed_action = None
         self.observer_rejected_action_signature = None
-        self.observer_redirect_skill_name = None
 
     def _handoff(
         self, human_input: dict[str, Any], reason_prefix: str

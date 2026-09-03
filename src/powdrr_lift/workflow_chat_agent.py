@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -137,10 +137,12 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
 from powdrr_lift.workflow_observer import (
+    ObserverActionRecommendation,
     ObserverDecision,
     ObserverExecutionContext,
     ShadowWorkflowObserver,
     compact_observer_mapping,
+    observer_action_matches,
 )
 from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
@@ -888,9 +890,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     current_step_index: int = 0
     inherited_interaction_style: str | None = None
     observer_intervention: str | None = None
+    observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
-    observer_redirect_step_id: str | None = None
-    observer_redirect_skill_name: str | None = None
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -992,6 +993,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     frozenset(getattr(self.current_step, "actions", ())),
                     enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
+                if self.observer_allowed_action is not None:
+                    self.state.runtime.allow_observer_action(
+                        asdict(self.observer_allowed_action)
+                    )
             dependency_name = _next_skill_dependency(
                 self.selected_skill,
                 self.current_step_index,
@@ -1345,15 +1350,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         action_signature = _workflow_action_signature(action)
-        if action.observer_override:
-            if not self.observer_override_is_authorized(action):
-                raise PowdrrExecutionError(
-                    "observer_override must match a pending observer recommendation."
-                )
-            self.observer_redirect_step_id = None
-            self.observer_redirect_skill_name = None
-            self.observer_rejected_action_signature = None
-            self.observer_intervention = None
+        observer_action_authorized = observer_action_matches(
+            action, self.observer_allowed_action
+        )
         if action_signature == self.observer_rejected_action_signature:
             raise PowdrrExecutionError(
                 "The observer rejected this exact action after it failed to "
@@ -1407,7 +1406,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 nested_skill,
                 resume_step_index=(
                     self.current_step_index
-                    if action.observer_override
+                    if observer_action_authorized
                     else self.current_step_index + 1
                 ),
                 clean_context=action.clean,
@@ -1487,8 +1486,18 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.current_step,
             )
         else:
-            _validate_workflow_action_for_step(action, self.current_step)
+            _validate_workflow_action_for_step(
+                action,
+                self.current_step,
+                observer_allowed_action=self.observer_allowed_action,
+            )
         _validate_workflow_action_outputs(action, self.current_step)
+        if observer_action_authorized:
+            if self.driver.runtime is not None:
+                self.driver.runtime.consume_observer_action(action)
+            self.observer_allowed_action = None
+            self.observer_rejected_action_signature = None
+            self.observer_intervention = None
         _record_workflow_action_outputs(action, self.state, self.current_step)
         if action.kind == "next_step":
             next_step = (
@@ -1636,20 +1645,37 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         guidance = [f"Reason: {decision.reason}", *decision.guidance]
         if decision.expected_progress:
             guidance.append(f"Evidence expected: {decision.expected_progress}")
+        recommended_action = decision.target_action
+        if recommended_action is None and decision.target_step_id:
+            recommended_action = ObserverActionRecommendation(
+                kind="goto_step", step_id=decision.target_step_id
+            )
+        if recommended_action is None and decision.target_skill_name:
+            recommended_action = ObserverActionRecommendation(
+                kind="invoke_skill", skill_name=decision.target_skill_name
+            )
+        if recommended_action:
+            self.observer_allowed_action = recommended_action
+            if self.driver.runtime is not None:
+                self.driver.runtime.allow_observer_action(asdict(recommended_action))
+            guidance.append(
+                f"Observer recommends the {recommended_action.kind!r} action; "
+                "choose it "
+                "directly if it is the appropriate next action."
+            )
         self.observer_intervention = "Observer intervention\n" + "\n".join(
             f"- {item}" for item in guidance
         )
         if decision.target_step_id:
             self.observer_intervention += (
                 "\n- Follow this advice with goto_step "
-                f"step_id={decision.target_step_id!r} "
-                "and observer_override=true."
+                f"step_id={decision.target_step_id!r}."
             )
         if decision.target_skill_name:
             self.observer_intervention += (
                 "\n- Follow this advice with invoke_skill "
-                f"skill={decision.target_skill_name!r}, "
-                "observer_override=true; the current skill resumes afterward."
+                f"skill={decision.target_skill_name!r}; the current skill resumes "
+                "afterward."
             )
         self.observer_rejected_action_signature = _workflow_action_signature(action)
         if decision.verdict == "redirect" and decision.target_step_id:
@@ -1666,20 +1692,19 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         "\n- Redirect ignored: target step is not prior to the "
                         "current step."
                     )
-                else:
-                    self.observer_redirect_step_id = decision.target_step_id
         if decision.verdict == "redirect" and decision.target_skill_name:
             try:
                 _find_skill_by_name(self.catalog, decision.target_skill_name)
             except RuntimeError as error:
                 self.observer_intervention += f"\n- Skill redirect ignored: {error}"
-            else:
-                self.observer_redirect_skill_name = decision.target_skill_name
         self.state.execution_events.append(
             {
                 "kind": "observer_intervention",
                 "verdict": decision.verdict,
                 "reason": decision.reason,
+                "target_action": (
+                    asdict(recommended_action) if recommended_action else None
+                ),
                 "target_step_id": decision.target_step_id,
                 "target_skill_name": decision.target_skill_name,
                 "action": json.loads(_workflow_action_signature(action)),
@@ -1697,27 +1722,20 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 material_progress=(
                     observation.made_progress if observation is not None else None
                 ),
+                target_action=(
+                    json.dumps(asdict(recommended_action), sort_keys=True)
+                    if recommended_action
+                    else None
+                ),
                 target_step_id=decision.target_step_id,
                 target_skill_name=decision.target_skill_name,
             )
         return observation is None
 
-    def observer_override_is_authorized(self, action: SkillChatAction) -> bool:
-        return bool(
-            action.observer_override
-            and (
-                action.kind == "goto_step"
-                and action.step_id == self.observer_redirect_step_id
-                or action.kind == "invoke_skill"
-                and action.skill_name == self.observer_redirect_skill_name
-            )
-        )
-
     def clear_observer_intervention(self) -> None:
         self.observer_intervention = None
+        self.observer_allowed_action = None
         self.observer_rejected_action_signature = None
-        self.observer_redirect_step_id = None
-        self.observer_redirect_skill_name = None
 
     def _retry_stalled_step(
         self,
@@ -4751,9 +4769,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "you cannot complete while a gate remains further ahead.\n"
         "These next_step and complete rules apply to every step, including steps "
         "whose optional prompt catalogs are omitted.\n"
-        "If the observer intervention names a prior step or another skill, follow "
-        "that recommendation only by setting observer_override=true on the matching "
-        "goto_step or invoke_skill action.\n"
+        "If the observer intervention recommends an action, treat that action as "
+        "allowed for this step and choose it directly when appropriate.\n"
         "When the current step declares outputs, provide the completed values "
         "in an outputs object using exactly those declared names. A later step "
         "receives only validated handoff inputs; do not rely on hidden transcript "
@@ -6176,13 +6193,19 @@ def _record_skill_pull_request(
     )
 
 
-def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> None:
+def _validate_workflow_action_for_step(
+    action: SkillChatAction,
+    step: Any,
+    *,
+    observer_allowed_action: ObserverActionRecommendation | None = None,
+) -> None:
     """Reject tool actions that do not match a current-step invocation."""
     allowed_actions = _declared_action_names(step)
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
         and action.kind not in {"prompt_user", "next_step"}
+        and not observer_action_matches(action, observer_allowed_action)
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
@@ -6216,7 +6239,9 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
     if action.kind != "invoke_tool":
         return
     try:
-        _validate_workflow_action_for_step_unwrapped(action, step)
+        _validate_workflow_action_for_step_unwrapped(
+            action, step, observer_allowed_action=observer_allowed_action
+        )
     except RuntimeError as exc:
         if isinstance(exc, _WorkflowToolValidationError):
             raise
@@ -7117,7 +7142,10 @@ def _validate_workflow_step_transition(
 
 
 def _validate_workflow_action_for_step_unwrapped(
-    action: SkillChatAction, step: Any
+    action: SkillChatAction,
+    step: Any,
+    *,
+    observer_allowed_action: ObserverActionRecommendation | None = None,
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
     allowed_actions = _declared_action_names(step)
@@ -7125,6 +7153,7 @@ def _validate_workflow_action_for_step_unwrapped(
         allowed_actions is not None
         and action.kind not in allowed_actions
         and action.kind not in {"prompt_user", "next_step"}
+        and not observer_action_matches(action, observer_allowed_action)
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
@@ -7430,14 +7459,10 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
         raise PowdrrExecutionError(
             "Workflow action outputs must be an object with named values."
         )
-    observer_override = payload.get("observer_override", False)
-    if not isinstance(observer_override, bool):
-        raise PowdrrExecutionError("observer_override must be a boolean when provided.")
     action = parser(payload, decisions_and_context, llm_type)
     return replace(
         action,
         outputs=dict(raw_outputs),
-        observer_override=observer_override,
     )
 
 

@@ -178,8 +178,6 @@ class WorkflowAction:
     context: tuple[str, ...] = field(default_factory=tuple)
     # Durable task execution uses this only when persisting a human handoff.
     human_input: dict[str, Any] | None = None
-    # True only when the agent explicitly accepts a matching observer transfer.
-    observer_override: bool = False
 
 
 def complete_json(
@@ -463,13 +461,6 @@ class WorkflowStepRunner:
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
-            observer_override_checker = getattr(
-                strategy, "observer_override_is_authorized", None
-            )
-            override_authorized = bool(
-                callable(observer_override_checker)
-                and observer_override_checker(action)
-            )
             if self.runtime is not None:
                 guidance = getattr(action, "decisions_and_context", None)
                 if isinstance(guidance, str):
@@ -478,7 +469,7 @@ class WorkflowStepRunner:
                         source_ref=f"{self.runtime.execution_id}:roundtrip-{roundtrips}",
                     )
             proposal_errors = self.kernel.validate_proposal(action)
-            if self.runtime is not None and not override_authorized:
+            if self.runtime is not None:
                 proposal_errors = (
                     *proposal_errors,
                     *self.runtime.validate_action(str(getattr(action, "kind", ""))),

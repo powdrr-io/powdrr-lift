@@ -142,11 +142,35 @@ class ObserverPacket:
 
 
 @dataclass(frozen=True, slots=True)
+class ObserverActionRecommendation:
+    """An observer recommendation constrained to one concrete action target."""
+
+    kind: str
+    tool: str | None = None
+    skill_name: str | None = None
+    step_id: str | None = None
+
+
+def observer_action_matches(
+    action: Any, recommendation: ObserverActionRecommendation | None
+) -> bool:
+    """Match the recommendation's kind and every supplied concrete target."""
+    if recommendation is None:
+        return False
+    return all(
+        getattr(action, key) == value
+        for key, value in asdict(recommendation).items()
+        if value is not None
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class ObserverDecision:
     verdict: ObserverVerdict
     reason: str
     guidance: tuple[str, ...] = ()
     expected_progress: str | None = None
+    target_action: ObserverActionRecommendation | None = None
     target_step_id: str | None = None
     target_skill_name: str | None = None
 
@@ -205,6 +229,7 @@ def build_observer_messages(packet: ObserverPacket) -> list[dict[str, str]]:
             "Choose an action with a materially different target or operation.",
         ],
         "expected_progress": "The next action changes state or reduces errors.",
+        "target_action": {"kind": "read_document"},
         "target_step_id": None,
         "target_skill_name": None,
     }
@@ -217,9 +242,12 @@ def build_observer_messages(packet: ObserverPacket) -> list[dict[str, str]]:
                 "remains aligned and how it could recover. Do not invoke tools, edit "
                 "files, or claim that you did. Return exactly one JSON object. "
                 "Allowed verdicts: continue, coach, redirect, block_transition, "
-                "request_human. For redirect, set target_step_id to a prior step or "
-                "target_skill_name to a catalog skill, and tell the agent to set "
-                "observer_override=true on the matching action. Complete example:\n"
+                "request_human. For a recommendation outside the current step "
+                "contract, set target_action to an object containing the action kind "
+                "and any concrete target (tool, skill_name, or step_id) the agent "
+                "should try. For redirect, "
+                "also set target_step_id to a prior step or target_skill_name to a "
+                "catalog skill. Complete example:\n"
                 + json.dumps(example, ensure_ascii=False)
             ),
         },
@@ -246,10 +274,41 @@ def parse_observer_decision(payload: Mapping[str, Any]) -> ObserverDecision:
     ):
         raise ValueError("Observer response guidance must be a list of strings.")
     expected_progress = payload.get("expected_progress")
+    target_action = payload.get("target_action")
     target_step_id = payload.get("target_step_id")
     target_skill_name = payload.get("target_skill_name")
     if expected_progress is not None and not isinstance(expected_progress, str):
         raise ValueError("Observer expected_progress must be a string or null.")
+    if target_action is not None:
+        if not isinstance(target_action, Mapping):
+            raise ValueError("Observer target_action must be an object or null.")
+        unknown_fields = set(target_action) - {"kind", "tool", "skill_name", "step_id"}
+        if unknown_fields:
+            raise ValueError(
+                "Observer target_action contains unsupported fields: "
+                + ", ".join(sorted(str(item) for item in unknown_fields))
+            )
+        kind = target_action.get("kind")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("Observer target_action.kind must be a non-empty string.")
+        for name in ("tool", "skill_name", "step_id"):
+            value = target_action.get(name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(
+                    f"Observer target_action.{name} must be a string or null."
+                )
+        if kind.strip() == "invoke_tool" and not target_action.get("tool"):
+            raise ValueError("Observer invoke_tool recommendations must name a tool.")
+        if kind.strip() == "invoke_skill" and not target_action.get("skill_name"):
+            raise ValueError("Observer invoke_skill recommendations must name a skill.")
+        if kind.strip() == "goto_step" and not target_action.get("step_id"):
+            raise ValueError("Observer goto_step recommendations must name a step.")
+        target_action = ObserverActionRecommendation(
+            kind=kind.strip(),
+            tool=target_action.get("tool"),
+            skill_name=target_action.get("skill_name"),
+            step_id=target_action.get("step_id"),
+        )
     if target_step_id is not None and not isinstance(target_step_id, str):
         raise ValueError("Observer target_step_id must be a string or null.")
     if target_skill_name is not None and not isinstance(target_skill_name, str):
@@ -259,6 +318,7 @@ def parse_observer_decision(payload: Mapping[str, Any]) -> ObserverDecision:
         reason=reason.strip(),
         guidance=tuple(item.strip() for item in guidance),
         expected_progress=expected_progress,
+        target_action=target_action,
         target_step_id=target_step_id,
         target_skill_name=target_skill_name,
     )

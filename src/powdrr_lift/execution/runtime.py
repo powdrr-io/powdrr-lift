@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -138,6 +138,7 @@ class ExecutionRuntime:
         )
         self._projected_kernel_events = 0
         self._allowed_actions: frozenset[str] | None = None
+        self._observer_allowed_action: dict[str, str] | None = None
         self._phase_actions: frozenset[str] | None = None
         self._persona_actions: frozenset[str] | None = None
         self._unit_actions: frozenset[str] | None = None
@@ -154,6 +155,7 @@ class ExecutionRuntime:
         # An empty set is meaningful: the step supports the implicit
         # ``next_step`` transition but no model/tool action.
         self._allowed_actions = actions if actions or enforce_empty else None
+        self._observer_allowed_action = None
         if actions is None and not enforce_empty:
             self._phase_actions = None
             self._persona_actions = None
@@ -165,6 +167,32 @@ class ExecutionRuntime:
     ) -> None:
         """Install a step contract without discarding phase/persona policy."""
         self._allowed_actions = actions if actions or enforce_empty else None
+        self._observer_allowed_action = None
+
+    def allow_observer_action(self, action: Mapping[str, str | None]) -> None:
+        """Temporarily allow one concrete observer-recommended action."""
+        kind = action.get("kind")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("observer action kind must be a non-empty string")
+        self._observer_allowed_action = {
+            key: value.strip()
+            for key, value in action.items()
+            if value is not None and value.strip()
+        }
+
+    def consume_observer_action(self, action: Any) -> None:
+        """Consume the one-shot observer allowance after the action is chosen."""
+        if self.observer_action_matches(action):
+            self._observer_allowed_action = None
+
+    def observer_action_matches(self, action: Any) -> bool:
+        """Return whether an action matches the complete temporary allowance."""
+        if self._observer_allowed_action is None:
+            return False
+        return all(
+            getattr(action, key, None) == value
+            for key, value in self._observer_allowed_action.items()
+        )
 
     def set_execution_scope(
         self,
@@ -177,6 +205,7 @@ class ExecutionRuntime:
     ) -> None:
         """Install all inputs to the one effective action intersection."""
         self._allowed_actions = declared_actions
+        self._observer_allowed_action = None
         self._phase_actions = phase_actions
         self._persona_actions = persona_actions
         self._unit_actions = unit_actions
@@ -195,11 +224,11 @@ class ExecutionRuntime:
             )
             if item is not None
         )
-        if not scopes:
-            return None
-        result = set(scopes[0])
+        result = set(scopes[0]) if scopes else set()
         for scope in scopes[1:]:
             result.intersection_update(scope)
+        if self._observer_allowed_action is not None:
+            result.add(self._observer_allowed_action["kind"])
         required = {
             item.required_action
             for item in (*self.state.obligations, *self.kernel.open_obligations)
@@ -207,7 +236,7 @@ class ExecutionRuntime:
         }
         if required:
             result.intersection_update(required)
-        return frozenset(result)
+        return frozenset(result) if scopes or result else None
 
     @contextmanager
     def transaction(self) -> Iterator[ExecutionRuntime]:
@@ -591,6 +620,7 @@ class ExecutionRuntime:
         action_kind: str,
         action_signature: str,
         material_progress: bool | None = None,
+        target_action: str | None = None,
         target_step_id: str | None = None,
         target_skill_name: str | None = None,
     ) -> ExecutionState:
@@ -609,6 +639,7 @@ class ExecutionRuntime:
                 "action_kind": action_kind,
                 "action_signature": action_signature,
                 "material_progress": material_progress,
+                "target_action": target_action,
                 "target_step_id": target_step_id,
                 "target_skill_name": target_skill_name,
             },

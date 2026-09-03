@@ -164,6 +164,7 @@ def test_runtime_prompt_context_resolves_intent_without_model_retrieval(
     assert "clause_ids" in context
     assert context["effective_contract"]["contract_fingerprint"].startswith("sha256:")
     assert source.intent_id in context["intent_ids"]
+    assert "contract_fingerprint" not in runtime.model_prompt_context()
 
     compacted = runtime.compact_prompt_context(
         {**context, "transcript": "long context " * 2_000}

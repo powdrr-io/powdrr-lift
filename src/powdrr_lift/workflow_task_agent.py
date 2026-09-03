@@ -352,7 +352,9 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 response_correction=self.response_correction,
                 compacted_context=self.compacted_context,
                 runtime_context=(
-                    self.runtime.prompt_context() if self.runtime is not None else None
+                    self.runtime.model_prompt_context()
+                    if self.runtime is not None
+                    else None
                 ),
                 observer_intervention=self.observer_intervention,
             )

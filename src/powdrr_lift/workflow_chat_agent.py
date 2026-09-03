@@ -1177,28 +1177,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 inherited_interaction_style=self.inherited_interaction_style,
                 observer_intervention=self.observer_intervention,
                 runtime_prompt_context=(
-                    self.driver.runtime.prompt_context()
+                    self.driver.runtime.model_prompt_context()
                     if self.driver.runtime is not None
                     else None
                 ),
             )
-            if self.state.runtime is not None:
-                compacted = self.state.runtime.compact_prompt_context(
-                    {
-                        "step_index": self.current_step_index,
-                        "selected_skill": self.selected_skill.skill.name,
-                    }
-                )
-                messages.append(
-                    {
-                        "role": "system",
-                        "content": (
-                            "Bounded runtime context; retrieve the complete context "
-                            "using full_context_ref: "
-                            + json.dumps(compacted, ensure_ascii=False)
-                        ),
-                    }
-                )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
                 messages=messages,

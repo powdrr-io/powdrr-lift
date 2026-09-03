@@ -509,6 +509,12 @@ class ExecutionRuntime:
             }
         )
 
+    def model_prompt_context(self) -> dict[str, Any]:
+        """Return runtime state needed by the model, excluding internal metadata."""
+        context = self.prompt_context()
+        context.pop("contract_fingerprint", None)
+        return context
+
     def effective_contract(self, context: dict[str, str]) -> EffectiveContract:
         """Resolve the exact active intent contract for a prompt boundary."""
         return resolve_effective_contract(self.intent_store, context)

@@ -223,6 +223,7 @@ from powdrr_lift.core.pr_specification import (
 from powdrr_lift.core.skill_specification import (
     Skill,
     SkillDocument,
+    CodingLoopSpec,
     SkillStep,
     SkillStepGate,
     SkillStepInput,
@@ -398,6 +399,7 @@ _EXPORTS: dict[str, str] = {
     "SystemSpecificationValidationReport": _SYSTEM,
     "Skill": _SKILL,
     "SkillDocument": _SKILL,
+    "CodingLoopSpec": _SKILL,
     "SkillStep": _SKILL,
     "SkillStepInput": _SKILL,
     "SkillStepOutput": _SKILL,

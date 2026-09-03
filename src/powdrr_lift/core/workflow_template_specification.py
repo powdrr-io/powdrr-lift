@@ -13,6 +13,7 @@ from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
+    CodingLoopSpec,
     SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
@@ -83,6 +84,7 @@ class WorkflowTaskTemplate:
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
+    coding_loop: CodingLoopSpec | None = None
     phase_type: PhaseType | None = None
     persona_id: str | None = None
 
@@ -125,6 +127,8 @@ class WorkflowTaskTemplate:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             step_data["gate"] = self.gate.to_data()
+        if self.coding_loop is not None:
+            step_data["coding_loop"] = self.coding_loop.to_data()
         if self.phase_type is not None:
             data["phase_type"] = self.phase_type.value
         if self.persona_id is not None:
@@ -656,7 +660,7 @@ def build_workflow_template_validation_report(
                     code="invalid_step_type_value",
                     message=(
                         "Workflow task template step_type must be "
-                        "freeform, invoke_tool, or gate."
+                        "freeform, invoke_tool, gate, or coding_loop."
                     ),
                     path=_child_path(task_template_path, "step_type"),
                 )
@@ -718,7 +722,7 @@ def build_workflow_template_validation_report(
                     path=_child_path(task_template_path, "tool_invocations"),
                 )
             )
-        elif step_type == "freeform" and pre_step is not None:
+        elif step_type in {"freeform", "coding_loop"} and pre_step is not None:
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="unexpected_pre_step",
@@ -1099,6 +1103,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         step_type=step.step_type,
         pre_step=step.pre_step,
         gate=step.gate,
+        coding_loop=step.coding_loop,
         output_state_type=output_state_type,
         dependent_state=dependent_state,
         generation=parsed_generation,

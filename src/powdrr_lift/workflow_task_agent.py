@@ -1141,6 +1141,32 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
         return 2
 
+    def coding_loop_exhausted(self, limit: int) -> int:
+        message = (
+            f"Coding loop for task {self.task.task_id!r} stopped after "
+            f"{limit} model iterations without a completion transition."
+        )
+        self.events.append(
+            {
+                "kind": "coding_loop_exhausted",
+                "task_id": self.task.task_id,
+                "max_iterations": limit,
+                "message": message,
+            }
+        )
+        _publish_workflow_progress(
+            self.repo_root,
+            self.workflow,
+            workflow_id=workflow_id_from_task_id(self.task.task_id),
+            reason=f"coding loop limit for {self.task.task_id}",
+            stdout=self.stdout,
+            open_pull_request=False,
+            events=self.events,
+            runtime=self.runtime,
+        )
+        print(message, file=self.stderr, flush=True)
+        return 2
+
 
 def _record_task_pull_request(
     action: WorkflowAction,
@@ -3505,6 +3531,22 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     def action_failure_exit_code(self, action: WorkflowAction) -> int:
         _ = action
         return 1
+
+    def coding_loop_exhausted(self, limit: int) -> int:
+        message = (
+            f"Coding loop for nested step {self.current_step.id!r} stopped after "
+            f"{limit} model iterations without a completion transition."
+        )
+        self.execution_events.append(
+            {
+                "kind": "coding_loop_exhausted",
+                "step_id": self.current_step.id,
+                "max_iterations": limit,
+                "message": message,
+            }
+        )
+        print(message, file=self.stderr, flush=True)
+        return 2
 
     def observe_outcome(
         self,

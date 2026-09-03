@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from powdrr_lift.core import (
+    CodingLoopSpec,
     Skill,
     SkillStep,
     SkillStepGate,
@@ -22,6 +23,62 @@ from powdrr_lift.core import (
     skill_to_json,
     validate_skill_directory,
 )
+
+
+def test_coding_loop_step_round_trips_with_typed_protocol() -> None:
+    skill = skill_from_json(
+        json.dumps(
+            {
+                "name": "coding-loop",
+                "when_to_use": ["Implement and verify a code change."],
+                "steps": [
+                    {
+                        "id": "implement",
+                        "description": "Implement the requested change.",
+                        "step_type": "coding_loop",
+                        "coding_loop": {
+                            "goal": "Make the targeted tests pass.",
+                            "verification": [{"id": "tests", "command": ["pytest"]}],
+                            "stopping_conditions": ["tests pass", "scope is complete"],
+                            "max_iterations": 5,
+                        },
+                        "actions": ["read_document", "edit", "invoke_tool"],
+                    }
+                ],
+            }
+        )
+    )
+
+    assert isinstance(skill.steps[0].coding_loop, CodingLoopSpec)
+    assert skill.steps[0].coding_loop.max_iterations == 5
+    serialized = json.loads(skill_to_json(skill))
+    assert serialized["steps"][0]["coding_loop"]["goal"] == (
+        "Make the targeted tests pass."
+    )
+    assert build_skill_validation_report(skill_to_json(skill)).validation_successful
+
+
+def test_coding_loop_step_rejects_invalid_iteration_budget() -> None:
+    report = build_skill_validation_report(
+        json.dumps(
+            {
+                "name": "invalid-coding-loop",
+                "when_to_use": ["Test validation."],
+                "steps": [
+                    {
+                        "description": "Implement.",
+                        "step_type": "coding_loop",
+                        "coding_loop": {"goal": "Implement", "max_iterations": 0},
+                    }
+                ],
+            }
+        )
+    )
+
+    assert not report.validation_successful
+    assert any(
+        issue.code == "invalid_coding_loop_max_iterations" for issue in report.issues
+    )
 
 
 def test_explicit_empty_actions_round_trip_as_closed_contract() -> None:

@@ -275,6 +275,40 @@ def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None
     ]
 
 
+def test_execution_driver_bounds_coding_loop_iterations() -> None:
+    class _CodingLoopStrategy(_ExecutionStrategy):
+        current_step_index = 0
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.client = _Client(
+                [{"kind": "next_step"}, {"kind": "next_step"}, {"kind": "next_step"}]
+            )
+            self.current_step = type(
+                "Step",
+                (),
+                {
+                    "id": "implement",
+                    "coding_loop": type("Loop", (), {"max_iterations": 2})(),
+                },
+            )()
+            self.exhausted_limit: int | None = None
+
+        def coding_loop_exhausted(self, limit: int) -> int:
+            self.exhausted_limit = limit
+            return 9
+
+    strategy = _CodingLoopStrategy()
+    assert (
+        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+            strategy, max_roundtrips=None, signature=workflow_action_signature
+        )
+        == 9
+    )
+    assert strategy.exhausted_limit == 2
+    assert strategy.executed == ["next_step", "next_step"]
+
+
 def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> None:
     class _StalledStrategy(_ExecutionStrategy):
         def __init__(self) -> None:

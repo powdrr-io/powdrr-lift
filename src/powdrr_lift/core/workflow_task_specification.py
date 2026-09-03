@@ -13,6 +13,7 @@ from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.skill_specification import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
+    CodingLoopSpec,
     SkillStepGate,
     SkillStepPreStep,
     SkillToolInvocation,
@@ -95,6 +96,7 @@ class WorkflowTask:
     step_type: str = "freeform"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
+    coding_loop: CodingLoopSpec | None = None
     workflow_template: str | None = None
     phase_type: PhaseType | None = None
     persona_id: str | None = None
@@ -144,6 +146,8 @@ class WorkflowTask:
             step_data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             step_data["gate"] = self.gate.to_data()
+        if self.coding_loop is not None:
+            step_data["coding_loop"] = self.coding_loop.to_data()
         if self.workflow_template is not None:
             data["workflow_template"] = self.workflow_template
         if self.phase_type is not None:
@@ -433,6 +437,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         step_type=step.step_type,
         pre_step=step.pre_step,
         gate=step.gate,
+        coding_loop=step.coding_loop,
         workflow_template=data.get("workflow_template"),
         output_state_type=output_state_type,
         upstream_task_ids=upstream_task_ids,
@@ -674,7 +679,10 @@ def build_workflow_task_validation_report(
         issues.append(
             WorkflowTaskValidationIssue(
                 code="invalid_step_type_value",
-                message=("Workflow task step_type must be freeform or invoke_tool."),
+                message=(
+                    "Workflow task step_type must be freeform, invoke_tool, gate, "
+                    "or coding_loop."
+                ),
                 path=_format_child_path(source_path, "step_type"),
             )
         )
@@ -714,11 +722,13 @@ def build_workflow_task_validation_report(
                 path=_format_child_path(source_path, "tool_invocations"),
             )
         )
-    elif step_type == "freeform" and pre_step is not None:
+    elif step_type in {"freeform", "coding_loop"} and pre_step is not None:
         issues.append(
             WorkflowTaskValidationIssue(
                 code="unexpected_pre_step",
-                message=("Only invoke_tool workflow tasks may declare pre_step."),
+                message=(
+                    "Only invoke_tool and gate workflow tasks may declare pre_step."
+                ),
                 path=_format_child_path(source_path, "pre_step"),
             )
         )

@@ -1837,6 +1837,22 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     def exhausted_roundtrips_exit_code(self) -> int:
         return 2
 
+    def coding_loop_exhausted(self, limit: int) -> int:
+        message = (
+            f"Coding loop for step {self.current_step.id!r} stopped after "
+            f"{limit} model iterations without a completion transition."
+        )
+        self.state.execution_events.append(
+            {
+                "kind": "coding_loop_exhausted",
+                "step_id": self.current_step.id,
+                "max_iterations": limit,
+                "message": message,
+            }
+        )
+        print(message, file=self.stderr, flush=True)
+        return 2
+
 
 @dataclass(frozen=True, slots=True)
 class _SkillExecutionFrame:
@@ -5140,6 +5156,23 @@ def _modular_action_system_prompt(
             "is unchanged or worse, change the target or repair strategy; do not keep "
             "retrying the same action.\n"
         )
+    coding_loop = getattr(current_step, "coding_loop", None)
+    if coding_loop is not None:
+        verification = json.dumps(
+            [dict(item) for item in coding_loop.verification], ensure_ascii=False
+        )
+        stopping = json.dumps(list(coding_loop.stopping_conditions), ensure_ascii=False)
+        prompt += (
+            "Coding-loop protocol: work toward the declared goal "
+            f"{coding_loop.goal!r}, inspect the "
+            "current implementation, make the smallest justified edits, and run "
+            f"each declared verification item {verification}. Stop only when the "
+            f"declared stopping conditions {stopping} are satisfied. This loop is "
+            f"bounded to {coding_loop.max_iterations} model iterations; use the "
+            "latest verification result as evidence and repair failures before "
+            "choosing next_step. Do not claim verification passed without a tool "
+            "result.\n"
+        )
     if "goto_step" in action_names or "complete" in action_names:
         prompt += (
             "Transition rules are enforced by the runtime: "
@@ -8430,6 +8463,8 @@ def _skill_step_to_data(step: Any) -> dict[str, Any]:
         ]
     if getattr(step, "pre_step", None) is not None:
         data["pre_step"] = step.pre_step.to_data()
+    if getattr(step, "coding_loop", None) is not None:
+        data["coding_loop"] = step.coding_loop.to_data()
     return data
 
 
@@ -10045,6 +10080,11 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     actions = _step_actions(step)
     return {
         "step_type": getattr(step, "step_type", "freeform"),
+        "coding_loop": (
+            step.coding_loop.to_data()
+            if getattr(step, "coding_loop", None) is not None
+            else None
+        ),
         "outputs": [
             output.to_data() for output in (getattr(step, "outputs", ()) or ())
         ],

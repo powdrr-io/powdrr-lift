@@ -1743,7 +1743,7 @@ def _parse_coding_loop(value: object) -> CodingLoopSpec:
     verification = tuple(
         CodingLoopVerification(
             id=_required_string(item, "id"),
-            command=_command_value(item["command"]),
+            command=_required_command_value(item["command"]),
             cwd=_optional_string(item.get("cwd")),
             env=tuple(sorted(_string_mapping(item.get("env"), "env").items())),
         )
@@ -1896,6 +1896,16 @@ def _command_value(value: object) -> str | tuple[str, ...] | None:
     if not value or not all(isinstance(item, str) and item.strip() for item in value):
         return None
     return tuple(item.strip() for item in value)
+
+
+def _required_command_value(value: object) -> str | tuple[str, ...]:
+    command = _command_value(value)
+    if command is None:
+        raise ValueError(
+            "Skill step coding_loop verification command must be a non-empty "
+            "string or command array."
+        )
+    return command
 
 
 def _string_mapping(value: object, field_name: str) -> dict[str, str]:

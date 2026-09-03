@@ -159,7 +159,7 @@ task_templates:
 - description: Run all tests and fix failures
   phase_type: validate
   persona_id: engineer
-  actions: [edit, read_document]
+  actions: [invoke_tool, edit, read_document]
   step_type: coding_loop
   complexity: high
   assignee_type: agent

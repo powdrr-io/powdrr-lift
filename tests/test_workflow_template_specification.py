@@ -436,6 +436,11 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     )
     assert template.task_templates[4].uses_skills == ()
     assert template.task_templates[4].step_type == "coding_loop"
+    assert template.task_templates[4].actions == (
+        "invoke_tool",
+        "edit",
+        "read_document",
+    )
     assert template.task_templates[4].coding_loop is not None
     assert template.task_templates[4].coding_loop.verification[0].command == (
         "<verification-command>"

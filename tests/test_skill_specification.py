@@ -235,7 +235,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
                 ("design-interview.yaml", 1),
-                ("design-interview.yaml", 21),
+                ("design-interview.yaml", 22),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -251,7 +251,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("review-architecture.yaml", 6),
                 ("run-tests-and-fix.yaml", 6),
                 ("run-tests-and-fix.yaml", 8),
-                ("design-interview.yaml", 23),
+                ("design-interview.yaml", 24),
             }
             expected_step_type = (
                 "invoke_tool"

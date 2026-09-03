@@ -1,25 +1,20 @@
 ---
 name: design-interview
-description: Interview a feature against every gather_context category, apply the resulting edits to a specification-v1 proposal, and validate it.
+description: Use a required feature description to gather every supported context category and edit a specification-v1 proposal.
 ---
 
 # Design Interview
 
-The feature description is an explicit input to this skill. The workflow first
-creates a feature/PR specification-v1 proposal, then processes every category
-supported by `gather_context` independently.
+This skill is called by another skill and requires `feature_description` as an
+input. It creates `docs/proposals/<work-item-name>/feature-pr-specification.yaml`.
 
-For each category it performs this loop:
+For each category supported by `gather_context`, the workflow does exactly this:
 
-1. Call `gather_context` with exactly that category.
-2. Treat the returned match list as the current set and present it to the LLM.
-3. Have the LLM return one complete set of `yaml_edit` operations for the
-   proposal document based on the feature description and gathered list.
+1. Call `gather_context` for that one category.
+2. Present the exact returned match list to the LLM.
+3. Have the LLM return one `yaml_edit` action containing the complete additions
+   and deletions for that category.
 
-The proposal is written to
-`docs/proposals/<work-item-name>/feature-pr-specification.yaml`. Current-state
-documents are read-only. Existing proposal edits are preserved as later
-categories are processed.
-
-After all categories are complete, the workflow runs the deterministic evaluator
-and repairs every reported issue until the proposal validates successfully.
+The proposal document is accumulated across categories. Current-state documents
+are never edited. After all categories, the deterministic evaluator runs and the
+LLM repairs reported proposal issues until validation passes.

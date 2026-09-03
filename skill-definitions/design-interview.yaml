@@ -1,20 +1,27 @@
 name: design-interview
 when_to_use:
-- When a feature description should be reconciled with current specification-v1
-  context before producing a proposal.
-- When each supported gather_context category should be reviewed independently
-  and converted into explicit proposal edits.
+- When a calling skill has a feature description and needs a specification-v1
+  proposal grounded in the repository's existing context.
 steps:
 - id: capture-feature
-  description: Capture the feature description used by the interview.
+  description: Accept the required feature description and identify the work item.
+  inputs:
+  - name: feature_description
+    type: string
+    required: true
+    source: caller
+  - name: work_item_name
+    type: string
+    required: false
+    source: caller
   actions: []
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Treat the feature description as an input to this skill. If it is already
-    present in task context, preserve it; otherwise ask one focused question with
-    prompt_user. Choose a stable kebab-case work_item_name. When both are known,
-    advance with outputs containing exactly work_item_name and feature_description.
+    The caller-provided feature_description is required input. Choose a stable
+    kebab-case work_item_name and advance with outputs containing exactly
+    work_item_name and feature_description. Do not ask the user for the feature
+    description and do not gather context in this step.
   outputs:
   - name: work_item_name
     type: string
@@ -32,199 +39,201 @@ steps:
     action: invoke_tool
     template:
       tool: internal
-      command:
-      - powdrr-lift
-      - feature-pr-specification
-      - --work-item-name
-      - <work-item-name>
+      command: [powdrr-lift, feature-pr-specification, --work-item-name, <work-item-name>]
   outputs:
   - name: proposal_template
     type: any
     required_for_next_step: true
 
 - id: gather-requirements
-  description: Gather requirements and edit the proposal from that result.
+  description: Gather requirements, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [requirements], using the feature
-    description as a keyword when useful. Present that returned match list as the
-    current requirements, then return one yaml_edit containing the complete set
-    of proposal edits required by the feature. Edit only
-    docs/proposals/<work-item-name>/feature-pr-specification.yaml. Do not edit
-    before the gather_context result is available.
+    First call exactly this action:
+    {"action":"gather_context","types":["requirements"],"keywords":["FEATURE_DESCRIPTION"]}.
+    Present the exact returned match list. Then return exactly one yaml_edit action
+    with this shape: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/feature-pr-specification.yaml","operations":[{"op":"upsert_item","section":"requirements","id":"REQUIREMENT_ID","value":{"description":"DESCRIPTION","state":"added"}}]}.
+    Include all additions and deletions in that operations list, preserve prior
+    proposal edits, and do not edit current-state files.
 - id: gather-approach
-  description: Gather approach items and edit the proposal from that result.
+  description: Gather approach, present it, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [approach]. Present the returned
-    current approach list, then use one yaml_edit to add, update, or remove the
-    proposal approach items needed for the feature. Preserve prior proposal edits.
+    First call exactly {"action":"gather_context","types":["approach"]} and
+    present its exact match list. Then return one yaml_edit action targeting
+    docs/proposals/<work-item-name>/feature-pr-specification.yaml with an
+    operations list of upsert_item or remove_item entries for section approach.
+    An added item has {"id":"APPROACH_ID","description":"DESCRIPTION","state":"added"}.
 - id: gather-entities
-  description: Gather entities and edit the proposal from that result.
+  description: Gather entities, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [entities]. Present the returned
-    current entity list, then use one yaml_edit with the complete entity changes
-    needed for the feature. Keep exact ids for dependencies and deletions.
+    First call exactly {"action":"gather_context","types":["entities"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with operations shaped as {"op":"upsert_item","section":"entities","id":"ENTITY_ID","value":{"id":"ENTITY_ID","type":"ENTITY_TYPE","summary":"SUMMARY","action":"added"}} or remove_item for deletions.
 - id: gather-entity-relationships
-  description: Gather entity relationships and edit the proposal from that result.
+  description: Gather entity relationships, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [entity-relationships]. Present
-    the returned relationship list, then use one yaml_edit to add, update, or
-    remove every relationship required by the feature. Use exact entity ids.
+    First call exactly {"action":"gather_context","types":["entity-relationships"]}
+    and present its exact match list. Then return one yaml_edit targeting the
+    proposal with operations shaped as {"op":"upsert_item","section":"entity_relationships","id":"RELATIONSHIP_ID","value":{"id":"RELATIONSHIP_ID","source":"SOURCE_ENTITY_ID","target":"TARGET_ENTITY_ID","relationship":"RELATIONSHIP"}} or remove_item.
 - id: gather-invariants
-  description: Gather invariants and edit the proposal from that result.
+  description: Gather invariants, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [invariants]. Present the result,
-    then use one yaml_edit for the complete invariant changes required by the
-    feature. Keep related entity and relationship references explicit.
+    First call exactly {"action":"gather_context","types":["invariants"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for section invariants. An added
+    item has {"id":"INVARIANT_ID","description":"DESCRIPTION","related":{"entities":[],"entity_relationships":[]}}.
 - id: gather-guidance
-  description: Gather guidance and edit the proposal from that result.
+  description: Gather guidance, present it, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [guidance]. Present the result,
-    then use one yaml_edit for all feature-specific guidance changes in the
-    proposal.
+    First call exactly {"action":"gather_context","types":["guidance"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for section guidance, using an item
+    shaped {"id":"GUIDANCE_ID","description":"DESCRIPTION","related":{"entities":[],"entity_relationships":[]}}.
 - id: gather-features
-  description: Gather features and edit the proposal from that result.
+  description: Gather features, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [features]. Present the returned
-    feature list, then use one yaml_edit for the proposal feature changes. Keep
-    feature ids unique.
+    First call exactly {"action":"gather_context","types":["features"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for section features. An added item
+    has {"id":"FEATURE_ID","action":"added","description":"DESCRIPTION","functional_requirements":[]}.
 - id: gather-human-decisions
-  description: Gather human decisions and edit the proposal from that result.
+  description: Gather human decisions, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [human-decisions]. Present the
-    result, then use one yaml_edit for decisions that must be preserved in the
-    proposal.
+    First call exactly {"action":"gather_context","types":["human-decisions"]}
+    and present its exact match list. Then return one yaml_edit targeting the
+    proposal with upsert_item or remove_item operations for section
+    human-decisions. An added item has {"id":"DECISION_ID","action":"added","description":"DESCRIPTION"}.
 - id: gather-intent
-  description: Gather intent and edit the proposal from that result.
+  description: Gather intent, present it, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [intent, intents]. Present the
-    returned intent records, then use one yaml_edit for proposal intent changes.
+    First call exactly {"action":"gather_context","types":["intent"]}
+    and present its exact match list. Then return one yaml_edit targeting the
+    proposal with the complete intent additions and deletions.
+- id: gather-intents
+  description: Gather intents, present them, and edit the proposal.
+  actions: [gather_context, yaml_edit, read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["intents"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with the complete intents additions and deletions.
 - id: gather-acceptance-criteria
-  description: Gather acceptance criteria and edit the proposal.
+  description: Gather acceptance criteria, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [acceptance_criteria]. Present
-    the result, then use one yaml_edit to add or update criteria proving the
-    feature outcomes.
+    First call exactly {"action":"gather_context","types":["acceptance_criteria"]}
+    and present its exact match list. Then return one yaml_edit targeting the
+    proposal with upsert_item or remove_item operations for acceptance_criteria.
 - id: gather-expected-tests
-  description: Gather expected tests and edit the proposal.
+  description: Gather expected tests, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [expected_tests]. Present the
-    result, then use one yaml_edit to capture feature-specific expected tests.
+    First call exactly {"action":"gather_context","types":["expected_tests"]}
+    and present its exact match list. Then return one yaml_edit targeting the
+    proposal with upsert_item or remove_item operations for expected_tests.
 - id: gather-required-test-cases
-  description: Gather required test cases and edit the proposal.
+  description: Gather required test cases, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [required_test_cases]. Present
-    the result, then use one yaml_edit to capture required feature test cases.
+    First call exactly {"action":"gather_context","types":["required_test_cases"]}
+    and present its exact match list. Then return one yaml_edit targeting the
+    proposal with upsert_item or remove_item operations for required_test_cases.
 - id: gather-expected-outcomes
-  description: Gather expected outcomes and edit the proposal.
+  description: Gather expected outcomes, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [expected_outcomes]. Present the
-    result, then use one yaml_edit to make feature outcomes explicit.
+    First call exactly {"action":"gather_context","types":["expected_outcomes"]}
+    and present its exact match list. Then return one yaml_edit targeting the
+    proposal with upsert_item or remove_item operations for expected_outcomes.
 - id: gather-non-goals
-  description: Gather non-goals and edit the proposal.
+  description: Gather non-goals, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [non_goals]. Present the result,
-    then use one yaml_edit to define what this feature will not change.
+    First call exactly {"action":"gather_context","types":["non_goals"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for non_goals.
 - id: gather-risks
-  description: Gather risks and edit the proposal.
+  description: Gather risks, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [risks]. Present the result,
-    then use one yaml_edit to capture feature risks.
+    First call exactly {"action":"gather_context","types":["risks"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for risks.
 - id: gather-decisions
-  description: Gather decisions and edit the proposal.
+  description: Gather decisions, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [decisions]. Present the result,
-    then use one yaml_edit for feature decisions and tradeoffs.
+    First call exactly {"action":"gather_context","types":["decisions"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for decisions.
 - id: gather-proposed-prs
-  description: Gather proposed PRs and edit the proposal.
+  description: Gather proposed PRs, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [proposed_prs]. Present the
-    result, then use one yaml_edit to align with existing proposed work.
+    First call exactly {"action":"gather_context","types":["proposed_prs"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for proposed_prs.
 - id: gather-modules
-  description: Gather modules and edit the proposal.
+  description: Gather modules, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [modules]. Present the current
-    module list, then use one yaml_edit for module changes or dependencies.
+    First call exactly {"action":"gather_context","types":["modules"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for modules.
 - id: gather-tools
-  description: Gather tools and edit the proposal.
+  description: Gather tools, present them, and edit the proposal.
   actions: [gather_context, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
-  prompt_catalogs: [context_types]
   details: >-
-    First call gather_context with exactly types [tools]. Present the current tool
-    list, then use one yaml_edit for validation or operational tool changes.
+    First call exactly {"action":"gather_context","types":["tools"]} and
+    present its exact match list. Then return one yaml_edit targeting the proposal
+    with upsert_item or remove_item operations for tools.
 - id: evaluate-proposal
   description: Deterministically validate the completed proposal.
   actions: []
@@ -235,10 +244,7 @@ steps:
     action: invoke_tool
     template:
       tool: internal
-      command:
-      - powdrr-lift
-      - evaluate
-      - docs/proposals/<work-item-name>/feature-pr-specification.yaml
+      command: [powdrr-lift, evaluate, docs/proposals/<work-item-name>/feature-pr-specification.yaml]
   outputs:
   - name: proposal_evaluation
     type: any
@@ -248,13 +254,10 @@ steps:
   actions: [yaml_edit, read_document, gather_context, goto_step]
   step_type: freeform
   llm_type: fast_iteration
-  prompt_catalogs: [context_types]
   details: >-
-    Review only the latest deterministic evaluator result. Repair every issue in
-    the proposal with yaml_edit, preserving valid prior edits. Use gather_context
-    only for missing or unknown current references. After editing, choose
-    next_step so evaluate-proposal reruns. Use goto_step to restart
-    capture-feature only when the feature input itself must be reconsidered.
+    Review only the latest evaluator result and use yaml_edit to fix every issue
+    in the proposal. Use gather_context only when a current reference is missing
+    or unknown. Then choose next_step so evaluate-proposal reruns.
 - id: gate-proposal
   description: Confirm that the proposal validates cleanly.
   actions: []
@@ -265,15 +268,8 @@ steps:
     action: invoke_tool
     template:
       tool: internal
-      command:
-      - powdrr-lift
-      - evaluate
-      - docs/proposals/<work-item-name>/feature-pr-specification.yaml
+      command: [powdrr-lift, evaluate, docs/proposals/<work-item-name>/feature-pr-specification.yaml]
   gate:
-    outcome:
-      path: returncode
-      equals: 0
+    outcome: {path: returncode, equals: 0}
     goto_step: evaluate-proposal
-    retry_context: >-
-      The proposal still has validation issues. Repair the exact reported paths
-      with yaml_edit and let evaluation rerun.
+    retry_context: Repair the exact evaluator issues with yaml_edit, then rerun evaluation.

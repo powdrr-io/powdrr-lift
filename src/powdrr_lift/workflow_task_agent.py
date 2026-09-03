@@ -74,12 +74,14 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_action_response,
     _print_waiting_for_model,
     _record_skill_pull_request,
+    _require_coding_loop_verification,
     _resolve_credentials,
     _resolve_llm_mapping,
     _resolve_local_model_path,
     _resolve_pre_step_template,
     _resolve_project_root,
     _resolve_worktree_file_path,
+    _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
     _step_index_by_id,
@@ -592,6 +594,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "The observer rejected this exact action after it failed to "
                 "make progress. Choose a materially different action."
             )
+        if action.kind == "next_step":
+            _require_coding_loop_verification(self.task, self.events)
         if action.kind == "gather_context":
             report = invoke_repository_read(
                 "gather_context",
@@ -714,6 +718,16 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     ),
                 }
             )
+            verification = _run_coding_loop_verification(
+                self.task,
+                worktree_root=self.repo_root,
+                stdout=self.stdout,
+                stderr=self.stderr,
+                verbose=self.config.verbose,
+                runtime=self.runtime,
+            )
+            if verification is not None:
+                self.events.append({"kind": "coding_loop_verification", **verification})
             return WorkflowActionOutcome()
         if action.kind == "yaml_edit":
             if action.file_path is None:
@@ -3287,6 +3301,8 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             )
         ):
             action = replace(action, outputs=dict(action.output_state))
+        if action.kind == "next_step":
+            _require_coding_loop_verification(step, self.execution_events)
         _validate_workflow_action_for_step(action, step)
         _validate_workflow_action_outputs(action, step)
         if action.kind in {"complete", "next_step"}:
@@ -3436,6 +3452,22 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             _record_task_action_outputs(
                 action, self.handoff_records, step, frame.step_index
             )
+            verification = _run_coding_loop_verification(
+                step,
+                worktree_root=self.repo_root,
+                stdout=self.stdout,
+                stderr=self.stderr,
+                verbose=self.verbose,
+                runtime=self.runtime,
+            )
+            if verification is not None:
+                self.execution_events.append(
+                    {
+                        "kind": "coding_loop_verification",
+                        "step_index": frame.step_index,
+                        **verification,
+                    }
+                )
             return WorkflowActionOutcome()
         if action.kind == "invoke_tool":
             if action.tool in {"shell", "internal"}:

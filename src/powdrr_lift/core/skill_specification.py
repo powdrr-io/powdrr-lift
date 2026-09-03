@@ -176,18 +176,39 @@ class SkillStepGate:
 
 
 @dataclass(frozen=True, slots=True)
+class CodingLoopVerification:
+    """One deterministic command used to verify a coding-loop iteration."""
+
+    id: str
+    command: tuple[str, ...]
+    cwd: str | None = None
+    env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+
+    def to_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "id": self.id,
+            "command": list(self.command),
+        }
+        if self.cwd is not None:
+            data["cwd"] = self.cwd
+        if self.env:
+            data["env"] = {key: value for key, value in self.env}
+        return data
+
+
+@dataclass(frozen=True, slots=True)
 class CodingLoopSpec:
     """Harness policy for an inspect, edit, verify, and repair loop."""
 
     goal: str
-    verification: tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
+    verification: tuple[CodingLoopVerification, ...] = field(default_factory=tuple)
     stopping_conditions: tuple[str, ...] = field(default_factory=tuple)
     max_iterations: int = 12
 
     def to_data(self) -> dict[str, Any]:
         return {
             "goal": self.goal,
-            "verification": [dict(item) for item in self.verification],
+            "verification": [item.to_data() for item in self.verification],
             "stopping_conditions": list(self.stopping_conditions),
             "max_iterations": self.max_iterations,
         }
@@ -1505,14 +1526,34 @@ def _validate_coding_loop(
         )
     verification = value.get("verification", [])
     if (
+        isinstance(verification, Sequence)
+        and not isinstance(verification, (str, bytes, bytearray))
+        and not verification
+    ):
+        issues.append(
+            SkillValidationIssue(
+                code="missing_coding_loop_verification",
+                message="coding_loop.verification must contain at least one command.",
+                path=_child_path(step_path, "coding_loop.verification"),
+            )
+        )
+    if (
         not isinstance(verification, Sequence)
         or isinstance(verification, (str, bytes, bytearray))
-        or any(not isinstance(item, Mapping) for item in verification)
+        or any(
+            not isinstance(item, Mapping)
+            or _optional_string(item.get("id")) is None
+            or not _command_sequence(item.get("command"))
+            for item in verification
+        )
     ):
         issues.append(
             SkillValidationIssue(
                 code="invalid_coding_loop_verification",
-                message="coding_loop.verification must be an array of objects.",
+                message=(
+                    "coding_loop.verification must be an array of objects with "
+                    "non-empty id and command fields."
+                ),
                 path=_child_path(step_path, "coding_loop.verification"),
             )
         )
@@ -1673,10 +1714,20 @@ def _parse_coding_loop(value: object) -> CodingLoopSpec:
     if (
         not isinstance(raw_verification, Sequence)
         or isinstance(raw_verification, (str, bytes, bytearray))
-        or not all(isinstance(item, Mapping) for item in raw_verification)
+        or not all(
+            isinstance(item, Mapping)
+            and _optional_string(item.get("id")) is not None
+            and _command_sequence(item.get("command"))
+            for item in raw_verification
+        )
     ):
         raise ValueError(
-            "Skill step coding_loop.verification must be an array of objects."
+            "Skill step coding_loop.verification must contain objects with "
+            "non-empty id and command fields."
+        )
+    if not raw_verification:
+        raise ValueError(
+            "Skill step coding_loop.verification must contain at least one command."
         )
     raw_stopping = value.get("stopping_conditions", [])
     stopping_conditions = _optional_string_sequence(raw_stopping)
@@ -1687,9 +1738,18 @@ def _parse_coding_loop(value: object) -> CodingLoopSpec:
         or not (1 <= max_iterations <= 100)
     ):
         raise ValueError("Skill step coding_loop.max_iterations must be from 1 to 100.")
+    verification = tuple(
+        CodingLoopVerification(
+            id=_required_string(item, "id"),
+            command=tuple(str(part) for part in item["command"]),
+            cwd=_optional_string(item.get("cwd")),
+            env=tuple(sorted(_string_mapping(item.get("env"), "env").items())),
+        )
+        for item in raw_verification
+    )
     return CodingLoopSpec(
         goal=goal,
-        verification=tuple(dict(item) for item in raw_verification),
+        verification=verification,
         stopping_conditions=stopping_conditions,
         max_iterations=max_iterations,
     )
@@ -1824,6 +1884,32 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise ValueError("Skill step uses_skills must be an array.")
     return tuple(_required_string({"value": item}, "value") for item in value)
+
+
+def _command_sequence(value: object) -> tuple[str, ...] | None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return None
+    if not value or not all(isinstance(item, str) and item.strip() for item in value):
+        return None
+    return tuple(item.strip() for item in value)
+
+
+def _string_mapping(value: object, field_name: str) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError(
+            f"Skill step coding_loop verification {field_name} must be an object."
+        )
+    if any(
+        not isinstance(key, str) or not key.strip() or not isinstance(item, str)
+        for key, item in value.items()
+    ):
+        raise ValueError(
+            f"Skill step coding_loop verification {field_name} keys and values "
+            "must be strings."
+        )
+    return {key.strip(): item for key, item in value.items()}
 
 
 def _optional_prompt_catalogs(value: object) -> tuple[str, ...]:

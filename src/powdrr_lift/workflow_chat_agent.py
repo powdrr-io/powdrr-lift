@@ -1472,6 +1472,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_step_index=parent_step_index,
             )
         self.failure_kind = "validation_error"
+        if action.kind == "next_step":
+            _require_coding_loop_verification(
+                self.current_step,
+                self.state.execution_events,
+                step_index=self.state.step_index,
+            )
         _validate_workflow_step_transition(
             action,
             self.current_step,
@@ -1527,6 +1533,26 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
         _register_validation_gate_discovery(action, self.state)
         _record_dynamic_validation_result(action, self.state)
+        verification = (
+            _run_coding_loop_verification(
+                self.current_step,
+                worktree_root=self.state.worktree_root,
+                stdout=self.stdout,
+                stderr=self.stderr,
+                verbose=self.config.verbose,
+                runtime=self.driver.runtime,
+            )
+            if action.kind in {"edit", "yaml_edit", "file_management"}
+            else None
+        )
+        if verification is not None:
+            self.state.execution_events.append(
+                {
+                    "kind": "coding_loop_verification",
+                    "step_index": self.state.step_index,
+                    **verification,
+                }
+            )
         _reset_validation_gate_after_correction(action, self.state)
         self.last_failed_action = None
         self.last_validation_error = None
@@ -8323,6 +8349,82 @@ def _execute_shell_tool(
     if len(attempted_commands) > 1:
         result["attempted_commands"] = attempted_commands
     return result
+
+
+def _run_coding_loop_verification(
+    step: Any,
+    *,
+    worktree_root: Path,
+    stdout: TextIO,
+    stderr: TextIO,
+    verbose: bool,
+    runtime: ExecutionRuntime | None,
+) -> dict[str, Any] | None:
+    coding_loop = getattr(step, "coding_loop", None)
+    if coding_loop is None or not coding_loop.verification:
+        return None
+    results: list[dict[str, Any]] = []
+    for verification in coding_loop.verification:
+        result = invoke_shell_capability(
+            {
+                "command": list(verification.command),
+                "cwd": verification.cwd,
+                "env": dict(verification.env),
+                "_tool_name": "coding_loop_verification",
+            },
+            worktree_root=worktree_root,
+            executor=lambda parameters: _execute_shell_tool(
+                dict(parameters),
+                worktree_root=worktree_root,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=verbose,
+                announce=False,
+                print_stdout=False,
+            ),
+            runtime=runtime,
+        )
+        passed = isinstance(result, Mapping) and result.get("returncode") == 0
+        results.append(
+            {
+                "id": verification.id,
+                "command": list(verification.command),
+                "passed": passed,
+                "result": result,
+            }
+        )
+    all_passed = all(item["passed"] for item in results)
+    return {
+        "results": results,
+        "all_passed": all_passed,
+        "error": None if all_passed else "One or more coding-loop checks failed.",
+    }
+
+
+def _require_coding_loop_verification(
+    step: Any,
+    events: Sequence[Mapping[str, Any]],
+    *,
+    step_index: int | None = None,
+) -> None:
+    coding_loop = getattr(step, "coding_loop", None)
+    if coding_loop is None or not coding_loop.verification:
+        return
+    latest = next(
+        (
+            event
+            for event in reversed(events)
+            if event.get("kind") == "coding_loop_verification"
+            and (step_index is None or event.get("step_index") == step_index)
+        ),
+        None,
+    )
+    if latest is None or latest.get("all_passed") is not True:
+        raise PowdrrExecutionError(
+            "This coding_loop step cannot choose next_step until its declared "
+            "verification commands pass. Make or repair the implementation, "
+            "then wait for the automatic verification result."
+        )
 
 
 def _structured_intrinsic_pre_step_parameters(

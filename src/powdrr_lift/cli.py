@@ -71,6 +71,13 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import PhaseType
+from powdrr_lift.core.design_graph import (
+    build_canonical_design_graph,
+    create_design_proposal_template,
+    design_proposal_default_output_path,
+    render_design_context,
+    validate_proposal,
+)
 from powdrr_lift.core.effective_contract import resolve_effective_contract
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.execution_plan import ExecutionPlan
@@ -863,6 +870,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to use when resolving relative paths.",
     )
     plan_diff_specification_parser.set_defaults(func=_run_plan_diff_specification)
+
+    design_graph_parser = subparsers.add_parser(
+        "design-graph",
+        aliases=["design_graph"],
+        help="Render the canonical design graph and an optional proposal preview.",
+    )
+    design_graph_parser.add_argument(
+        "--feature-id", help="Limit the graph to docs/current/<feature-id>."
+    )
+    design_graph_parser.add_argument(
+        "--proposal", type=Path, help="Proposal YAML containing semantic operations."
+    )
+    design_graph_parser.add_argument(
+        "--repo-root", type=Path, help="Repository root to inspect."
+    )
+    design_graph_parser.set_defaults(func=_run_design_graph)
+
+    validate_design_proposal_parser = subparsers.add_parser(
+        "validate-design-proposal",
+        aliases=["validate_design_proposal"],
+        help="Validate a semantic proposal against the current design graph.",
+    )
+    validate_design_proposal_parser.add_argument("proposal", type=Path)
+    validate_design_proposal_parser.add_argument(
+        "--feature-id", help="Limit the graph to docs/current/<feature-id>."
+    )
+    validate_design_proposal_parser.add_argument(
+        "--repo-root", type=Path, help="Repository root to inspect."
+    )
+    validate_design_proposal_parser.set_defaults(func=_run_validate_design_proposal)
+
+    design_proposal_parser = subparsers.add_parser(
+        "design-proposal",
+        aliases=["design_proposal"],
+        help="Create an empty semantic design proposal for a current feature.",
+    )
+    design_proposal_parser.add_argument("--feature-id", required=True)
+    design_proposal_parser.add_argument("--repo-root", type=Path)
+    design_proposal_parser.set_defaults(func=_run_design_proposal)
 
     pr_specification_parser = subparsers.add_parser(
         "pr-specification",
@@ -1756,6 +1802,59 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     return args.func(args)
+
+
+def _load_design_proposal(path: Path, repo_root: Path) -> Mapping[str, Any]:
+    resolved = path if path.is_absolute() else repo_root / path
+    try:
+        value = yaml.safe_load(resolved.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError(f"Could not read proposal {resolved}: {exc}") from exc
+    if not isinstance(value, Mapping):
+        raise ValueError("Design proposal must be a YAML mapping.")
+    return value
+
+
+def _run_design_graph(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        canonical = build_canonical_design_graph(repo_root, feature_id=args.feature_id)
+        proposal = (
+            _load_design_proposal(args.proposal, repo_root)
+            if args.proposal is not None
+            else None
+        )
+        print(render_design_context(canonical, proposal), end="")
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    return 0
+
+
+def _run_validate_design_proposal(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        canonical = build_canonical_design_graph(repo_root, feature_id=args.feature_id)
+        proposal = _load_design_proposal(args.proposal, repo_root)
+        result = validate_proposal(canonical, proposal)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    print(yaml.safe_dump(result.to_data(), sort_keys=False), end="")
+    return 0 if result.valid else 1
+
+
+def _run_design_proposal(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        output_path = create_design_proposal_template(args.feature_id, repo_root)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    _stage_generated_file(repo_root, output_path)
+    output_display = design_proposal_default_output_path(args.feature_id, repo_root)
+    print(f"Wrote design proposal template to {output_display}")
+    return 0
 
 
 def _stage_generated_file(repo_root: Path, output_path: Path) -> None:

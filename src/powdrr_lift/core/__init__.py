@@ -31,6 +31,18 @@ from powdrr_lift.core.execution_plan import (
     PlanEvaluation,
     evaluate_execution_plan,
 )
+from powdrr_lift.core.design_graph import (
+    DesignEdge,
+    DesignGraph,
+    DesignNode,
+    DesignValidationIssue,
+    ProposalValidationResult,
+    build_canonical_design_graph,
+    create_design_proposal_template,
+    design_proposal_default_output_path,
+    render_design_context,
+    validate_proposal,
+)
 from powdrr_lift.core.behavior_rule import (
     BEHAVIOR_RULE_SCHEMA_VERSION,
     BehaviorRule,

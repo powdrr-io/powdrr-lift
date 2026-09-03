@@ -242,6 +242,7 @@ class Skill:
     name: str
     when_to_use: tuple[str, ...]
     steps: tuple[SkillStep, ...]
+    inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     adversarial: bool | None = None
     interaction_style: str | None = None
 
@@ -250,6 +251,11 @@ class Skill:
             "name": self.name,
             "when_to_use": list(self.when_to_use),
             "steps": [step.to_data() for step in self.steps],
+            **(
+                {"inputs": [item.to_data() for item in self.inputs]}
+                if self.inputs
+                else {}
+            ),
             **(
                 {"interaction_style": self.interaction_style}
                 if self.interaction_style is not None
@@ -310,6 +316,7 @@ def skill_from_data(data: Mapping[str, Any]) -> Skill:
     name = _required_string(data, "name")
     when_to_use = _required_string_sequence(data, "when_to_use")
     steps = _parse_steps(data.get("steps"))
+    inputs = _parse_step_inputs(data.get("inputs", []))
     adversarial = data.get("adversarial")
     if adversarial is not None and not isinstance(adversarial, bool):
         raise ValueError("Skill adversarial must be a boolean.")
@@ -325,6 +332,7 @@ def skill_from_data(data: Mapping[str, Any]) -> Skill:
         name=name,
         when_to_use=when_to_use,
         steps=steps,
+        inputs=inputs,
         adversarial=adversarial,
         interaction_style=interaction_style,
     )
@@ -411,7 +419,14 @@ def build_skill_validation_report(
 
     _validate_unknown_keys(
         raw_skill,
-        {"name", "when_to_use", "steps", "adversarial", "interaction_style"},
+        {
+            "name",
+            "when_to_use",
+            "steps",
+            "inputs",
+            "adversarial",
+            "interaction_style",
+        },
         issues,
         path=_path_prefix(source_path) or "",
         subject="skill",
@@ -502,8 +517,21 @@ def build_skill_validation_report(
                     path=_child_path(source_path, "steps"),
                 )
             )
+
+    raw_inputs = raw_skill.get("inputs", [])
+    if raw_inputs is not None:
+        try:
+            _parse_step_inputs(raw_inputs)
+        except ValueError as exc:
+            issues.append(
+                SkillValidationIssue(
+                    code="invalid_inputs",
+                    message=str(exc),
+                    path=_child_path(source_path, "inputs"),
+                )
+            )
         seen_step_ids: set[str] = set()
-        for index, step in enumerate(steps):
+        for index, step in enumerate(cast("Sequence[Any]", steps)):
             step_path = _sequence_path(source_path, "steps", index)
             if not isinstance(step, Mapping):
                 issues.append(

@@ -288,7 +288,10 @@ def _declared_placeholders(
                 if isinstance(value, str):
                     declared.update(_PLACEHOLDER.findall(value))
     for item in definition.get("inputs", []):
-        if isinstance(item, str):
+        if isinstance(item, Mapping) and isinstance(item.get("name"), str):
+            declared.add(item["name"])
+            declared.add(item["name"].replace("_", "-"))
+        elif isinstance(item, str):
             declared.update(_PLACEHOLDER.findall(item))
     return declared
 

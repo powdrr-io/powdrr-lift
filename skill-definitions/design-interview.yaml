@@ -22,7 +22,7 @@ steps:
     Examine the exact returned list for the feature_description. Then return a
     JSON dictionary as the output requirements_edits, with exactly added and
     deleted lists. Each added requirement has {"id":"requirement-id","description":"...","state":"added"};
-    each deleted item has {"id":"existing-requirement-id"}. Do not edit files.
+    each deleted item has {"id":"existing-requirement-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: requirements_edits
     type: any
@@ -37,7 +37,7 @@ steps:
     Examine the exact returned list, then return output approach_edits as a JSON
     dictionary with exactly added and deleted lists. Each added approach item has
     {"id":"approach-id","description":"...","state":"added"}; each deleted
-    item has {"id":"existing-approach-id"}. Do not edit files.
+    item has {"id":"existing-approach-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: approach_edits
     type: any
@@ -52,7 +52,7 @@ steps:
     Examine the exact returned list, then return output entities_edits as a JSON
     dictionary with exactly added and deleted lists. Each added entity has
     {"id":"entity-id","type":"allowed entity type","summary":"..."}; each
-    deleted item has {"id":"existing-entity-id"}. Do not edit files.
+    deleted item has {"id":"existing-entity-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: entities_edits
     type: any
@@ -67,7 +67,7 @@ steps:
     Examine the exact returned list, then return output entity_relationships_edits
     as a JSON dictionary with exactly added and deleted lists. Each added
     relationship has {"id":"relationship-id","source":"entity-id","target":"entity-id","relationship":"..."};
-    each deleted item has {"id":"existing-relationship-id"}. Do not edit files.
+    each deleted item has {"id":"existing-relationship-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: entity_relationships_edits
     type: any
@@ -82,7 +82,7 @@ steps:
     Examine the exact returned list, then return output invariants_edits as a JSON
     dictionary with exactly added and deleted lists. Each added invariant has
     {"id":"invariant-id","description":"..."}; each deleted item has
-    {"id":"existing-invariant-id"}. Do not edit files.
+    {"id":"existing-invariant-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: invariants_edits
     type: any
@@ -97,7 +97,7 @@ steps:
     Examine the exact returned list, then return output guidance_edits as a JSON
     dictionary with exactly added and deleted lists. Each added guidance item has
     {"id":"guidance-id","description":"..."}; each deleted item has
-    {"id":"existing-guidance-id"}. Do not edit files.
+    {"id":"existing-guidance-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: guidance_edits
     type: any
@@ -112,7 +112,7 @@ steps:
     Examine the exact returned list, then return output features_edits as a JSON
     dictionary with exactly added and deleted lists. Each added feature has
     {"id":"feature-id","description":"..."}; each deleted item has
-    {"id":"existing-feature-id"}. Do not edit files.
+    {"id":"existing-feature-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: features_edits
     type: any
@@ -127,7 +127,7 @@ steps:
     Examine the exact returned list, then return output human_decisions_edits as a
     JSON dictionary with exactly added and deleted lists. Each added decision has
     {"id":"decision-id","description":"..."}; each deleted item has
-    {"id":"existing-decision-id"}. Do not edit files.
+    {"id":"existing-decision-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: human_decisions_edits
     type: any
@@ -294,6 +294,108 @@ steps:
   - name: tools_edits
     type: any
     required_for_next_step: true
+- id: generate-interview-input
+  description: Create the JSON file that will hold all interview outputs.
+  inputs:
+  - name: work_item_name
+    type: string
+    required: true
+  actions: []
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the design-interview-input generator exactly once; do not edit its output.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command: [powdrr-lift, design-interview-input, --work-item-name, <work-item-name>]
+  outputs:
+  - name: interview_input_template
+    type: any
+    required_for_next_step: true
+- id: store-interview-input
+  description: Store all interview outputs as one JSON input document.
+  inputs:
+  - name: interview_input_template
+    type: any
+    required: true
+  - name: feature_description
+    type: string
+    required: true
+  - name: requirements_edits
+    type: any
+    required: true
+  - name: approach_edits
+    type: any
+    required: true
+  - name: entities_edits
+    type: any
+    required: true
+  - name: entity_relationships_edits
+    type: any
+    required: true
+  - name: invariants_edits
+    type: any
+    required: true
+  - name: guidance_edits
+    type: any
+    required: true
+  - name: features_edits
+    type: any
+    required: true
+  - name: human_decisions_edits
+    type: any
+    required: true
+  - name: intent_edits
+    type: any
+    required: true
+  - name: intents_edits
+    type: any
+    required: true
+  - name: acceptance_criteria_edits
+    type: any
+    required: true
+  - name: expected_tests_edits
+    type: any
+    required: true
+  - name: required_test_cases_edits
+    type: any
+    required: true
+  - name: expected_outcomes_edits
+    type: any
+    required: true
+  - name: non_goals_edits
+    type: any
+    required: true
+  - name: risks_edits
+    type: any
+    required: true
+  - name: decisions_edits
+    type: any
+    required: true
+  - name: proposed_prs_edits
+    type: any
+    required: true
+  - name: modules_edits
+    type: any
+    required: true
+  - name: tools_edits
+    type: any
+    required: true
+  actions: [edit, read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Read the generated interview_input_template. Replace its complete contents
+    with one JSON dictionary containing work_item_name, feature_description, and
+    every *_edits input exactly as received. The dictionary must contain one
+    {"added": [...], "deleted": [...]} object for each category. Return exactly
+    one edit action for docs/proposals/<work-item-name>/design-interview-input.json;
+    do not edit YAML yet.
+  outputs:
+  - name: interview_input
+    type: any
+    required_for_next_step: true
 - id: generate-proposal-template
   description: Generate the specification-v1 proposal template from interview outputs.
   inputs:
@@ -363,20 +465,23 @@ steps:
   - name: tools_edits
     type: any
     required: true
+  - name: interview_input
+    type: any
+    required: true
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
     The 20 preceding *_edits inputs are the complete interview result. Invoke
     the feature-pr specification template generator exactly once for
-    <work-item-name>; it creates docs/proposals/<work-item-name>/feature-pr-specification.yaml.
-    Do not edit the YAML in this step. The next step will apply the interview
-    outputs to that generated template.
+    <work-item-name>, passing it the JSON interview input pointer. It creates
+    docs/proposals/<work-item-name>/feature-pr-specification.yaml. Do not edit
+    the YAML in this step.
   pre_step:
     action: invoke_tool
     template:
       tool: internal
-      command: [powdrr-lift, feature-pr-specification, --work-item-name, <work-item-name>]
+      command: [powdrr-lift, feature-pr-specification, --work-item-name, <work-item-name>, --interview-input, docs/proposals/<work-item-name>/design-interview-input.json]
   outputs:
   - name: proposal_template
     type: any
@@ -385,6 +490,9 @@ steps:
   description: Apply all interview outputs to the generated proposal YAML.
   inputs:
   - name: proposal_template
+    type: any
+    required: true
+  - name: interview_input
     type: any
     required: true
   - name: feature_description
@@ -454,10 +562,10 @@ steps:
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Use all 20 *_edits inputs and the generated proposal_template. Return exactly
-    one yaml_edit action targeting docs/proposals/<work-item-name>/feature-pr-specification.yaml.
-    Its operations must apply every added and deleted item from the interview;
-    do not edit current-state documents and do not invent changes.
+    Use interview_input and proposal_template. Return exactly one yaml_edit action
+    targeting docs/proposals/<work-item-name>/feature-pr-specification.yaml. Its
+    operations must apply every added and deleted item from the interview; do not
+    edit current-state documents and do not invent changes.
 - id: evaluate-proposal
   description: Deterministically validate the completed proposal.
   actions: []

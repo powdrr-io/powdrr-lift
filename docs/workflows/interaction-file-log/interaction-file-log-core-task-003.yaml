@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-task-003
-status: locked
+status: completed
 upstream_task_ids:
 - interaction-file-log-core-task-001
 - interaction-file-log-core-task-002
@@ -1224,6 +1224,20 @@ assignee_type: agent
 assignee_role: coder
 output_state_type: generated-test-diffs-state
 description: Generate the planned tests
+output_state:
+  generated-test-diffs-state:
+    test_paths:
+    - tests/interaction_log/test_writer.py
+    - tests/interaction_log/test_source.py
+    test_names:
+    - test-log-writer-writes-json
+    - test-log-writer-appends-entries
+    - test-interaction-source-feeds-writer
+    expected_failure_reasons:
+    - The log-writer module (src/powdrr/interaction_log/writer.py) does not exist
+      yet, so the import fails.
+    - The interaction-source module (src/powdrr/interaction_log/source.py) does not
+      exist yet, so the import fails.
 workflow_template: execute-proposed-pr
 phase_type: build
 persona_id: engineer

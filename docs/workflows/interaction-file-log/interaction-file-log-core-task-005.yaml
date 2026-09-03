@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-task-005
-status: open
+status: locked
 upstream_task_ids:
 - interaction-file-log-core-task-004
 - interaction-file-log-core-task-003
@@ -7,8 +7,28 @@ dependent_state:
 - all-tests-passed
 complexity: high
 input_state:
-  implementation_diffs: interaction-file-log-core-task-004.generated-product-code-state
-  generated_test_diffs: interaction-file-log-core-task-003.generated-test-diffs-state
+  implementation_diffs:
+    generated-product-code-state:
+      implementation_files:
+      - src/powdrr/interaction_log/entities.py
+      - src/powdrr/interaction_log/writer.py
+      - src/powdrr/interaction_log/source.py
+      - src/powdrr/interaction_log/tool.py
+      implementation_diffs: {}
+  generated_test_diffs:
+    generated-test-diffs-state:
+      test_paths:
+      - tests/interaction_log/test_writer.py
+      - tests/interaction_log/test_source.py
+      test_names:
+      - test-log-writer-writes-json
+      - test-log-writer-appends-entries
+      - test-interaction-source-feeds-writer
+      expected_failure_reasons:
+      - The log-writer module (src/powdrr/interaction_log/writer.py) does not exist
+        yet, so the import fails.
+      - The interaction-source module (src/powdrr/interaction_log/source.py) does
+        not exist yet, so the import fails.
   test_results: {}
 assignee_type: agent
 assignee_role: reviewer

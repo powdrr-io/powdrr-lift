@@ -1,12 +1,16 @@
 task_id: interaction-file-log-core-task-009
-status: open
+status: locked
 upstream_task_ids:
 - interaction-file-log-core-task-008
 dependent_state:
 - lint-checked
 complexity: medium
 input_state:
-  formatting_check: interaction-file-log-core-task-008.formatting-check-state
+  formatting_check:
+    formatting-check-state:
+      command: ruff format --check .
+      return_code: 0
+      result: All files are already formatted.
 assignee_type: agent
 assignee_role: reviewer
 output_state_type: lint-check-state

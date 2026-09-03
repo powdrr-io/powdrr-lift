@@ -52,6 +52,8 @@ SUPPORTED_STEP_ACTIONS = frozenset(
         "prompt_user",
         "edit",
         "yaml_edit",
+        "design_edit",
+        "discover_design",
         "file_management",
         "invoke_skill",
         "invoke_tool",

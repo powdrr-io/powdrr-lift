@@ -14,11 +14,12 @@ Use this skill to produce an implementation specification that stays consistent 
 ### Proposal overlay mode
 
 When proposing implementation changes against an existing product design,
-never edit the current-state YAML directly. Add structural `yaml_edit`-style
-operations to `docs/proposals/<work-item-name>/design-proposal.yaml`, using
-`set_value`, `remove_key`, `upsert_item`, or `remove_item` with stable `edit_id`
-values. Validate the merged canonical graph plus proposal edits and inspect the
-resolved preview before advancing.
+never edit the current-state YAML directly. Add graph operations to
+`docs/proposals/<work-item-name>/design-proposal.yaml`, using stable operation
+ids with `add_node`, `update_node`, `remove_node`, `add_edge`, `update_edge`,
+or `remove_edge`. Use `discover-design` when more connected context is needed.
+Validate the merged canonical graph plus proposal operations and inspect the
+resolved graph before advancing.
 
 1. Confirm the source architecture specification exists and has an `id`.
    - If needed, create or update it with `specify-architecture` first.

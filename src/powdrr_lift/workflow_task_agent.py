@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, TextIO
 
+import yaml
+
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -27,6 +29,12 @@ from powdrr_lift.core import (
     resolve_repo_root,
 )
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
+from powdrr_lift.core.design_graph import (
+    build_canonical_design_graph,
+    discover_design,
+    load_design_proposal,
+    validate_proposal,
+)
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -621,6 +629,64 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "result": json.loads(render_gather_context_report(report)),
                 }
             )
+            return WorkflowActionOutcome()
+        if action.kind == "design_edit":
+            if action.file_path is None:
+                raise PowdrrExecutionError("design_edit action must include file_path.")
+            path = _resolve_worktree_file_path(action.file_path, self.repo_root)
+            relative = path.relative_to(self.repo_root)
+            if (
+                relative.parts[:2] != ("docs", "proposals")
+                or path.name != "design-proposal.yaml"
+                or len(relative.parts) != 4
+            ):
+                raise PowdrrExecutionError(
+                    "design_edit may only target "
+                    "docs/proposals/<feature>/design-proposal.yaml."
+                )
+            feature_id = relative.parts[2]
+            proposal = (
+                load_design_proposal(path, self.repo_root)
+                if path.exists()
+                else {"id": feature_id}
+            )
+            proposal["operations"] = action.parameters["operations"]
+            canonical = build_canonical_design_graph(
+                self.repo_root, feature_id=feature_id
+            )
+            proposal.setdefault("base_version", canonical.version)
+            validation = validate_proposal(canonical, proposal)
+            if not validation.valid:
+                raise PowdrrExecutionError(
+                    "design_edit proposal is invalid: "
+                    + json.dumps(validation.to_data(), ensure_ascii=False)
+                )
+            updated = yaml.safe_dump(proposal, sort_keys=False)
+            invoke_file_mutation(
+                (action.file_path,),
+                worktree_root=self.repo_root,
+                executor=lambda: path.write_text(updated, encoding="utf-8"),
+                runtime=self.runtime,
+            )
+            self.events.append(
+                {
+                    "kind": action.kind,
+                    "file_path": action.file_path,
+                    "operation_count": len(proposal["operations"]),
+                }
+            )
+            return WorkflowActionOutcome()
+        if action.kind == "discover_design":
+            canonical = build_canonical_design_graph(
+                self.repo_root, feature_id=action.feature_id
+            )
+            discovered = discover_design(
+                canonical,
+                action.parameters["seeds"],
+                depth=int(action.parameters.get("depth", 1)),
+                limit=int(action.parameters.get("limit", 50)),
+            )
+            self.events.append({"kind": action.kind, "result": discovered.to_data()})
             return WorkflowActionOutcome()
         if action.kind == "next_step":
             output_state = _durable_task_action_output_state(action)

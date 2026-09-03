@@ -14,11 +14,11 @@ Use this skill to produce an architecture specification that stays consistent wi
 ### Proposal overlay mode
 
 For changes to an existing architecture, keep the current specification
-read-only. Store changes as structural edits in
-`docs/proposals/<work-item-name>/design-proposal.yaml`; use `upsert_item` for
-entities, relationships, invariants, or guidance and `remove_item` for
-removals. Inspect the derived resolved graph and validate the proposal before
-editing any canonical document.
+read-only. Store changes as graph operations in
+`docs/proposals/<work-item-name>/design-proposal.yaml`; use `add_node`,
+`update_node`, `remove_node`, `add_edge`, `update_edge`, and `remove_edge`.
+Use `discover-design` to expand context from graph seeds. Inspect the derived
+resolved graph and validate the proposal before editing any canonical document.
 
 1. Create the template.
    - Run `powdrr-lift architecture-specification --work-item-name <work-item-name> --entity-type <type> ...`.

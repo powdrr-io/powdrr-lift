@@ -2,6 +2,7 @@ from pathlib import Path
 
 from powdrr_lift.core.design_graph import (
     build_canonical_design_graph,
+    discover_design,
     render_design_context,
     validate_proposal,
 )
@@ -30,6 +31,9 @@ def _write_current_specs(root: Path) -> None:
         schema: https://powdrr.io/schemas/specification-v1
         id: demo-architecture
         entities:
+          - id: writer
+            type: Component
+            summary: Writes entries.
           - id: log-entry
             type: Artifact
             summary: One log entry.
@@ -64,24 +68,24 @@ def test_proposal_resolves_without_mutating_canonical_graph(tmp_path: Path) -> N
     canonical = build_canonical_design_graph(tmp_path, feature_id="demo")
     proposal = {
         "base_version": canonical.version,
-        "edits": [
+        "operations": [
             {
-                "edit_id": "op-add-writer",
-                "file_path": "docs/current/demo/architecture-specification.yaml",
-                "op": "upsert_item",
-                "section": "entities",
-                "id": "writer",
-                "value": {"type": "Component", "summary": "Writes entries."},
+                "id": "op-add-buffer",
+                "op": "add_node",
+                "node": {
+                    "id": "buffer",
+                    "type": "Component",
+                    "summary": "Buffers entries.",
+                },
             },
             {
-                "edit_id": "op-update-entry",
-                "file_path": "docs/current/demo/architecture-specification.yaml",
-                "op": "upsert_item",
-                "section": "entities",
-                "id": "log-entry",
-                "value": {
-                    "type": "Artifact",
-                    "summary": "A durable log entry.",
+                "id": "op-connect-buffer",
+                "op": "add_edge",
+                "edge": {
+                    "id": "buffer-writes-entry",
+                    "source": "buffer",
+                    "target": "log-entry",
+                    "relationship": "writes",
                 },
             },
         ],
@@ -91,10 +95,9 @@ def test_proposal_resolves_without_mutating_canonical_graph(tmp_path: Path) -> N
 
     assert result.valid is True
     assert result.graph is not None
-    assert any(node["id"] == "writer" for node in result.graph.nodes)
+    assert any(node["id"] == "buffer" for node in result.graph.nodes)
     assert any(
-        node["data"].get("summary") == "A durable log entry."
-        for node in result.graph.nodes
+        node["data"].get("summary") == "One log entry." for node in result.graph.nodes
     )
     assert any(
         node["data"].get("summary") == "One log entry." for node in canonical.nodes
@@ -109,12 +112,22 @@ def test_proposal_reports_stale_base_and_rendered_context_is_explicit(
 
     result = validate_proposal(
         canonical,
-        {"base_version": "stale", "edits": []},
+        {"base_version": "stale", "operations": []},
     )
-    context = render_design_context(canonical, {"edits": []})
+    context = render_design_context(canonical, {"operations": []})
 
     assert result.valid is False
     assert result.issues[0].code == "stale_proposal"
     assert "canonical_graph:" in context
     assert "proposal:" in context
-    assert "resolved_preview:" in context
+    assert "resolved_graph:" in context
+
+
+def test_discover_design_returns_bounded_connected_slice(tmp_path: Path) -> None:
+    _write_current_specs(tmp_path)
+    canonical = build_canonical_design_graph(tmp_path, feature_id="demo")
+
+    discovered = discover_design(canonical, ["writer"], depth=1, limit=2)
+
+    assert {node["id"] for node in discovered.nodes} == {"writer", "log-entry"}
+    assert [edge["id"] for edge in discovered.edges] == ["writer-writes-entry"]

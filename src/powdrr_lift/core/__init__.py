@@ -38,6 +38,7 @@ from powdrr_lift.core.design_graph import (
     build_canonical_design_graph,
     create_design_proposal_template,
     design_proposal_default_output_path,
+    discover_design,
     render_design_context,
     validate_proposal,
 )

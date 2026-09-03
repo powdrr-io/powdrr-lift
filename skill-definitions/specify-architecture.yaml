@@ -43,15 +43,16 @@ steps:
 - id: fill-architecture
   description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.
-  actions: [edit, yaml_edit, file_management, read_document]
+  actions: [edit, yaml_edit, design_edit, discover_design, file_management, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Use the yaml_edit action for every YAML change. For an existing design,
-    keep current-state YAML read-only and place yaml_edit-compatible operations
-    in docs/proposals/<work-item-name>/design-proposal.yaml; validate the
-    canonical graph plus those edits before advancing. Its shape is
-    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"<allowed-type>","name":"...","description":"..."}},{"op":"upsert_item","section":"relationships","id":"relationship-id","value":{"source":"entity-id","target":"entity-id","relationship":"..."}},{"op":"upsert_item","section":"invariants","id":"invariant-id","value":{"description":"...","entity_ids":["entity-id"]}}]}. Use set_value with a JSON path array for scalar or top-level list fields. Keep references explicit and make sure every invariant or guidance item points at listed entities or relationships.
+    For an existing design, use design_edit to store graph-native operations
+    (add_node, update_node, remove_node, add_edge, update_edge, or remove_edge)
+    in docs/proposals/<work-item-name>/design-proposal.yaml. Use discover_design
+    for additional connected context, then validate the merged graph. Keep
+    current-state YAML read-only. Use yaml_edit only for standalone generated
+    specification files.
   
 - id: evaluate-architecture
   description: Deterministically evaluate the filled architecture specification.
@@ -75,7 +76,7 @@ steps:
     required_for_next_step: true
 - id: repair-architecture
   description: Use yaml_edit to fix every issue reported by the architecture evaluator.
-  actions: [edit, yaml_edit, file_management, read_document, goto_step]
+  actions: [edit, yaml_edit, design_edit, discover_design, file_management, read_document, goto_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-

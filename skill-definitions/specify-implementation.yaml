@@ -41,15 +41,16 @@ steps:
 - id: fill-implementation
   description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
-  actions: [edit, yaml_edit, file_management, read_document]
+  actions: [edit, yaml_edit, design_edit, discover_design, file_management, read_document]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
-    Use the yaml_edit action for every YAML change. For an existing design,
-    keep current-state YAML read-only and place yaml_edit-compatible operations
-    in docs/proposals/<work-item-name>/design-proposal.yaml; validate the
-    canonical graph plus those edits before advancing. Its shape is
-    {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"<architecture-id>"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}},{"op":"upsert_item","section":"decisions","id":"decision-id","value":{"action":"added","description":"..."}}]}. Use set_value with a JSON path array for scalar fields and upsert_item with section, id, and a complete value mapping for list entries. Keep the implementation spec aligned with the source architecture version and do not invent new ids.
+    For an existing design, use design_edit to store graph-native operations
+    (add_node, update_node, remove_node, add_edge, update_edge, or remove_edge)
+    in docs/proposals/<work-item-name>/design-proposal.yaml. Use discover_design
+    for additional connected context, then validate the merged graph. Keep
+    current-state YAML read-only. Use yaml_edit only for standalone generated
+    specification files.
 - id: evaluate-implementation
   description: Deterministically evaluate the filled implementation specification.
   actions: []
@@ -72,7 +73,7 @@ steps:
     required_for_next_step: true
 - id: repair-implementation
   description: Use yaml_edit to fix every issue reported by the implementation evaluator.
-  actions: [edit, yaml_edit, file_management, read_document, goto_step]
+  actions: [edit, yaml_edit, design_edit, discover_design, file_management, read_document, goto_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-

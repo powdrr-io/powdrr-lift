@@ -243,12 +243,14 @@ steps:
     required_for_next_step: true
 - id: repair-feature-specifications
   description: Fix every reported specification issue with yaml_edit.
-  actions: [edit, yaml_edit, file_management, read_document, gather_context, goto_step]
+  actions: [edit, yaml_edit, design_edit, discover_design, file_management, read_document, gather_context, goto_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
     Review only the latest deterministic evaluator result and fix every reported
-    issue with yaml_edit; do not reuse an older LLM explanation after the gate
+    issue with yaml_edit; for an existing design, use design_edit to update the
+    graph proposal operation log and keep current-state YAML read-only. Use
+    discover_design for missing connected context. Do not reuse an older LLM explanation after the gate
     has rerun. Each action must include the YAML file_path and a non-empty
     operations array. Use set_value with a JSON path array for scalar changes and
     upsert_item with section, id, and a complete value mapping for list entries.

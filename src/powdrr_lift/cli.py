@@ -75,6 +75,7 @@ from powdrr_lift.core.design_graph import (
     build_canonical_design_graph,
     create_design_proposal_template,
     design_proposal_default_output_path,
+    discover_design,
     render_design_context,
     validate_proposal,
 )
@@ -886,6 +887,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo-root", type=Path, help="Repository root to inspect."
     )
     design_graph_parser.set_defaults(func=_run_design_graph)
+
+    discover_design_parser = subparsers.add_parser(
+        "discover-design",
+        aliases=["discover_design"],
+        help="Expand a bounded connected design graph from seed ids.",
+    )
+    discover_design_parser.add_argument("seeds", nargs="+", help="Graph node ids.")
+    discover_design_parser.add_argument("--feature-id")
+    discover_design_parser.add_argument("--depth", type=int, default=1)
+    discover_design_parser.add_argument("--limit", type=int, default=100)
+    discover_design_parser.add_argument("--repo-root", type=Path)
+    discover_design_parser.set_defaults(func=_run_discover_design)
 
     validate_design_proposal_parser = subparsers.add_parser(
         "validate-design-proposal",
@@ -1825,6 +1838,25 @@ def _run_design_graph(args: argparse.Namespace) -> int:
             else None
         )
         print(render_design_context(canonical, proposal), end="")
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    return 0
+
+
+def _run_discover_design(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        graph = build_canonical_design_graph(repo_root, feature_id=args.feature_id)
+        print(
+            yaml.safe_dump(
+                discover_design(
+                    graph, args.seeds, depth=args.depth, limit=args.limit
+                ).to_data(),
+                sort_keys=False,
+            ),
+            end="",
+        )
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1

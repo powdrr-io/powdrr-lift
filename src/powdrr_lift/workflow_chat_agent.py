@@ -58,6 +58,12 @@ from powdrr_lift.core import (
     system_specification_default_output_path,
 )
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
+from powdrr_lift.core.design_graph import (
+    build_canonical_design_graph,
+    discover_design,
+    load_design_proposal,
+    validate_proposal,
+)
 from powdrr_lift.core.python_tool_commands import (
     dependency_backed_command_variants,
     missing_executable_output,
@@ -5178,6 +5184,21 @@ def _modular_action_system_prompt(
             "item with section, id, and a complete value mapping. Return yaml_edit "
             'directly with action="yaml_edit"; never wrap it in invoke_tool.\n'
         )
+    if "design_edit" in action_names:
+        prompt += (
+            "design_edit guidance: update only the durable graph proposal at "
+            "docs/proposals/<work-item>/design-proposal.yaml. Send an ordered "
+            "operations array using add_node, update_node, remove_node, add_edge, "
+            "update_edge, or remove_edge; every operation needs a stable id. "
+            "The canonical graph is read-only and the runtime validates the merged "
+            "graph before saving. Do not use yaml_edit for graph proposals.\n"
+        )
+    if "discover_design" in action_names:
+        prompt += (
+            "discover_design guidance: provide graph node ids in seeds plus an "
+            "optional feature_id, depth, and limit to request a bounded connected "
+            "canonical graph slice.\n"
+        )
     if current_step.tool_invocations and "invoke_tool" in action_names:
         prompt += (
             "Tool guidance: invoke one of the declared tool_invocations successfully "
@@ -5250,6 +5271,8 @@ def _workflow_action_handlers() -> dict[
         "complete": _handle_workflow_action_complete,
         "edit": _handle_workflow_action_edit,
         "yaml_edit": _handle_workflow_action_yaml_edit,
+        "design_edit": _handle_workflow_action_design_edit,
+        "discover_design": _handle_workflow_action_discover_design,
         "file_management": _handle_workflow_action_file_management,
         "read_document": _handle_workflow_action_read_document,
         "list_files": _handle_workflow_action_list_files,
@@ -5324,6 +5347,18 @@ def _workflow_action_material_state(
             )
             for file_path in file_paths
         )
+    if action.kind == "design_edit":
+        return (
+            action.file_path,
+            json.dumps(action.parameters.get("operations", []), sort_keys=True),
+        )
+    if action.kind == "discover_design":
+        return (
+            action.feature_id,
+            tuple(action.parameters.get("seeds", ())),
+            action.parameters.get("depth"),
+            action.parameters.get("limit"),
+        )
     if action.kind == "file_management":
         return (action.file_operation, action.file_path, action.destination_path)
     if action.kind == "prompt_user":
@@ -5352,6 +5387,10 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
 def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
     if action.kind in {"edit", "yaml_edit"}:
         return "Attempting file edit"
+    if action.kind == "design_edit":
+        return "Updating graph proposal"
+    if action.kind == "discover_design":
+        return "Discovering connected design context"
     if action.kind == "file_management":
         return f"Managing file: {action.file_operation} {action.file_path}"
     if action.kind == "read_document":
@@ -5602,6 +5641,108 @@ def _handle_workflow_action_yaml_edit(
     )
     print(f"Edited YAML file: {target_path}", file=stdout)
     _verbose_print(stderr, config.verbose, f"Applied YAML edit to {target_path}")
+    return True
+
+
+def _handle_workflow_action_design_edit(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    if action.file_path is None:
+        raise PowdrrExecutionError("design_edit requires file_path.")
+    target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
+    try:
+        relative = target_path.relative_to(state.worktree_root)
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            "design_edit path must stay in the worktree."
+        ) from error
+    if (
+        relative.parts[:2] != ("docs", "proposals")
+        or target_path.name != "design-proposal.yaml"
+    ):
+        raise PowdrrExecutionError(
+            "design_edit may only write docs/proposals/<feature>/design-proposal.yaml."
+        )
+    feature_id = relative.parts[2] if len(relative.parts) > 2 else ""
+    if not feature_id:
+        raise PowdrrExecutionError(
+            "design_edit proposal path must include a feature id."
+        )
+    proposal = (
+        load_design_proposal(target_path, state.worktree_root)
+        if target_path.exists()
+        else {"id": feature_id}
+    )
+    proposal["operations"] = action.parameters["operations"]
+    canonical = build_canonical_design_graph(state.worktree_root, feature_id=feature_id)
+    proposal.setdefault("base_version", canonical.version)
+    validation = validate_proposal(canonical, proposal)
+    if not validation.valid:
+        raise PowdrrExecutionError(
+            "design_edit proposal is invalid: "
+            + json.dumps(validation.to_data(), ensure_ascii=False)
+        )
+    updated_text = yaml.safe_dump(proposal, sort_keys=False)
+    invoke_file_mutation(
+        (action.file_path,),
+        worktree_root=state.worktree_root,
+        executor=lambda: target_path.write_text(updated_text, encoding="utf-8"),
+        runtime=_ensure_execution_runtime(state),
+    )
+    state.current_file_path = target_path
+    if state.file_added_callback is not None:
+        state.file_added_callback((action.file_path,))
+    result = {
+        "file_path": action.file_path,
+        "operation_count": len(proposal["operations"]),
+    }
+    state.transcript.extend(
+        [
+            {"role": "assistant", "content": json.dumps({"design_edit": proposal})},
+            {"role": "user", "content": json.dumps({"design_edit_result": result})},
+        ]
+    )
+    state.execution_events.append(
+        {"kind": action.kind, **result, "step_index": state.step_index}
+    )
+    print(f"Updated design proposal: {target_path}", file=stdout)
+    _verbose_print(stderr, config.verbose, f"Applied graph proposal to {target_path}")
+    return True
+
+
+def _handle_workflow_action_discover_design(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = input_func
+    canonical = build_canonical_design_graph(
+        state.worktree_root, feature_id=action.feature_id
+    )
+    discovered = discover_design(
+        canonical,
+        action.parameters["seeds"],
+        depth=int(action.parameters["depth"]),
+        limit=int(action.parameters["limit"]),
+    )
+    result = discovered.to_data()
+    state.execution_context.append(
+        "Additional design graph context:\n" + yaml.safe_dump(result, sort_keys=False)
+    )
+    state.execution_events.append(
+        {"kind": action.kind, "result": result, "step_index": state.step_index}
+    )
+    _verbose_print(stderr, config.verbose, "Discovered additional design graph context")
+    _ = stdout, config
     return True
 
 
@@ -7476,6 +7617,8 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "gather_context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "invoke_skill": _parse_workflow_action_invoke_skill,
+        "design_edit": _parse_workflow_action_design_edit,
+        "discover_design": _parse_workflow_action_discover_design,
         "goto_step": _parse_workflow_action_goto_step,
         "read_document": _parse_workflow_action_read_document,
         "list_files": _parse_workflow_action_list_files,
@@ -7666,6 +7809,76 @@ def _parse_workflow_action_yaml_edit(
         kind="yaml_edit",
         file_path=file_path.strip(),
         yaml_operations=operations,
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
+
+
+def _parse_workflow_action_design_edit(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    file_path = payload.get("file_path")
+    operations = payload.get("operations")
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise PowdrrExecutionError("design_edit requires file_path.")
+    if not file_path.strip().endswith("design-proposal.yaml"):
+        raise PowdrrExecutionError(
+            "design_edit file_path must target design-proposal.yaml."
+        )
+    if (
+        not isinstance(operations, Sequence)
+        or isinstance(operations, (str, bytes, bytearray))
+        or not operations
+    ):
+        raise PowdrrExecutionError(
+            "design_edit requires a non-empty graph operations array."
+        )
+    allowed = {
+        "add_node",
+        "update_node",
+        "remove_node",
+        "add_edge",
+        "update_edge",
+        "remove_edge",
+    }
+    for operation in operations:
+        if not isinstance(operation, Mapping) or operation.get("op") not in allowed:
+            raise PowdrrExecutionError(
+                "design_edit operations must use add_node, update_node, "
+                "remove_node, add_edge, update_edge, or remove_edge."
+            )
+        if not isinstance(operation.get("id"), str) or not operation["id"].strip():
+            raise PowdrrExecutionError("Every design_edit operation requires an id.")
+    return SkillChatAction(
+        kind="design_edit",
+        file_path=file_path.strip(),
+        parameters={"operations": [dict(operation) for operation in operations]},
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
+
+
+def _parse_workflow_action_discover_design(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    seeds = payload.get("seeds")
+    if not isinstance(seeds, Sequence) or isinstance(seeds, (str, bytes, bytearray)):
+        raise PowdrrExecutionError("discover_design requires a seeds array.")
+    normalized = tuple(str(seed).strip() for seed in seeds if str(seed).strip())
+    if not normalized:
+        raise PowdrrExecutionError("discover_design seeds must not be empty.")
+    return SkillChatAction(
+        kind="discover_design",
+        feature_id=_optional_string(payload.get("feature_id")),
+        parameters={
+            "seeds": normalized,
+            "depth": payload.get("depth", 1),
+            "limit": payload.get("limit", 50),
+        },
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
@@ -10065,6 +10278,8 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
     "prompt_user": "Ask one necessary human question.",
     "edit": "Apply a known line-based change to a file.",
     "yaml_edit": "Apply a structural change to a YAML file.",
+    "design_edit": "Append or revise graph operations in the durable design proposal.",
+    "discover_design": "Expand the bounded canonical graph from seed node ids.",
     "file_management": "Move, rename, or delete one relative file.",
     "invoke_skill": "Run one listed nested skill.",
     "invoke_tool": "Run one command declared by this step.",

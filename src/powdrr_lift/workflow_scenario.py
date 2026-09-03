@@ -41,6 +41,7 @@ from powdrr_lift.workflow_chat_agent import (
     _workflow_action_signature,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
+    resolve_workflow_provider,
 )
 from powdrr_lift.workflow_llm import WorkflowStepRunner
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
@@ -305,7 +306,9 @@ def run_workflow_scenario(
                 )
         scenario_expect = _mapping(scenario.get("expect"), "scenario expect")
         scenario_inputs = _mapping(scenario.get("inputs", {}), "scenario inputs")
-        provider_name = _optional_text(provider.get("provider")) or "openai"
+        provider_name = _optional_text(provider.get("provider")) or "auto"
+        if provider_name == "auto":
+            provider_name = resolve_workflow_provider()
         configured_model = _optional_text(provider.get("model")) or _DEFAULT_MODEL
         live_client = None
         execution_model = "scripted"

@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-task-008
-status: locked
+status: completed
 upstream_task_ids:
 - interaction-file-log-core-task-007
 dependent_state:
@@ -17,6 +17,11 @@ assignee_type: agent
 assignee_role: reviewer
 output_state_type: formatting-check-state
 description: Run formatting checks
+output_state:
+  formatting-check-state:
+    command: ruff format --check .
+    return_code: 0
+    result: All files are already formatted.
 workflow_template: execute-proposed-pr
 phase_type: validate
 persona_id: engineer

@@ -161,18 +161,16 @@ def test_runtime_prompt_context_resolves_intent_without_model_retrieval(
         phase=PhaseType.BUILD,
     )
     context = runtime.prompt_context()
-    assert "clause_ids" in context
-    assert context["effective_contract"]["contract_fingerprint"].startswith("sha256:")
-    assert source.intent_id in context["intent_ids"]
-    assert "contract_fingerprint" not in runtime.model_prompt_context()
+    assert "clause_ids" not in context
+    assert "effective_contract" not in context
+    assert "contract_fingerprint" not in context
+    assert "intent_ids" not in context
 
     compacted = runtime.compact_prompt_context(
         {**context, "transcript": "long context " * 2_000}
     )
     restored = runtime.retrieve_prompt_context(compacted["full_context_ref"])
-    assert restored["intent_ids"] == context["intent_ids"]
-    assert restored["clause_ids"] == context["clause_ids"]
-    assert restored["contract_fingerprint"] == context["contract_fingerprint"]
+    assert restored["runtime_state"] == context
 
     restarted = ExecutionRuntime(
         "intent-runtime",
@@ -181,7 +179,4 @@ def test_runtime_prompt_context_resolves_intent_without_model_retrieval(
         repo_root=tmp_path,
         phase=PhaseType.BUILD,
     )
-    assert (
-        restarted.prompt_context()["contract_fingerprint"]
-        == context["contract_fingerprint"]
-    )
+    assert restarted.prompt_context() == context

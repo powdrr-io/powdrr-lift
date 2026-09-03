@@ -533,13 +533,8 @@ def test_persona_packet_installs_the_same_action_contract_used_for_validation(
     assert runtime.validate_action("edit")
     assert not runtime.validate_action("next_step")
     assert runtime.state.current_persona_id == "architect"
-    assert runtime.prompt_context()["persona_id"] == "architect"
-    assert runtime.prompt_context()["persona"] == {
-        "persona_id": "architect",
-        "persona_type": "architect",
-        "model_profile": "architecture",
-        "prompt_catalogs": ["architect-responsibilities"],
-    }
+    assert "persona_id" not in runtime.prompt_context()
+    assert "persona" not in runtime.prompt_context()
     assert runtime.verify().current_persona_id == "architect"
     resumed = ExecutionRuntime(
         "run-persona-contract",
@@ -548,8 +543,8 @@ def test_persona_packet_installs_the_same_action_contract_used_for_validation(
         repo_root=tmp_path,
         profile=profile,
     )
-    assert resumed.prompt_context()["persona_id"] == "architect"
-    assert resumed.prompt_context()["persona"]["persona_type"] == "architect"
+    assert "persona_id" not in resumed.prompt_context()
+    assert "persona" not in resumed.prompt_context()
 
 
 def test_runtime_rejects_capability_context_from_another_persona(
@@ -672,7 +667,7 @@ def test_runtime_compaction_has_retrievable_full_context(tmp_path: Path) -> None
     restored = runtime.retrieve_prompt_context(compacted["full_context_ref"])
 
     assert restored["transcript"] == "x" * 2_000
-    assert compacted["runtime_state"]["execution_id"] == "run-context"
+    assert "execution_id" not in compacted["runtime_state"]
 
 
 def test_runtime_profile_blocks_handoff_without_required_artifact(

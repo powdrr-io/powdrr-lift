@@ -294,7 +294,12 @@ def run_final_acceptance(
                 f"structured delivery stage did not execute: {stage}",
                 error_code="acceptance_delivery_incomplete",
             )
-    contract = runtime.prompt_context()
+    contract_context = {
+        "profile_id": profile.profile_id,
+        "phase_type": runtime.state.current_phase.value,
+    }
+    contract_data = runtime.effective_contract(contract_context).to_data()
+    contract_fingerprint = contract_data["contract_fingerprint"]
     persona_packets = tuple(
         build_persona_packet(
             profile,
@@ -557,7 +562,7 @@ def run_final_acceptance(
     compacted = runtime.compact_prompt_context(
         {
             "transcript": "x" * 2_000,
-            "contract_fingerprint": contract["contract_fingerprint"],
+            "contract_fingerprint": contract_fingerprint,
         }
     )
     restarted_runtime = ExecutionRuntime(
@@ -767,8 +772,8 @@ def run_final_acceptance(
         ),
         AcceptanceCheck(
             "runtime-contract",
-            "effective_contract" in contract and "clause_ids" in contract,
-            "prompt context contains the derived contract and typed references",
+            "contract_fingerprint" in contract_data and "clause_ids" in contract_data,
+            "runtime derives the effective contract for internal validation",
         ),
         AcceptanceCheck(
             "persona-phase-assignments",
@@ -835,8 +840,8 @@ def run_final_acceptance(
         ),
         AcceptanceCheck(
             "compaction-retrieval",
-            compacted["contract_fingerprint"] == contract["contract_fingerprint"]
-            and retrieved["contract_fingerprint"] == contract["contract_fingerprint"]
+            compacted["contract_fingerprint"] == contract_fingerprint
+            and retrieved["contract_fingerprint"] == contract_fingerprint
             and len(compacted["transcript"]) < len(retrieved["transcript"]),
             (
                 "compaction preserves typed references and retains bounded "

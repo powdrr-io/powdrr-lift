@@ -1177,7 +1177,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 inherited_interaction_style=self.inherited_interaction_style,
                 observer_intervention=self.observer_intervention,
                 runtime_prompt_context=(
-                    self.driver.runtime.model_prompt_context()
+                    self.driver.runtime.prompt_context()
                     if self.driver.runtime is not None
                     else None
                 ),

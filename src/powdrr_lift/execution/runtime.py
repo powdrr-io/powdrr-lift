@@ -435,53 +435,13 @@ class ExecutionRuntime:
         }
         rules = self.guidance(guidance_context)
         allowed_actions = self.allowed_actions()
-        active_persona = None
-        if self.profile is not None and self.state.current_persona_id is not None:
-            active_persona = next(
-                (
-                    persona
-                    for persona in self.profile.personas
-                    if persona.persona_id == self.state.current_persona_id
-                ),
-                None,
-            )
-        contract = self.effective_contract(
-            {
-                "profile_id": self.state.profile_id,
-                "phase_type": self.state.current_phase.value,
-                **(
-                    {"persona_id": self.state.current_persona_id}
-                    if self.state.current_persona_id is not None
-                    else {}
-                ),
-            }
-        )
         return compact_execution_context(
             {
-                "execution_id": self.execution_id,
                 "phase": self.state.current_phase.value,
-                "persona_id": self.state.current_persona_id,
-                "persona": (
-                    {
-                        "persona_id": active_persona.persona_id,
-                        "persona_type": active_persona.persona_type.value,
-                        "model_profile": active_persona.model_profile,
-                        "prompt_catalogs": list(active_persona.prompt_catalogs),
-                    }
-                    if active_persona is not None
-                    else None
-                ),
                 "allowed_actions": (
                     list(allowed_actions) if allowed_actions is not None else None
                 ),
                 "capability_catalog": list(self.capability_catalog()),
-                "artifact_ids": [item.artifact_id for item in self.state.artifacts],
-                "action_ids": [item.action_instance_id for item in self.state.actions],
-                "obligation_ids": [
-                    item.obligation_id for item in self.state.obligations
-                ],
-                "evidence_ids": [item.evidence_id for item in self.state.evidence],
-                "finding_ids": [item.finding_id for item in self.state.findings],
                 "guidance": [
                     {
                         "rule_id": rule.rule_id,
@@ -491,10 +451,6 @@ class ExecutionRuntime:
                     for rule in rules
                 ],
                 "guidance_required_actions": sorted(self.guidance_required_actions()),
-                "intent_ids": [item.intent_id for item in contract.sources],
-                "clause_ids": list(contract.clause_ids),
-                "contract_fingerprint": contract.fingerprint,
-                "effective_contract": contract.to_data(),
                 "open_obligations": [
                     item.to_data()
                     for item in {
@@ -508,12 +464,6 @@ class ExecutionRuntime:
                 ],
             }
         )
-
-    def model_prompt_context(self) -> dict[str, Any]:
-        """Return runtime state needed by the model, excluding internal metadata."""
-        context = self.prompt_context()
-        context.pop("contract_fingerprint", None)
-        return context
 
     def effective_contract(self, context: dict[str, str]) -> EffectiveContract:
         """Resolve the exact active intent contract for a prompt boundary."""

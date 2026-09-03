@@ -4,7 +4,7 @@ when_to_use:
 - When an existing pull request for the current branch must receive the prescribed description and updated commit.
 steps:
 - description: Generate the pull request description template.
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -26,7 +26,7 @@ steps:
     type: any
     required_for_next_step: true
 - description: Fill in the pull request description template.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -42,7 +42,7 @@ steps:
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
 - description: Stage the exact files that belong in the pull request.
-  actions: [invoke_tool, edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -70,7 +70,7 @@ steps:
     - add
     - <files-to-publish>
 - description: Commit the validated changes.
-  actions: [invoke_tool, edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -102,7 +102,7 @@ steps:
     - -m
     - <commit-message>
 - description: Push the committed changes.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -119,7 +119,7 @@ steps:
     - origin
     - HEAD
 - description: Create a draft pull request when none exists.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -146,7 +146,7 @@ steps:
   - tool: gh
     operation: pr_create
 - description: Update the existing pull request.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-

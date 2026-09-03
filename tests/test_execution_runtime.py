@@ -984,7 +984,7 @@ def test_compiled_workflow_preserves_multi_unit_dependencies_and_personas(
         ("src",),
     )
     actions: dict[PhaseType, tuple[str, ...]] = {
-        phase.phase_type: ("read_document", "next_step") for phase in profile.phases
+        phase.phase_type: ("read_document",) for phase in profile.phases
     }
 
     workflow = runtime.compile_plan_to_workflow(
@@ -1006,7 +1006,7 @@ def test_compiled_workflow_preserves_multi_unit_dependencies_and_personas(
     assert feature_build.input_state["execution_unit_id"] == "feature"
     assert feature_build.phase_type is PhaseType.BUILD
     assert feature_build.persona_id
-    assert feature_build.actions == ("read_document", "next_step")
+    assert feature_build.actions == ("read_document",)
     assert feature_build.input_state["intent_ids"] == ["intent-locking"]
     assert feature_build.input_state["clause_ids"] == ["clause-locking-v1"]
     reloaded = workflow.__class__.from_directory(tmp_path / "workflow")
@@ -1156,11 +1156,13 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     runtime.set_action_contract(frozenset({"read_document"}))
 
     assert runtime.validate_action("read_document") == ()
+    assert runtime.validate_action("prompt_user") == ()
     assert runtime.validate_action("next_step") == ()
     assert runtime.validate_action("edit")
-    assert runtime.allowed_actions() == ("next_step", "read_document")
+    assert runtime.allowed_actions() == ("next_step", "prompt_user", "read_document")
     assert runtime.prompt_context()["allowed_actions"] == [
         "next_step",
+        "prompt_user",
         "read_document",
     ]
 
@@ -1168,7 +1170,7 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     assert runtime.capability_catalog() == ()
 
     runtime.set_action_contract(frozenset(), enforce_empty=True)
-    assert runtime.allowed_actions() == ("next_step",)
+    assert runtime.allowed_actions() == ("next_step", "prompt_user")
     assert runtime.validate_action("edit")
     assert runtime.capability_catalog() == ()
 
@@ -1195,7 +1197,7 @@ def test_engine_bookkeeping_temporarily_suspends_action_contract(
         assert runtime.validate_action("git") == ()
         assert runtime.allowed_actions() is None
 
-    assert runtime.allowed_actions() == ("next_step", "read_document")
+    assert runtime.allowed_actions() == ("next_step", "prompt_user", "read_document")
     assert runtime.validate_action("git")
 
 

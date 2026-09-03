@@ -48,4 +48,3 @@ uses_skills:
 - finish-pr-prep
 actions:
 - invoke_skill
-- next_step

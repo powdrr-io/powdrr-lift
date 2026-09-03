@@ -7,7 +7,7 @@ when_to_use:
 - When the review must report findings directly on GitHub as inline pull-request comments.
 steps:
 - description: Discover the referenced pull request and its feature relationship.
-  actions: [gather_context, invoke_tool, edit, yaml_edit, read_document, prompt_user]
+  actions: [gather_context, invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -38,7 +38,7 @@ steps:
     - <pr-reference>
     - --patch
 - description: Decide whether the referenced PR is the final proposed PR.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
@@ -57,7 +57,7 @@ steps:
     Use the returned records to determine the ordered proposed-PR set and
     status rather than relying only on PR prose.
 - description: Review the current PR against the selected functionality scope.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -83,7 +83,7 @@ steps:
     explicit gap. This deterministic matrix is the basis for deciding whether
     the feature is complete.
 - description: Post every actionable finding as an inline pull-request comment.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -126,7 +126,7 @@ steps:
     - -f
     - side=RIGHT
 - description: Verify the posted review and report the audit result.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

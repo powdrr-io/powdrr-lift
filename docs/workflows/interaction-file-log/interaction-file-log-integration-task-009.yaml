@@ -24,8 +24,7 @@ details: 'Assign the deterministic lint result to lint-check-state. Do not fix f
   name is ''interaction-file-log-integration''. Use these values as search context
   and verify repository documents before deciding what they identify.'
 llm_type: simple_task
-actions:
-- next_step
+actions: []
 pre_step:
   action: invoke_tool
   template:

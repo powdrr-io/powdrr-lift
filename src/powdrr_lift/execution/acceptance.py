@@ -1016,7 +1016,7 @@ assignee_role: architect
 output_state_type: proposed-pr-context-state
 description: Gather context about the proposed PR
 step_type: invoke_tool
-actions: [next_step]
+actions: []
 pre_step:
   action: gather_context
   template:
@@ -1076,7 +1076,7 @@ when_to_use:
 steps:
 - id: inspect
   description: Inspect the fixture.
-  actions: [invoke_tool, complete, next_step]
+  actions: [invoke_tool, complete]
   step_type: freeform
   tool_invocations:
   - tool: shell

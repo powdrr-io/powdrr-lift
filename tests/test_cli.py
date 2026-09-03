@@ -129,7 +129,7 @@ def test_cli_compiles_plan_into_profiled_workflow(tmp_path: Path) -> None:
     actions_path.write_text(
         "\n".join(
             [
-                f"{phase}: [read_document, next_step]"
+                f"{phase}: [read_document]"
                 for phase in (
                     "intake",
                     "specify",
@@ -184,7 +184,7 @@ def test_cli_compiles_plan_into_profiled_workflow(tmp_path: Path) -> None:
     )
     assert build_task["phase_type"] == "build"
     assert build_task["persona_id"] == "engineer"
-    assert build_task["actions"] == ["read_document", "next_step"]
+    assert build_task["actions"] == ["read_document"]
 
 
 def test_staging_generated_directory_emits_each_file(

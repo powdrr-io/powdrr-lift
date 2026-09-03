@@ -36,4 +36,3 @@ uses_skills:
 - run-tests-and-fix
 actions:
 - invoke_skill
-- next_step

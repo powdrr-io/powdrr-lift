@@ -11,7 +11,7 @@ when_to_use:
 steps:
 - id: discover-design-scope
   description: Discover the pull request and establish the authoritative design scope.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: long_context
   details: >-
@@ -58,7 +58,7 @@ steps:
     - --patch
 - id: gather-design-context
   description: Gather the repository context needed to review the proposed design.
-  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -76,7 +76,7 @@ steps:
     {"action":"gather_context","types":["features","requirements","entities","entity-relationships","invariants","decisions","risks","guidance","proposed_prs"],"keywords":["<feature-id>"],"decisions_and_context":"Resolved feature <feature-id> from the PR and authoritative documents."}.
 - id: review-user-intent
   description: Ask whether the design properly captures the user's intent.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -101,7 +101,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-assumptions
   description: Ask whether the design contains assumptions requiring clarification.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -125,7 +125,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-traceability-and-completeness
   description: Ask whether the spec v1 design is complete and internally traceable.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -151,7 +151,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-existing-mechanisms
   description: Ask whether existing repository mechanisms can implement the design.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -189,7 +189,7 @@ steps:
     - tests
 - id: review-refactoring-opportunities
   description: Ask whether an existing area should be refactored first.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -213,7 +213,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-unnecessary-scope
   description: Ask whether the design includes unnecessary changes.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -236,7 +236,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-security
   description: Ask whether security concerns are addressed by the design.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -260,7 +260,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-performance
   description: Ask whether performance and scale concerns are addressed.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -284,7 +284,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-entity-lifecycle
   description: Ask whether entity lifecycle and removals are correct.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -308,7 +308,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-dependencies-and-delivery
   description: Ask whether proposed-PR dependencies and delivery sequencing are viable.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -332,7 +332,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-compatibility-and-failure-modes
   description: Ask whether compatibility, migration, and failure behavior are designed.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -355,7 +355,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-testability-and-operability
   description: Ask whether the design can be validated and operated safely.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -378,7 +378,7 @@ steps:
       -F, line=<changed-line>, -f, side=RIGHT]
 - id: verify-review
   description: Verify the review comments and report the design audit.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-

@@ -6,7 +6,7 @@ when_to_use:
 steps:
 - id: review-implementation-context
   description: Review the system and architecture context first.
-  actions: [invoke_skill, next_step]
+  actions: [invoke_skill]
   step_type: freeform
   llm_type: high_reasoning
   details: Confirm the source architecture id and the relevant entities before drafting
@@ -16,7 +16,7 @@ steps:
   - review-architecture
 - id: generate-implementation
   description: Generate the implementation specification template.
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -41,7 +41,7 @@ steps:
 - id: fill-implementation
   description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -49,7 +49,7 @@ steps:
     {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"<architecture-id>"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}},{"op":"upsert_item","section":"decisions","id":"decision-id","value":{"action":"added","description":"..."}}]}. Use set_value with a JSON path array for scalar fields and upsert_item with section, id, and a complete value mapping for list entries. Keep the implementation spec aligned with the source architecture version and do not invent new ids.
 - id: evaluate-implementation
   description: Deterministically evaluate the filled implementation specification.
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -69,7 +69,7 @@ steps:
     required_for_next_step: true
 - id: repair-implementation
   description: Use yaml_edit to fix every issue reported by the implementation evaluator.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document, goto_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -80,7 +80,7 @@ steps:
     entities, relationships, modules, tools, features, or decisions. For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"architecture-id"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}}]}. Do not use edit or rewrite the YAML as prose. If there are no issues, choose next_step without changing the file. If the evaluator reports invalid YAML/structure or you are stuck, restart generation with {"action":"goto_step","step_id":"generate-implementation"}; do not keep repeating the same repair. The generator will overwrite unreadable content and merge valid existing fields back into the restored template.
 - id: gate-implementation
   description: Confirm that implementation evaluation reports zero issues.
-  actions: [next_step]
+  actions: []
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when the evaluator exits successfully with zero issues.

@@ -326,6 +326,56 @@ def test_cleanup_removes_integration_artifacts_when_metadata_is_missing(
     )
 
 
+def test_cleanup_restores_missing_metadata_from_configured_checkout(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch=integration_branch_name("feature-17"),
+        workflow_relative_directory="docs/workflows/feature-17",
+    )
+    configured_workflow_dir = tmp_path / "docs" / "workflows" / "feature-17"
+    configured_workflow_dir.mkdir(parents=True)
+    save_workflow_git_state(configured_workflow_dir, state)
+    (configured_workflow_dir / "task-001.json").write_text(
+        '{"task_id": "task-001", "status": "open"}\n',
+        encoding="utf-8",
+    )
+    _git(tmp_path, "add", "docs/workflows/feature-17")
+    _git(tmp_path, "commit", "-m", "initialize workflow upstream")
+
+    integration_worktree, integration_branch = create_workflow_worktree(
+        tmp_path, "feature-17"
+    )
+    workflow_dir = integration_worktree / "docs" / "workflows" / "feature-17"
+
+    (workflow_dir / "feature-17-workflow.yaml").unlink()
+    (workflow_dir / "task-001.json").write_text(
+        '{"task_id": "task-001", "status": "completed"}\n',
+        encoding="utf-8",
+    )
+    _git(integration_worktree, "add", "docs/workflows/feature-17")
+    _git(integration_worktree, "commit", "-m", "advance workflow")
+
+    report = inspect_workflow_run(tmp_path, "feature-17")
+    assert report["workflow_git_state"] is None
+
+    cleaned = cleanup_workflow_run(tmp_path, "feature-17", report=report)
+
+    assert cleaned["integration_checkpoint_preserved"] is True
+    assert not any("workflow state" in error for error in cleaned["errors"])
+    assert load_workflow_git_state(workflow_dir, "feature-17") == state
+    assert '"status": "open"' in (workflow_dir / "task-001.json").read_text()
+
+
 def test_inspection_reads_checkpoint_from_branch_when_worktree_is_missing(
     tmp_path: Path,
 ) -> None:

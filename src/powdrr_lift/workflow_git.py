@@ -584,6 +584,13 @@ def cleanup_workflow_run(
     integration_worktree = Path(state_report["integration_worktree"])
     state_data = state_report.get("workflow_git_state")
     checkpoint_valid = isinstance(state_data, dict)
+    if not checkpoint_valid and integration_worktree.is_dir():
+        recovered_state = _find_workflow_git_state_in_checkout(
+            repo_root_path, proposed_pr_id, integration_worktree
+        )
+        if recovered_state is not None:
+            state_data = recovered_state.to_data()
+            checkpoint_valid = True
     if not checkpoint_valid:
         # Without valid metadata there is no trustworthy workflow directory or
         # checkpoint to preserve. Treat the run as incomplete and remove the
@@ -626,6 +633,7 @@ def cleanup_workflow_run(
                     f"{result.stderr.strip()}"
                 )
     elif integration_worktree.is_dir():
+        state_report = {**state_report, "workflow_git_state": state_data}
         recovery = _restore_workflow_git_state(
             state_report,
             integration_worktree,
@@ -696,6 +704,35 @@ def cleanup_workflow_run(
     }
 
 
+def _find_workflow_git_state_in_checkout(
+    repo_root: Path,
+    proposed_pr_id: str,
+    excluded_worktree: Path,
+) -> WorkflowGitState | None:
+    """Find the configured workflow identity outside its integration worktree."""
+    workflows_directory = repo_root / "docs" / "workflows"
+    if not workflows_directory.is_dir():
+        return None
+    filename = workflow_git_state_filename(proposed_pr_id)
+    excluded_worktree = excluded_worktree.resolve()
+    for path in sorted(workflows_directory.rglob(filename)):
+        try:
+            path.resolve().relative_to(excluded_worktree)
+        except ValueError:
+            pass
+        else:
+            continue
+        try:
+            state = WorkflowGitState.from_data(
+                yaml.safe_load(path.read_text(encoding="utf-8"))
+            )
+        except (OSError, yaml.YAMLError, ValueError):
+            continue
+        if state.proposed_pr_id == proposed_pr_id:
+            return state
+    return None
+
+
 def _restore_workflow_git_state(
     report: Mapping[str, Any],
     integration_worktree: Path,
@@ -711,12 +748,24 @@ def _restore_workflow_git_state(
     if not isinstance(relative_directory, str) or not relative_directory:
         return {"removed": [], "errors": ["workflow state has no workflow directory"]}
 
-    history = _git(
-        integration_worktree,
-        ["log", "--reverse", "--format=%H", "--", relative_directory],
+    base_branch = (
+        state_data.get("base_branch") if isinstance(state_data, dict) else None
     )
-    initial = next(iter(history.stdout.splitlines()), None)
-    if history.returncode != 0 or initial is None:
+    source_ref: str | None = None
+    if isinstance(base_branch, str) and base_branch:
+        upstream_files = _git(
+            integration_worktree,
+            ["ls-tree", "-r", "--name-only", base_branch, "--", relative_directory],
+        )
+        if upstream_files.returncode == 0 and upstream_files.stdout.strip():
+            source_ref = base_branch
+    if source_ref is None:
+        history = _git(
+            integration_worktree,
+            ["log", "--reverse", "--format=%H", "--", relative_directory],
+        )
+        source_ref = next(iter(history.stdout.splitlines()), None)
+    if source_ref is None:
         return {
             "removed": [],
             "errors": [
@@ -726,11 +775,11 @@ def _restore_workflow_git_state(
 
     changed = _git(
         integration_worktree,
-        ["diff", "--name-only", f"{initial}..HEAD", "--", relative_directory],
+        ["diff", "--name-only", f"{source_ref}..HEAD", "--", relative_directory],
     )
     errors: list[str] = []
     for path in changed.stdout.splitlines():
-        exists = _git(integration_worktree, ["cat-file", "-e", f"{initial}:{path}"])
+        exists = _git(integration_worktree, ["cat-file", "-e", f"{source_ref}:{path}"])
         if exists.returncode != 0:
             removed_file = _git(integration_worktree, ["rm", "-f", "--", path])
             if removed_file.returncode != 0:
@@ -742,7 +791,7 @@ def _restore_workflow_git_state(
         integration_worktree,
         [
             "restore",
-            f"--source={initial}",
+            f"--source={source_ref}",
             "--staged",
             "--worktree",
             "--",
@@ -758,6 +807,11 @@ def _restore_workflow_git_state(
                 + (restore.stderr.strip() or clean.stderr.strip())
             ],
         }
+
+    save_workflow_git_state(
+        integration_worktree / relative_directory,
+        WorkflowGitState.from_data(state_data),
+    )
 
     status = _git(integration_worktree, ["status", "--porcelain"])
     if status.stdout.strip():
@@ -781,7 +835,7 @@ def _restore_workflow_git_state(
             }
 
     return {
-        "removed": [f"reset-workflow-state:{relative_directory}:{initial}"],
+        "removed": [f"reset-workflow-state:{relative_directory}:{source_ref}"],
         "errors": [],
     }
 

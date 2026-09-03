@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-task-013
-status: locked
+status: completed
 upstream_task_ids:
 - interaction-file-log-core-task-001
 - interaction-file-log-core-task-006
@@ -1206,6 +1206,15 @@ assignee_type: agent
 assignee_role: reviewer
 output_state_type: promoted-current-state-documents
 description: Promote the feature documents
+output_state:
+  promoted-current-state-documents:
+    status: promoted
+    source: docs/proposals/interaction-file-log
+    destination: docs/current/interaction-file-log
+    moved_paths:
+    - docs/current/interaction-file-log/implementation-specification.yaml
+    - docs/current/interaction-file-log/proposed-pr-specification.yaml
+    - docs/current/interaction-file-log/system-specification.yaml
 workflow_template: execute-proposed-pr
 phase_type: confirm_readiness
 persona_id: code-reviewer

@@ -1,0 +1,20 @@
+{
+  "task_id": "interaction-file-log-pr-task-006",
+  "status": "open",
+  "upstream_task_ids": [
+    "interaction-file-log-pr-task-005"
+  ],
+  "dependent_state": [
+    "completeness-confirmed"
+  ],
+  "complexity": "medium",
+  "input_state": {
+    "changed_files": [],
+    "test_results": []
+  },
+  "assignee_type": "human",
+  "assignee_role": "reviewer",
+  "output_state_type": "confirmed-completeness-state",
+  "description": "Confirm completeness",
+  "llm_type": "high_reasoning"
+}

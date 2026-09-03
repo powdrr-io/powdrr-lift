@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -138,7 +138,7 @@ class ExecutionRuntime:
         )
         self._projected_kernel_events = 0
         self._allowed_actions: frozenset[str] | None = None
-        self._observer_allowed_action: str | None = None
+        self._observer_allowed_action: dict[str, str] | None = None
         self._phase_actions: frozenset[str] | None = None
         self._persona_actions: frozenset[str] | None = None
         self._unit_actions: frozenset[str] | None = None
@@ -169,16 +169,30 @@ class ExecutionRuntime:
         self._allowed_actions = actions if actions or enforce_empty else None
         self._observer_allowed_action = None
 
-    def allow_observer_action(self, action: str) -> None:
-        """Temporarily allow one observer-recommended action for this step."""
-        if not action.strip():
-            raise ValueError("observer action must be a non-empty string")
-        self._observer_allowed_action = action
+    def allow_observer_action(self, action: Mapping[str, str | None]) -> None:
+        """Temporarily allow one concrete observer-recommended action."""
+        kind = action.get("kind")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("observer action kind must be a non-empty string")
+        self._observer_allowed_action = {
+            key: value.strip()
+            for key, value in action.items()
+            if value is not None and value.strip()
+        }
 
-    def consume_observer_action(self, action: str) -> None:
+    def consume_observer_action(self, action: Any) -> None:
         """Consume the one-shot observer allowance after the action is chosen."""
-        if action == self._observer_allowed_action:
+        if self.observer_action_matches(action):
             self._observer_allowed_action = None
+
+    def observer_action_matches(self, action: Any) -> bool:
+        """Return whether an action matches the complete temporary allowance."""
+        if self._observer_allowed_action is None:
+            return False
+        return all(
+            getattr(action, key, None) == value
+            for key, value in self._observer_allowed_action.items()
+        )
 
     def set_execution_scope(
         self,
@@ -214,7 +228,7 @@ class ExecutionRuntime:
         for scope in scopes[1:]:
             result.intersection_update(scope)
         if self._observer_allowed_action is not None:
-            result.add(self._observer_allowed_action)
+            result.add(self._observer_allowed_action["kind"])
         required = {
             item.required_action
             for item in (*self.state.obligations, *self.kernel.open_obligations)
@@ -286,13 +300,13 @@ class ExecutionRuntime:
         effective = self.effective_action_contract()
         if effective is None:
             return None
-        return tuple(sorted({*effective, "next_step"}))
+        return tuple(sorted({*effective, "prompt_user", "next_step"}))
 
     def validate_action(self, action_kind: str) -> tuple[str, ...]:
         effective = self.effective_action_contract()
         if effective is None or action_kind in effective:
             return ()
-        if action_kind == "next_step":
+        if action_kind in {"prompt_user", "next_step"}:
             return ()
         return (f"action {action_kind!r} is not allowed by the active step contract",)
 

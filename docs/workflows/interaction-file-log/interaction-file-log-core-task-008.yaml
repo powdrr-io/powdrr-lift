@@ -24,8 +24,7 @@ details: 'Assign the deterministic formatter result to formatting-check-state. D
   name is ''interaction-file-log-core''. Use these values as search context and verify
   repository documents before deciding what they identify.'
 llm_type: simple_task
-actions:
-- next_step
+actions: []
 pre_step:
   action: invoke_tool
   template:

@@ -40,7 +40,7 @@ task_templates:
 - description: Gather context about the proposed PR
   phase_type: intake
   persona_id: architect
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   prompt_catalogs: [context_types]
   complexity: high
@@ -77,7 +77,7 @@ task_templates:
 - description: Create the execution plan
   phase_type: plan_pr
   persona_id: engineer
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -101,7 +101,7 @@ task_templates:
 - description: Generate the planned tests
   phase_type: build
   persona_id: engineer
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -127,7 +127,7 @@ task_templates:
 - description: Implement the planned product code
   phase_type: build
   persona_id: engineer
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -155,7 +155,7 @@ task_templates:
 - description: Run all tests and fix failures
   phase_type: validate
   persona_id: engineer
-  actions: [invoke_skill, next_step]
+  actions: [invoke_skill]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -183,7 +183,7 @@ task_templates:
 - description: Review specification completeness
   phase_type: review_specifications
   persona_id: specification-reviewer
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -209,7 +209,7 @@ task_templates:
 - description: Repair specification completeness gaps
   phase_type: specify
   persona_id: architect
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   complexity: high
   assignee_type: agent
@@ -233,7 +233,7 @@ task_templates:
 - description: Run formatting checks
   phase_type: validate
   persona_id: engineer
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -260,7 +260,7 @@ task_templates:
 - description: Run lint checks
   phase_type: validate
   persona_id: engineer
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -286,7 +286,7 @@ task_templates:
 - description: Run type checks
   phase_type: validate
   persona_id: engineer
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -311,7 +311,7 @@ task_templates:
 - description: Review the final diff for scope
   phase_type: review_pr
   persona_id: code-reviewer
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   complexity: medium
   assignee_type: agent
@@ -342,7 +342,7 @@ task_templates:
 - description: Repair final diff scope issues
   phase_type: resolve_findings
   persona_id: engineer
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   complexity: medium
   assignee_type: agent
@@ -366,7 +366,7 @@ task_templates:
 - description: Promote the feature documents
   phase_type: confirm_readiness
   persona_id: code-reviewer
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -396,7 +396,7 @@ task_templates:
 - description: Verify the pull request file set
   phase_type: confirm_readiness
   persona_id: code-reviewer
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -430,7 +430,7 @@ task_templates:
 - description: Finish pull request preparation
   phase_type: publish_pr
   persona_id: engineering-manager
-  actions: [invoke_skill, next_step]
+  actions: [invoke_skill]
   step_type: freeform
   complexity: medium
   assignee_type: agent

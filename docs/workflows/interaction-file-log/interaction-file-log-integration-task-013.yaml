@@ -30,8 +30,7 @@ details: 'The deterministic git mv already ran. Assign its complete result and m
   name is ''interaction-file-log-integration''. Use these values as search context
   and verify repository documents before deciding what they identify.'
 llm_type: simple_task
-actions:
-- next_step
+actions: []
 pre_step:
   action: invoke_tool
   template:

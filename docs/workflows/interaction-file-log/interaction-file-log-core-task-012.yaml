@@ -34,5 +34,3 @@ actions:
 - yaml_edit
 - file_management
 - read_document
-- prompt_user
-- next_step

@@ -6,7 +6,7 @@ when_to_use:
   proposed skill or workflow rewrite.
 steps:
 - description: Compare the original and proposed definitions without bias.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -16,7 +16,7 @@ steps:
     review's findings as evidence and do not propose improvements merely because
     your wording differs.
 - description: Report omissions and execution risks.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-

@@ -7,14 +7,14 @@ when_to_use:
   fit.
 steps:
 - description: Gather the requirements and approach context.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: simple_task
   details: Use the requirements and approach context to understand the new needs before
     judging the system specification.
 - description: Decide whether the current system specification needs to change.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document, complete]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -24,7 +24,7 @@ steps:
     system covers the new needs."}; otherwise choose next_step.
 - id: generate-system
   description: Deterministically generate the system specification template.
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -47,7 +47,7 @@ steps:
     required_for_next_step: true
 - id: fill-system
   description: Fill the system requirements and approach sections.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
@@ -56,7 +56,7 @@ steps:
     invoke_tool for YAML edits.
 - id: evaluate-system
   description: Deterministically evaluate the updated system specification.
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: Invoke the evaluator exactly once; do not edit the file in this step.
@@ -74,7 +74,7 @@ steps:
     required_for_next_step: true
 - id: repair-system
   description: Repair every reported system specification issue.
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document, goto_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
@@ -90,7 +90,7 @@ steps:
     instead of repeating the same repair.
 - id: gate-system
   description: Confirm that system evaluation reports zero issues.
-  actions: [next_step]
+  actions: []
   step_type: gate
   llm_type: simple_task
   details: The gate passes only when evaluation exits successfully with zero issues.

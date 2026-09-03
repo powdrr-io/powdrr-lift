@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -137,10 +137,12 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
 from powdrr_lift.workflow_observer import (
+    ObserverActionRecommendation,
     ObserverDecision,
     ObserverExecutionContext,
     ShadowWorkflowObserver,
     compact_observer_mapping,
+    observer_action_matches,
 )
 from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
@@ -888,7 +890,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     current_step_index: int = 0
     inherited_interaction_style: str | None = None
     observer_intervention: str | None = None
-    observer_allowed_action: str | None = None
+    observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
 
     @property
@@ -993,7 +995,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 if self.observer_allowed_action is not None:
                     self.state.runtime.allow_observer_action(
-                        self.observer_allowed_action
+                        asdict(self.observer_allowed_action)
                     )
             dependency_name = _next_skill_dependency(
                 self.selected_skill,
@@ -1348,7 +1350,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         action_signature = _workflow_action_signature(action)
-        observer_action_authorized = action.kind == self.observer_allowed_action
+        observer_action_authorized = observer_action_matches(
+            action, self.observer_allowed_action
+        )
         if action_signature == self.observer_rejected_action_signature:
             raise PowdrrExecutionError(
                 "The observer rejected this exact action after it failed to "
@@ -1490,7 +1494,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _validate_workflow_action_outputs(action, self.current_step)
         if observer_action_authorized:
             if self.driver.runtime is not None:
-                self.driver.runtime.consume_observer_action(action.kind)
+                self.driver.runtime.consume_observer_action(action)
             self.observer_allowed_action = None
             self.observer_rejected_action_signature = None
             self.observer_intervention = None
@@ -1642,16 +1646,21 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         if decision.expected_progress:
             guidance.append(f"Evidence expected: {decision.expected_progress}")
         recommended_action = decision.target_action
-        if decision.target_step_id:
-            recommended_action = recommended_action or "goto_step"
-        if decision.target_skill_name:
-            recommended_action = recommended_action or "invoke_skill"
+        if recommended_action is None and decision.target_step_id:
+            recommended_action = ObserverActionRecommendation(
+                kind="goto_step", step_id=decision.target_step_id
+            )
+        if recommended_action is None and decision.target_skill_name:
+            recommended_action = ObserverActionRecommendation(
+                kind="invoke_skill", skill_name=decision.target_skill_name
+            )
         if recommended_action:
             self.observer_allowed_action = recommended_action
             if self.driver.runtime is not None:
-                self.driver.runtime.allow_observer_action(recommended_action)
+                self.driver.runtime.allow_observer_action(asdict(recommended_action))
             guidance.append(
-                f"Observer recommends the {recommended_action!r} action; choose it "
+                f"Observer recommends the {recommended_action.kind!r} action; "
+                "choose it "
                 "directly if it is the appropriate next action."
             )
         self.observer_intervention = "Observer intervention\n" + "\n".join(
@@ -1693,7 +1702,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "kind": "observer_intervention",
                 "verdict": decision.verdict,
                 "reason": decision.reason,
-                "target_action": recommended_action,
+                "target_action": (
+                    asdict(recommended_action) if recommended_action else None
+                ),
                 "target_step_id": decision.target_step_id,
                 "target_skill_name": decision.target_skill_name,
                 "action": json.loads(_workflow_action_signature(action)),
@@ -1711,7 +1722,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 material_progress=(
                     observation.made_progress if observation is not None else None
                 ),
-                target_action=recommended_action,
+                target_action=(
+                    json.dumps(asdict(recommended_action), sort_keys=True)
+                    if recommended_action
+                    else None
+                ),
                 target_step_id=decision.target_step_id,
                 target_skill_name=decision.target_skill_name,
             )
@@ -6182,14 +6197,15 @@ def _validate_workflow_action_for_step(
     action: SkillChatAction,
     step: Any,
     *,
-    observer_allowed_action: str | None = None,
+    observer_allowed_action: ObserverActionRecommendation | None = None,
 ) -> None:
     """Reject tool actions that do not match a current-step invocation."""
     allowed_actions = _declared_action_names(step)
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
-        and action.kind != observer_allowed_action
+        and action.kind not in {"prompt_user", "next_step"}
+        and not observer_action_matches(action, observer_allowed_action)
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
@@ -7129,14 +7145,15 @@ def _validate_workflow_action_for_step_unwrapped(
     action: SkillChatAction,
     step: Any,
     *,
-    observer_allowed_action: str | None = None,
+    observer_allowed_action: ObserverActionRecommendation | None = None,
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
     allowed_actions = _declared_action_names(step)
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
-        and action.kind != observer_allowed_action
+        and action.kind not in {"prompt_user", "next_step"}
+        and not observer_action_matches(action, observer_allowed_action)
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
@@ -10060,7 +10077,7 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
 
 
 def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
-    """Return only this step's declared actions, always including next_step."""
+    """Return declared actions plus the universal prompt and advance actions."""
     declared = tuple(getattr(step, "actions", ()) or ())
     if declared or getattr(step, "actions_declared", False):
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
@@ -10102,6 +10119,8 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
+    if "prompt_user" not in action_names:
+        actions.append(("prompt_user", "Ask one necessary human question."))
     if "next_step" not in action_names:
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(

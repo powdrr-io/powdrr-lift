@@ -35,7 +35,7 @@ details: 'The deterministic repository status is authoritative. Verify that ever
   repository documents before deciding what they identify.'
 llm_type: simple_task
 actions:
-- next_step
+- invoke_tool
 pre_step:
   action: invoke_tool
   template:

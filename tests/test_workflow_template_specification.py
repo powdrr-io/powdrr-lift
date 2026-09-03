@@ -474,15 +474,13 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
     assert all(task.workflow_template == template_path.stem for task in tasks)
-    assert tasks[0].actions == ("next_step",)
+    assert tasks[0].actions == ()
     assert tasks[0].actions_declared is True
     assert tasks[1].actions == (
         "edit",
         "yaml_edit",
         "file_management",
         "read_document",
-        "prompt_user",
-        "next_step",
     )
 
 

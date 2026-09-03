@@ -234,7 +234,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
-                ("design-interview.yaml", 1),
+                ("design-interview.yaml", 20),
                 ("design-interview.yaml", 22),
             }
             expected_gate_steps = {

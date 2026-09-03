@@ -3,38 +3,375 @@ when_to_use:
 - When a calling skill has a feature description and needs a specification-v1
   proposal grounded in the repository's existing context.
 steps:
-- id: capture-feature
-  description: Accept the required feature description and identify the work item.
+- id: gather-requirements
+  description: Gather requirements and return proposal changes.
   inputs:
+  - name: work_item_name
+    type: string
+    required: true
+    source: caller
   - name: feature_description
     type: string
     required: true
     source: caller
-  - name: work_item_name
-    type: string
-    required: false
-    source: caller
-  actions: []
+  actions: [gather_context]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    The caller-provided feature_description is required input. Choose a stable
-    kebab-case work_item_name and advance with outputs containing exactly
-    work_item_name and feature_description. Do not ask the user for the feature
-    description and do not gather context in this step.
+    First call exactly {"action":"gather_context","types":["requirements"]}.
+    Examine the exact returned list for the feature_description. Then return a
+    JSON dictionary as the output requirements_edits, with exactly added and
+    deleted lists. Each added requirement has {"id":"requirement-id","description":"...","state":"added"};
+    each deleted item has {"id":"existing-requirement-id"}. Do not edit files.
   outputs:
+  - name: requirements_edits
+    type: any
+    required_for_next_step: true
+- id: gather-approach
+  description: Gather approach and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["approach"]}.
+    Examine the exact returned list, then return output approach_edits as a JSON
+    dictionary with exactly added and deleted lists. Each added approach item has
+    {"id":"approach-id","description":"...","state":"added"}; each deleted
+    item has {"id":"existing-approach-id"}. Do not edit files.
+  outputs:
+  - name: approach_edits
+    type: any
+    required_for_next_step: true
+- id: gather-entities
+  description: Gather entities and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["entities"]}.
+    Examine the exact returned list, then return output entities_edits as a JSON
+    dictionary with exactly added and deleted lists. Each added entity has
+    {"id":"entity-id","type":"allowed entity type","summary":"..."}; each
+    deleted item has {"id":"existing-entity-id"}. Do not edit files.
+  outputs:
+  - name: entities_edits
+    type: any
+    required_for_next_step: true
+- id: gather-entity-relationships
+  description: Gather entity relationships and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["entity-relationships"]}.
+    Examine the exact returned list, then return output entity_relationships_edits
+    as a JSON dictionary with exactly added and deleted lists. Each added
+    relationship has {"id":"relationship-id","source":"entity-id","target":"entity-id","relationship":"..."};
+    each deleted item has {"id":"existing-relationship-id"}. Do not edit files.
+  outputs:
+  - name: entity_relationships_edits
+    type: any
+    required_for_next_step: true
+- id: gather-invariants
+  description: Gather invariants and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["invariants"]}.
+    Examine the exact returned list, then return output invariants_edits as a JSON
+    dictionary with exactly added and deleted lists. Each added invariant has
+    {"id":"invariant-id","description":"..."}; each deleted item has
+    {"id":"existing-invariant-id"}. Do not edit files.
+  outputs:
+  - name: invariants_edits
+    type: any
+    required_for_next_step: true
+- id: gather-guidance
+  description: Gather guidance and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["guidance"]}.
+    Examine the exact returned list, then return output guidance_edits as a JSON
+    dictionary with exactly added and deleted lists. Each added guidance item has
+    {"id":"guidance-id","description":"..."}; each deleted item has
+    {"id":"existing-guidance-id"}. Do not edit files.
+  outputs:
+  - name: guidance_edits
+    type: any
+    required_for_next_step: true
+- id: gather-features
+  description: Gather features and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["features"]}.
+    Examine the exact returned list, then return output features_edits as a JSON
+    dictionary with exactly added and deleted lists. Each added feature has
+    {"id":"feature-id","description":"..."}; each deleted item has
+    {"id":"existing-feature-id"}. Do not edit files.
+  outputs:
+  - name: features_edits
+    type: any
+    required_for_next_step: true
+- id: gather-human-decisions
+  description: Gather human decisions and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["human-decisions"]}.
+    Examine the exact returned list, then return output human_decisions_edits as a
+    JSON dictionary with exactly added and deleted lists. Each added decision has
+    {"id":"decision-id","description":"..."}; each deleted item has
+    {"id":"existing-decision-id"}. Do not edit files.
+  outputs:
+  - name: human_decisions_edits
+    type: any
+    required_for_next_step: true
+- id: gather-intent
+  description: Gather intent and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["intent"]}.
+    Examine the exact returned list, then return output intent_edits as a JSON
+    dictionary with exactly added and deleted lists. Each item must have an id and
+    the fields required by the gathered intent shape. Do not edit files.
+  outputs:
+  - name: intent_edits
+    type: any
+    required_for_next_step: true
+- id: gather-intents
+  description: Gather intents and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["intents"]}.
+    Examine the exact returned list, then return output intents_edits as a JSON
+    dictionary with exactly added and deleted lists. Each item must have an id and
+    the fields required by the gathered intents shape. Do not edit files.
+  outputs:
+  - name: intents_edits
+    type: any
+    required_for_next_step: true
+- id: gather-acceptance-criteria
+  description: Gather acceptance criteria and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["acceptance_criteria"]}.
+    Examine the exact returned list, then return output acceptance_criteria_edits
+    as a JSON dictionary with exactly added and deleted lists. Each item has an id
+    and description. Do not edit files.
+  outputs:
+  - name: acceptance_criteria_edits
+    type: any
+    required_for_next_step: true
+- id: gather-expected-tests
+  description: Gather expected tests and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["expected_tests"]}.
+    Examine the exact returned list, then return output expected_tests_edits as a
+    JSON dictionary with exactly added and deleted lists. Each item has an id and
+    description. Do not edit files.
+  outputs:
+  - name: expected_tests_edits
+    type: any
+    required_for_next_step: true
+- id: gather-required-test-cases
+  description: Gather required test cases and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["required_test_cases"]}.
+    Examine the exact returned list, then return output required_test_cases_edits
+    as a JSON dictionary with exactly added and deleted lists. Each item has an id
+    and description. Do not edit files.
+  outputs:
+  - name: required_test_cases_edits
+    type: any
+    required_for_next_step: true
+- id: gather-expected-outcomes
+  description: Gather expected outcomes and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["expected_outcomes"]}.
+    Examine the exact returned list, then return output expected_outcomes_edits as
+    a JSON dictionary with exactly added and deleted lists. Each item has an id and
+    description. Do not edit files.
+  outputs:
+  - name: expected_outcomes_edits
+    type: any
+    required_for_next_step: true
+- id: gather-non-goals
+  description: Gather non-goals and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["non_goals"]} and
+    present the exact returned list. Then return output non_goals_edits as a JSON
+    dictionary with exactly added and deleted lists. Do not edit files.
+  outputs:
+  - name: non_goals_edits
+    type: any
+    required_for_next_step: true
+- id: gather-risks
+  description: Gather risks and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["risks"]} and
+    present the exact returned list. Then return output risks_edits as a JSON
+    dictionary with exactly added and deleted lists. Do not edit files.
+  outputs:
+  - name: risks_edits
+    type: any
+    required_for_next_step: true
+- id: gather-decisions
+  description: Gather decisions and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["decisions"]} and
+    present the exact returned list. Then return output decisions_edits as a JSON
+    dictionary with exactly added and deleted lists. Do not edit files.
+  outputs:
+  - name: decisions_edits
+    type: any
+    required_for_next_step: true
+- id: gather-proposed-prs
+  description: Gather proposed PRs and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["proposed_prs"]} and
+    present the exact returned list. Then return output proposed_prs_edits as a
+    JSON dictionary with exactly added and deleted lists. Do not edit files.
+  outputs:
+  - name: proposed_prs_edits
+    type: any
+    required_for_next_step: true
+- id: gather-modules
+  description: Gather modules and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["modules"]} and
+    present the exact returned list. Then return output modules_edits as a JSON
+    dictionary with exactly added and deleted lists. Do not edit files.
+  outputs:
+  - name: modules_edits
+    type: any
+    required_for_next_step: true
+- id: gather-tools
+  description: Gather tools and return proposal changes.
+  actions: [gather_context]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    First call exactly {"action":"gather_context","types":["tools"]} and
+    present the exact returned list. Then return output tools_edits as a JSON
+    dictionary with exactly added and deleted lists. Do not edit files.
+  outputs:
+  - name: tools_edits
+    type: any
+    required_for_next_step: true
+- id: generate-proposal-template
+  description: Generate the specification-v1 proposal template from interview outputs.
+  inputs:
   - name: work_item_name
     type: string
-    required_for_next_step: true
+    required: true
   - name: feature_description
     type: string
-    required_for_next_step: true
-- id: generate-proposal
-  description: Create the empty specification-v1 proposal template.
+    required: true
+  - name: requirements_edits
+    type: any
+    required: true
+  - name: approach_edits
+    type: any
+    required: true
+  - name: entities_edits
+    type: any
+    required: true
+  - name: entity_relationships_edits
+    type: any
+    required: true
+  - name: invariants_edits
+    type: any
+    required: true
+  - name: guidance_edits
+    type: any
+    required: true
+  - name: features_edits
+    type: any
+    required: true
+  - name: human_decisions_edits
+    type: any
+    required: true
+  - name: intent_edits
+    type: any
+    required: true
+  - name: intents_edits
+    type: any
+    required: true
+  - name: acceptance_criteria_edits
+    type: any
+    required: true
+  - name: expected_tests_edits
+    type: any
+    required: true
+  - name: required_test_cases_edits
+    type: any
+    required: true
+  - name: expected_outcomes_edits
+    type: any
+    required: true
+  - name: non_goals_edits
+    type: any
+    required: true
+  - name: risks_edits
+    type: any
+    required: true
+  - name: decisions_edits
+    type: any
+    required: true
+  - name: proposed_prs_edits
+    type: any
+    required: true
+  - name: modules_edits
+    type: any
+    required: true
+  - name: tools_edits
+    type: any
+    required: true
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the feature-pr specification generator exactly once; do not edit its output.
+  details: >-
+    The 20 preceding *_edits inputs are the complete interview result. Invoke
+    the feature-pr specification template generator exactly once for
+    <work-item-name>; it creates docs/proposals/<work-item-name>/feature-pr-specification.yaml.
+    Do not edit the YAML in this step. The next step will apply the interview
+    outputs to that generated template.
   pre_step:
     action: invoke_tool
     template:
@@ -44,196 +381,83 @@ steps:
   - name: proposal_template
     type: any
     required_for_next_step: true
-
-- id: gather-requirements
-  description: Gather requirements, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
+- id: apply-proposal-edits
+  description: Apply all interview outputs to the generated proposal YAML.
+  inputs:
+  - name: proposal_template
+    type: any
+    required: true
+  - name: feature_description
+    type: string
+    required: true
+  - name: requirements_edits
+    type: any
+    required: true
+  - name: approach_edits
+    type: any
+    required: true
+  - name: entities_edits
+    type: any
+    required: true
+  - name: entity_relationships_edits
+    type: any
+    required: true
+  - name: invariants_edits
+    type: any
+    required: true
+  - name: guidance_edits
+    type: any
+    required: true
+  - name: features_edits
+    type: any
+    required: true
+  - name: human_decisions_edits
+    type: any
+    required: true
+  - name: intent_edits
+    type: any
+    required: true
+  - name: intents_edits
+    type: any
+    required: true
+  - name: acceptance_criteria_edits
+    type: any
+    required: true
+  - name: expected_tests_edits
+    type: any
+    required: true
+  - name: required_test_cases_edits
+    type: any
+    required: true
+  - name: expected_outcomes_edits
+    type: any
+    required: true
+  - name: non_goals_edits
+    type: any
+    required: true
+  - name: risks_edits
+    type: any
+    required: true
+  - name: decisions_edits
+    type: any
+    required: true
+  - name: proposed_prs_edits
+    type: any
+    required: true
+  - name: modules_edits
+    type: any
+    required: true
+  - name: tools_edits
+    type: any
+    required: true
+  actions: [yaml_edit]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    First call exactly this action:
-    {"action":"gather_context","types":["requirements"],"keywords":["FEATURE_DESCRIPTION"]}.
-    Present the exact returned match list. Then return exactly one yaml_edit action
-    with this shape: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/feature-pr-specification.yaml","operations":[{"op":"upsert_item","section":"requirements","id":"REQUIREMENT_ID","value":{"description":"DESCRIPTION","state":"added"}}]}.
-    Include all additions and deletions in that operations list, preserve prior
-    proposal edits, and do not edit current-state files.
-- id: gather-approach
-  description: Gather approach, present it, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["approach"]} and
-    present its exact match list. Then return one yaml_edit action targeting
-    docs/proposals/<work-item-name>/feature-pr-specification.yaml with an
-    operations list of upsert_item or remove_item entries for section approach.
-    An added item has {"id":"APPROACH_ID","description":"DESCRIPTION","state":"added"}.
-- id: gather-entities
-  description: Gather entities, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["entities"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with operations shaped as {"op":"upsert_item","section":"entities","id":"ENTITY_ID","value":{"id":"ENTITY_ID","type":"ENTITY_TYPE","summary":"SUMMARY","action":"added"}} or remove_item for deletions.
-- id: gather-entity-relationships
-  description: Gather entity relationships, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["entity-relationships"]}
-    and present its exact match list. Then return one yaml_edit targeting the
-    proposal with operations shaped as {"op":"upsert_item","section":"entity_relationships","id":"RELATIONSHIP_ID","value":{"id":"RELATIONSHIP_ID","source":"SOURCE_ENTITY_ID","target":"TARGET_ENTITY_ID","relationship":"RELATIONSHIP"}} or remove_item.
-- id: gather-invariants
-  description: Gather invariants, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["invariants"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for section invariants. An added
-    item has {"id":"INVARIANT_ID","description":"DESCRIPTION","related":{"entities":[],"entity_relationships":[]}}.
-- id: gather-guidance
-  description: Gather guidance, present it, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["guidance"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for section guidance, using an item
-    shaped {"id":"GUIDANCE_ID","description":"DESCRIPTION","related":{"entities":[],"entity_relationships":[]}}.
-- id: gather-features
-  description: Gather features, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["features"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for section features. An added item
-    has {"id":"FEATURE_ID","action":"added","description":"DESCRIPTION","functional_requirements":[]}.
-- id: gather-human-decisions
-  description: Gather human decisions, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["human-decisions"]}
-    and present its exact match list. Then return one yaml_edit targeting the
-    proposal with upsert_item or remove_item operations for section
-    human-decisions. An added item has {"id":"DECISION_ID","action":"added","description":"DESCRIPTION"}.
-- id: gather-intent
-  description: Gather intent, present it, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["intent"]}
-    and present its exact match list. Then return one yaml_edit targeting the
-    proposal with the complete intent additions and deletions.
-- id: gather-intents
-  description: Gather intents, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["intents"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with the complete intents additions and deletions.
-- id: gather-acceptance-criteria
-  description: Gather acceptance criteria, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["acceptance_criteria"]}
-    and present its exact match list. Then return one yaml_edit targeting the
-    proposal with upsert_item or remove_item operations for acceptance_criteria.
-- id: gather-expected-tests
-  description: Gather expected tests, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["expected_tests"]}
-    and present its exact match list. Then return one yaml_edit targeting the
-    proposal with upsert_item or remove_item operations for expected_tests.
-- id: gather-required-test-cases
-  description: Gather required test cases, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["required_test_cases"]}
-    and present its exact match list. Then return one yaml_edit targeting the
-    proposal with upsert_item or remove_item operations for required_test_cases.
-- id: gather-expected-outcomes
-  description: Gather expected outcomes, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["expected_outcomes"]}
-    and present its exact match list. Then return one yaml_edit targeting the
-    proposal with upsert_item or remove_item operations for expected_outcomes.
-- id: gather-non-goals
-  description: Gather non-goals, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["non_goals"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for non_goals.
-- id: gather-risks
-  description: Gather risks, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["risks"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for risks.
-- id: gather-decisions
-  description: Gather decisions, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["decisions"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for decisions.
-- id: gather-proposed-prs
-  description: Gather proposed PRs, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["proposed_prs"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for proposed_prs.
-- id: gather-modules
-  description: Gather modules, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["modules"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for modules.
-- id: gather-tools
-  description: Gather tools, present them, and edit the proposal.
-  actions: [gather_context, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: high_reasoning
-  details: >-
-    First call exactly {"action":"gather_context","types":["tools"]} and
-    present its exact match list. Then return one yaml_edit targeting the proposal
-    with upsert_item or remove_item operations for tools.
+    Use all 20 *_edits inputs and the generated proposal_template. Return exactly
+    one yaml_edit action targeting docs/proposals/<work-item-name>/feature-pr-specification.yaml.
+    Its operations must apply every added and deleted item from the interview;
+    do not edit current-state documents and do not invent changes.
 - id: evaluate-proposal
   description: Deterministically validate the completed proposal.
   actions: []
@@ -256,8 +480,8 @@ steps:
   llm_type: fast_iteration
   details: >-
     Review only the latest evaluator result and use yaml_edit to fix every issue
-    in the proposal. Use gather_context only when a current reference is missing
-    or unknown. Then choose next_step so evaluate-proposal reruns.
+    in the proposal. Use gather_context only for missing or unknown references.
+    Then choose next_step so evaluate-proposal reruns.
 - id: gate-proposal
   description: Confirm that the proposal validates cleanly.
   actions: []

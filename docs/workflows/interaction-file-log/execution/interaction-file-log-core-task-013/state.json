@@ -5,8 +5,8 @@
   "mode": "enforce",
   "current_phase": "confirm_readiness",
   "phase_revision": 0,
-  "state_version": 46,
-  "event_sequence": 46,
+  "state_version": 93,
+  "event_sequence": 93,
   "current_persona_id": null,
   "active_unit_id": null,
   "artifacts": [],
@@ -88,6 +88,41 @@
       "status": "completed",
       "actor_id": "execution-runtime",
       "phase_type": "confirm_readiness"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-013:action:47",
+      "kind": "mutate_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "confirm_readiness"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-013:action:59",
+      "kind": "inspect_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "confirm_readiness"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-013:action:64",
+      "kind": "mutate_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "confirm_readiness"
+    },
+    {
+      "action_instance_id": "interaction-file-log-core-task-013:action:78",
+      "kind": "mutate_repository",
+      "status": "completed",
+      "actor_id": "execution-runtime",
+      "phase_type": "confirm_readiness"
+    },
+    {
+      "action_instance_id": "action-35",
+      "kind": "next_step",
+      "status": "completed",
+      "actor_id": "code-reviewer",
+      "phase_type": "confirm_readiness"
     }
   ],
   "obligations": [],
@@ -130,13 +165,45 @@
       "evidence_type": "capability:repository",
       "input_fingerprint": "582caf0b57d2b3cd322721d842cff72557c9df7a5600a3d582d6953f22179184",
       "successful": true,
-      "fresh": true
+      "fresh": false
     },
     {
       "evidence_id": "evidence-43",
       "producer_action_instance_id": "inspect_repository",
       "evidence_type": "capability:repository",
       "input_fingerprint": "6e210eb0942bb24f48e40fa7e26191e7f7aed2a77451ae44c8c6ba53b48f3103",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-55",
+      "producer_action_instance_id": "mutate_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "b07674af2b68be5a7b058154a0372a1c21d896da1ff7464613ed04b425d57ff0",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-60",
+      "producer_action_instance_id": "inspect_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "9b5050b8ed44ebd2d979b2f6402d5dd7a5fc2dae181a0db96c283dafb36efa40",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-74",
+      "producer_action_instance_id": "mutate_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "bd2f658a39c843ff9047410ed0a10b4716445bf537c7a97d2152fa203ffbe2db",
+      "successful": true,
+      "fresh": false
+    },
+    {
+      "evidence_id": "evidence-89",
+      "producer_action_instance_id": "mutate_repository",
+      "evidence_type": "capability:repository",
+      "input_fingerprint": "582caf0b57d2b3cd322721d842cff72557c9df7a5600a3d582d6953f22179184",
       "successful": true,
       "fresh": true
     }

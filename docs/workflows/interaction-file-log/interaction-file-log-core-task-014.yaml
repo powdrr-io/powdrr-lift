@@ -1,5 +1,5 @@
 task_id: interaction-file-log-core-task-014
-status: open
+status: locked
 upstream_task_ids:
 - interaction-file-log-core-task-004
 - interaction-file-log-core-task-013
@@ -8,9 +8,28 @@ dependent_state:
 - pull-request-files-verified
 complexity: medium
 input_state:
-  implementation_diffs: interaction-file-log-core-task-004.generated-product-code-state
-  promoted_documents: interaction-file-log-core-task-013.promoted-current-state-documents
-  type_check: interaction-file-log-core-task-010.type-check-state
+  implementation_diffs:
+    generated-product-code-state:
+      implementation_files:
+      - src/powdrr/interaction_log/entities.py
+      - src/powdrr/interaction_log/writer.py
+      - src/powdrr/interaction_log/source.py
+      - src/powdrr/interaction_log/tool.py
+      implementation_diffs: {}
+  promoted_documents:
+    promoted-current-state-documents:
+      status: promoted
+      source: docs/proposals/interaction-file-log
+      destination: docs/current/interaction-file-log
+      moved_paths:
+      - docs/current/interaction-file-log/implementation-specification.yaml
+      - docs/current/interaction-file-log/proposed-pr-specification.yaml
+      - docs/current/interaction-file-log/system-specification.yaml
+  type_check:
+    type-check-state:
+      command: mypy src
+      return_code: 0
+      result: 'Success: no issues found in 1 source file'
 assignee_type: agent
 assignee_role: reviewer
 output_state_type: staged-pull-request-state

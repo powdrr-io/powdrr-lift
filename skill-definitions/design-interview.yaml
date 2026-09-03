@@ -1,0 +1,424 @@
+name: design-interview
+when_to_use:
+- When a feature needs a deliberate inventory of the product entities it adds,
+  depends on, or removes before implementation planning.
+- When the design should be developed by walking the repository's complete
+  software-development entity taxonomy rather than by asking for one large
+  architecture document.
+steps:
+- id: establish-interview-context
+  description: Establish the feature outcome and current specification context.
+  actions: [gather_context, read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  prompt_catalogs: [context_types]
+  details: >-
+    Identify the feature or work-item name and its concrete desired outcomes.
+    Use gather_context to inspect the current requirements, approach, entities,
+    entity relationships, invariants, guidance, features, and decisions relevant
+    to that feature. Read software_development_entity_taxonomy.md before the
+    interview stages. Preserve the exact ids and types found in current specs.
+    Do not draft or edit the proposal yet. Record the feature outcome, current
+    context paths, and any ambiguity in decisions_and_context, then advance.
+
+- id: interview-product-org-ownership
+  description: Interview product, organization, and ownership entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    For every entity type under "Product, org, and ownership entities" in the
+    taxonomy, ask and answer: "This is the current set of <entity_type>. To
+    support all outcomes for <this_feature>, list every new entity of this type
+    we need, every existing entity we depend on, and every entity of this type
+    that should be deleted." Return the result in output
+    product_org_ownership_entities as an object with keys add, depend_on, delete,
+    and rationale. Each add/depend_on item needs an exact id, entity type, and
+    concise summary; delete contains exact existing ids. Include an empty list
+    when there are none. Do not invent a type outside this taxonomy group.
+  outputs:
+  - name: product_org_ownership_entities
+    type: any
+    required_for_next_step: true
+
+- id: interview-repository-source-control
+  description: Interview repository and source-control entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    For every entity type under "Repository and source-control entities", ask:
+    "This is the current set of <entity_type>. To support all outcomes for
+    <this_feature>, list every new entity of this type we need, every existing
+    entity we depend on, and every entity of this type that should be deleted."
+    Return output repository_source_control_entities with add, depend_on, delete,
+    and rationale. Use exact current ids and record evidence paths when known.
+  outputs:
+  - name: repository_source_control_entities
+    type: any
+    required_for_next_step: true
+
+- id: interview-source-code
+  outputs:
+  - name: source_code_entities
+    type: any
+    required_for_next_step: true
+  description: Interview source-code structure entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Source-code structure entities" using the exact
+    question: "This is the current set of <entity_type>. To support all outcomes
+    for <this_feature>, list all new entities, all dependencies, and all
+    deletions." Return output source_code_entities with add, depend_on, delete,
+    and rationale. Do not turn a file path or symbol into an entity unless the
+    current specifications or repository evidence supports it.
+
+- id: interview-language-runtime
+  outputs:
+  - name: language_runtime_entities
+    type: any
+    required_for_next_step: true
+  description: Interview programming-language and runtime entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Programming language and runtime entities" and answer
+    the feature question for each type. Return output language_runtime_entities
+    with add, depend_on, delete, and rationale. Distinguish a dependency from a
+    new entity and use exact existing ids when available.
+
+- id: interview-service-api
+  outputs:
+  - name: service_api_entities
+    type: any
+    required_for_next_step: true
+  description: Interview service and API entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Service and API entities" and answer the feature
+    question for each type. Return output service_api_entities with add,
+    depend_on, delete, and rationale. Include endpoints, handlers, and APIs only
+    when the feature outcome requires them.
+
+- id: interview-data-storage
+  outputs:
+  - name: data_storage_entities
+    type: any
+    required_for_next_step: true
+  description: Interview data and storage service entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Data and storage service entities" and answer the
+    feature question for each type. Return output data_storage_entities with add,
+    depend_on, delete, and rationale. Make persistence, cache, backup, and
+    archive dependencies explicit rather than implied.
+
+- id: interview-database-schema
+  outputs:
+  - name: database_schema_entities
+    type: any
+    required_for_next_step: true
+  description: Interview database schema and query entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Database schema and query entities" and answer the
+    feature question for each type. Return output database_schema_entities with
+    add, depend_on, delete, and rationale. Preserve exact ids for schema objects
+    and identify migration or constraint changes as entities when appropriate.
+
+- id: interview-messaging-integration
+  outputs:
+  - name: messaging_entities
+    type: any
+    required_for_next_step: true
+  description: Interview messaging, streaming, and integration entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Messaging, streaming, and integration entities" and
+    answer the feature question for each type. Return output messaging_entities
+    with add, depend_on, delete, and rationale. Include producer/consumer and
+    event-schema relationships in the rationale for the later relationship pass.
+
+- id: interview-frontend-web
+  outputs:
+  - name: frontend_web_entities
+    type: any
+    required_for_next_step: true
+  description: Interview frontend and web entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Frontend and web entities" and answer the feature
+    question for each type. Return output frontend_web_entities with add,
+    depend_on, delete, and rationale. Keep UI components, routes, stores, and
+    build artifacts distinct.
+
+- id: interview-client
+  outputs:
+  - name: client_entities
+    type: any
+    required_for_next_step: true
+  description: Interview mobile, desktop, and client entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Mobile, desktop, and client entities" and answer the
+    feature question for each type. Return output client_entities with add,
+    depend_on, delete, and rationale. Use empty results for platforms the feature
+    does not touch.
+
+- id: interview-build-dependencies
+  outputs:
+  - name: build_dependency_entities
+    type: any
+    required_for_next_step: true
+  description: Interview build, package, and dependency entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Build, package, and dependency entities" and answer
+    the feature question for each type. Return output build_dependency_entities
+    with add, depend_on, delete, and rationale, including package-manager or
+    generated-artifact implications where supported by evidence.
+
+- id: interview-testing-quality
+  outputs:
+  - name: testing_quality_entities
+    type: any
+    required_for_next_step: true
+  description: Interview testing and quality entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Testing and quality entities" and answer the feature
+    question for each type. Return output testing_quality_entities with add,
+    depend_on, delete, and rationale. Identify required test suites, fixtures,
+    quality gates, and test cases explicitly.
+
+- id: interview-cicd-release
+  outputs:
+  - name: cicd_release_entities
+    type: any
+    required_for_next_step: true
+  description: Interview CI/CD and release entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "CI/CD and release entities" and answer the feature
+    question for each type. Return output cicd_release_entities with add,
+    depend_on, delete, and rationale. Include pipeline, release, and deployment
+    dependencies only when required by the outcomes.
+
+- id: interview-containers
+  outputs:
+  - name: container_entities
+    type: any
+    required_for_next_step: true
+  description: Interview container and Kubernetes entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Containers and Kubernetes entities" and answer the
+    feature question for each type. Return output container_entities with add,
+    depend_on, delete, and rationale. Do not assume container infrastructure for
+    a feature without repository evidence.
+
+- id: interview-infrastructure-networking
+  outputs:
+  - name: infrastructure_entities
+    type: any
+    required_for_next_step: true
+  description: Interview infrastructure and networking entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Infrastructure and networking entities" and answer
+    the feature question for each type. Return output infrastructure_entities
+    with add, depend_on, delete, and rationale.
+
+- id: interview-cloud
+  outputs:
+  - name: cloud_entities
+    type: any
+    required_for_next_step: true
+  description: Interview cloud and AWS entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Cloud and AWS entities" and answer the feature
+    question for each type. Return output cloud_entities with add, depend_on,
+    delete, and rationale. Use exact provider resources only when current context
+    or the feature requires them.
+
+- id: interview-iac-configuration
+  outputs:
+  - name: iac_entities
+    type: any
+    required_for_next_step: true
+  description: Interview infrastructure-as-code and configuration entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Infrastructure-as-code and configuration entities"
+    and answer the feature question for each type. Return output iac_entities with
+    add, depend_on, delete, and rationale, including configuration files and
+    deployment declarations where applicable.
+
+- id: interview-security-compliance
+  outputs:
+  - name: security_entities
+    type: any
+    required_for_next_step: true
+  description: Interview security, identity, and compliance entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Security, identity, and compliance entities" and
+    answer the feature question for each type. Return output security_entities
+    with add, depend_on, delete, and rationale. Treat access control, secrets,
+    identities, and compliance obligations as explicit dependencies.
+
+- id: interview-observability
+  outputs:
+  - name: observability_entities
+    type: any
+    required_for_next_step: true
+  description: Interview observability and operations entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Observability and operations entities" and answer the
+    feature question for each type. Return output observability_entities with
+    add, depend_on, delete, and rationale, including logs, metrics, alerts, and
+    runbooks when needed to operate the outcome.
+
+- id: interview-architecture-docs-workflow
+  outputs:
+  - name: architecture_docs_entities
+    type: any
+    required_for_next_step: true
+  description: Interview architecture, ML, documentation, and workflow entity types.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Walk every type under "Architecture, ML, docs, and workflow entities" and
+    answer the feature question for each type. Return output architecture_docs_entities
+    with add, depend_on, delete, and rationale. Include specifications, decisions,
+    workflows, and documentation needed to make the design durable.
+
+- id: interview-relationships
+  description: Identify all relationships changed by the entity decisions.
+  actions: [read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Reconcile every prior entity interview against the current
+    entity_relationships. For each relationship type needed by the feature, ask:
+    "Given the proposed entities and dependencies, which relationships must be
+    added, updated, or deleted so the feature is complete and the architecture
+    remains coherent?" Return output relationship_changes with add, update,
+    delete, and rationale. Every relationship must name exact source and target
+    ids, a relationship value, and a unique id. Do not reference an entity that
+    is absent from the current model or prior additions.
+  outputs:
+  - name: relationship_changes
+    type: any
+    required_for_next_step: true
+
+- id: draft-proposal
+  description: Synthesize the interview into a specification-v1 proposal document.
+  actions: [edit, yaml_edit, file_management, read_document]
+  step_type: freeform
+  llm_type: high_reasoning
+  details: >-
+    Synthesize all interview outputs into one new proposal document at
+    docs/proposals/<work-item-name>/feature-pr-specification.yaml. Use schema
+    https://powdrr.io/schemas/specification-v1 and the repository's feature/PR
+    specification-v1 shape. Include only changes required for the feature, with
+    requirements, approach, entities, entity_relationships, invariants, guidance,
+    features, decisions, acceptance criteria, expected tests, expected outcomes,
+    non_goals, and risks as applicable. New records use action: added; deleted
+    records use action: removed; updates use action: supercedes with an explicit
+    same-section reference when that section supports state/action semantics.
+    Keep ids unique across the document. Use yaml_edit to create or update the
+    document, then choose next_step. Do not claim validation success yet.
+
+- id: evaluate-proposal
+  description: Deterministically validate the synthesized specification-v1 proposal.
+  actions: []
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: Invoke the declared evaluator exactly once and pass its complete result onward.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/feature-pr-specification.yaml
+  outputs:
+  - name: proposal_evaluation
+    type: any
+    required_for_next_step: true
+
+- id: repair-proposal
+  description: Repair every issue reported by the proposal evaluator.
+  actions: [yaml_edit, read_document, gather_context, goto_step]
+  step_type: freeform
+  llm_type: fast_iteration
+  prompt_catalogs: [context_types]
+  details: >-
+    Review only the latest deterministic evaluator result. Fix every reported
+    issue in docs/proposals/<work-item-name>/feature-pr-specification.yaml with
+    yaml_edit, preserving valid interview decisions and ids. Use gather_context or
+    read_document only when the evaluator identifies an unknown or missing
+    reference. After editing, choose next_step so evaluate-proposal reruns. If
+    the file is unreadable or the design cannot be repaired without losing the
+    interview, use goto_step to restart draft-proposal. Never claim validation
+    success before the deterministic evaluator reruns.
+- id: gate-proposal
+  description: Confirm that the design interview proposal validates cleanly.
+  actions: []
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when proposal evaluation exits successfully with zero issues.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: internal
+      command:
+      - powdrr-lift
+      - evaluate
+      - docs/proposals/<work-item-name>/feature-pr-specification.yaml
+  gate:
+    outcome:
+      path: returncode
+      equals: 0
+    goto_step: evaluate-proposal
+    retry_context: >-
+      The proposal still has validation issues. Inspect the latest evaluator
+      result, repair the exact reported paths, and let evaluate-proposal rerun.

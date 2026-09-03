@@ -498,7 +498,10 @@ def test_explicit_empty_step_does_not_infer_legacy_actions() -> None:
         )
     )
 
-    assert actions == (("next_step", "Advance only after this step is complete."),)
+    assert actions == (
+        ("prompt_user", "Ask one necessary human question."),
+        ("next_step", "Advance only after this step is complete."),
+    )
 
 
 def test_next_step_is_prompted_without_required_outputs() -> None:

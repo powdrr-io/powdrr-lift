@@ -7,7 +7,7 @@ when_to_use:
   staged file set is known.
 steps:
 - description: Deterministically inspect the staged file set.
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
@@ -27,7 +27,7 @@ steps:
     type: any
     required_for_next_step: true
 - description: Confirm the staged pull request scope.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -46,7 +46,7 @@ steps:
     - --cached
     - --stat
 - description: Discover validation tools for the staged languages.
-  actions: [gather_context, edit, yaml_edit, file_management, read_document, prompt_user]
+  actions: [gather_context, edit, yaml_edit, file_management, read_document]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
@@ -73,7 +73,7 @@ steps:
     type: any
     required_for_next_step: true
 - description: Run the final formatting, lint, type-check, and test passes.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   inputs:
   - name: validation_tool_obligations
@@ -120,7 +120,7 @@ steps:
     every obligation. Do not choose next_step, goto_step, or complete until the runtime gate
     reports that every obligation passed in the current epoch.
 - description: Leave the branch ready for pull request creation.
-  actions: [next_step]
+  actions: []
   step_type: invoke_tool
   llm_type: simple_task
   details: >-

@@ -6182,6 +6182,7 @@ def _validate_workflow_action_for_step(action: SkillChatAction, step: Any) -> No
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
+        and action.kind not in {"prompt_user", "next_step"}
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
@@ -7123,6 +7124,7 @@ def _validate_workflow_action_for_step_unwrapped(
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
+        and action.kind not in {"prompt_user", "next_step"}
         and not (
             action.kind == "complete" and not getattr(step, "actions_declared", False)
         )
@@ -10050,7 +10052,7 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
 
 
 def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
-    """Return only this step's declared actions, always including next_step."""
+    """Return declared actions plus the universal prompt and advance actions."""
     declared = tuple(getattr(step, "actions", ()) or ())
     if declared or getattr(step, "actions_declared", False):
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
@@ -10092,6 +10094,8 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
+    if "prompt_user" not in action_names:
+        actions.append(("prompt_user", "Ask one necessary human question."))
     if "next_step" not in action_names:
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(

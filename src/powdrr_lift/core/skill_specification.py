@@ -62,6 +62,7 @@ SUPPORTED_STEP_ACTIONS = frozenset(
         "complete",
     }
 )
+UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step"})
 SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate"})
 SUPPORTED_INTERACTION_STYLES = frozenset(
     {"engineering", "observational_review", "devils_advocate"}
@@ -1722,6 +1723,8 @@ def _optional_step_actions(value: object) -> tuple[str, ...]:
         name = _optional_string(item)
         if name is None:
             raise ValueError("Skill step actions must contain non-empty strings.")
+        if name in UNIVERSAL_STEP_ACTIONS:
+            raise ValueError(f"Skill step actions must omit universal action: {name}.")
         if name not in SUPPORTED_STEP_ACTIONS:
             raise ValueError(f"Skill step actions contains unsupported action: {name}.")
         if name in seen:

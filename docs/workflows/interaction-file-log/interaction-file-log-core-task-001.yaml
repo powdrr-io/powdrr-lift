@@ -26,8 +26,7 @@ details: 'The deterministic pre-step already gathered the context. Assign that e
   name is ''interaction-file-log-core''. Use these values as search context and verify
   repository documents before deciding what they identify.'
 llm_type: long_context
-actions:
-- next_step
+actions: []
 pre_step:
   action: gather_context
   template:

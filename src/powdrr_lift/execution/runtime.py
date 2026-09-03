@@ -271,13 +271,13 @@ class ExecutionRuntime:
         effective = self.effective_action_contract()
         if effective is None:
             return None
-        return tuple(sorted({*effective, "next_step"}))
+        return tuple(sorted({*effective, "prompt_user", "next_step"}))
 
     def validate_action(self, action_kind: str) -> tuple[str, ...]:
         effective = self.effective_action_contract()
         if effective is None or action_kind in effective:
             return ()
-        if action_kind == "next_step":
+        if action_kind in {"prompt_user", "next_step"}:
             return ()
         return (f"action {action_kind!r} is not allowed by the active step contract",)
 

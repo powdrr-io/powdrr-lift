@@ -75,7 +75,7 @@ def test_skill_round_trips_through_json() -> None:
                 id="capture-goal",
                 details="Record the user-visible outcome first.",
                 prompt_catalogs=(),
-                actions=("prompt_user",),
+                actions=(),
             ),
             SkillStep(
                 description="Pull in the system context.",
@@ -97,7 +97,7 @@ def test_skill_round_trips_through_json() -> None:
             ),
             SkillStep(
                 description="Summarize the result.",
-                actions=("next_step",),
+                actions=(),
             ),
         ),
         adversarial=True,
@@ -124,7 +124,6 @@ def test_skill_round_trips_through_json() -> None:
                 "step_type": "freeform",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
-                "actions": ["prompt_user"],
             },
             {
                 "description": "Pull in the system context.",
@@ -148,7 +147,6 @@ def test_skill_round_trips_through_json() -> None:
             {
                 "description": "Summarize the result.",
                 "step_type": "freeform",
-                "actions": ["next_step"],
             },
         ],
     }
@@ -388,10 +386,10 @@ def test_skill_validation_rejects_duplicate_step_ids() -> None:
         "steps:\n"
         "- id: repeat\n"
         "  description: First\n"
-        "  actions: [next_step]\n"
+        "  actions: []\n"
         "- id: repeat\n"
         "  description: Second\n"
-        "  actions: [next_step]\n",
+        "  actions: []\n",
         source_path=Path("repeated.yaml"),
     )
 
@@ -409,7 +407,6 @@ def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> Non
                     {
                         "description": "Filter gathered requirements.",
                         "step_type": "invoke_tool",
-                        "actions": ["next_step"],
                         "pre_step": {
                             "action": "gather_context",
                             "template": {
@@ -431,6 +428,19 @@ def test_skill_validation_accepts_invoke_tool_step_with_gather_pre_step() -> Non
     )
 
     assert report.validation_successful is True
+
+
+def test_skill_validation_rejects_explicit_universal_actions() -> None:
+    report = build_skill_validation_report(
+        "name: universal-actions\n"
+        "when_to_use: [review]\n"
+        "steps: [{description: review, actions: [prompt_user, next_step]}]\n",
+        source_path=Path("universal-actions.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["invalid_actions"]
+    assert "universal action" in report.issues[0].message
 
 
 def test_gate_step_round_trips_and_validates() -> None:
@@ -597,7 +607,7 @@ def test_skill_validation_accepts_adversarial_values() -> None:
         "name: adversarial\n"
         "adversarial: true\n"
         "when_to_use: [review]\n"
-        "steps: [{description: challenge, actions: [next_step]}]\n",
+        "steps: [{description: challenge, actions: []}]\n",
         source_path=Path("adversarial.yaml"),
     )
 
@@ -618,7 +628,7 @@ def test_skill_validation_accepts_inherited_adversarial_value() -> None:
         "name: inherited\n"
         "adversarial: null\n"
         "when_to_use: [review]\n"
-        "steps: [{description: challenge, actions: [next_step]}]\n",
+        "steps: [{description: challenge, actions: []}]\n",
         source_path=Path("inherited.yaml"),
     )
 
@@ -1155,11 +1165,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert step("generate-proposed-pr-specification").step_type == "invoke_tool"
     assert step("plan-proposed-prs").outputs[0].name == "proposed_pr_names"
     assert step("plan-proposed-prs").outputs[0].required_for_next_step
-    assert step("plan-proposed-prs").actions == (
-        "read_document",
-        "prompt_user",
-        "next_step",
-    )
+    assert step("plan-proposed-prs").actions == ("read_document",)
     plan_details = step("plan-proposed-prs").details
     assert plan_details is not None
     assert "planning-only step" in plan_details

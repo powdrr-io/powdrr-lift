@@ -6,7 +6,7 @@ when_to_use:
 - When the resolved branch must be validated through the repository's PR-preparation workflow.
 steps:
 - description: Inspect the pull request and confirm its GitHub merge status.
-  actions: [gather_context, invoke_tool, edit, yaml_edit, read_document, prompt_user]
+  actions: [gather_context, invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -36,7 +36,7 @@ steps:
     - <pr-reference>
     - --patch
 - description: Fetch the target branch and reproduce the merge conflict locally.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: simple_task
   details: >-
@@ -70,7 +70,7 @@ steps:
     - powdrr-lift
     - repository-state
 - description: Inventory each conflict and attribute the competing changes.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
@@ -117,7 +117,7 @@ steps:
     - <conflicting-symbol-or-text>
     - --oneline
 - description: Gather the relevant pull-request and commit context for each side.
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: freeform
   prompt_catalogs: [context_types]
   llm_type: long_context
@@ -167,7 +167,7 @@ steps:
     - <related-pr-number>
     - --patch
 - id: plan-resolutions
-  actions: [edit, yaml_edit, file_management, read_document, prompt_user, next_step]
+  actions: [edit, yaml_edit, file_management, read_document]
   step_type: freeform
   description: Plan the semantic resolution before editing conflict markers.
   llm_type: high_reasoning
@@ -182,7 +182,7 @@ steps:
     or documentation change. Do not edit until every conflict has a plan; if
     intent cannot be determined safely, ask one precise question.
 - id: verify-resolutions
-  actions: [invoke_tool, edit, yaml_edit, read_document, prompt_user, next_step]
+  actions: [invoke_tool, edit, yaml_edit, read_document, goto_step]
   step_type: freeform
   description: Apply and verify the conflict resolutions.
   llm_type: fast_iteration
@@ -219,7 +219,7 @@ steps:
   - tool: ref
     label: pr-prep
 - description: Run the PR-preparation workflow on the resolved merge.
-  actions: [invoke_skill, next_step]
+  actions: [invoke_skill]
   step_type: freeform
   llm_type: simple_task
   uses_skills:
@@ -232,7 +232,7 @@ steps:
     canonical formatting, lint, type-check, and test commands. Do not push or
     update the PR until finish-pr-prep reports the staged merge is ready.
 - description: Commit and push the resolved branch to the existing pull request.
-  actions: [invoke_skill, next_step]
+  actions: [invoke_skill]
   step_type: freeform
   llm_type: simple_task
   details: >-

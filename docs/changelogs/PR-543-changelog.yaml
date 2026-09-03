@@ -1,0 +1,61 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 543
+title: Align workflow actions with skill instructions
+intent:
+  problem: Skill and workflow steps can request actions that their explicit action contracts do not permit, while universal prompt and advance actions are unnecessarily repeated in every definition.
+  goal: Audit and correct all checked-in skill and workflow action contracts, make prompt_user and next_step universally available, and reject their explicit declaration.
+human-decisions:
+  - id: universal-workflow-actions
+    summary: Treat prompt_user and next_step as implicit actions available to every step; explicit inclusion is invalid.
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/skill_specification.py
+    type: modified
+    summary: Reject explicit universal actions while parsing skill, task, and template step contracts.
+    rationale: Keep one validation rule for all shared step definitions.
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    summary: Advertise and validate universal actions independently of declared tool actions.
+    rationale: Ensure the LLM can always ask the user or advance the workflow.
+  - path: src/powdrr_lift/execution/runtime.py
+    type: modified
+    summary: Include universal actions in execution runtime contracts.
+    rationale: Keep runtime enforcement consistent with prompts and parsers.
+  - path: skill-definitions
+    type: modified
+    summary: Remove universal actions and add missing actions required by step details, including goto_step and gather_context.
+    rationale: Make every skill definition executable under its declared contract.
+  - path: templates
+    type: modified
+    summary: Remove explicit universal actions from workflow templates.
+    rationale: Rely on the shared implicit-action contract.
+  - path: docs/workflows/interaction-file-log
+    type: modified
+    summary: Correct task action contracts, including invoke_tool for the staging tasks.
+    rationale: Ensure generated interaction workflows permit the actions their task instructions require.
+  - path: tests
+    type: modified
+    summary: Cover universal-action rejection, runtime availability, corrected generated workflows, and end-to-end execution.
+    rationale: Prevent future drift between instructions and executable action contracts.
+entities: []
+entity_relationships: []
+invariants:
+  - id: universal-actions-implicit-invariant
+    action: added
+    description: Every workflow step permits prompt_user and next_step without listing either action explicitly.
+    rationale: Keep essential interaction and progression capabilities available to every step.
+  - id: declared-actions-executable-invariant
+    action: added
+    description: Every non-universal action requested by a skill or workflow step is present in that step's explicit action contract.
+    rationale: Prevent the LLM from being instructed to perform an action that the runner rejects.
+guidance:
+  - id: audit-step-details-against-actions
+    action: added
+    description: When editing a skill or workflow template, compare each step's requested behavior with its allowed actions and validate the full collection.
+    rationale: Keep natural-language instructions and executable contracts synchronized.
+features:
+  - id: feature-consistent-step-action-contracts
+    action: added
+    description: Make skill and workflow step instructions executable by aligning declared actions with requested behavior and universal runtime capabilities.
+    rationale: Eliminate action-contract failures during workflow execution.
+proposed_prs: []

@@ -11,6 +11,15 @@ Use this skill to produce an architecture specification that stays consistent wi
 
 ## Workflow
 
+### Proposal overlay mode
+
+For changes to an existing architecture, keep the current specification
+read-only. Store changes as structural edits in
+`docs/proposals/<work-item-name>/design-proposal.yaml`; use `upsert_item` for
+entities, relationships, invariants, or guidance and `remove_item` for
+removals. Inspect the derived resolved graph and validate the proposal before
+editing any canonical document.
+
 1. Create the template.
    - Run `powdrr-lift architecture-specification --work-item-name <work-item-name> --entity-type <type> ...`.
    - If using MCP, call `create_architecture_specification` with the same

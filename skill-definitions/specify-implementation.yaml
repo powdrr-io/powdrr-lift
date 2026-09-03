@@ -45,7 +45,10 @@ steps:
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
-    Use the yaml_edit action for every YAML change. Its shape is
+    Use the yaml_edit action for every YAML change. For an existing design,
+    keep current-state YAML read-only and place yaml_edit-compatible operations
+    in docs/proposals/<work-item-name>/design-proposal.yaml; validate the
+    canonical graph plus those edits before advancing. Its shape is
     {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/implementation-specification.yaml","operations":[{"op":"set_value","path":["architecture_id"],"value":"<architecture-id>"},{"op":"upsert_item","section":"features","id":"feature-id","value":{"action":"added","description":"...","functional_requirements":["..."]}},{"op":"upsert_item","section":"decisions","id":"decision-id","value":{"action":"added","description":"..."}}]}. Use set_value with a JSON path array for scalar fields and upsert_item with section, id, and a complete value mapping for list entries. Keep the implementation spec aligned with the source architecture version and do not invent new ids.
 - id: evaluate-implementation
   description: Deterministically evaluate the filled implementation specification.

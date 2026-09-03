@@ -32,9 +32,7 @@ from powdrr_lift.core.execution_plan import (
     evaluate_execution_plan,
 )
 from powdrr_lift.core.design_graph import (
-    DesignEdge,
     DesignGraph,
-    DesignNode,
     DesignValidationIssue,
     ProposalValidationResult,
     build_canonical_design_graph,

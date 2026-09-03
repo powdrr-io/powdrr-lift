@@ -51,11 +51,12 @@ def test_canonical_graph_normalizes_current_yaml_and_preserves_provenance(
 
     graph = build_canonical_design_graph(tmp_path, feature_id="demo")
 
-    assert "system:requirement:req-log" in graph.nodes
-    assert graph.nodes["system:requirement:req-log"].source.endswith(
-        "demo/system-specification.yaml"
+    assert any(node["id"] == "req-log" for node in graph.nodes)
+    assert any(
+        node["source"]["file"].endswith("demo/system-specification.yaml")
+        for node in graph.nodes
     )
-    assert graph.edges[0].id == "writer-writes-entry"
+    assert graph.edges[0]["id"] == "writer-writes-entry"
 
 
 def test_proposal_resolves_without_mutating_canonical_graph(tmp_path: Path) -> None:
@@ -63,22 +64,25 @@ def test_proposal_resolves_without_mutating_canonical_graph(tmp_path: Path) -> N
     canonical = build_canonical_design_graph(tmp_path, feature_id="demo")
     proposal = {
         "base_version": canonical.version,
-        "operations": [
+        "edits": [
             {
-                "id": "op-add-writer",
-                "kind": "add_node",
-                "node": {
-                    "id": "writer",
-                    "kind": "component",
-                    "layer": "architecture",
-                    "data": {"summary": "Writes entries."},
-                },
+                "edit_id": "op-add-writer",
+                "file_path": "docs/current/demo/architecture-specification.yaml",
+                "op": "upsert_item",
+                "section": "entities",
+                "id": "writer",
+                "value": {"type": "Component", "summary": "Writes entries."},
             },
             {
-                "id": "op-update-entry",
-                "kind": "update_node",
-                "target": "entity:log-entry",
-                "set": {"summary": "A durable log entry."},
+                "edit_id": "op-update-entry",
+                "file_path": "docs/current/demo/architecture-specification.yaml",
+                "op": "upsert_item",
+                "section": "entities",
+                "id": "log-entry",
+                "value": {
+                    "type": "Artifact",
+                    "summary": "A durable log entry.",
+                },
             },
         ],
     }
@@ -87,9 +91,13 @@ def test_proposal_resolves_without_mutating_canonical_graph(tmp_path: Path) -> N
 
     assert result.valid is True
     assert result.graph is not None
-    assert "architecture:component:writer" in result.graph.nodes
-    assert canonical.nodes["architecture:entity:log-entry"].data["summary"] == (
-        "One log entry."
+    assert any(node["id"] == "writer" for node in result.graph.nodes)
+    assert any(
+        node["data"].get("summary") == "A durable log entry."
+        for node in result.graph.nodes
+    )
+    assert any(
+        node["data"].get("summary") == "One log entry." for node in canonical.nodes
     )
 
 
@@ -101,9 +109,9 @@ def test_proposal_reports_stale_base_and_rendered_context_is_explicit(
 
     result = validate_proposal(
         canonical,
-        {"base_version": "stale", "operations": []},
+        {"base_version": "stale", "edits": []},
     )
-    context = render_design_context(canonical, {"operations": []})
+    context = render_design_context(canonical, {"edits": []})
 
     assert result.valid is False
     assert result.issues[0].code == "stale_proposal"

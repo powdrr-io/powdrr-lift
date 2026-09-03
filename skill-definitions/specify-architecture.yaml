@@ -47,7 +47,10 @@ steps:
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    Use the yaml_edit action for every YAML change. Its shape is
+    Use the yaml_edit action for every YAML change. For an existing design,
+    keep current-state YAML read-only and place yaml_edit-compatible operations
+    in docs/proposals/<work-item-name>/design-proposal.yaml; validate the
+    canonical graph plus those edits before advancing. Its shape is
     {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/architecture-specification.yaml","operations":[{"op":"upsert_item","section":"entities","id":"entity-id","value":{"type":"<allowed-type>","name":"...","description":"..."}},{"op":"upsert_item","section":"relationships","id":"relationship-id","value":{"source":"entity-id","target":"entity-id","relationship":"..."}},{"op":"upsert_item","section":"invariants","id":"invariant-id","value":{"description":"...","entity_ids":["entity-id"]}}]}. Use set_value with a JSON path array for scalar or top-level list fields. Keep references explicit and make sure every invariant or guidance item points at listed entities or relationships.
   
 - id: evaluate-architecture

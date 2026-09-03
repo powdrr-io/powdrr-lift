@@ -11,6 +11,18 @@ Use this skill to draft a system specification, reconcile it with the repo's rul
 
 ## Workflow
 
+### Proposal overlay mode
+
+When updating an existing design, do not edit `docs/current` or treat the
+proposal specification files as the canonical product state. Create or update
+`docs/proposals/<work-item-name>/design-proposal.yaml` with `design-proposal`
+edits. Use the same structural primitives as `yaml_edit`: `set_value`,
+`remove_key`, `upsert_item`, and `remove_item`, each with `file_path`,
+`edit_id`, and the operation fields. Run `design-graph --feature-id
+<work-item-name> --proposal ...` to inspect the canonical graph, proposal, and
+resolved preview together. Run `validate-design-proposal` before advancing.
+The canonical graph is read-only; only the proposal edits are editable.
+
 1. Create the template.
    - Run `powdrr-lift system-specification --work-item-name <work-item-name>`.
    - If using MCP, call `create_system_specification` with the work item name.

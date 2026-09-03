@@ -45,7 +45,10 @@ steps:
   step_type: freeform
   llm_type: standard_reasoning
   details: >-
-    Use the yaml_edit action for every YAML change. Its shape is
+    Use the yaml_edit action for every YAML change. When updating an existing
+    design, current-state YAML is read-only: write structural operations to
+    docs/proposals/<work-item-name>/design-proposal.yaml and validate the merged
+    preview with design-graph and validate-design-proposal. Its shape is
     {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}},{"op":"upsert_item","section":"approach","id":"approach-id","value":{"description":"...","state":"added"}}]}. Use set_value with a JSON path array for scalar or top-level list fields, and upsert_item with section, id, and a complete value mapping for list entries. Keep each statement concrete enough that it can be validated against the work item without interpretation.
 - id: evaluate-system
   description: Deterministically evaluate the filled system specification.

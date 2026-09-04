@@ -5812,13 +5812,6 @@ def _handle_workflow_action_read_document(
         raise PowdrrExecutionError(
             "Workflow read_document action end_line must be >= start_line."
         )
-    requested_line_count = action.end_line - effective_start_line + 1
-    if requested_line_count > _MAX_DOCUMENT_CONTEXT_LINES:
-        raise PowdrrExecutionError(
-            "Workflow read_document action may request at most "
-            f"{_MAX_DOCUMENT_CONTEXT_LINES} lines."
-        )
-
     target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
     if not target_path.exists() or not target_path.is_file():
         directory = target_path.parent
@@ -5841,20 +5834,31 @@ def _handle_workflow_action_read_document(
             "compose a filename from the template id or workflow description."
         )
     lines = target_path.read_text(encoding="utf-8").splitlines()
-    if action.start_line > len(lines) and lines:
+    if lines and (action.end_line < 1 or action.start_line > len(lines)):
         raise PowdrrExecutionError(
             f"Workflow read_document action line range {action.start_line}-"
-            f"{action.end_line} is outside the document, which has "
-            f"{len(lines)} lines."
+            f"{action.end_line} has no overlap with the document, which has "
+            f"{len(lines)} lines. Request an overlapping range."
         )
 
     excerpt_start_line = max(1, action.start_line)
-    excerpt_end_line = min(action.end_line, len(lines))
+    excerpt_end_line = min(
+        action.end_line,
+        len(lines),
+        excerpt_start_line + _MAX_DOCUMENT_CONTEXT_LINES - 1,
+    )
+    document_complete = not lines or (
+        excerpt_start_line == 1 and excerpt_end_line == len(lines)
+    )
     excerpt = {
         "path": str(target_path.relative_to(state.worktree_root)),
+        "requested_start_line": action.start_line,
+        "requested_end_line": action.end_line,
         "start_line": excerpt_start_line,
         "end_line": excerpt_end_line,
         "document_line_count": len(lines),
+        "document_complete": document_complete,
+        "next_start_line": None if document_complete else excerpt_end_line + 1,
         "lines": [
             {
                 "line_number": line_number,
@@ -8163,11 +8167,6 @@ def _parse_workflow_action_read_document(
     if end_line < effective_start_line:
         raise PowdrrExecutionError(
             "Workflow read_document action end_line must be >= start_line."
-        )
-    if end_line - effective_start_line + 1 > _MAX_DOCUMENT_CONTEXT_LINES:
-        raise PowdrrExecutionError(
-            "Workflow read_document action may request at most "
-            f"{_MAX_DOCUMENT_CONTEXT_LINES} lines."
         )
     return SkillChatAction(
         kind="read_document",

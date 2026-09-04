@@ -222,7 +222,11 @@ def test_repository_read_capability_bounds_paths_and_ranges(tmp_path: Path) -> N
         context,
         {"file_path": "../README.md", "start_line": 1, "end_line": 20},
     ).valid
-    assert not adapter.validate(
+    assert adapter.validate(
         context,
         {"file_path": "README.md", "start_line": 1, "end_line": 2001},
+    ).valid
+    assert not adapter.validate(
+        context,
+        {"file_path": "README.md", "start_line": 20, "end_line": 1},
     ).valid

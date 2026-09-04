@@ -6,11 +6,14 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
+from typing import Any, TextIO, cast
 
 import pytest
 
-from powdrr_lift.core import WorkflowInstance
+from powdrr_lift.core import WorkflowInstance, save_workflow_task
 from powdrr_lift.core.workflow_template_specification import (
     instantiate_workflow_template,
 )
@@ -20,6 +23,46 @@ from powdrr_lift.workflow_task_agent import (
     run_workflow_task,
 )
 from powdrr_lift.workflow_task_scenario import LiveWorkflowTaskExchangeRecorder
+
+
+class _TeeTextIO(io.TextIOBase):
+    def __init__(self, capture: io.StringIO, display: Any) -> None:
+        self.capture = capture
+        self.display = display
+
+    def write(self, value: str) -> int:
+        self.capture.write(value)
+        written = self.display.write(value)
+        self.display.flush()
+        return written
+
+    def flush(self) -> None:
+        self.capture.flush()
+        self.display.flush()
+
+
+class _LoggingLiveRecorder(LiveWorkflowTaskExchangeRecorder):
+    def __init__(self, client: Any, log: Callable[[str], None]) -> None:
+        super().__init__(client)
+        self._log = log
+        self._roundtrip = 0
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        self._roundtrip += 1
+        self._log(f"[coding-loop] LLM roundtrip {self._roundtrip}: request sent")
+        try:
+            response = super().complete_json(messages)
+        except Exception as error:
+            self._log(
+                f"[coding-loop] LLM roundtrip {self._roundtrip}: "
+                f"transport error {type(error).__name__}: {error}"
+            )
+            raise
+        self._log(
+            f"[coding-loop] LLM roundtrip {self._roundtrip}: "
+            f"action={response.get('action', '<missing>')}"
+        )
+        return response
 
 
 def test_real_coding_loop_implements_substantial_change_in_repo_copy(
@@ -136,6 +179,17 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
         (workflow_dir / f"{later_task.task_id}.yaml").unlink()
 
     task = WorkflowInstance.from_directory(workflow_dir).tasks[2]
+    task = replace(
+        task,
+        details=(
+            f"{task.details}\n\n"
+            "Harness guidance: inspect only src/priority_queue.py and "
+            "tests/test_priority_queue.py. For read_document, always provide "
+            "file_path plus integer start_line 1 and end_line no greater than "
+            "2000. Do not request a whole-repository read."
+        ),
+    )
+    save_workflow_task(task, workflow_dir / f"{task.task_id}.yaml")
     config = WorkflowTaskAgentConfig(
         workflow_dir=workflow_dir,
         repo_root=repository,
@@ -146,12 +200,23 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
         max_roundtrips=100,
         max_stalled_roundtrips=8,
     )
-    recorder = LiveWorkflowTaskExchangeRecorder(_build_workflow_client(config, task))
     stdout = io.StringIO()
     stderr = io.StringIO()
+    recorder = _LoggingLiveRecorder(
+        _build_workflow_client(config, task),
+        lambda message: print(message, flush=True),
+    )
+    stdout_stream = _TeeTextIO(stdout, sys.stdout)
+    stderr_stream = _TeeTextIO(stderr, sys.stderr)
 
     assert (
-        run_workflow_task(config, client=recorder, stdout=stdout, stderr=stderr) == 0
+        run_workflow_task(
+            config,
+            client=recorder,
+            stdout=cast(TextIO, stdout_stream),
+            stderr=cast(TextIO, stderr_stream),
+        )
+        == 0
     ), stderr.getvalue()
     implementation = (repository / "src" / "priority_queue.py").read_text(
         encoding="utf-8"

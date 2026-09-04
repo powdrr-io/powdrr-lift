@@ -3967,25 +3967,33 @@ def _read_task_document(
             "do not infer or compose a filename."
         )
     lines = path.read_text(encoding="utf-8").splitlines()
-    effective_start_line = max(1, action.start_line)
-    if action.end_line < effective_start_line:
+    if action.end_line < action.start_line:
         raise PowdrrExecutionError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is invalid. "
             f"Request a range from 1 through {len(lines)}."
         )
-    if effective_start_line > len(lines):
+    if lines and (action.end_line < 1 or action.start_line > len(lines)):
         raise PowdrrExecutionError(
             "read_document action line range "
             f"{action.start_line}-{action.end_line} is outside the document "
-            f"with {len(lines)} lines. Request a start_line from 1 through "
-            f"{len(lines)}."
+            f"with {len(lines)} lines; the requested range has no overlap. "
+            "Request a range that overlaps the document."
         )
-    end_line = min(action.end_line, len(lines))
+    effective_start_line = max(1, action.start_line)
+    end_line = min(action.end_line, len(lines), effective_start_line + 1999)
+    document_complete = not lines or (
+        effective_start_line == 1 and end_line == len(lines)
+    )
     return {
         "path": action.file_path,
+        "requested_start_line": action.start_line,
+        "requested_end_line": action.end_line,
         "start_line": effective_start_line,
         "end_line": end_line,
+        "document_line_count": len(lines),
+        "document_complete": document_complete,
+        "next_start_line": None if document_complete else end_line + 1,
         "lines": [
             {
                 "line_number": number,

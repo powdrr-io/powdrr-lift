@@ -489,12 +489,10 @@ class RepositoryReadAdapter:
                 or not isinstance(start_line, int)
                 or isinstance(end_line, bool)
                 or not isinstance(end_line, int)
-                or start_line < 1
                 or end_line < start_line
-                or end_line - start_line + 1 > 2000
             ):
                 return ToolValidationReport(
-                    ("read_document requires a valid range of at most 2000 lines",)
+                    ("read_document requires an ordered integer line range",)
                 )
         elif not isinstance(arguments.get("recursive", False), bool):
             return ToolValidationReport(("list_files recursive must be a boolean",))

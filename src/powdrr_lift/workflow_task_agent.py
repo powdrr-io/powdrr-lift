@@ -2527,7 +2527,7 @@ def _nested_action_response_correction(
         )
     if isinstance(error, PowdrrExecutionError):
         correction += _typed_error_guidance(error)
-    if "Workflow edit action" in str(error):
+    if isinstance(error, PowdrrExecutionError) and error.action_kind == "edit":
         correction += (
             " For this edit repair, return action=edit with file_path at the top "
             "level and edits as an array; use one replace entry with integer "

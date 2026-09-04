@@ -7759,7 +7759,9 @@ def _parse_workflow_action_edit(
         )
     file_path = payload.get("file_path")
     if not isinstance(file_path, str) or not file_path.strip():
-        raise PowdrrExecutionError("Workflow edit action must include file_path.")
+        raise PowdrrExecutionError(
+            "Workflow edit action must include file_path.", action_kind="edit"
+        )
     edits = _required_edit_operations(payload.get("edits"))
     return SkillChatAction(
         kind="edit",
@@ -8792,11 +8794,15 @@ def _required_edit_operations(value: object) -> tuple[SkillChatEdit, ...]:
         value,
         (str, bytes, bytearray),
     ):
-        raise PowdrrExecutionError("Workflow edit action edits must be an array.")
+        raise PowdrrExecutionError(
+            "Workflow edit action edits must be an array.", action_kind="edit"
+        )
 
     edits = tuple(_required_edit_operation(item) for item in value)
     if not edits:
-        raise PowdrrExecutionError("Workflow edit action edits must not be empty.")
+        raise PowdrrExecutionError(
+            "Workflow edit action edits must not be empty.", action_kind="edit"
+        )
     return edits
 
 
@@ -8805,18 +8811,22 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
         value,
         (str, bytes, bytearray),
     ):
-        raise PowdrrExecutionError("Workflow edit action file_edits must be an array.")
+        raise PowdrrExecutionError(
+            "Workflow edit action file_edits must be an array.", action_kind="edit"
+        )
 
     file_edits: list[SkillChatFileEdits] = []
     for item in value:
         if not isinstance(item, dict):
             raise PowdrrExecutionError(
-                "Workflow edit action file_edits must contain objects."
+                "Workflow edit action file_edits must contain objects.",
+                action_kind="edit",
             )
         file_path = item.get("file_path")
         if not isinstance(file_path, str) or not file_path.strip():
             raise PowdrrExecutionError(
-                "Workflow edit action file_edits entries must include file_path."
+                "Workflow edit action file_edits entries must include file_path.",
+                action_kind="edit",
             )
         file_edits.append(
             SkillChatFileEdits(
@@ -8825,21 +8835,28 @@ def _required_file_edits(value: object) -> tuple[SkillChatFileEdits, ...]:
             )
         )
     if not file_edits:
-        raise PowdrrExecutionError("Workflow edit action file_edits must not be empty.")
+        raise PowdrrExecutionError(
+            "Workflow edit action file_edits must not be empty.", action_kind="edit"
+        )
     return tuple(file_edits)
 
 
 def _required_edit_operation(value: object) -> SkillChatEdit:
     if not isinstance(value, dict):
-        raise PowdrrExecutionError("Workflow edit action edits must be objects.")
+        raise PowdrrExecutionError(
+            "Workflow edit action edits must be objects.", action_kind="edit"
+        )
 
     kind = value.get("kind")
     if not isinstance(kind, str) or not kind.strip():
-        raise PowdrrExecutionError("Workflow edit action edit kind must be a string.")
+        raise PowdrrExecutionError(
+            "Workflow edit action edit kind must be a string.", action_kind="edit"
+        )
     normalized_kind = kind.strip()
     if normalized_kind not in {"add", "remove", "replace"}:
         raise PowdrrExecutionError(
-            "Workflow edit action edit kind must be add, remove, or replace."
+            "Workflow edit action edit kind must be add, remove, or replace.",
+            action_kind="edit",
         )
 
     start_line = _required_edit_line_number(
@@ -8852,20 +8869,23 @@ def _required_edit_operation(value: object) -> SkillChatEdit:
         end_line = _required_edit_line_number(end_line_value, field_name="end_line")
         if end_line < start_line:
             raise PowdrrExecutionError(
-                "Workflow edit action end_line must be >= start_line."
+                "Workflow edit action end_line must be >= start_line.",
+                action_kind="edit",
             )
 
     text_value = value.get("text")
     if normalized_kind in {"add", "replace"}:
         if not isinstance(text_value, str):
             raise PowdrrExecutionError(
-                "Workflow edit action add/replace edits must include text."
+                "Workflow edit action add/replace edits must include text.",
+                action_kind="edit",
             )
         text = text_value
     else:
         if text_value is not None:
             raise PowdrrExecutionError(
-                "Workflow edit action remove edits must not include text."
+                "Workflow edit action remove edits must not include text.",
+                action_kind="edit",
             )
         text = None
         if end_line is None:
@@ -8882,7 +8902,8 @@ def _required_edit_operation(value: object) -> SkillChatEdit:
 def _required_edit_line_number(value: object, *, field_name: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise PowdrrExecutionError(
-            f"Workflow edit action {field_name} must be a positive integer."
+            f"Workflow edit action {field_name} must be a positive integer.",
+            action_kind="edit",
         )
     return value
 

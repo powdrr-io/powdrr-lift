@@ -3996,6 +3996,8 @@ def _prompt_transcript(
 def _prompt_step_context(
     execution_context: Sequence[str],
     durable_facts: Mapping[str, Mapping[str, Any]] | None = None,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    current_step_index: int | None = None,
 ) -> list[str]:
     """Bound recurring step context while retaining the newest handoff facts."""
     result_prefixes = (
@@ -4004,8 +4006,16 @@ def _prompt_step_context(
         "Document context: ",
         "Gate failed: ",
     )
+    keep_current_gather = any(
+        event.get("kind") == "gather_context"
+        and event.get("step_index") == current_step_index
+        for event in execution_events
+    )
     execution_context = [
-        value for value in execution_context if not value.startswith(result_prefixes)
+        value
+        for value in execution_context
+        if keep_current_gather and value.startswith("Gathered context:\n")
+        or not value.startswith(result_prefixes)
     ]
     fact_values = {
         str(record.get("value"))
@@ -4601,7 +4611,12 @@ def _build_step_execution_messages(
         # Cross-step values must travel through declared handoff inputs. The
         # prompt helper retains explicit invocation context while removing
         # implicit tool and document results.
-        "step_context": _prompt_step_context(execution_context, durable_facts),
+        "step_context": _prompt_step_context(
+            execution_context,
+            durable_facts,
+            execution_events,
+            current_step_index,
+        ),
         "durable_facts": _prompt_durable_facts(durable_facts or {}),
         "available_tools": [
             {
@@ -6968,6 +6983,14 @@ def _validate_workflow_handoff(
             and producer.get("step_index") == current_step_index
         )
 
+    def is_prior_step_record(record: Mapping[str, Any]) -> bool:
+        producer = record.get("produced_by")
+        return (
+            isinstance(producer, Mapping)
+            and isinstance(producer.get("step_index"), int)
+            and producer["step_index"] < current_step_index
+        )
+
     required_outputs = {
         output.name for output in current_step.outputs if output.required_for_next_step
     }
@@ -6992,11 +7015,16 @@ def _validate_workflow_handoff(
             record is None
             or (
                 input_spec.source == "previous_step"
-                and not is_current_step_record(record)
+                and not (
+                    is_current_step_record(record) or is_prior_step_record(record)
+                )
             )
             or (
                 input_spec.source == "workflow_context"
                 and record.get("source") != "workflow_context"
+                and not (
+                    is_current_step_record(record) or is_prior_step_record(record)
+                )
             )
         ):
             missing_inputs.append(input_spec.name)

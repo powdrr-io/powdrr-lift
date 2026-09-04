@@ -157,6 +157,12 @@ def run_workflow_scenario(
     )
     if fixture_path is not None and not fixture_path.is_dir():
         raise WorkflowScenarioError(f"Scenario fixture does not exist: {fixture_path}")
+    max_roundtrips = (
+        max_roundtrips_override
+        if max_roundtrips_override is not None
+        else _optional_positive_int_or_none(provider.get("max_roundtrips"))
+        or (100 if provider_mode == "scripted" else 128)
+    )
     if scenario["execution_mode"] == "workflow_task":
         generated_workflow_root: Path | None = None
         if "workflow_template" in scenario:
@@ -341,6 +347,7 @@ def run_workflow_scenario(
                 root_intent=_required_text(scenario.get("request"), "scenario request"),
                 client=live_client,
                 initial_inputs=scenario_inputs,
+                max_roundtrips=max_roundtrips,
             )
         else:
             execution = _run_scripted_skill(
@@ -401,6 +408,7 @@ def _run_live_skill(
     root_intent: str,
     client: Any,
     initial_inputs: Mapping[str, Any],
+    max_roundtrips: int,
 ) -> _ScriptedSkillExecution:
     responses: list[dict[str, Any]] = []
     prompt_sizes: list[int] = []
@@ -426,7 +434,6 @@ def _run_live_skill(
         assignee_role=AgentRole.CODER,
     )
     stdout = io.StringIO()
-    stdout = io.StringIO()
     stderr = io.StringIO()
     runtime = ExecutionRuntime(
         "live-design-interview",
@@ -447,6 +454,7 @@ def _run_live_skill(
             timeout_backoff_seconds=0,
             error_log_root=worktree_root,
             runtime=runtime,
+            max_roundtrips=max_roundtrips,
         )
     except RuntimeError as exc:
         stderr.write(

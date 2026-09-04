@@ -26,6 +26,7 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
     scenario_path = tmp_path / "design-interview-live.yaml"
     scenario_path.write_text("# Scenario is assembled in the test.\n", encoding="utf-8")
     work_item_name = "live-design-interview"
+    max_roundtrips = int(os.environ.get("POWDRR_LIVE_LLM_MAX_ROUNDTRIPS", "128"))
     scenario = {
         "schema_version": 1,
         "id": "live-design-interview",
@@ -47,7 +48,7 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
             "mode": "live",
             "provider": os.environ.get("POWDRR_LIVE_LLM_PROVIDER", "auto"),
             "model": os.environ.get("POWDRR_LIVE_LLM_MODEL"),
-            "max_roundtrips": 128,
+            "max_roundtrips": max_roundtrips,
         },
         "expect": {
             "outcome": "complete",
@@ -55,7 +56,7 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
                 f"docs/proposals/{work_item_name}/design-interview-input.json",
                 f"docs/proposals/{work_item_name}/feature-pr-specification.yaml",
             ],
-            "max_roundtrips": 128,
+            "max_roundtrips": max_roundtrips,
         },
     }
 
@@ -65,14 +66,10 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
         repo_root=repository_root,
     )
 
-    assert result.status == "passed", (
-        result.stderr[-3000:],
-        len(result.llm_exchanges),
-        result.llm_exchanges[-1:],
-    )
+    assert result.status == "passed", result.stderr
     assert any(
-        event.get("kind") == "invoke_tool"
-        and event.get("parameters", {}).get("command", [None])[-2:]
+        event.get("kind") == "deterministic_pre_step"
+        and event.get("template", {}).get("command", [None])[-2:]
         == [
             "evaluate",
             f"docs/proposals/{work_item_name}/feature-pr-specification.yaml",

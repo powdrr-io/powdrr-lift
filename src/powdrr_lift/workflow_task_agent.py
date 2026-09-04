@@ -3341,6 +3341,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.handoff_records,
                 current_step_index=frame.step_index,
             )
+            self.transcript = self.transcript[:1]
             frame.step_index += 1
             self.execution_events.append(
                 {"kind": action.kind, "skill": frame.skill.skill.name}
@@ -3417,11 +3418,16 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 ),
                 runtime=self.runtime,
             )
+            gathered_context = render_gather_context_report(report)
             self.execution_events.append(
                 {
                     "kind": action.kind,
-                    "result": json.loads(render_gather_context_report(report)),
+                    "step_index": frame.step_index,
+                    "result": json.loads(gathered_context),
                 }
+            )
+            self.transcript.append(
+                {"role": "user", "content": f"Gathered context:\n{gathered_context}"}
             )
             _record_task_action_outputs(
                 action, self.handoff_records, step, frame.step_index
@@ -3630,6 +3636,7 @@ def _run_skill_for_agent_with_shared_runner(
     clean: bool = False,
     error_log_root: Path | None = None,
     runtime: ExecutionRuntime | None = None,
+    max_roundtrips: int = DEFAULT_MAX_ROUNDTRIPS,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
     transcript = [] if clean else [{"role": "user", "content": task.description}]
@@ -3691,7 +3698,7 @@ def _run_skill_for_agent_with_shared_runner(
     strategy.driver = driver
     exit_code = driver.run(
         strategy,
-        max_roundtrips=DEFAULT_MAX_ROUNDTRIPS,
+        max_roundtrips=max_roundtrips,
         signature=workflow_action_signature,
     )
     if exit_code != 0:
@@ -3717,6 +3724,7 @@ def _run_skill_for_agent(
     clean: bool = False,
     error_log_root: Path | None = None,
     runtime: ExecutionRuntime | None = None,
+    max_roundtrips: int = DEFAULT_MAX_ROUNDTRIPS,
 ) -> dict[str, Any]:
     return _run_skill_for_agent_with_shared_runner(
         skill_name,
@@ -3733,6 +3741,7 @@ def _run_skill_for_agent(
         clean=clean,
         error_log_root=error_log_root,
         runtime=runtime,
+        max_roundtrips=max_roundtrips,
     )
 
 

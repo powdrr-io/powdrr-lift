@@ -4673,6 +4673,14 @@ def _build_step_execution_messages(
     prompt_data["available_actions"] = [
         name for name, _instructions in _step_actions(current_step)
     ]
+    if "edit" in prompt_data["available_actions"]:
+        prompt_data["edit_contract"] = (
+            "For edit, return exactly one JSON object with action=edit, a string "
+            "file_path, and a non-empty edits array. Each edit must be an object "
+            "with kind add, remove, or replace; replace requires positive integer "
+            "start_line and end_line plus a string text. Do not use yaml_edit, "
+            "file_edits, operations, or a nested parameters object."
+        )
     required_output_names = [
         output.name for output in getattr(current_step, "outputs", ())
     ]

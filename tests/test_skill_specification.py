@@ -275,11 +275,11 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 0),
                 ("run-tests-and-fix.yaml", 0),
                 ("run-tests-and-fix.yaml", 4),
+                ("execute-proposed-pr.yaml", 5),
+                ("execute-proposed-pr.yaml", 6),
                 ("execute-proposed-pr.yaml", 7),
-                ("execute-proposed-pr.yaml", 8),
-                ("execute-proposed-pr.yaml", 9),
-                ("execute-proposed-pr.yaml", 12),
-                ("execute-proposed-pr.yaml", 13),
+                ("execute-proposed-pr.yaml", 10),
+                ("execute-proposed-pr.yaml", 11),
                 ("start-implementing-feature.yaml", 7),
                 ("run-tests-and-fix.yaml", 1),
                 ("run-tests-and-fix.yaml", 7),
@@ -309,7 +309,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             }
             expected_step_type = (
                 "coding_loop"
-                if (path.name, index) == ("execute-proposed-pr.yaml", 4)
+                if (path.name, index) == ("execute-proposed-pr.yaml", 2)
                 else "invoke_tool"
                 if (path.name, index) in expected_invoke_tool_steps
                 else "gate"

@@ -6676,14 +6676,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert len(workflow_state_files) == 1
     tasks = load_workflow_tasks(workflow_directory)
     assert [task.task_id for task in tasks] == [
-        f"display-related-photos-pr-001-task-{index:03d}" for index in range(1, 16)
+        f"display-related-photos-pr-001-task-{index:03d}" for index in range(1, 14)
     ], start_stdout.getvalue() + start_stderr.getvalue()
     assert [task.description for task in tasks] == [
         "Gather context about the proposed PR",
         "Create the execution plan",
-        "Generate the planned tests",
-        "Implement the planned product code",
-        "Run all tests and fix failures",
+        "Implement, test, and repair the proposed PR",
         "Review specification completeness",
         "Repair specification completeness gaps",
         "Run formatting checks",
@@ -6703,26 +6701,23 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ("task-001",),
         ("task-001", "task-002"),
         ("task-001", "task-002", "task-003"),
-        ("task-004", "task-003"),
-        ("task-001", "task-002", "task-004", "task-005"),
+        ("task-004",),
+        ("task-005",),
         ("task-006",),
         ("task-007",),
-        ("task-008",),
+        ("task-006", "task-007", "task-008"),
         ("task-009",),
-        ("task-008", "task-009", "task-010"),
-        ("task-011",),
-        ("task-001", "task-006", "task-012"),
-        ("task-004", "task-013", "task-010"),
+        ("task-001", "task-004", "task-010"),
+        ("task-003", "task-011", "task-008"),
         (
             "task-001",
+            "task-003",
             "task-004",
-            "task-005",
             "task-006",
+            "task-007",
             "task-008",
-            "task-009",
-            "task-010",
-            "task-013",
-            "task-014",
+            "task-011",
+            "task-012",
         ),
     ]
     assert all(task.status.value == "open" for task in tasks)
@@ -6802,7 +6797,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert load_ready_workflow_tasks(workflow_root) == ()
 
     execute_tasks = load_workflow_tasks(workflow_root / "display-related-photos")
-    assert len(execute_tasks) == 15
+    assert len(execute_tasks) == 13
     assert execute_tasks[0].input_state["proposed_pr"] == (
         "display-related-photos-pr-001"
     )
@@ -6810,9 +6805,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     assert [task.description for task in execute_tasks] == [
         "Gather context about the proposed PR",
         "Create the execution plan",
-        "Generate the planned tests",
-        "Implement the planned product code",
-        "Run all tests and fix failures",
+        "Implement, test, and repair the proposed PR",
         "Review specification completeness",
         "Repair specification completeness gaps",
         "Run formatting checks",

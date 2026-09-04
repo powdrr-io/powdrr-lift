@@ -149,6 +149,7 @@ def run_workflow_scenario(
             generated_workflow_root = Path(
                 tempfile.mkdtemp(prefix="powdrr-lift-live-workflow-template-")
             )
+            template_values = _template_values(scenario.get("template_values"))
             workflow_dir, _ = instantiate_workflow_template(
                 _resolve_path(
                     _required_text(
@@ -160,6 +161,7 @@ def run_workflow_scenario(
                     scenario.get("work_item_name"), "work_item_name"
                 ),
                 output_root=generated_workflow_root,
+                template_values=template_values,
             )
         else:
             workflow_dir = _resolve_path(
@@ -745,6 +747,19 @@ def _mapping_sequence(value: Any, label: str) -> list[Mapping[str, Any]]:
     ):
         raise WorkflowScenarioError(f"{label} must be a list of objects.")
     return list(value)
+
+
+def _template_values(value: Any) -> dict[str, str]:
+    if value is None:
+        return {}
+    mapping = _mapping(value, "scenario template_values")
+    if not all(
+        isinstance(key, str) and isinstance(item, str) for key, item in mapping.items()
+    ):
+        raise WorkflowScenarioError(
+            "scenario template_values must map string names to string values."
+        )
+    return dict(mapping)
 
 
 def _string_sequence(value: Any, label: str) -> list[str]:

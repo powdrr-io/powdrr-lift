@@ -326,9 +326,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert [task.description for task in template.task_templates] == [
         "Gather context about the proposed PR",
         "Create the execution plan",
-        "Generate the planned tests",
-        "Implement the planned product code",
-        "Run all tests and fix failures",
+        "Implement, test, and repair the proposed PR",
         "Review specification completeness",
         "Repair specification completeness gaps",
         "Run formatting checks",
@@ -348,8 +346,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ] == [
         "intake",
         "plan_pr",
-        "build",
-        "build",
         "validate",
         "review_specifications",
         "specify",
@@ -364,8 +360,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     ]
     assert [task.persona_id for task in template.task_templates] == [
         "architect",
-        "engineer",
-        "engineer",
         "engineer",
         "engineer",
         "specification-reviewer",
@@ -399,8 +393,6 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         ("agent", "architect"),
         ("agent", "architect"),
         ("agent", "coder"),
-        ("agent", "coder"),
-        ("agent", "reviewer"),
         ("agent", "architect"),
         ("agent", "coder"),
         ("agent", "reviewer"),
@@ -413,7 +405,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         ("agent", "reviewer"),
     ]
     assert template.task_templates[0].tool_invocations == ()
-    invoke_tool_indexes = (0, 7, 8, 9, 12, 13)
+    invoke_tool_indexes = (0, 5, 6, 7, 10, 11)
     assert [
         index
         for index, task in enumerate(template.task_templates)
@@ -424,7 +416,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         for task in template.task_templates
         if task.step_type == "freeform"
     )
-    assert freeform_details.count("Perform exactly one action") >= 7
+    assert freeform_details.count("Perform exactly one action") >= 5
     assert '"action":"edit"' in freeform_details
     assert '"action":"file_management"' in freeform_details
     assert '"action":"next_step"' in freeform_details
@@ -434,29 +426,31 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[1].input_state["proposed_pr_context"] == (
         "<upstream-task-0>.proposed-pr-context-state"
     )
-    assert template.task_templates[4].uses_skills == ()
-    assert template.task_templates[4].step_type == "coding_loop"
-    assert template.task_templates[4].actions == (
+    assert template.task_templates[2].uses_skills == ()
+    assert template.task_templates[2].step_type == "coding_loop"
+    assert template.task_templates[2].actions == (
         "invoke_tool",
         "edit",
+        "yaml_edit",
+        "file_management",
         "read_document",
     )
-    assert template.task_templates[4].coding_loop is not None
-    assert template.task_templates[4].coding_loop.verification[0].command == (
+    assert template.task_templates[2].coding_loop is not None
+    assert template.task_templates[2].coding_loop.verification[0].command == (
         "<verification-command>"
     )
-    assert template.task_templates[4].input_state["implementation_diffs"] == (
-        "<upstream-task-3>.generated-product-code-state"
+    assert template.task_templates[2].input_state["proposed_pr_context"] == (
+        "<upstream-task-0>.proposed-pr-context-state"
     )
-    assert template.task_templates[5].description == (
+    assert template.task_templates[3].description == (
         "Review specification completeness"
     )
-    assert template.task_templates[11].input_state["scope_review"] == (
-        "<upstream-task-10>.final-scope-review-state"
+    assert template.task_templates[9].input_state["scope_review"] == (
+        "<upstream-task-8>.final-scope-review-state"
     )
-    assert template.task_templates[14].uses_skills == ("finish-pr-prep",)
-    assert template.task_templates[14].input_state["staged_changes"] == (
-        "<upstream-task-13>.staged-pull-request-state"
+    assert template.task_templates[12].uses_skills == ("finish-pr-prep",)
+    assert template.task_templates[12].input_state["staged_changes"] == (
+        "<upstream-task-11>.staged-pull-request-state"
     )
     plan_details = template.task_templates[1].details or ""
     assert '"action":"next_step"' in plan_details
@@ -480,7 +474,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     )
 
     assert output_directory == tmp_path / "workflows" / "example-feature"
-    assert len(tasks) == 15
+    assert len(tasks) == 13
     assert tasks[0].task_id == "task-001"
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
@@ -493,8 +487,8 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
         "file_management",
         "read_document",
     )
-    assert tasks[4].coding_loop is not None
-    assert tasks[4].coding_loop.verification[0].command == "pytest -q"
+    assert tasks[2].coding_loop is not None
+    assert tasks[2].coding_loop.verification[0].command == "pytest -q"
 
 
 def test_checked_in_execute_workflows_do_not_terminate_on_intermediate_tasks() -> None:
@@ -535,11 +529,11 @@ def test_instantiate_execute_proposed_pr_workflow_provides_resolution_context(
     assert tasks[1].input_state["proposed_pr_context"] == (
         "interaction-file-log-pr-001-task-001.proposed-pr-context-state"
     )
-    assert tasks[4].input_state["implementation_diffs"] == (
-        "interaction-file-log-pr-001-task-004.generated-product-code-state"
+    assert tasks[2].input_state["proposed_pr_context"] == (
+        "interaction-file-log-pr-001-task-001.proposed-pr-context-state"
     )
-    assert tasks[14].input_state["staged_changes"] == (
-        "interaction-file-log-pr-001-task-014.staged-pull-request-state"
+    assert tasks[12].input_state["staged_changes"] == (
+        "interaction-file-log-pr-001-task-012.staged-pull-request-state"
     )
     assert "interaction-file-log-pr-001" in (tasks[0].details or "")
     assert "Interaction File Log" in (tasks[0].details or "")

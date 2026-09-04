@@ -7102,6 +7102,8 @@ def _validate_workflow_handoff(
         raise PowdrrExecutionError(
             "Cannot advance: the next step is missing required inputs: "
             + ", ".join(missing_inputs)
+            + "; available handoffs: "
+            + ", ".join(sorted(str(name) for name in records))
         )
     mismatched = []
     for input_spec in next_step.inputs:

@@ -8468,6 +8468,21 @@ def _run_coding_loop_verification(
             runtime=runtime,
         )
         passed = isinstance(result, Mapping) and result.get("returncode") == 0
+        status = "passed" if passed else "failed"
+        returncode = result.get("returncode") if isinstance(result, Mapping) else None
+        print(
+            f"Coding-loop verification {verification.id}: {status} (exit {returncode})",
+            file=stderr,
+            flush=True,
+        )
+        if not passed and isinstance(result, Mapping):
+            verification_stdout = result.get("stdout")
+            if isinstance(verification_stdout, str) and verification_stdout:
+                print(
+                    f"Coding-loop verification output:\n{verification_stdout[-4000:]}",
+                    file=stderr,
+                    flush=True,
+                )
         results.append(
             {
                 "id": verification.id,

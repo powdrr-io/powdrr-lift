@@ -94,6 +94,7 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
             "*.pyc",
         ),
     )
+    _initialize_git_repository(repository)
     (repository / "src" / "priority_queue.py").write_text(
         "class PriorityQueue:\n"
         "    def __init__(self) -> None:\n"
@@ -186,7 +187,10 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
             "Harness guidance: inspect only src/priority_queue.py and "
             "tests/test_priority_queue.py. For read_document, always provide "
             "file_path plus integer start_line 1 and end_line no greater than "
-            "2000. Do not request a whole-repository read."
+            "2000. Do not request a whole-repository read. The seeded tests are "
+            "authoritative and already cover the acceptance criteria; do not "
+            "edit the test file unless it is objectively incorrect. Implement "
+            "the product file and do not finish until verification passes."
         ),
     )
     save_workflow_task(task, workflow_dir / f"{task.task_id}.yaml")
@@ -246,3 +250,20 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
         and event.get("payload", {}).get("successful") is True
         for event in events
     )
+
+
+def _initialize_git_repository(repository: Path) -> None:
+    for arguments in (
+        ("init", "-b", "main"),
+        ("config", "user.name", "Coding Loop Harness"),
+        ("config", "user.email", "coding-loop-harness@example.invalid"),
+        ("add", "."),
+        ("commit", "-m", "Harness repository baseline"),
+    ):
+        subprocess.run(
+            ["git", *arguments],
+            cwd=repository,
+            capture_output=True,
+            text=True,
+            check=True,
+        )

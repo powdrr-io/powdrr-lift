@@ -438,7 +438,8 @@ def _run_live_skill(
             error_log_root=worktree_root,
             runtime=runtime,
         )
-    except RuntimeError:
+    except RuntimeError as exc:
+        stderr.write(f"Live skill runner failed: {exc}\n")
         return _ScriptedSkillExecution(
             skill=load_skill(definition_path),
             exit_code=1,

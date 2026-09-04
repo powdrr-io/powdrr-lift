@@ -3060,6 +3060,10 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step = frame.skill.skill.steps[frame.step_index]
             step = self.current_step
             if self.runtime is not None:
+                self.runtime.install_step_scope(
+                    frozenset(getattr(step, "actions", ())),
+                    enforce_empty=getattr(step, "actions_declared", False),
+                )
                 self.runtime.set_action_contract(
                     frozenset(getattr(step, "actions", ())),
                     enforce_empty=getattr(step, "actions_declared", False),
@@ -3546,7 +3550,7 @@ def _run_skill_for_agent_with_shared_runner(
             {
                 str(name): {
                     "name": str(name),
-                    "type": "any",
+                    "type": "string" if isinstance(value, str) else "any",
                     "value": value,
                     "produced_by": {"source": "task_context"},
                     "source": "task_context",

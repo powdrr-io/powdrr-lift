@@ -7,8 +7,6 @@ when_to_use:
 how_to_fill_this_out:
 - Keep the tasks in this order. Each task has one responsibility and must
   complete before the next task starts.
-- A freeform task performs one LLM-directed action. A coding_loop task is the
-  deliberate exception; it owns the inspect, implement, test, and repair loop.
 - The execute-proposed-pr template requires the `verification-command` template
   value. Discover the repository's test command from the gathered `tools`
   context, then pass that command when instantiating this template.
@@ -119,7 +117,7 @@ task_templates:
     stopping_conditions:
     - The complete test suite passes.
     - No approved implementation or test issue remains unresolved.
-    max_iterations: 20
+    max_iterations: 100
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: <upstream-task-1>.detailed-execution-plan-state

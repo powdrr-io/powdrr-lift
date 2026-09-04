@@ -1134,6 +1134,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 if generated_file_path is not None:
                     self.state.current_file_path = generated_file_path
+                if self.current_step.step_type == "invoke_tool":
+                    self.state.step_index += 1
+                    continue
             step_mapping = (
                 _resolve_llm_mapping(
                     self.current_step.llm_type or self.selection.llm_type,

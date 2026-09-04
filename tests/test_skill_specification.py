@@ -309,13 +309,16 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 7),
                 ("execute-proposed-pr.yaml", 10),
                 ("execute-proposed-pr.yaml", 11),
-                ("start-implementing-feature.yaml", 7),
+                ("start-implementing-feature.yaml", 1),
+                ("start-implementing-feature.yaml", 2),
+                ("start-implementing-feature.yaml", 3),
+                ("start-implementing-feature.yaml", 8),
                 ("run-tests-and-fix.yaml", 1),
                 ("run-tests-and-fix.yaml", 7),
-                ("start-implementing-feature.yaml", 9),
-                ("start-implementing-feature.yaml", 15),
-                ("start-implementing-feature.yaml", 18),
-                ("start-implementing-feature.yaml", 20),
+                ("start-implementing-feature.yaml", 10),
+                ("start-implementing-feature.yaml", 16),
+                ("start-implementing-feature.yaml", 19),
+                ("start-implementing-feature.yaml", 21),
                 ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
@@ -328,8 +331,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 5),
-                ("start-implementing-feature.yaml", 5),
-                ("start-implementing-feature.yaml", 11),
+                ("start-implementing-feature.yaml", 6),
+                ("start-implementing-feature.yaml", 12),
                 ("specify-a-feature.yaml", 5),
                 ("specify-a-feature.yaml", 9),
                 ("specify-a-feature.yaml", 12),
@@ -1207,44 +1210,54 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         assert pre_step is not None
         return tuple(pre_step.template["command"])
 
-    def tool_command(step_id: str) -> tuple[str, ...]:
-        assert len(step(step_id).tool_invocations) == 1
-        return step(step_id).tool_invocations[0].command
-
-    assert tool_command("discover-proposed-feature") == (
+    assert step("capture-feature-query").outputs[0].name == "feature_query"
+    assert step("capture-feature-query").outputs[0].required_for_next_step
+    assert pre_step_command("discover-proposed-feature") == (
         "fuzzy-match",
         "docs/proposals",
         "-name",
-        "<feature-name>",
+        "<feature-query>",
         "-type",
         "d",
         "-maxdepth",
         "2",
         "-print",
     )
-    assert tool_command("discover-current-feature") == (
+    assert pre_step_command("discover-current-feature") == (
         "fuzzy-match",
         "docs/current",
         "-name",
-        "<feature-name>",
+        "<feature-query>",
         "-type",
         "d",
         "-maxdepth",
         "2",
         "-print",
     )
-    assert tool_command("discover-feature-workflows") == (
+    assert pre_step_command("discover-feature-workflows") == (
         "fuzzy-match",
         "docs/workflows",
         "-name",
-        "<feature-name>",
+        "<feature-query>",
         "-type",
         "d",
         "-maxdepth",
         "3",
         "-print",
     )
-    assert step("discover-proposed-feature").step_type == "freeform"
+    for step_id, output_name in (
+        ("discover-proposed-feature", "proposed_feature_candidates"),
+        ("discover-current-feature", "current_feature_candidates"),
+        ("discover-feature-workflows", "workflow_candidates"),
+    ):
+        discovery_step = step(step_id)
+        assert discovery_step.step_type == "invoke_tool"
+        assert discovery_step.actions == ()
+        assert discovery_step.actions_declared
+        assert discovery_step.pre_step is not None
+        assert discovery_step.pre_step.template["tool"] == "fuzzy-match"
+        assert discovery_step.outputs[0].name == output_name
+        assert discovery_step.outputs[0].required_for_next_step
     assert step("select-feature-context").step_type == "freeform"
     assert step("select-feature-context").outputs[0].name == "feature_name"
     assert step("select-feature-context").outputs[0].required_for_next_step

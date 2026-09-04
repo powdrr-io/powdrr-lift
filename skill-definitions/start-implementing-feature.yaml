@@ -8,72 +8,106 @@ when_to_use:
 - When the generated planning artifacts and first task should be placed in a
   pull request for user review.
 steps:
+- id: capture-feature-query
+  description: Capture the feature name to search for.
+  actions: []
+  step_type: freeform
+  llm_type: simple_task
+  details: >-
+    Extract the feature name or identifier from the user's request without
+    selecting a canonical repository feature. Normalize surrounding prose but
+    preserve the meaningful words in the requested name. If the request does
+    not identify any feature, ask one specific question. Otherwise advance with
+    exactly one output named feature_query. The following deterministic steps
+    use this value only as a search query; they select nothing.
+  outputs:
+  - name: feature_query
+    type: string
+    required_for_next_step: true
 - id: discover-proposed-feature
   description: Discover proposed feature specification candidates.
-  actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: standard_reasoning
+  actions: []
+  step_type: invoke_tool
+  llm_type: simple_task
   details: >-
     Invoke only the declared fuzzy-match command once for docs/proposals using
     the feature name from the user's request. Do not invoke internal, shell, or
     any other tool in this step. Treat a missing root or empty result as no
     matches; do not select the feature yet.
-  tool_invocations:
-  - tool: fuzzy-match
-    command:
-    - fuzzy-match
-    - docs/proposals
-    - -name
-    - <feature-name>
-    - -type
-    - d
-    - -maxdepth
-    - "2"
-    - -print
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: fuzzy-match
+      command:
+      - fuzzy-match
+      - docs/proposals
+      - -name
+      - <feature-query>
+      - -type
+      - d
+      - -maxdepth
+      - "2"
+      - -print
+  outputs:
+  - name: proposed_feature_candidates
+    type: any
+    required_for_next_step: true
 - id: discover-current-feature
   description: Discover current feature specification candidates.
-  actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: standard_reasoning
+  actions: []
+  step_type: invoke_tool
+  llm_type: simple_task
   details: >-
     Invoke only the declared fuzzy-match command once for docs/current using
     the feature name from the user's request. Do not invoke internal, shell, or
     any other tool in this step. Treat a missing root or empty result as no
     matches; do not select the feature yet.
-  tool_invocations:
-  - tool: fuzzy-match
-    command:
-    - fuzzy-match
-    - docs/current
-    - -name
-    - <feature-name>
-    - -type
-    - d
-    - -maxdepth
-    - "2"
-    - -print
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: fuzzy-match
+      command:
+      - fuzzy-match
+      - docs/current
+      - -name
+      - <feature-query>
+      - -type
+      - d
+      - -maxdepth
+      - "2"
+      - -print
+  outputs:
+  - name: current_feature_candidates
+    type: any
+    required_for_next_step: true
 - id: discover-feature-workflows
   description: Discover execution workflow candidates.
-  actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
-  llm_type: standard_reasoning
+  actions: []
+  step_type: invoke_tool
+  llm_type: simple_task
   details: >-
     Invoke only the declared fuzzy-match command once for docs/workflows using
     the feature name from the user's request. Do not invoke internal, shell, or
     any other tool in this step. Treat a missing root or empty result as no
     matches; do not select the workflow yet.
-  tool_invocations:
-  - tool: fuzzy-match
-    command:
-    - fuzzy-match
-    - docs/workflows
-    - -name
-    - <feature-name>
-    - -type
-    - d
-    - -maxdepth
-    - "3"
-    - -print
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: fuzzy-match
+      command:
+      - fuzzy-match
+      - docs/workflows
+      - -name
+      - <feature-query>
+      - -type
+      - d
+      - -maxdepth
+      - "3"
+      - -print
+  outputs:
+  - name: workflow_candidates
+    type: any
+    required_for_next_step: true
 - id: select-feature-context
   description: Select the canonical feature and workflow context.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]

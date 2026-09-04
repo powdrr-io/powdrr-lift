@@ -270,6 +270,36 @@ def test_feature_pr_template_consumes_design_interview_input(tmp_path: Path) -> 
     ]
 
 
+def test_feature_pr_template_preserves_feature_description_when_edits_are_empty(
+    tmp_path: Path,
+) -> None:
+    interview_path = tmp_path / "design-interview-input.json"
+    interview_path.write_text(
+        json.dumps(
+            {
+                "work_item_name": "example-feature",
+                "feature_description": "Capture interaction inputs and outputs.",
+                "requirements_edits": {"added": [], "deleted": []},
+                "features_edits": {"added": [], "deleted": []},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    document = yaml.safe_load(
+        feature_planning.render_feature_pr_specification_template(
+            work_item_name="example-feature", interview_input=interview_path
+        )
+    )
+
+    assert document["requirements"][0]["description"] == (
+        "Capture interaction inputs and outputs."
+    )
+    assert document["features"][0]["description"] == (
+        "Capture interaction inputs and outputs."
+    )
+
+
 def _create_repo_with_structured_specs_and_changelogs(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

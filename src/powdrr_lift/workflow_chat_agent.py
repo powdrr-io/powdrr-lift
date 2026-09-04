@@ -8728,7 +8728,9 @@ def _required_action_string_sequence(
         (str, bytes, bytearray),
     ):
         raise PowdrrExecutionError(
-            f"Workflow gather_context action {field_name} must be an array."
+            f"Workflow gather_context action {field_name} must be an array.",
+            action_kind="gather_context",
+            remediation=(f"Return {field_name} as a non-empty JSON array of strings."),
         )
 
     normalized_values = tuple(
@@ -8736,7 +8738,9 @@ def _required_action_string_sequence(
     )
     if not normalized_values:
         raise PowdrrExecutionError(
-            f"Workflow gather_context action {field_name} must not be empty."
+            f"Workflow gather_context action {field_name} must not be empty.",
+            action_kind="gather_context",
+            remediation=(f"Return {field_name} as a non-empty JSON array of strings."),
         )
     return normalized_values
 

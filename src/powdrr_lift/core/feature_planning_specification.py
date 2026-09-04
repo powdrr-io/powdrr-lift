@@ -92,9 +92,11 @@ def render_feature_pr_specification_template(
         if not isinstance(loaded, dict):
             raise ValueError("interview_input must contain a JSON object.")
         interview = loaded
-    resolved_title = title or interview.get("feature_description")
-    if resolved_title is not None and not isinstance(resolved_title, str):
+    feature_description = interview.get("feature_description")
+    if feature_description is not None and not isinstance(feature_description, str):
         raise ValueError("feature_description must be a string when provided.")
+    feature_description = feature_description.strip() if feature_description else None
+    resolved_title = title or feature_description
     requirements_edits = interview.get("requirements_edits", {})
     if not isinstance(requirements_edits, dict):
         raise ValueError("requirements_edits must be a JSON object when provided.")
@@ -263,6 +265,14 @@ def render_feature_pr_specification_template(
             for item in deleted
             if isinstance(item, dict)
         )
+        if not items and feature_description and key in {"requirements", "features"}:
+            items = [
+                {
+                    "id": f"{normalized_work_item_name}-{key.rstrip('s')}",
+                    "description": feature_description,
+                    ("state" if key == "requirements" else "action"): "added",
+                }
+            ]
         if key in {"requirements", "approach"}:
             for item in items:
                 item.setdefault("state", "added")

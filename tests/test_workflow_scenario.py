@@ -25,23 +25,28 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
     repository_root = Path(__file__).resolve().parents[1]
     scenario_path = tmp_path / "design-interview-live.yaml"
     scenario_path.write_text("# Scenario is assembled in the test.\n", encoding="utf-8")
-    work_item_name = "live-design-interview"
+    work_item_name = "interaction-file-logging"
     max_roundtrips = int(os.environ.get("POWDRR_LIVE_LLM_MAX_ROUNDTRIPS", "128"))
     scenario = {
         "schema_version": 1,
-        "id": "live-design-interview",
+        "id": "interaction-file-logging-live",
         "definition": "skill-definitions/design-interview.yaml",
         "execution_mode": "workflow_chat",
         "request": (
-            "Run the design-interview skill for work item live-design-interview. "
-            "The feature is a small interaction log that records one human input "
-            "and one model response as structured JSONL without storing secrets."
+            "I want to specify a feature where all human and LLM interactions are "
+            "written to a file log\n\n\ninteraction-file-logging, capture all "
+            "human and llm interaction inputs and outputs. format should be json, "
+            'use a hidden directory like .powdrr and file name "interaction-log.json". '
+            "Interactions are what was the input and output of every interaction "
+            "with the user or with the LLM."
         ),
         "inputs": {
             "work_item_name": work_item_name,
             "feature_description": (
-                "Record human inputs and model responses as structured JSONL "
-                "without storing secrets."
+                "capture all human and llm interaction inputs and outputs. format "
+                "should be json, use a hidden directory like .powdrr and file name "
+                '"interaction-log.json". Interactions are what was the input and '
+                "output of every interaction with the user or with the LLM."
             ),
         },
         "provider": {
@@ -56,6 +61,27 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
                 f"docs/proposals/{work_item_name}/design-interview-input.json",
                 f"docs/proposals/{work_item_name}/feature-pr-specification.yaml",
             ],
+            "proposal_quality": {
+                "file": (
+                    f"docs/proposals/{work_item_name}/feature-pr-specification.yaml"
+                ),
+                "required_sections": [
+                    "schema",
+                    "id",
+                    "title",
+                    "requirements",
+                    "features",
+                    "intent",
+                ],
+                "non_empty_sections": ["requirements", "features", "intent"],
+                "required_text": [
+                    "interaction",
+                    "interaction-log.json",
+                    ".powdrr",
+                    "human",
+                    "LLM",
+                ],
+            },
             "max_roundtrips": max_roundtrips,
         },
     }
@@ -66,7 +92,35 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
         repo_root=repository_root,
     )
 
-    assert result.status == "passed", result.stderr
+    assert result.status == "passed", f"{result.stderr}\nassertions={result.assertions}"
+    gathered_types = {
+        context_type
+        for event in result.execution_events
+        if event.get("kind") == "gather_context"
+        for context_type in event.get("types", [])
+    }
+    assert gathered_types == {
+        "requirements",
+        "approach",
+        "entities",
+        "entity-relationships",
+        "invariants",
+        "guidance",
+        "features",
+        "human-decisions",
+        "intent",
+        "intents",
+        "acceptance_criteria",
+        "expected_tests",
+        "required_test_cases",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
+        "decisions",
+        "proposed_prs",
+        "modules",
+        "tools",
+    }
     assert any(
         event.get("kind") == "deterministic_pre_step"
         and event.get("template", {}).get("command", [None])[-2:]

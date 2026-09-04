@@ -788,6 +788,63 @@ def _evaluate_assertions(
             assertions.append(
                 _assert(field, exists is should_exist, relative_path, exists)
             )
+    proposal_quality = expect.get("proposal_quality")
+    if proposal_quality is not None:
+        quality = _mapping(proposal_quality, "proposal_quality")
+        proposal_path = worktree_root / _required_text(
+            quality.get("file"), "proposal_quality.file"
+        )
+        proposal_text = ""
+        proposal_data: Any = None
+        parse_error: str | None = None
+        try:
+            proposal_text = proposal_path.read_text(encoding="utf-8")
+            proposal_data = yaml.safe_load(proposal_text)
+        except (OSError, yaml.YAMLError) as exc:
+            parse_error = str(exc)
+        assertions.append(
+            _assert(
+                "proposal_quality.parseable",
+                parse_error is None and isinstance(proposal_data, Mapping),
+                "a YAML mapping",
+                parse_error or type(proposal_data).__name__,
+            )
+        )
+        if isinstance(proposal_data, Mapping):
+            for section in _string_sequence(
+                quality.get("required_sections"), "proposal_quality.required_sections"
+            ):
+                assertions.append(
+                    _assert(
+                        "proposal_quality.required_sections",
+                        section in proposal_data,
+                        section,
+                        sorted(str(key) for key in proposal_data),
+                    )
+                )
+            for section in _string_sequence(
+                quality.get("non_empty_sections"), "proposal_quality.non_empty_sections"
+            ):
+                value = proposal_data.get(section)
+                assertions.append(
+                    _assert(
+                        "proposal_quality.non_empty_sections",
+                        isinstance(value, (list, Mapping, str)) and bool(value),
+                        section,
+                        value,
+                    )
+                )
+        for required_text in _string_sequence(
+            quality.get("required_text"), "proposal_quality.required_text"
+        ):
+            assertions.append(
+                _assert(
+                    "proposal_quality.required_text",
+                    required_text in proposal_text,
+                    required_text,
+                    proposal_text,
+                )
+            )
     if expect.get("all_gates_passed") is True:
         failed_gates = [
             event

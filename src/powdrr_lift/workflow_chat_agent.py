@@ -7487,9 +7487,18 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     if decisions_and_context is None and nested_decisions is not None:
         decisions_and_context = _optional_string(nested_decisions)
     parser_payload = payload
-    if normalized_kind == "gather_context" and isinstance(payload.get("types"), str):
+    if normalized_kind == "gather_context" and isinstance(
+        payload.get("parameters"), Mapping
+    ):
         parser_payload = dict(payload)
-        parser_payload["types"] = [payload["types"]]
+        for name, value in payload["parameters"].items():
+            parser_payload.setdefault(name, value)
+    if normalized_kind == "gather_context" and isinstance(
+        parser_payload.get("types"), str
+    ):
+        if parser_payload is payload:
+            parser_payload = dict(payload)
+        parser_payload["types"] = [parser_payload["types"]]
     action = parser(parser_payload, decisions_and_context, llm_type)
     return replace(
         action,

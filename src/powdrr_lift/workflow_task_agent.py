@@ -597,6 +597,23 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
         if action.kind == "next_step":
             _require_coding_loop_verification(self.task, self.events)
+        elif (
+            getattr(self.task, "coding_loop", None) is not None
+            and next(
+                (
+                    event
+                    for event in reversed(self.events)
+                    if event.get("kind") == "coding_loop_verification"
+                ),
+                {},
+            ).get("all_passed")
+            is True
+        ):
+            raise PowdrrExecutionError(
+                "This coding_loop step has already passed all declared checks. "
+                "Choose next_step with the required output_state; do not perform "
+                "another edit, read, or verification run."
+            )
         if action.kind == "gather_context":
             report = invoke_repository_read(
                 "gather_context",
@@ -3595,6 +3612,17 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         **verification,
                     }
                 )
+                if verification["all_passed"]:
+                    completion_guidance = (
+                        "Automatic coding-loop verification passed all declared "
+                        "checks. The stopping conditions are satisfied; choose "
+                        "next_step now with the required output_state. Do not "
+                        "edit, reread files, or rerun verification."
+                    )
+                    self.execution_context.append(completion_guidance)
+                    self.transcript.append(
+                        {"role": "user", "content": completion_guidance}
+                    )
             return WorkflowActionOutcome()
         if action.kind == "invoke_tool":
             if action.tool in {"shell", "internal"}:

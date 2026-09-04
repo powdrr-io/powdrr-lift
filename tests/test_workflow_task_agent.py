@@ -29,6 +29,7 @@ from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     _action_system_prompt,
@@ -1604,7 +1605,51 @@ def test_read_task_document_clamps_end_line_to_document_length(
     )
 
     assert result["end_line"] == 2
+    assert result["document_line_count"] == 2
+    assert result["document_complete"] is True
+    assert result["next_start_line"] is None
     assert [line["text"] for line in result["lines"]] == ["first", "second"]
+
+
+def test_read_task_document_clamps_overlapping_range_to_context_limit(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "long.md").write_text(
+        "\n".join(f"line-{index}" for index in range(1, 2501)),
+        encoding="utf-8",
+    )
+
+    result = _read_task_document(
+        WorkflowAction(
+            kind="read_document",
+            file_path="long.md",
+            start_line=1,
+            end_line=100_000,
+        ),
+        tmp_path,
+    )
+
+    assert result["start_line"] == 1
+    assert result["end_line"] == 2000
+    assert result["document_line_count"] == 2500
+    assert result["document_complete"] is False
+    assert result["next_start_line"] == 2001
+    assert len(result["lines"]) == 2000
+
+
+def test_read_task_document_rejects_non_overlapping_range(tmp_path: Path) -> None:
+    (tmp_path / "short.md").write_text("one\ntwo\n", encoding="utf-8")
+
+    with pytest.raises(PowdrrExecutionError, match="no overlap"):
+        _read_task_document(
+            WorkflowAction(
+                kind="read_document",
+                file_path="short.md",
+                start_line=100,
+                end_line=200,
+            ),
+            tmp_path,
+        )
 
 
 def test_read_task_document_accepts_zero_to_max_lines_range(

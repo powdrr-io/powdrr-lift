@@ -3379,6 +3379,9 @@ def test_read_document_action_returns_requested_lines_as_next_context(
     assert context["document_context"]["path"] == "docs/specification.yaml"
     assert context["document_context"]["start_line"] == 2
     assert context["document_context"]["end_line"] == 3
+    assert context["document_context"]["document_line_count"] == 4
+    assert context["document_context"]["document_complete"] is False
+    assert context["document_context"]["next_start_line"] == 4
     assert [line["text"] for line in context["document_context"]["lines"]] == [
         "two",
         "three",
@@ -3467,6 +3470,49 @@ def test_read_document_action_accepts_zero_to_max_lines_range(
     assert len(context["lines"]) == 2000
     assert context["lines"][0]["line_number"] == 1
     assert context["lines"][-1]["line_number"] == 2000
+
+
+def test_read_document_action_clamps_overlapping_range_and_reports_continuation(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "long.md"
+    document.write_text(
+        "\n".join(f"line-{index}" for index in range(1, 2501)),
+        encoding="utf-8",
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    action = _parse_action_response(
+        {
+            "action": "read_document",
+            "file_path": "long.md",
+            "start_line": 1,
+            "end_line": 100_000,
+        }
+    )
+
+    assert (
+        _handle_workflow_action_read_document(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+        is True
+    )
+    context = json.loads(state.transcript[-1]["content"])["document_context"]
+    assert context["end_line"] == 2000
+    assert context["document_line_count"] == 2500
+    assert context["document_complete"] is False
+    assert context["next_start_line"] == 2001
 
 
 def test_read_document_missing_file_lists_directory_files(

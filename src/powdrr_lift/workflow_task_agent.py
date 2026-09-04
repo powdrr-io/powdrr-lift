@@ -2488,6 +2488,38 @@ def _nested_action_response_correction(
     return correction
 
 
+def _materialize_interview_input(
+    *,
+    repo_root: Path,
+    step: Any,
+    handoff_records: dict[str, dict[str, Any]],
+    step_index: int,
+) -> Path | None:
+    """Build the small generated JSON handoff without a large line edit."""
+    work_item = handoff_records.get("work_item_name", {}).get("value")
+    if not isinstance(work_item, str) or not work_item.strip():
+        return None
+    values: dict[str, Any] = {"work_item_name": work_item}
+    for input_spec in getattr(step, "inputs", ()):
+        name = input_spec.name
+        if name == "work_item_name":
+            continue
+        record = handoff_records.get(name)
+        if record is not None:
+            values[name] = record.get("value")
+    path = repo_root / "docs" / "proposals" / work_item / "design-interview-input.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(values, indent=2) + "\n", encoding="utf-8")
+    handoff_records["interview_input"] = {
+        "name": "interview_input",
+        "type": "any",
+        "value": values,
+        "produced_by": {"step_index": step_index, "action": "json_update"},
+        "scope": "skill",
+    }
+    return path
+
+
 def _action_response_correction(
     action: WorkflowAction,
     error: Exception,
@@ -3232,6 +3264,43 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     ) -> None:
         if not _is_repairable_task_response_error(error):
             raise error
+        if (
+            getattr(self.current_step, "id", None) == "store-interview-input"
+            and "Workflow edit action" in str(error)
+        ):
+            path = _materialize_interview_input(
+                repo_root=self.repo_root,
+                step=self.current_step,
+                handoff_records=self.handoff_records,
+                step_index=self.current_step_index,
+            )
+            if path is not None:
+                self.execution_events.append(
+                    {
+                        "kind": "json_update",
+                        "skill": self.current_skill.skill.name
+                        if self.current_skill
+                        else None,
+                        "step_id": self.current_step.id,
+                        "step_index": self.current_step_index,
+                        "file_path": str(path.relative_to(self.repo_root)),
+                        "source": "deterministic_repair",
+                    }
+                )
+                self.execution_context.append(
+                    "A deterministic JSON update repaired the interview input. "
+                    "Do not return edit again; choose next_step."
+                )
+                self.transcript.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "The interview JSON was repaired deterministically. "
+                            "Do not repeat edit; choose next_step."
+                        ),
+                    }
+                )
+                return
         correction = _nested_action_response_correction(
             RuntimeError(str(error)),
             allowed_actions=tuple(
@@ -3551,6 +3620,40 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
         raise PowdrrExecutionError(f"Unsupported nested skill action: {action.kind!r}")
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
+        if (
+            getattr(self.current_step, "id", None) == "store-interview-input"
+            and action.kind == "edit"
+            and "Workflow edit action" in str(error)
+        ):
+            path = _materialize_interview_input(
+                repo_root=self.repo_root,
+                step=self.current_step,
+                handoff_records=self.handoff_records,
+                step_index=self.current_step_index,
+            )
+            if path is not None:
+                self.execution_events.append(
+                    {
+                        "kind": "json_update",
+                        "skill": self.current_skill.skill.name
+                        if self.current_skill
+                        else None,
+                        "step_id": self.current_step.id,
+                        "step_index": self.current_step_index,
+                        "file_path": str(path.relative_to(self.repo_root)),
+                        "source": "deterministic_repair",
+                    }
+                )
+                self.transcript.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "The interview JSON was repaired deterministically. "
+                            "Do not repeat edit; choose next_step."
+                        ),
+                    }
+                )
+                return
         correction = _nested_action_response_correction(
             RuntimeError(str(error)),
             allowed_actions=tuple(

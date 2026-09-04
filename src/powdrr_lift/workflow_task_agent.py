@@ -2526,14 +2526,7 @@ def _nested_action_response_correction(
             "names: " + ", ".join(required_outputs) + "."
         )
     if isinstance(error, PowdrrExecutionError):
-        correction += _typed_error_guidance(error)
-    if isinstance(error, PowdrrExecutionError) and error.action_kind == "edit":
-        correction += (
-            " For this edit repair, return action=edit with file_path at the top "
-            "level and edits as an array; use one replace entry with integer "
-            "start_line, end_line, and string text. Do not return the failed "
-            "payload shape or a prose explanation."
-        )
+        correction += _typed_error_guidance(error) + error.correction_notes()
     return correction
 
 

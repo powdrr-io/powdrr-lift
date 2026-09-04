@@ -4014,7 +4014,8 @@ def _prompt_step_context(
     execution_context = [
         value
         for value in execution_context
-        if keep_current_gather and value.startswith("Gathered context:\n")
+        if keep_current_gather
+        and value.startswith("Gathered context:\n")
         or not value.startswith(result_prefixes)
     ]
     fact_values = {
@@ -4690,7 +4691,7 @@ def _build_step_execution_messages(
             "When choosing next_step, include outputs with exactly these names: "
             + ", ".join(required_output_names)
             + ". Every edit output must be present even when no changes are needed; "
-            "use {\"added\":[],\"deleted\":[]} for no changes."
+            'use {"added":[],"deleted":[]} for no changes.'
         )
     if validation_gate is not None:
         prompt_data["validation_gate"] = dict(validation_gate)
@@ -7023,16 +7024,12 @@ def _validate_workflow_handoff(
             record is None
             or (
                 input_spec.source == "previous_step"
-                and not (
-                    is_current_step_record(record) or is_prior_step_record(record)
-                )
+                and not (is_current_step_record(record) or is_prior_step_record(record))
             )
             or (
                 input_spec.source == "workflow_context"
                 and record.get("source") != "workflow_context"
-                and not (
-                    is_current_step_record(record) or is_prior_step_record(record)
-                )
+                and not (is_current_step_record(record) or is_prior_step_record(record))
             )
         ):
             missing_inputs.append(input_spec.name)

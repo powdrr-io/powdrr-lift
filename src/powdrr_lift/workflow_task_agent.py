@@ -2479,9 +2479,7 @@ def _nested_action_response_correction(
     if required_outputs:
         correction += (
             " If choosing next_step, outputs must contain exactly these declared "
-            "names: "
-            + ", ".join(required_outputs)
-            + "."
+            "names: " + ", ".join(required_outputs) + "."
         )
     if isinstance(error, PowdrrExecutionError):
         correction += _typed_error_guidance(error)
@@ -3264,10 +3262,9 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     ) -> None:
         if not _is_repairable_task_response_error(error):
             raise error
-        if (
-            getattr(self.current_step, "id", None) == "store-interview-input"
-            and "Workflow edit action" in str(error)
-        ):
+        if getattr(
+            self.current_step, "id", None
+        ) == "store-interview-input" and "Workflow edit action" in str(error):
             path = _materialize_interview_input(
                 repo_root=self.repo_root,
                 step=self.current_step,
@@ -3309,8 +3306,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 else ()
             ),
             required_outputs=tuple(
-                output.name
-                for output in getattr(self.current_step, "outputs", ())
+                output.name for output in getattr(self.current_step, "outputs", ())
             ),
         )
         if self.error_log_root is not None:
@@ -3381,14 +3377,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             )
             return WorkflowActionOutcome()
         if action.kind == "next_step":
-            if (
-                getattr(step, "id", None) == "store-interview-input"
-                and any(output.name == "interview_input" for output in step.outputs)
+            if getattr(step, "id", None) == "store-interview-input" and any(
+                output.name == "interview_input" for output in step.outputs
             ):
                 input_files = sorted(
-                    self.repo_root.glob(
-                        "docs/proposals/*/design-interview-input.json"
-                    )
+                    self.repo_root.glob("docs/proposals/*/design-interview-input.json")
                 )
                 if len(input_files) == 1:
                     action = replace(
@@ -3663,8 +3656,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             ),
             rejected_action=workflow_action_signature(action),
             required_outputs=tuple(
-                output.name
-                for output in getattr(self.current_step, "outputs", ())
+                output.name for output in getattr(self.current_step, "outputs", ())
             ),
         )
         self.execution_events.append(

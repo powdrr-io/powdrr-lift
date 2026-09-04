@@ -32,6 +32,14 @@ def test_execution_error_categories_are_distinct() -> None:
     assert len({category.__name__ for category in categories}) == len(categories)
 
 
+def test_execution_error_provides_typed_correction_notes() -> None:
+    edit_error = PowdrrExecutionError("invalid edit", action_kind="edit")
+    other_error = PowdrrExecutionError("invalid action", action_kind="next_step")
+
+    assert "action=edit" in edit_error.correction_notes()
+    assert other_error.correction_notes() == ""
+
+
 def test_runtime_surfaces_corrupt_state_as_non_correctable_error(
     tmp_path: Path,
 ) -> None:

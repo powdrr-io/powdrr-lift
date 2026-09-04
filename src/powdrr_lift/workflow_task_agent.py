@@ -2526,7 +2526,7 @@ def _nested_action_response_correction(
             "names: " + ", ".join(required_outputs) + "."
         )
     if isinstance(error, PowdrrExecutionError):
-        correction += _typed_error_guidance(error)
+        correction += _typed_error_guidance(error) + error.correction_notes()
     return correction
 
 

@@ -29,6 +29,17 @@ class PowdrrExecutionError(RuntimeError):
         self.details = dict(details or {})
         self.cause_error = cause_error
 
+    def correction_notes(self) -> str:
+        """Return additional model guidance for this typed execution error."""
+        if self.action_kind == "edit":
+            return (
+                " For this edit repair, return action=edit with file_path at the "
+                "top level and edits as an array; use one replace entry with "
+                "integer start_line, end_line, and string text. Do not return "
+                "the failed payload shape or a prose explanation."
+            )
+        return ""
+
 
 class AgentCorrectableError(PowdrrExecutionError):
     """An action can be repaired by returning a corrected request."""

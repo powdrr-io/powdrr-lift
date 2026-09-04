@@ -7515,12 +7515,18 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
     if decisions_and_context is None and nested_decisions is not None:
         decisions_and_context = _optional_string(nested_decisions)
     parser_payload = payload
-    if normalized_kind == "gather_context" and isinstance(
+    if normalized_kind in {"edit", "gather_context", "read_document"} and isinstance(
         payload.get("parameters"), Mapping
     ):
         parser_payload = dict(payload)
         for name, value in payload["parameters"].items():
             parser_payload.setdefault(name, value)
+    if normalized_kind == "edit":
+        raw_edits = parser_payload.get("edits")
+        if isinstance(raw_edits, Mapping):
+            if parser_payload is payload:
+                parser_payload = dict(payload)
+            parser_payload["edits"] = [dict(raw_edits)]
     if normalized_kind == "gather_context" and isinstance(
         parser_payload.get("types"), str
     ):

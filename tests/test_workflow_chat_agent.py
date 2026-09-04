@@ -173,6 +173,27 @@ def test_goto_step_action_requires_a_step_id() -> None:
         _parse_action_response({"action": "goto_step"})
 
 
+def test_edit_action_repair_accepts_nested_parameters_and_single_edit() -> None:
+    action = _parse_action_response(
+        {
+            "action": "edit",
+            "parameters": {
+                "file_path": "docs/proposals/example/input.json",
+                "edits": {
+                    "kind": "replace",
+                    "start_line": 1,
+                    "end_line": 1,
+                    "text": "{}\n",
+                },
+            },
+        }
+    )
+
+    assert action.kind == "edit"
+    assert action.file_path == "docs/proposals/example/input.json"
+    assert len(action.edits) == 1
+
+
 def test_execution_events_for_prompt_compacts_results_without_mutating_summary_data() -> (
     None
 ):

@@ -2461,6 +2461,8 @@ def _nested_action_response_correction(
     error: RuntimeError,
     *,
     allowed_actions: Sequence[str] = (),
+    rejected_action: str | None = None,
+    required_outputs: Sequence[str] = (),
 ) -> str:
     """Return actionable repair guidance for a nested skill response."""
     allowed = ", ".join((*allowed_actions, "next_step")) or "next_step"
@@ -2468,9 +2470,19 @@ def _nested_action_response_correction(
         f"The nested skill response was invalid: {error} "
         "Return exactly one corrected JSON object for the current nested step. "
         f'The top-level "action" must be one of: {allowed}. '
+        "Do not repeat the rejected action or its arguments. "
         "Follow the current step details and output contract exactly. "
         "Do not return markdown, prose, or a nested action object."
     )
+    if rejected_action is not None:
+        correction += f" Rejected action signature: {rejected_action}."
+    if required_outputs:
+        correction += (
+            " If choosing next_step, outputs must contain exactly these declared "
+            "names: "
+            + ", ".join(required_outputs)
+            + "."
+        )
     if isinstance(error, PowdrrExecutionError):
         correction += _typed_error_guidance(error)
     return correction
@@ -3227,6 +3239,10 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 if self.current_step is not None
                 else ()
             ),
+            required_outputs=tuple(
+                output.name
+                for output in getattr(self.current_step, "outputs", ())
+            ),
         )
         if self.error_log_root is not None:
             record_workflow_llm_error(
@@ -3536,6 +3552,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 if self.current_step is not None
                 else ()
             ),
+            rejected_action=workflow_action_signature(action),
+            required_outputs=tuple(
+                output.name
+                for output in getattr(self.current_step, "outputs", ())
+            ),
         )
         self.execution_events.append(
             {
@@ -3578,9 +3599,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
 
     def action_failure_exit_code(self, action: WorkflowAction) -> int | None:
         _ = action
-        if self.driver is not None:
-            self.driver.action_engine.reset_progress()
-        return None
+        return 1
 
     def observe_outcome(
         self,

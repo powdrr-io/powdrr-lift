@@ -3885,14 +3885,15 @@ def _execution_events_for_prompt(
     event stream as metadata while leaving the complete event stream intact
     for persistence and diagnostics.
     """
-    events = execution_events
-    if current_step_index is not None:
-        events = [
-            _sanitize_prior_step_event(event)
-            if event.get("step_index") != current_step_index
-            else event
+    events = (
+        [
+            event
             for event in execution_events
+            if event.get("step_index") == current_step_index
         ]
+        if current_step_index is not None
+        else execution_events
+    )
     return [
         {key: value for key, value in event.items() if key != "decisions_and_context"}
         for event in prune_execution_events(events, include_results=False)
@@ -3906,10 +3907,9 @@ def _latest_execution_event_for_prompt(
     """Retain the latest result separately from the compact event metadata."""
     if current_step_index is not None:
         execution_events = [
-            _sanitize_prior_step_event(event)
-            if event.get("step_index") != current_step_index
-            else event
+            event
             for event in execution_events
+            if event.get("step_index") == current_step_index
         ]
     if not execution_events:
         return None
@@ -4526,14 +4526,6 @@ def _build_step_execution_messages(
             invocation.tool
             for invocation in current_step.tool_invocations
             if invocation.tool != "ref"
-        }
-        | {
-            _INTERNAL_TOOL,
-            GIT_TOOL,
-            GH_TOOL,
-            ENRICH_TOOL,
-            VALIDATE_EDIT_TOOL,
-            APPLY_EDIT_TOOL,
         }
     )
     tool_descriptions = {

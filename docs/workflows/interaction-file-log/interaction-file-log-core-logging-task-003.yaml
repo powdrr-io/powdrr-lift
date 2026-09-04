@@ -1,0 +1,56 @@
+task_id: interaction-file-log-core-logging-task-003
+status: open
+upstream_task_ids:
+- interaction-file-log-core-logging-task-001
+- interaction-file-log-core-logging-task-002
+dependent_state:
+- implementation-and-tests-passed
+complexity: high
+input_state:
+  proposed_pr_context: interaction-file-log-core-logging-task-001.proposed-pr-context-state
+  execution_plan: interaction-file-log-core-logging-task-002.detailed-execution-plan-state
+  implementation_and_test_diffs: {}
+  test_results: {}
+assignee_type: agent
+assignee_role: coder
+output_state_type: implementation-and-test-state
+description: Implement, test, and repair the proposed PR
+workflow_template: execute-proposed-pr
+phase_type: validate
+persona_id: engineer
+step_type: coding_loop
+details: 'Work as a bounded inspect, implement, test, and repair loop. Use the proposed
+  PR context and execution plan to decide what product behavior and focused tests
+  are needed. Make the smallest safe edits in the approved scope; do not weaken tests
+  or claim success from prose. After every edit, the harness automatically runs the
+  declared full-test-suite verification command and records its exact result. Use
+  failures as evidence, repair the implementation or tests when justified, and repeat
+  until the suite passes. Finish with next_step and implementation-and-test-state
+  containing the changed paths, test coverage, and final verification evidence; next_step
+  is rejected until the latest automatic verification passes. Use only the documented
+  top-level action shapes. For edits, use {"action":"edit","file_path":"relative/path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]};
+  for multiple files use file_edits with one file_path per entry. For commands, use
+  invoke_tool with tool shell and parameters.command as a string or argv array. Do
+  not nest action fields under parameters or use old/new/content edit fields.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-core-logging''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: standard_reasoning
+actions:
+- invoke_tool
+- edit
+- yaml_edit
+- file_management
+- read_document
+coding_loop:
+  goal: Implement the proposed PR, add focused tests, and make the complete test suite
+    pass.
+  verification:
+  - id: full-test-suite
+    command: uv run --extra dev pytest
+  stopping_conditions:
+  - The complete test suite passes.
+  - No approved implementation or test issue remains unresolved.
+  max_iterations: 100

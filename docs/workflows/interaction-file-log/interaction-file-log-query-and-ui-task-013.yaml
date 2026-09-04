@@ -1,0 +1,49 @@
+task_id: interaction-file-log-query-and-ui-task-013
+status: open
+upstream_task_ids:
+- interaction-file-log-query-and-ui-task-001
+- interaction-file-log-query-and-ui-task-003
+- interaction-file-log-query-and-ui-task-004
+- interaction-file-log-query-and-ui-task-006
+- interaction-file-log-query-and-ui-task-007
+- interaction-file-log-query-and-ui-task-008
+- interaction-file-log-query-and-ui-task-011
+- interaction-file-log-query-and-ui-task-012
+dependent_state:
+- pull-request-prep-complete
+complexity: medium
+input_state:
+  proposed_pr_context: interaction-file-log-query-and-ui-task-001.proposed-pr-context-state
+  implementation_and_test_diffs: interaction-file-log-query-and-ui-task-003.implementation-and-test-state
+  all_tests_results: interaction-file-log-query-and-ui-task-003.implementation-and-test-state
+  completeness_review: interaction-file-log-query-and-ui-task-004.specification-completeness-state
+  formatting_check: interaction-file-log-query-and-ui-task-006.formatting-check-state
+  lint_check: interaction-file-log-query-and-ui-task-007.lint-check-state
+  type_check: interaction-file-log-query-and-ui-task-008.type-check-state
+  promoted_documents: interaction-file-log-query-and-ui-task-011.promoted-current-state-documents
+  staged_changes: interaction-file-log-query-and-ui-task-012.staged-pull-request-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: pull-request-prep-state
+description: Finish pull request preparation
+workflow_template: execute-proposed-pr
+phase_type: publish_pr
+persona_id: engineering-manager
+step_type: freeform
+details: 'The listed finish-pr-prep skill runs automatically because it is declared
+  in uses_skills. Do not return invoke_skill for it; doing so is recursive and will
+  be rejected. Do not independently edit, stage, commit, push, or create a pull request
+  here; the attached skill owns its validation operations. After the attached skill
+  returns, pass its complete evidence to the next workflow boundary with a separate
+  next_step action, for example: {"action":"next_step","output_state":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep
+  completed with the recorded validation evidence."}
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-query-and-ui''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: fast_iteration
+uses_skills:
+- finish-pr-prep
+actions:
+- invoke_skill

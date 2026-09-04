@@ -1,0 +1,34 @@
+task_id: interaction-file-log-query-and-ui-task-008
+status: open
+upstream_task_ids:
+- interaction-file-log-query-and-ui-task-007
+dependent_state:
+- type-checked
+complexity: medium
+input_state:
+  lint_check: interaction-file-log-query-and-ui-task-007.lint-check-state
+assignee_type: agent
+assignee_role: reviewer
+output_state_type: type-check-state
+description: Run type checks
+workflow_template: execute-proposed-pr
+phase_type: validate
+persona_id: engineer
+step_type: invoke_tool
+details: 'Assign the deterministic type-check result to type-check-state. Do not fix
+  files in this step. Finish with next_step and output_state exactly containing that
+  typed state, including the command, return code, and result.
+
+
+  Instantiation context: work item name is ''interaction-file-log''; workflow instance
+  name is ''interaction-file-log-query-and-ui''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
+llm_type: simple_task
+pre_step:
+  action: invoke_tool
+  template:
+    tool: shell
+    command:
+    - mypy
+    - src
+actions: []

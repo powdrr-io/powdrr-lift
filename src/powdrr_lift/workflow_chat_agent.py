@@ -5197,7 +5197,13 @@ def _modular_action_system_prompt(
             f"bounded to {coding_loop.max_iterations} model iterations; use the "
             "latest verification result as evidence and repair failures before "
             "choosing next_step. Do not claim verification passed without a tool "
-            "result.\n"
+            "result. If no verification result exists yet, invoke the declared "
+            "command first so you can observe the baseline, including failures. "
+            "For shell/process tools, use an argv array and omit cwd or use a "
+            "path relative to the active worktree; do not use shell operators, "
+            "absolute paths, or commands that assume an unverified filename. "
+            "Use the returned error/output to choose the next edit, then let the "
+            "automatic coding-loop verification run after each edit.\n"
         )
     if "goto_step" in action_names or "complete" in action_names:
         prompt += (

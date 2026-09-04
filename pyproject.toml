@@ -38,6 +38,9 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "real_coding_loop: opt-in live-LLM coding-loop integration test",
+]
 
 [tool.ruff]
 line-length = 88

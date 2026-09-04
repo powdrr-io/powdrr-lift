@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import io
+import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -7,13 +11,23 @@ import pytest
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
+    CodingLoopSpec,
+    CodingLoopVerification,
     TaskComplexity,
     TaskStatus,
     WorkflowInstance,
     WorkflowTask,
 )
 from powdrr_lift.workflow_scenario import load_workflow_scenario, run_workflow_scenario
-from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
+from powdrr_lift.workflow_task_agent import (
+    WorkflowTaskAgentConfig,
+    _build_workflow_client,
+    run_workflow_task,
+)
+from powdrr_lift.workflow_task_scenario import (
+    LiveWorkflowTaskExchangeRecorder,
+    run_workflow_task_scenario,
+)
 
 
 def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
@@ -45,6 +59,177 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
     assert result["exit_code"] == 0
     assert result["task_status"] == "completed"
     assert result["output_matches"] is True
+
+
+def _coding_task_agent_reacts_to_failure_and_verifies_the_fix(
+    tmp_path: Path,
+) -> None:
+    if os.environ.get("POWDRR_LIFT_RUN_LIVE_CODING_LOOP") != "1":
+        pytest.skip("set POWDRR_LIFT_RUN_LIVE_CODING_LOOP=1 to run the live test")
+    provider = "deepinfra"
+    api_key = os.environ.get("DEEPINFRA_API_TOKEN") or os.environ.get(
+        "DEEPINFRA_API_KEY"
+    )
+    if not api_key:
+        pytest.skip("set DEEPINFRA_API_TOKEN or DEEPINFRA_API_KEY to run the live test")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "skill-definitions").mkdir()
+    product_path = tmp_path / "src" / "fibonacci.py"
+    test_path = tmp_path / "tests" / "test_fibonacci.py"
+    product_path.write_text(
+        "def fibonacci(n: int) -> int:\n    raise NotImplementedError\n",
+        encoding="utf-8",
+    )
+    test_path.write_text(
+        "from src.fibonacci import fibonacci\n\n\n"
+        "def test_fibonacci_small_values() -> None:\n"
+        "    assert fibonacci(0) == 0\n"
+        "    assert fibonacci(1) == 1\n"
+        "    assert fibonacci(100) == 354224848179261915075\n\n\n"
+        "def test_fibonacci_million() -> None:\n"
+        "    value = fibonacci(1_000_000)\n"
+        "    assert len(str(value)) == 208988\n"
+        "    assert value % 10 == 5\n",
+        encoding="utf-8",
+    )
+    workflow = WorkflowInstance.create(
+        tmp_path / "workflow",
+        (
+            WorkflowTask(
+                task_id="coding-task",
+                status=TaskStatus.OPEN,
+                complexity=TaskComplexity.MEDIUM,
+                input_state={
+                    "goal": (
+                        "Add an efficient, well-tested fibonacci function that "
+                        "can compute fibonacci(1_000_000)."
+                    ),
+                },
+                description=(
+                    "Implement an efficient, well-tested fibonacci function "
+                    "that can compute fibonacci(1_000_000), then verify it."
+                ),
+                details=(
+                    "Implement the requested feature in the repository. Begin by "
+                    "running the existing tests so you can observe and understand "
+                    "any failure. Make focused production and test changes, use an "
+                    "efficient algorithm appropriate to the requested input size, "
+                    "rerun verification after edits, and repair any failures before "
+                    'returning next_step with output_state {"verified": true}. '
+                    "Follow the intrinsic coding-task action guidance for response "
+                    "shape and tool use."
+                ),
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.CODER,
+                llm_type="standard_reasoning",
+                actions=("invoke_tool", "edit"),
+                step_type="coding_loop",
+                coding_loop=CodingLoopSpec(
+                    goal="Implement and verify the efficient fibonacci feature.",
+                    verification=(
+                        CodingLoopVerification(
+                            id="pytest",
+                            command=("python", "-m", "pytest", "-q"),
+                        ),
+                    ),
+                    stopping_conditions=("pytest passes",),
+                    max_iterations=12,
+                ),
+                output_state_type="coding-task-state",
+            ),
+        ),
+    )
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow.directory,
+        repo_root=tmp_path,
+        provider=provider,
+        api_key=api_key,
+        allow_unmanaged_git=True,
+        max_roundtrips=30,
+    )
+    # Build the production client through the same provider/mapping resolver as
+    # the task runner, so DeepInfra selects the model for standard_reasoning.
+    client = LiveWorkflowTaskExchangeRecorder(
+        _build_workflow_client(config, workflow.tasks[0])
+    )
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        config,
+        client=client,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    product = product_path.read_text(encoding="utf-8")
+    test = test_path.read_text(encoding="utf-8")
+    assert product_path.is_file()
+    assert "def fibonacci" in product
+    assert "fibonacci(100)" in test
+    assert "fibonacci(1_000_000)" in test
+    assert "208988" in test
+    subprocess.run(
+        ["python", "-m", "pytest", "-q"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
+    assert completed.status is TaskStatus.COMPLETED
+    assert completed.output_state == {"verified": True}
+    durable_events = [
+        json.loads(line)
+        for line in (workflow.directory / "execution" / "coding-task" / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    event_kinds = [event["payload"].get("kind") for event in durable_events]
+    assert event_kinds.count("edit") >= 1
+    assert event_kinds.count("run_process") >= 2
+    assert event_kinds.count("next_step") >= 1
+    failed_process_evidence = [
+        event
+        for event in durable_events
+        if event["event_type"] == "evidence_recorded"
+        and event["payload"].get("evidence_type") == "capability:process"
+        and event["payload"].get("successful") is False
+    ]
+    assert failed_process_evidence, (
+        "the live agent must observe the initial pytest failure"
+    )
+    assert any(
+        event["payload"].get("evidence_type") == "capability:process"
+        and event["payload"].get("successful") is True
+        for event in durable_events
+        if event["event_type"] == "evidence_recorded"
+    )
+    verification_decision = next(
+        event
+        for event in durable_events
+        if event["event_type"] == "capability_decision"
+        and event["payload"].get("tool_name") == "process"
+    )
+    assert verification_decision["payload"]["arguments"]["command"] == [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+    ]
+    assert len(client.exchanges) >= 2
+    first_prompt = json.loads(client.exchanges[0]["input"][1]["content"])
+    assert first_prompt["task"]["step_type"] == "coding_loop"
+    assert first_prompt["task"]["coding_loop"]["verification"][0]["id"] == ("pytest")
+    assert "invoke_tool" in client.exchanges[0]["input"][0]["content"]
+    assert "edit" in client.exchanges[0]["input"][0]["content"]
+    final_prompt = json.loads(client.exchanges[-1]["input"][1]["content"])
+    assert any(
+        event["kind"] == "coding_loop_verification"
+        for event in final_prompt["events"]["recent"]
+    )
 
 
 def test_workflow_scenario_dispatches_to_task_adapter(tmp_path: Path) -> None:

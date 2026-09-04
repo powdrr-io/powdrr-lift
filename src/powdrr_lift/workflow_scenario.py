@@ -402,6 +402,16 @@ def _run_live_skill(
     client: Any,
     initial_inputs: Mapping[str, Any],
 ) -> _ScriptedSkillExecution:
+    responses: list[dict[str, Any]] = []
+    prompt_sizes: list[int] = []
+
+    class _RecordingClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            prompt_sizes.append(len(json.dumps(messages, ensure_ascii=False)))
+            response = client.complete_json(messages)
+            responses.append(dict(response))
+            return response
+
     catalog = tuple(
         SkillCatalogEntry(path, load_skill(path))
         for path in sorted(definition_path.parent.glob("*.yaml"))
@@ -428,7 +438,7 @@ def _run_live_skill(
         outcome = _run_skill_for_agent(
             "design-interview",
             catalog=catalog,
-            client=client,
+            client=_RecordingClient(),
             task=task,
             repo_root=worktree_root,
             stdout=stdout,
@@ -439,14 +449,20 @@ def _run_live_skill(
             runtime=runtime,
         )
     except RuntimeError as exc:
-        stderr.write(f"Live skill runner failed: {exc}\n")
+        stderr.write(
+            f"Live skill runner failed: {exc}; requests={len(responses)}; "
+            f"prompt_sizes={prompt_sizes}\n"
+        )
         return _ScriptedSkillExecution(
             skill=load_skill(definition_path),
             exit_code=1,
             execution_events=[],
             audit_events=[],
             roundtrips=0,
-            llm_exchanges=[],
+            llm_exchanges=[
+                [{"role": "assistant", "content": json.dumps(response)}]
+                for response in responses
+            ],
             stdout=stdout.getvalue(),
             stderr=stderr.getvalue(),
         )
@@ -456,7 +472,10 @@ def _run_live_skill(
         execution_events=list(outcome.get("events", [])),
         audit_events=[],
         roundtrips=len(outcome.get("events", [])),
-        llm_exchanges=[],
+        llm_exchanges=[
+            [{"role": "assistant", "content": json.dumps(response)}]
+            for response in responses
+        ],
         stdout=stdout.getvalue(),
         stderr=stderr.getvalue(),
     )

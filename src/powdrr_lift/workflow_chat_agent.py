@@ -3998,6 +3998,15 @@ def _prompt_step_context(
     durable_facts: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[str]:
     """Bound recurring step context while retaining the newest handoff facts."""
+    result_prefixes = (
+        "Gathered context:\n",
+        "Deterministic pre-step gather_context result:\n",
+        "Document context: ",
+        "Gate failed: ",
+    )
+    execution_context = [
+        value for value in execution_context if not value.startswith(result_prefixes)
+    ]
     fact_values = {
         str(record.get("value"))
         for record in (durable_facts or {}).values()
@@ -4597,6 +4606,9 @@ def _build_step_execution_messages(
             current_step,
             handoff_records or {},
         ),
+        # Cross-step values must travel through declared handoff inputs. The
+        # prompt helper retains explicit invocation context while removing
+        # implicit tool and document results.
         "step_context": _prompt_step_context(execution_context, durable_facts),
         "durable_facts": _prompt_durable_facts(durable_facts or {}),
         "available_tools": [
@@ -4654,6 +4666,17 @@ def _build_step_execution_messages(
     prompt_data["available_actions"] = [
         name for name, _instructions in _step_actions(current_step)
     ]
+    required_output_names = [
+        output.name for output in getattr(current_step, "outputs", ())
+    ]
+    if required_output_names:
+        prompt_data["required_output_names"] = required_output_names
+        prompt_data["output_contract"] = (
+            "When choosing next_step, include outputs with exactly these names: "
+            + ", ".join(required_output_names)
+            + ". Every edit output must be present even when no changes are needed; "
+            "use {\"added\":[],\"deleted\":[]} for no changes."
+        )
     if validation_gate is not None:
         prompt_data["validation_gate"] = dict(validation_gate)
     pre_step_event = _latest_deterministic_pre_step(
@@ -7459,7 +7482,15 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
         raise PowdrrExecutionError(
             "Workflow action outputs must be an object with named values."
         )
-    action = parser(payload, decisions_and_context, llm_type)
+    raw_outputs = dict(raw_outputs)
+    nested_decisions = raw_outputs.pop("decisions_and_context", None)
+    if decisions_and_context is None and nested_decisions is not None:
+        decisions_and_context = _optional_string(nested_decisions)
+    parser_payload = payload
+    if normalized_kind == "gather_context" and isinstance(payload.get("types"), str):
+        parser_payload = dict(payload)
+        parser_payload["types"] = [payload["types"]]
+    action = parser(parser_payload, decisions_and_context, llm_type)
     return replace(
         action,
         outputs=dict(raw_outputs),

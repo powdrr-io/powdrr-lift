@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -1175,6 +1176,28 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
         "file-mutation",
         "validate-edit",
     }
+
+
+def test_observer_action_allowance_is_one_shot_and_step_scoped(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-observer-action",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.set_action_contract(frozenset({"next_step"}))
+    runtime.allow_observer_action({"kind": "read_document"})
+
+    assert runtime.allowed_actions() == ("next_step", "prompt_user", "read_document")
+    assert runtime.validate_action("read_document") == ()
+
+    runtime.consume_observer_action(SimpleNamespace(kind="read_document"))
+    assert runtime.allowed_actions() == ("next_step", "prompt_user")
+    assert runtime.validate_action("read_document")
+
+    runtime.allow_observer_action({"kind": "read_document"})
+    runtime.install_step_scope(frozenset({"next_step"}))
+    assert runtime.allowed_actions() == ("next_step", "prompt_user")
 
 
 def test_engine_bookkeeping_temporarily_suspends_action_contract(

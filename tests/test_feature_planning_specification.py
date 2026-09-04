@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -227,6 +228,45 @@ def test_create_feature_pr_specification_template_writes_default_file(
         "expected_outcomes",
         "non_goals",
         "risks",
+    ]
+
+
+def test_feature_pr_template_consumes_design_interview_input(tmp_path: Path) -> None:
+    interview_path = tmp_path / "design-interview-input.json"
+    interview_path.write_text(
+        json.dumps(
+            {
+                "work_item_name": "example-feature",
+                "feature_description": "Support example workflows.",
+                "requirements_edits": {
+                    "added": [
+                        {
+                            "id": "requirement-example-workflows",
+                            "description": "Example workflows are supported.",
+                            "state": "added",
+                        }
+                    ],
+                    "deleted": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rendered = feature_planning.render_feature_pr_specification_template(
+        work_item_name="example-feature",
+        interview_input=interview_path,
+    )
+
+    document = yaml.safe_load(rendered)
+    assert document["id"] == "example-feature"
+    assert document["title"] == "Support example workflows."
+    assert document["requirements"] == [
+        {
+            "id": "requirement-example-workflows",
+            "description": "Example workflows are supported.",
+            "state": "added",
+        }
     ]
 
 

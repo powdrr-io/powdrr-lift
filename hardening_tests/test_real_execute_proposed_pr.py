@@ -98,6 +98,14 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
     (repository / "src" / "priority_queue.py").write_text(
         "class PriorityQueue:\n"
         "    def __init__(self) -> None:\n"
+        "        self._items = []\n\n"
+        "    def push(self, item: object, priority: int) -> None:\n"
+        "        raise NotImplementedError\n\n"
+        "    def peek(self) -> object:\n"
+        "        raise NotImplementedError\n\n"
+        "    def pop(self) -> object:\n"
+        "        raise NotImplementedError\n\n"
+        "    def empty(self) -> bool:\n"
         "        raise NotImplementedError\n",
         encoding="utf-8",
     )
@@ -153,8 +161,9 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
                 {
                     "id": "stable-priority-order",
                     "description": (
-                        "PriorityQueue orders larger priorities first and preserves "
-                        "FIFO order for equal priorities."
+                        "PriorityQueue.push(item, priority) accepts a string item "
+                        "and integer priority, orders larger priorities first, and "
+                        "preserves FIFO order for equal priorities."
                     ),
                 },
                 {

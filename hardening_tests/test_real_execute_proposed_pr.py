@@ -199,7 +199,13 @@ def test_real_coding_loop_implements_substantial_change_in_repo_copy(
             "2000. Do not request a whole-repository read. The seeded tests are "
             "authoritative and already cover the acceptance criteria; do not "
             "edit the test file unless it is objectively incorrect. Implement "
-            "the product file and do not finish until verification passes."
+            "the product file and do not finish until verification passes. Use "
+            "a monotonic insertion sequence together with heapq (or an equally "
+            "safe stable ordering) so ties are FIFO; never call list.index from "
+            "inside a list.sort key because Python temporarily empties the list "
+            "during sorting. After a failed verification, make the smallest "
+            "repair to the reported target before rereading files; do not repeat "
+            "the same read-only inspection without changing the implementation."
         ),
     )
     save_workflow_task(task, workflow_dir / f"{task.task_id}.yaml")

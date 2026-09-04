@@ -7,8 +7,8 @@ when_to_use:
 how_to_fill_this_out:
 - Keep the tasks in this order. Each task has one responsibility and must
   complete before the next task starts.
-- A freeform task performs one LLM-directed action. Do not combine discovery,
-  editing, validation, review, and repair in one task.
+- A freeform task performs one LLM-directed action. A coding_loop task is the
+  deliberate exception; it owns the inspect, implement, test, and repair loop.
 - The execute-proposed-pr template requires the `verification-command` template
   value. Discover the repository's test command from the gathered `tools`
   context, then pass that command when instantiating this template.
@@ -28,10 +28,10 @@ how_to_fill_this_out:
 - The final task should use `next_step` after persisting its output; the runner
   observes that all tasks are complete and finishes the workflow. Use `complete`
   only for an early termination condition.
-- Do not modify product code before the test-generation task completes. After
-  product code is emitted, the test-run/fix skill must report a passing full
-  suite before the remaining validation and review tasks begin. Do not create
-  a pull request before all validation and review tasks complete.
+- The coding_loop task must add or update focused tests before claiming the
+  implementation is complete, and its declared verification must pass before
+  the remaining validation and review tasks begin. Do not create a pull request
+  before all validation and review tasks complete.
 invariants:
 - id: workflow-implements-target
   relationship: implements
@@ -102,95 +102,45 @@ task_templates:
   output_state_type: detailed-execution-plan-state
   dependent_state:
   - execution-plan-created
-- description: Generate the planned tests
-  phase_type: build
-  persona_id: engineer
-  actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
-  complexity: high
-  assignee_type: agent
-  assignee_role: coder
-  llm_type: standard_reasoning
-  input_state:
-    proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    execution_plan: <upstream-task-1>.detailed-execution-plan-state
-    test_plan: []
-  details: >-
-    Perform exactly one action: edit only the test files named by the execution
-    plan. Add focused tests for the acceptance criteria and required edge cases;
-    do not edit product code, run tests, or review unrelated files. Use one
-    edit action, with file_edits when more than one test file is required. A
-    valid response after the edit looks like:
-    {"action":"edit","file_edits":[{"file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":1,"text":"new test code"}]}],"decisions_and_context":"Added the planned failing tests without changing product code."}
-    After the edit result is returned, finish the task with
-    output_state.generated-test-diffs-state containing the test paths, test
-    names, and expected failure reasons. Use next_step with that output_state.
-  output_state_type: generated-test-diffs-state
-  dependent_state:
-  - tests-generated
-- description: Implement the planned product code
-  phase_type: build
-  persona_id: engineer
-  actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
-  complexity: high
-  assignee_type: agent
-  assignee_role: coder
-  llm_type: standard_reasoning
-  input_state:
-    proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    execution_plan: <upstream-task-1>.detailed-execution-plan-state
-    generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
-    implementation_diffs: {}
-  details: >-
-    Perform exactly one action: edit the approved product files to implement the
-    proposed behavior and satisfy the failing tests. Make the smallest safe
-    change; do not weaken or delete tests, run validation, or clean unrelated
-    files. Use one edit action, with file_edits for multiple files. A valid
-    response looks like:
-    {"action":"edit","file_edits":[{"file_path":"src/feature.py","edits":[{"kind":"replace","start_line":10,"end_line":12,"text":"implementation code"}]}],"decisions_and_context":"Implemented the planned behavior in the approved product file."}
-    After the edit result is returned, finish this task with next_step and the
-    declared output_state. Use this shape, replacing the example values with
-    the actual edit evidence:
-    {"action":"next_step","output_state":{"generated-product-code-state":{"implementation_files":["src/feature.py"],"implementation_diffs":{}}},"decisions_and_context":"Implemented the planned behavior in the approved product file."}
-  output_state_type: generated-product-code-state
-  dependent_state:
-  - product-code-generated
-- description: Run all tests and fix failures
+- description: Implement, test, and repair the proposed PR
   phase_type: validate
   persona_id: engineer
-  actions: [invoke_tool, edit, read_document]
+  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
   step_type: coding_loop
   complexity: high
   assignee_type: agent
-  assignee_role: reviewer
-  llm_type: fast_iteration
+  assignee_role: coder
+  llm_type: standard_reasoning
   coding_loop:
-    goal: Make the implementation and generated tests pass the complete test suite.
+    goal: Implement the proposed PR, add focused tests, and make the complete test suite pass.
     verification:
     - id: full-test-suite
       command: <verification-command>
     stopping_conditions:
     - The complete test suite passes.
     - No approved implementation or test issue remains unresolved.
-    max_iterations: 12
+    max_iterations: 20
   input_state:
-    implementation_diffs: <upstream-task-3>.generated-product-code-state
-    generated_test_diffs: <upstream-task-2>.generated-test-diffs-state
+    proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
+    execution_plan: <upstream-task-1>.detailed-execution-plan-state
+    implementation_and_test_diffs: {}
     test_results: {}
   details: >-
-    Work as a bounded inspect, edit, verify, and repair loop. Read the current
-    implementation and generated tests, then make focused edits only in the
-    approved product and test paths. After every edit, the harness automatically
-    runs the declared full-test-suite verification command and records its exact
-    result in the task context. Use that result to repair failures rather than
-    repeating an unchanged edit. Do not claim success from memory or prose.
-    Finish with next_step and all-tests-results-state containing the exact final
-    verification command, return code, and test summary; next_step is rejected
-    until the latest automatic verification passes.
-  output_state_type: all-tests-results-state
+    Work as a bounded inspect, implement, test, and repair loop. Use the
+    proposed PR context and execution plan to decide what product behavior and
+    focused tests are needed. Make the smallest safe edits in the approved
+    scope; do not weaken tests or claim success from prose. After every edit,
+    the harness automatically runs the declared full-test-suite verification
+    command and records its exact result. Use failures as evidence, repair the
+    implementation or tests when justified, and repeat until the suite passes.
+    Finish with next_step and implementation-and-test-state containing the
+    changed paths, test coverage, and final verification evidence; next_step is
+    rejected until the latest automatic verification passes.
+    Use only the documented top-level action shapes. For edits, use
+    {"action":"edit","file_path":"relative/path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}; for multiple files use file_edits with one file_path per entry. For commands, use invoke_tool with tool shell and parameters.command as a string or argv array. Do not nest action fields under parameters or use old/new/content edit fields.
+  output_state_type: implementation-and-test-state
   dependent_state:
-  - all-tests-passed
+  - implementation-and-tests-passed
 - description: Review specification completeness
   phase_type: review_specifications
   persona_id: specification-reviewer
@@ -203,8 +153,8 @@ task_templates:
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: <upstream-task-1>.detailed-execution-plan-state
-    implementation_diffs: <upstream-task-3>.generated-product-code-state
-    all_tests_results: <upstream-task-4>.all-tests-results-state
+    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
+    all_tests_results: <upstream-task-2>.implementation-and-test-state
     completeness_review: {}
   details: >-
     Perform exactly one action: compare the implementation and test evidence to
@@ -227,7 +177,7 @@ task_templates:
   assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    completeness_review: <upstream-task-5>.specification-completeness-state
+    completeness_review: <upstream-task-3>.specification-completeness-state
     repair_result: {}
   details: >-
     Perform exactly one action only when the completeness review identifies a
@@ -251,7 +201,7 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    completeness_repair: <upstream-task-6>.completeness-repair-state
+    completeness_repair: <upstream-task-4>.completeness-repair-state
   pre_step:
     action: invoke_tool
     template:
@@ -278,7 +228,7 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    formatting_check: <upstream-task-7>.formatting-check-state
+    formatting_check: <upstream-task-5>.formatting-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -304,7 +254,7 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    lint_check: <upstream-task-8>.lint-check-state
+    lint_check: <upstream-task-6>.lint-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -329,9 +279,9 @@ task_templates:
   assignee_role: reviewer
   llm_type: high_reasoning
   input_state:
-    formatting_check: <upstream-task-7>.formatting-check-state
-    lint_check: <upstream-task-8>.lint-check-state
-    type_check: <upstream-task-9>.type-check-state
+    formatting_check: <upstream-task-5>.formatting-check-state
+    lint_check: <upstream-task-6>.lint-check-state
+    type_check: <upstream-task-7>.type-check-state
     scope_review: {}
   details: >-
     Perform exactly one action: inspect the complete diff and identify debug
@@ -360,7 +310,7 @@ task_templates:
   assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    scope_review: <upstream-task-10>.final-scope-review-state
+    scope_review: <upstream-task-8>.final-scope-review-state
     scope_repair: {}
   details: >-
     Perform exactly one action only when the scope review identifies a finding:
@@ -385,8 +335,8 @@ task_templates:
   llm_type: simple_task
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    completeness_review: <upstream-task-5>.specification-completeness-state
-    scope_repair: <upstream-task-11>.final-scope-repair-state
+    completeness_review: <upstream-task-3>.specification-completeness-state
+    scope_repair: <upstream-task-9>.final-scope-repair-state
     feature_id: <work-item-name>
   pre_step:
     action: invoke_tool
@@ -414,9 +364,9 @@ task_templates:
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    implementation_diffs: <upstream-task-3>.generated-product-code-state
-    promoted_documents: <upstream-task-12>.promoted-current-state-documents
-    type_check: <upstream-task-9>.type-check-state
+    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
+    promoted_documents: <upstream-task-10>.promoted-current-state-documents
+    type_check: <upstream-task-7>.type-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -451,14 +401,14 @@ task_templates:
   - finish-pr-prep
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    implementation_diffs: <upstream-task-3>.generated-product-code-state
-    all_tests_results: <upstream-task-4>.all-tests-results-state
-    completeness_review: <upstream-task-5>.specification-completeness-state
-    formatting_check: <upstream-task-7>.formatting-check-state
-    lint_check: <upstream-task-8>.lint-check-state
-    type_check: <upstream-task-9>.type-check-state
-    promoted_documents: <upstream-task-12>.promoted-current-state-documents
-    staged_changes: <upstream-task-13>.staged-pull-request-state
+    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
+    all_tests_results: <upstream-task-2>.implementation-and-test-state
+    completeness_review: <upstream-task-3>.specification-completeness-state
+    formatting_check: <upstream-task-5>.formatting-check-state
+    lint_check: <upstream-task-6>.lint-check-state
+    type_check: <upstream-task-7>.type-check-state
+    promoted_documents: <upstream-task-10>.promoted-current-state-documents
+    staged_changes: <upstream-task-11>.staged-pull-request-state
   details: >-
     The listed finish-pr-prep skill runs automatically because it is declared
     in uses_skills. Do not return invoke_skill for it; doing so is recursive and

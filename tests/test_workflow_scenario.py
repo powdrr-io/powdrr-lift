@@ -66,7 +66,7 @@ def test_live_design_interview_builds_a_valid_specification_v1_document(
     )
 
     assert result.status == "passed", (
-        result.stderr,
+        result.stderr[-3000:],
         len(result.llm_exchanges),
         result.llm_exchanges[-1:],
     )

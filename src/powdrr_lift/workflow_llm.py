@@ -334,7 +334,7 @@ class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):
 
     def record_action_error(self, action: Any, error: Exception) -> None: ...
 
-    def action_failure_exit_code(self, action: Any) -> int: ...
+    def action_failure_exit_code(self, action: Any) -> int | None: ...
 
     def observe_outcome(
         self,
@@ -548,7 +548,9 @@ class WorkflowStepRunner:
                     )
                     == ProgressDecision.THRESHOLD
                 ):
-                    return strategy.action_failure_exit_code(action)
+                    failure_exit_code = strategy.action_failure_exit_code(action)
+                    if failure_exit_code is not None:
+                        return failure_exit_code
                 continue
 
             self.kernel.complete(action)

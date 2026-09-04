@@ -78,10 +78,28 @@ def render_feature_pr_specification_template(
     *,
     work_item_name: str,
     title: str | None = None,
+    interview_input: str | Path | None = None,
 ) -> str:
     normalized_work_item_name = work_item_name.strip()
     if not normalized_work_item_name:
         raise ValueError("work_item_name must not be empty.")
+
+    interview: dict[str, Any] = {}
+    if interview_input is not None:
+        loaded = json.loads(Path(interview_input).read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict):
+            raise ValueError("interview_input must contain a JSON object.")
+        interview = loaded
+    resolved_title = title or interview.get("feature_description")
+    if resolved_title is not None and not isinstance(resolved_title, str):
+        raise ValueError("feature_description must be a string when provided.")
+    requirements_edits = interview.get("requirements_edits", {})
+    if not isinstance(requirements_edits, dict):
+        raise ValueError("requirements_edits must be a JSON object when provided.")
+    requirements = requirements_edits.get("added", [])
+    if not isinstance(requirements, list):
+        raise ValueError("requirements_edits.added must be a JSON array when provided.")
+    requirement_yaml = json.dumps(requirements, ensure_ascii=False)
 
     lines = [
         "# Feature and PR specification template.",
@@ -106,12 +124,10 @@ def render_feature_pr_specification_template(
         "# - Keep ids unique across the whole document.",
         "#",
         f"schema: {SPECIFICATION_SCHEMA_URL}",
-        "id: null",
-        "title: null",
-        "requirements:",
-        "  - id: null",
-        "    description: null",
-        "    state: null",
+        f"id: {json.dumps(normalized_work_item_name)}",
+        "title: "
+        f"{json.dumps(resolved_title) if resolved_title is not None else 'null'}",
+        f"requirements: {requirement_yaml if requirements else '[]'}",
         "approach:",
         "  - id: null",
         "    description: null",

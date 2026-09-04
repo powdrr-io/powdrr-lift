@@ -243,6 +243,35 @@ def test_skill_interaction_style_round_trips_and_validates() -> None:
     assert any(issue.code == "invalid_interaction_style" for issue in report.issues)
 
 
+def test_skill_round_trip_preserves_required_caller_inputs() -> None:
+    skill = Skill(
+        name="design-interview",
+        when_to_use=("Create a feature proposal.",),
+        inputs=(
+            SkillStepInput("work_item_name", "string", True, "caller"),
+            SkillStepInput("feature_description", "string", True, "caller"),
+        ),
+        steps=(SkillStep(description="Interview the caller."),),
+    )
+
+    parsed = skill_from_json(skill_to_json(skill))
+
+    assert parsed.inputs == skill.inputs
+
+    report = build_skill_validation_report(
+        yaml.safe_dump(
+            {
+                "name": "requires-input",
+                "when_to_use": ["Create a feature proposal."],
+                "inputs": [{"name": "feature_description", "source": "caller"}],
+                "steps": [{"description": "Interview the caller."}],
+            }
+        ),
+        source_path="skill.yaml",
+    )
+    assert report.validation_successful
+
+
 def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
     repository_root = Path(__file__).parents[1]
     definition_paths = sorted((repository_root / "skill-definitions").glob("*.yaml"))
@@ -291,6 +320,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
                 ("specify-a-feature.yaml", 13),
+                ("design-interview.yaml", 20),
+                ("design-interview.yaml", 22),
+                ("design-interview.yaml", 23),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -306,6 +338,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("review-architecture.yaml", 6),
                 ("run-tests-and-fix.yaml", 6),
                 ("run-tests-and-fix.yaml", 8),
+                ("design-interview.yaml", 25),
             }
             expected_step_type = (
                 "coding_loop"
@@ -836,6 +869,7 @@ def test_checked_in_skill_definitions_directory_is_valid() -> None:
         "bootstrap-code-structure",
         "create-pull-request",
         "dead-code-review",
+        "design-interview",
         "feature-functionality-review",
         "feature-test-coverage-review",
         "finish-pr-prep",

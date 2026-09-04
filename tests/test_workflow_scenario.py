@@ -1,14 +1,82 @@
 from __future__ import annotations
 
 import json
+import os
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+
+import pytest
 
 from powdrr_lift.workflow_scenario import (
     load_workflow_scenario,
     run_workflow_scenario,
 )
+
+
+@pytest.mark.skipif(
+    os.environ.get("POWDRR_LIVE_LLM_TESTS") != "1",
+    reason="Set POWDRR_LIVE_LLM_TESTS=1 to run the live provider scenario.",
+)
+def test_live_design_interview_builds_a_valid_specification_v1_document(
+    tmp_path: Path,
+) -> None:
+    """Exercise every design-interview step with actual provider responses."""
+    repository_root = Path(__file__).resolve().parents[1]
+    scenario_path = tmp_path / "design-interview-live.yaml"
+    scenario_path.write_text("# Scenario is assembled in the test.\n", encoding="utf-8")
+    work_item_name = "live-design-interview"
+    max_roundtrips = int(os.environ.get("POWDRR_LIVE_LLM_MAX_ROUNDTRIPS", "128"))
+    scenario = {
+        "schema_version": 1,
+        "id": "live-design-interview",
+        "definition": "skill-definitions/design-interview.yaml",
+        "execution_mode": "workflow_chat",
+        "request": (
+            "Run the design-interview skill for work item live-design-interview. "
+            "The feature is a small interaction log that records one human input "
+            "and one model response as structured JSONL without storing secrets."
+        ),
+        "inputs": {
+            "work_item_name": work_item_name,
+            "feature_description": (
+                "Record human inputs and model responses as structured JSONL "
+                "without storing secrets."
+            ),
+        },
+        "provider": {
+            "mode": "live",
+            "provider": os.environ.get("POWDRR_LIVE_LLM_PROVIDER", "auto"),
+            "model": os.environ.get("POWDRR_LIVE_LLM_MODEL"),
+            "max_roundtrips": max_roundtrips,
+        },
+        "expect": {
+            "outcome": "complete",
+            "required_files": [
+                f"docs/proposals/{work_item_name}/design-interview-input.json",
+                f"docs/proposals/{work_item_name}/feature-pr-specification.yaml",
+            ],
+            "max_roundtrips": max_roundtrips,
+        },
+    }
+
+    result = run_workflow_scenario(
+        scenario,
+        scenario_path=scenario_path,
+        repo_root=repository_root,
+    )
+
+    assert result.status == "passed", result.stderr
+    assert any(
+        event.get("kind") == "deterministic_pre_step"
+        and event.get("template", {}).get("command", [None])[-2:]
+        == [
+            "evaluate",
+            f"docs/proposals/{work_item_name}/feature-pr-specification.yaml",
+        ]
+        and event.get("result", {}).get("returncode") == 0
+        for event in result.execution_events
+    )
 
 
 def test_scripted_scenario_runs_real_skill_actions_in_isolated_fixture(

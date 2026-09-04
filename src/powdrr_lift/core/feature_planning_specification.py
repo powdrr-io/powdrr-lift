@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from powdrr_lift.change_log_template import (
     _git_output,
     _resolve_default_branch,
@@ -207,7 +209,133 @@ def render_feature_pr_specification_template(
     if title is not None:
         lines[lines.index("title: null")] = f"title: {json.dumps(title)}"
 
-    return "\n".join(lines)
+    template = "\n".join(lines)
+    if interview_input is None:
+        return template
+    input_path = Path(interview_input)
+    interview = json.loads(input_path.read_text(encoding="utf-8"))
+    if not isinstance(interview, dict):
+        raise ValueError("Design interview input must be a JSON object.")
+    document = yaml.safe_load(template)
+    if not isinstance(document, dict):
+        raise ValueError("Generated feature proposal template is invalid YAML.")
+    document["id"] = normalized_work_item_name
+    document["title"] = title or interview.get("feature_description")
+    section_names = (
+        "requirements",
+        "approach",
+        "entities",
+        "entity_relationships",
+        "invariants",
+        "guidance",
+        "features",
+        "human-decisions",
+        "intent",
+        "acceptance_criteria",
+        "expected_tests",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
+        "modules",
+        "tools",
+    )
+    for key in section_names:
+        value = interview.get(f"{key.replace('-', '_')}_edits")
+        if not isinstance(value, dict):
+            continue
+        added = value.get("added", [])
+        deleted = value.get("deleted", [])
+        if not isinstance(added, list) or not isinstance(deleted, list):
+            raise ValueError(f"Interview input {key}_edits must contain lists.")
+        items = [dict(item) for item in added if isinstance(item, dict)]
+        items.extend(
+            {
+                **dict(item),
+                **(
+                    {"state": "removed"}
+                    if key in {"requirements", "approach"}
+                    else {"action": "removed"}
+                ),
+                "description": dict(item).get(
+                    "description", f"Remove existing {key} item {item.get('id')}."
+                ),
+            }
+            for item in deleted
+            if isinstance(item, dict)
+        )
+        if key in {"requirements", "approach"}:
+            for item in items:
+                item.setdefault("state", "added")
+        if key == "intent":
+            intent = items[0] if items else {}
+            document[key] = {
+                "problem": intent.get(
+                    "problem",
+                    interview.get("feature_description") or "Define the feature.",
+                ),
+                "goal": intent.get(
+                    "goal",
+                    interview.get("feature_description") or "Implement the feature.",
+                ),
+                "reasoning": intent.get(
+                    "reasoning", "The feature description defines the required outcome."
+                ),
+            }
+        else:
+            document[key] = items
+    return yaml.safe_dump(document, sort_keys=False)
+
+
+def create_design_interview_input_template(
+    *,
+    work_item_name: str,
+    output_path: str | Path | None = None,
+    repo_root: str | Path | None = None,
+) -> Path:
+    repo_root_path = _resolve_repo_root(repo_root)
+    resolved = (
+        Path(output_path)
+        if output_path is not None
+        else (
+            repo_root_path
+            / "docs"
+            / "proposals"
+            / work_item_name
+            / "design-interview-input.json"
+        )
+    )
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    sections = (
+        "requirements",
+        "approach",
+        "entities",
+        "entity_relationships",
+        "invariants",
+        "guidance",
+        "features",
+        "human_decisions",
+        "intent",
+        "intents",
+        "acceptance_criteria",
+        "expected_tests",
+        "required_test_cases",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
+        "decisions",
+        "proposed_prs",
+        "modules",
+        "tools",
+    )
+    value: dict[str, Any] = {
+        "work_item_name": work_item_name,
+        "feature_description": "",
+    }
+    value.update(
+        {f"{section}_edits": {"added": [], "deleted": []} for section in sections}
+    )
+    resolved.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    return resolved
 
 
 def create_system_map_specification_template(
@@ -249,6 +377,7 @@ def create_feature_pr_specification_template(
     output_path: str | Path | None = None,
     repo_root: str | Path | None = None,
     title: str | None = None,
+    interview_input: str | Path | None = None,
 ) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
     resolved_output_path = (
@@ -267,6 +396,7 @@ def create_feature_pr_specification_template(
             render_feature_pr_specification_template(
                 work_item_name=work_item_name,
                 title=title,
+                interview_input=interview_input,
             ),
             existing_content,
         ),

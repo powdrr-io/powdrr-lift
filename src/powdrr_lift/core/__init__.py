@@ -166,6 +166,7 @@ from powdrr_lift.core.entity_context import (
     render_entity_relationship_report,
 )
 from powdrr_lift.core.feature_planning_specification import (
+    create_design_interview_input_template,
     create_feature_pr_specification_template,
     create_system_map_specification_template,
     feature_pr_specification_default_output_path,

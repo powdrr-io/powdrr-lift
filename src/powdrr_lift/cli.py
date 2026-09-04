@@ -29,6 +29,7 @@ from powdrr_lift.core import (
     create_change_log_template_from_plan_diff,
     create_codebase_state,
     create_current_state_specification,
+    create_design_interview_input_template,
     create_feature_pr_specification_template,
     create_implementation_specification_template,
     create_plan_diff_specification,
@@ -808,7 +809,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--title",
         help="Optional title to embed in the template.",
     )
+    feature_pr_specification_parser.add_argument(
+        "--interview-input",
+        type=Path,
+        help="JSON design-interview input used to seed the proposal template.",
+    )
     feature_pr_specification_parser.set_defaults(func=_run_feature_pr_specification)
+
+    design_interview_input_parser = subparsers.add_parser(
+        "design-interview-input",
+        aliases=["design_interview_input"],
+        help="Create a JSON input document for the design interview.",
+    )
+    design_interview_input_parser.add_argument("--work-item-name", required=True)
+    design_interview_input_parser.add_argument("--output", type=Path)
+    design_interview_input_parser.add_argument("--repo-root", type=Path)
+    design_interview_input_parser.set_defaults(func=_run_design_interview_input)
 
     start_planning_feature_parser = subparsers.add_parser(
         "start-planning-feature",
@@ -3222,6 +3238,7 @@ def _run_feature_pr_specification(args: argparse.Namespace) -> int:
         output_path=args.output,
         repo_root=repo_root,
         title=args.title,
+        interview_input=args.interview_input,
     )
     _stage_generated_file(repo_root, output_path)
     if args.output is None:
@@ -3233,6 +3250,18 @@ def _run_feature_pr_specification(args: argparse.Namespace) -> int:
     else:
         print(f"Wrote feature and PR specification template to {output_path}")
 
+    return 0
+
+
+def _run_design_interview_input(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    output_path = create_design_interview_input_template(
+        work_item_name=args.work_item_name,
+        output_path=args.output,
+        repo_root=repo_root,
+    )
+    _stage_generated_file(repo_root, output_path)
+    print(f"Wrote design interview input to {output_path}")
     return 0
 
 
@@ -3324,6 +3353,8 @@ _SPECIFICATION_FILENAMES = {
     "implementation-specification.yml": "implementation",
     "proposed-pr-specification.yaml": "pr",
     "proposed-pr-specification.yml": "pr",
+    "feature-pr-specification.yaml": "pr",
+    "feature-pr-specification.yml": "pr",
 }
 _SPECIFICATION_FILENAME_SUFFIXES = tuple(
     (f"-{filename}", kind) for filename, kind in _SPECIFICATION_FILENAMES.items()

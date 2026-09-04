@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, TextIO
@@ -2500,24 +2501,65 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
     )
 
 
-def _nested_action_response_correction(error: RuntimeError) -> str:
+def _nested_action_response_correction(
+    error: RuntimeError,
+    *,
+    allowed_actions: Sequence[str] = (),
+    rejected_action: str | None = None,
+    required_outputs: Sequence[str] = (),
+) -> str:
     """Return actionable repair guidance for a nested skill response."""
+    allowed = ", ".join((*allowed_actions, "next_step")) or "next_step"
     correction = (
         f"The nested skill response was invalid: {error} "
         "Return exactly one corrected JSON object for the current nested step. "
-        "The top-level discriminator is the string field "
-        '"action":"edit". For a normal edit, use this exact shape: '
-        '{"action":"edit","file_path":"relative/path.py","edits":['
-        '{"kind":"replace","start_line":1,"end_line":1,"text":"replacement"}]}. '
-        'Each item in "edits" must be an object, and its "kind" must be the '
-        'string "add", "remove", or "replace"; never put an object or the '
-        'top-level action value in "kind". For multiple files, use '
-        '"file_edits":[{"file_path":"relative/path.py","edits":[...]}]. '
+        f'The top-level "action" must be one of: {allowed}. '
+        "Do not repeat the rejected action or its arguments. "
+        "Follow the current step details and output contract exactly. "
         "Do not return markdown, prose, or a nested action object."
     )
+    if rejected_action is not None:
+        correction += f" Rejected action signature: {rejected_action}."
+    if required_outputs:
+        correction += (
+            " If choosing next_step, outputs must contain exactly these declared "
+            "names: " + ", ".join(required_outputs) + "."
+        )
     if isinstance(error, PowdrrExecutionError):
         correction += _typed_error_guidance(error)
     return correction
+
+
+def _materialize_interview_input(
+    *,
+    repo_root: Path,
+    step: Any,
+    handoff_records: dict[str, dict[str, Any]],
+    step_index: int,
+) -> Path | None:
+    """Build the small generated JSON handoff without a large line edit."""
+    work_item = handoff_records.get("work_item_name", {}).get("value")
+    if not isinstance(work_item, str) or not work_item.strip():
+        return None
+    values: dict[str, Any] = {"work_item_name": work_item}
+    for input_spec in getattr(step, "inputs", ()):
+        name = input_spec.name
+        if name == "work_item_name":
+            continue
+        record = handoff_records.get(name)
+        if record is not None:
+            values[name] = record.get("value")
+    path = repo_root / "docs" / "proposals" / work_item / "design-interview-input.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(values, indent=2) + "\n", encoding="utf-8")
+    handoff_records["interview_input"] = {
+        "name": "interview_input",
+        "type": "any",
+        "value": values,
+        "produced_by": {"step_index": step_index, "action": "json_update"},
+        "scope": "skill",
+    }
+    return path
 
 
 def _action_response_correction(
@@ -3104,6 +3146,10 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step = frame.skill.skill.steps[frame.step_index]
             step = self.current_step
             if self.runtime is not None:
+                self.runtime.install_step_scope(
+                    frozenset(getattr(step, "actions", ())),
+                    enforce_empty=getattr(step, "actions_declared", False),
+                )
                 self.runtime.set_action_contract(
                     frozenset(getattr(step, "actions", ())),
                     enforce_empty=getattr(step, "actions_declared", False),
@@ -3114,20 +3160,25 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 if self.runtime is not None:
                     self.runtime.install_step_scope(frozenset())
                 try:
-                    passed = _run_gate(
-                        step,
-                        skill_name=frame.skill.skill.name,
-                        worktree_root=self.repo_root,
-                        execution_events=self.execution_events,
-                        execution_context=self.execution_context,
-                        handoff_records=self.handoff_records,
-                        step_index=frame.step_index,
-                        workflow_context=None,
-                        stdout=self.stdout,
-                        stderr=self.stderr,
-                        verbose=self.verbose,
-                        runtime=self.runtime,
-                    )
+                    with (
+                        self.runtime.without_action_contract()
+                        if self.runtime is not None
+                        else nullcontext()
+                    ):
+                        passed = _run_gate(
+                            step,
+                            skill_name=frame.skill.skill.name,
+                            worktree_root=self.repo_root,
+                            execution_events=self.execution_events,
+                            execution_context=self.execution_context,
+                            handoff_records=self.handoff_records,
+                            step_index=frame.step_index,
+                            workflow_context=None,
+                            stdout=self.stdout,
+                            stderr=self.stderr,
+                            verbose=self.verbose,
+                            runtime=self.runtime,
+                        )
                 finally:
                     if self.runtime is not None:
                         self.runtime.install_step_scope(
@@ -3154,20 +3205,25 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 frame.step_index = target_index
                 continue
             if step.step_type == "invoke_tool" and step.pre_step is not None:
-                _run_deterministic_pre_step(
-                    step,
-                    skill_name=frame.skill.skill.name,
-                    worktree_root=self.repo_root,
-                    execution_events=self.execution_events,
-                    execution_context=self.execution_context,
-                    handoff_records=self.handoff_records,
-                    step_index=frame.step_index,
-                    workflow_context=None,
-                    stdout=self.stdout,
-                    stderr=self.stderr,
-                    verbose=self.verbose,
-                    runtime=self.runtime,
-                )
+                with (
+                    self.runtime.without_action_contract()
+                    if self.runtime is not None
+                    else nullcontext()
+                ):
+                    _run_deterministic_pre_step(
+                        step,
+                        skill_name=frame.skill.skill.name,
+                        worktree_root=self.repo_root,
+                        execution_events=self.execution_events,
+                        execution_context=self.execution_context,
+                        handoff_records=self.handoff_records,
+                        step_index=frame.step_index,
+                        workflow_context=None,
+                        stdout=self.stdout,
+                        stderr=self.stderr,
+                        verbose=self.verbose,
+                        runtime=self.runtime,
+                    )
             return WorkflowActionRequest(
                 client=self.client,
                 messages=_build_step_execution_messages(
@@ -3250,7 +3306,53 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     ) -> None:
         if not _is_repairable_task_response_error(error):
             raise error
-        correction = _nested_action_response_correction(error)
+        if getattr(
+            self.current_step, "id", None
+        ) == "store-interview-input" and "Workflow edit action" in str(error):
+            path = _materialize_interview_input(
+                repo_root=self.repo_root,
+                step=self.current_step,
+                handoff_records=self.handoff_records,
+                step_index=self.current_step_index,
+            )
+            if path is not None:
+                self.execution_events.append(
+                    {
+                        "kind": "json_update",
+                        "skill": self.current_skill.skill.name
+                        if self.current_skill
+                        else None,
+                        "step_id": self.current_step.id,
+                        "step_index": self.current_step_index,
+                        "file_path": str(path.relative_to(self.repo_root)),
+                        "source": "deterministic_repair",
+                    }
+                )
+                self.execution_context.append(
+                    "A deterministic JSON update repaired the interview input. "
+                    "Do not return edit again; choose next_step."
+                )
+                self.transcript.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "The interview JSON was repaired deterministically. "
+                            "Do not repeat edit; choose next_step."
+                        ),
+                    }
+                )
+                return
+        correction = _nested_action_response_correction(
+            RuntimeError(str(error)),
+            allowed_actions=tuple(
+                getattr(self.current_step, "actions", ())
+                if self.current_step is not None
+                else ()
+            ),
+            required_outputs=tuple(
+                output.name for output in getattr(self.current_step, "outputs", ())
+            ),
+        )
         if self.error_log_root is not None:
             record_workflow_llm_error(
                 self.error_log_root,
@@ -3321,6 +3423,21 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             )
             return WorkflowActionOutcome()
         if action.kind == "next_step":
+            if getattr(step, "id", None) == "store-interview-input" and any(
+                output.name == "interview_input" for output in step.outputs
+            ):
+                input_files = sorted(
+                    self.repo_root.glob("docs/proposals/*/design-interview-input.json")
+                )
+                if len(input_files) == 1:
+                    action = replace(
+                        action,
+                        outputs={
+                            "interview_input": json.loads(
+                                input_files[0].read_text(encoding="utf-8")
+                            )
+                        },
+                    )
             next_step = (
                 frame.skill.skill.steps[frame.step_index + 1]
                 if frame.step_index + 1 < len(frame.skill.skill.steps)
@@ -3332,6 +3449,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.handoff_records,
                 current_step_index=frame.step_index,
             )
+            self.transcript = self.transcript[:1]
             frame.step_index += 1
             self.execution_events.append(
                 {"kind": action.kind, "skill": frame.skill.skill.name}
@@ -3408,11 +3526,16 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 ),
                 runtime=self.runtime,
             )
+            gathered_context = render_gather_context_report(report)
             self.execution_events.append(
                 {
                     "kind": action.kind,
-                    "result": json.loads(render_gather_context_report(report)),
+                    "step_index": frame.step_index,
+                    "result": json.loads(gathered_context),
                 }
+            )
+            self.transcript.append(
+                {"role": "user", "content": f"Gathered context:\n{gathered_context}"}
             )
             _record_task_action_outputs(
                 action, self.handoff_records, step, frame.step_index
@@ -3552,7 +3675,80 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
         raise PowdrrExecutionError(f"Unsupported nested skill action: {action.kind!r}")
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
-        raise error
+        if (
+            getattr(self.current_step, "id", None) == "store-interview-input"
+            and action.kind == "edit"
+            and "Workflow edit action" in str(error)
+        ):
+            path = _materialize_interview_input(
+                repo_root=self.repo_root,
+                step=self.current_step,
+                handoff_records=self.handoff_records,
+                step_index=self.current_step_index,
+            )
+            if path is not None:
+                self.execution_events.append(
+                    {
+                        "kind": "json_update",
+                        "skill": self.current_skill.skill.name
+                        if self.current_skill
+                        else None,
+                        "step_id": self.current_step.id,
+                        "step_index": self.current_step_index,
+                        "file_path": str(path.relative_to(self.repo_root)),
+                        "source": "deterministic_repair",
+                    }
+                )
+                self.transcript.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "The interview JSON was repaired deterministically. "
+                            "Do not repeat edit; choose next_step."
+                        ),
+                    }
+                )
+                return
+        correction = _nested_action_response_correction(
+            RuntimeError(str(error)),
+            allowed_actions=tuple(
+                getattr(self.current_step, "actions", ())
+                if self.current_step is not None
+                else ()
+            ),
+            rejected_action=workflow_action_signature(action),
+            required_outputs=tuple(
+                output.name for output in getattr(self.current_step, "outputs", ())
+            ),
+        )
+        self.execution_events.append(
+            {
+                "kind": "action_error",
+                "skill": self.current_skill.skill.name if self.current_skill else None,
+                "step_id": getattr(self.current_step, "id", None),
+                "step_index": self.current_step_index,
+                "action": json.loads(workflow_action_signature(action)),
+                "error": str(error),
+                "guidance": correction,
+            }
+        )
+        self.execution_context.append(correction)
+        self.transcript.append(
+            {
+                "role": "assistant",
+                "content": json.dumps(
+                    json.loads(workflow_action_signature(action)), ensure_ascii=False
+                ),
+            }
+        )
+        self.transcript.append({"role": "user", "content": correction})
+        print(
+            "Nested skill action failed for "
+            f"{self.current_skill.skill.name if self.current_skill else '<unknown>'}/"
+            f"{getattr(self.current_step, 'id', '<unknown>')} "
+            f"({action.kind}): {error}; requesting a corrected action.",
+            file=self.stderr,
+        )
 
     def no_progress_threshold_exit_code(
         self,
@@ -3564,7 +3760,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.driver.action_engine.reset_progress()
         return None
 
-    def action_failure_exit_code(self, action: WorkflowAction) -> int:
+    def action_failure_exit_code(self, action: WorkflowAction) -> int | None:
         _ = action
         return 1
 
@@ -3613,6 +3809,7 @@ def _run_skill_for_agent_with_shared_runner(
     clean: bool = False,
     error_log_root: Path | None = None,
     runtime: ExecutionRuntime | None = None,
+    max_roundtrips: int = DEFAULT_MAX_ROUNDTRIPS,
 ) -> dict[str, Any]:
     selected_skill = _find_skill_by_name(catalog, skill_name)
     transcript = [] if clean else [{"role": "user", "content": task.description}]
@@ -3624,7 +3821,7 @@ def _run_skill_for_agent_with_shared_runner(
             {
                 str(name): {
                     "name": str(name),
-                    "type": "any",
+                    "type": "string" if isinstance(value, str) else "any",
                     "value": value,
                     "produced_by": {"source": "task_context"},
                     "source": "task_context",
@@ -3674,7 +3871,7 @@ def _run_skill_for_agent_with_shared_runner(
     strategy.driver = driver
     exit_code = driver.run(
         strategy,
-        max_roundtrips=DEFAULT_MAX_ROUNDTRIPS,
+        max_roundtrips=max_roundtrips,
         signature=workflow_action_signature,
     )
     if exit_code != 0:
@@ -3700,6 +3897,7 @@ def _run_skill_for_agent(
     clean: bool = False,
     error_log_root: Path | None = None,
     runtime: ExecutionRuntime | None = None,
+    max_roundtrips: int = DEFAULT_MAX_ROUNDTRIPS,
 ) -> dict[str, Any]:
     return _run_skill_for_agent_with_shared_runner(
         skill_name,
@@ -3716,6 +3914,7 @@ def _run_skill_for_agent(
         clean=clean,
         error_log_root=error_log_root,
         runtime=runtime,
+        max_roundtrips=max_roundtrips,
     )
 
 

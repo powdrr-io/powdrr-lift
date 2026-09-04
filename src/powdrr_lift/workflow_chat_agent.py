@@ -3927,14 +3927,15 @@ def _execution_events_for_prompt(
     event stream as metadata while leaving the complete event stream intact
     for persistence and diagnostics.
     """
-    events = execution_events
-    if current_step_index is not None:
-        events = [
-            _sanitize_prior_step_event(event)
-            if event.get("step_index") != current_step_index
-            else event
+    events = (
+        [
+            event
             for event in execution_events
+            if event.get("step_index") == current_step_index
         ]
+        if current_step_index is not None
+        else execution_events
+    )
     return [
         {key: value for key, value in event.items() if key != "decisions_and_context"}
         for event in prune_execution_events(events, include_results=False)
@@ -3948,10 +3949,9 @@ def _latest_execution_event_for_prompt(
     """Retain the latest result separately from the compact event metadata."""
     if current_step_index is not None:
         execution_events = [
-            _sanitize_prior_step_event(event)
-            if event.get("step_index") != current_step_index
-            else event
+            event
             for event in execution_events
+            if event.get("step_index") == current_step_index
         ]
     if not execution_events:
         return None
@@ -4038,8 +4038,28 @@ def _prompt_transcript(
 def _prompt_step_context(
     execution_context: Sequence[str],
     durable_facts: Mapping[str, Mapping[str, Any]] | None = None,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    current_step_index: int | None = None,
 ) -> list[str]:
     """Bound recurring step context while retaining the newest handoff facts."""
+    result_prefixes = (
+        "Gathered context:\n",
+        "Deterministic pre-step gather_context result:\n",
+        "Document context: ",
+        "Gate failed: ",
+    )
+    keep_current_gather = any(
+        event.get("kind") == "gather_context"
+        and event.get("step_index") == current_step_index
+        for event in execution_events
+    )
+    execution_context = [
+        value
+        for value in execution_context
+        if keep_current_gather
+        and value.startswith("Gathered context:\n")
+        or not value.startswith(result_prefixes)
+    ]
     fact_values = {
         str(record.get("value"))
         for record in (durable_facts or {}).values()
@@ -4560,14 +4580,6 @@ def _build_step_execution_messages(
             for invocation in current_step.tool_invocations
             if invocation.tool != "ref"
         }
-        | {
-            _INTERNAL_TOOL,
-            GIT_TOOL,
-            GH_TOOL,
-            ENRICH_TOOL,
-            VALIDATE_EDIT_TOOL,
-            APPLY_EDIT_TOOL,
-        }
     )
     tool_descriptions = {
         "shell": (
@@ -4639,7 +4651,15 @@ def _build_step_execution_messages(
             current_step,
             handoff_records or {},
         ),
-        "step_context": _prompt_step_context(execution_context, durable_facts),
+        # Cross-step values must travel through declared handoff inputs. The
+        # prompt helper retains explicit invocation context while removing
+        # implicit tool and document results.
+        "step_context": _prompt_step_context(
+            execution_context,
+            durable_facts,
+            execution_events,
+            current_step_index,
+        ),
         "durable_facts": _prompt_durable_facts(durable_facts or {}),
         "available_tools": [
             {
@@ -4696,6 +4716,25 @@ def _build_step_execution_messages(
     prompt_data["available_actions"] = [
         name for name, _instructions in _step_actions(current_step)
     ]
+    if "edit" in prompt_data["available_actions"]:
+        prompt_data["edit_contract"] = (
+            "For edit, return exactly one JSON object with action=edit, a string "
+            "file_path, and a non-empty edits array. Each edit must be an object "
+            "with kind add, remove, or replace; replace requires positive integer "
+            "start_line and end_line plus a string text. Do not use yaml_edit, "
+            "file_edits, operations, or a nested parameters object."
+        )
+    required_output_names = [
+        output.name for output in getattr(current_step, "outputs", ())
+    ]
+    if required_output_names:
+        prompt_data["required_output_names"] = required_output_names
+        prompt_data["output_contract"] = (
+            "When choosing next_step, include outputs with exactly these names: "
+            + ", ".join(required_output_names)
+            + ". Every edit output must be present even when no changes are needed; "
+            'use {"added":[],"deleted":[]} for no changes.'
+        )
     if validation_gate is not None:
         prompt_data["validation_gate"] = dict(validation_gate)
     pre_step_event = _latest_deterministic_pre_step(
@@ -7018,6 +7057,14 @@ def _validate_workflow_handoff(
             and producer.get("step_index") == current_step_index
         )
 
+    def is_prior_step_record(record: Mapping[str, Any]) -> bool:
+        producer = record.get("produced_by")
+        return (
+            isinstance(producer, Mapping)
+            and isinstance(producer.get("step_index"), int)
+            and producer["step_index"] < current_step_index
+        )
+
     required_outputs = {
         output.name for output in current_step.outputs if output.required_for_next_step
     }
@@ -7042,11 +7089,12 @@ def _validate_workflow_handoff(
             record is None
             or (
                 input_spec.source == "previous_step"
-                and not is_current_step_record(record)
+                and not (is_current_step_record(record) or is_prior_step_record(record))
             )
             or (
                 input_spec.source == "workflow_context"
                 and record.get("source") != "workflow_context"
+                and not (is_current_step_record(record) or is_prior_step_record(record))
             )
         ):
             missing_inputs.append(input_spec.name)
@@ -7526,7 +7574,30 @@ def _parse_action_response(payload: dict[str, Any]) -> SkillChatAction:
         raise PowdrrExecutionError(
             "Workflow action outputs must be an object with named values."
         )
-    action = parser(payload, decisions_and_context, llm_type)
+    raw_outputs = dict(raw_outputs)
+    nested_decisions = raw_outputs.pop("decisions_and_context", None)
+    if decisions_and_context is None and nested_decisions is not None:
+        decisions_and_context = _optional_string(nested_decisions)
+    parser_payload = payload
+    if normalized_kind in {"edit", "gather_context", "read_document"} and isinstance(
+        payload.get("parameters"), Mapping
+    ):
+        parser_payload = dict(payload)
+        for name, value in payload["parameters"].items():
+            parser_payload.setdefault(name, value)
+    if normalized_kind == "edit":
+        raw_edits = parser_payload.get("edits")
+        if isinstance(raw_edits, Mapping):
+            if parser_payload is payload:
+                parser_payload = dict(payload)
+            parser_payload["edits"] = [dict(raw_edits)]
+    if normalized_kind == "gather_context" and isinstance(
+        parser_payload.get("types"), str
+    ):
+        if parser_payload is payload:
+            parser_payload = dict(payload)
+        parser_payload["types"] = [parser_payload["types"]]
+    action = parser(parser_payload, decisions_and_context, llm_type)
     return replace(
         action,
         outputs=dict(raw_outputs),

@@ -178,6 +178,27 @@ def test_goto_step_action_requires_a_step_id() -> None:
         _parse_action_response({"action": "goto_step"})
 
 
+def test_edit_action_repair_accepts_nested_parameters_and_single_edit() -> None:
+    action = _parse_action_response(
+        {
+            "action": "edit",
+            "parameters": {
+                "file_path": "docs/proposals/example/input.json",
+                "edits": {
+                    "kind": "replace",
+                    "start_line": 1,
+                    "end_line": 1,
+                    "text": "{}\n",
+                },
+            },
+        }
+    )
+
+    assert action.kind == "edit"
+    assert action.file_path == "docs/proposals/example/input.json"
+    assert len(action.edits) == 1
+
+
 def test_execution_events_for_prompt_compacts_results_without_mutating_summary_data() -> (
     None
 ):
@@ -475,9 +496,8 @@ def test_execution_event_prompt_uses_only_current_step_events() -> None:
     current = _execution_events_for_prompt(events, 1)
     latest = _latest_execution_event_for_prompt(events, 1)
 
-    assert len(current) == 2
-    assert "parameters" not in current[0]
-    assert current[1]["parameters"]["command"] == ["powdrr-lift", "evaluate"]
+    assert len(current) == 1
+    assert current[0]["parameters"]["command"] == ["powdrr-lift", "evaluate"]
     assert latest is not None
     assert latest["parameters"]["command"] == ["powdrr-lift", "evaluate"]
 
@@ -3679,7 +3699,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
                 assert prompt["durable_facts"][-1]["value"] == (
                     "Requirements gathered."
                 )
-                assert prompt["execution_events"][-1]["kind"] == "next_step"
+                assert prompt["execution_events"] == []
             else:
                 raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
 
@@ -3863,7 +3883,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
                 assert prompt["current_file"]["path"] == str(
                     system_spec_path.relative_to(worktree_root)
                 )
-                assert prompt["execution_events"][-1]["kind"] == "next_step"
+                assert prompt["execution_events"] == []
             else:
                 raise AssertionError(f"Unexpected LLM call index: {self._call_index}")
 
@@ -5230,7 +5250,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             captured["api_key"] = api_key
             captured["base_url"] = base_url
             self._call_index = 0
-            self._nested_event_count = 0
             self._nested_validation_index = 0
             self._nested_invoked_steps: set[tuple[str, int, str]] = set()
 
@@ -5254,7 +5273,10 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         ) -> dict[str, object]:
             prompt = json.loads(messages[1]["content"])
             execution_events = prompt["execution_events"]
-            assert len(execution_events) >= self._nested_event_count
+            assert all(
+                event.get("step_index") == prompt["current_step_index"]
+                for event in execution_events
+            )
             assert prompt["execution_mode"] == "execute_selected_skill"
             assert prompt["selected_skill"]["name"] == "specify-a-feature"
             assert prompt["current_step_index"] == expected_step_index
@@ -5274,7 +5296,6 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "finish-pr-prep",
                     "create-pull-request",
                 }
-                self._nested_event_count += 1
                 current_step = cast(dict[str, object], prompt["current_step"])
                 step_index = int(prompt["current_step_index"])
                 available_actions = prompt.get("available_actions", [])

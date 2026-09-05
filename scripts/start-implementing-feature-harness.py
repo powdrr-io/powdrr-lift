@@ -6,12 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import select
 import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -332,8 +334,10 @@ def _run_iteration(
         cwd=repo_root,
         text=True,
         stdin=subprocess.PIPE,
-        stdout=transcript_stream,
+        stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        bufsize=1,
+        universal_newlines=True,
         start_new_session=True,
         # Validation commands run inside the isolated worktree. Prevent uv
         # from inheriting the harness worktree's environment and repeatedly
@@ -343,10 +347,27 @@ def _run_iteration(
     timed_out = False
     interrupted = False
     try:
-        process.communicate(
-            input="\n".join([args.prompt, *answers]) + "\n", timeout=args.timeout
-        )
-        output = transcript.read_text(encoding="utf-8")
+        assert process.stdin is not None
+        process.stdin.write("\n".join([args.prompt, *answers]) + "\n")
+        process.stdin.close()
+        assert process.stdout is not None
+        output_parts: list[str] = []
+        deadline = time.monotonic() + args.timeout
+        while True:
+            if time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(command, args.timeout)
+            ready, _, _ = select.select([process.stdout], [], [], 0.5)
+            if ready:
+                line = process.stdout.readline()
+                if line:
+                    output_parts.append(line)
+                    transcript_stream.write(line)
+                    transcript_stream.flush()
+                    print(line, end="", file=sys.stderr, flush=True)
+                    continue
+            if process.poll() is not None:
+                break
+        output = "".join(output_parts)
     except subprocess.TimeoutExpired:
         timed_out = True
         try:

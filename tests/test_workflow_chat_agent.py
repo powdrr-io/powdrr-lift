@@ -6697,7 +6697,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     )
     monkeypatch.setattr(
         "powdrr_lift.execution.runtime.ExecutionRuntime.publish_readiness",
-        lambda _runtime: types.SimpleNamespace(ready=True, reasons=()),
+        lambda _runtime, **_kwargs: types.SimpleNamespace(ready=True, reasons=()),
     )
 
     start_stdout = io.StringIO()

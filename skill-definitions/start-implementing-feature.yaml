@@ -259,8 +259,13 @@ steps:
   details: >-
     In docs/proposals/<feature-name>/proposed-pr-specification.yaml, replace
     every placeholder and fill every required field using the selected feature,
-    project-structure, and planned
-    proposed-PR context. Fill one ordered proposed_prs entry for every planned
+    project-structure, and planned proposed-PR context. Prefer returning the
+    completed semantic object in `next_step.outputs.semantic_specification`; the
+    runtime validates and materializes it as YAML. This object is a flat
+    top-level mapping: never create a `specification_v1` wrapper. Its allowed
+    top-level keys are `schema`, `id`, `feature_ids`, `proposed_prs`, `entities`,
+    `modules`, `tools`, `entity_relationships`, `features`, and `decisions`.
+    Fill one ordered proposed_prs entry for every planned
     proposed PR in the same file. Each entry must contain only its stable id,
     intent, justification, and dependent_prs. In the feature-wide
     specification-v1 sections, list every entity/module/tool/relationship/
@@ -298,8 +303,10 @@ steps:
   llm_type: fast_iteration
   details: >-
     Review the deterministic evaluator result and repair every reported issue in
-    the single proposed-pr-specification.yaml with yaml_edit. Use the
-    evaluator's specific error details, expected/actual id-action pairs, exact
+    the single proposed-pr-specification.yaml with yaml_edit. If a repair path
+    begins with `specification_v1`, it is invalid; reread the flat document and
+    use the exact top-level section named by the evaluator. Use the evaluator's
+    specific error details, expected/actual id-action pairs, exact
     paths, and yaml_edit example. For v1 effect mismatches, use upsert_item with
     the authoritative id and action shown by the evaluator; never use positional
     set_value to append list entries or change an authoritative id/action. Do not instantiate

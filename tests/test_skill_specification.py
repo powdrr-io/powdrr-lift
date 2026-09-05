@@ -1285,6 +1285,18 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--output",
         "docs/proposals/<feature-name>/proposed-pr-specification.yaml",
     )
+    fill_step = step("fill-proposed-pr-specification")
+    assert fill_step.actions == ("read_document",)
+    assert fill_step.outputs[0].name == "semantic_specification"
+    assert fill_step.outputs[0].required_for_next_step
+    assert fill_step.details is not None
+    assert "Do not edit YAML" in fill_step.details
+    assert "effect_assignments" in fill_step.details
+    repair_step = step("repair-proposed-pr-specification")
+    assert repair_step.actions == ("read_document", "goto_step")
+    assert repair_step.details is not None
+    assert "Do not repair YAML" in repair_step.details
+    assert "fill-proposed-pr-specification" in repair_step.details
     assert step("evaluate-proposed-pr-specification").step_type == "invoke_tool"
     assert pre_step_command("evaluate-proposed-pr-specification") == (
         "powdrr-lift",

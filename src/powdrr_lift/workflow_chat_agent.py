@@ -58,6 +58,7 @@ from powdrr_lift.core import (
     system_specification_default_output_path,
 )
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
+from powdrr_lift.core.execution_state import ExecutionArtifact
 from powdrr_lift.core.python_tool_commands import (
     dependency_backed_command_variants,
     missing_executable_output,
@@ -1508,6 +1509,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.observer_rejected_action_signature = None
             self.observer_intervention = None
         _record_workflow_action_outputs(action, self.state, self.current_step)
+        _materialize_semantic_pr_specification(action, self.state, self.current_step)
+        _record_runtime_readiness_artifact(action, self.state, self.current_step)
         if action.kind == "next_step":
             next_step = (
                 self.selected_skill.skill.steps[self.state.step_index + 1]
@@ -4383,12 +4386,18 @@ def _run_deterministic_pre_step(
             "step_index": step_index,
         }
         execution_events.append(event)
+        _record_runtime_readiness_from_pre_step(step, runtime)
         if isinstance(handoff_records, dict):
             for output in step.outputs:
+                output_value = (
+                    _runtime_readiness_report(runtime)
+                    if output.name == "readiness_report"
+                    else result
+                )
                 handoff_records[output.name] = {
                     "name": output.name,
                     "type": output.type,
-                    "value": result,
+                    "value": output_value,
                     "produced_by": {
                         "step_index": step_index,
                         "action": "deterministic_pre_step",
@@ -7009,6 +7018,126 @@ def _record_workflow_action_outputs(
         }
 
 
+def _record_runtime_readiness_artifact(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    step: Any,
+) -> None:
+    """Replace model-asserted readiness with a runtime-evaluated artifact."""
+    if "readiness_report" not in action.outputs or state.runtime is None:
+        return
+    report_data = _runtime_readiness_report(state.runtime)
+    record = state.handoff_records.get("readiness_report")
+    if record is not None:
+        record["value"] = report_data
+        record["produced_by"] = {
+            "step_index": state.step_index,
+            "action": "runtime_readiness_evaluation",
+        }
+    if not report_data["ready"]:
+        return
+    content_ref = (
+        "readiness:"
+        + hashlib.sha256(
+            json.dumps(report_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+    )
+    artifact = ExecutionArtifact(
+        artifact_id="readiness-report-" + content_ref[-16:],
+        artifact_type="readiness_report",
+        schema_version="readiness-report-v1",
+        owner_persona_id="code_reviewer",
+        content_ref=content_ref,
+        accepted=True,
+    )
+    state.runtime.record_artifact(artifact)
+
+
+def _materialize_semantic_pr_specification(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    step: Any,
+) -> None:
+    """Materialize a flat semantic PR-spec object supplied in step outputs."""
+    value = action.outputs.get("semantic_specification")
+    if value is None or step.id != "fill-proposed-pr-specification":
+        return
+    if not isinstance(value, Mapping):
+        raise PowdrrExecutionError("semantic_specification must be a JSON object.")
+    allowed = {
+        "schema",
+        "id",
+        "feature_ids",
+        "proposed_prs",
+        "entities",
+        "modules",
+        "tools",
+        "entity_relationships",
+        "features",
+        "decisions",
+    }
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise PowdrrExecutionError(
+            "semantic_specification contains unknown top-level keys: "
+            + ", ".join(unknown)
+        )
+    target = state.current_file_path
+    if target is None or target.name != "proposed-pr-specification.yaml":
+        candidates = tuple(state.worktree_root.rglob("proposed-pr-specification.yaml"))
+        target = candidates[0] if len(candidates) == 1 else None
+    if target is None:
+        raise PowdrrExecutionError(
+            "Cannot materialize semantic_specification without the proposed PR "
+            "specification path in current file context."
+        )
+    updated_text = yaml.safe_dump(dict(value), sort_keys=False)
+    _validate_structured_document_text(target, updated_text)
+    invoke_file_mutation(
+        (_worktree_relative_path(target, state.worktree_root),),
+        worktree_root=state.worktree_root,
+        executor=lambda: target.write_text(updated_text, encoding="utf-8"),
+        runtime=_ensure_execution_runtime(state),
+    )
+    state.current_file_path = target
+
+
+def _runtime_readiness_report(runtime: ExecutionRuntime) -> dict[str, Any]:
+    report = runtime.publish_readiness(required_artifact_types=())
+    return {
+        "ready": report.ready,
+        "reasons": list(report.reasons),
+        "satisfied_requirements": list(getattr(report, "satisfied_requirements", ())),
+    }
+
+
+def _record_runtime_readiness_from_pre_step(
+    step: Any,
+    runtime: ExecutionRuntime,
+) -> None:
+    if not any(output.name == "readiness_report" for output in step.outputs):
+        return
+    report_data = _runtime_readiness_report(runtime)
+    if not report_data["ready"]:
+        return
+    content_ref = (
+        "readiness:"
+        + hashlib.sha256(
+            json.dumps(report_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+    )
+    runtime.record_artifact(
+        ExecutionArtifact(
+            artifact_id="readiness-report-" + content_ref[-16:],
+            artifact_type="readiness_report",
+            schema_version="readiness-report-v1",
+            owner_persona_id="code_reviewer",
+            content_ref=content_ref,
+            accepted=True,
+        )
+    )
+
+
 def _workflow_handoff_inputs(
     step: Any,
     records: Mapping[str, Mapping[str, Any]],
@@ -7351,6 +7480,13 @@ def _validate_workflow_action_for_step_unwrapped(
                 f"step. Use one of: {declared}."
             )
         return
+    if action.tool == "shell":
+        command_items = _command_items_for_validation(action.parameters.get("command"))
+        if command_items == ["git", "diff", "--cached", "--name-only"] and any(
+            invocation.tool == GIT_TOOL and invocation.operation == "add"
+            for invocation in supported_invocations
+        ):
+            return
     matching_invocations = tuple(
         invocation
         for invocation in supported_invocations

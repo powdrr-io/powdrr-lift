@@ -495,6 +495,52 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     assert len(client.messages) == 3
 
 
+def test_nested_atomic_tool_step_advances_without_llm_confirmation(
+    tmp_path: Path,
+) -> None:
+    skills_dir = tmp_path / "skill-definitions"
+    save_skill(
+        Skill(
+            name="nested-skill",
+            when_to_use=("Run nested work.",),
+            steps=(
+                SkillStep(
+                    description="Run the deterministic nested command.",
+                    step_type="invoke_tool",
+                    pre_step=SkillStepPreStep(
+                        action="invoke_tool",
+                        template={"tool": "shell", "command": ["printf", "nested"]},
+                    ),
+                ),
+            ),
+        ),
+        skills_dir / "nested-skill.yaml",
+    )
+    workflow = _workflow(tmp_path)
+    client = _FakeClient(
+        [
+            {"action": "invoke_skill", "skill": "nested-skill"},
+            {"action": "complete", "output_state": {"ok": True}},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert len(client.messages) == 2
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[
+        0
+    ].output_state == {"ok": True}
+
+
 def test_process_workflow_task_propagates_verbose_to_nested_tools(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

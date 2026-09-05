@@ -1,0 +1,185 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 554
+title: Make atomic workflow steps deterministic
+intent:
+  problem: Deterministic workflow operations still require LLM calls to select the only available action and confirm advancement, creating avoidable latency and opportunities for instruction drift.
+  goal: Document an orchestration-first reliability model, make atomic skill steps advance under runtime control, and measure the change in the live start-feature workflow.
+human-decisions:
+  - id: run-deterministic-workflow-experiment
+    summary: Document the workflow-reliability proposal in a pull request and run the first deterministic-execution experiment.
+structured_files: []
+files:
+  - path: docs/design/llm-workflow-reliability.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 202
+    summary: Describe the runtime-owned workflow model, observed failure modes, experiment, live results, and follow-on work.
+    rationale: Preserve the reliability analysis and the experiment outcome as a reviewable engineering decision record.
+    related:
+      decisions:
+        - run-deterministic-workflow-experiment
+      invariants:
+        - runtime-owns-atomic-step-advancement
+      guidance:
+        - separate-workflow-judgment-from-execution
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span:
+      start_line: 11
+      end_line: 26
+    summary: Add a feature-query judgment node before deterministic discovery.
+    rationale: Keep natural-language interpretation with the LLM while moving fixed repository searches into the runtime.
+    related:
+      decisions:
+        - run-deterministic-workflow-experiment
+      invariants:
+        - runtime-owns-atomic-step-advancement
+      guidance:
+        - separate-workflow-judgment-from-execution
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span:
+      start_line: 29
+      end_line: 31
+    summary: Declare the proposed-feature discovery step as an atomic tool invocation.
+    rationale: Let the runtime own a fixed repository search.
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span:
+      start_line: 37
+      end_line: 54
+    summary: Define deterministic proposed-feature discovery and its named output.
+    rationale: Make the search arguments and evidence contract explicit.
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span:
+      start_line: 57
+      end_line: 59
+    summary: Declare the current-feature discovery step as an atomic tool invocation.
+    rationale: Let the runtime own a fixed repository search.
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span:
+      start_line: 65
+      end_line: 82
+    summary: Define deterministic current-feature discovery and its named output.
+    rationale: Make the search arguments and evidence contract explicit.
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span:
+      start_line: 85
+      end_line: 87
+    summary: Declare workflow discovery as an atomic tool invocation.
+    rationale: Let the runtime own a fixed repository search.
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span:
+      start_line: 93
+      end_line: 110
+    summary: Define deterministic workflow discovery and its named output.
+    rationale: Make the search arguments and evidence contract explicit.
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    span:
+      start_line: 1137
+      end_line: 1139
+    summary: Advance interactive atomic tool steps immediately after their deterministic pre-step is recorded.
+    rationale: Remove model confirmation calls from runtime-owned interactive operations.
+    related:
+      invariants:
+        - runtime-owns-atomic-step-advancement
+  - path: src/powdrr_lift/workflow_task_agent.py
+    type: modified
+    span:
+      start_line: 3227
+      end_line: 3228
+    summary: Advance nested atomic tool steps immediately after their deterministic pre-step is recorded.
+    rationale: Apply the same runtime ownership boundary to nested durable-task skills.
+    related:
+      invariants:
+        - runtime-owns-atomic-step-advancement
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 312, end_line: 315}
+    summary: Expect the feature-query output contract.
+    rationale: Cover the new judgment node.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 318, end_line: 321}
+    summary: Expect shifted feature selection references.
+    rationale: Keep schema assertions aligned with the inserted node.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 334, end_line: 335}
+    summary: Expect the shifted implementation-spec reference.
+    rationale: Keep schema assertions aligned with the inserted node.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1213, end_line: 1215}
+    summary: Expect the three discovery steps to be atomic.
+    rationale: Cover deterministic step declarations.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1219, end_line: 1219}
+    summary: Verify proposed-feature discovery has no model actions.
+    rationale: Prevent accidental model-owned execution.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1226, end_line: 1226}
+    summary: Verify the proposed-feature output name.
+    rationale: Cover the evidence contract.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1230, end_line: 1230}
+    summary: Verify current-feature discovery has no model actions.
+    rationale: Prevent accidental model-owned execution.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1237, end_line: 1237}
+    summary: Verify the current-feature output name.
+    rationale: Cover the evidence contract.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1241, end_line: 1241}
+    summary: Verify workflow discovery has no model actions.
+    rationale: Prevent accidental model-owned execution.
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1248, end_line: 1260}
+    summary: Verify workflow discovery arguments, output, and shifted selection step.
+    rationale: Cover the deterministic declaration end to end.
+  - path: tests/test_workflow_chat_agent.py
+    type: modified
+    span: {start_line: 6465, end_line: 6470}
+    summary: Make the fake model satisfy the new feature-query judgment step.
+    rationale: Exercise the updated workflow end to end.
+  - path: tests/test_workflow_chat_agent.py
+    type: modified
+    span: {start_line: 6726, end_line: 6727}
+    summary: Verify discovery starts with a model judgment followed by runtime events.
+    rationale: Assert the expected execution boundary.
+  - path: tests/test_workflow_chat_agent.py
+    type: modified
+    span: {start_line: 6730, end_line: 6742}
+    summary: Verify atomic discovery steps never appear in model requests.
+    rationale: Prevent regression to model-confirmed deterministic work.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 498, end_line: 543}
+    summary: Verify a nested atomic tool step advances without model confirmation.
+    rationale: Cover runtime-owned advancement in nested skills.
+entities: []
+entity_relationships: []
+invariants:
+  - id: runtime-owns-atomic-step-advancement
+    action: added
+    description: An invoke_tool skill step advances after its deterministic pre-step is recorded without requiring an LLM confirmation action.
+    rationale: Make fixed operations deterministic and eliminate avoidable instruction-following failure points.
+guidance:
+  - id: separate-workflow-judgment-from-execution
+    action: added
+    description: Use LLM steps for semantic judgments and runtime-owned nodes for fully declared operations and branches.
+    rationale: Concentrate model variability where interpretation is useful while making procedural sequencing enforceable.
+features: []
+proposed_prs: []

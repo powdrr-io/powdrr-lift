@@ -6462,6 +6462,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "start-implementing-feature"
                 )
                 step_index = int(prompt["current_step_index"])
+                if prompt["current_step"].get("id") == "capture-feature-query":
+                    self._call_index += 1
+                    return {
+                        "action": "next_step",
+                        "outputs": {"feature_query": "display-related-photos"},
+                    }
                 tool_invocations = prompt["current_step"].get("tool_invocations", [])
                 if tool_invocations and step_index not in self._start_invoked_steps:
                     invocation = next(
@@ -6717,9 +6723,23 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     start_summary = json.loads(start_summary_path.read_text(encoding="utf-8"))
     assert start_summary["selected_skill_name"] == "start-implementing-feature"
     start_event_kinds = [event["kind"] for event in start_summary["execution_events"]]
-    assert start_event_kinds[0] == "invoke_tool"
+    assert start_event_kinds[0] == "next_step"
+    assert start_event_kinds[1:4] == ["deterministic_pre_step"] * 3
     assert start_event_kinds.count("next_step") >= 6
     assert start_event_kinds[-1] in {"complete", "next_step"}
+    prompted_step_ids = {
+        json.loads(messages[1]["content"])["current_step"].get("id")
+        for messages in cast(list[list[dict[str, str]]], start_captured["messages"])[1:]
+        if json.loads(messages[1]["content"]).get("execution_mode")
+        == "execute_selected_skill"
+    }
+    assert prompted_step_ids.isdisjoint(
+        {
+            "discover-proposed-feature",
+            "discover-current-feature",
+            "discover-feature-workflows",
+        }
+    )
     assert any(
         event["kind"] == "invoke_tool"
         and event.get("tool") == "gh"

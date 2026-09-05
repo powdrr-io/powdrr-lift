@@ -3241,6 +3241,8 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         verbose=self.verbose,
                         runtime=self.runtime,
                     )
+                frame.step_index += 1
+                continue
             return WorkflowActionRequest(
                 client=self.client,
                 messages=_build_step_execution_messages(

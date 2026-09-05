@@ -35,6 +35,7 @@ _EFFECT_SOURCE_FILES = (
     "architecture-specification.yaml",
     "implementation-specification.yaml",
 )
+_PROPOSED_PR_SCHEMA = "https://powdrr.io/schemas/proposed-pr-specification-v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +177,210 @@ def render_pr_specification_template(
         "",
     ]
     return "\n".join(lines)
+
+
+def compile_semantic_pr_specification(
+    semantic_specification: Mapping[str, Any],
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Compile model-owned PR decisions into the authoritative YAML structure."""
+    repo_root_path = _resolve_repo_root(repo_root)
+    _require_exact_keys(
+        semantic_specification,
+        expected={"proposed_prs", "effect_assignments"},
+        path="semantic_specification",
+    )
+    raw_prs = _require_semantic_sequence(
+        semantic_specification["proposed_prs"],
+        path="semantic_specification.proposed_prs",
+    )
+    if not raw_prs:
+        raise ValueError("semantic_specification.proposed_prs must not be empty.")
+
+    proposed_prs: list[dict[str, Any]] = []
+    proposed_pr_ids: set[str] = set()
+    normalized_pr_ids: set[str] = set()
+    for index, raw_pr in enumerate(raw_prs):
+        path = f"semantic_specification.proposed_prs[{index}]"
+        pr = _require_semantic_mapping(raw_pr, path=path)
+        _require_exact_keys(
+            pr,
+            expected={"id", "intent", "justification", "dependent_pr_ids"},
+            path=path,
+        )
+        proposed_pr_id = _require_semantic_string(pr["id"], path=f"{path}.id")
+        normalized_pr_id = _normalize_identifier(proposed_pr_id)
+        if normalized_pr_id in normalized_pr_ids:
+            raise ValueError(f"{path}.id duplicates proposed PR id {proposed_pr_id!r}.")
+        proposed_pr_ids.add(proposed_pr_id)
+        normalized_pr_ids.add(normalized_pr_id)
+        dependencies = [
+            _require_semantic_string(
+                value, path=f"{path}.dependent_pr_ids[{dep_index}]"
+            )
+            for dep_index, value in enumerate(
+                _require_semantic_sequence(
+                    pr["dependent_pr_ids"],
+                    path=f"{path}.dependent_pr_ids",
+                )
+            )
+        ]
+        proposed_prs.append(
+            {
+                "id": proposed_pr_id,
+                "intent": _require_semantic_string(pr["intent"], path=f"{path}.intent"),
+                "justification": _require_semantic_string(
+                    pr["justification"], path=f"{path}.justification"
+                ),
+                "dependent_prs": dependencies,
+            }
+        )
+
+    known_existing_ids = {
+        _normalize_identifier(value)
+        for value in _load_existing_pr_ids(
+            repo_root_path,
+            excluded_file_path=file_path,
+        )
+    }
+    duplicate_existing_ids = sorted(normalized_pr_ids & known_existing_ids)
+    if duplicate_existing_ids:
+        raise ValueError(
+            "semantic_specification proposes ids that already exist: "
+            + ", ".join(duplicate_existing_ids)
+        )
+
+    for index, proposed_pr in enumerate(proposed_prs):
+        for dependency in proposed_pr["dependent_prs"]:
+            if dependency not in proposed_pr_ids:
+                raise ValueError(
+                    "semantic_specification.proposed_prs"
+                    f"[{index}].dependent_pr_ids references unknown proposed PR "
+                    f"id {dependency!r}."
+                )
+
+    authoritative_effects = _load_authoritative_effects(
+        repo_root_path,
+        work_item_name=work_item_name,
+    )
+    expected_effects = {
+        (section, item_id, action)
+        for section in _EFFECT_SECTIONS
+        for item_id, action in authoritative_effects[section]
+    }
+    raw_assignments = _require_semantic_sequence(
+        semantic_specification["effect_assignments"],
+        path="semantic_specification.effect_assignments",
+    )
+    assignments: dict[tuple[str, str, str], str] = {}
+    for index, raw_assignment in enumerate(raw_assignments):
+        path = f"semantic_specification.effect_assignments[{index}]"
+        assignment = _require_semantic_mapping(raw_assignment, path=path)
+        _require_exact_keys(
+            assignment,
+            expected={"section", "id", "action", "proposed_pr_id"},
+            path=path,
+        )
+        effect = (
+            _require_semantic_string(assignment["section"], path=f"{path}.section"),
+            _require_semantic_string(assignment["id"], path=f"{path}.id"),
+            _require_semantic_string(assignment["action"], path=f"{path}.action"),
+        )
+        if effect not in expected_effects:
+            raise ValueError(f"{path} references unknown effect {effect!r}.")
+        if effect in assignments:
+            raise ValueError(f"{path} duplicates effect assignment {effect!r}.")
+        proposed_pr_id = _require_semantic_string(
+            assignment["proposed_pr_id"], path=f"{path}.proposed_pr_id"
+        )
+        if proposed_pr_id not in proposed_pr_ids:
+            raise ValueError(
+                f"{path}.proposed_pr_id references unknown proposed PR id "
+                f"{proposed_pr_id!r}."
+            )
+        assignments[effect] = proposed_pr_id
+
+    missing_effects = sorted(expected_effects - set(assignments))
+    if missing_effects:
+        raise ValueError(
+            "semantic_specification.effect_assignments is missing authoritative "
+            "effects: " + ", ".join(repr(effect) for effect in missing_effects)
+        )
+
+    feature_ids = [item_id for item_id, _action in authoritative_effects["features"]]
+    if not feature_ids:
+        raise ValueError(
+            "Cannot derive feature_ids because the authoritative implementation "
+            "specification has no feature effects."
+        )
+    compiled: dict[str, Any] = {
+        "schema": _PROPOSED_PR_SCHEMA,
+        "id": work_item_name,
+        "feature_ids": feature_ids,
+        "proposed_prs": proposed_prs,
+    }
+    for section in _EFFECT_SECTIONS:
+        compiled[section] = [
+            {
+                "id": item_id,
+                "action": action,
+                "proposed_pr_id": assignments[(section, item_id, action)],
+            }
+            for item_id, action in authoritative_effects[section]
+        ]
+
+    compiled_yaml = yaml.safe_dump(compiled, sort_keys=False)
+    report = build_pr_specification_validation_report(
+        compiled_yaml,
+        work_item_name=work_item_name,
+        repo_root=repo_root_path,
+        file_path=file_path,
+    )
+    if not report.validation_successful:
+        details = "; ".join(
+            f"{issue.path or '<document>'}: {issue.message}" for issue in report.issues
+        )
+        raise ValueError(f"Compiled proposed PR specification is invalid: {details}")
+    return compiled
+
+
+def _require_exact_keys(
+    value: Mapping[str, Any],
+    *,
+    expected: set[str],
+    path: str,
+) -> None:
+    actual = set(value)
+    missing = sorted(expected - actual)
+    unknown = sorted(actual - expected)
+    if missing or unknown:
+        details = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if unknown:
+            details.append("unknown " + ", ".join(unknown))
+        raise ValueError(f"{path} has invalid keys ({'; '.join(details)}).")
+
+
+def _require_semantic_mapping(value: Any, *, path: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{path} must be an object.")
+    return value
+
+
+def _require_semantic_sequence(value: Any, *, path: str) -> Sequence[Any]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise ValueError(f"{path} must be an array.")
+    return value
+
+
+def _require_semantic_string(value: Any, *, path: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{path} must be a non-empty string.")
+    return value.strip()
 
 
 def _load_authoritative_effects(

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Callable
 from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 import yaml
@@ -256,6 +258,156 @@ def test_validate_unified_proposed_pr_effects_match_v1_files(tmp_path: Path) -> 
         file_path=proposal_dir / "proposed-pr-specification.yaml",
     )
     assert report.validation_successful is True
+
+
+def _write_semantic_compiler_specs(repo_root: Path) -> Path:
+    _write_implementation_specification(repo_root)
+    proposal_dir = repo_root / "docs" / "proposals" / "feature-a"
+    proposal_dir.mkdir(parents=True)
+    (proposal_dir / "architecture-specification.yaml").write_text(
+        """
+        entities:
+          - id: entity-a
+            action: added
+        """,
+        encoding="utf-8",
+    )
+    (proposal_dir / "implementation-specification.yaml").write_text(
+        """
+        features:
+          - id: feature-a
+            action: added
+        decisions:
+          - id: decision-a
+            action: changed
+        """,
+        encoding="utf-8",
+    )
+    return proposal_dir / "proposed-pr-specification.yaml"
+
+
+def _semantic_specification() -> dict[str, Any]:
+    return {
+        "proposed_prs": [
+            {
+                "id": "feature-a-core",
+                "intent": "Add the core entity.",
+                "justification": "The feature needs a foundation.",
+                "dependent_pr_ids": [],
+            },
+            {
+                "id": "feature-a-integration",
+                "intent": "Expose the feature behavior.",
+                "justification": "This completes the requested capability.",
+                "dependent_pr_ids": ["feature-a-core"],
+            },
+        ],
+        "effect_assignments": [
+            {
+                "section": "entities",
+                "id": "entity-a",
+                "action": "added",
+                "proposed_pr_id": "feature-a-core",
+            },
+            {
+                "section": "features",
+                "id": "feature-a",
+                "action": "added",
+                "proposed_pr_id": "feature-a-integration",
+            },
+            {
+                "section": "decisions",
+                "id": "decision-a",
+                "action": "changed",
+                "proposed_pr_id": "feature-a-core",
+            },
+        ],
+    }
+
+
+def test_compile_semantic_pr_specification_owns_document_structure(
+    tmp_path: Path,
+) -> None:
+    output_path = _write_semantic_compiler_specs(tmp_path)
+
+    compiled = pr_specification_module.compile_semantic_pr_specification(
+        _semantic_specification(),
+        work_item_name="feature-a",
+        repo_root=tmp_path,
+        file_path=output_path,
+    )
+
+    assert list(compiled) == [
+        "schema",
+        "id",
+        "feature_ids",
+        "proposed_prs",
+        "entities",
+        "modules",
+        "tools",
+        "entity_relationships",
+        "features",
+        "decisions",
+    ]
+    assert compiled["id"] == "feature-a"
+    assert compiled["feature_ids"] == ["feature-a"]
+    assert compiled["entities"] == [
+        {
+            "id": "entity-a",
+            "action": "added",
+            "proposed_pr_id": "feature-a-core",
+        }
+    ]
+    assert compiled["proposed_prs"][1]["dependent_prs"] == ["feature-a-core"]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "error"),
+    [
+        (
+            lambda value: value["effect_assignments"].pop(),
+            "is missing authoritative effects",
+        ),
+        (
+            lambda value: value["effect_assignments"].append(
+                dict(value["effect_assignments"][0])
+            ),
+            "duplicates effect assignment",
+        ),
+        (
+            lambda value: value["effect_assignments"][0].update(id="unknown"),
+            "references unknown effect",
+        ),
+        (
+            lambda value: value["effect_assignments"][0].update(
+                proposed_pr_id="unknown-pr"
+            ),
+            "references unknown proposed PR id",
+        ),
+        (
+            lambda value: value["proposed_prs"][0].update(
+                dependent_pr_ids=["feature-a-integration"]
+            ),
+            "dependency cycle",
+        ),
+    ],
+)
+def test_compile_semantic_pr_specification_rejects_invalid_decisions(
+    tmp_path: Path,
+    mutate: Callable[[dict[str, Any]], None],
+    error: str,
+) -> None:
+    output_path = _write_semantic_compiler_specs(tmp_path)
+    semantic = _semantic_specification()
+    mutate(semantic)
+
+    with pytest.raises(ValueError, match=error):
+        pr_specification_module.compile_semantic_pr_specification(
+            semantic,
+            work_item_name="feature-a",
+            repo_root=tmp_path,
+            file_path=output_path,
+        )
 
 
 def test_unified_proposed_pr_dependency_graph_is_loaded_from_one_file(

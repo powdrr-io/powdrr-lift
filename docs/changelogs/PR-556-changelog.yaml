@@ -1,0 +1,142 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 556
+title: Compile proposed PR specifications from semantic decisions
+intent:
+  problem: Direct YAML authoring and path-based repair let model formatting mistakes create invalid proposed PR specifications and repeated repair loops.
+  goal: Require a small semantic decision object, validate it before mutation, and compile the verifiable YAML structure under runtime control.
+human-decisions:
+  - id: replace-proposed-pr-yaml-authoring
+    summary: Prioritize consistency and verifiable structure by moving proposed PR authoring and repair away from direct YAML mutation.
+structured_files: []
+files:
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span: {start_line: 256, end_line: 256}
+    summary: Remove model-owned edit actions from proposed PR authoring.
+    rationale: Prevent direct mutation of the generated YAML.
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span: {start_line: 260, end_line: 280}
+    summary: Require a constrained semantic decision output with an exact action envelope.
+    rationale: Let the runtime own document structure while making the nested-array response format explicit.
+    related:
+      decisions: [replace-proposed-pr-yaml-authoring]
+      invariants: [runtime-owns-proposed-pr-structure]
+      guidance: [collect-decisions-then-compile]
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span: {start_line: 301, end_line: 301}
+    summary: Restrict repair to document reads and workflow redirection.
+    rationale: Keep malformed YAML paths outside the repair interface.
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span: {start_line: 305, end_line: 312}
+    summary: Advance clean evaluations and regenerate invalid specifications from semantic decisions.
+    rationale: Avoid unnecessary repair loops and replace path-level repair with deterministic compilation.
+    related:
+      decisions: [replace-proposed-pr-yaml-authoring]
+      invariants: [runtime-owns-proposed-pr-structure]
+  - path: skill-definitions/start-implementing-feature.yaml
+    type: modified
+    span: {start_line: 334, end_line: 335}
+    summary: Route gate failures back through semantic regeneration.
+    rationale: Ensure repeated validation never falls back to YAML mutation.
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span: {start_line: 38, end_line: 38}
+    summary: Define the runtime-owned proposed PR schema identifier.
+    rationale: Keep serialization constants out of model output.
+    related:
+      entities: [pr-specification-core]
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    span: {start_line: 182, end_line: 385}
+    summary: Compile constrained PR records and effect assignments into authoritative documents.
+    rationale: Reject unknown keys, invalid references, incomplete assignments, and dependency cycles before writing.
+    related:
+      decisions: [replace-proposed-pr-yaml-authoring]
+      entities: [pr-specification-core]
+      invariants: [runtime-owns-proposed-pr-structure]
+      guidance: [collect-decisions-then-compile]
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    span: {start_line: 62, end_line: 62}
+    summary: Import the semantic proposed PR compiler.
+    rationale: Connect workflow materialization to the deterministic compiler.
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    span: {start_line: 7062, end_line: 7062}
+    summary: Describe semantic output as compiled PR decisions.
+    rationale: Clarify the runtime ownership boundary.
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    span: {start_line: 7067, end_line: 7084}
+    summary: Remove acceptance of document-shaped semantic output.
+    rationale: Prevent the model from controlling top-level YAML structure.
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    span: {start_line: 7077, end_line: 7088}
+    summary: Compile and serialize the semantic decision object.
+    rationale: Validate the complete result before persistence.
+    related:
+      decisions: [replace-proposed-pr-yaml-authoring]
+      entities: [pr-specification-core]
+      invariants: [runtime-owns-proposed-pr-structure]
+  - path: src/powdrr_lift/workflow_chat_agent.py
+    type: modified
+    span: {start_line: 7090, end_line: 7098}
+    summary: Persist compiled YAML as an engine-owned mutation.
+    rationale: Avoid granting file-edit capabilities to the model step.
+    related:
+      invariants: [runtime-owns-proposed-pr-structure]
+  - path: tests/test_pr_specification.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import callable typing for compiler mutation cases.
+    rationale: Type the parameterized rejection tests.
+  - path: tests/test_pr_specification.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Import dynamic value typing for semantic fixtures.
+    rationale: Represent JSON-like semantic test objects accurately.
+  - path: tests/test_pr_specification.py
+    type: modified
+    span: {start_line: 263, end_line: 412}
+    summary: Cover compilation and invalid semantic decisions.
+    rationale: Prove missing, duplicate, unknown, and cyclic input is rejected.
+    related:
+      entities: [pr-specification-core]
+      invariants: [runtime-owns-proposed-pr-structure]
+  - path: tests/test_skill_specification.py
+    type: modified
+    span: {start_line: 1288, end_line: 1299}
+    summary: Verify semantic output is required and repair cannot edit YAML.
+    rationale: Prevent workflow contract regressions.
+    related:
+      invariants: [runtime-owns-proposed-pr-structure]
+  - path: tests/test_workflow_chat_agent.py
+    type: modified
+    span: {start_line: 6510, end_line: 6549}
+    summary: Exercise semantic compilation in the mocked end-to-end workflow.
+    rationale: Verify materialization succeeds without model edit actions.
+    related:
+      invariants: [runtime-owns-proposed-pr-structure]
+entities:
+  - id: pr-specification-core
+    type: Module
+    action: modified
+    description: Proposed PR logic now compiles a constrained semantic contract into validated YAML.
+    rationale: Centralize schema fields, authoritative effects, ordering, and validation in deterministic code.
+entity_relationships: []
+invariants:
+  - id: runtime-owns-proposed-pr-structure
+    action: added
+    description: The model supplies only proposed PR decisions and effect assignments; deterministic runtime code owns and validates the persisted document structure.
+    rationale: Make proposed PR output consistent and verifiable independently of model formatting behavior.
+guidance:
+  - id: collect-decisions-then-compile
+    action: added
+    description: Collect semantic choices in a narrow exact-key object, reject invalid references or graph structure, and compile the repository format deterministically.
+    rationale: Use model judgment where it is valuable without delegating serialization and repair mechanics.
+features: []
+proposed_prs: []

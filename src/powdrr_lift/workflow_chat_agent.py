@@ -59,6 +59,7 @@ from powdrr_lift.core import (
 )
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.execution_state import ExecutionArtifact
+from powdrr_lift.core.pr_specification import compile_semantic_pr_specification
 from powdrr_lift.core.python_tool_commands import (
     dependency_backed_command_variants,
     missing_executable_output,
@@ -7058,30 +7059,12 @@ def _materialize_semantic_pr_specification(
     state: _WorkflowExecutionState,
     step: Any,
 ) -> None:
-    """Materialize a flat semantic PR-spec object supplied in step outputs."""
+    """Compile model-owned PR decisions into a validated proposed-PR document."""
     value = action.outputs.get("semantic_specification")
     if value is None or step.id != "fill-proposed-pr-specification":
         return
     if not isinstance(value, Mapping):
         raise PowdrrExecutionError("semantic_specification must be a JSON object.")
-    allowed = {
-        "schema",
-        "id",
-        "feature_ids",
-        "proposed_prs",
-        "entities",
-        "modules",
-        "tools",
-        "entity_relationships",
-        "features",
-        "decisions",
-    }
-    unknown = sorted(set(value) - allowed)
-    if unknown:
-        raise PowdrrExecutionError(
-            "semantic_specification contains unknown top-level keys: "
-            + ", ".join(unknown)
-        )
     target = state.current_file_path
     if target is None or target.name != "proposed-pr-specification.yaml":
         candidates = tuple(state.worktree_root.rglob("proposed-pr-specification.yaml"))
@@ -7091,14 +7074,28 @@ def _materialize_semantic_pr_specification(
             "Cannot materialize semantic_specification without the proposed PR "
             "specification path in current file context."
         )
-    updated_text = yaml.safe_dump(dict(value), sort_keys=False)
-    _validate_structured_document_text(target, updated_text)
-    invoke_file_mutation(
-        (_worktree_relative_path(target, state.worktree_root),),
-        worktree_root=state.worktree_root,
-        executor=lambda: target.write_text(updated_text, encoding="utf-8"),
-        runtime=_ensure_execution_runtime(state),
+    try:
+        compiled = compile_semantic_pr_specification(
+            value,
+            work_item_name=target.parent.name,
+            repo_root=state.worktree_root,
+            file_path=target,
+        )
+    except ValueError as exc:
+        raise PowdrrExecutionError(str(exc)) from exc
+    updated_text = (
+        "# This file is read-only and should never be edited by a tool or agent.\n"
+        + yaml.safe_dump(compiled, sort_keys=False)
     )
+    _validate_structured_document_text(target, updated_text)
+    runtime = _ensure_execution_runtime(state)
+    with runtime.without_action_contract():
+        invoke_file_mutation(
+            (_worktree_relative_path(target, state.worktree_root),),
+            worktree_root=state.worktree_root,
+            executor=lambda: target.write_text(updated_text, encoding="utf-8"),
+            runtime=runtime,
+        )
     state.current_file_path = target
 
 

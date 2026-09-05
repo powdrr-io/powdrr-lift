@@ -253,31 +253,31 @@ steps:
     required_for_next_step: true
 - id: fill-proposed-pr-specification
   description: Fill the complete proposed PR specification.
-  actions: [edit, yaml_edit, file_management, read_document]
+  actions: [read_document]
   step_type: freeform
   llm_type: high_reasoning
   details: >-
-    In docs/proposals/<feature-name>/proposed-pr-specification.yaml, replace
-    every placeholder and fill every required field using the selected feature,
-    project-structure, and planned proposed-PR context. Prefer returning the
-    completed semantic object in `next_step.outputs.semantic_specification`; the
-    runtime validates and materializes it as YAML. This object is a flat
-    top-level mapping: never create a `specification_v1` wrapper. Its allowed
-    top-level keys are `schema`, `id`, `feature_ids`, `proposed_prs`, `entities`,
-    `modules`, `tools`, `entity_relationships`, `features`, and `decisions`.
-    Fill one ordered proposed_prs entry for every planned
-    proposed PR in the same file. Each entry must contain only its stable id,
-    intent, justification, and dependent_prs. In the feature-wide
-    specification-v1 sections, list every entity/module/tool/relationship/
-    feature/decision change exactly once and label it with a declared
-    proposed_pr_id. Keep the generated id/action pairs exactly as provided by
-    the authoritative proposal specs; only fill proposed_pr_id. Do not put
-    change lists inside individual proposed PR entries.
-    Remove generator
-    instructions and instructional comments. Do not leave null, empty, example,
-    or TODO values in required fields. Use yaml_edit for all YAML changes in
-    this active worktree. Do not validate or instantiate workflows until this
-    single file is fully populated.
+    Do not edit YAML. Return one complete decision object in
+    `next_step.outputs.semantic_specification`; the runtime validates it and
+    compiles the proposed-pr-specification.yaml deterministically. The object
+    must contain exactly `proposed_prs` and `effect_assignments`.
+    `proposed_prs` is an ordered array whose entries contain exactly `id`,
+    `intent`, `justification`, and `dependent_pr_ids`; use an empty dependency
+    array when there are no prerequisites. `effect_assignments` contains one
+    entry for every generated authoritative effect, with exactly `section`,
+    `id`, `action`, and `proposed_pr_id`. Copy each section/id/action triple
+    exactly from the generated template and assign it to one declared proposed
+    PR. Do not supply schema, work-item id, feature ids, YAML sections, paths,
+    comments, or wrappers; the runtime owns those fields and rejects unknown,
+    duplicate, missing, or cyclic data before writing the file.
+    `effect_assignments` must always be an array nested inside
+    `semantic_specification`, never a separate output or object map. Use this
+    exact action envelope:
+    `{"action":"next_step","outputs":{"semantic_specification":{"proposed_prs":[{"id":"<pr-id>","intent":"<intent>","justification":"<reason>","dependent_pr_ids":[]}],"effect_assignments":[{"section":"<section>","id":"<effect-id>","action":"<added|changed|removed>","proposed_pr_id":"<pr-id>"}]}}}`.
+  outputs:
+  - name: semantic_specification
+    type: any
+    required_for_next_step: true
 - id: evaluate-proposed-pr-specification
   description: Evaluate the proposed PR specification deterministically.
   actions: []
@@ -298,22 +298,18 @@ steps:
     required_for_next_step: true
 - id: repair-proposed-pr-specification
   description: Repair every reported proposed PR specification issue.
-  actions: [edit, yaml_edit, file_management, read_document]
+  actions: [read_document, goto_step]
   step_type: freeform
   llm_type: fast_iteration
   details: >-
-    Review the deterministic evaluator result and repair every reported issue in
-    the single proposed-pr-specification.yaml with yaml_edit. If a repair path
-    begins with `specification_v1`, it is invalid; reread the flat document and
-    use the exact top-level section named by the evaluator. Use the evaluator's
-    specific error details, expected/actual id-action pairs, exact
-    paths, and yaml_edit example. For v1 effect mismatches, use upsert_item with
-    the authoritative id and action shown by the evaluator; never use positional
-    set_value to append list entries or change an authoritative id/action. Do not instantiate
-    workflows, stage artifacts, request approval, or create a pull request while
-    the proposed PR file is invalid. After changing the YAML, choose next_step
-    so deterministic evaluation runs again; if no repair is needed, proceed to
-    the validation gate.
+    Do not repair YAML or use evaluator YAML paths. Review the deterministic
+    evaluator result. If validation_successful is true and issues is empty,
+    choose next_step without changing the file. Otherwise use goto_step with
+    step_id `fill-proposed-pr-specification` and explain the semantic decision
+    that must change. That step will return a complete replacement semantic
+    object and the runtime will compile the whole document again. Do not
+    instantiate workflows, stage artifacts, request approval, or create a pull
+    request while the proposed PR file is invalid.
 - id: gate-proposed-pr-specification
   description: Confirm the proposed PR specification is valid.
   actions: []
@@ -335,8 +331,8 @@ steps:
     goto_step: repair-proposed-pr-specification
     retry_context: >-
       The proposed-PR specification gate failed. Inspect the latest evaluator
-      result, repair the single proposed-pr-specification.yaml with yaml_edit, and
-      rerun deterministic evaluation before continuing.
+      result, return to fill-proposed-pr-specification, and regenerate it from a
+      complete semantic decision object before continuing.
 - id: plan-workflow-instantiation
   description: Plan execution workflow instantiation.
   actions: [gather_context, edit, yaml_edit, file_management, read_document]

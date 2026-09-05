@@ -6507,6 +6507,46 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             "proposed_pr_names": ["display-related-photos-pr-001"]
                         },
                     }
+                if prompt["current_step"].get("id") == "fill-proposed-pr-specification":
+                    self._call_index += 1
+                    proposed_pr_id = "display-related-photos-pr-001"
+                    effects = (
+                        ("entities", "related-photo", "added"),
+                        ("entities", "gallery-photo", "added"),
+                        ("modules", "related-photos-module", "added"),
+                        ("tools", "related-photos-check", "added"),
+                        (
+                            "entity_relationships",
+                            "related-photo-groups-with-gallery-photo",
+                            "added",
+                        ),
+                        ("features", "display-related-photos", "added"),
+                        ("decisions", "display-related-photos-grid", "added"),
+                    )
+                    return {
+                        "action": "next_step",
+                        "outputs": {
+                            "semantic_specification": {
+                                "proposed_prs": [
+                                    {
+                                        "id": proposed_pr_id,
+                                        "intent": pr_spec_entry["intent"],
+                                        "justification": pr_spec_entry["justification"],
+                                        "dependent_pr_ids": [],
+                                    }
+                                ],
+                                "effect_assignments": [
+                                    {
+                                        "section": section,
+                                        "id": item_id,
+                                        "action": action,
+                                        "proposed_pr_id": proposed_pr_id,
+                                    }
+                                    for section, item_id, action in effects
+                                ],
+                            }
+                        },
+                    }
                 if prompt["current_step"].get("id") == "plan-workflow-instantiation":
                     if not self._workflow_tools_gathered:
                         self._workflow_tools_gathered = True

@@ -13,6 +13,7 @@ from typing import Any
 
 from powdrr_lift.workflow_replay import (
     WorkflowReplayError,
+    redact_replay_bundle,
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
 )
@@ -159,6 +160,7 @@ def promote_replay_candidates(
                 }
             )
             continue
+        bundle = redact_replay_bundle(bundle)
         name = f"{cluster.rank:04d}-{cluster.fingerprint}.yaml"
         path = save_workflow_replay_bundle(output_dir / name, bundle)
         promoted.append(

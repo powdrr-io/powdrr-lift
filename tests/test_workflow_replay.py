@@ -2,13 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION,
+    WorkflowReplayError,
     build_workflow_replay_state,
     load_workflow_replay_bundle,
+    redact_replay_bundle,
     render_skill_replay,
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
+    validate_replay_fixture_safety,
 )
 
 
@@ -121,3 +126,33 @@ steps:
         "requires a successful tool invocation"
         in rendered["response_validation"]["error"]
     )
+
+
+def test_replay_fixture_redaction_removes_credentials_and_absolute_paths() -> None:
+    bundle = {
+        "id": "unsafe",
+        "prompt_state": {
+            "message": "Read /private/tmp/worktree/file.py",
+            "headers": {"authorization": "Bearer abcdefghijklmnopqrstuvwxyz"},
+            "custom": "customer-secret-123",
+        },
+        "redactions": [],
+    }
+
+    redacted = redact_replay_bundle(
+        bundle,
+        secret_patterns=(r"customer-secret-\d+",),
+    )
+
+    assert redacted["prompt_state"]["message"] == "Read <repo-root>"
+    assert redacted["prompt_state"]["headers"]["authorization"] == "<redacted>"
+    assert redacted["prompt_state"]["custom"] == "<redacted>"
+    assert len(redacted["redactions"]) == 3
+    validate_replay_fixture_safety(redacted, secret_patterns=(r"customer-secret-\d+",))
+
+
+def test_replay_fixture_safety_rejects_unredacted_sensitive_data() -> None:
+    with pytest.raises(WorkflowReplayError, match="sensitive data"):
+        validate_replay_fixture_safety(
+            {"prompt_state": {"path": "/Users/example/project"}}
+        )

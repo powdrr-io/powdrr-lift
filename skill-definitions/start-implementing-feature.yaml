@@ -398,6 +398,7 @@ steps:
 - id: repair-proposed-pr-specification
   description: Repair every reported proposed PR specification issue.
   actions: [read_document, goto_step]
+  requires_explicit_transition: true
   step_type: freeform
   llm_type: fast_iteration
   details: >-

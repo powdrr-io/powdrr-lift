@@ -1064,6 +1064,22 @@ def test_step_allowed_actions_reject_direct_edit() -> None:
         )
 
 
+def test_repair_step_cannot_advance_without_returning_to_validation() -> None:
+    step = SkillStep(
+        id="repair-proposed-pr-specification",
+        description="Repair semantic decisions.",
+        requires_explicit_transition=True,
+    )
+
+    with pytest.raises(RuntimeError, match="requires an explicit transition"):
+        _validate_workflow_step_transition(
+            _parse_action_response({"action": "next_step"}),
+            step,
+            [],
+            0,
+        )
+
+
 def test_workflow_can_advance_after_empty_gather_context_result() -> None:
     validated = False
     try:

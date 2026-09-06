@@ -1351,6 +1351,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     )
     repair_step = step("repair-proposed-pr-specification")
     assert repair_step.actions == ("read_document", "goto_step")
+    assert repair_step.requires_explicit_transition is True
     assert repair_step.details is not None
     assert "Do not repair YAML" in repair_step.details
     assert "plan-proposed-pr-specification" in repair_step.details

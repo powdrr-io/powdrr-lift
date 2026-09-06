@@ -236,6 +236,7 @@ class SkillStep:
     actions: tuple[str, ...] = field(default_factory=tuple)
     # An explicit empty list is a closed contract; omission remains legacy.
     actions_declared: bool = False
+    requires_explicit_transition: bool = False
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -274,6 +275,8 @@ class SkillStep:
             data["actions"] = list(self.actions)
         elif self.actions_declared:
             data["actions"] = []
+        if self.requires_explicit_transition:
+            data["requires_explicit_transition"] = True
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -608,6 +611,7 @@ def build_skill_validation_report(
                     "tool_invocations",
                     "prompt_catalogs",
                     "actions",
+                    "requires_explicit_transition",
                     "pre_step",
                     "gate",
                     "validation_gate",
@@ -671,6 +675,20 @@ def build_skill_validation_report(
                         code="invalid_llm_type",
                         message="Skill step llm_type must be a non-empty string.",
                         path=_child_path(step_path, "llm_type"),
+                    )
+                )
+
+            requires_explicit_transition = step_mapping.get(
+                "requires_explicit_transition", False
+            )
+            if not isinstance(requires_explicit_transition, bool):
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_requires_explicit_transition",
+                        message=(
+                            "Skill step requires_explicit_transition must be a boolean."
+                        ),
+                        path=_child_path(step_path, "requires_explicit_transition"),
                     )
                 )
 
@@ -1700,6 +1718,9 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     actions = _optional_step_actions(data.get("actions"))
     actions_declared = "actions" in data
+    requires_explicit_transition = data.get("requires_explicit_transition", False)
+    if not isinstance(requires_explicit_transition, bool):
+        raise ValueError("Skill step requires_explicit_transition must be a boolean.")
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
     raw_coding_loop = data.get("coding_loop")
@@ -1780,6 +1801,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         prompt_catalogs=prompt_catalogs,
         actions=actions,
         actions_declared=actions_declared,
+        requires_explicit_transition=requires_explicit_transition,
         pre_step=pre_step,
         gate=gate,
         validation_gate=validation_gate,

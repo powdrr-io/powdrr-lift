@@ -1064,20 +1064,41 @@ def test_step_allowed_actions_reject_direct_edit() -> None:
         )
 
 
-def test_repair_step_cannot_advance_without_returning_to_validation() -> None:
+def test_repair_step_next_step_returns_to_validation_gate() -> None:
     step = SkillStep(
         id="repair-proposed-pr-specification",
         description="Repair semantic decisions.",
-        requires_explicit_transition=True,
+        next_step_override="evaluate-proposed-pr-specification",
     )
 
-    with pytest.raises(RuntimeError, match="requires an explicit transition"):
-        _validate_workflow_step_transition(
-            _parse_action_response({"action": "next_step"}),
-            step,
-            [],
-            0,
-        )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            Path("skill.yaml"),
+            Skill(
+                name="start-implementing-feature",
+                when_to_use=(),
+                steps=(
+                    SkillStep(
+                        id="evaluate-proposed-pr-specification", description="Validate."
+                    ),
+                    step,
+                ),
+            ),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=1,
+        worktree_root=Path("."),
+    )
+
+    _validate_workflow_step_transition(
+        _parse_action_response({"action": "next_step"}),
+        step,
+        [],
+        1,
+        state=state,
+    )
 
 
 def test_workflow_can_advance_after_empty_gather_context_result() -> None:

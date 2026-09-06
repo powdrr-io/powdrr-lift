@@ -7529,13 +7529,19 @@ def _validate_workflow_step_transition(
     """Prevent the LLM from skipping a step's required tool invocation."""
     if action.kind not in {"next_step", "goto_step", "complete"}:
         return
-    if action.kind == "next_step" and getattr(
-        step, "requires_explicit_transition", False
-    ):
-        raise PowdrrExecutionError(
-            "This workflow step requires an explicit transition; choose its "
-            "declared goto_step target so validation can run again."
-        )
+    if action.kind == "next_step":
+        next_step_override = getattr(step, "next_step_override", None)
+        if next_step_override:
+            if state is None:
+                raise PowdrrExecutionError(
+                    "Workflow next_step_override requires the current skill state."
+                )
+            target_index = _step_index_by_id(state.selected_skill, next_step_override)
+            if target_index >= current_step_index:
+                raise PowdrrExecutionError(
+                    "Workflow next_step_override must target a prior step; "
+                    f"{next_step_override!r} is not before step {current_step_index}."
+                )
     if action.kind == "goto_step":
         if state is None:
             raise PowdrrExecutionError(

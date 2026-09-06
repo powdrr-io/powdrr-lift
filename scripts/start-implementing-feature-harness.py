@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import select
@@ -16,6 +17,14 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any
+
+import yaml
+
+from powdrr_lift.core.pr_specification import (
+    build_authoritative_effect_handoff,
+    build_pr_specification_validation_report,
+    compile_split_pr_specification,
+)
 
 DEFAULT_PROMPT = (
     "Start implementing the existing interaction-file-log feature. Use the "
@@ -42,6 +51,12 @@ _FAILURE_MARKERS = (
     "correction_required",
     "workflow stopped",
     "repair failed",
+)
+_SPLIT_PHASE_IDS = (
+    "plan-proposed-pr-specification",
+    "load-authoritative-pr-effects",
+    "allocate-proposed-pr-effects",
+    "evaluate-proposed-pr-specification",
 )
 
 
@@ -285,6 +300,137 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _split_contract_probe(repo_root: Path, feature_name: str) -> dict[str, Any]:
+    """Prove malformed split inputs fail closed and valid inputs compile."""
+    target = _feature_path(repo_root, feature_name) / "proposed-pr-specification.yaml"
+    if not target.is_file():
+        return {"available": False, "reason": f"missing {target}"}
+    before = target.read_bytes()
+    raw = yaml.safe_load(before)
+    if not isinstance(raw, dict) or not isinstance(raw.get("proposed_prs"), list):
+        return {"available": False, "reason": "existing proposal is not unified"}
+    handoff = build_authoritative_effect_handoff(
+        work_item_name=feature_name,
+        repo_root=repo_root,
+    )
+    plan = {
+        "proposed_prs": [
+            {
+                "id": item["id"],
+                "intent": item["intent"],
+                "justification": item["justification"],
+                "dependent_pr_ids": item.get("dependent_prs", []),
+            }
+            for item in raw["proposed_prs"]
+            if isinstance(item, dict)
+        ]
+    }
+    owners = {
+        (section, item["id"], item["action"]): item.get("proposed_pr_id")
+        for section in (
+            "entities",
+            "modules",
+            "tools",
+            "entity_relationships",
+            "features",
+            "decisions",
+        )
+        for item in raw.get(section, [])
+        if isinstance(item, dict)
+    }
+    allocation = {
+        "assignments": [
+            {
+                "effect_ref": effect["effect_ref"],
+                "proposed_pr_id": owners[
+                    (effect["section"], effect["id"], effect["action"])
+                ],
+            }
+            for effect in handoff["effects"]
+        ]
+    }
+    cases: dict[str, bool] = {}
+    malformed_values = {
+        "planning_unknown_field": ({**plan, "effects": []}, allocation),
+        "allocation_unknown_field": (
+            plan,
+            {
+                "assignments": [
+                    {**allocation["assignments"][0], "section": "entities"},
+                    *allocation["assignments"][1:],
+                ]
+            },
+        ),
+        "allocation_incomplete": (
+            plan,
+            {"assignments": allocation["assignments"][:-1]},
+        ),
+    }
+    for name, (case_plan, case_allocation) in malformed_values.items():
+        try:
+            compile_split_pr_specification(
+                case_plan,
+                case_allocation,
+                handoff,
+                work_item_name=feature_name,
+                repo_root=repo_root,
+                file_path=target,
+            )
+        except ValueError:
+            cases[name] = target.read_bytes() == before
+        else:
+            cases[name] = False
+    compiled = compile_split_pr_specification(
+        plan,
+        allocation,
+        handoff,
+        work_item_name=feature_name,
+        repo_root=repo_root,
+        file_path=target,
+    )
+    cases["valid_split_compiles"] = bool(compiled.get("proposed_prs"))
+    cases["valid_probe_does_not_mutate"] = target.read_bytes() == before
+    return {
+        "available": True,
+        "cases": cases,
+        "all_passed": all(cases.values()),
+        "authoritative_effect_count": len(handoff["effects"]),
+        "document_sha256": hashlib.sha256(before).hexdigest(),
+    }
+
+
+def _split_phase_evidence(
+    output: str,
+    errors: list[dict[str, Any]],
+) -> dict[str, Any]:
+    error_step_ids = {
+        str(context.get("skill", {}).get("step_id"))
+        for error in errors
+        if isinstance((context := error.get("context")), dict)
+        and isinstance(context.get("skill"), dict)
+    }
+    seen = [
+        step_id
+        for step_id in _SPLIT_PHASE_IDS
+        if step_id in output or step_id in error_step_ids
+    ]
+    rejected = [
+        step_id
+        for step_id in (
+            "plan-proposed-pr-specification",
+            "allocate-proposed-pr-effects",
+        )
+        if step_id in error_step_ids
+    ]
+    return {
+        "seen_steps": seen,
+        "malformed_response_rejections": rejected,
+        "evaluation_gate_passed": (
+            "evaluate-proposed-pr-specification): passed" in output
+        ),
+    }
+
+
 def _log_root(repo_root: Path) -> Path:
     common_dir = subprocess.run(
         ["git", "rev-parse", "--git-common-dir"],
@@ -397,7 +543,7 @@ def _run_iteration(
     elif new_errors or corrections or process.returncode != 0:
         status = "failed"
     output_lines = (output or "").splitlines()
-    return {
+    result = {
         "iteration": iteration,
         "status": status,
         "returncode": process.returncode,
@@ -411,6 +557,24 @@ def _run_iteration(
             None,
         ),
     }
+    result["split_phase_evidence"] = _split_phase_evidence(output, new_errors)
+    target = (
+        _feature_path(repo_root, args.feature_name) / "proposed-pr-specification.yaml"
+    )
+    if target.is_file():
+        target_bytes = target.read_bytes()
+        validation = build_pr_specification_validation_report(
+            target_bytes.decode("utf-8"),
+            work_item_name=args.feature_name,
+            repo_root=repo_root,
+            file_path=target,
+        )
+        result["compiled_document"] = {
+            "sha256": hashlib.sha256(target_bytes).hexdigest(),
+            "validation_successful": validation.validation_successful,
+            "issues": [issue.message for issue in validation.issues],
+        }
+    return result
 
 
 def _run_repair_command(
@@ -453,6 +617,12 @@ def main() -> int:
     try:
         if not args.no_seed_feature:
             _seed_feature_from_history(run_root, args.feature_name)
+        contract_probe = _split_contract_probe(run_root, args.feature_name)
+        print(
+            "Split contract probe: "
+            + json.dumps(contract_probe, ensure_ascii=False, sort_keys=True),
+            file=sys.stderr,
+        )
         log_root = _log_root(run_root)
         error_log = _resolve_path(
             args.error_log, repo_root=repo_root, log_root=log_root
@@ -473,6 +643,7 @@ def main() -> int:
                 iteration=iteration,
             )
             reports.append(result)
+            result["split_contract_probe"] = contract_probe
             print(
                 f"Iteration {iteration}: {result['status']} "
                 f"(errors={result['error_count']}, "

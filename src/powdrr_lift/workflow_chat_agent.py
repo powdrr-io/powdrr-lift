@@ -1518,12 +1518,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_step_index=parent_step_index,
             )
         self.failure_kind = "validation_error"
-        if action.kind == "next_step":
-            _require_coding_loop_verification(
-                self.current_step,
-                self.state.execution_events,
-                step_index=self.state.step_index,
-            )
+        _validate_coding_loop_action(
+            self.current_step,
+            self.state.execution_events,
+            action_kind=action.kind,
+            step_index=self.state.step_index,
+        )
         _validate_workflow_step_transition(
             action,
             self.current_step,
@@ -8923,6 +8923,22 @@ def _require_coding_loop_verification(
     *,
     step_index: int | None = None,
 ) -> None:
+    _validate_coding_loop_action(
+        step,
+        events,
+        action_kind="next_step",
+        step_index=step_index,
+    )
+
+
+def _validate_coding_loop_action(
+    step: Any,
+    events: Sequence[Mapping[str, Any]],
+    *,
+    action_kind: str,
+    step_index: int | None = None,
+) -> None:
+    """Enforce coding-loop completion from typed events, not model guidance."""
     coding_loop = getattr(step, "coding_loop", None)
     if coding_loop is None or not coding_loop.verification:
         return
@@ -8935,11 +8951,23 @@ def _require_coding_loop_verification(
         ),
         None,
     )
-    if latest is None or latest.get("all_passed") is not True:
+    if action_kind == "next_step" and (
+        latest is None or latest.get("all_passed") is not True
+    ):
         raise PowdrrExecutionError(
             "This coding_loop step cannot choose next_step until its declared "
             "verification commands pass. Make or repair the implementation, "
             "then wait for the automatic verification result."
+        )
+    if (
+        latest is not None
+        and latest.get("all_passed") is True
+        and action_kind != "next_step"
+    ):
+        raise PowdrrExecutionError(
+            "This coding_loop step has already passed all declared checks. "
+            "Choose next_step with the required output_state; do not perform "
+            "another edit, read, or verification run."
         )
 
 

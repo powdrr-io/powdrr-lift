@@ -132,6 +132,7 @@ from powdrr_lift.workflow_chat_agent import (
     _serialize_messages,
     _step_action_response_schema,
     _step_actions,
+    _validate_coding_loop_action,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
@@ -573,6 +574,42 @@ def test_coding_loop_runs_declared_verification_and_requires_pass(
         step,
         [{"kind": "coding_loop_verification", **verification}],
     )
+
+
+def test_coding_loop_rejects_actions_after_successful_verification() -> None:
+    step = SkillStep(
+        description="Implement and verify.",
+        step_type="coding_loop",
+        coding_loop=CodingLoopSpec(
+            goal="Make the check pass.",
+            verification=(CodingLoopVerification(id="check", command="true"),),
+        ),
+    )
+    events = [{"kind": "coding_loop_verification", "all_passed": True}]
+
+    with pytest.raises(PowdrrExecutionError, match="already passed"):
+        _validate_coding_loop_action(step, events, action_kind="read_document")
+
+    _validate_coding_loop_action(step, events, action_kind="next_step")
+
+
+def test_coding_loop_success_is_scoped_to_current_step() -> None:
+    step = SkillStep(
+        description="Implement and verify.",
+        step_type="coding_loop",
+        coding_loop=CodingLoopSpec(
+            goal="Make the check pass.",
+            verification=(CodingLoopVerification(id="check", command="true"),),
+        ),
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="until"):
+        _validate_coding_loop_action(
+            step,
+            [{"kind": "coding_loop_verification", "step_index": 1, "all_passed": True}],
+            action_kind="next_step",
+            step_index=0,
+        )
 
 
 def test_explicit_step_contract_rejects_undeclared_complete() -> None:

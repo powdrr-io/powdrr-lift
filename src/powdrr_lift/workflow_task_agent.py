@@ -86,6 +86,7 @@ from powdrr_lift.workflow_chat_agent import (
     _run_deterministic_pre_step,
     _run_gate,
     _step_index_by_id,
+    _validate_coding_loop_action,
     _validate_internal_command,
     _validate_workflow_action_for_step,
     _validate_workflow_action_outputs,
@@ -595,25 +596,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "The observer rejected this exact action after it failed to "
                 "make progress. Choose a materially different action."
             )
-        if action.kind == "next_step":
-            _require_coding_loop_verification(self.task, self.events)
-        elif (
-            getattr(self.task, "coding_loop", None) is not None
-            and next(
-                (
-                    event
-                    for event in reversed(self.events)
-                    if event.get("kind") == "coding_loop_verification"
-                ),
-                {},
-            ).get("all_passed")
-            is True
-        ):
-            raise PowdrrExecutionError(
-                "This coding_loop step has already passed all declared checks. "
-                "Choose next_step with the required output_state; do not perform "
-                "another edit, read, or verification run."
-            )
+        _validate_coding_loop_action(
+            self.task,
+            self.events,
+            action_kind=action.kind,
+        )
         if action.kind == "gather_context":
             report = invoke_repository_read(
                 "gather_context",

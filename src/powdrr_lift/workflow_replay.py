@@ -314,6 +314,7 @@ def render_skill_replay(
         SkillCatalogEntry,
         _build_step_execution_messages,
         _parse_action_response,
+        _validate_coding_loop_action,
         _validate_workflow_action_for_step,
         _validate_workflow_step_transition,
         _WorkflowExecutionState,
@@ -393,6 +394,13 @@ def render_skill_replay(
             execution_events,
             step_index,
             state=execution_state,
+        )
+        _validate_coding_loop_action(
+            current_step,
+            execution_events,
+            action_kind=action.kind,
+            step_index=step_index,
+            worktree_root=repo_root,
         )
         _validate_workflow_action_for_step(action, current_step)
     except RuntimeError as exc:

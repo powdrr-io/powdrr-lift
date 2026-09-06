@@ -1523,6 +1523,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.state.execution_events,
             action_kind=action.kind,
             step_index=self.state.step_index,
+            worktree_root=self.state.worktree_root,
         )
         _validate_workflow_step_transition(
             action,
@@ -8913,8 +8914,35 @@ def _run_coding_loop_verification(
     return {
         "results": results,
         "all_passed": all_passed,
+        "worktree_fingerprint": _coding_loop_worktree_fingerprint(worktree_root),
         "error": None if all_passed else "One or more coding-loop checks failed.",
     }
+
+
+def _coding_loop_worktree_fingerprint(worktree_root: Path) -> str:
+    """Hash material worktree contents for verification evidence binding."""
+    digest = hashlib.sha256()
+    ignored_directories = {".git", ".venv", "__pycache__", ".pytest_cache"}
+    for directory, dirnames, filenames in os.walk(worktree_root, followlinks=False):
+        dirnames[:] = sorted(
+            name for name in dirnames if name not in ignored_directories
+        )
+        for filename in sorted(filenames):
+            path = Path(directory) / filename
+            relative_path = path.relative_to(worktree_root).as_posix()
+            digest.update(relative_path.encode("utf-8"))
+            digest.update(b"\0")
+            try:
+                if path.is_symlink():
+                    digest.update(b"symlink\0")
+                    digest.update(os.readlink(path).encode("utf-8"))
+                else:
+                    digest.update(b"file\0")
+                    digest.update(path.read_bytes())
+            except OSError as error:
+                digest.update(f"unreadable:{error}".encode())
+            digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _require_coding_loop_verification(
@@ -8922,12 +8950,14 @@ def _require_coding_loop_verification(
     events: Sequence[Mapping[str, Any]],
     *,
     step_index: int | None = None,
+    worktree_root: Path | None = None,
 ) -> None:
     _validate_coding_loop_action(
         step,
         events,
         action_kind="next_step",
         step_index=step_index,
+        worktree_root=worktree_root,
     )
 
 
@@ -8937,6 +8967,7 @@ def _validate_coding_loop_action(
     *,
     action_kind: str,
     step_index: int | None = None,
+    worktree_root: Path | None = None,
 ) -> None:
     """Enforce coding-loop completion from typed events, not model guidance."""
     coding_loop = getattr(step, "coding_loop", None)
@@ -8969,6 +9000,18 @@ def _validate_coding_loop_action(
             "Choose next_step with the required output_state; do not perform "
             "another edit, read, or verification run."
         )
+    if latest is not None and latest.get("all_passed") is True:
+        recorded_fingerprint = latest.get("worktree_fingerprint")
+        if (
+            worktree_root is not None
+            and isinstance(recorded_fingerprint, str)
+            and recorded_fingerprint != _coding_loop_worktree_fingerprint(worktree_root)
+        ):
+            raise PowdrrExecutionError(
+                "This coding_loop verification is stale because the worktree "
+                "changed after the checks passed. Run the declared verification "
+                "commands again before choosing next_step."
+            )
 
 
 def _structured_intrinsic_pre_step_parameters(

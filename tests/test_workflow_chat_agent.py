@@ -83,6 +83,7 @@ from powdrr_lift.workflow_chat_agent import (
     _build_selection_messages,
     _build_step_execution_messages,
     _catalog_entry_to_data,
+    _coding_loop_worktree_fingerprint,
     _command_matches_invocation,
     _complete_json_with_model_fallback,
     _current_file_context,
@@ -573,7 +574,39 @@ def test_coding_loop_runs_declared_verification_and_requires_pass(
     _require_coding_loop_verification(
         step,
         [{"kind": "coding_loop_verification", **verification}],
+        worktree_root=tmp_path,
     )
+
+
+def test_coding_loop_verification_becomes_stale_after_worktree_change(
+    tmp_path: Path,
+) -> None:
+    step = SkillStep(
+        description="Implement and verify.",
+        step_type="coding_loop",
+        coding_loop=CodingLoopSpec(
+            goal="Make the check pass.",
+            verification=(CodingLoopVerification(id="check", command="true"),),
+        ),
+    )
+    target = tmp_path / "implementation.py"
+    target.write_text("value = 1\n", encoding="utf-8")
+    events = [
+        {
+            "kind": "coding_loop_verification",
+            "all_passed": True,
+            "worktree_fingerprint": _coding_loop_worktree_fingerprint(tmp_path),
+        }
+    ]
+
+    target.write_text("value = 2\n", encoding="utf-8")
+
+    with pytest.raises(PowdrrExecutionError, match="verification is stale"):
+        _require_coding_loop_verification(
+            step,
+            events,
+            worktree_root=tmp_path,
+        )
 
 
 def test_coding_loop_rejects_actions_after_successful_verification() -> None:

@@ -600,6 +600,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.task,
             self.events,
             action_kind=action.kind,
+            worktree_root=self.repo_root,
         )
         if action.kind == "gather_context":
             report = invoke_repository_read(
@@ -3414,7 +3415,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
         ):
             action = replace(action, outputs=dict(action.output_state))
         if action.kind == "next_step":
-            _require_coding_loop_verification(step, self.execution_events)
+            _require_coding_loop_verification(
+                step,
+                self.execution_events,
+                worktree_root=self.repo_root,
+            )
         _validate_workflow_action_for_step(action, step)
         _validate_workflow_action_outputs(action, step)
         if action.kind in {"complete", "next_step"}:

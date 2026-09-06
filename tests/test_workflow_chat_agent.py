@@ -103,6 +103,7 @@ from powdrr_lift.workflow_chat_agent import (
     _modular_action_system_prompt,
     _normalize_cache_usage,
     _parse_action_response,
+    _parse_action_response_with_schema,
     _parse_json_object,
     _parse_workflow_action_gather_context,
     _prompt_durable_facts,
@@ -129,11 +130,13 @@ from powdrr_lift.workflow_chat_agent import (
     _run_deterministic_pre_step,
     _run_gate,
     _serialize_messages,
+    _step_action_response_schema,
     _step_actions,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
+    _validate_workflow_action_outputs,
     _validate_workflow_handoff,
     _validate_workflow_step_transition,
     _validation_actions_match,
@@ -681,6 +684,63 @@ def test_gate_reports_fresh_result_separately_from_llm_commentary(
     assert "issues remain" in output
 
 
+def test_failed_evaluator_gate_exposes_structured_issues_for_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = {
+        "returncode": 1,
+        "validation_successful": False,
+        "issues": [
+            {
+                "code": "unknown_proposed_pr_id",
+                "path": "entities[0].proposed_pr_id",
+                "message": "Unknown proposed PR.",
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        lambda *args, **kwargs: result,
+    )
+    step = SkillStep(
+        id="evaluate-proposed-pr-specification",
+        description="Evaluate.",
+        step_type="gate",
+        pre_step=SkillStepPreStep(
+            action="invoke_tool",
+            template={
+                "tool": "internal",
+                "command": ["powdrr-lift", "evaluate", "docs/proposals/example"],
+            },
+        ),
+        gate=SkillStepGate(
+            outcome={"path": "returncode", "equals": 0},
+            goto_step="repair-proposed-pr-specification",
+            success_goto_step="plan-workflow-instantiation",
+            retry_context="Repair the semantic phase.",
+        ),
+    )
+    execution_context: list[str] = []
+
+    passed = _run_gate(
+        step,
+        skill_name="start-implementing-feature",
+        worktree_root=tmp_path,
+        execution_events=[],
+        execution_context=execution_context,
+        handoff_records={},
+        step_index=12,
+        workflow_context=None,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        verbose=False,
+    )
+
+    assert passed is False
+    assert "unknown_proposed_pr_id" in execution_context[-1]
+    assert "entities[0].proposed_pr_id" in execution_context[-1]
+
+
 def test_invoke_tool_runs_gather_context_pre_step_once(
     tmp_path: Path,
 ) -> None:
@@ -1002,6 +1062,43 @@ def test_step_allowed_actions_reject_direct_edit() -> None:
             ),
             step,
         )
+
+
+def test_repair_step_next_step_returns_to_validation_gate() -> None:
+    step = SkillStep(
+        id="repair-proposed-pr-specification",
+        description="Repair semantic decisions.",
+        next_step_override="evaluate-proposed-pr-specification",
+    )
+
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            Path("skill.yaml"),
+            Skill(
+                name="start-implementing-feature",
+                when_to_use=(),
+                steps=(
+                    SkillStep(
+                        id="evaluate-proposed-pr-specification", description="Validate."
+                    ),
+                    step,
+                ),
+            ),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=1,
+        worktree_root=Path("."),
+    )
+
+    _validate_workflow_step_transition(
+        _parse_action_response({"action": "next_step"}),
+        step,
+        [],
+        1,
+        state=state,
+    )
 
 
 def test_workflow_can_advance_after_empty_gather_context_result() -> None:
@@ -1576,6 +1673,48 @@ def test_local_llama_client_requests_full_gpu_offload(
     assert captured["n_ctx"] == 24576
 
 
+def test_local_llama_client_receives_active_response_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+    model_path.touch()
+    captured: dict[str, object] = {}
+
+    class FakeLlama:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def create_chat_completion(self, **kwargs: object) -> dict[str, object]:
+            captured.update(kwargs)
+            return {"choices": [{"message": {"content": '{"action":"next_step"}'}}]}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "llama_cpp",
+        types.SimpleNamespace(
+            Llama=FakeLlama,
+            llama_supports_gpu_offload=lambda: True,
+        ),
+    )
+    response_schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string"}},
+        "required": ["action"],
+        "additionalProperties": False,
+    }
+
+    client = LocalLlamaChatClient(model_path=model_path)
+
+    assert client.complete_json(
+        [{"role": "user", "content": "test"}],
+        response_schema=response_schema,
+    ) == {"action": "next_step"}
+    assert captured["response_format"] == {
+        "type": "json_object",
+        "schema": response_schema,
+    }
+
+
 def test_local_model_context_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "8192")
 
@@ -2022,13 +2161,22 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
     tmp_path: Path,
 ) -> None:
     class _FakeClient:
-        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
             assert messages == [{"role": "user", "content": "request"}]
+            assert response_schema == {"type": "object"}
             return {"action": "complete", "text": "done"}
 
     recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
 
-    assert recorder.complete_json([{"role": "user", "content": "request"}]) == {
+    assert recorder.complete_json(
+        [{"role": "user", "content": "request"}],
+        response_schema={"type": "object"},
+    ) == {
         "action": "complete",
         "text": "done",
     }
@@ -2121,11 +2269,125 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
         base_url="https://api.openai.com/v1",
     )
 
-    assert client.complete_json([{"role": "user", "content": "request"}]) == {
-        "action": "complete"
+    response_schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string"}},
+        "required": ["action"],
+        "additionalProperties": False,
     }
+    assert client.complete_json(
+        [{"role": "user", "content": "request"}],
+        response_schema=response_schema,
+    ) == {"action": "complete"}
     assert serialization_calls == 1
     assert request_bodies[0]["messages"] == [{"role": "user", "content": "request"}]
+    assert request_bodies[0]["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "workflow_action",
+            "strict": True,
+            "schema": response_schema,
+        },
+    }
+
+
+def test_step_action_response_schema_embeds_strict_declared_output() -> None:
+    output_schema = {
+        "type": "object",
+        "properties": {"items": {"type": "array"}},
+        "required": ["items"],
+        "additionalProperties": False,
+    }
+    step = SkillStep(
+        id="plan",
+        description="Plan.",
+        actions=(),
+        actions_declared=True,
+        outputs=(
+            SkillStepOutput(
+                "plan",
+                "object",
+                True,
+                schema=output_schema,
+            ),
+        ),
+    )
+
+    schema = _step_action_response_schema(step)
+
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["outputs"] == {
+        "type": "object",
+        "properties": {"plan": output_schema},
+        "required": ["plan"],
+        "additionalProperties": False,
+    }
+
+
+def test_declared_output_schema_rejects_malformed_shape_before_handoff() -> None:
+    step = SkillStep(
+        id="allocate",
+        description="Allocate.",
+        outputs=(
+            SkillStepOutput(
+                "allocation",
+                "object",
+                True,
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "assignments": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "effect_ref": {"type": "string"},
+                                    "proposed_pr_id": {"type": "string"},
+                                },
+                                "required": ["effect_ref", "proposed_pr_id"],
+                                "additionalProperties": False,
+                            },
+                        }
+                    },
+                    "required": ["assignments"],
+                    "additionalProperties": False,
+                },
+            ),
+        ),
+    )
+    malformed = WorkflowAction(
+        kind="next_step",
+        outputs={
+            "allocation": {
+                "assignments": [
+                    {
+                        "effect_ref": "effect-1",
+                        "proposed_pr_id": "pr-1",
+                        "section": "entities",
+                    }
+                ]
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="unknown properties: section"):
+        _validate_workflow_action_outputs(malformed, step)
+
+
+def test_active_response_schema_rejects_unknown_envelope_fields() -> None:
+    step = SkillStep(
+        id="plan",
+        description="Plan.",
+        actions=(),
+        actions_declared=True,
+    )
+    schema = _step_action_response_schema(step)
+
+    with pytest.raises(RuntimeError, match="unknown properties: surprise"):
+        _parse_action_response_with_schema(
+            {"action": "next_step", "surprise": True},
+            schema=schema,
+        )
 
 
 def test_normalize_cache_usage_supports_provider_formats() -> None:
@@ -6507,26 +6769,13 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             "proposed_pr_names": ["display-related-photos-pr-001"]
                         },
                     }
-                if prompt["current_step"].get("id") == "fill-proposed-pr-specification":
+                if prompt["current_step"].get("id") == "plan-proposed-pr-specification":
                     self._call_index += 1
                     proposed_pr_id = "display-related-photos-pr-001"
-                    effects = (
-                        ("entities", "related-photo", "added"),
-                        ("entities", "gallery-photo", "added"),
-                        ("modules", "related-photos-module", "added"),
-                        ("tools", "related-photos-check", "added"),
-                        (
-                            "entity_relationships",
-                            "related-photo-groups-with-gallery-photo",
-                            "added",
-                        ),
-                        ("features", "display-related-photos", "added"),
-                        ("decisions", "display-related-photos-grid", "added"),
-                    )
                     return {
                         "action": "next_step",
                         "outputs": {
-                            "semantic_specification": {
+                            "proposed_pr_plan": {
                                 "proposed_prs": [
                                     {
                                         "id": proposed_pr_id,
@@ -6534,16 +6783,27 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                                         "justification": pr_spec_entry["justification"],
                                         "dependent_pr_ids": [],
                                     }
-                                ],
-                                "effect_assignments": [
+                                ]
+                            }
+                        },
+                    }
+                if prompt["current_step"].get("id") == "allocate-proposed-pr-effects":
+                    self._call_index += 1
+                    proposed_pr_id = "display-related-photos-pr-001"
+                    effect_record = prompt["handoff_inputs"]["resolved"][
+                        "authoritative_effects"
+                    ]
+                    return {
+                        "action": "next_step",
+                        "outputs": {
+                            "effect_allocation": {
+                                "assignments": [
                                     {
-                                        "section": section,
-                                        "id": item_id,
-                                        "action": action,
+                                        "effect_ref": effect["effect_ref"],
                                         "proposed_pr_id": proposed_pr_id,
                                     }
-                                    for section, item_id, action in effects
-                                ],
+                                    for effect in effect_record["value"]["effects"]
+                                ]
                             }
                         },
                     }
@@ -6778,8 +7038,20 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             "discover-proposed-feature",
             "discover-current-feature",
             "discover-feature-workflows",
+            "repair-proposed-pr-specification",
         }
     )
+    assert {
+        "plan-proposed-pr-specification",
+        "allocate-proposed-pr-effects",
+        "plan-workflow-instantiation",
+    } <= prompted_step_ids
+    gate_event = next(
+        event
+        for event in start_summary["execution_events"]
+        if event["kind"] == "gate" and event.get("step_index") == 12
+    )
+    assert gate_event["passed"] is True
     assert any(
         event["kind"] == "invoke_tool"
         and event.get("tool") == "gh"
@@ -8610,14 +8882,9 @@ def test_anthropic_chat_client_sends_messages_api_request(
                 {
                     "content": [
                         {
-                            "type": "text",
-                            "text": json.dumps(
-                                {
-                                    "selected_skill_path": (
-                                        "skill-definitions/specify-a-feature.yaml"
-                                    )
-                                }
-                            ),
+                            "type": "tool_use",
+                            "name": "workflow_action",
+                            "input": {"action": "next_step"},
                         }
                     ]
                 }
@@ -8637,11 +8904,18 @@ def test_anthropic_chat_client_sends_messages_api_request(
         api_key="anth-key",
         base_url="https://api.anthropic.com",
     )
+    response_schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string"}},
+        "required": ["action"],
+        "additionalProperties": False,
+    }
     response = client.complete_json(
         [
             {"role": "system", "content": "system prompt"},
             {"role": "user", "content": "hello"},
-        ]
+        ],
+        response_schema=response_schema,
     )
 
     assert captured["url"] == "https://api.anthropic.com/v1/messages"
@@ -8655,10 +8929,16 @@ def test_anthropic_chat_client_sends_messages_api_request(
                 "content": [{"type": "text", "text": "hello"}],
             }
         ],
+        "tools": [
+            {
+                "name": "workflow_action",
+                "description": "Return the next workflow action.",
+                "input_schema": response_schema,
+            }
+        ],
+        "tool_choice": {"type": "tool", "name": "workflow_action"},
     }
-    assert response == {
-        "selected_skill_path": "skill-definitions/specify-a-feature.yaml"
-    }
+    assert response == {"action": "next_step"}
 
 
 def test_openai_chat_client_reports_malformed_json_content(

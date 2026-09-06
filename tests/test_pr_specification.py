@@ -325,6 +325,115 @@ def _semantic_specification() -> dict[str, Any]:
     }
 
 
+def _split_specification_inputs(
+    repo_root: Path,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    handoff = pr_specification_module.build_authoritative_effect_handoff(
+        work_item_name="feature-a",
+        repo_root=repo_root,
+    )
+    proposed_pr_plan = {"proposed_prs": _semantic_specification()["proposed_prs"]}
+    owners = {
+        (assignment["section"], assignment["id"], assignment["action"]): assignment[
+            "proposed_pr_id"
+        ]
+        for assignment in _semantic_specification()["effect_assignments"]
+    }
+    effect_allocation = {
+        "assignments": [
+            {
+                "effect_ref": effect["effect_ref"],
+                "proposed_pr_id": owners[
+                    (effect["section"], effect["id"], effect["action"])
+                ],
+            }
+            for effect in handoff["effects"]
+        ]
+    }
+    return proposed_pr_plan, effect_allocation, handoff
+
+
+def test_split_pr_compiler_preserves_authoritative_effect_order_and_values(
+    tmp_path: Path,
+) -> None:
+    output_path = _write_semantic_compiler_specs(tmp_path)
+    plan, allocation, handoff = _split_specification_inputs(tmp_path)
+
+    assert [
+        (effect["section"], effect["id"], effect["action"])
+        for effect in handoff["effects"]
+    ] == [
+        ("entities", "entity-a", "added"),
+        ("features", "feature-a", "added"),
+        ("decisions", "decision-a", "changed"),
+    ]
+    assert len({effect["effect_ref"] for effect in handoff["effects"]}) == 3
+
+    compiled = pr_specification_module.compile_split_pr_specification(
+        plan,
+        allocation,
+        handoff,
+        work_item_name="feature-a",
+        repo_root=tmp_path,
+        file_path=output_path,
+    )
+
+    assert [compiled[section] for section in ("entities", "features", "decisions")] == [
+        [
+            {
+                "id": "entity-a",
+                "action": "added",
+                "proposed_pr_id": "feature-a-core",
+            }
+        ],
+        [
+            {
+                "id": "feature-a",
+                "action": "added",
+                "proposed_pr_id": "feature-a-integration",
+            }
+        ],
+        [
+            {
+                "id": "decision-a",
+                "action": "changed",
+                "proposed_pr_id": "feature-a-core",
+            }
+        ],
+    ]
+
+
+@pytest.mark.parametrize("invalid_case", ["missing", "duplicate", "unknown", "stale"])
+def test_split_pr_compiler_rejects_invalid_allocation_without_mutation(
+    tmp_path: Path,
+    invalid_case: str,
+) -> None:
+    output_path = _write_semantic_compiler_specs(tmp_path)
+    output_path.write_bytes(b"existing proposed PR bytes\n")
+    before = output_path.read_bytes()
+    plan, allocation, handoff = _split_specification_inputs(tmp_path)
+    if invalid_case == "missing":
+        allocation["assignments"].pop()
+    elif invalid_case == "duplicate":
+        allocation["assignments"].append(dict(allocation["assignments"][0]))
+    elif invalid_case == "unknown":
+        allocation["assignments"][0]["effect_ref"] = "effect-unknown"
+    else:
+        handoff["effects"][0]["action"] = "removed"
+
+    with pytest.raises(ValueError):
+        pr_specification_module.compile_split_pr_specification(
+            plan,
+            allocation,
+            handoff,
+            work_item_name="feature-a",
+            repo_root=tmp_path,
+            file_path=output_path,
+        )
+
+    assert output_path.read_bytes() == before
+
+
 def test_compile_semantic_pr_specification_owns_document_structure(
     tmp_path: Path,
 ) -> None:

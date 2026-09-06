@@ -313,12 +313,12 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("start-implementing-feature.yaml", 2),
                 ("start-implementing-feature.yaml", 3),
                 ("start-implementing-feature.yaml", 8),
+                ("start-implementing-feature.yaml", 10),
                 ("run-tests-and-fix.yaml", 1),
                 ("run-tests-and-fix.yaml", 7),
-                ("start-implementing-feature.yaml", 10),
-                ("start-implementing-feature.yaml", 16),
-                ("start-implementing-feature.yaml", 19),
-                ("start-implementing-feature.yaml", 21),
+                ("start-implementing-feature.yaml", 17),
+                ("start-implementing-feature.yaml", 20),
+                ("start-implementing-feature.yaml", 22),
                 ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
@@ -416,6 +416,12 @@ def test_skill_step_contracts_round_trip_and_validate() -> None:
                         name="validation_result",
                         type="validation_result",
                         required_for_next_step=True,
+                        schema={
+                            "type": "object",
+                            "properties": {"valid": {"type": "boolean"}},
+                            "required": ["valid"],
+                            "additionalProperties": False,
+                        },
                     ),
                 ),
             ),
@@ -435,6 +441,12 @@ def test_skill_step_contracts_round_trip_and_validate() -> None:
     parsed = skill_from_json(skill_to_json(skill))
 
     assert parsed == skill
+    assert parsed.steps[0].outputs[0].schema == {
+        "type": "object",
+        "properties": {"valid": {"type": "boolean"}},
+        "required": ["valid"],
+        "additionalProperties": False,
+    }
     report = build_skill_validation_report(skill_to_json(skill))
     assert report.validation_successful is True
 
@@ -460,6 +472,31 @@ def test_skill_step_contracts_reject_duplicate_names() -> None:
 
     assert report.validation_successful is False
     assert any(issue.code == "duplicate_output_name" for issue in report.issues)
+
+
+def test_skill_step_output_schema_rejects_unknown_schema_fields() -> None:
+    report = build_skill_validation_report(
+        json.dumps(
+            {
+                "name": "invalid-output-schema",
+                "when_to_use": ["Test output validation."],
+                "steps": [
+                    {
+                        "description": "Produce output.",
+                        "outputs": [
+                            {
+                                "name": "result",
+                                "schema": {"type": "object", "mystery": True},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "invalid_output_schema" for issue in report.issues)
 
 
 def test_skill_file_helpers_round_trip(tmp_path: Path) -> None:
@@ -1285,28 +1322,50 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--output",
         "docs/proposals/<feature-name>/proposed-pr-specification.yaml",
     )
-    fill_step = step("fill-proposed-pr-specification")
-    assert fill_step.actions == ("read_document",)
-    assert fill_step.outputs[0].name == "semantic_specification"
-    assert fill_step.outputs[0].required_for_next_step
-    assert fill_step.details is not None
-    assert "Do not edit YAML" in fill_step.details
-    assert "effect_assignments" in fill_step.details
+    planning_step = step("plan-proposed-pr-specification")
+    assert planning_step.actions == ("read_document",)
+    assert planning_step.outputs[0].name == "proposed_pr_plan"
+    assert planning_step.outputs[0].required_for_next_step
+    assert planning_step.outputs[0].schema is not None
+    assert planning_step.outputs[0].schema["additionalProperties"] is False
+    assert planning_step.details is not None
+    assert "planning-only judgment" in planning_step.details
+    assert "Do not edit YAML" in planning_step.details
+    assert "authoritative effects" in planning_step.details
+    load_effects_step = step("load-authoritative-pr-effects")
+    assert load_effects_step.step_type == "invoke_tool"
+    assert pre_step_command("load-authoritative-pr-effects") == (
+        "powdrr-lift",
+        "authoritative-pr-effects",
+        "--work-item-name",
+        "<feature-name>",
+    )
+    assert load_effects_step.outputs[0].name == "authoritative_effects"
+    allocation_step = step("allocate-proposed-pr-effects")
+    assert allocation_step.outputs[0].name == "effect_allocation"
+    assert allocation_step.outputs[0].schema is not None
+    assert allocation_step.outputs[0].schema["additionalProperties"] is False
+    assert allocation_step.details is not None
+    assert "Never return, copy, or invent section, id, action" in (
+        allocation_step.details
+    )
     repair_step = step("repair-proposed-pr-specification")
     assert repair_step.actions == ("read_document", "goto_step")
+    assert repair_step.next_step_override == "evaluate-proposed-pr-specification"
     assert repair_step.details is not None
     assert "Do not repair YAML" in repair_step.details
-    assert "fill-proposed-pr-specification" in repair_step.details
-    assert step("evaluate-proposed-pr-specification").step_type == "invoke_tool"
+    assert "plan-proposed-pr-specification" in repair_step.details
+    assert "allocate-proposed-pr-effects" in repair_step.details
+    assert step("evaluate-proposed-pr-specification").step_type == "gate"
     assert pre_step_command("evaluate-proposed-pr-specification") == (
         "powdrr-lift",
         "evaluate",
         "docs/proposals/<feature-name>",
     )
-    assert step("gate-proposed-pr-specification").step_type == "gate"
-    gate = step("gate-proposed-pr-specification").gate
+    gate = step("evaluate-proposed-pr-specification").gate
     assert gate is not None
     assert gate.goto_step == "repair-proposed-pr-specification"
+    assert gate.success_goto_step == "plan-workflow-instantiation"
     assert step("instantiate-execution-workflows").tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",

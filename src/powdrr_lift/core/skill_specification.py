@@ -139,14 +139,18 @@ class SkillStepOutput:
     type: str = "any"
     required_for_next_step: bool = False
     scope: str = "skill"
+    schema: Mapping[str, Any] | None = None
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "name": self.name,
             "type": self.type,
             "required_for_next_step": self.required_for_next_step,
             "scope": self.scope,
         }
+        if self.schema is not None:
+            data["schema"] = dict(self.schema)
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,13 +170,17 @@ class SkillStepGate:
     outcome: Mapping[str, Any]
     goto_step: str
     retry_context: str
+    success_goto_step: str | None = None
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "outcome": dict(self.outcome),
             "goto_step": self.goto_step,
             "retry_context": self.retry_context,
         }
+        if self.success_goto_step is not None:
+            data["success_goto_step"] = self.success_goto_step
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,6 +236,7 @@ class SkillStep:
     actions: tuple[str, ...] = field(default_factory=tuple)
     # An explicit empty list is a closed contract; omission remains legacy.
     actions_declared: bool = False
+    next_step_override: str | None = None
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -266,6 +275,8 @@ class SkillStep:
             data["actions"] = list(self.actions)
         elif self.actions_declared:
             data["actions"] = []
+        if self.next_step_override is not None:
+            data["next_step_override"] = self.next_step_override
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
@@ -600,6 +611,7 @@ def build_skill_validation_report(
                     "tool_invocations",
                     "prompt_catalogs",
                     "actions",
+                    "next_step_override",
                     "pre_step",
                     "gate",
                     "validation_gate",
@@ -663,6 +675,21 @@ def build_skill_validation_report(
                         code="invalid_llm_type",
                         message="Skill step llm_type must be a non-empty string.",
                         path=_child_path(step_path, "llm_type"),
+                    )
+                )
+
+            next_step_override = step_mapping.get("next_step_override")
+            if (
+                next_step_override is not None
+                and _optional_string(next_step_override) is None
+            ):
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_next_step_override",
+                        message=(
+                            "Skill step next_step_override must be a non-empty string."
+                        ),
+                        path=_child_path(step_path, "next_step_override"),
                     )
                 )
 
@@ -806,6 +833,20 @@ def build_skill_validation_report(
                                 code="missing_gate_retry_context",
                                 message="gate must declare non-empty retry_context.",
                                 path=_child_path(step_path, "gate.retry_context"),
+                            )
+                        )
+                    if (
+                        "success_goto_step" in raw_gate
+                        and _optional_string(raw_gate.get("success_goto_step")) is None
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_gate_success_goto_step",
+                                message=(
+                                    "gate success_goto_step must be a non-empty "
+                                    "step id when provided."
+                                ),
+                                path=_child_path(step_path, "gate.success_goto_step"),
                             )
                         )
             elif raw_gate is not None:
@@ -1447,7 +1488,10 @@ def _validate_step_contracts(
 ) -> None:
     for field_name, item_keys in (
         ("inputs", {"name", "type", "required", "source"}),
-        ("outputs", {"name", "type", "required_for_next_step", "scope"}),
+        (
+            "outputs",
+            {"name", "type", "required_for_next_step", "scope", "schema"},
+        ),
     ):
         value = step_mapping.get(field_name)
         if value is None:
@@ -1529,6 +1573,34 @@ def _validate_step_contracts(
                         path=_child_path(item_path, boolean_key),
                     )
                 )
+            if field_name == "outputs" and "schema" in item:
+                schema = item["schema"]
+                if not isinstance(schema, Mapping):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_output_schema",
+                            message="Skill step output schema must be an object.",
+                            path=_child_path(item_path, "schema"),
+                        )
+                    )
+                elif schema.get("type") is None:
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_output_schema",
+                            message="Skill step output schema must declare a type.",
+                            path=_child_path(item_path, "schema.type"),
+                        )
+                    )
+                else:
+                    schema_error = _output_schema_declaration_error(schema)
+                    if schema_error is not None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_output_schema",
+                                message=schema_error,
+                                path=_child_path(item_path, "schema"),
+                            )
+                        )
 
 
 def _validate_coding_loop(
@@ -1647,6 +1719,9 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     actions = _optional_step_actions(data.get("actions"))
     actions_declared = "actions" in data
+    next_step_override = _optional_string(data.get("next_step_override"))
+    if data.get("next_step_override") is not None and next_step_override is None:
+        raise ValueError("Skill step next_step_override must be a non-empty string.")
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
     raw_coding_loop = data.get("coding_loop")
@@ -1727,6 +1802,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         prompt_catalogs=prompt_catalogs,
         actions=actions,
         actions_declared=actions_declared,
+        next_step_override=next_step_override,
         pre_step=pre_step,
         gate=gate,
         validation_gate=validation_gate,
@@ -1839,6 +1915,7 @@ def _parse_gate(value: object) -> SkillStepGate | None:
         outcome={**outcome, "path": path},
         goto_step=_required_string(value, "goto_step"),
         retry_context=_required_string(value, "retry_context"),
+        success_goto_step=_optional_string(value.get("success_goto_step")),
     )
 
 
@@ -1878,8 +1955,63 @@ def _parse_step_outputs(value: object) -> tuple[SkillStepOutput, ...]:
                 "Skill step output required_for_next_step must be a boolean."
             )
         scope = _optional_string(item.get("scope")) or "skill"
-        result.append(SkillStepOutput(name, item_type, required_for_next_step, scope))
+        raw_schema = item.get("schema")
+        if raw_schema is not None and not isinstance(raw_schema, Mapping):
+            raise ValueError("Skill step output schema must be an object.")
+        if isinstance(raw_schema, Mapping):
+            schema_error = _output_schema_declaration_error(raw_schema)
+            if schema_error is not None:
+                raise ValueError(schema_error)
+        schema = dict(raw_schema) if isinstance(raw_schema, Mapping) else None
+        result.append(
+            SkillStepOutput(name, item_type, required_for_next_step, scope, schema)
+        )
     return tuple(result)
+
+
+def _output_schema_declaration_error(schema: Mapping[str, Any]) -> str | None:
+    allowed = {
+        "type",
+        "properties",
+        "required",
+        "additionalProperties",
+        "items",
+        "minItems",
+        "minLength",
+        "enum",
+    }
+    unknown = sorted(str(key) for key in set(schema) - allowed)
+    if unknown:
+        return "Skill step output schema has unknown fields: " + ", ".join(unknown)
+    schema_type = schema.get("type")
+    if schema_type not in {
+        "object",
+        "array",
+        "string",
+        "integer",
+        "number",
+        "boolean",
+        "null",
+    }:
+        return "Skill step output schema must declare a supported type."
+    properties = schema.get("properties")
+    if properties is not None:
+        if schema_type != "object" or not isinstance(properties, Mapping):
+            return "Skill step output schema properties must be an object."
+        for name, child in properties.items():
+            if not isinstance(name, str) or not isinstance(child, Mapping):
+                return "Skill step output schema properties must contain schemas."
+            error = _output_schema_declaration_error(child)
+            if error is not None:
+                return error
+    items = schema.get("items")
+    if items is not None:
+        if schema_type != "array" or not isinstance(items, Mapping):
+            return "Skill step output schema items must be an object."
+        error = _output_schema_declaration_error(items)
+        if error is not None:
+            return error
+    return None
 
 
 def _report_to_data(report: SkillValidationReport) -> dict[str, Any]:

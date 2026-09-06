@@ -9,6 +9,7 @@ keep only presentation and human-handoff policy.
 
 from __future__ import annotations
 
+import inspect
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -35,6 +36,17 @@ class WorkflowLLMClient(Protocol):
     """Minimal provider surface used by every workflow runner."""
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
+
+
+class SchemaAwareWorkflowLLMClient(Protocol):
+    """Optional provider surface for strict workflow action schemas."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]: ...
 
 
 class WorkflowLLMTimeoutExhausted(ProviderExecutionError):
@@ -183,6 +195,8 @@ class WorkflowAction:
 def complete_json(
     client: WorkflowLLMClient,
     messages: list[dict[str, str]],
+    *,
+    response_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Make the single provider call used by workflow execution.
 
@@ -190,7 +204,23 @@ def complete_json(
     provider clients remain transport implementations; runners must use an
     engine rather than calling ``complete_json`` themselves.
     """
-    return client.complete_json(messages)
+    if response_schema is None or not _client_supports_response_schema(client):
+        return client.complete_json(messages)
+    schema_client = cast(SchemaAwareWorkflowLLMClient, client)
+    return schema_client.complete_json(messages, response_schema=response_schema)
+
+
+def _client_supports_response_schema(client: WorkflowLLMClient) -> bool:
+    """Keep schema-aware requests compatible with legacy/test provider clients."""
+    try:
+        parameters = inspect.signature(client.complete_json).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(
+        parameter.name == "response_schema"
+        or parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters
+    )
 
 
 def is_timeout_error(error: RuntimeError) -> bool:
@@ -224,12 +254,13 @@ def complete_json_with_timeout_retry(
     stderr: Any,
     max_timeout_retries: int,
     timeout_backoff_seconds: float,
+    response_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Request JSON with the common exponential transient-error retry policy."""
     retries = 0
     while True:
         try:
-            return complete_json(client, messages)
+            return complete_json(client, messages, response_schema=response_schema)
         except RuntimeError as exc:
             if not is_retryable_provider_error(exc):
                 raise
@@ -297,6 +328,7 @@ class WorkflowActionRequest:
     stderr: Any
     max_timeout_retries: int
     timeout_backoff_seconds: float
+    response_schema: Mapping[str, Any] | None = None
     request_action: Callable[[], Any] | None = None
 
 
@@ -471,6 +503,7 @@ class WorkflowStepRunner:
                         stderr=request.stderr,
                         max_timeout_retries=request.max_timeout_retries,
                         timeout_backoff_seconds=request.timeout_backoff_seconds,
+                        response_schema=request.response_schema,
                     )
                 )
             except WorkflowLLMTimeoutExhausted:
@@ -686,6 +719,7 @@ class WorkflowLLMActionEngine:
         stderr: Any,
         max_timeout_retries: int,
         timeout_backoff_seconds: float,
+        response_schema: Mapping[str, Any] | None = None,
     ) -> ActionT:
         """Make one LLM request and parse its sole workflow action."""
         payload = complete_json_with_timeout_retry(
@@ -695,6 +729,7 @@ class WorkflowLLMActionEngine:
             stderr=stderr,
             max_timeout_retries=max_timeout_retries,
             timeout_backoff_seconds=timeout_backoff_seconds,
+            response_schema=response_schema,
         )
         self.last_payload = payload
         return parser(payload)

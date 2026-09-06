@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -179,32 +181,72 @@ def render_pr_specification_template(
     return "\n".join(lines)
 
 
-def compile_semantic_pr_specification(
-    semantic_specification: Mapping[str, Any],
+def build_authoritative_effect_handoff(
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Return ordered authoritative effects with stable, opaque references."""
+    repo_root_path = _resolve_repo_root(repo_root)
+    authoritative_effects = _load_authoritative_effects(
+        repo_root_path,
+        work_item_name=work_item_name,
+    )
+    effects: list[dict[str, str]] = []
+    referenced_effects: dict[str, tuple[str, str, str]] = {}
+    for section in _EFFECT_SECTIONS:
+        for item_id, action in authoritative_effects[section]:
+            effect = (section, item_id, action)
+            digest_input = json.dumps(
+                effect, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+            effect_ref = "effect-" + hashlib.sha256(digest_input).hexdigest()[:20]
+            collision = referenced_effects.get(effect_ref)
+            if collision is not None and collision != effect:
+                raise ValueError(
+                    f"Stable effect reference collision for {effect_ref!r}: "
+                    f"{collision!r} and {effect!r}."
+                )
+            referenced_effects[effect_ref] = effect
+            effects.append(
+                {
+                    "effect_ref": effect_ref,
+                    "section": section,
+                    "id": item_id,
+                    "action": action,
+                }
+            )
+    return {"effects": effects}
+
+
+def compile_split_pr_specification(
+    proposed_pr_plan: Mapping[str, Any],
+    effect_allocation: Mapping[str, Any],
+    authoritative_effect_handoff: Mapping[str, Any],
     *,
     work_item_name: str,
     repo_root: str | Path | None = None,
     file_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Compile model-owned PR decisions into the authoritative YAML structure."""
+    """Compile separately validated planning and allocation decisions."""
     repo_root_path = _resolve_repo_root(repo_root)
     _require_exact_keys(
-        semantic_specification,
-        expected={"proposed_prs", "effect_assignments"},
-        path="semantic_specification",
+        proposed_pr_plan,
+        expected={"proposed_prs"},
+        path="proposed_pr_plan",
     )
     raw_prs = _require_semantic_sequence(
-        semantic_specification["proposed_prs"],
-        path="semantic_specification.proposed_prs",
+        proposed_pr_plan["proposed_prs"],
+        path="proposed_pr_plan.proposed_prs",
     )
     if not raw_prs:
-        raise ValueError("semantic_specification.proposed_prs must not be empty.")
+        raise ValueError("proposed_pr_plan.proposed_prs must not be empty.")
 
     proposed_prs: list[dict[str, Any]] = []
     proposed_pr_ids: set[str] = set()
     normalized_pr_ids: set[str] = set()
     for index, raw_pr in enumerate(raw_prs):
-        path = f"semantic_specification.proposed_prs[{index}]"
+        path = f"proposed_pr_plan.proposed_prs[{index}]"
         pr = _require_semantic_mapping(raw_pr, path=path)
         _require_exact_keys(
             pr,
@@ -257,42 +299,71 @@ def compile_semantic_pr_specification(
         for dependency in proposed_pr["dependent_prs"]:
             if dependency not in proposed_pr_ids:
                 raise ValueError(
-                    "semantic_specification.proposed_prs"
+                    "proposed_pr_plan.proposed_prs"
                     f"[{index}].dependent_pr_ids references unknown proposed PR "
                     f"id {dependency!r}."
                 )
 
-    authoritative_effects = _load_authoritative_effects(
-        repo_root_path,
+    expected_handoff = build_authoritative_effect_handoff(
         work_item_name=work_item_name,
+        repo_root=repo_root_path,
     )
-    expected_effects = {
-        (section, item_id, action)
-        for section in _EFFECT_SECTIONS
-        for item_id, action in authoritative_effects[section]
-    }
+    _require_exact_keys(
+        authoritative_effect_handoff,
+        expected={"effects"},
+        path="authoritative_effect_handoff",
+    )
+    raw_effects = _require_semantic_sequence(
+        authoritative_effect_handoff["effects"],
+        path="authoritative_effect_handoff.effects",
+    )
+    effects: list[dict[str, str]] = []
+    for index, raw_effect in enumerate(raw_effects):
+        path = f"authoritative_effect_handoff.effects[{index}]"
+        effect = _require_semantic_mapping(raw_effect, path=path)
+        _require_exact_keys(
+            effect,
+            expected={"effect_ref", "section", "id", "action"},
+            path=path,
+        )
+        effects.append(
+            {
+                field: _require_semantic_string(effect[field], path=f"{path}.{field}")
+                for field in ("effect_ref", "section", "id", "action")
+            }
+        )
+    if authoritative_effect_handoff != expected_handoff:
+        raise ValueError(
+            "authoritative_effect_handoff does not exactly match the current "
+            "ordered authoritative effects."
+        )
+
+    _require_exact_keys(
+        effect_allocation,
+        expected={"assignments"},
+        path="effect_allocation",
+    )
     raw_assignments = _require_semantic_sequence(
-        semantic_specification["effect_assignments"],
-        path="semantic_specification.effect_assignments",
+        effect_allocation["assignments"],
+        path="effect_allocation.assignments",
     )
-    assignments: dict[tuple[str, str, str], str] = {}
+    expected_refs = {effect["effect_ref"] for effect in effects}
+    assignments: dict[str, str] = {}
     for index, raw_assignment in enumerate(raw_assignments):
-        path = f"semantic_specification.effect_assignments[{index}]"
+        path = f"effect_allocation.assignments[{index}]"
         assignment = _require_semantic_mapping(raw_assignment, path=path)
         _require_exact_keys(
             assignment,
-            expected={"section", "id", "action", "proposed_pr_id"},
+            expected={"effect_ref", "proposed_pr_id"},
             path=path,
         )
-        effect = (
-            _require_semantic_string(assignment["section"], path=f"{path}.section"),
-            _require_semantic_string(assignment["id"], path=f"{path}.id"),
-            _require_semantic_string(assignment["action"], path=f"{path}.action"),
+        effect_ref = _require_semantic_string(
+            assignment["effect_ref"], path=f"{path}.effect_ref"
         )
-        if effect not in expected_effects:
-            raise ValueError(f"{path} references unknown effect {effect!r}.")
-        if effect in assignments:
-            raise ValueError(f"{path} duplicates effect assignment {effect!r}.")
+        if effect_ref not in expected_refs:
+            raise ValueError(f"{path} references unknown effect_ref {effect_ref!r}.")
+        if effect_ref in assignments:
+            raise ValueError(f"{path} duplicates effect_ref {effect_ref!r}.")
         proposed_pr_id = _require_semantic_string(
             assignment["proposed_pr_id"], path=f"{path}.proposed_pr_id"
         )
@@ -301,16 +372,18 @@ def compile_semantic_pr_specification(
                 f"{path}.proposed_pr_id references unknown proposed PR id "
                 f"{proposed_pr_id!r}."
             )
-        assignments[effect] = proposed_pr_id
+        assignments[effect_ref] = proposed_pr_id
 
-    missing_effects = sorted(expected_effects - set(assignments))
-    if missing_effects:
+    missing_refs = sorted(expected_refs - set(assignments))
+    if missing_refs:
         raise ValueError(
-            "semantic_specification.effect_assignments is missing authoritative "
-            "effects: " + ", ".join(repr(effect) for effect in missing_effects)
+            "effect_allocation.assignments is missing authoritative effect_refs: "
+            + ", ".join(repr(effect_ref) for effect_ref in missing_refs)
         )
 
-    feature_ids = [item_id for item_id, _action in authoritative_effects["features"]]
+    feature_ids = [
+        effect["id"] for effect in effects if effect["section"] == "features"
+    ]
     if not feature_ids:
         raise ValueError(
             "Cannot derive feature_ids because the authoritative implementation "
@@ -325,11 +398,12 @@ def compile_semantic_pr_specification(
     for section in _EFFECT_SECTIONS:
         compiled[section] = [
             {
-                "id": item_id,
-                "action": action,
-                "proposed_pr_id": assignments[(section, item_id, action)],
+                "id": effect["id"],
+                "action": effect["action"],
+                "proposed_pr_id": assignments[effect["effect_ref"]],
             }
-            for item_id, action in authoritative_effects[section]
+            for effect in effects
+            if effect["section"] == section
         ]
 
     compiled_yaml = yaml.safe_dump(compiled, sort_keys=False)
@@ -345,6 +419,75 @@ def compile_semantic_pr_specification(
         )
         raise ValueError(f"Compiled proposed PR specification is invalid: {details}")
     return compiled
+
+
+def compile_semantic_pr_specification(
+    semantic_specification: Mapping[str, Any],
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Compatibility adapter for the superseded combined semantic contract."""
+    _require_exact_keys(
+        semantic_specification,
+        expected={"proposed_prs", "effect_assignments"},
+        path="semantic_specification",
+    )
+    handoff = build_authoritative_effect_handoff(
+        work_item_name=work_item_name,
+        repo_root=repo_root,
+    )
+    refs_by_effect = {
+        (effect["section"], effect["id"], effect["action"]): effect["effect_ref"]
+        for effect in handoff["effects"]
+    }
+    assignments = []
+    assigned_effects: set[tuple[str, str, str]] = set()
+    for index, raw_assignment in enumerate(
+        _require_semantic_sequence(
+            semantic_specification["effect_assignments"],
+            path="semantic_specification.effect_assignments",
+        )
+    ):
+        path = f"semantic_specification.effect_assignments[{index}]"
+        assignment = _require_semantic_mapping(raw_assignment, path=path)
+        _require_exact_keys(
+            assignment,
+            expected={"section", "id", "action", "proposed_pr_id"},
+            path=path,
+        )
+        effect = (
+            _require_semantic_string(assignment["section"], path=f"{path}.section"),
+            _require_semantic_string(assignment["id"], path=f"{path}.id"),
+            _require_semantic_string(assignment["action"], path=f"{path}.action"),
+        )
+        effect_ref = refs_by_effect.get(effect)
+        if effect_ref is None:
+            raise ValueError(f"{path} references unknown effect {effect!r}.")
+        if effect in assigned_effects:
+            raise ValueError(f"{path} duplicates effect assignment {effect!r}.")
+        assigned_effects.add(effect)
+        assignments.append(
+            {
+                "effect_ref": effect_ref,
+                "proposed_pr_id": assignment["proposed_pr_id"],
+            }
+        )
+    missing_effects = set(refs_by_effect) - assigned_effects
+    if missing_effects:
+        raise ValueError(
+            "semantic_specification.effect_assignments is missing authoritative "
+            "effects: " + ", ".join(repr(effect) for effect in sorted(missing_effects))
+        )
+    return compile_split_pr_specification(
+        {"proposed_prs": semantic_specification["proposed_prs"]},
+        {"assignments": assignments},
+        handoff,
+        work_item_name=work_item_name,
+        repo_root=repo_root,
+        file_path=file_path,
+    )
 
 
 def _require_exact_keys(

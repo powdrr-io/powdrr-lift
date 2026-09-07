@@ -345,6 +345,11 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("run-tests-and-fix.yaml", 8),
                 ("design-interview.yaml", 25),
             }
+            expected_predicated_steps = {
+                ("run-tests-and-fix.yaml", 2),
+                ("run-tests-and-fix.yaml", 3),
+                ("run-tests-and-fix.yaml", 5),
+            }
             expected_step_type = (
                 "coding_loop"
                 if (path.name, index) == ("execute-proposed-pr.yaml", 2)
@@ -352,6 +357,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 if (path.name, index) in expected_invoke_tool_steps
                 else "gate"
                 if (path.name, index) in expected_gate_steps
+                else "predicated"
+                if (path.name, index) in expected_predicated_steps
                 else "freeform"
             )
             assert step["step_type"] == expected_step_type, (
@@ -1000,9 +1007,17 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert steps["enrich-test-results"].outputs[0].name == "enriched_test_result"
     assert steps["enrich-test-results"].outputs[0].required_for_next_step
     assert steps["diagnose-test-results"].inputs[0].name == "enriched_test_result"
+    assert steps["diagnose-test-results"].step_type == "predicated"
+    assert steps["diagnose-test-results"].completion is not None
+    assert steps["diagnose-test-results"].completion.required_outputs == (
+        "test_diagnosis",
+    )
     assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
     assert steps["diagnose-test-results"].outputs[0].required_for_next_step
     assert steps["produce-repair-edit"].inputs[0].name == "test_diagnosis"
+    assert steps["produce-repair-edit"].step_type == "predicated"
+    assert steps["produce-repair-edit"].completion is not None
+    assert steps["produce-repair-edit"].completion.required_outputs == ("repair_edit",)
     assert steps["produce-repair-edit"].outputs[0].name == "repair_edit"
     assert steps["produce-repair-edit"].outputs[0].required_for_next_step
     assert steps["validate-repair-edit"].pre_step is not None
@@ -1014,6 +1029,9 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert steps["validate-repair-edit"].outputs[0].required_for_next_step
     assert steps["repair-invalid-edit"].inputs[0].name == "repair_edit"
     assert steps["repair-invalid-edit"].inputs[1].name == "edit_validation"
+    assert steps["repair-invalid-edit"].step_type == "predicated"
+    assert steps["repair-invalid-edit"].completion is not None
+    assert steps["repair-invalid-edit"].completion.required_outputs == ("repair_edit",)
     assert steps["repair-invalid-edit"].outputs[0].name == "repair_edit"
     assert steps["validate-repair-edit-gate"].gate is not None
     assert steps["validate-repair-edit-gate"].gate.goto_step == "repair-invalid-edit"

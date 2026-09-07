@@ -348,6 +348,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             expected_predicated_steps = {
                 ("run-tests-and-fix.yaml", 3),
                 ("run-tests-and-fix.yaml", 5),
+                ("start-implementing-feature.yaml", 23),
             } | {("design-interview.yaml", index) for index in range(20)}
             expected_step_type = (
                 "coding_loop"
@@ -1466,7 +1467,71 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "powdrr-lift",
         "repository-state",
     )
-    assert step("prepare-feature-pull-request").uses_skills == ("finish-pr-prep",)
+    prepare_step = step("prepare-feature-pull-request")
+    assert prepare_step.step_type == "predicated"
+    assert prepare_step.actions == ("invoke_skill",)
+    assert prepare_step.uses_skills == ("finish-pr-prep",)
+    assert prepare_step.completion is not None
+    assert prepare_step.completion.required_outputs == (
+        "final_repository_state",
+        "readiness_report",
+    )
+    assert [output.name for output in prepare_step.outputs] == [
+        "final_repository_state",
+        "readiness_report",
+    ]
+    assert all(output.required_for_next_step for output in prepare_step.outputs)
+    assert prepare_step.outputs[0].schema == {
+        "type": "object",
+        "required": ["clean", "files"],
+        "properties": {
+            "root": {"type": "string"},
+            "branch": {"type": "string"},
+            "upstream": {"type": "string"},
+            "ahead": {"type": "integer"},
+            "behind": {"type": "integer"},
+            "clean": {"type": "boolean"},
+            "files": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "path",
+                        "staged",
+                        "unstaged",
+                        "untracked",
+                        "conflicted",
+                    ],
+                    "properties": {
+                        "path": {"type": "string"},
+                        "index_status": {"type": "string"},
+                        "worktree_status": {"type": "string"},
+                        "staged": {"type": "boolean"},
+                        "unstaged": {"type": "boolean"},
+                        "untracked": {"type": "boolean"},
+                        "conflicted": {"type": "boolean"},
+                    },
+                },
+            },
+        },
+    }
+    assert prepare_step.outputs[1].schema == {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["ready", "reasons", "satisfied_requirements"],
+        "properties": {
+            "ready": {"type": "boolean"},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "satisfied_requirements": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+    }
+    prepare_details = prepare_step.details
+    assert prepare_details is not None
+    assert '"action":"emit_outputs"' in prepare_details
+    assert "copying the exact values" in prepare_details
     assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
 
 

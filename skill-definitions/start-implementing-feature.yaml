@@ -615,12 +615,67 @@ steps:
     required_for_next_step: true
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
-  actions: []
-  step_type: freeform
+  actions: [invoke_skill]
+  step_type: predicated
   llm_type: fast_iteration
-  details: Run finish-pr-prep after the validated planning artifacts are staged. If cleanup changes files, restage only those artifacts before continuing. Do not implement any proposed PR in this skill.
+  completion:
+    required_outputs:
+    - final_repository_state
+    - readiness_report
+  details: >-
+    Invoke the listed finish-pr-prep skill after the validated planning artifacts
+    are staged. If cleanup changes files, restage only those artifacts before
+    continuing. Do not implement any proposed PR in this skill. After the nested
+    skill returns, explicitly publish both handoffs with an `emit_outputs` action,
+    copying the exact values returned by the nested skill:
+    {"action":"emit_outputs","outputs":{"final_repository_state":{},"readiness_report":{}}}
+    Do not return next_step or synthesize either value; the step advances only
+    after both declared outputs are explicitly emitted and the readiness report
+    is accepted.
   uses_skills:
   - finish-pr-prep
+  outputs:
+  - name: final_repository_state
+    type: any
+    required_for_next_step: true
+    schema:
+      type: object
+      required: [clean, files]
+      properties:
+        root: {type: string}
+        branch: {type: string}
+        upstream: {type: string}
+        ahead: {type: integer}
+        behind: {type: integer}
+        clean: {type: boolean}
+        files:
+          type: array
+          items:
+            type: object
+            required: [path, staged, unstaged, untracked, conflicted]
+            properties:
+              path: {type: string}
+              index_status: {type: string}
+              worktree_status: {type: string}
+              staged: {type: boolean}
+              unstaged: {type: boolean}
+              untracked: {type: boolean}
+              conflicted: {type: boolean}
+  - name: readiness_report
+    type: any
+    required_for_next_step: true
+    schema:
+      type: object
+      additionalProperties: false
+      required: [ready, reasons, satisfied_requirements]
+      properties:
+        ready: {type: boolean}
+        reasons:
+          type: array
+          items: {type: string}
+        satisfied_requirements:
+          type: array
+          items: {type: string}
 - id: create-feature-pull-request
   description: Commit the validated artifacts and open a draft pull request.
   actions: []

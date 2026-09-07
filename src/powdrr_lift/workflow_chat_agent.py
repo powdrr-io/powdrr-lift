@@ -995,7 +995,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
             if self.state.runtime is not None:
                 self.state.runtime.install_step_scope(
-                    frozenset(getattr(self.current_step, "actions", ())),
+                    _runtime_step_actions(self.current_step),
                     enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
                 if self.observer_allowed_action is not None:
@@ -1068,7 +1068,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            frozenset(self.current_step.actions),
+                            _runtime_step_actions(self.current_step),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 if passed:
@@ -1134,7 +1134,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            frozenset(self.current_step.actions),
+                            _runtime_step_actions(self.current_step),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 pre_step_event = _latest_deterministic_pre_step(
@@ -4960,6 +4960,39 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
             '"llm_type":"standard_reasoning"}\n'
         )
     )
+    required_action_guidance = ""
+    if predicated_step:
+        requirements = tuple(
+            getattr(getattr(current_step, "completion", None), "required_actions", ())
+        )
+        if requirements:
+            obligation_lines = []
+            for requirement in requirements:
+                cardinality = (
+                    f" exactly {requirement.exactly} time(s)"
+                    if requirement.exactly is not None
+                    else " at least once"
+                )
+                parameters = (
+                    " with parameters "
+                    + json.dumps(requirement.parameters, sort_keys=True)
+                    if requirement.parameters is not None
+                    else ""
+                )
+                target = (
+                    f" for every target from {requirement.targets_from}"
+                    if requirement.targets_from is not None
+                    else ""
+                )
+                obligation_lines.append(
+                    f"  - {requirement.action}{cardinality}{parameters}{target}"
+                )
+            required_action_guidance = (
+                "Before emit_outputs, complete every required action obligation "
+                "below. Do not emit outputs early; the runtime will reject them.\n"
+                + "\n".join(obligation_lines)
+                + "\n"
+            )
     if current_step is None or _step_needs_prompt_catalog(
         current_step, "context_types"
     ):
@@ -5031,6 +5064,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "those exact paths. Never synthesize a filename from a task id, template "
         "id, package name, or related name.\n"
         + completion_guidance
+        + required_action_guidance
         + "- complete: choose this when the skill has finished and no more action "
         "is required. Every later gate in this skill must already have passed; "
         "you cannot complete while a gate remains further ahead.\n"
@@ -7598,24 +7632,34 @@ def _predicated_step_complete(step: Any, state: _WorkflowExecutionState) -> bool
         ):
             return False
     for requirement in getattr(completion, "required_actions", ()):
-        if requirement.targets_from is None:
-            if not any(
-                event.get("step_index") == state.step_index
-                and event.get("kind") == requirement.action
-                for event in state.execution_events
+        events = _predicated_action_evidence(requirement, state)
+        if requirement.targets_from is not None:
+            targets = _resolve_predicated_targets(requirement.targets_from, state)
+            if any(
+                not any(
+                    event.get(requirement.match_field) == target for event in events
+                )
+                for target in targets
             ):
                 return False
-            continue
-        targets = _resolve_predicated_targets(requirement.targets_from, state)
-        for target in targets:
-            if not any(
-                event.get("step_index") == state.step_index
-                and event.get("kind") == requirement.action
-                and event.get(requirement.match_field) == target
-                for event in state.execution_events
-            ):
-                return False
+        elif not events:
+            return False
+        if requirement.exactly is not None and len(events) != requirement.exactly:
+            return False
     return True
+
+
+def _predicated_action_evidence(
+    requirement: Any, state: _WorkflowExecutionState
+) -> list[Mapping[str, Any]]:
+    parameters = requirement.parameters or {}
+    return [
+        event
+        for event in state.execution_events
+        if event.get("step_index") == state.step_index
+        and event.get("kind") == requirement.action
+        and all(event.get(name) == value for name, value in parameters.items())
+    ]
 
 
 def _resolve_predicated_targets(path: str, state: _WorkflowExecutionState) -> list[Any]:
@@ -7691,6 +7735,20 @@ def _validate_workflow_step_transition(
     state: _WorkflowExecutionState | None = None,
 ) -> None:
     """Prevent the LLM from skipping a step's required tool invocation."""
+    if state is not None and getattr(step, "step_type", "freeform") == "predicated":
+        for requirement in getattr(
+            getattr(step, "completion", None), "required_actions", ()
+        ):
+            if (
+                action.kind == requirement.action
+                and requirement.exactly is not None
+                and len(_predicated_action_evidence(requirement, state))
+                >= requirement.exactly
+            ):
+                raise PowdrrExecutionError(
+                    f"Predicated step permits at most {requirement.exactly} "
+                    f"{requirement.action} action(s) matching its required parameters."
+                )
     if action.kind == "emit_outputs":
         if getattr(step, "step_type", "freeform") != "predicated":
             raise PowdrrExecutionError(
@@ -7706,31 +7764,29 @@ def _validate_workflow_step_transition(
             and getattr(step, "completion", None) is not None
         ):
             missing = [
-                requirement.targets_from
+                requirement.targets_from or requirement.action
                 for requirement in getattr(step.completion, "required_actions", ())
-                if requirement.targets_from is not None
-                and not all(
-                    any(
-                        event.get("step_index") == state.step_index
-                        and event.get("kind") == requirement.action
-                        and event.get(requirement.match_field) == target
-                        for event in state.execution_events
+                if (
+                    not _predicated_action_evidence(requirement, state)
+                    or (
+                        requirement.exactly is not None
+                        and len(_predicated_action_evidence(requirement, state))
+                        > requirement.exactly
                     )
-                    for target in _resolve_predicated_targets(
-                        requirement.targets_from, state
+                )
+                or (
+                    requirement.targets_from is not None
+                    and not all(
+                        any(
+                            event.get(requirement.match_field) == target
+                            for event in _predicated_action_evidence(requirement, state)
+                        )
+                        for target in _resolve_predicated_targets(
+                            requirement.targets_from, state
+                        )
                     )
                 )
             ]
-            missing.extend(
-                requirement.action
-                for requirement in getattr(step.completion, "required_actions", ())
-                if requirement.targets_from is None
-                and not any(
-                    event.get("step_index") == state.step_index
-                    and event.get("kind") == requirement.action
-                    for event in state.execution_events
-                )
-            )
             if missing:
                 raise PowdrrExecutionError(
                     "Cannot emit_outputs until required action evidence is recorded: "
@@ -11273,6 +11329,18 @@ def _declared_action_names(step: Any) -> tuple[str, ...]:
     ):
         names.append("next_step")
     return tuple(names)
+
+
+def _runtime_step_actions(step: Any) -> frozenset[str]:
+    """Include predicated output publication in the runtime action scope.
+
+    ``next_step`` remains an implicit transition for every contracted step; the
+    runtime permits it separately in ``ExecutionRuntime.validate_action``.
+    """
+    actions = frozenset(getattr(step, "actions", ()) or ())
+    if getattr(step, "step_type", "freeform") == "predicated":
+        return actions | {"emit_outputs"}
+    return actions
 
 
 def _action_repair_prompt(

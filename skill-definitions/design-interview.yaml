@@ -28,7 +28,18 @@ steps:
     each deleted item has {"id":"existing-requirement-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: requirements_edits
-    type: any
+    type: object
+    schema: &proposal_edits_schema
+      type: object
+      required: [added, deleted]
+      additionalProperties: false
+      properties:
+        added:
+          type: array
+          items: {type: object, required: [id]}
+        deleted:
+          type: array
+          items: {type: object, required: [id]}
     required_for_next_step: true
 - id: gather-approach
   description: Gather approach and return proposal changes.
@@ -46,7 +57,8 @@ steps:
     item has {"id":"existing-approach-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: approach_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-entities
   description: Gather entities and return proposal changes.
@@ -64,7 +76,8 @@ steps:
     deleted item has {"id":"existing-entity-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: entities_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-entity-relationships
   description: Gather entity relationships and return proposal changes.
@@ -82,7 +95,8 @@ steps:
     each deleted item has {"id":"existing-relationship-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: entity_relationships_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-invariants
   description: Gather invariants and return proposal changes.
@@ -100,7 +114,8 @@ steps:
     {"id":"existing-invariant-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: invariants_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-guidance
   description: Gather guidance and return proposal changes.
@@ -118,7 +133,8 @@ steps:
     {"id":"existing-guidance-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: guidance_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-features
   description: Gather features and return proposal changes.
@@ -136,7 +152,8 @@ steps:
     {"id":"existing-feature-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: features_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-human-decisions
   description: Gather human decisions and return proposal changes.
@@ -154,7 +171,8 @@ steps:
     {"id":"existing-decision-id"}. IDs must be globally unique across every category. Do not edit files.
   outputs:
   - name: human_decisions_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-intent
   description: Gather intent and return proposal changes.
@@ -171,7 +189,8 @@ steps:
     the fields required by the gathered intent shape. Do not edit files.
   outputs:
   - name: intent_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-intents
   description: Gather intents and return proposal changes.
@@ -188,7 +207,8 @@ steps:
     the fields required by the gathered intents shape. Do not edit files.
   outputs:
   - name: intents_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-acceptance-criteria
   description: Gather acceptance criteria and return proposal changes.
@@ -205,7 +225,8 @@ steps:
     and description. Do not edit files.
   outputs:
   - name: acceptance_criteria_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-expected-tests
   description: Gather expected tests and return proposal changes.
@@ -222,7 +243,8 @@ steps:
     description. Do not edit files.
   outputs:
   - name: expected_tests_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-required-test-cases
   description: Gather required test cases and return proposal changes.
@@ -239,7 +261,8 @@ steps:
     and description. Do not edit files.
   outputs:
   - name: required_test_cases_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-expected-outcomes
   description: Gather expected outcomes and return proposal changes.
@@ -256,7 +279,8 @@ steps:
     description. Do not edit files.
   outputs:
   - name: expected_outcomes_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-non-goals
   description: Gather non-goals and return proposal changes.
@@ -272,7 +296,8 @@ steps:
     dictionary with exactly added and deleted lists. Do not edit files.
   outputs:
   - name: non_goals_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-risks
   description: Gather risks and return proposal changes.
@@ -288,7 +313,8 @@ steps:
     dictionary with exactly added and deleted lists. Do not edit files.
   outputs:
   - name: risks_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-decisions
   description: Gather decisions and return proposal changes.
@@ -304,7 +330,8 @@ steps:
     dictionary with exactly added and deleted lists. Do not edit files.
   outputs:
   - name: decisions_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-proposed-prs
   description: Gather proposed PRs and return proposal changes.
@@ -320,7 +347,8 @@ steps:
     JSON dictionary with exactly added and deleted lists. Do not edit files.
   outputs:
   - name: proposed_prs_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-modules
   description: Gather modules and return proposal changes.
@@ -336,7 +364,8 @@ steps:
     dictionary with exactly added and deleted lists. Do not edit files.
   outputs:
   - name: modules_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: gather-tools
   description: Gather tools and return proposal changes.
@@ -352,7 +381,8 @@ steps:
     dictionary with exactly added and deleted lists. Do not edit files.
   outputs:
   - name: tools_edits
-    type: any
+    type: object
+    schema: *proposal_edits_schema
     required_for_next_step: true
 - id: generate-interview-input
   description: Create the JSON file that will hold all interview outputs.

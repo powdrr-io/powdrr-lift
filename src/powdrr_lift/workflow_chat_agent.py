@@ -4935,6 +4935,39 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         else "- next_step: choose this when the current step is complete and the next "
         "skill step should receive the accumulated context.\n"
     )
+    required_action_guidance = ""
+    if predicated_step:
+        requirements = tuple(
+            getattr(getattr(current_step, "completion", None), "required_actions", ())
+        )
+        if requirements:
+            obligation_lines = []
+            for requirement in requirements:
+                cardinality = (
+                    f" exactly {requirement.exactly} time(s)"
+                    if requirement.exactly is not None
+                    else " at least once"
+                )
+                parameters = (
+                    " with parameters "
+                    + json.dumps(requirement.parameters, sort_keys=True)
+                    if requirement.parameters is not None
+                    else ""
+                )
+                target = (
+                    f" for every target from {requirement.targets_from}"
+                    if requirement.targets_from is not None
+                    else ""
+                )
+                obligation_lines.append(
+                    f"  - {requirement.action}{cardinality}{parameters}{target}"
+                )
+            required_action_guidance = (
+                "Before emit_outputs, complete every required action obligation "
+                "below. Do not emit outputs early; the runtime will reject them.\n"
+                + "\n".join(obligation_lines)
+                + "\n"
+            )
     if current_step is None or _step_needs_prompt_catalog(
         current_step, "context_types"
     ):
@@ -5008,6 +5041,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "those exact paths. Never synthesize a filename from a task id, template "
         "id, package name, or related name.\n"
         + completion_guidance
+        + required_action_guidance
         + "- complete: choose this when the skill has finished and no more action "
         "is required. Every later gate in this skill must already have passed; "
         "you cannot complete while a gate remains further ahead.\n"

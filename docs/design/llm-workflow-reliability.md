@@ -109,6 +109,29 @@ definitions; use Structured Outputs for schema adherence; and avoid procedural
 prompt detail when the exact procedure does not need to be model-selected:
 <https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.5>.
 
+## Predicated steps
+
+`freeform` remains the compatibility mode where the model may choose
+`next_step`. New workflows can opt into a deterministic completion boundary with
+`step_type: predicated`:
+
+```yaml
+step_type: predicated
+completion:
+  required_outputs: [validation_result]
+outputs:
+  - name: validation_result
+    type: validation_result
+```
+
+The runtime advances the step only after every named output was produced by an
+accepted action in the current step. Predicated steps do not expose `next_step`
+in their action schema; incomplete work remains at the same step and the model
+must produce the missing output. This first predicate is intentionally closed
+over typed handoff outputs so replay and restart can evaluate it without model
+interpretation. Additional predicate kinds should be added only with typed
+state and deterministic evaluators.
+
 ## First experiment
 
 ### Hypothesis

@@ -1155,6 +1155,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 if generated_file_path is not None:
                     self.state.current_file_path = generated_file_path
+                if (
+                    self.current_step.step_type == "predicated"
+                    and _predicated_step_complete(self.current_step, self.state)
+                ):
+                    _advance_predicated_step(self.state, self.current_step)
+                    continue
                 if self.current_step.step_type == "invoke_tool":
                     self.state.step_index += 1
                     continue
@@ -1603,6 +1609,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 }
             )
         _reset_validation_gate_after_correction(action, self.state)
+        if self.current_step.step_type == "predicated" and _predicated_step_complete(
+            self.current_step, self.state
+        ):
+            _advance_predicated_step(self.state, self.current_step)
         self.last_failed_action = None
         self.last_validation_error = None
         return WorkflowActionOutcome(continue_running=should_continue)
@@ -7520,6 +7530,47 @@ def _validate_workflow_handoff(
         )
 
 
+def _predicated_step_complete(step: Any, state: _WorkflowExecutionState) -> bool:
+    completion = getattr(step, "completion", None)
+    if completion is None:
+        return False
+    for output_name in completion.required_outputs:
+        record = state.handoff_records.get(output_name)
+        producer = record.get("produced_by") if isinstance(record, Mapping) else None
+        if (
+            not isinstance(producer, Mapping)
+            or producer.get("step_index") != state.step_index
+        ):
+            return False
+    return True
+
+
+def _advance_predicated_step(
+    state: _WorkflowExecutionState,
+    current_step: Any,
+) -> None:
+    next_index = state.step_index + 1
+    next_step = (
+        state.selected_skill.skill.steps[next_index]
+        if next_index < len(state.selected_skill.skill.steps)
+        else None
+    )
+    _validate_workflow_handoff(
+        current_step,
+        next_step,
+        state.handoff_records,
+        current_step_index=state.step_index,
+    )
+    state.execution_events.append(
+        {
+            "kind": "predicated_advance",
+            "step_index": state.step_index,
+            "required_outputs": list(current_step.completion.required_outputs),
+        }
+    )
+    state.step_index = next_index
+
+
 def _validate_workflow_step_transition(
     action: SkillChatAction,
     step: Any,
@@ -7528,6 +7579,14 @@ def _validate_workflow_step_transition(
     state: _WorkflowExecutionState | None = None,
 ) -> None:
     """Prevent the LLM from skipping a step's required tool invocation."""
+    if (
+        getattr(step, "step_type", "freeform") == "predicated"
+        and action.kind == "next_step"
+    ):
+        raise PowdrrExecutionError(
+            "Predicated steps advance automatically when their completion "
+            "predicate is satisfied; next_step is not a valid model action."
+        )
     if action.kind not in {"next_step", "goto_step", "complete"}:
         return
     if action.kind == "next_step":
@@ -10803,6 +10862,11 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
             if getattr(step, "coding_loop", None) is not None
             else None
         ),
+        "completion": (
+            step.completion.to_data()
+            if getattr(step, "completion", None) is not None
+            else None
+        ),
         "outputs": [
             output.to_data() for output in (getattr(step, "outputs", ()) or ())
         ],
@@ -10845,6 +10909,11 @@ def _step_action_response_schema(step: Any) -> dict[str, Any]:
             "next_step",
             "complete",
         ):
+            if (
+                legacy_action == "next_step"
+                and getattr(step, "step_type", "freeform") == "predicated"
+            ):
+                continue
             if legacy_action not in action_names:
                 action_names.append(legacy_action)
     properties: dict[str, Any] = {
@@ -10991,7 +11060,10 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     action_names = {name for name, _ in actions}
     if "prompt_user" not in action_names:
         actions.append(("prompt_user", "Ask one necessary human question."))
-    if "next_step" not in action_names:
+    if (
+        "next_step" not in action_names
+        and getattr(step, "step_type", "freeform") != "predicated"
+    ):
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(
         output
@@ -11013,7 +11085,10 @@ def _declared_action_names(step: Any) -> tuple[str, ...]:
     # next_step is an implicit runtime action; its output-specific guidance is
     # rendered only when the step declares required handoff outputs.
     names = [name for name, _ in _step_actions(step)]
-    if "next_step" not in names:
+    if (
+        "next_step" not in names
+        and getattr(step, "step_type", "freeform") != "predicated"
+    ):
         names.append("next_step")
     return tuple(names)
 
@@ -11025,15 +11100,26 @@ def _action_repair_prompt(
     failed_action: SkillChatAction | None = None,
     validation_error: str | None = None,
 ) -> str:
+    predicated = (
+        current_step is not None
+        and getattr(current_step, "step_type", "freeform") == "predicated"
+    )
+    empty_response_guidance = (
+        "If the original action response was empty, return a valid action that "
+        "can produce the missing completion output."
+        if predicated
+        else (
+            "If the original action response was empty, choose next_step when the "
+            "current step is complete instead of returning an empty response. If "
+            "this corrective response is also empty, the system will interpret it "
+            "as next_step."
+        )
+    )
     prompt = (
         "Generate a JSON document selecting the best action based on this "
         "context. The current step's action declarations below are the only "
         "actions available. Do not use action names or instructions from a "
-        "previous step.\n"
-        "If the original action response was empty, choose next_step when the "
-        "current step is complete instead of returning an empty response. If "
-        "this corrective response is also empty, the system will interpret it "
-        "as next_step.\n"
+        "previous step.\n" + empty_response_guidance + "\n"
         'Return exactly one JSON object with a top-level "action" field and the '
         "fields required by that action. Do not combine actions or output "
         "markdown."

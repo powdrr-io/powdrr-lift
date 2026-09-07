@@ -10,6 +10,7 @@ from powdrr_lift.core import (
     CodingLoopSpec,
     Skill,
     SkillStep,
+    SkillStepCompletion,
     SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
@@ -19,6 +20,7 @@ from powdrr_lift.core import (
     build_skill_validation_report,
     load_skill,
     save_skill,
+    skill_from_data,
     skill_from_json,
     skill_to_json,
     validate_skill_directory,
@@ -666,6 +668,41 @@ def test_skill_validation_rejects_unknown_step_type() -> None:
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["invalid_step_type_value"]
+
+
+def test_predicated_step_requires_declared_completion_outputs() -> None:
+    skill = skill_from_data(
+        {
+            "name": "predicated",
+            "when_to_use": ["review"],
+            "steps": [
+                {
+                    "id": "produce-result",
+                    "description": "Produce the result.",
+                    "step_type": "predicated",
+                    "completion": {"required_outputs": ["result"]},
+                    "outputs": [{"name": "result", "type": "object"}],
+                }
+            ],
+        }
+    )
+
+    assert skill.steps[0].completion == SkillStepCompletion(("result",))
+    assert skill.steps[0].to_data()["completion"] == {"required_outputs": ["result"]}
+
+
+def test_predicated_step_rejects_missing_completion() -> None:
+    report = build_skill_validation_report(
+        "name: predicated\n"
+        "when_to_use: [review]\n"
+        "steps:\n"
+        "- description: Produce the result.\n"
+        "  step_type: predicated\n",
+        source_path=Path("predicated.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["missing_completion"]
 
 
 def test_skill_validation_rejects_empty_prompt_catalogs() -> None:

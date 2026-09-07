@@ -25,6 +25,7 @@ from powdrr_lift.core import (
     CodingLoopVerification,
     Skill,
     SkillStep,
+    SkillStepCompletion,
     SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
@@ -75,6 +76,7 @@ from powdrr_lift.workflow_chat_agent import (
     WorkflowContext,
     _action_repair_prompt,
     _action_system_prompt,
+    _advance_predicated_step,
     _apply_file_edits,
     _apply_yaml_operations,
     _available_work_item_documents,
@@ -107,6 +109,7 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_action_response_with_schema,
     _parse_json_object,
     _parse_workflow_action_gather_context,
+    _predicated_step_complete,
     _prompt_durable_facts,
     _prompt_step_context,
     _prompt_transcript,
@@ -538,6 +541,56 @@ def test_next_step_is_prompted_without_required_outputs() -> None:
     actions = _step_actions(SkillStep(description="Finish the step."))
 
     assert any(name == "next_step" for name, _ in actions)
+
+
+def test_predicated_step_omits_model_next_step_action() -> None:
+    step = SkillStep(
+        description="Produce the result.",
+        step_type="predicated",
+        completion=SkillStepCompletion(("result",)),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+
+    assert all(name != "next_step" for name, _ in _step_actions(step))
+    assert (
+        "next_step"
+        not in _step_action_response_schema(step)["properties"]["action"]["enum"]
+    )
+
+
+def test_predicated_step_advances_after_current_step_outputs(tmp_path: Path) -> None:
+    predicated = SkillStep(
+        description="Produce the result.",
+        id="produce-result",
+        step_type="predicated",
+        completion=SkillStepCompletion(("result",)),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+    next_step = SkillStep(description="Use the result.", id="use-result")
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="test", when_to_use=(), steps=(predicated, next_step)),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        handoff_records={
+            "result": {
+                "name": "result",
+                "type": "object",
+                "value": {"ok": True},
+                "produced_by": {"step_index": 0, "action": "edit"},
+            }
+        },
+    )
+
+    assert _predicated_step_complete(predicated, state)
+    _advance_predicated_step(state, predicated)
+    assert state.step_index == 1
+    assert state.execution_events[-1]["kind"] == "predicated_advance"
 
 
 def test_coding_loop_runs_declared_verification_and_requires_pass(

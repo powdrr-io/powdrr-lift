@@ -233,6 +233,8 @@ class SkillStepRequiredAction:
     action: str
     targets_from: str | None = None
     match_field: str | None = None
+    exactly: int | None = None
+    parameters: Mapping[str, Any] | None = None
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {"action": self.action}
@@ -240,6 +242,10 @@ class SkillStepRequiredAction:
             data["targets_from"] = self.targets_from
         if self.match_field is not None:
             data["match_field"] = self.match_field
+        if self.exactly is not None:
+            data["exactly"] = self.exactly
+        if self.parameters is not None:
+            data["parameters"] = dict(self.parameters)
         return data
 
 
@@ -1036,6 +1042,22 @@ def build_skill_validation_report(
                                     for field_name in ("targets_from", "match_field")
                                     if field_name in required_action
                                 )
+                                or (
+                                    "exactly" in required_action
+                                    and (
+                                        isinstance(required_action["exactly"], bool)
+                                        or not isinstance(
+                                            required_action["exactly"], int
+                                        )
+                                        or required_action["exactly"] < 1
+                                    )
+                                )
+                                or (
+                                    "parameters" in required_action
+                                    and not isinstance(
+                                        required_action["parameters"], Mapping
+                                    )
+                                )
                             ):
                                 issues.append(
                                     SkillValidationIssue(
@@ -1043,7 +1065,8 @@ def build_skill_validation_report(
                                         message=(
                                             "predicated required_actions entries must "
                                             "declare action, or both targets_from "
-                                            "and match_field strings."
+                                            "and match_field strings, with optional "
+                                            "positive exactly and object parameters."
                                         ),
                                         path=_child_path(
                                             step_path,
@@ -2062,18 +2085,43 @@ def _parse_step_completion(value: object) -> SkillStepCompletion | None:
         action = _optional_string(item.get("action"))
         targets_from = _optional_string(item.get("targets_from"))
         match_field = _optional_string(item.get("match_field"))
+        exactly = item.get("exactly")
+        parameters = item.get("parameters")
         if action is None or (targets_from is None) != (match_field is None):
             raise ValueError(
                 "Skill step completion.required_actions entries must declare "
                 "action, or both targets_from and match_field strings."
             )
-        if set(item) - {"action", "targets_from", "match_field"}:
+        if exactly is not None and (
+            isinstance(exactly, bool) or not isinstance(exactly, int) or exactly < 1
+        ):
+            raise ValueError(
+                "Skill step completion.required_actions.exactly must be a "
+                "positive integer."
+            )
+        if parameters is not None and not isinstance(parameters, Mapping):
+            raise ValueError(
+                "Skill step completion.required_actions.parameters must be an object."
+            )
+        if set(item) - {
+            "action",
+            "targets_from",
+            "match_field",
+            "exactly",
+            "parameters",
+        }:
             raise ValueError(
                 "Skill step completion.required_actions entries contain "
                 "unsupported fields."
             )
         required_actions.append(
-            SkillStepRequiredAction(action, targets_from, match_field)
+            SkillStepRequiredAction(
+                action,
+                targets_from,
+                match_field,
+                exactly,
+                dict(parameters) if isinstance(parameters, Mapping) else None,
+            )
         )
     unknown = set(value) - {"required_outputs", "required_actions"}
     if unknown:

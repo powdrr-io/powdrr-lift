@@ -637,6 +637,51 @@ def test_predicated_step_requires_action_only_evidence(tmp_path: Path) -> None:
     assert _predicated_step_complete(predicated, state)
 
 
+def test_predicated_action_evidence_matches_parameters_and_cardinality(
+    tmp_path: Path,
+) -> None:
+    predicated = SkillStep(
+        description="Gather and emit.",
+        step_type="predicated",
+        completion=SkillStepCompletion(
+            ("result",),
+            (
+                SkillStepRequiredAction(
+                    "gather_context",
+                    exactly=1,
+                    parameters={"types": ["requirements"]},
+                ),
+            ),
+        ),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="test", when_to_use=(), steps=(predicated,)),
+        ),
+        transcript=[],
+        execution_events=[
+            {
+                "kind": "gather_context",
+                "step_index": 0,
+                "types": ["approach"],
+            }
+        ],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        handoff_records={
+            "result": {"produced_by": {"step_index": 0, "action": "emit_outputs"}}
+        },
+    )
+    assert not _predicated_step_complete(predicated, state)
+    state.execution_events[0]["types"] = ["requirements"]
+    assert _predicated_step_complete(predicated, state)
+    state.execution_events.append(dict(state.execution_events[0]))
+    assert not _predicated_step_complete(predicated, state)
+
+
 def test_predicated_step_requires_all_declared_action_evidence(tmp_path: Path) -> None:
     predicated = SkillStep(
         description="Produce the result.",

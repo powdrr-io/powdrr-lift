@@ -7576,24 +7576,34 @@ def _predicated_step_complete(step: Any, state: _WorkflowExecutionState) -> bool
         ):
             return False
     for requirement in getattr(completion, "required_actions", ()):
-        if requirement.targets_from is None:
-            if not any(
-                event.get("step_index") == state.step_index
-                and event.get("kind") == requirement.action
-                for event in state.execution_events
+        events = _predicated_action_evidence(requirement, state)
+        if requirement.targets_from is not None:
+            targets = _resolve_predicated_targets(requirement.targets_from, state)
+            if any(
+                not any(
+                    event.get(requirement.match_field) == target for event in events
+                )
+                for target in targets
             ):
                 return False
-            continue
-        targets = _resolve_predicated_targets(requirement.targets_from, state)
-        for target in targets:
-            if not any(
-                event.get("step_index") == state.step_index
-                and event.get("kind") == requirement.action
-                and event.get(requirement.match_field) == target
-                for event in state.execution_events
-            ):
-                return False
+        elif not events:
+            return False
+        if requirement.exactly is not None and len(events) != requirement.exactly:
+            return False
     return True
+
+
+def _predicated_action_evidence(
+    requirement: Any, state: _WorkflowExecutionState
+) -> list[Mapping[str, Any]]:
+    parameters = requirement.parameters or {}
+    return [
+        event
+        for event in state.execution_events
+        if event.get("step_index") == state.step_index
+        and event.get("kind") == requirement.action
+        and all(event.get(name) == value for name, value in parameters.items())
+    ]
 
 
 def _resolve_predicated_targets(path: str, state: _WorkflowExecutionState) -> list[Any]:
@@ -7669,6 +7679,20 @@ def _validate_workflow_step_transition(
     state: _WorkflowExecutionState | None = None,
 ) -> None:
     """Prevent the LLM from skipping a step's required tool invocation."""
+    if state is not None and getattr(step, "step_type", "freeform") == "predicated":
+        for requirement in getattr(
+            getattr(step, "completion", None), "required_actions", ()
+        ):
+            if (
+                action.kind == requirement.action
+                and requirement.exactly is not None
+                and len(_predicated_action_evidence(requirement, state))
+                >= requirement.exactly
+            ):
+                raise PowdrrExecutionError(
+                    f"Predicated step permits at most {requirement.exactly} "
+                    f"{requirement.action} action(s) matching its required parameters."
+                )
     if action.kind == "emit_outputs":
         if getattr(step, "step_type", "freeform") != "predicated":
             raise PowdrrExecutionError(
@@ -7684,31 +7708,29 @@ def _validate_workflow_step_transition(
             and getattr(step, "completion", None) is not None
         ):
             missing = [
-                requirement.targets_from
+                requirement.targets_from or requirement.action
                 for requirement in getattr(step.completion, "required_actions", ())
-                if requirement.targets_from is not None
-                and not all(
-                    any(
-                        event.get("step_index") == state.step_index
-                        and event.get("kind") == requirement.action
-                        and event.get(requirement.match_field) == target
-                        for event in state.execution_events
+                if (
+                    not _predicated_action_evidence(requirement, state)
+                    or (
+                        requirement.exactly is not None
+                        and len(_predicated_action_evidence(requirement, state))
+                        > requirement.exactly
                     )
-                    for target in _resolve_predicated_targets(
-                        requirement.targets_from, state
+                )
+                or (
+                    requirement.targets_from is not None
+                    and not all(
+                        any(
+                            event.get(requirement.match_field) == target
+                            for event in _predicated_action_evidence(requirement, state)
+                        )
+                        for target in _resolve_predicated_targets(
+                            requirement.targets_from, state
+                        )
                     )
                 )
             ]
-            missing.extend(
-                requirement.action
-                for requirement in getattr(step.completion, "required_actions", ())
-                if requirement.targets_from is None
-                and not any(
-                    event.get("step_index") == state.step_index
-                    and event.get("kind") == requirement.action
-                    for event in state.execution_events
-                )
-            )
             if missing:
                 raise PowdrrExecutionError(
                     "Cannot emit_outputs until required action evidence is recorded: "

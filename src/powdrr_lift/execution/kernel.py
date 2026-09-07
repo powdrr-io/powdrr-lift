@@ -243,6 +243,8 @@ class ActionKernel:
     ) -> tuple[str, ...]:
         """Return relationship violations before an action can start."""
         semantic_action = self._semantic_action(action, semantic_action)
+        if semantic_action == "emit_outputs":
+            return ()
         if not self._obligations:
             return ()
         required = {

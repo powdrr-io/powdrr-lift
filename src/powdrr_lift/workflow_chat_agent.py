@@ -995,7 +995,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
             if self.state.runtime is not None:
                 self.state.runtime.install_step_scope(
-                    frozenset(getattr(self.current_step, "actions", ())),
+                    _runtime_step_actions(self.current_step),
                     enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
                 if self.observer_allowed_action is not None:
@@ -1068,7 +1068,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            frozenset(self.current_step.actions),
+                            _runtime_step_actions(self.current_step),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 if passed:
@@ -1134,7 +1134,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            frozenset(self.current_step.actions),
+                            _runtime_step_actions(self.current_step),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 pre_step_event = _latest_deterministic_pre_step(
@@ -11307,6 +11307,18 @@ def _declared_action_names(step: Any) -> tuple[str, ...]:
     ):
         names.append("next_step")
     return tuple(names)
+
+
+def _runtime_step_actions(step: Any) -> frozenset[str]:
+    """Include predicated output publication in the runtime action scope.
+
+    ``next_step`` remains an implicit transition for every contracted step; the
+    runtime permits it separately in ``ExecutionRuntime.validate_action``.
+    """
+    actions = frozenset(getattr(step, "actions", ()) or ())
+    if getattr(step, "step_type", "freeform") == "predicated":
+        return actions | {"emit_outputs"}
+    return actions
 
 
 def _action_repair_prompt(

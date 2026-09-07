@@ -311,6 +311,8 @@ class ExecutionRuntime:
 
     def validate_action(self, action_kind: str) -> tuple[str, ...]:
         effective = self.effective_action_contract()
+        if action_kind == "emit_outputs":
+            return ()
         if effective is None or action_kind in effective:
             return ()
         if action_kind in {"prompt_user", "next_step"}:

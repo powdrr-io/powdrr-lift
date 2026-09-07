@@ -34,7 +34,14 @@ from powdrr_lift.core.execution_state import (
     ExecutionObligation,
     ExecutionState,
 )
-from powdrr_lift.core.intent import IntentStore
+from powdrr_lift.core.intent import (
+    IntentClause,
+    IntentContract,
+    IntentKind,
+    IntentStore,
+    IntentTrigger,
+    make_intent_source,
+)
 from powdrr_lift.core.workflow_task_specification import WorkflowInstance
 from powdrr_lift.errors import PersistenceCorruptionError, PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
@@ -463,6 +470,14 @@ class ExecutionRuntime:
             ),
         }
         rules = self.guidance(guidance_context)
+        contract = self.effective_contract(guidance_context)
+        intent_requirements = sorted(
+            {
+                requirement
+                for clause in contract.clauses
+                for requirement in clause.contract.requirements
+            }
+        )
         allowed_actions = self.allowed_actions()
         return compact_execution_context(
             {
@@ -480,6 +495,12 @@ class ExecutionRuntime:
                     for rule in rules
                 ],
                 "guidance_required_actions": sorted(self.guidance_required_actions()),
+                "effective_contract": contract.to_data(),
+                "intent_ids": sorted({item.intent_id for item in contract.clauses}),
+                "clause_ids": list(contract.clause_ids),
+                "contract_fingerprint": contract.fingerprint,
+                "intent_requirements": intent_requirements,
+                "intent_conflicts": list(contract.conflicts),
                 "open_obligations": [
                     item.to_data()
                     for item in {
@@ -506,6 +527,17 @@ class ExecutionRuntime:
 
     def guidance_required_actions(self) -> frozenset[str]:
         """Derive typed follow-ups from the active durable instructions."""
+        contract = self.effective_contract(
+            {
+                "profile_id": self.state.profile_id,
+                "phase_type": self.state.current_phase.value,
+            }
+        )
+        actions = {
+            requirement
+            for clause in contract.clauses
+            for requirement in clause.contract.requirements
+        }
         text = " ".join(
             rule.text.casefold()
             for rule in self.guidance(
@@ -515,7 +547,6 @@ class ExecutionRuntime:
                 }
             )
         )
-        actions: set[str] = set()
         if "review" in text and "resolv" in text:
             actions.update({"run_validation", "resolve_review_thread"})
         if "optimistic lock" in text or "optimistic-lock" in text:
@@ -526,7 +557,20 @@ class ExecutionRuntime:
         self, *, action_instance_id: str, action: str
     ) -> None:
         """Materialize matching user guidance when its triggering action occurs."""
-        required: tuple[str, ...] = ()
+        contract = self.effective_contract(
+            {
+                "profile_id": self.state.profile_id,
+                "phase_type": self.state.current_phase.value,
+            }
+        )
+        required_set = {
+            requirement
+            for clause in contract.clauses
+            if clause.contract.trigger is IntentTrigger.AFTER_ACTION
+            and clause.contract.trigger_action == action
+            for requirement in clause.contract.requirements
+        }
+        required: tuple[str, ...] = tuple(sorted(required_set))
         rules_text = " ".join(
             rule.text.casefold()
             for rule in self.guidance(
@@ -536,10 +580,11 @@ class ExecutionRuntime:
                 }
             )
         )
-        if action == "edit_for_review_comment" and "resolv" in rules_text:
-            required = ("resolve_review_thread",)
-        elif action == "change_mutable_row" and "optimistic lock" in rules_text:
-            required = ("add_optimistic_lock", "run_concurrency_test")
+        if not required:
+            if action == "edit_for_review_comment" and "resolv" in rules_text:
+                required = ("resolve_review_thread",)
+            elif action == "change_mutable_row" and "optimistic lock" in rules_text:
+                required = ("add_optimistic_lock", "run_concurrency_test")
         for required_action in required:
             self.kernel.add_obligation(
                 ExecutionObligation(
@@ -578,17 +623,61 @@ class ExecutionRuntime:
             ),
             None,
         )
-        return self.remember_guidance(
-            nominate_behavior_rule(
-                text,
-                rule_id=rule_id,
-                source_ref=source_ref,
-                scope=scope
-                if scope is not None
-                else {"profile_id": self.state.profile_id},
-            ),
+        rule = nominate_behavior_rule(
+            text,
+            rule_id=rule_id,
+            source_ref=source_ref,
+            scope=scope if scope is not None else {"profile_id": self.state.profile_id},
+        )
+        saved = self.remember_guidance(
+            rule,
             expected_version=current.version if current is not None else None,
         )
+        requirements: tuple[str, ...] = ()
+        trigger_action: str | None = None
+        if "review" in normalized and "resolv" in normalized:
+            requirements = ("run_validation", "resolve_review_thread")
+            trigger_action = "edit_for_review_comment"
+        elif "optimistic lock" in normalized or "optimistic-lock" in normalized:
+            requirements = ("add_optimistic_lock", "run_concurrency_test")
+            trigger_action = "change_mutable_row"
+        guidance_scope = (
+            scope if scope is not None else {"profile_id": self.state.profile_id}
+        )
+        source = make_intent_source(
+            intent_id=f"guidance:{rule_id}",
+            exact_text=text,
+            source_ref=source_ref,
+            supplied_by="user-guidance",
+        )
+        if not any(
+            item.intent_id == source.intent_id for item in self.intent_store.sources()
+        ):
+            self.intent_store.capture(
+                source,
+                (
+                    IntentClause(
+                        f"guidance:{rule_id}:v{saved.version}",
+                        source.intent_id,
+                        (0, len(text)),
+                        IntentKind.GUIDANCE,
+                        IntentContract(
+                            selectors={
+                                key: (value,) for key, value in guidance_scope.items()
+                            },
+                            trigger=(
+                                IntentTrigger.AFTER_ACTION
+                                if trigger_action is not None
+                                else IntentTrigger.BEFORE_ACTION
+                            ),
+                            trigger_action=trigger_action,
+                            requirements=requirements,
+                        ),
+                        version=saved.version,
+                    ),
+                ),
+            )
+        return saved
 
     def capture_explicit_guidance(self, text: str, *, source_ref: str) -> Any | None:
         """Capture only directive-shaped text, keeping ordinary rationale ephemeral."""

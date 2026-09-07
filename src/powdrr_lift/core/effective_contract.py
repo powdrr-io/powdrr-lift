@@ -38,7 +38,10 @@ class EffectiveContract:
                 "intent_id": clause.intent_id,
                 "kind": clause.kind.value,
                 "version": clause.version,
-                "selectors": clause.contract.selectors,
+                "selectors": {
+                    key: list(values)
+                    for key, values in sorted(clause.contract.selectors.items())
+                },
                 "trigger": clause.contract.trigger.value,
                 "trigger_action": clause.contract.trigger_action,
                 "requirements": list(clause.contract.requirements),

@@ -149,7 +149,12 @@ def test_runtime_prompt_context_resolves_intent_without_model_retrieval(
                 source.intent_id,
                 (0, len(source.exact_text)),
                 IntentKind.GUIDANCE,
-                IntentContract(selectors={"profile_id": ("default",)}),
+                IntentContract(
+                    selectors={"profile_id": ("default",)},
+                    trigger=IntentTrigger.AFTER_ACTION,
+                    trigger_action="change_mutable_row",
+                    requirements=("add_optimistic_lock", "run_concurrency_test"),
+                ),
             ),
         ),
     )
@@ -161,16 +166,27 @@ def test_runtime_prompt_context_resolves_intent_without_model_retrieval(
         phase=PhaseType.BUILD,
     )
     context = runtime.prompt_context()
-    assert "clause_ids" not in context
-    assert "effective_contract" not in context
-    assert "contract_fingerprint" not in context
-    assert "intent_ids" not in context
-
+    assert context["clause_ids"] == ["clause-runtime"]
+    assert context["intent_ids"] == ["intent-runtime"]
+    assert context["effective_contract"]["clause_ids"] == ["clause-runtime"]
+    assert context["contract_fingerprint"].startswith("sha256:")
+    assert context["intent_requirements"] == [
+        "add_optimistic_lock",
+        "run_concurrency_test",
+    ]
     compacted = runtime.compact_prompt_context(
         {**context, "transcript": "long context " * 2_000}
     )
     restored = runtime.retrieve_prompt_context(compacted["full_context_ref"])
     assert restored["runtime_state"] == context
+
+    runtime.apply_guidance_obligations(
+        action_instance_id="action-runtime", action="change_mutable_row"
+    )
+    assert {item.required_action for item in runtime.kernel.open_obligations} == {
+        "add_optimistic_lock",
+        "run_concurrency_test",
+    }
 
     restarted = ExecutionRuntime(
         "intent-runtime",

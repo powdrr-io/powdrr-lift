@@ -1,0 +1,16 @@
+name: coding-loop-replay
+when_to_use:
+  - Exercise coding-loop replay guards.
+steps:
+  - id: implement
+    description: Implement and verify.
+    step_type: coding_loop
+    actions: [read_document, edit]
+    coding_loop:
+      goal: Make the check pass.
+      verification:
+        - id: check
+          command: "true"
+      stopping_conditions:
+        - The check passes.
+      max_iterations: 4

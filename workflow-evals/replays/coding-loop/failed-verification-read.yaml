@@ -1,0 +1,15 @@
+schema_version: 1
+id: coding-loop-failed-verification-read
+execution_mode: execute_selected_skill
+definition:
+  kind: skill
+  path: skill.yaml
+  name: coding-loop-replay
+step: {index: 0, id: implement}
+prompt_builder_version: 1
+prompt_state:
+  execution_events:
+    - {kind: coding_loop_verification, step_index: 0, all_passed: false}
+failed_response: {action: read_document, file_path: skill.yaml, start_line: 1, end_line: 10}
+expected: {response_valid: true}
+redactions: []

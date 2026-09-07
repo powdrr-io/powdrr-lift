@@ -263,3 +263,137 @@ def test_replay_fixture_safety_rejects_unredacted_sensitive_data() -> None:
         validate_replay_fixture_safety(
             {"prompt_state": {"path": "/Users/example/project"}}
         )
+
+
+def test_coding_loop_replay_corpus_exercises_completion_guards(tmp_path: Path) -> None:
+    skill_path = tmp_path / "skill.yaml"
+    skill_path.write_text(
+        """\
+name: coding-loop-replay
+when_to_use:
+  - Exercise coding-loop replay guards.
+steps:
+  - id: implement
+    description: Implement and verify.
+    step_type: coding_loop
+    actions: [read_document, edit]
+    coding_loop:
+      goal: Make the check pass.
+      verification:
+        - id: check
+          command: "true"
+      stopping_conditions: [The check passes.]
+      max_iterations: 4
+""",
+        encoding="utf-8",
+    )
+    corpus = (
+        {
+            "id": "failed-verification-read",
+            "events": [
+                {
+                    "kind": "coding_loop_verification",
+                    "step_index": 0,
+                    "all_passed": False,
+                }
+            ],
+            "response": {
+                "action": "read_document",
+                "file_path": "skill.yaml",
+                "start_line": 1,
+                "end_line": 10,
+            },
+            "valid": True,
+        },
+        {
+            "id": "repeated-inspection-after-failure",
+            "events": [
+                {"kind": "read_document"},
+                {
+                    "kind": "coding_loop_verification",
+                    "step_index": 0,
+                    "all_passed": False,
+                },
+            ],
+            "response": {
+                "action": "read_document",
+                "file_path": "skill.yaml",
+                "start_line": 1,
+                "end_line": 10,
+            },
+            "valid": True,
+        },
+        {
+            "id": "redundant-action-after-pass",
+            "events": [
+                {
+                    "kind": "coding_loop_verification",
+                    "step_index": 0,
+                    "all_passed": True,
+                }
+            ],
+            "response": {
+                "action": "read_document",
+                "file_path": "skill.yaml",
+                "start_line": 1,
+                "end_line": 10,
+            },
+            "valid": False,
+            "error": "already passed",
+        },
+        {
+            "id": "stale-pass-completion",
+            "events": [
+                {
+                    "kind": "coding_loop_verification",
+                    "step_index": 0,
+                    "all_passed": True,
+                    "worktree_fingerprint": "stale-fingerprint",
+                }
+            ],
+            "response": {"action": "next_step"},
+            "valid": False,
+            "error": "verification is stale",
+        },
+    )
+
+    for case in corpus:
+        bundle = {
+            "schema_version": WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION,
+            "id": case["id"],
+            "execution_mode": "execute_selected_skill",
+            "definition": {
+                "kind": "skill",
+                "path": "skill.yaml",
+                "name": "coding-loop-replay",
+            },
+            "step": {"index": 0, "id": "implement"},
+            "prompt_builder_version": 1,
+            "prompt_state": {"execution_events": case["events"]},
+            "failed_response": case["response"],
+            "expected": {},
+            "redactions": [],
+        }
+        rendered = render_skill_replay(bundle, repo_root=tmp_path)
+        validation = rendered["response_validation"]
+        assert validation["valid"] is case["valid"]
+        if not case["valid"]:
+            assert case["error"] in validation["error"]
+
+
+def test_committed_coding_loop_replay_fixtures_are_portable() -> None:
+    corpus_root = Path(__file__).parents[1] / "workflow-evals/replays/coding-loop"
+    expected = {
+        "failed-verification-read.yaml": (True, None),
+        "repeated-inspection-after-failure.yaml": (True, None),
+        "redundant-action-after-pass.yaml": (False, "already passed"),
+        "stale-pass-completion.yaml": (False, "verification is stale"),
+    }
+
+    for filename, (valid, error_text) in expected.items():
+        bundle = load_workflow_replay_bundle(corpus_root / filename)
+        rendered = render_skill_replay(bundle, repo_root=corpus_root)
+        validation = rendered["response_validation"]
+        assert validation["valid"] is valid
+        if error_text is not None:
+            assert error_text in validation["error"]

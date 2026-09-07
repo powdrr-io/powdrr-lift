@@ -231,15 +231,16 @@ class SkillStepRequiredAction:
     """Action evidence required before a predicated step may complete."""
 
     action: str
-    targets_from: str
-    match_field: str
+    targets_from: str | None = None
+    match_field: str | None = None
 
     def to_data(self) -> dict[str, Any]:
-        return {
-            "action": self.action,
-            "targets_from": self.targets_from,
-            "match_field": self.match_field,
-        }
+        data: dict[str, Any] = {"action": self.action}
+        if self.targets_from is not None:
+            data["targets_from"] = self.targets_from
+        if self.match_field is not None:
+            data["match_field"] = self.match_field
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -1021,13 +1022,19 @@ def build_skill_validation_report(
                         for action_index, required_action in enumerate(
                             raw_required_actions
                         ):
-                            if not isinstance(required_action, Mapping) or any(
-                                _optional_string(required_action.get(field_name))
+                            if (
+                                not isinstance(required_action, Mapping)
+                                or _optional_string(required_action.get("action"))
                                 is None
-                                for field_name in (
-                                    "action",
-                                    "targets_from",
-                                    "match_field",
+                                or (
+                                    ("targets_from" in required_action)
+                                    != ("match_field" in required_action)
+                                )
+                                or any(
+                                    _optional_string(required_action.get(field_name))
+                                    is None
+                                    for field_name in ("targets_from", "match_field")
+                                    if field_name in required_action
                                 )
                             ):
                                 issues.append(
@@ -1035,8 +1042,8 @@ def build_skill_validation_report(
                                         code="invalid_completion",
                                         message=(
                                             "predicated required_actions entries must "
-                                            "declare action, targets_from, and "
-                                            "match_field strings."
+                                            "declare action, or both targets_from "
+                                            "and match_field strings."
                                         ),
                                         path=_child_path(
                                             step_path,
@@ -2055,12 +2062,12 @@ def _parse_step_completion(value: object) -> SkillStepCompletion | None:
         action = _optional_string(item.get("action"))
         targets_from = _optional_string(item.get("targets_from"))
         match_field = _optional_string(item.get("match_field"))
-        if action is None or targets_from is None or match_field is None:
+        if action is None or (targets_from is None) != (match_field is None):
             raise ValueError(
                 "Skill step completion.required_actions entries must declare "
-                "action, targets_from, and match_field strings."
+                "action, or both targets_from and match_field strings."
             )
-        if set(item) != {"action", "targets_from", "match_field"}:
+        if set(item) - {"action", "targets_from", "match_field"}:
             raise ValueError(
                 "Skill step completion.required_actions entries contain "
                 "unsupported fields."

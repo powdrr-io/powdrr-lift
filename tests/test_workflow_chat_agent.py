@@ -426,12 +426,28 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
         current_step=SkillStep(
             description="Produce a result.",
             step_type="predicated",
-            completion=SkillStepCompletion(("result",)),
+            completion=SkillStepCompletion(
+                ("result",),
+                (
+                    SkillStepRequiredAction(
+                        "gather_context",
+                        exactly=1,
+                        parameters={"types": ["requirements"]},
+                    ),
+                ),
+            ),
             outputs=(SkillStepOutput(name="result"),),
         )
     )
     assert "never return next_step" in predicated_prompt
     assert '"outputs"' in predicated_prompt
+    assert "Before emit_outputs, complete every required action obligation" in (
+        predicated_prompt
+    )
+    assert (
+        'gather_context exactly 1 time(s) with parameters {"types": ["requirements"]}'
+        in (predicated_prompt)
+    )
 
     output_step = SkillStep(
         description="Capture the feature name.",

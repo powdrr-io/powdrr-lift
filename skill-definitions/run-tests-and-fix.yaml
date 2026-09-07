@@ -87,10 +87,37 @@ steps:
     {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
     "file_edits":[...]}}}. Do not return next_step; the runtime advances after
     repair_edit is present.
-    If no repair is needed, set repair_edit to null and explain why.
+    If no repair is needed, emit an edit object with an empty file_edits array
+    and explain why in decisions_and_context.
   outputs:
   - name: repair_edit
-    type: any
+    type: object
+    schema: &deferred_edit_schema
+      type: object
+      required: [action, file_edits]
+      additionalProperties: false
+      properties:
+        action: {type: string, enum: [edit]}
+        file_edits:
+          type: array
+          items:
+            type: object
+            required: [file_path, edits]
+            additionalProperties: false
+            properties:
+              file_path: {type: string, minLength: 1}
+              edits:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [kind, start_line, end_line]
+                  additionalProperties: false
+                  properties:
+                    kind: {type: string, enum: [add, remove, replace]}
+                    start_line: {type: integer}
+                    end_line: {type: integer}
+                    text: {type: string}
     required_for_next_step: true
   actions: [read_document]
 - id: validate-repair-edit
@@ -143,7 +170,8 @@ steps:
     prose description.
   outputs:
   - name: repair_edit
-    type: any
+    type: object
+    schema: *deferred_edit_schema
     required_for_next_step: true
 - id: validate-repair-edit-gate
   description: Require the corrected deferred edit to pass validation.

@@ -420,7 +420,6 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     ordinary_system_prompt = _action_system_prompt(current_step=ordinary_step)
     assert "Use next_step when the current step is complete" in ordinary_system_prompt
     assert "Use complete when the skill is finished" in ordinary_system_prompt
-    assert "apply to every step" in ordinary_system_prompt
 
     predicated_prompt = _action_system_prompt(
         current_step=SkillStep(

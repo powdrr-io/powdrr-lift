@@ -39,9 +39,7 @@ steps:
     required_for_next_step: true
 - id: diagnose-test-results
   description: Produce a traceback-supported diagnosis from structured test results.
-  step_type: predicated
-  completion:
-    required_outputs: [test_diagnosis]
+  step_type: freeform
   inputs:
   - name: enriched_test_result
     type: any
@@ -50,12 +48,9 @@ steps:
   details: >-
     Consume only enriched_test_result. Identify every failing test and its exact
     root cause. List only approved source or test files that require changes.
-    Emit test_diagnosis containing classification, failing_tests,
+    Return next_step with test_diagnosis containing classification, failing_tests,
     and root_causes; each root cause must contain cause, files_to_change, and
     repair_strategy. Do not edit files in this step and do not run commands.
-    Return it in the same JSON action object as the final action, for example:
-    {"action":"emit_outputs","outputs":{"test_diagnosis":{...}}}. Do not return
-    next_step; the runtime advances after test_diagnosis is present.
   outputs:
   - name: test_diagnosis
     type: any

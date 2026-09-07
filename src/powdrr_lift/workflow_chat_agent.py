@@ -5011,13 +5011,6 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         + "- complete: choose this when the skill has finished and no more action "
         "is required. Every later gate in this skill must already have passed; "
         "you cannot complete while a gate remains further ahead.\n"
-        + (
-            "These next_step and complete rules apply to every step, including "
-            "steps whose optional prompt catalogs are omitted.\n"
-            if not predicated_step
-            else "The active step contract is authoritative; do not use actions "
-            "omitted from its action schema.\n"
-        )
         + "If the observer intervention recommends an action, treat that action as "
         "allowed for this step and choose it directly when appropriate.\n"
         "When the current step declares outputs, provide the completed values "

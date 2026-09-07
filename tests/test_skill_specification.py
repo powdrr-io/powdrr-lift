@@ -348,7 +348,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             expected_predicated_steps = {
                 ("run-tests-and-fix.yaml", 3),
                 ("run-tests-and-fix.yaml", 5),
-            }
+            } | {("design-interview.yaml", index) for index in range(20)}
             expected_step_type = (
                 "coding_loop"
                 if (path.name, index) == ("execute-proposed-pr.yaml", 2)

@@ -7576,6 +7576,14 @@ def _predicated_step_complete(step: Any, state: _WorkflowExecutionState) -> bool
         ):
             return False
     for requirement in getattr(completion, "required_actions", ()):
+        if requirement.targets_from is None:
+            if not any(
+                event.get("step_index") == state.step_index
+                and event.get("kind") == requirement.action
+                for event in state.execution_events
+            ):
+                return False
+            continue
         targets = _resolve_predicated_targets(requirement.targets_from, state)
         for target in targets:
             if not any(
@@ -7678,7 +7686,8 @@ def _validate_workflow_step_transition(
             missing = [
                 requirement.targets_from
                 for requirement in getattr(step.completion, "required_actions", ())
-                if not all(
+                if requirement.targets_from is not None
+                and not all(
                     any(
                         event.get("step_index") == state.step_index
                         and event.get("kind") == requirement.action
@@ -7690,6 +7699,16 @@ def _validate_workflow_step_transition(
                     )
                 )
             ]
+            missing.extend(
+                requirement.action
+                for requirement in getattr(step.completion, "required_actions", ())
+                if requirement.targets_from is None
+                and not any(
+                    event.get("step_index") == state.step_index
+                    and event.get("kind") == requirement.action
+                    for event in state.execution_events
+                )
+            )
             if missing:
                 raise PowdrrExecutionError(
                     "Cannot emit_outputs until required action evidence is recorded: "

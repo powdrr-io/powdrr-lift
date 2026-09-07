@@ -7575,7 +7575,56 @@ def _predicated_step_complete(step: Any, state: _WorkflowExecutionState) -> bool
             or producer.get("step_index") != state.step_index
         ):
             return False
+    for requirement in getattr(completion, "required_actions", ()):
+        targets = _resolve_predicated_targets(requirement.targets_from, state)
+        for target in targets:
+            if not any(
+                event.get("step_index") == state.step_index
+                and event.get("kind") == requirement.action
+                and event.get(requirement.match_field) == target
+                for event in state.execution_events
+            ):
+                return False
     return True
+
+
+def _resolve_predicated_targets(path: str, state: _WorkflowExecutionState) -> list[Any]:
+    """Resolve a small deterministic handoff path such as ``x.items[*].file``."""
+    segments = path.split(".")
+    if not segments or segments[0] not in state.handoff_records:
+        return []
+    values: list[Any] = [state.handoff_records[segments[0]].get("value")]
+    for segment in segments[1:]:
+        wildcard = segment.endswith("[*]")
+        key = segment[:-3] if wildcard else segment
+        next_values: list[Any] = []
+        for value in values:
+            if key and isinstance(value, Mapping) and key in value:
+                nested = value[key]
+                if (
+                    wildcard
+                    and isinstance(nested, Sequence)
+                    and not isinstance(nested, (str, bytes, bytearray))
+                ):
+                    next_values.extend(nested)
+                else:
+                    next_values.append(nested)
+            elif (
+                wildcard
+                and isinstance(value, Sequence)
+                and not isinstance(value, (str, bytes, bytearray))
+            ):
+                next_values.extend(value)
+        values = next_values
+    flattened: list[Any] = []
+    for value in values:
+        if isinstance(value, Sequence) and not isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            flattened.extend(value)
+        else:
+            flattened.append(value)
+    return flattened
 
 
 def _advance_predicated_step(
@@ -7621,6 +7670,31 @@ def _validate_workflow_step_transition(
             raise PowdrrExecutionError(
                 "emit_outputs must include at least one declared output."
             )
+        if (
+            state is not None
+            and not _predicated_step_complete(step, state)
+            and getattr(step, "completion", None) is not None
+        ):
+            missing = [
+                requirement.targets_from
+                for requirement in getattr(step.completion, "required_actions", ())
+                if not all(
+                    any(
+                        event.get("step_index") == state.step_index
+                        and event.get("kind") == requirement.action
+                        and event.get(requirement.match_field) == target
+                        for event in state.execution_events
+                    )
+                    for target in _resolve_predicated_targets(
+                        requirement.targets_from, state
+                    )
+                )
+            ]
+            if missing:
+                raise PowdrrExecutionError(
+                    "Cannot emit_outputs until required action evidence is recorded: "
+                    + ", ".join(missing)
+                )
     if (
         getattr(step, "step_type", "freeform") == "predicated"
         and action.kind == "next_step"

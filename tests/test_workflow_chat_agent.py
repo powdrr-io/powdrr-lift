@@ -30,6 +30,7 @@ from powdrr_lift.core import (
     SkillStepInput,
     SkillStepOutput,
     SkillStepPreStep,
+    SkillStepRequiredAction,
     SkillToolInvocation,
     load_skill,
     save_skill,
@@ -606,6 +607,48 @@ def test_predicated_step_advances_after_current_step_outputs(tmp_path: Path) -> 
     _advance_predicated_step(state, predicated)
     assert state.step_index == 1
     assert state.execution_events[-1]["kind"] == "predicated_advance"
+
+
+def test_predicated_step_requires_all_declared_action_evidence(tmp_path: Path) -> None:
+    predicated = SkillStep(
+        description="Produce the result.",
+        step_type="predicated",
+        completion=SkillStepCompletion(
+            ("result",),
+            (
+                SkillStepRequiredAction(
+                    "read_document", "diagnosis.files[*]", "file_path"
+                ),
+            ),
+        ),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="test", when_to_use=(), steps=(predicated,)),
+        ),
+        transcript=[],
+        execution_events=[
+            {"kind": "read_document", "step_index": 0, "file_path": "a.py"}
+        ],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        handoff_records={
+            "diagnosis": {
+                "value": {"files": ["a.py", "b.py"]},
+                "produced_by": {"step_index": 0, "action": "edit"},
+            },
+            "result": {"produced_by": {"step_index": 0, "action": "emit_outputs"}},
+        },
+    )
+
+    assert not _predicated_step_complete(predicated, state)
+    state.execution_events.append(
+        {"kind": "read_document", "step_index": 0, "file_path": "b.py"}
+    )
+    assert _predicated_step_complete(predicated, state)
 
 
 def test_coding_loop_runs_declared_verification_and_requires_pass(

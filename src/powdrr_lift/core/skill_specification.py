@@ -227,13 +227,35 @@ class CodingLoopSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillStepRequiredAction:
+    """Action evidence required before a predicated step may complete."""
+
+    action: str
+    targets_from: str
+    match_field: str
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "action": self.action,
+            "targets_from": self.targets_from,
+            "match_field": self.match_field,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStepCompletion:
     """Deterministic completion conditions for a predicated step."""
 
     required_outputs: tuple[str, ...]
+    required_actions: tuple[SkillStepRequiredAction, ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
-        return {"required_outputs": list(self.required_outputs)}
+        data: dict[str, Any] = {"required_outputs": list(self.required_outputs)}
+        if self.required_actions:
+            data["required_actions"] = [
+                item.to_data() for item in self.required_actions
+            ]
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -899,7 +921,8 @@ def build_skill_validation_report(
                     )
                 else:
                     unsupported_completion_fields = set(raw_completion) - {
-                        "required_outputs"
+                        "required_outputs",
+                        "required_actions",
                     }
                     if unsupported_completion_fields:
                         issues.append(
@@ -978,6 +1001,49 @@ def build_skill_validation_report(
                                     ),
                                 )
                             )
+                    raw_required_actions = raw_completion.get("required_actions", [])
+                    if not isinstance(raw_required_actions, Sequence) or isinstance(
+                        raw_required_actions, (str, bytes, bytearray)
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_completion",
+                                message=(
+                                    "predicated completion.required_actions must be "
+                                    "an array."
+                                ),
+                                path=_child_path(
+                                    step_path, "completion.required_actions"
+                                ),
+                            )
+                        )
+                    else:
+                        for action_index, required_action in enumerate(
+                            raw_required_actions
+                        ):
+                            if not isinstance(required_action, Mapping) or any(
+                                _optional_string(required_action.get(field_name))
+                                is None
+                                for field_name in (
+                                    "action",
+                                    "targets_from",
+                                    "match_field",
+                                )
+                            ):
+                                issues.append(
+                                    SkillValidationIssue(
+                                        code="invalid_completion",
+                                        message=(
+                                            "predicated required_actions entries must "
+                                            "declare action, targets_from, and "
+                                            "match_field strings."
+                                        ),
+                                        path=_child_path(
+                                            step_path,
+                                            f"completion.required_actions[{action_index}]",
+                                        ),
+                                    )
+                                )
             elif raw_completion is not None:
                 issues.append(
                     SkillValidationIssue(
@@ -1975,13 +2041,40 @@ def _parse_step_completion(value: object) -> SkillStepCompletion | None:
                 "Skill step completion.required_outputs must not contain duplicates."
             )
         required_outputs.append(output_name)
-    unknown = set(value) - {"required_outputs"}
+    raw_actions = value.get("required_actions", [])
+    if not isinstance(raw_actions, Sequence) or isinstance(
+        raw_actions, (str, bytes, bytearray)
+    ):
+        raise ValueError("Skill step completion.required_actions must be an array.")
+    required_actions: list[SkillStepRequiredAction] = []
+    for item in raw_actions:
+        if not isinstance(item, Mapping):
+            raise ValueError(
+                "Skill step completion.required_actions entries must be objects."
+            )
+        action = _optional_string(item.get("action"))
+        targets_from = _optional_string(item.get("targets_from"))
+        match_field = _optional_string(item.get("match_field"))
+        if action is None or targets_from is None or match_field is None:
+            raise ValueError(
+                "Skill step completion.required_actions entries must declare "
+                "action, targets_from, and match_field strings."
+            )
+        if set(item) != {"action", "targets_from", "match_field"}:
+            raise ValueError(
+                "Skill step completion.required_actions entries contain "
+                "unsupported fields."
+            )
+        required_actions.append(
+            SkillStepRequiredAction(action, targets_from, match_field)
+        )
+    unknown = set(value) - {"required_outputs", "required_actions"}
     if unknown:
         raise ValueError(
             "Skill step completion contains unsupported fields: "
             + ", ".join(sorted(str(item) for item in unknown))
         )
-    return SkillStepCompletion(tuple(required_outputs))
+    return SkillStepCompletion(tuple(required_outputs), tuple(required_actions))
 
 
 def _parse_coding_loop(value: object) -> CodingLoopSpec:

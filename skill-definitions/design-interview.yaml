@@ -18,7 +18,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [requirements_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [requirements]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["requirements"]}.
@@ -47,7 +47,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [approach_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [approach]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["approach"]}.
@@ -66,7 +66,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [entities_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [entities]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["entities"]}.
@@ -85,7 +85,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [entity_relationships_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [entity-relationships]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["entity-relationships"]}.
@@ -104,7 +104,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [invariants_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [invariants]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["invariants"]}.
@@ -123,7 +123,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [guidance_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [guidance]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["guidance"]}.
@@ -142,7 +142,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [features_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [features]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["features"]}.
@@ -161,7 +161,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [human_decisions_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [human-decisions]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["human-decisions"]}.
@@ -180,7 +180,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [intent_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [intent]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["intent"]}.
@@ -198,7 +198,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [intents_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [intents]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["intents"]}.
@@ -216,7 +216,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [acceptance_criteria_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [acceptance_criteria]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["acceptance_criteria"]}.
@@ -234,7 +234,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [expected_tests_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [expected_tests]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["expected_tests"]}.
@@ -252,7 +252,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [required_test_cases_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [required_test_cases]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["required_test_cases"]}.
@@ -270,7 +270,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [expected_outcomes_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [expected_outcomes]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["expected_outcomes"]}.
@@ -288,7 +288,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [non_goals_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [non_goals]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["non_goals"]} and
@@ -305,7 +305,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [risks_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [risks]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["risks"]} and
@@ -322,7 +322,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [decisions_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [decisions]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["decisions"]} and
@@ -339,7 +339,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [proposed_prs_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [proposed-prs]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["proposed_prs"]} and
@@ -356,7 +356,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [modules_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [modules]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["modules"]} and
@@ -373,7 +373,7 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [tools_edits]
-    required_actions: [{action: gather_context}]
+    required_actions: [{action: gather_context, exactly: 1, parameters: {types: [tools]}}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["tools"]} and

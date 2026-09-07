@@ -538,19 +538,6 @@ class ExecutionRuntime:
             for clause in contract.clauses
             for requirement in clause.contract.requirements
         }
-        text = " ".join(
-            rule.text.casefold()
-            for rule in self.guidance(
-                {
-                    "profile_id": self.state.profile_id,
-                    "phase_type": self.state.current_phase.value,
-                }
-            )
-        )
-        if "review" in text and "resolv" in text:
-            actions.update({"run_validation", "resolve_review_thread"})
-        if "optimistic lock" in text or "optimistic-lock" in text:
-            actions.update({"add_optimistic_lock", "run_concurrency_test"})
         return frozenset(actions)
 
     def apply_guidance_obligations(
@@ -571,20 +558,6 @@ class ExecutionRuntime:
             for requirement in clause.contract.requirements
         }
         required: tuple[str, ...] = tuple(sorted(required_set))
-        rules_text = " ".join(
-            rule.text.casefold()
-            for rule in self.guidance(
-                {
-                    "profile_id": self.state.profile_id,
-                    "phase_type": self.state.current_phase.value,
-                }
-            )
-        )
-        if not required:
-            if action == "edit_for_review_comment" and "resolv" in rules_text:
-                required = ("resolve_review_thread",)
-            elif action == "change_mutable_row" and "optimistic lock" in rules_text:
-                required = ("add_optimistic_lock", "run_concurrency_test")
         for required_action in required:
             self.kernel.add_obligation(
                 ExecutionObligation(
@@ -604,7 +577,13 @@ class ExecutionRuntime:
         return self.behavior_rule_store.save(rule, expected_version=expected_version)
 
     def capture_guidance(
-        self, text: str, *, source_ref: str, scope: dict[str, str] | None = None
+        self,
+        text: str,
+        *,
+        source_ref: str,
+        scope: dict[str, str] | None = None,
+        trigger_action: str | None = None,
+        requirements: tuple[str, ...] = (),
     ) -> Any:
         """Turn an explicit user instruction into durable future behavior."""
         normalized = " ".join(text.strip().casefold().split())
@@ -633,14 +612,6 @@ class ExecutionRuntime:
             rule,
             expected_version=current.version if current is not None else None,
         )
-        requirements: tuple[str, ...] = ()
-        trigger_action: str | None = None
-        if "review" in normalized and "resolv" in normalized:
-            requirements = ("run_validation", "resolve_review_thread")
-            trigger_action = "edit_for_review_comment"
-        elif "optimistic lock" in normalized or "optimistic-lock" in normalized:
-            requirements = ("add_optimistic_lock", "run_concurrency_test")
-            trigger_action = "change_mutable_row"
         guidance_scope = (
             scope if scope is not None else {"profile_id": self.state.profile_id}
         )

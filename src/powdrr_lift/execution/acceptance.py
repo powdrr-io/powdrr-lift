@@ -519,10 +519,14 @@ def run_final_acceptance(
     runtime.capture_guidance(
         "When a review-driven change is made, resolve the comment after validation.",
         source_ref="acceptance:user-request:review-resolution",
+        trigger_action="edit_for_review_comment",
+        requirements=("run_validation", "resolve_review_thread"),
     )
     runtime.capture_guidance(
         "Always use optimistic locking for mutable row changes.",
         source_ref="acceptance:user-request:optimistic-locking",
+        trigger_action="change_mutable_row",
+        requirements=("add_optimistic_lock", "run_concurrency_test"),
     )
     guidance_after = runtime.prompt_context()
     guidance_requirements = runtime.guidance_required_actions()
@@ -541,6 +545,8 @@ def run_final_acceptance(
     guidance_execution.capture_guidance(
         "Always use optimistic locking for mutable row changes.",
         source_ref="acceptance:user-request:optimistic-locking",
+        trigger_action="change_mutable_row",
+        requirements=("add_optimistic_lock", "run_concurrency_test"),
     )
     guidance_execution.set_execution_scope(
         declared_actions=frozenset({"change_mutable_row"}),

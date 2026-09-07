@@ -620,6 +620,103 @@ def test_unified_proposed_pr_rejects_unlabeled_or_mismatched_effects(
     assert mismatch["yaml_edit"]["operations"][0]["op"] == "upsert_item"
 
 
+def test_unified_proposed_prs_cover_feature_requirements_and_tests(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposal_dir = tmp_path / "docs" / "proposals" / "feature-a"
+    proposal_dir.mkdir(parents=True)
+    (proposal_dir / "feature-pr-specification.yaml").write_text(
+        """
+        id: feature-a
+        requirements:
+          - id: req-core
+            description: Build the core behavior.
+        acceptance_criteria:
+          - id: ac-core
+            description: The core behavior works.
+        expected_tests:
+          - id: test-core
+            description: Core behavior is tested.
+        """,
+        encoding="utf-8",
+    )
+    proposed = """
+    schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+    id: feature-a
+    feature_ids: [feature-a, feature-b]
+    proposed_prs:
+      - id: feature-a-core
+        intent: Build the feature.
+        justification: It is required.
+        dependent_prs: []
+        requirements: [req-core]
+        acceptance_criteria: [ac-core]
+        expected_tests: [test-core]
+    entities: []
+    modules: []
+    tools: []
+    entity_relationships: []
+    features: []
+    decisions: []
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed,
+        work_item_name="feature-a",
+        repo_root=tmp_path,
+        file_path=proposal_dir / "proposed-pr-specification.yaml",
+    )
+
+    assert report.validation_successful is True
+
+
+def test_unified_proposed_prs_reject_uncovered_feature_requirements(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    proposal_dir = tmp_path / "docs" / "proposals" / "feature-a"
+    proposal_dir.mkdir(parents=True)
+    (proposal_dir / "feature-pr-specification.yaml").write_text(
+        """
+        id: feature-a
+        requirements:
+          - id: req-core
+            description: Build the core behavior.
+        acceptance_criteria: []
+        expected_tests: []
+        """,
+        encoding="utf-8",
+    )
+    proposed = """
+    schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+    id: feature-a
+    feature_ids: [feature-a, feature-b]
+    proposed_prs:
+      - id: feature-a-core
+        intent: Build the feature.
+        justification: It is required.
+        dependent_prs: []
+        requirements: []
+    entities: []
+    modules: []
+    tools: []
+    entity_relationships: []
+    features: []
+    decisions: []
+    """
+
+    report = build_pr_specification_validation_report(
+        proposed,
+        work_item_name="feature-a",
+        repo_root=tmp_path,
+        file_path=proposal_dir / "proposed-pr-specification.yaml",
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "uncovered_feature_items" for issue in report.issues)
+
+
 def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
     _write_implementation_specification(tmp_path)
     _write_existing_pr_specification(tmp_path)

@@ -12,6 +12,7 @@ from powdrr_lift.workflow_replay import (
     redact_replay_bundle,
     render_skill_replay,
     render_skill_replay_corpus,
+    render_skill_replay_trajectory,
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
     validate_replay_fixture_safety,
@@ -175,6 +176,63 @@ steps:
     assert report["failed"] == 2
     assert [item["valid"] for item in report["bundles"]] == [False, False, True]
     assert "expected response_valid=False" in report["bundles"][1]["error"]
+
+
+def test_replay_trajectory_asserts_actions_and_roundtrip_bound(tmp_path: Path) -> None:
+    (tmp_path / "skill.yaml").write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect-files
+    description: Inspect files.
+    tool_invocations:
+      - tool: shell
+        command: [rg, --files]
+""",
+        encoding="utf-8",
+    )
+    bundle = {
+        "schema_version": 1,
+        "id": "trajectory",
+        "execution_mode": "execute_selected_skill",
+        "definition": {"kind": "skill", "path": "skill.yaml", "name": "inspect"},
+        "step": {"index": 0, "id": "inspect-files"},
+        "prompt_builder_version": 1,
+        "prompt_state": {},
+        "trajectory": [
+            {
+                "response": {
+                    "action": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                }
+            },
+            {
+                "response": {
+                    "action": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                }
+            },
+        ],
+        "expected": {
+            "required_actions": ["invoke_tool"],
+            "max_repeated_action_count": 1,
+            "max_roundtrips": 2,
+        },
+        "redactions": [],
+    }
+
+    rendered = render_skill_replay_trajectory(bundle, repo_root=tmp_path)
+
+    assert rendered["trajectory_validation"] == {
+        "trajectory_valid": True,
+        "required_actions": True,
+        "max_repeated_action_count": True,
+        "max_roundtrips": True,
+        "valid": True,
+    }
 
 
 def test_replay_fixture_redaction_removes_credentials_and_absolute_paths() -> None:

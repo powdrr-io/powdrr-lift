@@ -284,6 +284,12 @@ def render_skill_replay(
 ) -> dict[str, Any]:
     """Render and validate a skill replay without invoking tools or an LLM."""
     _validate_replay_bundle(bundle)
+    if "trajectory" in bundle:
+        return render_skill_replay_trajectory(
+            bundle,
+            repo_root=repo_root,
+            definition_path=definition_path,
+        )
     definition = _mapping(bundle.get("definition"), "bundle definition")
     resolved_definition = _resolve_definition_path(
         definition_path or Path(_string(definition.get("path"), "definition path")),
@@ -403,6 +409,87 @@ def render_skill_replay(
     return result
 
 
+def render_skill_replay_trajectory(
+    bundle: Mapping[str, Any],
+    *,
+    repo_root: Path,
+    definition_path: Path | None = None,
+) -> dict[str, Any]:
+    """Render each response in a no-tool trajectory and evaluate its assertions."""
+    trajectory = bundle.get("trajectory")
+    if not isinstance(trajectory, list) or not trajectory:
+        raise WorkflowReplayError("bundle trajectory must be a non-empty list.")
+    responses: list[dict[str, Any]] = []
+    actions: list[str] = []
+    errors: list[str] = []
+    for index, item in enumerate(trajectory):
+        if not isinstance(item, Mapping) or not isinstance(
+            item.get("response"), Mapping
+        ):
+            raise WorkflowReplayError(
+                f"bundle trajectory[{index}].response must be an object."
+            )
+        single = dict(bundle)
+        single.pop("trajectory", None)
+        single["failed_response"] = dict(item["response"])
+        if isinstance(item.get("prompt_state"), Mapping):
+            single["prompt_state"] = dict(item["prompt_state"])
+        rendered = render_skill_replay(
+            single,
+            repo_root=repo_root,
+            definition_path=definition_path,
+        )
+        validation = rendered["response_validation"]
+        response = {"index": index, **validation}
+        responses.append(response)
+        if validation.get("valid") is True:
+            actions.append(str(validation["action"]))
+        elif isinstance(validation.get("error"), str):
+            errors.append(validation["error"])
+
+    expected = bundle.get("expected")
+    assertions: dict[str, Any] = {"trajectory_valid": not errors}
+    if isinstance(expected, Mapping):
+        required = expected.get("required_actions", [])
+        forbidden = expected.get("forbidden_actions", [])
+        maximum = expected.get("max_repeated_action_count")
+        if required:
+            assertions["required_actions"] = all(
+                isinstance(action, str) and action in actions for action in required
+            )
+        if forbidden:
+            assertions["forbidden_actions"] = not any(
+                isinstance(action, str) and action in actions for action in forbidden
+            )
+        if maximum is not None:
+            if not isinstance(maximum, int) or maximum < 0:
+                raise WorkflowReplayError(
+                    "bundle expected.max_repeated_action_count must be non-negative."
+                )
+            counts = {action: actions.count(action) for action in set(actions)}
+            repeated = sum(max(count - 1, 0) for count in counts.values())
+            assertions["max_repeated_action_count"] = repeated <= maximum
+        if "max_roundtrips" in expected:
+            maximum_roundtrips = expected["max_roundtrips"]
+            if not isinstance(maximum_roundtrips, int) or maximum_roundtrips < 0:
+                raise WorkflowReplayError(
+                    "bundle expected.max_roundtrips must be non-negative."
+                )
+            assertions["max_roundtrips"] = len(trajectory) <= maximum_roundtrips
+    assertions["valid"] = all(assertions.values())
+    return {
+        "schema_version": WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION,
+        "bundle_id": bundle["id"],
+        "trajectory": responses,
+        "trajectory_validation": assertions,
+        "response_validation": {
+            "valid": assertions["valid"],
+            "action": actions[-1] if actions else None,
+            "error": "; ".join(errors) if errors else None,
+        },
+    }
+
+
 def render_skill_replay_corpus(
     directory: Path,
     *,
@@ -429,7 +516,9 @@ def render_skill_replay_corpus(
                 definition_path=definition_path,
             )
             expectation_error = _replay_expectation_error(
-                bundle, rendered["response_validation"]
+                bundle,
+                rendered["response_validation"],
+                rendered.get("trajectory_validation"),
             )
             if expectation_error is not None:
                 bundles.append(
@@ -463,7 +552,9 @@ def render_skill_replay_corpus(
 
 
 def _replay_expectation_error(
-    bundle: Mapping[str, Any], validation: Mapping[str, Any]
+    bundle: Mapping[str, Any],
+    validation: Mapping[str, Any],
+    trajectory_validation: Mapping[str, Any] | None = None,
 ) -> str | None:
     expected = bundle.get("expected")
     if expected is None:
@@ -495,6 +586,14 @@ def _replay_expectation_error(
         actual_error = validation.get("error")
         if not isinstance(actual_error, str) or expected_error not in actual_error:
             return f"expected error to contain {expected_error!r}."
+    if (
+        trajectory_validation is not None
+        and trajectory_validation.get("valid") is not True
+    ):
+        failed = [
+            name for name, passed in trajectory_validation.items() if passed is False
+        ]
+        return "trajectory assertions failed: " + ", ".join(failed)
     return None
 
 
@@ -513,6 +612,10 @@ def _validate_replay_bundle(bundle: Mapping[str, Any]) -> None:
     step = _mapping(bundle.get("step"), "bundle step")
     _integer(step.get("index"), "bundle step.index")
     _mapping(bundle.get("prompt_state"), "bundle prompt_state")
+    if "trajectory" in bundle:
+        if not isinstance(bundle.get("trajectory"), list):
+            raise WorkflowReplayError("bundle trajectory must be a list.")
+        return
     if not isinstance(bundle.get("failed_response"), Mapping):
         raise WorkflowReplayError("bundle failed_response must be an object.")
 

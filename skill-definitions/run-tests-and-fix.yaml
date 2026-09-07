@@ -60,6 +60,10 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [repair_edit]
+    required_actions:
+      - action: read_document
+        targets_from: test_diagnosis.root_causes[*].files_to_change
+        match_field: file_path
   inputs:
   - name: test_diagnosis
     type: any
@@ -112,6 +116,10 @@ steps:
   step_type: predicated
   completion:
     required_outputs: [repair_edit]
+    required_actions:
+      - action: read_document
+        targets_from: test_diagnosis.root_causes[*].files_to_change
+        match_field: file_path
   inputs:
   - name: repair_edit
     type: any

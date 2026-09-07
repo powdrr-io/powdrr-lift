@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION,
+    WorkflowReplayError,
     build_workflow_replay_state,
     load_workflow_replay_bundle,
+    redact_replay_bundle,
     render_skill_replay,
+    render_skill_replay_corpus,
+    render_skill_replay_trajectory,
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
+    validate_replay_fixture_safety,
 )
 
 
@@ -121,3 +128,138 @@ steps:
         "requires a successful tool invocation"
         in rendered["response_validation"]["error"]
     )
+
+
+def test_replay_corpus_reports_all_bundles_and_malformed_files(tmp_path: Path) -> None:
+    skill_path = tmp_path / "skill.yaml"
+    skill_path.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect-files
+    description: Inspect files.
+    tool_invocations:
+      - tool: shell
+        command: [rg, --files]
+""",
+        encoding="utf-8",
+    )
+    corpus_dir = tmp_path / "replays"
+    bundle = {
+        "schema_version": 1,
+        "id": "valid-bundle",
+        "execution_mode": "execute_selected_skill",
+        "definition": {"kind": "skill", "path": "skill.yaml", "name": "inspect"},
+        "step": {"index": 0, "id": "inspect-files"},
+        "prompt_builder_version": 1,
+        "prompt_state": {},
+        "failed_response": {
+            "action": "invoke_tool",
+            "tool": "shell",
+            "parameters": {"command": ["rg", "--files"]},
+        },
+        "expected": {"response_valid": True, "action": "invoke_tool"},
+        "redactions": [],
+    }
+    save_workflow_replay_bundle(corpus_dir / "valid.yaml", bundle)
+    mismatch = dict(bundle)
+    mismatch["id"] = "mismatch-bundle"
+    mismatch["expected"] = {"response_valid": False}
+    save_workflow_replay_bundle(corpus_dir / "mismatch.yaml", mismatch)
+    (corpus_dir / "broken.yaml").write_text("not: [valid", encoding="utf-8")
+
+    report = render_skill_replay_corpus(corpus_dir, repo_root=tmp_path)
+
+    assert report["bundle_count"] == 3
+    assert report["passed"] == 1
+    assert report["failed"] == 2
+    assert [item["valid"] for item in report["bundles"]] == [False, False, True]
+    assert "expected response_valid=False" in report["bundles"][1]["error"]
+
+
+def test_replay_trajectory_asserts_actions_and_roundtrip_bound(tmp_path: Path) -> None:
+    (tmp_path / "skill.yaml").write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect-files
+    description: Inspect files.
+    tool_invocations:
+      - tool: shell
+        command: [rg, --files]
+""",
+        encoding="utf-8",
+    )
+    bundle = {
+        "schema_version": 1,
+        "id": "trajectory",
+        "execution_mode": "execute_selected_skill",
+        "definition": {"kind": "skill", "path": "skill.yaml", "name": "inspect"},
+        "step": {"index": 0, "id": "inspect-files"},
+        "prompt_builder_version": 1,
+        "prompt_state": {},
+        "trajectory": [
+            {
+                "response": {
+                    "action": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                }
+            },
+            {
+                "response": {
+                    "action": "invoke_tool",
+                    "tool": "shell",
+                    "parameters": {"command": ["rg", "--files"]},
+                }
+            },
+        ],
+        "expected": {
+            "required_actions": ["invoke_tool"],
+            "max_repeated_action_count": 1,
+            "max_roundtrips": 2,
+        },
+        "redactions": [],
+    }
+
+    rendered = render_skill_replay_trajectory(bundle, repo_root=tmp_path)
+
+    assert rendered["trajectory_validation"] == {
+        "trajectory_valid": True,
+        "required_actions": True,
+        "max_repeated_action_count": True,
+        "max_roundtrips": True,
+        "valid": True,
+    }
+
+
+def test_replay_fixture_redaction_removes_credentials_and_absolute_paths() -> None:
+    bundle = {
+        "id": "unsafe",
+        "prompt_state": {
+            "message": "Read /private/tmp/worktree/file.py",
+            "headers": {"authorization": "Bearer abcdefghijklmnopqrstuvwxyz"},
+            "custom": "customer-secret-123",
+        },
+        "redactions": [],
+    }
+
+    redacted = redact_replay_bundle(
+        bundle,
+        secret_patterns=(r"customer-secret-\d+",),
+    )
+
+    assert redacted["prompt_state"]["message"] == "Read <repo-root>"
+    assert redacted["prompt_state"]["headers"]["authorization"] == "<redacted>"
+    assert redacted["prompt_state"]["custom"] == "<redacted>"
+    assert len(redacted["redactions"]) == 3
+    validate_replay_fixture_safety(redacted, secret_patterns=(r"customer-secret-\d+",))
+
+
+def test_replay_fixture_safety_rejects_unredacted_sensitive_data() -> None:
+    with pytest.raises(WorkflowReplayError, match="sensitive data"):
+        validate_replay_fixture_safety(
+            {"prompt_state": {"path": "/Users/example/project"}}
+        )

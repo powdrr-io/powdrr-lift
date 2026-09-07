@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -16,10 +17,107 @@ from powdrr_lift.workflow_error_logging import WORKFLOW_LLM_ERROR_LOG
 
 WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION = 1
 WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION = 1
+_ABSOLUTE_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_])/(?:Users|home|private|tmp|var)/[^\s\"']+"
+)
+_CREDENTIAL_RE = re.compile(
+    r"(?i)(?:api[_-]?key|access[_-]?key|secret|password|token|authorization)"
+    r"\s*[:=]\s*([^\s,}\"']+)"
+)
+_TOKEN_RE = re.compile(
+    r"(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
+    r"AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9._-]{20,}|sk-[A-Za-z0-9_-]{20,})"
+)
 
 
 class WorkflowReplayError(ValueError):
     """Raised when a replay bundle cannot be loaded or evaluated."""
+
+
+def redact_replay_bundle(
+    bundle: Mapping[str, Any],
+    *,
+    secret_patterns: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Return a portable bundle with credentials and absolute paths redacted."""
+    redactions: list[dict[str, str]] = []
+    patterns = tuple(re.compile(pattern) for pattern in secret_patterns)
+
+    def redact(value: Any, path: str) -> Any:
+        if isinstance(value, Mapping):
+            result: dict[str, Any] = {}
+            for key, item in value.items():
+                child_path = f"{path}.{key}" if path else str(key)
+                if re.search(r"(?i)(api[_-]?key|secret|password|token)", str(key)):
+                    if item not in (None, "", "<redacted>"):
+                        redactions.append({"path": child_path, "reason": "credential"})
+                    result[str(key)] = "<redacted>" if item else item
+                else:
+                    result[str(key)] = redact(item, child_path)
+            return result
+        if isinstance(value, list):
+            return [
+                redact(item, f"{path}[{index}]") for index, item in enumerate(value)
+            ]
+        if not isinstance(value, str):
+            return value
+        updated = _ABSOLUTE_PATH_RE.sub("<repo-root>", value)
+        if updated != value:
+            redactions.append({"path": path, "reason": "absolute_path"})
+        for pattern in patterns:
+            before_pattern = updated
+            updated = pattern.sub("<redacted>", updated)
+            if updated != before_pattern:
+                redactions.append({"path": path, "reason": "custom_credential"})
+        credential_updated = _CREDENTIAL_RE.sub(
+            lambda match: (
+                match.group(0)[: match.group(0).find(match.group(1))] + "<redacted>"
+            ),
+            updated,
+        )
+        credential_updated = _TOKEN_RE.sub("<redacted>", credential_updated)
+        if credential_updated != updated:
+            redactions.append({"path": path, "reason": "credential"})
+        return credential_updated
+
+    normalized = redact(dict(bundle), "")
+    assert isinstance(normalized, dict)
+    existing = normalized.get("redactions")
+    normalized["redactions"] = (
+        list(existing) if isinstance(existing, list) else []
+    ) + redactions
+    validate_replay_fixture_safety(normalized, secret_patterns=secret_patterns)
+    return normalized
+
+
+def validate_replay_fixture_safety(
+    bundle: Mapping[str, Any],
+    *,
+    secret_patterns: Sequence[str] = (),
+) -> None:
+    """Reject replay data that still contains credentials or absolute paths."""
+    patterns = tuple(re.compile(pattern) for pattern in secret_patterns)
+
+    def visit(value: Any, path: str) -> None:
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                visit(item, f"{path}.{key}" if path else str(key))
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]")
+        elif isinstance(value, str):
+            if _ABSOLUTE_PATH_RE.search(value) or _CREDENTIAL_RE.search(value):
+                raise WorkflowReplayError(
+                    f"replay fixture contains sensitive data at {path}."
+                )
+            if _TOKEN_RE.search(value) or any(
+                pattern.search(value) for pattern in patterns
+            ):
+                raise WorkflowReplayError(
+                    f"replay fixture contains credential-shaped data at {path}."
+                )
+
+    visit(bundle, "")
 
 
 def build_workflow_replay_state(
@@ -138,6 +236,7 @@ def load_workflow_replay_bundle(path: Path) -> dict[str, Any]:
         raise WorkflowReplayError("replay bundle must decode to an object.")
     bundle = dict(loaded)
     _validate_replay_bundle(bundle)
+    validate_replay_fixture_safety(bundle)
     return bundle
 
 
@@ -145,6 +244,7 @@ def save_workflow_replay_bundle(path: Path, bundle: Mapping[str, Any]) -> Path:
     """Validate and save a replay bundle in YAML or JSON format."""
     normalized = dict(bundle)
     _validate_replay_bundle(normalized)
+    validate_replay_fixture_safety(normalized)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix == ".json":
         text = json.dumps(normalized, indent=2, ensure_ascii=False) + "\n"
@@ -184,6 +284,12 @@ def render_skill_replay(
 ) -> dict[str, Any]:
     """Render and validate a skill replay without invoking tools or an LLM."""
     _validate_replay_bundle(bundle)
+    if "trajectory" in bundle:
+        return render_skill_replay_trajectory(
+            bundle,
+            repo_root=repo_root,
+            definition_path=definition_path,
+        )
     definition = _mapping(bundle.get("definition"), "bundle definition")
     resolved_definition = _resolve_definition_path(
         definition_path or Path(_string(definition.get("path"), "definition path")),
@@ -303,6 +409,194 @@ def render_skill_replay(
     return result
 
 
+def render_skill_replay_trajectory(
+    bundle: Mapping[str, Any],
+    *,
+    repo_root: Path,
+    definition_path: Path | None = None,
+) -> dict[str, Any]:
+    """Render each response in a no-tool trajectory and evaluate its assertions."""
+    trajectory = bundle.get("trajectory")
+    if not isinstance(trajectory, list) or not trajectory:
+        raise WorkflowReplayError("bundle trajectory must be a non-empty list.")
+    responses: list[dict[str, Any]] = []
+    actions: list[str] = []
+    errors: list[str] = []
+    for index, item in enumerate(trajectory):
+        if not isinstance(item, Mapping) or not isinstance(
+            item.get("response"), Mapping
+        ):
+            raise WorkflowReplayError(
+                f"bundle trajectory[{index}].response must be an object."
+            )
+        single = dict(bundle)
+        single.pop("trajectory", None)
+        single["failed_response"] = dict(item["response"])
+        if isinstance(item.get("prompt_state"), Mapping):
+            single["prompt_state"] = dict(item["prompt_state"])
+        rendered = render_skill_replay(
+            single,
+            repo_root=repo_root,
+            definition_path=definition_path,
+        )
+        validation = rendered["response_validation"]
+        response = {"index": index, **validation}
+        responses.append(response)
+        if validation.get("valid") is True:
+            actions.append(str(validation["action"]))
+        elif isinstance(validation.get("error"), str):
+            errors.append(validation["error"])
+
+    expected = bundle.get("expected")
+    assertions: dict[str, Any] = {"trajectory_valid": not errors}
+    if isinstance(expected, Mapping):
+        required = expected.get("required_actions", [])
+        forbidden = expected.get("forbidden_actions", [])
+        maximum = expected.get("max_repeated_action_count")
+        if required:
+            assertions["required_actions"] = all(
+                isinstance(action, str) and action in actions for action in required
+            )
+        if forbidden:
+            assertions["forbidden_actions"] = not any(
+                isinstance(action, str) and action in actions for action in forbidden
+            )
+        if maximum is not None:
+            if not isinstance(maximum, int) or maximum < 0:
+                raise WorkflowReplayError(
+                    "bundle expected.max_repeated_action_count must be non-negative."
+                )
+            counts = {action: actions.count(action) for action in set(actions)}
+            repeated = sum(max(count - 1, 0) for count in counts.values())
+            assertions["max_repeated_action_count"] = repeated <= maximum
+        if "max_roundtrips" in expected:
+            maximum_roundtrips = expected["max_roundtrips"]
+            if not isinstance(maximum_roundtrips, int) or maximum_roundtrips < 0:
+                raise WorkflowReplayError(
+                    "bundle expected.max_roundtrips must be non-negative."
+                )
+            assertions["max_roundtrips"] = len(trajectory) <= maximum_roundtrips
+    assertions["valid"] = all(assertions.values())
+    return {
+        "schema_version": WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION,
+        "bundle_id": bundle["id"],
+        "trajectory": responses,
+        "trajectory_validation": assertions,
+        "response_validation": {
+            "valid": assertions["valid"],
+            "action": actions[-1] if actions else None,
+            "error": "; ".join(errors) if errors else None,
+        },
+    }
+
+
+def render_skill_replay_corpus(
+    directory: Path,
+    *,
+    repo_root: Path,
+    definition_path: Path | None = None,
+) -> dict[str, Any]:
+    """Render every replay bundle in a directory without invoking tools."""
+    if not directory.is_dir():
+        raise WorkflowReplayError(
+            f"Replay corpus directory does not exist: {directory}"
+        )
+    paths = sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.suffix.casefold() in {".yaml", ".yml", ".json"}
+    )
+    bundles: list[dict[str, Any]] = []
+    for path in paths:
+        try:
+            bundle = load_workflow_replay_bundle(path)
+            rendered = render_skill_replay(
+                bundle,
+                repo_root=repo_root,
+                definition_path=definition_path,
+            )
+            expectation_error = _replay_expectation_error(
+                bundle,
+                rendered["response_validation"],
+                rendered.get("trajectory_validation"),
+            )
+            if expectation_error is not None:
+                bundles.append(
+                    {
+                        "path": str(path),
+                        "bundle_id": rendered["bundle_id"],
+                        "response_validation": rendered["response_validation"],
+                        "valid": False,
+                        "error": expectation_error,
+                    }
+                )
+                continue
+            bundles.append(
+                {
+                    "path": str(path),
+                    "bundle_id": rendered["bundle_id"],
+                    "response_validation": rendered["response_validation"],
+                    "valid": True,
+                }
+            )
+        except WorkflowReplayError as exc:
+            bundles.append({"path": str(path), "valid": False, "error": str(exc)})
+    failed = sum(not bundle["valid"] for bundle in bundles)
+    return {
+        "directory": str(directory),
+        "bundle_count": len(bundles),
+        "passed": len(bundles) - failed,
+        "failed": failed,
+        "bundles": bundles,
+    }
+
+
+def _replay_expectation_error(
+    bundle: Mapping[str, Any],
+    validation: Mapping[str, Any],
+    trajectory_validation: Mapping[str, Any] | None = None,
+) -> str | None:
+    expected = bundle.get("expected")
+    if expected is None:
+        return None
+    if not isinstance(expected, Mapping):
+        return "bundle expected must be an object."
+    expected_valid = expected.get("response_valid")
+    if expected_valid is not None:
+        if not isinstance(expected_valid, bool):
+            return "bundle expected.response_valid must be a boolean."
+        if validation.get("valid") is not expected_valid:
+            return (
+                "expected response_valid="
+                f"{expected_valid}, got {validation.get('valid')}."
+            )
+    expected_action = expected.get("action")
+    if expected_action is not None:
+        if not isinstance(expected_action, str) or not expected_action:
+            return "bundle expected.action must be a non-empty string."
+        if validation.get("action") != expected_action:
+            return (
+                f"expected action {expected_action!r}, "
+                f"got {validation.get('action')!r}."
+            )
+    expected_error = expected.get("error_contains")
+    if expected_error is not None:
+        if not isinstance(expected_error, str) or not expected_error:
+            return "bundle expected.error_contains must be a non-empty string."
+        actual_error = validation.get("error")
+        if not isinstance(actual_error, str) or expected_error not in actual_error:
+            return f"expected error to contain {expected_error!r}."
+    if (
+        trajectory_validation is not None
+        and trajectory_validation.get("valid") is not True
+    ):
+        failed = [
+            name for name, passed in trajectory_validation.items() if passed is False
+        ]
+        return "trajectory assertions failed: " + ", ".join(failed)
+    return None
+
+
 def _validate_replay_bundle(bundle: Mapping[str, Any]) -> None:
     if bundle.get("schema_version") != WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION:
         raise WorkflowReplayError(
@@ -318,6 +612,10 @@ def _validate_replay_bundle(bundle: Mapping[str, Any]) -> None:
     step = _mapping(bundle.get("step"), "bundle step")
     _integer(step.get("index"), "bundle step.index")
     _mapping(bundle.get("prompt_state"), "bundle prompt_state")
+    if "trajectory" in bundle:
+        if not isinstance(bundle.get("trajectory"), list):
+            raise WorkflowReplayError("bundle trajectory must be a list.")
+        return
     if not isinstance(bundle.get("failed_response"), Mapping):
         raise WorkflowReplayError("bundle failed_response must be an object.")
 

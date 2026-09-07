@@ -1,0 +1,688 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: deterministic-proposed-pr-planning
+title: Deterministic proposed PR planning and effect allocation
+requirements:
+- id: req-separate-pr-planning-and-effect-allocation
+  description: Proposed PR planning and authoritative effect allocation must be separate
+    semantic phases with independently validated handoffs.
+  state: added
+- id: req-authoritative-effects-as-runtime-input
+  description: Runtime code must load authoritative section, id, and action effects,
+    give each one a stable effect reference, and provide that structured handoff to
+    allocation without requiring the model to transcribe the effect triple.
+  state: added
+- id: req-machine-checkable-step-output
+  description: Every model-owned planning and allocation output must declare a strict
+    machine-checkable schema that rejects missing fields, unknown fields, invalid
+    nesting, and malformed assignments before recording a handoff or mutating a file.
+  state: added
+- id: req-deterministic-validation-branching
+  description: Runtime code must route a successful proposed PR evaluation forward
+    and a failed evaluation to semantic repair without an LLM confirmation step.
+  state: added
+- id: req-preserve-runtime-owned-pr-document
+  description: The runtime must continue to own proposed PR schema fields, feature
+    ids, ordering, YAML serialization, validation, and persistence while compiling
+    the new split inputs.
+  state: added
+- id: req-preserve-effect-equivalence
+  description: The compiled compatibility document must contain every authoritative
+    effect exactly once with unchanged section, id, and action values and exactly
+    one valid proposed PR assignment.
+  state: added
+- id: req-split-planning-verification
+  description: Unit, mocked workflow, and isolated live-harness coverage must prove
+    malformed split outputs fail before mutation and valid split outputs compile and
+    evaluate successfully.
+  state: added
+approach:
+- id: app-typed-pr-planning-contract
+  description: Replace the combined semantic response with a planning-only output
+    containing ordered PR ids, intent, justification, and dependency ids.
+  state: added
+- id: app-authoritative-effect-pre-step
+  description: Add a deterministic runtime pre-step that reads the authoritative architecture
+    and implementation effects, creates collision-checked stable effect references,
+    and records the structured effect handoff for allocation.
+  state: added
+- id: app-typed-effect-allocation-contract
+  description: Add a second schema-constrained model output containing only stable
+    effect references and target proposed PR ids; runtime validation resolves the
+    references and rejects incomplete, duplicate, or unknown assignments.
+  state: added
+- id: app-split-input-pr-compiler
+  description: Refactor the proposed PR compiler to accept a validated plan, validated
+    allocation, and runtime-owned authoritative effect handoff, then validate the
+    complete document before atomic persistence.
+  state: added
+- id: app-runtime-validation-route
+  description: Place evaluator results directly behind a runtime-owned gate so zero
+    issues advance and failures return to the responsible semantic phase with structured
+    repair context.
+  state: added
+- id: app-schema-aware-workflow-request
+  description: Extend skill step output declarations with JSON schemas and derive
+    strict provider response schemas for the active action envelope while retaining
+    shared runtime action validation after parsing.
+  state: added
+- id: app-live-planning-harness
+  description: Extend the isolated start-implementing-feature harness and focused
+    unit fixtures for malformed planning, malformed allocation, unknown and incomplete
+    references, deterministic branching, and one valid end-to-end split run.
+  state: added
+entities:
+- id: start-implementing-feature-skill
+  type: Skill
+  summary: Workflow contract that plans proposed PRs, allocates authoritative effects,
+    compiles the compatibility document, evaluates it, and instantiates execution
+    workflows.
+  rationale: req-separate-pr-planning-and-effect-allocation and req-deterministic-validation-branching
+    require this orchestration boundary to expose two judgment phases and runtime-owned
+    transitions.
+- id: proposed-pr-planning-output
+  type: Configuration file
+  summary: In-memory schema-constrained output containing only ordered proposed PR
+    definitions and dependencies.
+  rationale: req-machine-checkable-step-output requires the planning judgment to be
+    validated independently from effect allocation.
+- id: authoritative-effect-handoff
+  type: Configuration file
+  summary: In-memory runtime-owned collection of stable effect references paired with
+    exact authoritative section, id, and action values.
+  rationale: req-authoritative-effects-as-runtime-input makes the repository effect
+    set an input rather than model-authored output.
+- id: proposed-pr-effect-allocation-output
+  type: Configuration file
+  summary: In-memory schema-constrained assignments from stable effect references
+    to declared proposed PR ids.
+  rationale: req-separate-pr-planning-and-effect-allocation requires allocation judgment
+    without retranscribing authoritative values.
+- id: pr-specification-core
+  type: Module
+  summary: Loader, split-input compiler, and validator for the runtime-owned proposed
+    PR document.
+  rationale: req-preserve-runtime-owned-pr-document and req-preserve-effect-equivalence
+    are enforced at this boundary before persistence.
+- id: workflow-step-output-contract
+  type: Schema
+  summary: Parsed skill-step output declaration including its type, handoff policy,
+    and optional strict JSON schema.
+  rationale: req-machine-checkable-step-output requires schema metadata to travel
+    from skill YAML to the active provider request.
+- id: workflow-llm-request
+  type: Interface
+  summary: Shared provider request boundary that accepts an optional response schema
+    in addition to messages.
+  rationale: app-schema-aware-workflow-request must carry one derived schema through
+    retry, fallback, recording, and provider adapters.
+- id: workflow-chat-agent
+  type: Module
+  summary: Runtime that builds active-step response schemas, validates actions and
+    handoffs, invokes deterministic pre-steps, compiles documents, and applies gates.
+  rationale: req-machine-checkable-step-output and req-deterministic-validation-branching
+    converge at this execution boundary.
+- id: proposed-pr-specification-document
+  type: Template file
+  summary: Existing read-only proposed-pr-specification.yaml compatibility artifact
+    consumed by evaluators and workflow instantiation.
+  rationale: req-preserve-runtime-owned-pr-document prohibits replacing the downstream
+    file format with model-authored output.
+- id: start-implementing-feature-live-harness
+  type: Test harness
+  summary: Isolated multi-iteration live workflow runner with transcripts, structured
+    errors, mutation checks, and final evaluation status.
+  rationale: req-split-planning-verification requires inspectable end-to-end evidence
+    beyond mocked execution.
+modules:
+- id: mod-start-implementing-feature-skill
+  action: changed
+  relative_location: skill-definitions/start-implementing-feature.yaml
+  purpose: Declare separate planning and allocation steps, their strict output schemas,
+    the authoritative-effect handoff, compilation inputs, and direct evaluator gate
+    routing.
+- id: mod-skill-specification
+  action: changed
+  relative_location: src/powdrr_lift/core/skill_specification.py
+  purpose: Parse, validate, serialize, and expose optional machine-checkable schemas
+    on skill-step output declarations.
+- id: mod-workflow-llm
+  action: changed
+  relative_location: src/powdrr_lift/workflow_llm.py
+  purpose: Carry an optional response schema through the shared client protocol and
+    timeout-retry request path without changing callers that use generic JSON mode.
+- id: mod-workflow-chat-agent
+  action: changed
+  relative_location: src/powdrr_lift/workflow_chat_agent.py
+  purpose: Derive the active action-envelope schema, pass it to supported providers,
+    build the authoritative-effect handoff, compile split inputs, and route evaluation
+    outcomes in runtime code.
+- id: mod-pr-specification-core
+  action: changed
+  relative_location: src/powdrr_lift/core/pr_specification.py
+  purpose: Generate stable effect references and validate and compile separate proposed
+    PR plans and allocations while preserving exact effect equivalence and validate-before-write
+    behavior.
+- id: mod-start-feature-live-harness
+  action: changed
+  relative_location: scripts/start-implementing-feature-harness.py
+  purpose: Add split-output conformance cases and report whether invalid responses
+    mutated the compatibility document and whether the final compiled document evaluated
+    cleanly.
+- id: mod-skill-specification-tests
+  action: changed
+  relative_location: tests/test_skill_specification.py
+  purpose: Cover schema declaration parsing and the split start-implementing-feature
+    step contract.
+- id: mod-pr-specification-tests
+  action: changed
+  relative_location: tests/test_pr_specification.py
+  purpose: Cover stable effect handoffs, split compilation, total and exact allocation,
+    dependency validation, and no mutation for invalid input.
+- id: mod-workflow-chat-agent-tests
+  action: changed
+  relative_location: tests/test_workflow_chat_agent.py
+  purpose: Cover derived provider schemas, malformed response rejection, runtime handoffs,
+    deterministic success and repair routing, and valid mocked end-to-end execution.
+entity_relationships:
+- id: skill-produces-pr-plan
+  source: start-implementing-feature-skill
+  target: proposed-pr-planning-output
+  relationship: produces
+  description: The planning judgment emits only proposed PR definitions and dependencies.
+  rationale: app-typed-pr-planning-contract keeps decomposition independent from effect
+    discovery and assignment.
+- id: runtime-provides-authoritative-effects
+  source: workflow-chat-agent
+  target: authoritative-effect-handoff
+  relationship: produces
+  description: A deterministic pre-step loads authoritative effects and assigns stable
+    references before allocation begins.
+  rationale: app-authoritative-effect-pre-step prevents model transcription of repository-owned
+    values.
+- id: allocation-references-authoritative-effects
+  source: proposed-pr-effect-allocation-output
+  target: authoritative-effect-handoff
+  relationship: references
+  description: Allocation returns each stable effect reference once without returning
+    section, id, or action.
+  rationale: app-typed-effect-allocation-contract lets the model choose ownership
+    without rewriting the authoritative triple.
+- id: allocation-targets-pr-plan
+  source: proposed-pr-effect-allocation-output
+  target: proposed-pr-planning-output
+  relationship: assigns_to
+  description: Every allocation target must be a proposed PR declared by the validated
+    plan.
+  rationale: req-preserve-effect-equivalence requires one valid assignment for each
+    authoritative effect.
+- id: compiler-consumes-effect-handoff
+  source: pr-specification-core
+  target: authoritative-effect-handoff
+  relationship: consumes
+  description: The compiler expands stable references from the runtime-owned handoff
+    into exact persisted section, id, and action values.
+  rationale: app-split-input-pr-compiler keeps authoritative expansion deterministic.
+- id: compiler-consumes-allocation
+  source: pr-specification-core
+  target: proposed-pr-effect-allocation-output
+  relationship: consumes
+  description: The compiler combines validated allocation assignments with the separately
+    validated PR plan.
+  rationale: app-split-input-pr-compiler composes the two semantic phases only after
+    both validate.
+- id: compiler-writes-compatibility-document
+  source: pr-specification-core
+  target: proposed-pr-specification-document
+  relationship: produces
+  description: Runtime code validates the complete document and atomically persists
+    the existing read-only YAML format.
+  rationale: req-preserve-runtime-owned-pr-document retains downstream evaluator and
+    workflow-instantiation compatibility.
+- id: workflow-uses-output-contract
+  source: workflow-chat-agent
+  target: workflow-step-output-contract
+  relationship: consumes
+  description: The active step declaration determines the strict action and output
+    schema used at the model boundary.
+  rationale: app-schema-aware-workflow-request must derive provider constraints from
+    repository-owned workflow metadata.
+- id: workflow-sends-schema-request
+  source: workflow-chat-agent
+  target: workflow-llm-request
+  relationship: invokes
+  description: The runtime sends the derived schema through the common request and
+    retry path to the selected provider adapter.
+  rationale: req-machine-checkable-step-output requires one consistent schema boundary
+    across supported providers.
+- id: live-harness-tests-skill
+  source: start-implementing-feature-live-harness
+  target: start-implementing-feature-skill
+  relationship: tests
+  description: The harness drives malformed and valid split responses in an isolated
+    disposable worktree and records structured evidence.
+  rationale: app-live-planning-harness proves both rejection and completion behavior
+    without contaminating the source checkout.
+invariants:
+- id: inv-pr-planning-excludes-effect-allocation
+  description: The planning output contains proposed PR definitions and dependency
+    ids only; it contains no effect references, authoritative effect triples, assignments,
+    or persisted-document fields.
+  rationale: req-separate-pr-planning-and-effect-allocation makes the first model
+    boundary planning-only.
+  related:
+    entities:
+    - proposed-pr-planning-output
+    - proposed-pr-effect-allocation-output
+    entity_relationships:
+    - skill-produces-pr-plan
+    - allocation-targets-pr-plan
+- id: inv-model-never-transcribes-authoritative-effects
+  description: No model output copies or invents authoritative section, id, or action
+    values; allocation returns only runtime-provided stable effect references and
+    planned PR ids.
+  rationale: req-authoritative-effects-as-runtime-input prevents drift between repository
+    source and model output.
+  related:
+    entities:
+    - authoritative-effect-handoff
+    - proposed-pr-effect-allocation-output
+    entity_relationships:
+    - runtime-provides-authoritative-effects
+    - allocation-references-authoritative-effects
+- id: inv-effect-allocation-is-total-and-exact
+  description: Every authoritative effect reference is allocated exactly once to a
+    declared proposed PR, with no missing, duplicate, unknown, modified, or stale
+    reference.
+  rationale: req-preserve-effect-equivalence is the compatibility document's central
+    correctness condition.
+  related:
+    entities:
+    - authoritative-effect-handoff
+    - proposed-pr-effect-allocation-output
+    - pr-specification-core
+    entity_relationships:
+    - allocation-references-authoritative-effects
+    - compiler-consumes-allocation
+- id: inv-step-output-schema-precedes-mutation
+  description: Planning and allocation responses must satisfy their strict provider
+    and runtime schemas before handoff recording, compilation, or file mutation.
+  rationale: req-machine-checkable-step-output requires malformed shapes to fail at
+    the earliest boundary.
+  related:
+    entities:
+    - workflow-step-output-contract
+    - workflow-llm-request
+    - workflow-chat-agent
+    entity_relationships:
+    - workflow-uses-output-contract
+    - workflow-sends-schema-request
+- id: inv-pr-document-remains-runtime-owned
+  description: Deterministic runtime code alone owns schema fields, work-item and
+    feature ids, effect ordering and expansion, YAML serialization, validation, and
+    persistence.
+  rationale: req-preserve-runtime-owned-pr-document preserves the successful PR 556
+    compiler boundary.
+  related:
+    entities:
+    - pr-specification-core
+    - proposed-pr-specification-document
+    - workflow-chat-agent
+    entity_relationships:
+    - compiler-writes-compatibility-document
+- id: inv-validation-result-selects-branch
+  description: A successful evaluator result advances and a failed result returns
+    to semantic repair through a runtime-selected transition, without model confirmation.
+  rationale: req-deterministic-validation-branching ensures identical evaluator results
+    always select the same transition.
+  related:
+    entities:
+    - start-implementing-feature-skill
+    - workflow-chat-agent
+    entity_relationships:
+    - workflow-uses-output-contract
+- id: inv-invalid-split-input-does-not-mutate
+  description: Invalid planning, allocation, dependency, schema, reference, or effect-equivalence
+    input leaves any existing proposed PR specification byte-for-byte unchanged.
+  rationale: req-split-planning-verification makes non-mutation an observable acceptance
+    condition.
+  related:
+    entities:
+    - pr-specification-core
+    - proposed-pr-specification-document
+    entity_relationships:
+    - compiler-writes-compatibility-document
+- id: inv-live-harness-isolates-worktree
+  description: Live harness execution occurs in an isolated disposable worktree while
+    reports, structured errors, and transcripts remain inspectable outside the run
+    tree.
+  rationale: req-split-planning-verification must not modify the source checkout.
+  related:
+    entities:
+    - start-implementing-feature-live-harness
+    entity_relationships:
+    - live-harness-tests-skill
+guidance:
+- id: guide-plan-before-allocation
+  description: Validate the complete ordered proposed PR plan before constructing
+    or exposing the authoritative-effect handoff to allocation.
+  rationale: This keeps planning independent and prevents effect structure from biasing
+    PR decomposition.
+  related:
+    entities:
+    - proposed-pr-planning-output
+    - authoritative-effect-handoff
+    entity_relationships:
+    - skill-produces-pr-plan
+    - runtime-provides-authoritative-effects
+- id: guide-use-stable-effect-references
+  description: Derive collision-checked stable opaque references from authoritative
+    effects and require allocation output to return only each reference and its target
+    proposed PR id.
+  rationale: Stable references preserve exact identity without model transcription
+    and remain diagnosable across repair attempts.
+  related:
+    entities:
+    - authoritative-effect-handoff
+    - proposed-pr-effect-allocation-output
+    entity_relationships:
+    - allocation-references-authoritative-effects
+- id: guide-derive-response-schema-from-step-contract
+  description: Build a strict provider response schema from the active action set
+    and declared output schemas, reject unknown properties, and retain shared semantic
+    action validation after parsing.
+  rationale: Provider structure validation and runtime semantic validation protect
+    complementary boundaries.
+  related:
+    entities:
+    - workflow-step-output-contract
+    - workflow-llm-request
+    - workflow-chat-agent
+    entity_relationships:
+    - workflow-uses-output-contract
+    - workflow-sends-schema-request
+- id: guide-compile-after-both-phases-validate
+  description: Invoke compilation only after the plan, authoritative handoff, and
+    allocation each pass structural and domain validation.
+  rationale: Validation-before-write is necessary to preserve byte-for-byte non-mutation
+    on invalid input.
+  related:
+    entities:
+    - pr-specification-core
+    - proposed-pr-planning-output
+    - proposed-pr-effect-allocation-output
+    entity_relationships:
+    - compiler-consumes-effect-handoff
+    - compiler-consumes-allocation
+- id: guide-route-evaluator-status-directly
+  description: Use evaluator status and structured issues directly in runtime gate
+    logic and expose issues as repair context only after the runtime selects the failure
+    branch.
+  rationale: Deterministic evidence should control deterministic transitions.
+  related:
+    entities:
+    - workflow-chat-agent
+    - start-implementing-feature-skill
+    entity_relationships:
+    - workflow-uses-output-contract
+- id: guide-test-malformed-and-valid-split-cases
+  description: Cover invalid nesting, unknown properties, malformed allocation entries,
+    unknown PR and effect references, incomplete and duplicate coverage, dependency
+    cycles, no mutation, success routing, repair routing, and a valid live completion.
+  rationale: The observed PR 556 run exposed shape and allocation failures that must
+    become stable regression cases.
+  related:
+    entities:
+    - start-implementing-feature-live-harness
+    - pr-specification-core
+    - workflow-chat-agent
+    entity_relationships:
+    - live-harness-tests-skill
+    - compiler-consumes-allocation
+features:
+- id: feature-split-proposed-pr-planning
+  action: added
+  description: Split proposed PR definition from authoritative effect allocation into
+    independently validated model phases.
+  functional_requirements:
+  - Planning emits only ordered PR ids, intent, justification, and dependency ids.
+  - Allocation begins only after the plan validates and consumes a runtime-owned authoritative-effect
+    handoff.
+  - Allocation emits only stable effect references and declared target PR ids.
+- id: feature-schema-constrained-workflow-output
+  action: added
+  description: Add step-specific strict response schemas to workflow model requests.
+  functional_requirements:
+  - Skill output declarations can carry machine-checkable JSON schemas that round-trip
+    through parsing and serialization.
+  - The active action envelope and declared output schema are propagated through request
+    retry, fallback, recording, and supported provider adapters.
+  - Runtime action and domain validation remain authoritative after structural parsing.
+- id: feature-split-input-pr-compilation
+  action: added
+  description: Compile the existing read-only proposed PR YAML from a validated plan,
+    allocation, and authoritative-effect handoff.
+  functional_requirements:
+  - Runtime code owns the schema, work-item id, feature ids, effect order and values,
+    YAML serialization, validation, and persistence.
+  - Compilation preserves dependency, uniqueness, and exact effect-equivalence checks.
+  - Failed validation leaves the compatibility document unchanged.
+- id: feature-deterministic-pr-validation-routing
+  action: added
+  description: Route proposed PR evaluation success and failure through runtime-owned
+    transitions.
+  functional_requirements:
+  - Zero issues and a successful evaluator return advance directly to workflow-instantiation
+    planning.
+  - An unsuccessful evaluator return routes to the responsible planning or allocation
+    repair phase with structured issues.
+  - Neither branch requires a model confirmation action.
+- id: feature-live-split-planning-harness
+  action: added
+  description: Extend isolated start-implementing-feature verification for malformed
+    and valid split planning responses.
+  functional_requirements:
+  - Invalid planning and allocation response shapes are rejected before handoff recording
+    or mutation.
+  - Invalid semantic references and incomplete allocation leave the compatibility
+    document unchanged.
+  - A valid split response compiles, evaluates, and routes forward with actionable
+    transcript and report evidence.
+human-decisions:
+- id: decision-separate-plan-from-effect-allocation
+  action: added
+  description: Use one model phase for PR decomposition and a later model phase for
+    assigning runtime-owned authoritative effect references.
+- id: decision-authoritative-effects-are-input-not-output
+  action: added
+  description: Pass authoritative effects as structured runtime input and prohibit
+    model output from returning their section, id, or action values.
+- id: decision-keep-runtime-owned-compatibility-yaml
+  action: added
+  description: Retain the merged compiler-owned proposed PR YAML as the downstream
+    compatibility artifact.
+- id: decision-use-provider-and-runtime-validation
+  action: added
+  description: Enforce response structure with provider schemas and continue enforcing
+    action, domain, dependency, and effect-equivalence rules in deterministic runtime
+    code.
+- id: decision-runtime-owns-validation-branches
+  action: added
+  description: Treat evaluator results as control-flow inputs whose next transition
+    is selected by runtime gate semantics.
+- id: decision-single-reviewable-pr
+  action: added
+  description: Deliver the schema, runtime, compiler, skill, tests, and harness updates
+    in one reviewable PR because the boundaries must land together to remain executable
+    and no independent compatibility dependency requires a split.
+feature_ids:
+- feature-specified-template-workflows
+intent:
+  problem: The start-implementing-feature workflow currently asks one model response
+    to plan proposed PRs, transcribe every authoritative effect triple, and allocate
+    those effects; generic JSON-object mode admits malformed shapes, and a model-owned
+    repair step confirms deterministic evaluator results.
+  goal: Make proposed PR planning and effect allocation separate schema-checked phases,
+    pass authoritative effects through a stable runtime-owned handoff, compile the
+    existing read-only YAML without mutation on invalid input, and route evaluation
+    results deterministically.
+  reasoning: PR 556 established a validated runtime-owned compiler but its live run
+    still rejected incorrect nesting, a map instead of an allocation array, and incomplete
+    allocation before succeeding. Splitting judgment, transcription, and deterministic
+    routing removes those recurring failure paths while preserving the compatibility
+    artifact and existing effect-equivalence guarantees.
+acceptance_criteria:
+- id: ac-planning-contract-is-independent
+  description: The planning step accepts only ordered proposed PR records with id,
+    intent, justification, and dependency ids and cannot express effect allocation
+    or YAML-owned fields.
+- id: ac-allocation-uses-runtime-effect-refs
+  description: The allocation step receives exact authoritative effects as a structured
+    runtime handoff and returns each stable effect reference exactly once with one
+    declared proposed PR id, without returning section, id, or action.
+- id: ac-strict-output-schemas
+  description: Unknown fields, missing required fields, invalid nesting, and malformed
+    planning or allocation entries are rejected by the declared schema before a handoff
+    is recorded or a document is mutated.
+- id: ac-compiler-preserves-equivalence
+  description: Valid split inputs compile to the existing ordered proposed-pr-specification.yaml
+    structure with every authoritative effect unchanged and assigned exactly once.
+- id: ac-invalid-input-preserves-file
+  description: Every invalid schema, dependency, reference, allocation-coverage, or
+    compiled-document case leaves an existing proposed PR file byte-for-byte unchanged.
+- id: ac-runtime-routes-evaluation
+  description: Successful evaluation skips repair and advances, while invalid evaluation
+    enters semantic repair with structured issues, with no model confirmation on either
+    branch.
+- id: ac-unit-and-mocked-coverage
+  description: Focused unit and mocked end-to-end tests cover schema propagation,
+    split handoffs, compiler validation, non-mutation, and both evaluator routes.
+- id: ac-live-harness-coverage
+  description: The isolated live harness records malformed planning and allocation
+    rejections plus a valid split response that compiles and evaluates cleanly without
+    modifying the source checkout.
+expected_tests:
+- id: test-skill-output-schema-contract
+  description: In tests/test_skill_specification.py, validate schema declaration parsing,
+    unknown schema fields, round-trip serialization, and separate planning and allocation
+    step definitions.
+- id: test-provider-response-schema
+  description: In tests/test_workflow_chat_agent.py, assert the exact active-step
+    JSON schema is sent through generic, retry, recording, OpenAI-compatible, local,
+    and Anthropic request paths while schema-less calls retain JSON-object behavior.
+- id: test-planning-shape-rejection
+  description: In tests/test_workflow_chat_agent.py, reject missing, nested, extra,
+    or effect-bearing planning fields before recording proposed_pr_plan or changing
+    the proposed PR file.
+- id: test-allocation-shape-and-reference-rejection
+  description: In tests/test_pr_specification.py and tests/test_workflow_chat_agent.py,
+    reject malformed entries, unknown or duplicate effect references, unknown PR ids,
+    incomplete coverage, and dependency cycles before persistence.
+- id: test-valid-split-compilation
+  description: In tests/test_pr_specification.py, compile a valid plan and allocation
+    through the authoritative handoff and assert ordered exact equivalence with the
+    existing proposed PR YAML schema.
+- id: test-runtime-evaluator-routing
+  description: In tests/test_workflow_chat_agent.py, prove a successful evaluation
+    reaches workflow-instantiation planning without an LLM repair call and a failed
+    evaluation reaches the correct semantic repair step with structured issues.
+- id: test-mocked-start-feature-workflow
+  description: In tests/test_workflow_chat_agent.py, update the mocked start-implementing-feature
+    run to produce the two split outputs and verify the final compatibility document
+    and workflow dependency metadata.
+- id: test-focused-and-full-verification
+  description: Run `uv run pytest tests/test_skill_specification.py tests/test_pr_specification.py
+    tests/test_workflow_chat_agent.py`, then `uv run ruff format --check .`, `uv run
+    ruff check .`, `uv run mypy src tests`, and `uv run pytest tests`.
+- id: test-live-start-feature-harness
+  description: Run `uv run python scripts/start-implementing-feature-harness.py --repo-root
+    . --feature-name interaction-file-log --iterations 1 --max-turns 40 --timeout
+    1800` with configured live-provider credentials and retain its external report,
+    transcript, structured errors, mutation assertions, and final evaluation status.
+required_test_cases:
+- id: rtc-planning-schema-fails-closed
+  description: A planning response with wrong nesting, unknown fields, or any effect
+    data is rejected before proposed_pr_plan is recorded and before file mutation.
+- id: rtc-allocation-schema-fails-closed
+  description: An allocation response that is not the exact assignments array of effect_ref
+    and proposed_pr_id entries is rejected before handoff recording and mutation.
+- id: rtc-allocation-is-total-and-exact
+  description: Unknown, duplicate, missing, modified, or stale effect references and
+    unknown PR ids fail while leaving the prior proposed PR file byte-for-byte unchanged.
+- id: rtc-valid-split-input-compiles
+  description: A valid plan, authoritative handoff, and allocation compile every source
+    effect once in source order with unchanged section, id, and action values.
+- id: rtc-success-route-skips-repair
+  description: A successful zero-issue evaluator result advances without exposing
+    the repair step to an LLM.
+- id: rtc-failure-route-enters-repair
+  description: A failed evaluator result routes to the responsible semantic repair
+    phase and supplies its structured issues without model-selected branching.
+- id: rtc-live-harness-isolated-completion
+  description: A live malformed-then-valid split planning run completes in a disposable
+    worktree, preserves the source checkout, and reports a valid compiled proposed
+    PR document.
+expected_outcomes:
+- id: outcome-model-does-not-transcribe-effects
+  description: Models make only PR decomposition and reference-to-PR allocation judgments;
+    runtime code owns authoritative effect values and document construction.
+- id: outcome-malformed-output-fails-early
+  description: Structural response errors fail at the provider or action boundary
+    before they can become handoffs, compiler input, or file changes.
+- id: outcome-exact-compatible-yaml
+  description: Downstream evaluation and workflow instantiation continue to consume
+    the same read-only proposed PR YAML with exact authoritative effect equivalence.
+- id: outcome-deterministic-validation-flow
+  description: Evaluator success and failure choose stable runtime transitions without
+    confirmation roundtrips.
+- id: outcome-one-reviewable-pr
+  description: One cohesive PR updates the output contract, provider plumbing, workflow
+    runtime, compiler, skill definition, focused tests, and live harness with no dependency
+    PR.
+- id: outcome-complete-verification-evidence
+  description: Focused tests, the full lint/type/test suite, and an isolated live
+    run provide inspectable proof for malformed and valid split outputs.
+non_goals:
+- id: ng-no-public-yaml-format-change
+  description: Do not replace or expose a new downstream proposed PR document format;
+    proposed-pr-specification.yaml remains the compatibility artifact.
+- id: ng-no-model-authored-effect-triples
+  description: Do not ask any planning, allocation, or repair response to return authoritative
+    section, id, or action values.
+- id: ng-no-model-owned-validation-branch
+  description: Do not retain a model confirmation step between evaluator completion
+    and success or repair routing.
+- id: ng-no-broad-workflow-engine-redesign
+  description: Do not introduce a general workflow language, completion-predicate
+    system, or unrelated validation-gate redesign beyond the schema and transition
+    support required here.
+- id: ng-no-unnecessary-pr-split
+  description: Do not split the tightly coupled schema, runtime, compiler, skill,
+    test, and harness changes into dependent PRs absent a newly discovered repository
+    compatibility requirement.
+risks:
+- id: risk-provider-schema-differences
+  description: OpenAI-compatible, local, and Anthropic providers expose different
+    structured-output capabilities, so adapters must preserve one strict runtime contract
+    and fail clearly when a provider cannot honor it.
+- id: risk-client-protocol-fanout
+  description: Extending the shared LLM client signature affects recording, retry,
+    fallback, observer, and numerous fake clients; compatibility defaults and focused
+    type/tests are required.
+- id: risk-effect-reference-stability
+  description: Positional references can drift when source ordering changes and truncated
+    hashes can collide, so reference derivation must be deterministic, content-bound,
+    collision-checked, and covered by tests.
+- id: risk-stale-repair-handoff
+  description: Returning from failed evaluation to planning or allocation can reuse
+    stale effects or assignments unless the runtime invalidates downstream handoffs
+    and regenerates authoritative references.
+- id: risk-atomic-persistence-regression
+  description: Refactoring the compiler could write before all split inputs and the
+    compiled document validate, violating byte-for-byte non-mutation guarantees.
+- id: risk-skill-runtime-drift
+  description: Step ids, declared inputs and outputs, compiler materialization hooks,
+    and gate targets can diverge unless contract tests assert the full path.
+- id: risk-live-provider-variability
+  description: Live responses and provider availability are nondeterministic, so the
+    harness must distinguish provider failures from contract failures while unit and
+    mocked tests remain the deterministic gate.

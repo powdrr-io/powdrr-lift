@@ -178,6 +178,7 @@ from powdrr_lift.workflow_replay import (
     load_error_record,
     load_workflow_replay_bundle,
     render_skill_replay,
+    render_skill_replay_corpus,
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
 )
@@ -1057,6 +1058,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--bundle",
         type=Path,
         help="Existing YAML or JSON replay bundle to render and validate.",
+    )
+    replay_source.add_argument(
+        "--directory",
+        type=Path,
+        help="Directory of replay bundles to render and validate as a corpus.",
     )
     replay_source.add_argument(
         "--error-log",
@@ -3575,6 +3581,18 @@ def _run_workflow_replay(args: argparse.Namespace) -> int:
                 "bundle": str(saved_path),
                 "bundle_id": bundle["id"],
             }
+        elif args.directory is not None:
+            directory = (
+                args.directory
+                if args.directory.is_absolute()
+                else repo_root / args.directory
+            )
+            result = render_skill_replay_corpus(
+                directory,
+                repo_root=repo_root,
+                definition_path=args.definition,
+            )
+            result["status"] = "corpus"
         else:
             assert args.bundle is not None
             bundle_path = (
@@ -3595,6 +3613,13 @@ def _run_workflow_replay(args: argparse.Namespace) -> int:
         print(json.dumps(result, indent=2, ensure_ascii=False))
     elif result["status"] == "exported":
         print(f"Exported workflow replay bundle: {result['bundle']}")
+    elif result["status"] == "corpus":
+        print(
+            f"Validated replay corpus: {result['passed']} passed, "
+            f"{result['failed']} failed."
+        )
+        if result["failed"]:
+            return 1
     else:
         validation = result["response_validation"]
         step_label = result["step"]["id"] or result["step"]["index"]

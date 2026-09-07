@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -35,6 +37,12 @@ _EFFECT_SOURCE_FILES = (
     "architecture-specification.yaml",
     "implementation-specification.yaml",
 )
+_FEATURE_COVERAGE_SECTIONS = (
+    "requirements",
+    "acceptance_criteria",
+    "expected_tests",
+)
+_PROPOSED_PR_SCHEMA = "https://powdrr.io/schemas/proposed-pr-specification-v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +148,13 @@ def render_pr_specification_template(
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
         "# - Fill in each proposed PR's intent, justification, and dependencies.",
+        "# - List the authoritative requirement, acceptance-criterion, and test ids",
+        "#   delivered or proven by each proposed PR under its coverage sections.",
+        "# - This document has one flat top-level mapping. Do not create a",
+        "#   `specification_v1` wrapper or nest these sections under another key.",
+        "#   The only top-level sections are `schema`, `id`, `feature_ids`,",
+        "#   `proposed_prs`, `entities`, `modules`, `tools`,",
+        "#   `entity_relationships`, `features`, and `decisions`.",
         "# - In the feature-wide specification-v1 sections below",
         "#   (`entities`, `modules`, `tools`, `entity_relationships`, `features`,",
         "#   and `decisions`), record every action-bearing id once and label each",
@@ -160,6 +175,9 @@ def render_pr_specification_template(
         "    intent: null",
         "    justification: null",
         "    dependent_prs: []",
+        "    requirements: []",
+        "    acceptance_criteria: []",
+        "    expected_tests: []",
         *[
             line
             for section in _EFFECT_SECTIONS
@@ -171,6 +189,351 @@ def render_pr_specification_template(
         "",
     ]
     return "\n".join(lines)
+
+
+def build_authoritative_effect_handoff(
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Return ordered authoritative effects with stable, opaque references."""
+    repo_root_path = _resolve_repo_root(repo_root)
+    authoritative_effects = _load_authoritative_effects(
+        repo_root_path,
+        work_item_name=work_item_name,
+    )
+    effects: list[dict[str, str]] = []
+    referenced_effects: dict[str, tuple[str, str, str]] = {}
+    for section in _EFFECT_SECTIONS:
+        for item_id, action in authoritative_effects[section]:
+            effect = (section, item_id, action)
+            digest_input = json.dumps(
+                effect, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+            effect_ref = "effect-" + hashlib.sha256(digest_input).hexdigest()[:20]
+            collision = referenced_effects.get(effect_ref)
+            if collision is not None and collision != effect:
+                raise ValueError(
+                    f"Stable effect reference collision for {effect_ref!r}: "
+                    f"{collision!r} and {effect!r}."
+                )
+            referenced_effects[effect_ref] = effect
+            effects.append(
+                {
+                    "effect_ref": effect_ref,
+                    "section": section,
+                    "id": item_id,
+                    "action": action,
+                }
+            )
+    return {"effects": effects}
+
+
+def compile_split_pr_specification(
+    proposed_pr_plan: Mapping[str, Any],
+    effect_allocation: Mapping[str, Any],
+    authoritative_effect_handoff: Mapping[str, Any],
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Compile separately validated planning and allocation decisions."""
+    repo_root_path = _resolve_repo_root(repo_root)
+    _require_exact_keys(
+        proposed_pr_plan,
+        expected={"proposed_prs"},
+        path="proposed_pr_plan",
+    )
+    raw_prs = _require_semantic_sequence(
+        proposed_pr_plan["proposed_prs"],
+        path="proposed_pr_plan.proposed_prs",
+    )
+    if not raw_prs:
+        raise ValueError("proposed_pr_plan.proposed_prs must not be empty.")
+
+    proposed_prs: list[dict[str, Any]] = []
+    proposed_pr_ids: set[str] = set()
+    normalized_pr_ids: set[str] = set()
+    for index, raw_pr in enumerate(raw_prs):
+        path = f"proposed_pr_plan.proposed_prs[{index}]"
+        pr = _require_semantic_mapping(raw_pr, path=path)
+        _require_exact_keys(
+            pr,
+            expected={"id", "intent", "justification", "dependent_pr_ids"},
+            path=path,
+        )
+        proposed_pr_id = _require_semantic_string(pr["id"], path=f"{path}.id")
+        normalized_pr_id = _normalize_identifier(proposed_pr_id)
+        if normalized_pr_id in normalized_pr_ids:
+            raise ValueError(f"{path}.id duplicates proposed PR id {proposed_pr_id!r}.")
+        proposed_pr_ids.add(proposed_pr_id)
+        normalized_pr_ids.add(normalized_pr_id)
+        dependencies = [
+            _require_semantic_string(
+                value, path=f"{path}.dependent_pr_ids[{dep_index}]"
+            )
+            for dep_index, value in enumerate(
+                _require_semantic_sequence(
+                    pr["dependent_pr_ids"],
+                    path=f"{path}.dependent_pr_ids",
+                )
+            )
+        ]
+        proposed_prs.append(
+            {
+                "id": proposed_pr_id,
+                "intent": _require_semantic_string(pr["intent"], path=f"{path}.intent"),
+                "justification": _require_semantic_string(
+                    pr["justification"], path=f"{path}.justification"
+                ),
+                "dependent_prs": dependencies,
+            }
+        )
+
+    known_existing_ids = {
+        _normalize_identifier(value)
+        for value in _load_existing_pr_ids(
+            repo_root_path,
+            excluded_file_path=file_path,
+        )
+    }
+    duplicate_existing_ids = sorted(normalized_pr_ids & known_existing_ids)
+    if duplicate_existing_ids:
+        raise ValueError(
+            "semantic_specification proposes ids that already exist: "
+            + ", ".join(duplicate_existing_ids)
+        )
+
+    for index, proposed_pr in enumerate(proposed_prs):
+        for dependency in proposed_pr["dependent_prs"]:
+            if dependency not in proposed_pr_ids:
+                raise ValueError(
+                    "proposed_pr_plan.proposed_prs"
+                    f"[{index}].dependent_pr_ids references unknown proposed PR "
+                    f"id {dependency!r}."
+                )
+
+    expected_handoff = build_authoritative_effect_handoff(
+        work_item_name=work_item_name,
+        repo_root=repo_root_path,
+    )
+    _require_exact_keys(
+        authoritative_effect_handoff,
+        expected={"effects"},
+        path="authoritative_effect_handoff",
+    )
+    raw_effects = _require_semantic_sequence(
+        authoritative_effect_handoff["effects"],
+        path="authoritative_effect_handoff.effects",
+    )
+    effects: list[dict[str, str]] = []
+    for index, raw_effect in enumerate(raw_effects):
+        path = f"authoritative_effect_handoff.effects[{index}]"
+        effect = _require_semantic_mapping(raw_effect, path=path)
+        _require_exact_keys(
+            effect,
+            expected={"effect_ref", "section", "id", "action"},
+            path=path,
+        )
+        effects.append(
+            {
+                field: _require_semantic_string(effect[field], path=f"{path}.{field}")
+                for field in ("effect_ref", "section", "id", "action")
+            }
+        )
+    if authoritative_effect_handoff != expected_handoff:
+        raise ValueError(
+            "authoritative_effect_handoff does not exactly match the current "
+            "ordered authoritative effects."
+        )
+
+    _require_exact_keys(
+        effect_allocation,
+        expected={"assignments"},
+        path="effect_allocation",
+    )
+    raw_assignments = _require_semantic_sequence(
+        effect_allocation["assignments"],
+        path="effect_allocation.assignments",
+    )
+    expected_refs = {effect["effect_ref"] for effect in effects}
+    assignments: dict[str, str] = {}
+    for index, raw_assignment in enumerate(raw_assignments):
+        path = f"effect_allocation.assignments[{index}]"
+        assignment = _require_semantic_mapping(raw_assignment, path=path)
+        _require_exact_keys(
+            assignment,
+            expected={"effect_ref", "proposed_pr_id"},
+            path=path,
+        )
+        effect_ref = _require_semantic_string(
+            assignment["effect_ref"], path=f"{path}.effect_ref"
+        )
+        if effect_ref not in expected_refs:
+            raise ValueError(f"{path} references unknown effect_ref {effect_ref!r}.")
+        if effect_ref in assignments:
+            raise ValueError(f"{path} duplicates effect_ref {effect_ref!r}.")
+        proposed_pr_id = _require_semantic_string(
+            assignment["proposed_pr_id"], path=f"{path}.proposed_pr_id"
+        )
+        if proposed_pr_id not in proposed_pr_ids:
+            raise ValueError(
+                f"{path}.proposed_pr_id references unknown proposed PR id "
+                f"{proposed_pr_id!r}."
+            )
+        assignments[effect_ref] = proposed_pr_id
+
+    missing_refs = sorted(expected_refs - set(assignments))
+    if missing_refs:
+        raise ValueError(
+            "effect_allocation.assignments is missing authoritative effect_refs: "
+            + ", ".join(repr(effect_ref) for effect_ref in missing_refs)
+        )
+
+    feature_ids = [
+        effect["id"] for effect in effects if effect["section"] == "features"
+    ]
+    if not feature_ids:
+        raise ValueError(
+            "Cannot derive feature_ids because the authoritative implementation "
+            "specification has no feature effects."
+        )
+    compiled: dict[str, Any] = {
+        "schema": _PROPOSED_PR_SCHEMA,
+        "id": work_item_name,
+        "feature_ids": feature_ids,
+        "proposed_prs": proposed_prs,
+    }
+    for section in _EFFECT_SECTIONS:
+        compiled[section] = [
+            {
+                "id": effect["id"],
+                "action": effect["action"],
+                "proposed_pr_id": assignments[effect["effect_ref"]],
+            }
+            for effect in effects
+            if effect["section"] == section
+        ]
+
+    compiled_yaml = yaml.safe_dump(compiled, sort_keys=False)
+    report = build_pr_specification_validation_report(
+        compiled_yaml,
+        work_item_name=work_item_name,
+        repo_root=repo_root_path,
+        file_path=file_path,
+    )
+    if not report.validation_successful:
+        details = "; ".join(
+            f"{issue.path or '<document>'}: {issue.message}" for issue in report.issues
+        )
+        raise ValueError(f"Compiled proposed PR specification is invalid: {details}")
+    return compiled
+
+
+def compile_semantic_pr_specification(
+    semantic_specification: Mapping[str, Any],
+    *,
+    work_item_name: str,
+    repo_root: str | Path | None = None,
+    file_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Compatibility adapter for the superseded combined semantic contract."""
+    _require_exact_keys(
+        semantic_specification,
+        expected={"proposed_prs", "effect_assignments"},
+        path="semantic_specification",
+    )
+    handoff = build_authoritative_effect_handoff(
+        work_item_name=work_item_name,
+        repo_root=repo_root,
+    )
+    refs_by_effect = {
+        (effect["section"], effect["id"], effect["action"]): effect["effect_ref"]
+        for effect in handoff["effects"]
+    }
+    assignments = []
+    assigned_effects: set[tuple[str, str, str]] = set()
+    for index, raw_assignment in enumerate(
+        _require_semantic_sequence(
+            semantic_specification["effect_assignments"],
+            path="semantic_specification.effect_assignments",
+        )
+    ):
+        path = f"semantic_specification.effect_assignments[{index}]"
+        assignment = _require_semantic_mapping(raw_assignment, path=path)
+        _require_exact_keys(
+            assignment,
+            expected={"section", "id", "action", "proposed_pr_id"},
+            path=path,
+        )
+        effect = (
+            _require_semantic_string(assignment["section"], path=f"{path}.section"),
+            _require_semantic_string(assignment["id"], path=f"{path}.id"),
+            _require_semantic_string(assignment["action"], path=f"{path}.action"),
+        )
+        effect_ref = refs_by_effect.get(effect)
+        if effect_ref is None:
+            raise ValueError(f"{path} references unknown effect {effect!r}.")
+        if effect in assigned_effects:
+            raise ValueError(f"{path} duplicates effect assignment {effect!r}.")
+        assigned_effects.add(effect)
+        assignments.append(
+            {
+                "effect_ref": effect_ref,
+                "proposed_pr_id": assignment["proposed_pr_id"],
+            }
+        )
+    missing_effects = set(refs_by_effect) - assigned_effects
+    if missing_effects:
+        raise ValueError(
+            "semantic_specification.effect_assignments is missing authoritative "
+            "effects: " + ", ".join(repr(effect) for effect in sorted(missing_effects))
+        )
+    return compile_split_pr_specification(
+        {"proposed_prs": semantic_specification["proposed_prs"]},
+        {"assignments": assignments},
+        handoff,
+        work_item_name=work_item_name,
+        repo_root=repo_root,
+        file_path=file_path,
+    )
+
+
+def _require_exact_keys(
+    value: Mapping[str, Any],
+    *,
+    expected: set[str],
+    path: str,
+) -> None:
+    actual = set(value)
+    missing = sorted(expected - actual)
+    unknown = sorted(actual - expected)
+    if missing or unknown:
+        details = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if unknown:
+            details.append("unknown " + ", ".join(unknown))
+        raise ValueError(f"{path} has invalid keys ({'; '.join(details)}).")
+
+
+def _require_semantic_mapping(value: Any, *, path: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{path} must be an object.")
+    return value
+
+
+def _require_semantic_sequence(value: Any, *, path: str) -> Sequence[Any]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise ValueError(f"{path} must be an array.")
+    return value
+
+
+def _require_semantic_string(value: Any, *, path: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{path} must be a non-empty string.")
+    return value.strip()
 
 
 def _load_authoritative_effects(
@@ -615,6 +978,13 @@ def _build_multi_proposed_pr_validation_report(
         proposed_pr_ids=tuple(ids.values()),
         issues=issues,
     )
+    _validate_multi_pr_feature_coverage(
+        raw_spec,
+        repo_root=repo_root,
+        work_item_name=work_item_name,
+        proposed_pr_ids=tuple(ids.values()),
+        issues=issues,
+    )
     _validate_v1_effect_equivalence(
         raw_spec,
         repo_root=repo_root,
@@ -780,6 +1150,144 @@ def _validate_multi_pr_details(
                         f"proposed_prs[{index}].{section}[{item_index}].action",
                     )
                 )
+
+
+def _validate_multi_pr_feature_coverage(
+    raw_spec: Mapping[str, Any],
+    *,
+    repo_root: Path,
+    work_item_name: str,
+    proposed_pr_ids: Sequence[str],
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    """Require every authoritative feature item to have one proposed-PR owner."""
+    source_path = (
+        repo_root / PROPOSALS_ROOT / work_item_name / "feature-pr-specification.yaml"
+    )
+    if not source_path.is_file():
+        return
+    try:
+        source = _load_yaml_mapping(source_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            PRSpecificationValidationIssue(
+                "invalid_feature_coverage_source",
+                f"Could not read feature coverage source: {exc}",
+                str(source_path),
+            )
+        )
+        return
+
+    authoritative: dict[str, set[str]] = {}
+    for section in _FEATURE_COVERAGE_SECTIONS:
+        ids: set[str] = set()
+        raw_items = source.get(section, [])
+        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
+            continue
+        for index, raw_item in enumerate(raw_items):
+            if not isinstance(raw_item, Mapping):
+                continue
+            item_id = _optional_string(raw_item.get("id"))
+            if item_id is None:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "feature_coverage_id_missing",
+                        "Authoritative feature coverage items require an id.",
+                        f"{source_path}:{section}[{index}].id",
+                    )
+                )
+                continue
+            if item_id in ids:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "duplicate_feature_coverage_id",
+                        f"Authoritative feature item id {item_id!r} is duplicated.",
+                        f"{source_path}:{section}[{index}].id",
+                    )
+                )
+            ids.add(item_id)
+        if ids:
+            authoritative[section] = ids
+
+    owners: dict[str, dict[str, str]] = {section: {} for section in authoritative}
+    known_pr_ids = _normalize_identifier_set(proposed_pr_ids)
+    for index, raw_pr in enumerate(
+        _coerce_sequence(
+            raw_spec.get("proposed_prs"),
+            path="proposed_prs",
+            issues=issues,
+            issue_code="invalid_proposed_prs_section",
+            issue_message="proposed_prs must be a list of proposed PR mappings.",
+        )
+    ):
+        if not isinstance(raw_pr, Mapping):
+            continue
+        proposed_pr_id = _optional_string(raw_pr.get("id"))
+        if proposed_pr_id is None:
+            continue
+        for section, expected_ids in authoritative.items():
+            raw_values = raw_pr.get(section, [])
+            if not isinstance(raw_values, Sequence) or isinstance(
+                raw_values, (str, bytes)
+            ):
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "invalid_feature_coverage_section",
+                        f"{section} must be a list of ids in each proposed PR.",
+                        f"proposed_prs[{index}].{section}",
+                    )
+                )
+                continue
+            for value_index, raw_value in enumerate(raw_values):
+                coverage_id = _optional_string(raw_value)
+                path = f"proposed_prs[{index}].{section}[{value_index}]"
+                if coverage_id is None:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "feature_coverage_id_missing",
+                            f"{section} entries must be non-empty ids.",
+                            path,
+                        )
+                    )
+                    continue
+                if coverage_id not in expected_ids:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "unknown_feature_coverage_id",
+                            f"{coverage_id!r} is not an authoritative {section} id.",
+                            path,
+                        )
+                    )
+                    continue
+                if coverage_id in owners[section]:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "duplicate_feature_coverage_assignment",
+                            f"{section} id {coverage_id!r} is assigned to both "
+                            f"{owners[section][coverage_id]!r} and {proposed_pr_id!r}.",
+                            path,
+                        )
+                    )
+                owners[section][coverage_id] = proposed_pr_id
+                if _normalize_identifier(proposed_pr_id) not in known_pr_ids:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "unknown_proposed_pr_id",
+                            f"Proposed PR id {proposed_pr_id!r} is not declared.",
+                            f"proposed_prs[{index}].id",
+                        )
+                    )
+    for section, expected_ids in authoritative.items():
+        missing = sorted(expected_ids - set(owners[section]))
+        if missing:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "uncovered_feature_items",
+                    f"Every authoritative {section} item must be assigned to a "
+                    f"proposed PR; missing: {', '.join(missing)}.",
+                    f"proposed_prs.*.{section}",
+                )
+            )
 
 
 def _validate_dependency_graph(

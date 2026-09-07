@@ -59,11 +59,9 @@ steps:
     Do not stage or preserve unintended diagnostic logs, generated artifacts,
     or other files in the pull request. Verify the staged names with `git
     diff --cached --name-only`; do not advance until every intended path is
-    staged and no unintended path is staged. The name-only verification is a
-    declared shell action below; use that exact command shape, not a different
-    Git status or diff command. This verification is mandatory after every
-    staging or cleanup action, including file_management deletion; never choose
-    next_step immediately after deleting an unintended file.
+    staged and no unintended path is staged. This verification is mandatory
+    after every staging or cleanup action; never choose next_step immediately
+    after deleting an unintended file.
   tool_invocations:
   - tool: git
     command:

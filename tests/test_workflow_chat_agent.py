@@ -25,10 +25,12 @@ from powdrr_lift.core import (
     CodingLoopVerification,
     Skill,
     SkillStep,
+    SkillStepCompletion,
     SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
     SkillStepPreStep,
+    SkillStepRequiredAction,
     SkillToolInvocation,
     load_skill,
     save_skill,
@@ -75,6 +77,7 @@ from powdrr_lift.workflow_chat_agent import (
     WorkflowContext,
     _action_repair_prompt,
     _action_system_prompt,
+    _advance_predicated_step,
     _apply_file_edits,
     _apply_yaml_operations,
     _available_work_item_documents,
@@ -83,6 +86,7 @@ from powdrr_lift.workflow_chat_agent import (
     _build_selection_messages,
     _build_step_execution_messages,
     _catalog_entry_to_data,
+    _coding_loop_worktree_fingerprint,
     _command_matches_invocation,
     _complete_json_with_model_fallback,
     _current_file_context,
@@ -103,8 +107,10 @@ from powdrr_lift.workflow_chat_agent import (
     _modular_action_system_prompt,
     _normalize_cache_usage,
     _parse_action_response,
+    _parse_action_response_with_schema,
     _parse_json_object,
     _parse_workflow_action_gather_context,
+    _predicated_step_complete,
     _prompt_durable_facts,
     _prompt_step_context,
     _prompt_transcript,
@@ -129,11 +135,14 @@ from powdrr_lift.workflow_chat_agent import (
     _run_deterministic_pre_step,
     _run_gate,
     _serialize_messages,
+    _step_action_response_schema,
     _step_actions,
+    _validate_coding_loop_action,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,
     _validate_user_question,
     _validate_workflow_action_for_step,
+    _validate_workflow_action_outputs,
     _validate_workflow_handoff,
     _validate_workflow_step_transition,
     _validation_actions_match,
@@ -412,7 +421,17 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     ordinary_system_prompt = _action_system_prompt(current_step=ordinary_step)
     assert "Use next_step when the current step is complete" in ordinary_system_prompt
     assert "Use complete when the skill is finished" in ordinary_system_prompt
-    assert "apply to every step" in ordinary_system_prompt
+
+    predicated_prompt = _action_system_prompt(
+        current_step=SkillStep(
+            description="Produce a result.",
+            step_type="predicated",
+            completion=SkillStepCompletion(("result",)),
+            outputs=(SkillStepOutput(name="result"),),
+        )
+    )
+    assert "never return next_step" in predicated_prompt
+    assert '"outputs"' in predicated_prompt
 
     output_step = SkillStep(
         description="Capture the feature name.",
@@ -535,6 +554,131 @@ def test_next_step_is_prompted_without_required_outputs() -> None:
     assert any(name == "next_step" for name, _ in actions)
 
 
+def test_predicated_step_omits_model_next_step_action() -> None:
+    step = SkillStep(
+        description="Produce the result.",
+        step_type="predicated",
+        completion=SkillStepCompletion(("result",)),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+
+    assert all(name != "next_step" for name, _ in _step_actions(step))
+    assert any(name == "emit_outputs" for name, _ in _step_actions(step))
+    assert (
+        "next_step"
+        not in _step_action_response_schema(step)["properties"]["action"]["enum"]
+    )
+    assert (
+        "emit_outputs"
+        in _step_action_response_schema(step)["properties"]["action"]["enum"]
+    )
+
+
+def test_predicated_step_advances_after_current_step_outputs(tmp_path: Path) -> None:
+    predicated = SkillStep(
+        description="Produce the result.",
+        id="produce-result",
+        step_type="predicated",
+        completion=SkillStepCompletion(("result",)),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+    next_step = SkillStep(description="Use the result.", id="use-result")
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="test", when_to_use=(), steps=(predicated, next_step)),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        handoff_records={
+            "result": {
+                "name": "result",
+                "type": "object",
+                "value": {"ok": True},
+                "produced_by": {"step_index": 0, "action": "edit"},
+            }
+        },
+    )
+
+    assert _predicated_step_complete(predicated, state)
+    _advance_predicated_step(state, predicated)
+    assert state.step_index == 1
+    assert state.execution_events[-1]["kind"] == "predicated_advance"
+
+
+def test_predicated_step_requires_action_only_evidence(tmp_path: Path) -> None:
+    predicated = SkillStep(
+        description="Gather and emit.",
+        step_type="predicated",
+        completion=SkillStepCompletion(
+            ("result",), (SkillStepRequiredAction("gather_context"),)
+        ),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="test", when_to_use=(), steps=(predicated,)),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        handoff_records={
+            "result": {"produced_by": {"step_index": 0, "action": "emit_outputs"}}
+        },
+    )
+    assert not _predicated_step_complete(predicated, state)
+    state.execution_events.append({"kind": "gather_context", "step_index": 0})
+    assert _predicated_step_complete(predicated, state)
+
+
+def test_predicated_step_requires_all_declared_action_evidence(tmp_path: Path) -> None:
+    predicated = SkillStep(
+        description="Produce the result.",
+        step_type="predicated",
+        completion=SkillStepCompletion(
+            ("result",),
+            (
+                SkillStepRequiredAction(
+                    "read_document", "diagnosis.files[*]", "file_path"
+                ),
+            ),
+        ),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            tmp_path / "skill.json",
+            Skill(name="test", when_to_use=(), steps=(predicated,)),
+        ),
+        transcript=[],
+        execution_events=[
+            {"kind": "read_document", "step_index": 0, "file_path": "a.py"}
+        ],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+        handoff_records={
+            "diagnosis": {
+                "value": {"files": ["a.py", "b.py"]},
+                "produced_by": {"step_index": 0, "action": "edit"},
+            },
+            "result": {"produced_by": {"step_index": 0, "action": "emit_outputs"}},
+        },
+    )
+
+    assert not _predicated_step_complete(predicated, state)
+    state.execution_events.append(
+        {"kind": "read_document", "step_index": 0, "file_path": "b.py"}
+    )
+    assert _predicated_step_complete(predicated, state)
+
+
 def test_coding_loop_runs_declared_verification_and_requires_pass(
     tmp_path: Path,
 ) -> None:
@@ -569,7 +713,75 @@ def test_coding_loop_runs_declared_verification_and_requires_pass(
     _require_coding_loop_verification(
         step,
         [{"kind": "coding_loop_verification", **verification}],
+        worktree_root=tmp_path,
     )
+
+
+def test_coding_loop_verification_becomes_stale_after_worktree_change(
+    tmp_path: Path,
+) -> None:
+    step = SkillStep(
+        description="Implement and verify.",
+        step_type="coding_loop",
+        coding_loop=CodingLoopSpec(
+            goal="Make the check pass.",
+            verification=(CodingLoopVerification(id="check", command="true"),),
+        ),
+    )
+    target = tmp_path / "implementation.py"
+    target.write_text("value = 1\n", encoding="utf-8")
+    events = [
+        {
+            "kind": "coding_loop_verification",
+            "all_passed": True,
+            "worktree_fingerprint": _coding_loop_worktree_fingerprint(tmp_path),
+        }
+    ]
+
+    target.write_text("value = 2\n", encoding="utf-8")
+
+    with pytest.raises(PowdrrExecutionError, match="verification is stale"):
+        _require_coding_loop_verification(
+            step,
+            events,
+            worktree_root=tmp_path,
+        )
+
+
+def test_coding_loop_rejects_actions_after_successful_verification() -> None:
+    step = SkillStep(
+        description="Implement and verify.",
+        step_type="coding_loop",
+        coding_loop=CodingLoopSpec(
+            goal="Make the check pass.",
+            verification=(CodingLoopVerification(id="check", command="true"),),
+        ),
+    )
+    events = [{"kind": "coding_loop_verification", "all_passed": True}]
+
+    with pytest.raises(PowdrrExecutionError, match="already passed"):
+        _validate_coding_loop_action(step, events, action_kind="read_document")
+
+    _validate_coding_loop_action(step, events, action_kind="next_step")
+
+
+def test_coding_loop_success_is_scoped_to_current_step() -> None:
+    step = SkillStep(
+        description="Implement and verify.",
+        step_type="coding_loop",
+        coding_loop=CodingLoopSpec(
+            goal="Make the check pass.",
+            verification=(CodingLoopVerification(id="check", command="true"),),
+        ),
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="until"):
+        _validate_coding_loop_action(
+            step,
+            [{"kind": "coding_loop_verification", "step_index": 1, "all_passed": True}],
+            action_kind="next_step",
+            step_index=0,
+        )
 
 
 def test_explicit_step_contract_rejects_undeclared_complete() -> None:
@@ -679,6 +891,63 @@ def test_gate_reports_fresh_result_separately_from_llm_commentary(
     )
     assert '"returncode": 0' in output
     assert "issues remain" in output
+
+
+def test_failed_evaluator_gate_exposes_structured_issues_for_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = {
+        "returncode": 1,
+        "validation_successful": False,
+        "issues": [
+            {
+                "code": "unknown_proposed_pr_id",
+                "path": "entities[0].proposed_pr_id",
+                "message": "Unknown proposed PR.",
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        lambda *args, **kwargs: result,
+    )
+    step = SkillStep(
+        id="evaluate-proposed-pr-specification",
+        description="Evaluate.",
+        step_type="gate",
+        pre_step=SkillStepPreStep(
+            action="invoke_tool",
+            template={
+                "tool": "internal",
+                "command": ["powdrr-lift", "evaluate", "docs/proposals/example"],
+            },
+        ),
+        gate=SkillStepGate(
+            outcome={"path": "returncode", "equals": 0},
+            goto_step="repair-proposed-pr-specification",
+            success_goto_step="plan-workflow-instantiation",
+            retry_context="Repair the semantic phase.",
+        ),
+    )
+    execution_context: list[str] = []
+
+    passed = _run_gate(
+        step,
+        skill_name="start-implementing-feature",
+        worktree_root=tmp_path,
+        execution_events=[],
+        execution_context=execution_context,
+        handoff_records={},
+        step_index=12,
+        workflow_context=None,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        verbose=False,
+    )
+
+    assert passed is False
+    assert "unknown_proposed_pr_id" in execution_context[-1]
+    assert "entities[0].proposed_pr_id" in execution_context[-1]
 
 
 def test_invoke_tool_runs_gather_context_pre_step_once(
@@ -1002,6 +1271,43 @@ def test_step_allowed_actions_reject_direct_edit() -> None:
             ),
             step,
         )
+
+
+def test_repair_step_next_step_returns_to_validation_gate() -> None:
+    step = SkillStep(
+        id="repair-proposed-pr-specification",
+        description="Repair semantic decisions.",
+        next_step_override="evaluate-proposed-pr-specification",
+    )
+
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(
+            Path("skill.yaml"),
+            Skill(
+                name="start-implementing-feature",
+                when_to_use=(),
+                steps=(
+                    SkillStep(
+                        id="evaluate-proposed-pr-specification", description="Validate."
+                    ),
+                    step,
+                ),
+            ),
+        ),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=1,
+        worktree_root=Path("."),
+    )
+
+    _validate_workflow_step_transition(
+        _parse_action_response({"action": "next_step"}),
+        step,
+        [],
+        1,
+        state=state,
+    )
 
 
 def test_workflow_can_advance_after_empty_gather_context_result() -> None:
@@ -1576,6 +1882,48 @@ def test_local_llama_client_requests_full_gpu_offload(
     assert captured["n_ctx"] == 24576
 
 
+def test_local_llama_client_receives_active_response_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-q5_k_m.gguf"
+    model_path.touch()
+    captured: dict[str, object] = {}
+
+    class FakeLlama:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def create_chat_completion(self, **kwargs: object) -> dict[str, object]:
+            captured.update(kwargs)
+            return {"choices": [{"message": {"content": '{"action":"next_step"}'}}]}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "llama_cpp",
+        types.SimpleNamespace(
+            Llama=FakeLlama,
+            llama_supports_gpu_offload=lambda: True,
+        ),
+    )
+    response_schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string"}},
+        "required": ["action"],
+        "additionalProperties": False,
+    }
+
+    client = LocalLlamaChatClient(model_path=model_path)
+
+    assert client.complete_json(
+        [{"role": "user", "content": "test"}],
+        response_schema=response_schema,
+    ) == {"action": "next_step"}
+    assert captured["response_format"] == {
+        "type": "json_object",
+        "schema": response_schema,
+    }
+
+
 def test_local_model_context_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "8192")
 
@@ -2022,13 +2370,22 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
     tmp_path: Path,
 ) -> None:
     class _FakeClient:
-        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
             assert messages == [{"role": "user", "content": "request"}]
+            assert response_schema == {"type": "object"}
             return {"action": "complete", "text": "done"}
 
     recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
 
-    assert recorder.complete_json([{"role": "user", "content": "request"}]) == {
+    assert recorder.complete_json(
+        [{"role": "user", "content": "request"}],
+        response_schema={"type": "object"},
+    ) == {
         "action": "complete",
         "text": "done",
     }
@@ -2121,11 +2478,125 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
         base_url="https://api.openai.com/v1",
     )
 
-    assert client.complete_json([{"role": "user", "content": "request"}]) == {
-        "action": "complete"
+    response_schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string"}},
+        "required": ["action"],
+        "additionalProperties": False,
     }
+    assert client.complete_json(
+        [{"role": "user", "content": "request"}],
+        response_schema=response_schema,
+    ) == {"action": "complete"}
     assert serialization_calls == 1
     assert request_bodies[0]["messages"] == [{"role": "user", "content": "request"}]
+    assert request_bodies[0]["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "workflow_action",
+            "strict": True,
+            "schema": response_schema,
+        },
+    }
+
+
+def test_step_action_response_schema_embeds_strict_declared_output() -> None:
+    output_schema = {
+        "type": "object",
+        "properties": {"items": {"type": "array"}},
+        "required": ["items"],
+        "additionalProperties": False,
+    }
+    step = SkillStep(
+        id="plan",
+        description="Plan.",
+        actions=(),
+        actions_declared=True,
+        outputs=(
+            SkillStepOutput(
+                "plan",
+                "object",
+                True,
+                schema=output_schema,
+            ),
+        ),
+    )
+
+    schema = _step_action_response_schema(step)
+
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["outputs"] == {
+        "type": "object",
+        "properties": {"plan": output_schema},
+        "required": ["plan"],
+        "additionalProperties": False,
+    }
+
+
+def test_declared_output_schema_rejects_malformed_shape_before_handoff() -> None:
+    step = SkillStep(
+        id="allocate",
+        description="Allocate.",
+        outputs=(
+            SkillStepOutput(
+                "allocation",
+                "object",
+                True,
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "assignments": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "effect_ref": {"type": "string"},
+                                    "proposed_pr_id": {"type": "string"},
+                                },
+                                "required": ["effect_ref", "proposed_pr_id"],
+                                "additionalProperties": False,
+                            },
+                        }
+                    },
+                    "required": ["assignments"],
+                    "additionalProperties": False,
+                },
+            ),
+        ),
+    )
+    malformed = WorkflowAction(
+        kind="next_step",
+        outputs={
+            "allocation": {
+                "assignments": [
+                    {
+                        "effect_ref": "effect-1",
+                        "proposed_pr_id": "pr-1",
+                        "section": "entities",
+                    }
+                ]
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="unknown properties: section"):
+        _validate_workflow_action_outputs(malformed, step)
+
+
+def test_active_response_schema_rejects_unknown_envelope_fields() -> None:
+    step = SkillStep(
+        id="plan",
+        description="Plan.",
+        actions=(),
+        actions_declared=True,
+    )
+    schema = _step_action_response_schema(step)
+
+    with pytest.raises(RuntimeError, match="unknown properties: surprise"):
+        _parse_action_response_with_schema(
+            {"action": "next_step", "surprise": True},
+            schema=schema,
+        )
 
 
 def test_normalize_cache_usage_supports_provider_formats() -> None:
@@ -6482,7 +6953,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 if step_id == "prepare-feature-pull-request":
                     self._call_index += 1
                     return {
-                        "action": "next_step",
+                        "action": "emit_outputs",
                         "outputs": {
                             "final_repository_state": {
                                 "clean": True,
@@ -6494,6 +6965,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                                 "validation": "passed",
                             },
                         },
+                    }
+                if prompt["current_step"].get("id") == "capture-feature-query":
+                    self._call_index += 1
+                    return {
+                        "action": "next_step",
+                        "outputs": {"feature_query": "display-related-photos"},
                     }
                 tool_invocations = prompt["current_step"].get("tool_invocations", [])
                 if tool_invocations and step_index not in self._start_invoked_steps:
@@ -6532,6 +7009,44 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "action": "next_step",
                         "outputs": {
                             "proposed_pr_names": ["display-related-photos-pr-001"]
+                        },
+                    }
+                if prompt["current_step"].get("id") == "plan-proposed-pr-specification":
+                    self._call_index += 1
+                    proposed_pr_id = "display-related-photos-pr-001"
+                    return {
+                        "action": "next_step",
+                        "outputs": {
+                            "proposed_pr_plan": {
+                                "proposed_prs": [
+                                    {
+                                        "id": proposed_pr_id,
+                                        "intent": pr_spec_entry["intent"],
+                                        "justification": pr_spec_entry["justification"],
+                                        "dependent_pr_ids": [],
+                                    }
+                                ]
+                            }
+                        },
+                    }
+                if prompt["current_step"].get("id") == "allocate-proposed-pr-effects":
+                    self._call_index += 1
+                    proposed_pr_id = "display-related-photos-pr-001"
+                    effect_record = prompt["handoff_inputs"]["resolved"][
+                        "authoritative_effects"
+                    ]
+                    return {
+                        "action": "next_step",
+                        "outputs": {
+                            "effect_allocation": {
+                                "assignments": [
+                                    {
+                                        "effect_ref": effect["effect_ref"],
+                                        "proposed_pr_id": proposed_pr_id,
+                                    }
+                                    for effect in effect_record["value"]["effects"]
+                                ]
+                            }
                         },
                     }
                 if prompt["current_step"].get("id") == "plan-workflow-instantiation":
@@ -6724,7 +7239,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     )
     monkeypatch.setattr(
         "powdrr_lift.execution.runtime.ExecutionRuntime.publish_readiness",
-        lambda _runtime: types.SimpleNamespace(ready=True, reasons=()),
+        lambda _runtime, **_kwargs: types.SimpleNamespace(ready=True, reasons=()),
     )
 
     start_stdout = io.StringIO()
@@ -6750,9 +7265,35 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
     start_summary = json.loads(start_summary_path.read_text(encoding="utf-8"))
     assert start_summary["selected_skill_name"] == "start-implementing-feature"
     start_event_kinds = [event["kind"] for event in start_summary["execution_events"]]
-    assert start_event_kinds[0] == "invoke_tool"
+    assert start_event_kinds[0] == "next_step"
+    assert start_event_kinds[1:4] == ["deterministic_pre_step"] * 3
     assert start_event_kinds.count("next_step") >= 6
     assert start_event_kinds[-1] in {"complete", "next_step"}
+    prompted_step_ids = {
+        json.loads(messages[1]["content"])["current_step"].get("id")
+        for messages in cast(list[list[dict[str, str]]], start_captured["messages"])[1:]
+        if json.loads(messages[1]["content"]).get("execution_mode")
+        == "execute_selected_skill"
+    }
+    assert prompted_step_ids.isdisjoint(
+        {
+            "discover-proposed-feature",
+            "discover-current-feature",
+            "discover-feature-workflows",
+            "repair-proposed-pr-specification",
+        }
+    )
+    assert {
+        "plan-proposed-pr-specification",
+        "allocate-proposed-pr-effects",
+        "plan-workflow-instantiation",
+    } <= prompted_step_ids
+    gate_event = next(
+        event
+        for event in start_summary["execution_events"]
+        if event["kind"] == "gate" and event.get("step_index") == 12
+    )
+    assert gate_event["passed"] is True
     assert any(
         event["kind"] == "invoke_tool"
         and event.get("tool") == "gh"
@@ -8583,14 +9124,9 @@ def test_anthropic_chat_client_sends_messages_api_request(
                 {
                     "content": [
                         {
-                            "type": "text",
-                            "text": json.dumps(
-                                {
-                                    "selected_skill_path": (
-                                        "skill-definitions/specify-a-feature.yaml"
-                                    )
-                                }
-                            ),
+                            "type": "tool_use",
+                            "name": "workflow_action",
+                            "input": {"action": "next_step"},
                         }
                     ]
                 }
@@ -8610,11 +9146,18 @@ def test_anthropic_chat_client_sends_messages_api_request(
         api_key="anth-key",
         base_url="https://api.anthropic.com",
     )
+    response_schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string"}},
+        "required": ["action"],
+        "additionalProperties": False,
+    }
     response = client.complete_json(
         [
             {"role": "system", "content": "system prompt"},
             {"role": "user", "content": "hello"},
-        ]
+        ],
+        response_schema=response_schema,
     )
 
     assert captured["url"] == "https://api.anthropic.com/v1/messages"
@@ -8628,10 +9171,16 @@ def test_anthropic_chat_client_sends_messages_api_request(
                 "content": [{"type": "text", "text": "hello"}],
             }
         ],
+        "tools": [
+            {
+                "name": "workflow_action",
+                "description": "Return the next workflow action.",
+                "input_schema": response_schema,
+            }
+        ],
+        "tool_choice": {"type": "tool", "name": "workflow_action"},
     }
-    assert response == {
-        "selected_skill_path": "skill-definitions/specify-a-feature.yaml"
-    }
+    assert response == {"action": "next_step"}
 
 
 def test_openai_chat_client_reports_malformed_json_content(

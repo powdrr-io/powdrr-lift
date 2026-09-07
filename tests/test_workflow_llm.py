@@ -12,6 +12,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
     WorkflowStepRunner,
+    complete_json_with_timeout_retry,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_signature,
@@ -69,6 +70,42 @@ class _Client:
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         _ = messages
         return self.payloads.pop(0)
+
+
+def test_timeout_retry_preserves_optional_response_schema(
+    monkeypatch: Any,
+) -> None:
+    schema = {"type": "object"}
+
+    class _SchemaClient:
+        def __init__(self) -> None:
+            self.calls: list[object] = []
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            _ = messages
+            self.calls.append(response_schema)
+            if len(self.calls) == 1:
+                raise RuntimeError("request timed out")
+            return {"action": "next_step"}
+
+    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", lambda _: None)
+    client = _SchemaClient()
+
+    assert complete_json_with_timeout_retry(
+        client,
+        [],
+        model="test",
+        stderr=None,
+        max_timeout_retries=1,
+        timeout_backoff_seconds=0,
+        response_schema=schema,
+    ) == {"action": "next_step"}
+    assert client.calls == [schema, schema]
 
 
 class _ExecutionStrategy(WorkflowExecutionStrategy):

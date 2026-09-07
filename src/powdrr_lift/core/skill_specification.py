@@ -62,8 +62,10 @@ SUPPORTED_STEP_ACTIONS = frozenset(
         "complete",
     }
 )
-UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step"})
-SUPPORTED_STEP_TYPES = frozenset({"freeform", "invoke_tool", "gate", "coding_loop"})
+UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step", "emit_outputs"})
+SUPPORTED_STEP_TYPES = frozenset(
+    {"freeform", "predicated", "invoke_tool", "gate", "coding_loop"}
+)
 SUPPORTED_INTERACTION_STYLES = frozenset(
     {"engineering", "observational_review", "devils_advocate"}
 )
@@ -139,14 +141,18 @@ class SkillStepOutput:
     type: str = "any"
     required_for_next_step: bool = False
     scope: str = "skill"
+    schema: Mapping[str, Any] | None = None
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "name": self.name,
             "type": self.type,
             "required_for_next_step": self.required_for_next_step,
             "scope": self.scope,
         }
+        if self.schema is not None:
+            data["schema"] = dict(self.schema)
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,13 +172,17 @@ class SkillStepGate:
     outcome: Mapping[str, Any]
     goto_step: str
     retry_context: str
+    success_goto_step: str | None = None
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "outcome": dict(self.outcome),
             "goto_step": self.goto_step,
             "retry_context": self.retry_context,
         }
+        if self.success_goto_step is not None:
+            data["success_goto_step"] = self.success_goto_step
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +227,39 @@ class CodingLoopSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillStepRequiredAction:
+    """Action evidence required before a predicated step may complete."""
+
+    action: str
+    targets_from: str | None = None
+    match_field: str | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {"action": self.action}
+        if self.targets_from is not None:
+            data["targets_from"] = self.targets_from
+        if self.match_field is not None:
+            data["match_field"] = self.match_field
+        return data
+
+
+@dataclass(frozen=True, slots=True)
+class SkillStepCompletion:
+    """Deterministic completion conditions for a predicated step."""
+
+    required_outputs: tuple[str, ...]
+    required_actions: tuple[SkillStepRequiredAction, ...] = field(default_factory=tuple)
+
+    def to_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {"required_outputs": list(self.required_outputs)}
+        if self.required_actions:
+            data["required_actions"] = [
+                item.to_data() for item in self.required_actions
+            ]
+        return data
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
@@ -228,6 +271,7 @@ class SkillStep:
     actions: tuple[str, ...] = field(default_factory=tuple)
     # An explicit empty list is a closed contract; omission remains legacy.
     actions_declared: bool = False
+    next_step_override: str | None = None
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
@@ -236,6 +280,7 @@ class SkillStep:
     gate: SkillStepGate | None = None
     validation_gate: Mapping[str, Any] | None = None
     coding_loop: CodingLoopSpec | None = None
+    completion: SkillStepCompletion | None = None
 
     def __post_init__(self) -> None:
         if self.actions:
@@ -266,12 +311,16 @@ class SkillStep:
             data["actions"] = list(self.actions)
         elif self.actions_declared:
             data["actions"] = []
+        if self.next_step_override is not None:
+            data["next_step_override"] = self.next_step_override
         if self.pre_step is not None:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             data["gate"] = self.gate.to_data()
         if self.coding_loop is not None:
             data["coding_loop"] = self.coding_loop.to_data()
+        if self.completion is not None:
+            data["completion"] = self.completion.to_data()
         if self.validation_gate is not None:
             data["validation_gate"] = self.validation_gate
         if self.inputs:
@@ -600,10 +649,12 @@ def build_skill_validation_report(
                     "tool_invocations",
                     "prompt_catalogs",
                     "actions",
+                    "next_step_override",
                     "pre_step",
                     "gate",
                     "validation_gate",
                     "coding_loop",
+                    "completion",
                     "inputs",
                     "outputs",
                 },
@@ -666,6 +717,21 @@ def build_skill_validation_report(
                     )
                 )
 
+            next_step_override = step_mapping.get("next_step_override")
+            if (
+                next_step_override is not None
+                and _optional_string(next_step_override) is None
+            ):
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_next_step_override",
+                        message=(
+                            "Skill step next_step_override must be a non-empty string."
+                        ),
+                        path=_child_path(step_path, "next_step_override"),
+                    )
+                )
+
             interaction_style = step_mapping.get("interaction_style")
             if interaction_style is not None:
                 normalized_style = _optional_interaction_style(interaction_style)
@@ -689,8 +755,8 @@ def build_skill_validation_report(
                     SkillValidationIssue(
                         code="invalid_step_type_value",
                         message=(
-                            "Skill step step_type must be freeform, invoke_tool, "
-                            "gate, or coding_loop."
+                            "Skill step step_type must be freeform, predicated, "
+                            "invoke_tool, gate, or coding_loop."
                         ),
                         path=_child_path(step_path, "step_type"),
                     )
@@ -707,6 +773,7 @@ def build_skill_validation_report(
                 )
             elif normalized_step_type in {
                 "freeform",
+                "predicated",
                 "invoke_tool",
                 "gate",
             } and isinstance(pre_step, Mapping):
@@ -808,6 +875,20 @@ def build_skill_validation_report(
                                 path=_child_path(step_path, "gate.retry_context"),
                             )
                         )
+                    if (
+                        "success_goto_step" in raw_gate
+                        and _optional_string(raw_gate.get("success_goto_step")) is None
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_gate_success_goto_step",
+                                message=(
+                                    "gate success_goto_step must be a non-empty "
+                                    "step id when provided."
+                                ),
+                                path=_child_path(step_path, "gate.success_goto_step"),
+                            )
+                        )
             elif raw_gate is not None:
                 issues.append(
                     SkillValidationIssue(
@@ -825,6 +906,157 @@ def build_skill_validation_report(
                         code="unexpected_coding_loop",
                         message="Only coding_loop steps may declare coding_loop.",
                         path=_child_path(step_path, "coding_loop"),
+                    )
+                )
+            raw_completion = step_mapping.get("completion")
+            if normalized_step_type == "predicated":
+                if not isinstance(raw_completion, Mapping):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="missing_completion",
+                            message=(
+                                "predicated steps must declare a completion object."
+                            ),
+                            path=_child_path(step_path, "completion"),
+                        )
+                    )
+                else:
+                    unsupported_completion_fields = set(raw_completion) - {
+                        "required_outputs",
+                        "required_actions",
+                    }
+                    if unsupported_completion_fields:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_completion",
+                                message=(
+                                    "predicated completion contains unsupported "
+                                    "fields: "
+                                    + ", ".join(
+                                        sorted(
+                                            str(item)
+                                            for item in unsupported_completion_fields
+                                        )
+                                    )
+                                ),
+                                path=_child_path(step_path, "completion"),
+                            )
+                        )
+                    required_outputs = raw_completion.get("required_outputs")
+                    required_output_names = (
+                        list(required_outputs)
+                        if isinstance(required_outputs, Sequence)
+                        and not isinstance(required_outputs, (str, bytes, bytearray))
+                        else []
+                    )
+                    if (
+                        not required_output_names
+                        or any(
+                            _optional_string(item) is None
+                            for item in required_output_names
+                        )
+                        or len(
+                            {_optional_string(item) for item in required_output_names}
+                        )
+                        != len(required_output_names)
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_completion",
+                                message=(
+                                    "predicated completion.required_outputs must be a "
+                                    "non-empty array of unique strings."
+                                ),
+                                path=_child_path(
+                                    step_path, "completion.required_outputs"
+                                ),
+                            )
+                        )
+                    else:
+                        raw_outputs = step_mapping.get("outputs")
+                        declared_output_names = (
+                            {
+                                _optional_string(item.get("name"))
+                                for item in raw_outputs
+                                if isinstance(item, Mapping)
+                            }
+                            if isinstance(raw_outputs, Sequence)
+                            and not isinstance(raw_outputs, (str, bytes, bytearray))
+                            else set()
+                        )
+                        missing_outputs = sorted(
+                            name
+                            for name in required_output_names
+                            if name not in declared_output_names
+                        )
+                        if missing_outputs:
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="invalid_completion",
+                                    message=(
+                                        "predicated completion references undeclared "
+                                        "outputs: " + ", ".join(missing_outputs)
+                                    ),
+                                    path=_child_path(
+                                        step_path, "completion.required_outputs"
+                                    ),
+                                )
+                            )
+                    raw_required_actions = raw_completion.get("required_actions", [])
+                    if not isinstance(raw_required_actions, Sequence) or isinstance(
+                        raw_required_actions, (str, bytes, bytearray)
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_completion",
+                                message=(
+                                    "predicated completion.required_actions must be "
+                                    "an array."
+                                ),
+                                path=_child_path(
+                                    step_path, "completion.required_actions"
+                                ),
+                            )
+                        )
+                    else:
+                        for action_index, required_action in enumerate(
+                            raw_required_actions
+                        ):
+                            if (
+                                not isinstance(required_action, Mapping)
+                                or _optional_string(required_action.get("action"))
+                                is None
+                                or (
+                                    ("targets_from" in required_action)
+                                    != ("match_field" in required_action)
+                                )
+                                or any(
+                                    _optional_string(required_action.get(field_name))
+                                    is None
+                                    for field_name in ("targets_from", "match_field")
+                                    if field_name in required_action
+                                )
+                            ):
+                                issues.append(
+                                    SkillValidationIssue(
+                                        code="invalid_completion",
+                                        message=(
+                                            "predicated required_actions entries must "
+                                            "declare action, or both targets_from "
+                                            "and match_field strings."
+                                        ),
+                                        path=_child_path(
+                                            step_path,
+                                            f"completion.required_actions[{action_index}]",
+                                        ),
+                                    )
+                                )
+            elif raw_completion is not None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="unexpected_completion",
+                        message="Only predicated steps may declare completion.",
+                        path=_child_path(step_path, "completion"),
                     )
                 )
             raw_validation_gate = step_mapping.get("validation_gate")
@@ -1447,7 +1679,10 @@ def _validate_step_contracts(
 ) -> None:
     for field_name, item_keys in (
         ("inputs", {"name", "type", "required", "source"}),
-        ("outputs", {"name", "type", "required_for_next_step", "scope"}),
+        (
+            "outputs",
+            {"name", "type", "required_for_next_step", "scope", "schema"},
+        ),
     ):
         value = step_mapping.get(field_name)
         if value is None:
@@ -1529,6 +1764,34 @@ def _validate_step_contracts(
                         path=_child_path(item_path, boolean_key),
                     )
                 )
+            if field_name == "outputs" and "schema" in item:
+                schema = item["schema"]
+                if not isinstance(schema, Mapping):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_output_schema",
+                            message="Skill step output schema must be an object.",
+                            path=_child_path(item_path, "schema"),
+                        )
+                    )
+                elif schema.get("type") is None:
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_output_schema",
+                            message="Skill step output schema must declare a type.",
+                            path=_child_path(item_path, "schema.type"),
+                        )
+                    )
+                else:
+                    schema_error = _output_schema_declaration_error(schema)
+                    if schema_error is not None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_output_schema",
+                                message=schema_error,
+                                path=_child_path(item_path, "schema"),
+                            )
+                        )
 
 
 def _validate_coding_loop(
@@ -1629,7 +1892,9 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     description = _required_string(data, "description")
     step_type = _optional_string(data.get("step_type")) or "freeform"
     if step_type not in SUPPORTED_STEP_TYPES:
-        raise ValueError("Skill step step_type must be freeform, invoke_tool, or gate.")
+        raise ValueError(
+            "Skill step step_type must be freeform, predicated, invoke_tool, or gate."
+        )
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
     raw_interaction_style = data.get("interaction_style")
@@ -1647,12 +1912,17 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     actions = _optional_step_actions(data.get("actions"))
     actions_declared = "actions" in data
+    next_step_override = _optional_string(data.get("next_step_override"))
+    if data.get("next_step_override") is not None and next_step_override is None:
+        raise ValueError("Skill step next_step_override must be a non-empty string.")
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
     raw_coding_loop = data.get("coding_loop")
     coding_loop = (
         _parse_coding_loop(raw_coding_loop) if raw_coding_loop is not None else None
     )
+    raw_completion = data.get("completion")
+    completion = _parse_step_completion(raw_completion)
     raw_validation_gate = data.get("validation_gate")
     if raw_validation_gate is not None and not isinstance(raw_validation_gate, Mapping):
         raise ValueError("Skill step validation_gate must be an object.")
@@ -1713,8 +1983,22 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         raise ValueError("coding_loop steps must declare a coding_loop object.")
     if step_type != "coding_loop" and coding_loop is not None:
         raise ValueError("Only coding_loop steps may declare coding_loop.")
+    if step_type == "predicated" and completion is None:
+        raise ValueError("predicated steps must declare a completion object.")
+    if step_type != "predicated" and completion is not None:
+        raise ValueError("Only predicated steps may declare completion.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
+    if completion is not None:
+        declared_outputs = {output.name for output in outputs}
+        missing_outputs = sorted(
+            name for name in completion.required_outputs if name not in declared_outputs
+        )
+        if missing_outputs:
+            raise ValueError(
+                "predicated completion references undeclared outputs: "
+                + ", ".join(missing_outputs)
+            )
     return SkillStep(
         id=step_id,
         description=description,
@@ -1727,13 +2011,77 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         prompt_catalogs=prompt_catalogs,
         actions=actions,
         actions_declared=actions_declared,
+        next_step_override=next_step_override,
         pre_step=pre_step,
         gate=gate,
         validation_gate=validation_gate,
         coding_loop=coding_loop,
+        completion=completion,
         inputs=inputs,
         outputs=outputs,
     )
+
+
+def _parse_step_completion(value: object) -> SkillStepCompletion | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("Skill step completion must be an object.")
+    raw_outputs = value.get("required_outputs")
+    if (
+        not isinstance(raw_outputs, Sequence)
+        or isinstance(raw_outputs, (str, bytes, bytearray))
+        or not raw_outputs
+    ):
+        raise ValueError(
+            "Skill step completion.required_outputs must be a non-empty array."
+        )
+    required_outputs: list[str] = []
+    for item in raw_outputs:
+        output_name = _optional_string(item)
+        if output_name is None:
+            raise ValueError(
+                "Skill step completion.required_outputs must contain strings."
+            )
+        if output_name in required_outputs:
+            raise ValueError(
+                "Skill step completion.required_outputs must not contain duplicates."
+            )
+        required_outputs.append(output_name)
+    raw_actions = value.get("required_actions", [])
+    if not isinstance(raw_actions, Sequence) or isinstance(
+        raw_actions, (str, bytes, bytearray)
+    ):
+        raise ValueError("Skill step completion.required_actions must be an array.")
+    required_actions: list[SkillStepRequiredAction] = []
+    for item in raw_actions:
+        if not isinstance(item, Mapping):
+            raise ValueError(
+                "Skill step completion.required_actions entries must be objects."
+            )
+        action = _optional_string(item.get("action"))
+        targets_from = _optional_string(item.get("targets_from"))
+        match_field = _optional_string(item.get("match_field"))
+        if action is None or (targets_from is None) != (match_field is None):
+            raise ValueError(
+                "Skill step completion.required_actions entries must declare "
+                "action, or both targets_from and match_field strings."
+            )
+        if set(item) - {"action", "targets_from", "match_field"}:
+            raise ValueError(
+                "Skill step completion.required_actions entries contain "
+                "unsupported fields."
+            )
+        required_actions.append(
+            SkillStepRequiredAction(action, targets_from, match_field)
+        )
+    unknown = set(value) - {"required_outputs", "required_actions"}
+    if unknown:
+        raise ValueError(
+            "Skill step completion contains unsupported fields: "
+            + ", ".join(sorted(str(item) for item in unknown))
+        )
+    return SkillStepCompletion(tuple(required_outputs), tuple(required_actions))
 
 
 def _parse_coding_loop(value: object) -> CodingLoopSpec:
@@ -1839,6 +2187,7 @@ def _parse_gate(value: object) -> SkillStepGate | None:
         outcome={**outcome, "path": path},
         goto_step=_required_string(value, "goto_step"),
         retry_context=_required_string(value, "retry_context"),
+        success_goto_step=_optional_string(value.get("success_goto_step")),
     )
 
 
@@ -1878,8 +2227,63 @@ def _parse_step_outputs(value: object) -> tuple[SkillStepOutput, ...]:
                 "Skill step output required_for_next_step must be a boolean."
             )
         scope = _optional_string(item.get("scope")) or "skill"
-        result.append(SkillStepOutput(name, item_type, required_for_next_step, scope))
+        raw_schema = item.get("schema")
+        if raw_schema is not None and not isinstance(raw_schema, Mapping):
+            raise ValueError("Skill step output schema must be an object.")
+        if isinstance(raw_schema, Mapping):
+            schema_error = _output_schema_declaration_error(raw_schema)
+            if schema_error is not None:
+                raise ValueError(schema_error)
+        schema = dict(raw_schema) if isinstance(raw_schema, Mapping) else None
+        result.append(
+            SkillStepOutput(name, item_type, required_for_next_step, scope, schema)
+        )
     return tuple(result)
+
+
+def _output_schema_declaration_error(schema: Mapping[str, Any]) -> str | None:
+    allowed = {
+        "type",
+        "properties",
+        "required",
+        "additionalProperties",
+        "items",
+        "minItems",
+        "minLength",
+        "enum",
+    }
+    unknown = sorted(str(key) for key in set(schema) - allowed)
+    if unknown:
+        return "Skill step output schema has unknown fields: " + ", ".join(unknown)
+    schema_type = schema.get("type")
+    if schema_type not in {
+        "object",
+        "array",
+        "string",
+        "integer",
+        "number",
+        "boolean",
+        "null",
+    }:
+        return "Skill step output schema must declare a supported type."
+    properties = schema.get("properties")
+    if properties is not None:
+        if schema_type != "object" or not isinstance(properties, Mapping):
+            return "Skill step output schema properties must be an object."
+        for name, child in properties.items():
+            if not isinstance(name, str) or not isinstance(child, Mapping):
+                return "Skill step output schema properties must contain schemas."
+            error = _output_schema_declaration_error(child)
+            if error is not None:
+                return error
+    items = schema.get("items")
+    if items is not None:
+        if schema_type != "array" or not isinstance(items, Mapping):
+            return "Skill step output schema items must be an object."
+        error = _output_schema_declaration_error(items)
+        if error is not None:
+            return error
+    return None
 
 
 def _report_to_data(report: SkillValidationReport) -> dict[str, Any]:

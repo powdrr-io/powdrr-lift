@@ -58,6 +58,11 @@ from powdrr_lift.core import (
     system_specification_default_output_path,
 )
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
+from powdrr_lift.core.execution_state import ExecutionArtifact
+from powdrr_lift.core.pr_specification import (
+    build_authoritative_effect_handoff,
+    compile_split_pr_specification,
+)
 from powdrr_lift.core.python_tool_commands import (
     dependency_backed_command_variants,
     missing_executable_output,
@@ -905,15 +910,6 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _restore_parent(self) -> None:
         frame = self.skill_stack.pop()
-        parent_step = frame.parent_skill.skill.steps[frame.parent_step_index]
-        parent_output_names = {
-            output.name for output in (getattr(parent_step, "outputs", ()) or ())
-        }
-        nested_output_records = {
-            name: dict(record)
-            for name, record in self.state.handoff_records.items()
-            if name in parent_output_names
-        }
         if frame.dependency_key is not None:
             self.completed_dependencies.add(frame.dependency_key)
         self.state.selected_skill = frame.parent_skill
@@ -933,7 +929,6 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 name: dict(record)
                 for name, record in (frame.parent_durable_facts or ())
             }
-        self.state.handoff_records.update(nested_output_records)
         self.current_model = frame.parent_model
         self.provider = frame.parent_provider
         self.provider_role = frame.parent_provider_role
@@ -1000,7 +995,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
             if self.state.runtime is not None:
                 self.state.runtime.install_step_scope(
-                    frozenset(getattr(self.current_step, "actions", ())),
+                    _runtime_step_actions(self.current_step),
                     enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
                 if self.observer_allowed_action is not None:
@@ -1073,11 +1068,27 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            frozenset(self.current_step.actions),
+                            _runtime_step_actions(self.current_step),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 if passed:
-                    self.state.step_index += 1
+                    success_step_id = self.current_step.gate.success_goto_step
+                    if success_step_id is None:
+                        self.state.step_index += 1
+                    else:
+                        target_index = _step_index_by_id(
+                            self.selected_skill, success_step_id
+                        )
+                        self.state.step_index = target_index
+                        self.state.execution_events.append(
+                            {
+                                "kind": "goto_step",
+                                "step_id": success_step_id,
+                                "target_step_index": target_index,
+                                "source": "gate_success",
+                                "step_index": self.current_step_index,
+                            }
+                        )
                 else:
                     target_index = _step_index_by_id(
                         self.selected_skill, self.current_step.gate.goto_step
@@ -1123,7 +1134,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            frozenset(self.current_step.actions),
+                            _runtime_step_actions(self.current_step),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 pre_step_event = _latest_deterministic_pre_step(
@@ -1144,6 +1155,15 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 if generated_file_path is not None:
                     self.state.current_file_path = generated_file_path
+                if (
+                    self.current_step.step_type == "predicated"
+                    and _predicated_step_complete(self.current_step, self.state)
+                ):
+                    _advance_predicated_step(self.state, self.current_step)
+                    continue
+                if self.current_step.step_type == "invoke_tool":
+                    self.state.step_index += 1
+                    continue
             step_mapping = (
                 _resolve_llm_mapping(
                     self.current_step.llm_type or self.selection.llm_type,
@@ -1197,22 +1217,38 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     else None
                 ),
             )
+            response_schema = _step_action_response_schema(self.current_step)
+            response_parser = partial(
+                _parse_action_response_with_schema, schema=response_schema
+            )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
                 messages=messages,
-                parser=_parse_action_response,
+                parser=response_parser,
                 model=self.current_model,
                 stderr=self.stderr,
                 max_timeout_retries=0,
                 timeout_backoff_seconds=0,
-                request_action=partial(self._request_action, messages),
+                response_schema=response_schema,
+                request_action=partial(
+                    self._request_action,
+                    messages,
+                    response_schema=response_schema,
+                    parser=response_parser,
+                ),
             )
 
-    def _request_action(self, messages: list[dict[str, str]]) -> SkillChatAction:
+    def _request_action(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+        parser: Callable[[dict[str, Any]], SkillChatAction] | None = None,
+    ) -> SkillChatAction:
         action, self.current_model, self.provider = _complete_json_with_model_fallback(
             client_for=self.client_for_model,
             messages=messages,
-            parser=_parse_action_response,
+            parser=parser or _parse_action_response,
             context=(
                 f"workflow execution for step {self.current_step_index + 1}/"
                 f"{len(self.selected_skill.skill.steps)}"
@@ -1237,6 +1273,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
             ),
             empty_response_fallback_payload={"action": "next_step"},
+            response_schema=response_schema,
         )
         if action is None:
             raise WorkflowLLMExecutionAborted(1)
@@ -1455,6 +1492,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return WorkflowActionOutcome()
         if action.kind == "goto_step":
             target_index = _step_index_by_id(self.selected_skill, action.step_id)
+            _reset_split_pr_handoffs_for_repair(
+                self.state,
+                skill_name=self.selected_skill.skill.name,
+                target_step_id=action.step_id,
+            )
             self.state.step_index = target_index
             if action.decisions_and_context:
                 self.state.execution_context.append(action.decisions_and_context)
@@ -1482,12 +1524,13 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_step_index=parent_step_index,
             )
         self.failure_kind = "validation_error"
-        if action.kind == "next_step":
-            _require_coding_loop_verification(
-                self.current_step,
-                self.state.execution_events,
-                step_index=self.state.step_index,
-            )
+        _validate_coding_loop_action(
+            self.current_step,
+            self.state.execution_events,
+            action_kind=action.kind,
+            step_index=self.state.step_index,
+            worktree_root=self.state.worktree_root,
+        )
         _validate_workflow_step_transition(
             action,
             self.current_step,
@@ -1514,7 +1557,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.observer_allowed_action = None
             self.observer_rejected_action_signature = None
             self.observer_intervention = None
+        _materialize_split_pr_specification(action, self.state, self.current_step)
         _record_workflow_action_outputs(action, self.state, self.current_step)
+        _record_runtime_readiness_artifact(action, self.state, self.current_step)
         if action.kind == "next_step":
             next_step = (
                 self.selected_skill.skill.steps[self.state.step_index + 1]
@@ -1564,6 +1609,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 }
             )
         _reset_validation_gate_after_correction(action, self.state)
+        if self.current_step.step_type == "predicated" and _predicated_step_complete(
+            self.current_step, self.state
+        ):
+            _advance_predicated_step(self.state, self.current_step)
         self.last_failed_action = None
         self.last_validation_error = None
         return WorkflowActionOutcome(continue_running=should_continue)
@@ -1960,9 +2009,16 @@ class _LLMExchangeRecordingClient:
         self._client = client
         self._repo_root = repo_root.expanduser().resolve()
 
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         try:
-            response = _request_json(self._client, messages)
+            response = _request_json(
+                self._client, messages, response_schema=response_schema
+            )
         except Exception as exc:
             serialized_messages = _client_serialized_messages(
                 self._client,
@@ -2078,7 +2134,12 @@ class OpenAIChatClient:
         self.last_usage: dict[str, Any] = {}
         self.last_serialized_messages: str | None = None
 
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         serialized_messages = _serialize_messages(messages)
         self.last_serialized_messages = serialized_messages
         max_tokens, estimated_input_tokens = _request_token_budget(
@@ -2091,7 +2152,18 @@ class OpenAIChatClient:
             "messages": messages,
             "temperature": 0,
             "max_tokens": max_tokens,
-            "response_format": {"type": "json_object"},
+            "response_format": (
+                {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "workflow_action",
+                        "strict": True,
+                        "schema": dict(response_schema),
+                    },
+                }
+                if response_schema is not None
+                else {"type": "json_object"}
+            ),
             "stream": True,
         }
         request = Request(
@@ -2292,13 +2364,25 @@ class LocalLlamaChatClient:
                 f"Underlying error: {exc}"
             ) from exc
 
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         try:
             response = self._llama.create_chat_completion(
                 messages=messages,
                 temperature=0,
                 max_tokens=_MAX_COMPLETION_TOKENS,
-                response_format={"type": "json_object"},
+                response_format=(
+                    {
+                        "type": "json_object",
+                        "schema": dict(response_schema),
+                    }
+                    if response_schema is not None
+                    else {"type": "json_object"}
+                ),
             )
         except Exception as exc:
             raise LocalModelRuntimeError(
@@ -2342,7 +2426,13 @@ class AnthropicChatClient:
         self._limits = limits or _DEFAULT_MODEL_LIMITS
         self.last_serialized_messages: str | None = None
 
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        _ = response_schema
         serialized_messages = _serialize_messages(messages)
         self.last_serialized_messages = serialized_messages
         system_prompt, conversation_messages = _split_system_message(messages)
@@ -2362,6 +2452,7 @@ class AnthropicChatClient:
                 max_tokens=max_tokens,
                 serialized_messages=serialized_conversation_messages,
                 system_prompt=system_prompt,
+                response_schema=response_schema,
             ).encode("utf-8"),
             headers={
                 "x-api-key": self._api_key,
@@ -2417,6 +2508,12 @@ class AnthropicChatClient:
         for block in content:
             if not isinstance(block, dict):
                 continue
+            if (
+                block.get("type") == "tool_use"
+                and block.get("name") == "workflow_action"
+                and isinstance(block.get("input"), dict)
+            ):
+                return cast(dict[str, Any], block["input"])
             if block.get("type") != "text":
                 continue
             text = block.get("text")
@@ -2489,6 +2586,7 @@ def _serialize_anthropic_payload(
     max_tokens: int,
     serialized_messages: str,
     system_prompt: str | None,
+    response_schema: Mapping[str, Any] | None = None,
 ) -> str:
     serialized = (
         "{"
@@ -2501,6 +2599,14 @@ def _serialize_anthropic_payload(
     )
     if system_prompt is not None:
         serialized += ',"system":' + json.dumps(system_prompt, ensure_ascii=False)
+    if response_schema is not None:
+        serialized += (
+            ',"tools":['
+            '{"name":"workflow_action","description":"Return the next workflow '
+            'action.","input_schema":'
+            + json.dumps(response_schema, ensure_ascii=False, separators=(",", ":"))
+            + '}],"tool_choice":{"type":"tool","name":"workflow_action"}'
+        )
     return serialized + "}"
 
 
@@ -4348,6 +4454,25 @@ def _run_deterministic_pre_step(
                 worktree_root=worktree_root,
                 runtime=runtime,
             )
+        elif tool == _INTERNAL_TOOL and _is_authoritative_effect_command(
+            parameters.get("command")
+        ):
+            command = _command_items_for_validation(parameters.get("command"))
+            work_item_name = _extract_command_option(command, "--work-item-name")
+            if work_item_name is None:
+                raise PowdrrExecutionError(
+                    "authoritative-pr-effects requires --work-item-name."
+                )
+            result = invoke_repository_read(
+                "authoritative_pr_effects",
+                {"work_item_name": work_item_name},
+                worktree_root=worktree_root,
+                executor=lambda _arguments: build_authoritative_effect_handoff(
+                    work_item_name=work_item_name,
+                    repo_root=worktree_root,
+                ),
+                runtime=runtime,
+            )
         elif tool in {"shell", _INTERNAL_TOOL}:
             if tool == _INTERNAL_TOOL and parameters.get("help") is not True:
                 _validate_internal_command(parameters.get("command"))
@@ -4390,12 +4515,18 @@ def _run_deterministic_pre_step(
             "step_index": step_index,
         }
         execution_events.append(event)
+        _record_runtime_readiness_from_pre_step(step, runtime)
         if isinstance(handoff_records, dict):
             for output in step.outputs:
+                output_value = (
+                    _runtime_readiness_report(runtime)
+                    if output.name == "readiness_report"
+                    else result
+                )
                 handoff_records[output.name] = {
                     "name": output.name,
                     "type": output.type,
-                    "value": result,
+                    "value": output_value,
                     "produced_by": {
                         "step_index": step_index,
                         "action": "deterministic_pre_step",
@@ -4473,6 +4604,14 @@ def _run_deterministic_pre_step(
         "Deterministic pre-step gather_context result:\n"
         + json.dumps(result, ensure_ascii=False)
     )
+
+
+def _is_authoritative_effect_command(command: object) -> bool:
+    command_items = _command_items(command)
+    return len(command_items) >= 2 and command_items[:2] == [
+        "powdrr-lift",
+        "authoritative-pr-effects",
+    ]
 
 
 def _gate_outcome_matches(
@@ -4781,6 +4920,21 @@ def _build_step_execution_messages(
 
 
 def _action_system_prompt(*, current_step: Any | None = None) -> str:
+    predicated_step = (
+        current_step is not None
+        and getattr(current_step, "step_type", "freeform") == "predicated"
+    )
+    completion_guidance = (
+        "- predicated completion: never return next_step. Choose one declared "
+        "work action and include completed handoff values in the top-level "
+        "outputs object, for example "
+        '{"action":"emit_outputs","outputs":{"result":{}}}. '
+        "The runtime advances automatically as soon as every required output "
+        "is present; if more work is needed, omit that output and continue.\n"
+        if predicated_step
+        else "- next_step: choose this when the current step is complete and the next "
+        "skill step should receive the accumulated context.\n"
+    )
     if current_step is None or _step_needs_prompt_catalog(
         current_step, "context_types"
     ):
@@ -4853,14 +5007,11 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "returned path; if the error lists candidate files, choose only one of "
         "those exact paths. Never synthesize a filename from a task id, template "
         "id, package name, or related name.\n"
-        "- next_step: choose this when the current step is complete and the next "
-        "skill step should receive the accumulated context.\n"
-        "- complete: choose this when the skill has finished and no more action "
+        + completion_guidance
+        + "- complete: choose this when the skill has finished and no more action "
         "is required. Every later gate in this skill must already have passed; "
         "you cannot complete while a gate remains further ahead.\n"
-        "These next_step and complete rules apply to every step, including steps "
-        "whose optional prompt catalogs are omitted.\n"
-        "If the observer intervention recommends an action, treat that action as "
+        + "If the observer intervention recommends an action, treat that action as "
         "allowed for this step and choose it directly when appropriate.\n"
         "When the current step declares outputs, provide the completed values "
         "in an outputs object using exactly those declared names. A later step "
@@ -5375,6 +5526,7 @@ def _workflow_action_handlers() -> dict[
         "read_document": _handle_workflow_action_read_document,
         "list_files": _handle_workflow_action_list_files,
         "next_step": _handle_workflow_action_next_step,
+        "emit_outputs": _handle_workflow_action_emit_outputs,
         "prompt_user": _handle_workflow_action_prompt_user,
         "invoke_tool": _handle_workflow_action_invoke_tool,
         "gather_context": _handle_workflow_action_gather_context,
@@ -6040,6 +6192,26 @@ def _handle_workflow_action_next_step(
         }
     )
     state.step_index += 1
+    return True
+
+
+def _handle_workflow_action_emit_outputs(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    stdout: TextIO,
+    stderr: TextIO,
+    input_func: Callable[[], str],
+    config: WorkflowChatConfig,
+) -> bool:
+    _ = stdout, stderr, input_func, config
+    state.execution_events.append(
+        {
+            "kind": action.kind,
+            "outputs": dict(action.outputs),
+            "decisions_and_context": action.decisions_and_context,
+            "step_index": state.step_index,
+        }
+    )
     return True
 
 
@@ -6992,6 +7164,99 @@ def _validate_workflow_action_outputs(action: SkillChatAction, step: Any) -> Non
             "Workflow action outputs are not declared by the current step: "
             + ", ".join(unexpected)
         )
+    declarations = {output.name: output for output in step.outputs}
+    for name, value in action.outputs.items():
+        declaration = declarations[name]
+        if declaration.schema is None:
+            continue
+        schema_error = _json_schema_error(
+            value,
+            declaration.schema,
+            path=f"outputs.{name}",
+        )
+        if schema_error is not None:
+            raise PowdrrExecutionError(
+                f"Workflow action output does not match its declared schema: "
+                f"{schema_error}"
+            )
+
+
+def _json_schema_error(
+    value: Any,
+    schema: Mapping[str, Any],
+    *,
+    path: str,
+) -> str | None:
+    """Validate the strict JSON-schema subset used by workflow handoffs."""
+    expected_type = schema.get("type")
+    type_matches = {
+        "object": isinstance(value, Mapping),
+        "array": isinstance(value, Sequence)
+        and not isinstance(value, (str, bytes, bytearray)),
+        "string": isinstance(value, str),
+        "integer": isinstance(value, int) and not isinstance(value, bool),
+        "number": isinstance(value, (int, float)) and not isinstance(value, bool),
+        "boolean": isinstance(value, bool),
+        "null": value is None,
+    }
+    if isinstance(expected_type, str) and not type_matches.get(expected_type, False):
+        return f"{path} must be {expected_type}."
+    enum = schema.get("enum")
+    if isinstance(enum, Sequence) and value not in enum:
+        return f"{path} must be one of {list(enum)!r}."
+    if isinstance(value, Mapping):
+        properties = schema.get("properties", {})
+        if not isinstance(properties, Mapping):
+            return f"{path} schema properties must be an object."
+        required = schema.get("required", ())
+        required_names = (
+            tuple(required)
+            if isinstance(required, Sequence)
+            and not isinstance(required, (str, bytes, bytearray))
+            else ()
+        )
+        missing = sorted(str(name) for name in required_names if name not in value)
+        if missing:
+            return f"{path} is missing required properties: {', '.join(missing)}."
+        if schema.get("additionalProperties") is False:
+            unknown = sorted(str(name) for name in set(value) - set(properties))
+            if unknown:
+                return f"{path} has unknown properties: {', '.join(unknown)}."
+        for name, item in value.items():
+            item_schema = properties.get(name)
+            if not isinstance(item_schema, Mapping):
+                continue
+            error = _json_schema_error(item, item_schema, path=f"{path}.{name}")
+            if error is not None:
+                return error
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        min_items = schema.get("minItems")
+        if isinstance(min_items, int) and len(value) < min_items:
+            return f"{path} must contain at least {min_items} items."
+        item_schema = schema.get("items")
+        if isinstance(item_schema, Mapping):
+            for index, item in enumerate(value):
+                error = _json_schema_error(item, item_schema, path=f"{path}[{index}]")
+                if error is not None:
+                    return error
+    if isinstance(value, str):
+        min_length = schema.get("minLength")
+        if isinstance(min_length, int) and len(value) < min_length:
+            return f"{path} must contain at least {min_length} characters."
+    return None
+
+
+def _parse_action_response_with_schema(
+    payload: dict[str, Any],
+    *,
+    schema: Mapping[str, Any],
+) -> SkillChatAction:
+    schema_error = _json_schema_error(payload, schema, path="response")
+    if schema_error is not None:
+        raise PowdrrExecutionError(
+            f"Workflow action response does not match the active schema: {schema_error}"
+        )
+    return _parse_action_response(payload)
 
 
 def _record_workflow_action_outputs(
@@ -7014,6 +7279,162 @@ def _record_workflow_action_outputs(
             },
             "scope": declaration.scope if declaration is not None else "skill",
         }
+
+
+def _record_runtime_readiness_artifact(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    step: Any,
+) -> None:
+    """Replace model-asserted readiness with a runtime-evaluated artifact."""
+    if "readiness_report" not in action.outputs or state.runtime is None:
+        return
+    report_data = _runtime_readiness_report(state.runtime)
+    record = state.handoff_records.get("readiness_report")
+    if record is not None:
+        record["value"] = report_data
+        record["produced_by"] = {
+            "step_index": state.step_index,
+            "action": "runtime_readiness_evaluation",
+        }
+    if not report_data["ready"]:
+        return
+    content_ref = (
+        "readiness:"
+        + hashlib.sha256(
+            json.dumps(report_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+    )
+    artifact = ExecutionArtifact(
+        artifact_id="readiness-report-" + content_ref[-16:],
+        artifact_type="readiness_report",
+        schema_version="readiness-report-v1",
+        owner_persona_id="code_reviewer",
+        content_ref=content_ref,
+        accepted=True,
+    )
+    state.runtime.record_artifact(artifact)
+
+
+def _materialize_split_pr_specification(
+    action: SkillChatAction,
+    state: _WorkflowExecutionState,
+    step: Any,
+) -> None:
+    """Compile validated split decisions into the proposed-PR document."""
+    allocation = action.outputs.get("effect_allocation")
+    if allocation is None or step.id != "allocate-proposed-pr-effects":
+        return
+    if not isinstance(allocation, Mapping):
+        raise PowdrrExecutionError("effect_allocation must be a JSON object.")
+    plan_record = state.handoff_records.get("proposed_pr_plan")
+    effects_record = state.handoff_records.get("authoritative_effects")
+    plan = plan_record.get("value") if isinstance(plan_record, Mapping) else None
+    effects = (
+        effects_record.get("value") if isinstance(effects_record, Mapping) else None
+    )
+    if not isinstance(plan, Mapping) or not isinstance(effects, Mapping):
+        raise PowdrrExecutionError(
+            "Cannot compile effect_allocation without validated proposed_pr_plan "
+            "and authoritative_effects handoffs."
+        )
+    target = state.current_file_path
+    if target is None or target.name != "proposed-pr-specification.yaml":
+        candidates = tuple(state.worktree_root.rglob("proposed-pr-specification.yaml"))
+        target = candidates[0] if len(candidates) == 1 else None
+    if target is None:
+        raise PowdrrExecutionError(
+            "Cannot materialize effect_allocation without the proposed PR "
+            "specification path in current file context."
+        )
+    try:
+        compiled = compile_split_pr_specification(
+            plan,
+            allocation,
+            effects,
+            work_item_name=target.parent.name,
+            repo_root=state.worktree_root,
+            file_path=target,
+        )
+    except ValueError as exc:
+        raise PowdrrExecutionError(str(exc)) from exc
+    updated_text = (
+        "# This file is read-only and should never be edited by a tool or agent.\n"
+        + yaml.safe_dump(compiled, sort_keys=False)
+    )
+    _validate_structured_document_text(target, updated_text)
+    runtime = _ensure_execution_runtime(state)
+    with runtime.without_action_contract():
+        invoke_file_mutation(
+            (_worktree_relative_path(target, state.worktree_root),),
+            worktree_root=state.worktree_root,
+            executor=lambda: target.write_text(updated_text, encoding="utf-8"),
+            runtime=runtime,
+        )
+    state.current_file_path = target
+
+
+def _reset_split_pr_handoffs_for_repair(
+    state: _WorkflowExecutionState,
+    *,
+    skill_name: str,
+    target_step_id: str | None,
+) -> None:
+    if skill_name != "start-implementing-feature":
+        return
+    if target_step_id == "plan-proposed-pr-specification":
+        for name in (
+            "proposed_pr_plan",
+            "authoritative_effects",
+            "effect_allocation",
+        ):
+            state.handoff_records.pop(name, None)
+        effect_step_index = _step_index_by_id(
+            state.selected_skill, "load-authoritative-pr-effects"
+        )
+        _invalidate_deterministic_pre_step(
+            state.execution_events,
+            skill_name=skill_name,
+            step_index=effect_step_index,
+        )
+    elif target_step_id == "allocate-proposed-pr-effects":
+        state.handoff_records.pop("effect_allocation", None)
+
+
+def _runtime_readiness_report(runtime: ExecutionRuntime) -> dict[str, Any]:
+    report = runtime.publish_readiness(required_artifact_types=())
+    return {
+        "ready": report.ready,
+        "reasons": list(report.reasons),
+        "satisfied_requirements": list(getattr(report, "satisfied_requirements", ())),
+    }
+
+
+def _record_runtime_readiness_from_pre_step(
+    step: Any,
+    runtime: ExecutionRuntime,
+) -> None:
+    if not any(output.name == "readiness_report" for output in step.outputs):
+        return
+    report_data = _runtime_readiness_report(runtime)
+    if not report_data["ready"]:
+        return
+    content_ref = (
+        "readiness:"
+        + hashlib.sha256(
+            json.dumps(report_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+    )
+    runtime.record_artifact(
+        ExecutionArtifact(
+            artifact_id="readiness-report-" + content_ref[-16:],
+            artifact_type="readiness_report",
+            schema_version="readiness-report-v1",
+            owner_persona_id="code_reviewer",
+            content_ref=content_ref,
+            accepted=True,
+        )
+    )
 
 
 def _workflow_handoff_inputs(
@@ -7142,6 +7563,104 @@ def _validate_workflow_handoff(
         )
 
 
+def _predicated_step_complete(step: Any, state: _WorkflowExecutionState) -> bool:
+    completion = getattr(step, "completion", None)
+    if completion is None:
+        return False
+    for output_name in completion.required_outputs:
+        record = state.handoff_records.get(output_name)
+        producer = record.get("produced_by") if isinstance(record, Mapping) else None
+        if (
+            not isinstance(producer, Mapping)
+            or producer.get("step_index") != state.step_index
+        ):
+            return False
+    for requirement in getattr(completion, "required_actions", ()):
+        if requirement.targets_from is None:
+            if not any(
+                event.get("step_index") == state.step_index
+                and event.get("kind") == requirement.action
+                for event in state.execution_events
+            ):
+                return False
+            continue
+        targets = _resolve_predicated_targets(requirement.targets_from, state)
+        for target in targets:
+            if not any(
+                event.get("step_index") == state.step_index
+                and event.get("kind") == requirement.action
+                and event.get(requirement.match_field) == target
+                for event in state.execution_events
+            ):
+                return False
+    return True
+
+
+def _resolve_predicated_targets(path: str, state: _WorkflowExecutionState) -> list[Any]:
+    """Resolve a small deterministic handoff path such as ``x.items[*].file``."""
+    segments = path.split(".")
+    if not segments or segments[0] not in state.handoff_records:
+        return []
+    values: list[Any] = [state.handoff_records[segments[0]].get("value")]
+    for segment in segments[1:]:
+        wildcard = segment.endswith("[*]")
+        key = segment[:-3] if wildcard else segment
+        next_values: list[Any] = []
+        for value in values:
+            if key and isinstance(value, Mapping) and key in value:
+                nested = value[key]
+                if (
+                    wildcard
+                    and isinstance(nested, Sequence)
+                    and not isinstance(nested, (str, bytes, bytearray))
+                ):
+                    next_values.extend(nested)
+                else:
+                    next_values.append(nested)
+            elif (
+                wildcard
+                and isinstance(value, Sequence)
+                and not isinstance(value, (str, bytes, bytearray))
+            ):
+                next_values.extend(value)
+        values = next_values
+    flattened: list[Any] = []
+    for value in values:
+        if isinstance(value, Sequence) and not isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            flattened.extend(value)
+        else:
+            flattened.append(value)
+    return flattened
+
+
+def _advance_predicated_step(
+    state: _WorkflowExecutionState,
+    current_step: Any,
+) -> None:
+    next_index = state.step_index + 1
+    next_step = (
+        state.selected_skill.skill.steps[next_index]
+        if next_index < len(state.selected_skill.skill.steps)
+        else None
+    )
+    _validate_workflow_handoff(
+        current_step,
+        next_step,
+        state.handoff_records,
+        current_step_index=state.step_index,
+    )
+    state.execution_events.append(
+        {
+            "kind": "predicated_advance",
+            "step_index": state.step_index,
+            "required_outputs": list(current_step.completion.required_outputs),
+        }
+    )
+    state.step_index = next_index
+
+
 def _validate_workflow_step_transition(
     action: SkillChatAction,
     step: Any,
@@ -7150,8 +7669,74 @@ def _validate_workflow_step_transition(
     state: _WorkflowExecutionState | None = None,
 ) -> None:
     """Prevent the LLM from skipping a step's required tool invocation."""
+    if action.kind == "emit_outputs":
+        if getattr(step, "step_type", "freeform") != "predicated":
+            raise PowdrrExecutionError(
+                "emit_outputs is valid only for predicated steps."
+            )
+        if not action.outputs:
+            raise PowdrrExecutionError(
+                "emit_outputs must include at least one declared output."
+            )
+        if (
+            state is not None
+            and not _predicated_step_complete(step, state)
+            and getattr(step, "completion", None) is not None
+        ):
+            missing = [
+                requirement.targets_from
+                for requirement in getattr(step.completion, "required_actions", ())
+                if requirement.targets_from is not None
+                and not all(
+                    any(
+                        event.get("step_index") == state.step_index
+                        and event.get("kind") == requirement.action
+                        and event.get(requirement.match_field) == target
+                        for event in state.execution_events
+                    )
+                    for target in _resolve_predicated_targets(
+                        requirement.targets_from, state
+                    )
+                )
+            ]
+            missing.extend(
+                requirement.action
+                for requirement in getattr(step.completion, "required_actions", ())
+                if requirement.targets_from is None
+                and not any(
+                    event.get("step_index") == state.step_index
+                    and event.get("kind") == requirement.action
+                    for event in state.execution_events
+                )
+            )
+            if missing:
+                raise PowdrrExecutionError(
+                    "Cannot emit_outputs until required action evidence is recorded: "
+                    + ", ".join(missing)
+                )
+    if (
+        getattr(step, "step_type", "freeform") == "predicated"
+        and action.kind == "next_step"
+    ):
+        raise PowdrrExecutionError(
+            "Predicated steps advance automatically when their completion "
+            "predicate is satisfied; next_step is not a valid model action."
+        )
     if action.kind not in {"next_step", "goto_step", "complete"}:
         return
+    if action.kind == "next_step":
+        next_step_override = getattr(step, "next_step_override", None)
+        if next_step_override:
+            if state is None:
+                raise PowdrrExecutionError(
+                    "Workflow next_step_override requires the current skill state."
+                )
+            target_index = _step_index_by_id(state.selected_skill, next_step_override)
+            if target_index >= current_step_index:
+                raise PowdrrExecutionError(
+                    "Workflow next_step_override must target a prior step; "
+                    f"{next_step_override!r} is not before step {current_step_index}."
+                )
     if action.kind == "goto_step":
         if state is None:
             raise PowdrrExecutionError(
@@ -7358,6 +7943,13 @@ def _validate_workflow_action_for_step_unwrapped(
                 f"step. Use one of: {declared}."
             )
         return
+    if action.tool == "shell":
+        command_items = _command_items_for_validation(action.parameters.get("command"))
+        if command_items == ["git", "diff", "--cached", "--name-only"] and any(
+            invocation.tool == GIT_TOOL and invocation.operation == "add"
+            for invocation in supported_invocations
+        ):
+            return
     matching_invocations = tuple(
         invocation
         for invocation in supported_invocations
@@ -7641,8 +8233,21 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "read_document": _parse_workflow_action_read_document,
         "list_files": _parse_workflow_action_list_files,
         "next_step": _parse_workflow_action_next_step,
+        "emit_outputs": _parse_workflow_action_emit_outputs,
         "prompt_user": _parse_workflow_action_prompt_user,
     }
+
+
+def _parse_workflow_action_emit_outputs(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    return SkillChatAction(
+        kind="emit_outputs",
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
 
 
 def _parse_workflow_action_invoke_skill(
@@ -8516,8 +9121,35 @@ def _run_coding_loop_verification(
     return {
         "results": results,
         "all_passed": all_passed,
+        "worktree_fingerprint": _coding_loop_worktree_fingerprint(worktree_root),
         "error": None if all_passed else "One or more coding-loop checks failed.",
     }
+
+
+def _coding_loop_worktree_fingerprint(worktree_root: Path) -> str:
+    """Hash material worktree contents for verification evidence binding."""
+    digest = hashlib.sha256()
+    ignored_directories = {".git", ".venv", "__pycache__", ".pytest_cache"}
+    for directory, dirnames, filenames in os.walk(worktree_root, followlinks=False):
+        dirnames[:] = sorted(
+            name for name in dirnames if name not in ignored_directories
+        )
+        for filename in sorted(filenames):
+            path = Path(directory) / filename
+            relative_path = path.relative_to(worktree_root).as_posix()
+            digest.update(relative_path.encode("utf-8"))
+            digest.update(b"\0")
+            try:
+                if path.is_symlink():
+                    digest.update(b"symlink\0")
+                    digest.update(os.readlink(path).encode("utf-8"))
+                else:
+                    digest.update(b"file\0")
+                    digest.update(path.read_bytes())
+            except OSError as error:
+                digest.update(f"unreadable:{error}".encode())
+            digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _require_coding_loop_verification(
@@ -8525,7 +9157,26 @@ def _require_coding_loop_verification(
     events: Sequence[Mapping[str, Any]],
     *,
     step_index: int | None = None,
+    worktree_root: Path | None = None,
 ) -> None:
+    _validate_coding_loop_action(
+        step,
+        events,
+        action_kind="next_step",
+        step_index=step_index,
+        worktree_root=worktree_root,
+    )
+
+
+def _validate_coding_loop_action(
+    step: Any,
+    events: Sequence[Mapping[str, Any]],
+    *,
+    action_kind: str,
+    step_index: int | None = None,
+    worktree_root: Path | None = None,
+) -> None:
+    """Enforce coding-loop completion from typed events, not model guidance."""
     coding_loop = getattr(step, "coding_loop", None)
     if coding_loop is None or not coding_loop.verification:
         return
@@ -8538,12 +9189,36 @@ def _require_coding_loop_verification(
         ),
         None,
     )
-    if latest is None or latest.get("all_passed") is not True:
+    if action_kind == "next_step" and (
+        latest is None or latest.get("all_passed") is not True
+    ):
         raise PowdrrExecutionError(
             "This coding_loop step cannot choose next_step until its declared "
             "verification commands pass. Make or repair the implementation, "
             "then wait for the automatic verification result."
         )
+    if (
+        latest is not None
+        and latest.get("all_passed") is True
+        and action_kind != "next_step"
+    ):
+        raise PowdrrExecutionError(
+            "This coding_loop step has already passed all declared checks. "
+            "Choose next_step with the required output_state; do not perform "
+            "another edit, read, or verification run."
+        )
+    if latest is not None and latest.get("all_passed") is True:
+        recorded_fingerprint = latest.get("worktree_fingerprint")
+        if (
+            worktree_root is not None
+            and isinstance(recorded_fingerprint, str)
+            and recorded_fingerprint != _coding_loop_worktree_fingerprint(worktree_root)
+        ):
+            raise PowdrrExecutionError(
+                "This coding_loop verification is stale because the worktree "
+                "changed after the checks passed. Run the declared verification "
+                "commands again before choosing next_step."
+            )
 
 
 def _structured_intrinsic_pre_step_parameters(
@@ -9026,6 +9701,7 @@ def _complete_json_with_model_fallback(
     provider: str,
     empty_response_fallback_payload: dict[str, Any] | None = None,
     error_recorder: Callable[[RuntimeError, dict[str, Any] | None], None] | None = None,
+    response_schema: Mapping[str, Any] | None = None,
 ) -> tuple[Any | None, str, str]:
     active_model = model
     active_provider = provider
@@ -9077,6 +9753,7 @@ def _complete_json_with_model_fallback(
                 ),
                 empty_response_fallback_payload=empty_response_fallback_payload,
                 error_recorder=error_recorder,
+                response_schema=response_schema,
             )
             return result, active_model, active_provider
         except _ModelUnavailableError as exc:
@@ -9138,6 +9815,7 @@ def _complete_json_with_repair(
     fallback_on_transient_exhaustion: bool = False,
     empty_response_fallback_payload: dict[str, Any] | None = None,
     error_recorder: Callable[[RuntimeError, dict[str, Any] | None], None] | None = None,
+    response_schema: Mapping[str, Any] | None = None,
 ) -> Any | None:
     empty_question_reprompts = 0
     empty_response_reprompts = 0
@@ -9151,7 +9829,7 @@ def _complete_json_with_repair(
         )
         _print_waiting_for_model(stderr, model)
         try:
-            payload = _request_json(client, messages)
+            payload = _request_json(client, messages, response_schema=response_schema)
             _verbose_json(
                 stderr,
                 config.verbose,
@@ -9180,7 +9858,9 @@ def _complete_json_with_repair(
                     time.sleep(delay_seconds)
                     try:
                         _print_waiting_for_model(stderr, model)
-                        payload = _request_json(client, messages)
+                        payload = _request_json(
+                            client, messages, response_schema=response_schema
+                        )
                         _verbose_json(
                             stderr,
                             config.verbose,
@@ -9241,6 +9921,7 @@ def _complete_json_with_repair(
                         stderr=stderr,
                         verbose=config.verbose,
                         error_recorder=error_recorder,
+                        response_schema=response_schema,
                     )
                 except _EmptyProviderResponseError as empty_exc:
                     empty_response_reprompts += 1
@@ -9403,6 +10084,7 @@ def _complete_json_with_repair(
                     stderr=stderr,
                     verbose=config.verbose,
                     error_recorder=error_recorder,
+                    response_schema=response_schema,
                 )
             except _EmptyProviderResponseError as empty_exc:
                 empty_response_reprompts += 1
@@ -10167,6 +10849,7 @@ def _attempt_json_repair(
     verbose: bool,
     previous_payload: dict[str, Any] | None = None,
     error_recorder: Callable[[RuntimeError, dict[str, Any] | None], None] | None = None,
+    response_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     repair_messages = _build_json_repair_messages(
         messages,
@@ -10183,7 +10866,9 @@ def _attempt_json_repair(
     )
     try:
         _print_waiting_for_model(stderr, model)
-        repaired_payload = _request_json(client, repair_messages)
+        repaired_payload = _request_json(
+            client, repair_messages, response_schema=response_schema
+        )
         _verbose_json(
             stderr,
             verbose,
@@ -10325,6 +11010,11 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
             if getattr(step, "coding_loop", None) is not None
             else None
         ),
+        "completion": (
+            step.completion.to_data()
+            if getattr(step, "completion", None) is not None
+            else None
+        ),
         "outputs": [
             output.to_data() for output in (getattr(step, "outputs", ()) or ())
         ],
@@ -10340,6 +11030,131 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     }
 
 
+def _step_action_response_schema(step: Any) -> dict[str, Any]:
+    """Derive a strict provider envelope from the active step contract."""
+    outputs = tuple(getattr(step, "outputs", ()) or ())
+    output_properties = {
+        output.name: (
+            dict(output.schema)
+            if output.schema is not None
+            else _json_schema_for_declared_type(output.type)
+        )
+        for output in outputs
+    }
+    action_names = [name for name, _instructions in _step_actions(step)]
+    if not getattr(step, "actions_declared", False):
+        for legacy_action in (
+            "gather_context",
+            "prompt_user",
+            "edit",
+            "yaml_edit",
+            "file_management",
+            "invoke_skill",
+            "invoke_tool",
+            "read_document",
+            "list_files",
+            "goto_step",
+            "next_step",
+            "complete",
+        ):
+            if (
+                legacy_action == "next_step"
+                and getattr(step, "step_type", "freeform") == "predicated"
+            ):
+                continue
+            if legacy_action not in action_names:
+                action_names.append(legacy_action)
+    properties: dict[str, Any] = {
+        "action": {
+            "type": "string",
+            "enum": action_names,
+        },
+        "decisions_and_context": {"type": "string"},
+        "llm_type": {"type": "string"},
+    }
+    action_properties: dict[str, dict[str, Any]] = {
+        "gather_context": {
+            "types": {"type": "array", "items": {"type": "string"}},
+            "feature_id": {"type": "string"},
+            "keywords": {"type": "array", "items": {"type": "string"}},
+            "filters": {"type": "object"},
+        },
+        "prompt_user": {"text": {"type": "string"}},
+        "edit": {
+            "file_path": {"type": "string"},
+            "edits": {"type": "array", "items": {"type": "object"}},
+            "file_edits": {"type": "array", "items": {"type": "object"}},
+        },
+        "yaml_edit": {
+            "file_path": {"type": "string"},
+            "operations": {"type": "array", "items": {"type": "object"}},
+        },
+        "file_management": {
+            "operation": {"type": "string"},
+            "file_path": {"type": "string"},
+            "destination_path": {"type": "string"},
+        },
+        "invoke_skill": {
+            "skill": {"type": "string"},
+            "provider_role": {
+                "type": "string",
+                "enum": ["normal", "adversarial"],
+            },
+            "clean": {"type": "boolean"},
+            "context": {"type": "array", "items": {"type": "string"}},
+        },
+        "invoke_tool": {
+            "tool": {"type": "string"},
+            "parameters": {"type": "object"},
+        },
+        "read_document": {
+            "file_path": {"type": "string"},
+            "start_line": {"type": "integer"},
+            "end_line": {"type": "integer"},
+        },
+        "list_files": {
+            "directory": {"type": "string"},
+            "pattern": {"type": "string"},
+            "recursive": {"type": "boolean"},
+        },
+        "goto_step": {"step_id": {"type": "string"}},
+        "next_step": {"output_state": {}},
+        "complete": {"text": {"type": "string"}},
+        "emit_outputs": {},
+    }
+    for action_name in action_names:
+        properties.update(action_properties.get(action_name, {}))
+    if outputs:
+        properties["outputs"] = {
+            "type": "object",
+            "properties": output_properties,
+            "required": [
+                output.name
+                for output in outputs
+                if output.required_for_next_step
+                or (
+                    getattr(step, "step_type", "freeform") == "predicated"
+                    and getattr(step, "completion", None) is not None
+                    and output.name in step.completion.required_outputs
+                )
+            ],
+            "additionalProperties": False,
+        }
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": ["action"],
+        "additionalProperties": False,
+    }
+
+
+def _json_schema_for_declared_type(type_name: str) -> dict[str, Any]:
+    normalized = type_name.strip().casefold()
+    if normalized in {"string", "array", "object", "integer", "number", "boolean"}:
+        return {"type": normalized}
+    return {}
+
+
 _DEFAULT_ACTION_INSTRUCTIONS = {
     "gather_context": "Discover checked-in specifications relevant to this step.",
     "prompt_user": "Ask one necessary human question.",
@@ -10352,6 +11167,7 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
     "list_files": "Discover exact file paths.",
     "goto_step": "Repeat one declared prior step when another pass is needed.",
     "next_step": "Advance after this step is complete.",
+    "emit_outputs": "Publish the completed outputs for a predicated step.",
     "complete": "End the skill after all work is finished.",
 }
 
@@ -10399,9 +11215,15 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
+    if getattr(step, "step_type", "freeform") == "predicated":
+        actions.append(("emit_outputs", _DEFAULT_ACTION_INSTRUCTIONS["emit_outputs"]))
+        action_names.add("emit_outputs")
     if "prompt_user" not in action_names:
         actions.append(("prompt_user", "Ask one necessary human question."))
-    if "next_step" not in action_names:
+    if (
+        "next_step" not in action_names
+        and getattr(step, "step_type", "freeform") != "predicated"
+    ):
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(
         output
@@ -10423,9 +11245,20 @@ def _declared_action_names(step: Any) -> tuple[str, ...]:
     # next_step is an implicit runtime action; its output-specific guidance is
     # rendered only when the step declares required handoff outputs.
     names = [name for name, _ in _step_actions(step)]
-    if "next_step" not in names:
+    if (
+        "next_step" not in names
+        and getattr(step, "step_type", "freeform") != "predicated"
+    ):
         names.append("next_step")
     return tuple(names)
+
+
+def _runtime_step_actions(step: Any) -> frozenset[str]:
+    """Include universal predicated output publication in the runtime scope."""
+    actions = frozenset(getattr(step, "actions", ()) or ())
+    if getattr(step, "step_type", "freeform") == "predicated":
+        return actions | {"emit_outputs"}
+    return actions
 
 
 def _action_repair_prompt(
@@ -10435,15 +11268,26 @@ def _action_repair_prompt(
     failed_action: SkillChatAction | None = None,
     validation_error: str | None = None,
 ) -> str:
+    predicated = (
+        current_step is not None
+        and getattr(current_step, "step_type", "freeform") == "predicated"
+    )
+    empty_response_guidance = (
+        "If the original action response was empty, return a valid action that "
+        "can produce the missing completion output."
+        if predicated
+        else (
+            "If the original action response was empty, choose next_step when the "
+            "current step is complete instead of returning an empty response. If "
+            "this corrective response is also empty, the system will interpret it "
+            "as next_step."
+        )
+    )
     prompt = (
         "Generate a JSON document selecting the best action based on this "
         "context. The current step's action declarations below are the only "
         "actions available. Do not use action names or instructions from a "
-        "previous step.\n"
-        "If the original action response was empty, choose next_step when the "
-        "current step is complete instead of returning an empty response. If "
-        "this corrective response is also empty, the system will interpret it "
-        "as next_step.\n"
+        "previous step.\n" + empty_response_guidance + "\n"
         'Return exactly one JSON object with a top-level "action" field and the '
         "fields required by that action. Do not combine actions or output "
         "markdown."

@@ -15,7 +15,10 @@ steps:
     required: true
     source: caller
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [requirements_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["requirements"]}.
@@ -30,7 +33,10 @@ steps:
 - id: gather-approach
   description: Gather approach and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [approach_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["approach"]}.
@@ -45,7 +51,10 @@ steps:
 - id: gather-entities
   description: Gather entities and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [entities_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["entities"]}.
@@ -60,7 +69,10 @@ steps:
 - id: gather-entity-relationships
   description: Gather entity relationships and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [entity_relationships_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["entity-relationships"]}.
@@ -75,7 +87,10 @@ steps:
 - id: gather-invariants
   description: Gather invariants and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [invariants_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["invariants"]}.
@@ -90,7 +105,10 @@ steps:
 - id: gather-guidance
   description: Gather guidance and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [guidance_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["guidance"]}.
@@ -105,7 +123,10 @@ steps:
 - id: gather-features
   description: Gather features and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [features_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["features"]}.
@@ -120,7 +141,10 @@ steps:
 - id: gather-human-decisions
   description: Gather human decisions and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [human_decisions_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["human-decisions"]}.
@@ -135,7 +159,10 @@ steps:
 - id: gather-intent
   description: Gather intent and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [intent_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["intent"]}.
@@ -149,7 +176,10 @@ steps:
 - id: gather-intents
   description: Gather intents and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [intents_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["intents"]}.
@@ -163,7 +193,10 @@ steps:
 - id: gather-acceptance-criteria
   description: Gather acceptance criteria and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [acceptance_criteria_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["acceptance_criteria"]}.
@@ -177,7 +210,10 @@ steps:
 - id: gather-expected-tests
   description: Gather expected tests and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [expected_tests_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["expected_tests"]}.
@@ -191,7 +227,10 @@ steps:
 - id: gather-required-test-cases
   description: Gather required test cases and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [required_test_cases_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["required_test_cases"]}.
@@ -205,7 +244,10 @@ steps:
 - id: gather-expected-outcomes
   description: Gather expected outcomes and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [expected_outcomes_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["expected_outcomes"]}.
@@ -219,7 +261,10 @@ steps:
 - id: gather-non-goals
   description: Gather non-goals and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [non_goals_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["non_goals"]} and
@@ -232,7 +277,10 @@ steps:
 - id: gather-risks
   description: Gather risks and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [risks_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["risks"]} and
@@ -245,7 +293,10 @@ steps:
 - id: gather-decisions
   description: Gather decisions and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [decisions_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["decisions"]} and
@@ -258,7 +309,10 @@ steps:
 - id: gather-proposed-prs
   description: Gather proposed PRs and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [proposed_prs_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["proposed_prs"]} and
@@ -271,7 +325,10 @@ steps:
 - id: gather-modules
   description: Gather modules and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [modules_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["modules"]} and
@@ -284,7 +341,10 @@ steps:
 - id: gather-tools
   description: Gather tools and return proposal changes.
   actions: [gather_context]
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [tools_edits]
+    required_actions: [{action: gather_context}]
   llm_type: high_reasoning
   details: >-
     First call exactly {"action":"gather_context","types":["tools"]} and

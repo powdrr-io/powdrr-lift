@@ -57,7 +57,13 @@ steps:
     required_for_next_step: true
 - id: produce-repair-edit
   description: Produce one deferred edit for all diagnosed failures.
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [repair_edit]
+    required_actions:
+      - action: read_document
+        targets_from: test_diagnosis.root_causes[*].files_to_change
+        match_field: file_path
   inputs:
   - name: test_diagnosis
     type: any
@@ -76,8 +82,11 @@ steps:
     array. Do not guess line 1, use traceback line numbers as edit ranges, or
     claim the repair is applied. Edit line numbers are 1-based: start_line and
     end_line must be positive integers (1 or greater), never 0; end_line must be
-    greater than or equal to start_line. Return next_step with exactly:
-    {"action":"next_step","outputs":{"repair_edit":{"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}},"decisions_and_context":"Produced one deferred edit for validation."}
+    greater than or equal to start_line. Return outputs.repair_edit in the same
+    JSON action object as the final action, for example:
+    {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
+    "file_edits":[...]}}}. Do not return next_step; the runtime advances after
+    repair_edit is present.
     If no repair is needed, set repair_edit to null and explain why.
   outputs:
   - name: repair_edit
@@ -104,7 +113,13 @@ steps:
     required_for_next_step: true
 - id: repair-invalid-edit
   description: Correct the deferred edit using deterministic validation feedback.
-  step_type: freeform
+  step_type: predicated
+  completion:
+    required_outputs: [repair_edit]
+    required_actions:
+      - action: read_document
+        targets_from: test_diagnosis.root_causes[*].files_to_change
+        match_field: file_path
   inputs:
   - name: repair_edit
     type: any
@@ -117,12 +132,15 @@ steps:
   details: >-
     Use the repair_edit and edit_validation handoffs. If edit_validation has
     returncode 0, return the exact same repair_edit unchanged. If it failed,
-    correct only the reported validation issue and return next_step with a new
+    correct only the reported validation issue and emit a new
     repair_edit. Re-read any target file needed to determine exact in-bounds
     lines. The output must remain one complete canonical edit action object;
     never use line_number or content, and never apply files in this step.
-    Return next_step with outputs.repair_edit containing the full corrected
-    object, not a prose description.
+    Return it in the top-level outputs object with an emit_outputs action, for
+    example: {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
+    "file_edits":[...]}}}. Do not return next_step; the runtime advances after
+    repair_edit is present. The value must be the full corrected object, not a
+    prose description.
   outputs:
   - name: repair_edit
     type: any

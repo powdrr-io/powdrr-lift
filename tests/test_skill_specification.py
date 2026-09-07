@@ -10,6 +10,7 @@ from powdrr_lift.core import (
     CodingLoopSpec,
     Skill,
     SkillStep,
+    SkillStepCompletion,
     SkillStepGate,
     SkillStepInput,
     SkillStepOutput,
@@ -19,6 +20,7 @@ from powdrr_lift.core import (
     build_skill_validation_report,
     load_skill,
     save_skill,
+    skill_from_data,
     skill_from_json,
     skill_to_json,
     validate_skill_directory,
@@ -309,13 +311,16 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("execute-proposed-pr.yaml", 7),
                 ("execute-proposed-pr.yaml", 10),
                 ("execute-proposed-pr.yaml", 11),
-                ("start-implementing-feature.yaml", 7),
+                ("start-implementing-feature.yaml", 1),
+                ("start-implementing-feature.yaml", 2),
+                ("start-implementing-feature.yaml", 3),
+                ("start-implementing-feature.yaml", 8),
+                ("start-implementing-feature.yaml", 10),
                 ("run-tests-and-fix.yaml", 1),
                 ("run-tests-and-fix.yaml", 7),
-                ("start-implementing-feature.yaml", 9),
-                ("start-implementing-feature.yaml", 15),
-                ("start-implementing-feature.yaml", 18),
+                ("start-implementing-feature.yaml", 17),
                 ("start-implementing-feature.yaml", 20),
+                ("start-implementing-feature.yaml", 22),
                 ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
@@ -328,8 +333,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 5),
-                ("start-implementing-feature.yaml", 5),
-                ("start-implementing-feature.yaml", 11),
+                ("start-implementing-feature.yaml", 6),
+                ("start-implementing-feature.yaml", 12),
                 ("specify-a-feature.yaml", 5),
                 ("specify-a-feature.yaml", 9),
                 ("specify-a-feature.yaml", 12),
@@ -340,6 +345,10 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("run-tests-and-fix.yaml", 8),
                 ("design-interview.yaml", 25),
             }
+            expected_predicated_steps = {
+                ("run-tests-and-fix.yaml", 3),
+                ("run-tests-and-fix.yaml", 5),
+            } | {("design-interview.yaml", index) for index in range(20)}
             expected_step_type = (
                 "coding_loop"
                 if (path.name, index) == ("execute-proposed-pr.yaml", 2)
@@ -347,6 +356,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 if (path.name, index) in expected_invoke_tool_steps
                 else "gate"
                 if (path.name, index) in expected_gate_steps
+                else "predicated"
+                if (path.name, index) in expected_predicated_steps
                 else "freeform"
             )
             assert step["step_type"] == expected_step_type, (
@@ -413,6 +424,12 @@ def test_skill_step_contracts_round_trip_and_validate() -> None:
                         name="validation_result",
                         type="validation_result",
                         required_for_next_step=True,
+                        schema={
+                            "type": "object",
+                            "properties": {"valid": {"type": "boolean"}},
+                            "required": ["valid"],
+                            "additionalProperties": False,
+                        },
                     ),
                 ),
             ),
@@ -432,6 +449,12 @@ def test_skill_step_contracts_round_trip_and_validate() -> None:
     parsed = skill_from_json(skill_to_json(skill))
 
     assert parsed == skill
+    assert parsed.steps[0].outputs[0].schema == {
+        "type": "object",
+        "properties": {"valid": {"type": "boolean"}},
+        "required": ["valid"],
+        "additionalProperties": False,
+    }
     report = build_skill_validation_report(skill_to_json(skill))
     assert report.validation_successful is True
 
@@ -457,6 +480,31 @@ def test_skill_step_contracts_reject_duplicate_names() -> None:
 
     assert report.validation_successful is False
     assert any(issue.code == "duplicate_output_name" for issue in report.issues)
+
+
+def test_skill_step_output_schema_rejects_unknown_schema_fields() -> None:
+    report = build_skill_validation_report(
+        json.dumps(
+            {
+                "name": "invalid-output-schema",
+                "when_to_use": ["Test output validation."],
+                "steps": [
+                    {
+                        "description": "Produce output.",
+                        "outputs": [
+                            {
+                                "name": "result",
+                                "schema": {"type": "object", "mystery": True},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "invalid_output_schema" for issue in report.issues)
 
 
 def test_skill_file_helpers_round_trip(tmp_path: Path) -> None:
@@ -626,6 +674,41 @@ def test_skill_validation_rejects_unknown_step_type() -> None:
 
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["invalid_step_type_value"]
+
+
+def test_predicated_step_requires_declared_completion_outputs() -> None:
+    skill = skill_from_data(
+        {
+            "name": "predicated",
+            "when_to_use": ["review"],
+            "steps": [
+                {
+                    "id": "produce-result",
+                    "description": "Produce the result.",
+                    "step_type": "predicated",
+                    "completion": {"required_outputs": ["result"]},
+                    "outputs": [{"name": "result", "type": "object"}],
+                }
+            ],
+        }
+    )
+
+    assert skill.steps[0].completion == SkillStepCompletion(("result",))
+    assert skill.steps[0].to_data()["completion"] == {"required_outputs": ["result"]}
+
+
+def test_predicated_step_rejects_missing_completion() -> None:
+    report = build_skill_validation_report(
+        "name: predicated\n"
+        "when_to_use: [review]\n"
+        "steps:\n"
+        "- description: Produce the result.\n"
+        "  step_type: predicated\n",
+        source_path=Path("predicated.yaml"),
+    )
+
+    assert report.validation_successful is False
+    assert [issue.code for issue in report.issues] == ["missing_completion"]
 
 
 def test_skill_validation_rejects_empty_prompt_catalogs() -> None:
@@ -923,9 +1006,14 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert steps["enrich-test-results"].outputs[0].name == "enriched_test_result"
     assert steps["enrich-test-results"].outputs[0].required_for_next_step
     assert steps["diagnose-test-results"].inputs[0].name == "enriched_test_result"
+    assert steps["diagnose-test-results"].step_type == "freeform"
+    assert steps["diagnose-test-results"].completion is None
     assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
     assert steps["diagnose-test-results"].outputs[0].required_for_next_step
     assert steps["produce-repair-edit"].inputs[0].name == "test_diagnosis"
+    assert steps["produce-repair-edit"].step_type == "predicated"
+    assert steps["produce-repair-edit"].completion is not None
+    assert steps["produce-repair-edit"].completion.required_outputs == ("repair_edit",)
     assert steps["produce-repair-edit"].outputs[0].name == "repair_edit"
     assert steps["produce-repair-edit"].outputs[0].required_for_next_step
     assert steps["validate-repair-edit"].pre_step is not None
@@ -937,6 +1025,9 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert steps["validate-repair-edit"].outputs[0].required_for_next_step
     assert steps["repair-invalid-edit"].inputs[0].name == "repair_edit"
     assert steps["repair-invalid-edit"].inputs[1].name == "edit_validation"
+    assert steps["repair-invalid-edit"].step_type == "predicated"
+    assert steps["repair-invalid-edit"].completion is not None
+    assert steps["repair-invalid-edit"].completion.required_outputs == ("repair_edit",)
     assert steps["repair-invalid-edit"].outputs[0].name == "repair_edit"
     assert steps["validate-repair-edit-gate"].gate is not None
     assert steps["validate-repair-edit-gate"].gate.goto_step == "repair-invalid-edit"
@@ -1207,44 +1298,54 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         assert pre_step is not None
         return tuple(pre_step.template["command"])
 
-    def tool_command(step_id: str) -> tuple[str, ...]:
-        assert len(step(step_id).tool_invocations) == 1
-        return step(step_id).tool_invocations[0].command
-
-    assert tool_command("discover-proposed-feature") == (
+    assert step("capture-feature-query").outputs[0].name == "feature_query"
+    assert step("capture-feature-query").outputs[0].required_for_next_step
+    assert pre_step_command("discover-proposed-feature") == (
         "fuzzy-match",
         "docs/proposals",
         "-name",
-        "<feature-name>",
+        "<feature-query>",
         "-type",
         "d",
         "-maxdepth",
         "2",
         "-print",
     )
-    assert tool_command("discover-current-feature") == (
+    assert pre_step_command("discover-current-feature") == (
         "fuzzy-match",
         "docs/current",
         "-name",
-        "<feature-name>",
+        "<feature-query>",
         "-type",
         "d",
         "-maxdepth",
         "2",
         "-print",
     )
-    assert tool_command("discover-feature-workflows") == (
+    assert pre_step_command("discover-feature-workflows") == (
         "fuzzy-match",
         "docs/workflows",
         "-name",
-        "<feature-name>",
+        "<feature-query>",
         "-type",
         "d",
         "-maxdepth",
         "3",
         "-print",
     )
-    assert step("discover-proposed-feature").step_type == "freeform"
+    for step_id, output_name in (
+        ("discover-proposed-feature", "proposed_feature_candidates"),
+        ("discover-current-feature", "current_feature_candidates"),
+        ("discover-feature-workflows", "workflow_candidates"),
+    ):
+        discovery_step = step(step_id)
+        assert discovery_step.step_type == "invoke_tool"
+        assert discovery_step.actions == ()
+        assert discovery_step.actions_declared
+        assert discovery_step.pre_step is not None
+        assert discovery_step.pre_step.template["tool"] == "fuzzy-match"
+        assert discovery_step.outputs[0].name == output_name
+        assert discovery_step.outputs[0].required_for_next_step
     assert step("select-feature-context").step_type == "freeform"
     assert step("select-feature-context").outputs[0].name == "feature_name"
     assert step("select-feature-context").outputs[0].required_for_next_step
@@ -1272,16 +1373,50 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "--output",
         "docs/proposals/<feature-name>/proposed-pr-specification.yaml",
     )
-    assert step("evaluate-proposed-pr-specification").step_type == "invoke_tool"
+    planning_step = step("plan-proposed-pr-specification")
+    assert planning_step.actions == ("read_document",)
+    assert planning_step.outputs[0].name == "proposed_pr_plan"
+    assert planning_step.outputs[0].required_for_next_step
+    assert planning_step.outputs[0].schema is not None
+    assert planning_step.outputs[0].schema["additionalProperties"] is False
+    assert planning_step.details is not None
+    assert "planning-only judgment" in planning_step.details
+    assert "Do not edit YAML" in planning_step.details
+    assert "authoritative effects" in planning_step.details
+    load_effects_step = step("load-authoritative-pr-effects")
+    assert load_effects_step.step_type == "invoke_tool"
+    assert pre_step_command("load-authoritative-pr-effects") == (
+        "powdrr-lift",
+        "authoritative-pr-effects",
+        "--work-item-name",
+        "<feature-name>",
+    )
+    assert load_effects_step.outputs[0].name == "authoritative_effects"
+    allocation_step = step("allocate-proposed-pr-effects")
+    assert allocation_step.outputs[0].name == "effect_allocation"
+    assert allocation_step.outputs[0].schema is not None
+    assert allocation_step.outputs[0].schema["additionalProperties"] is False
+    assert allocation_step.details is not None
+    assert "Never return, copy, or invent section, id, action" in (
+        allocation_step.details
+    )
+    repair_step = step("repair-proposed-pr-specification")
+    assert repair_step.actions == ("read_document", "goto_step")
+    assert repair_step.next_step_override == "evaluate-proposed-pr-specification"
+    assert repair_step.details is not None
+    assert "Do not repair YAML" in repair_step.details
+    assert "plan-proposed-pr-specification" in repair_step.details
+    assert "allocate-proposed-pr-effects" in repair_step.details
+    assert step("evaluate-proposed-pr-specification").step_type == "gate"
     assert pre_step_command("evaluate-proposed-pr-specification") == (
         "powdrr-lift",
         "evaluate",
         "docs/proposals/<feature-name>",
     )
-    assert step("gate-proposed-pr-specification").step_type == "gate"
-    gate = step("gate-proposed-pr-specification").gate
+    gate = step("evaluate-proposed-pr-specification").gate
     assert gate is not None
     assert gate.goto_step == "repair-proposed-pr-specification"
+    assert gate.success_goto_step == "plan-workflow-instantiation"
     assert step("instantiate-execution-workflows").tool_invocations[0].command == (
         "powdrr-lift",
         "instantiate-workflow",
@@ -1332,8 +1467,14 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "repository-state",
     )
     prepare_step = step("prepare-feature-pull-request")
+    assert prepare_step.step_type == "predicated"
     assert prepare_step.actions == ("invoke_skill",)
     assert prepare_step.uses_skills == ("finish-pr-prep",)
+    assert prepare_step.completion is not None
+    assert prepare_step.completion.required_outputs == (
+        "final_repository_state",
+        "readiness_report",
+    )
     assert [output.name for output in prepare_step.outputs] == [
         "final_repository_state",
         "readiness_report",
@@ -1341,7 +1482,8 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert all(output.required_for_next_step for output in prepare_step.outputs)
     prepare_details = prepare_step.details
     assert prepare_details is not None
-    assert "accepted `readiness_report`" in prepare_details
+    assert '"action":"emit_outputs"' in prepare_details
+    assert "copying the exact values" in prepare_details
     assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
 
 

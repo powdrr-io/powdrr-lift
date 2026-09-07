@@ -1331,7 +1331,17 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "powdrr-lift",
         "repository-state",
     )
-    assert step("prepare-feature-pull-request").uses_skills == ("finish-pr-prep",)
+    prepare_step = step("prepare-feature-pull-request")
+    assert prepare_step.actions == ("invoke_skill",)
+    assert prepare_step.uses_skills == ("finish-pr-prep",)
+    assert [output.name for output in prepare_step.outputs] == [
+        "final_repository_state",
+        "readiness_report",
+    ]
+    assert all(output.required_for_next_step for output in prepare_step.outputs)
+    prepare_details = prepare_step.details
+    assert prepare_details is not None
+    assert "accepted `readiness_report`" in prepare_details
     assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
 
 

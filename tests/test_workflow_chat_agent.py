@@ -6372,6 +6372,22 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             "tool": "shell",
                             "parameters": {"command": shell_invocations[0]["command"]},
                         }
+                    if step_index == 4:
+                        self._call_index += 1
+                        return {
+                            "action": "next_step",
+                            "outputs": {
+                                "final_repository_state": {
+                                    "clean": True,
+                                    "staged": ["docs/proposals/display-related-photos"],
+                                },
+                                "readiness_report": {
+                                    "accepted": True,
+                                    "ready": True,
+                                    "validation": "passed",
+                                },
+                            },
+                        }
                     self._call_index += 1
                     return {"action": "next_step"}
                 if prompt["selected_skill"]["name"] == "create-pull-request":
@@ -6462,6 +6478,23 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     "start-implementing-feature"
                 )
                 step_index = int(prompt["current_step_index"])
+                step_id = prompt["current_step"].get("id")
+                if step_id == "prepare-feature-pull-request":
+                    self._call_index += 1
+                    return {
+                        "action": "next_step",
+                        "outputs": {
+                            "final_repository_state": {
+                                "clean": True,
+                                "staged": ["docs/proposals/display-related-photos"],
+                            },
+                            "readiness_report": {
+                                "accepted": True,
+                                "ready": True,
+                                "validation": "passed",
+                            },
+                        },
+                    }
                 tool_invocations = prompt["current_step"].get("tool_invocations", [])
                 if tool_invocations and step_index not in self._start_invoked_steps:
                     invocation = next(

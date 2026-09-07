@@ -905,6 +905,15 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _restore_parent(self) -> None:
         frame = self.skill_stack.pop()
+        parent_step = frame.parent_skill.skill.steps[frame.parent_step_index]
+        parent_output_names = {
+            output.name for output in (getattr(parent_step, "outputs", ()) or ())
+        }
+        nested_output_records = {
+            name: dict(record)
+            for name, record in self.state.handoff_records.items()
+            if name in parent_output_names
+        }
         if frame.dependency_key is not None:
             self.completed_dependencies.add(frame.dependency_key)
         self.state.selected_skill = frame.parent_skill
@@ -924,6 +933,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 name: dict(record)
                 for name, record in (frame.parent_durable_facts or ())
             }
+        self.state.handoff_records.update(nested_output_records)
         self.current_model = frame.parent_model
         self.provider = frame.parent_provider
         self.provider_role = frame.parent_provider_role

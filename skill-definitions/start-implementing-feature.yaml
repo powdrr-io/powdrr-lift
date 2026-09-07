@@ -501,12 +501,25 @@ steps:
     required_for_next_step: true
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
-  actions: []
+  actions: [invoke_skill]
   step_type: freeform
   llm_type: fast_iteration
-  details: Run finish-pr-prep after the validated planning artifacts are staged. If cleanup changes files, restage only those artifacts before continuing. Do not implement any proposed PR in this skill.
+  details: >-
+    Invoke the listed finish-pr-prep skill after the validated planning artifacts
+    are staged. If cleanup changes files, restage only those artifacts before
+    continuing. Do not implement any proposed PR in this skill. The nested skill
+    must return both `final_repository_state` and an accepted `readiness_report`;
+    preserve both values as this step's outputs and do not advance when either
+    output is missing or not accepted.
   uses_skills:
   - finish-pr-prep
+  outputs:
+  - name: final_repository_state
+    type: any
+    required_for_next_step: true
+  - name: readiness_report
+    type: any
+    required_for_next_step: true
 - id: create-feature-pull-request
   description: Commit the validated artifacts and open a draft pull request.
   actions: []

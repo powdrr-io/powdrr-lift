@@ -403,6 +403,51 @@ def render_skill_replay(
     return result
 
 
+def render_skill_replay_corpus(
+    directory: Path,
+    *,
+    repo_root: Path,
+    definition_path: Path | None = None,
+) -> dict[str, Any]:
+    """Render every replay bundle in a directory without invoking tools."""
+    if not directory.is_dir():
+        raise WorkflowReplayError(
+            f"Replay corpus directory does not exist: {directory}"
+        )
+    paths = sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.suffix.casefold() in {".yaml", ".yml", ".json"}
+    )
+    bundles: list[dict[str, Any]] = []
+    for path in paths:
+        try:
+            bundle = load_workflow_replay_bundle(path)
+            rendered = render_skill_replay(
+                bundle,
+                repo_root=repo_root,
+                definition_path=definition_path,
+            )
+            bundles.append(
+                {
+                    "path": str(path),
+                    "bundle_id": rendered["bundle_id"],
+                    "response_validation": rendered["response_validation"],
+                    "valid": True,
+                }
+            )
+        except WorkflowReplayError as exc:
+            bundles.append({"path": str(path), "valid": False, "error": str(exc)})
+    failed = sum(not bundle["valid"] for bundle in bundles)
+    return {
+        "directory": str(directory),
+        "bundle_count": len(bundles),
+        "passed": len(bundles) - failed,
+        "failed": failed,
+        "bundles": bundles,
+    }
+
+
 def _validate_replay_bundle(bundle: Mapping[str, Any]) -> None:
     if bundle.get("schema_version") != WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION:
         raise WorkflowReplayError(

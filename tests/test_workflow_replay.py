@@ -11,6 +11,7 @@ from powdrr_lift.workflow_replay import (
     load_workflow_replay_bundle,
     redact_replay_bundle,
     render_skill_replay,
+    render_skill_replay_corpus,
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
     validate_replay_fixture_safety,
@@ -126,6 +127,49 @@ steps:
         "requires a successful tool invocation"
         in rendered["response_validation"]["error"]
     )
+
+
+def test_replay_corpus_reports_all_bundles_and_malformed_files(tmp_path: Path) -> None:
+    skill_path = tmp_path / "skill.yaml"
+    skill_path.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect-files
+    description: Inspect files.
+    tool_invocations:
+      - tool: shell
+        command: [rg, --files]
+""",
+        encoding="utf-8",
+    )
+    corpus_dir = tmp_path / "replays"
+    bundle = {
+        "schema_version": 1,
+        "id": "valid-bundle",
+        "execution_mode": "execute_selected_skill",
+        "definition": {"kind": "skill", "path": "skill.yaml", "name": "inspect"},
+        "step": {"index": 0, "id": "inspect-files"},
+        "prompt_builder_version": 1,
+        "prompt_state": {},
+        "failed_response": {
+            "action": "invoke_tool",
+            "tool": "shell",
+            "parameters": {"command": ["rg", "--files"]},
+        },
+        "expected": {},
+        "redactions": [],
+    }
+    save_workflow_replay_bundle(corpus_dir / "valid.yaml", bundle)
+    (corpus_dir / "broken.yaml").write_text("not: [valid", encoding="utf-8")
+
+    report = render_skill_replay_corpus(corpus_dir, repo_root=tmp_path)
+
+    assert report["bundle_count"] == 2
+    assert report["passed"] == 1
+    assert report["failed"] == 1
+    assert [item["valid"] for item in report["bundles"]] == [False, True]
 
 
 def test_replay_fixture_redaction_removes_credentials_and_absolute_paths() -> None:

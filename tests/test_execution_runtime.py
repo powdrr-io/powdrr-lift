@@ -153,6 +153,8 @@ def test_durable_guidance_creates_obligations_when_triggering_action_runs(
     runtime.capture_guidance(
         "Always use optimistic locking for mutable row changes.",
         source_ref="test:user-request",
+        trigger_action="change_mutable_row",
+        requirements=("add_optimistic_lock", "run_concurrency_test"),
     )
     actions = frozenset(
         {"change_mutable_row", "add_optimistic_lock", "run_concurrency_test"}
@@ -1106,7 +1108,10 @@ def test_runtime_captures_explicit_guidance_with_stable_identity(
     )
 
     first = runtime.capture_guidance(
-        "Always use optimistic locking for mutable rows.", source_ref="user:1"
+        "Always use optimistic locking for mutable rows.",
+        source_ref="user:1",
+        trigger_action="change_mutable_row",
+        requirements=("add_optimistic_lock", "run_concurrency_test"),
     )
     second = runtime.capture_guidance(
         "Always use optimistic locking for mutable rows.", source_ref="user:2"

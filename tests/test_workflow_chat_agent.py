@@ -6850,12 +6850,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                             "outputs": {
                                 "final_repository_state": {
                                     "clean": True,
-                                    "staged": ["docs/proposals/display-related-photos"],
+                                    "files": [],
                                 },
                                 "readiness_report": {
-                                    "accepted": True,
                                     "ready": True,
-                                    "validation": "passed",
+                                    "reasons": [],
+                                    "satisfied_requirements": [],
                                 },
                             },
                         }
@@ -6957,12 +6957,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "outputs": {
                             "final_repository_state": {
                                 "clean": True,
-                                "staged": ["docs/proposals/display-related-photos"],
+                                "files": [],
                             },
                             "readiness_report": {
-                                "accepted": True,
                                 "ready": True,
-                                "validation": "passed",
+                                "reasons": [],
+                                "satisfied_requirements": [],
                             },
                         },
                     }

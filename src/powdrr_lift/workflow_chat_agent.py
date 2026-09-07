@@ -11254,7 +11254,11 @@ def _declared_action_names(step: Any) -> tuple[str, ...]:
 
 
 def _runtime_step_actions(step: Any) -> frozenset[str]:
-    """Include universal predicated output publication in the runtime scope."""
+    """Include predicated output publication in the runtime action scope.
+
+    ``next_step`` remains an implicit transition for every contracted step; the
+    runtime permits it separately in ``ExecutionRuntime.validate_action``.
+    """
     actions = frozenset(getattr(step, "actions", ()) or ())
     if getattr(step, "step_type", "freeform") == "predicated":
         return actions | {"emit_outputs"}

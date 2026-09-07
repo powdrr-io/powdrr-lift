@@ -1481,6 +1481,53 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "readiness_report",
     ]
     assert all(output.required_for_next_step for output in prepare_step.outputs)
+    assert prepare_step.outputs[0].schema == {
+        "type": "object",
+        "required": ["clean", "files"],
+        "properties": {
+            "root": {"type": "string"},
+            "branch": {"type": "string"},
+            "upstream": {"type": "string"},
+            "ahead": {"type": "integer"},
+            "behind": {"type": "integer"},
+            "clean": {"type": "boolean"},
+            "files": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "path",
+                        "staged",
+                        "unstaged",
+                        "untracked",
+                        "conflicted",
+                    ],
+                    "properties": {
+                        "path": {"type": "string"},
+                        "index_status": {"type": "string"},
+                        "worktree_status": {"type": "string"},
+                        "staged": {"type": "boolean"},
+                        "unstaged": {"type": "boolean"},
+                        "untracked": {"type": "boolean"},
+                        "conflicted": {"type": "boolean"},
+                    },
+                },
+            },
+        },
+    }
+    assert prepare_step.outputs[1].schema == {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["ready", "reasons", "satisfied_requirements"],
+        "properties": {
+            "ready": {"type": "boolean"},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "satisfied_requirements": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+    }
     prepare_details = prepare_step.details
     assert prepare_details is not None
     assert '"action":"emit_outputs"' in prepare_details

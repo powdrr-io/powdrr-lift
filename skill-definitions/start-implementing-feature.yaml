@@ -638,9 +638,44 @@ steps:
   - name: final_repository_state
     type: any
     required_for_next_step: true
+    schema:
+      type: object
+      required: [clean, files]
+      properties:
+        root: {type: string}
+        branch: {type: string}
+        upstream: {type: string}
+        ahead: {type: integer}
+        behind: {type: integer}
+        clean: {type: boolean}
+        files:
+          type: array
+          items:
+            type: object
+            required: [path, staged, unstaged, untracked, conflicted]
+            properties:
+              path: {type: string}
+              index_status: {type: string}
+              worktree_status: {type: string}
+              staged: {type: boolean}
+              unstaged: {type: boolean}
+              untracked: {type: boolean}
+              conflicted: {type: boolean}
   - name: readiness_report
     type: any
     required_for_next_step: true
+    schema:
+      type: object
+      additionalProperties: false
+      required: [ready, reasons, satisfied_requirements]
+      properties:
+        ready: {type: boolean}
+        reasons:
+          type: array
+          items: {type: string}
+        satisfied_requirements:
+          type: array
+          items: {type: string}
 - id: create-feature-pull-request
   description: Commit the validated artifacts and open a draft pull request.
   actions: []

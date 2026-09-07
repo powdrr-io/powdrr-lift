@@ -37,6 +37,11 @@ _EFFECT_SOURCE_FILES = (
     "architecture-specification.yaml",
     "implementation-specification.yaml",
 )
+_FEATURE_COVERAGE_SECTIONS = (
+    "requirements",
+    "acceptance_criteria",
+    "expected_tests",
+)
 _PROPOSED_PR_SCHEMA = "https://powdrr.io/schemas/proposed-pr-specification-v1"
 
 
@@ -143,6 +148,8 @@ def render_pr_specification_template(
         "# - Reference one or more current feature ids from the codebase state",
         "#   listed below.",
         "# - Fill in each proposed PR's intent, justification, and dependencies.",
+        "# - List the authoritative requirement, acceptance-criterion, and test ids",
+        "#   delivered or proven by each proposed PR under its coverage sections.",
         "# - This document has one flat top-level mapping. Do not create a",
         "#   `specification_v1` wrapper or nest these sections under another key.",
         "#   The only top-level sections are `schema`, `id`, `feature_ids`,",
@@ -168,6 +175,9 @@ def render_pr_specification_template(
         "    intent: null",
         "    justification: null",
         "    dependent_prs: []",
+        "    requirements: []",
+        "    acceptance_criteria: []",
+        "    expected_tests: []",
         *[
             line
             for section in _EFFECT_SECTIONS
@@ -968,6 +978,13 @@ def _build_multi_proposed_pr_validation_report(
         proposed_pr_ids=tuple(ids.values()),
         issues=issues,
     )
+    _validate_multi_pr_feature_coverage(
+        raw_spec,
+        repo_root=repo_root,
+        work_item_name=work_item_name,
+        proposed_pr_ids=tuple(ids.values()),
+        issues=issues,
+    )
     _validate_v1_effect_equivalence(
         raw_spec,
         repo_root=repo_root,
@@ -1133,6 +1150,144 @@ def _validate_multi_pr_details(
                         f"proposed_prs[{index}].{section}[{item_index}].action",
                     )
                 )
+
+
+def _validate_multi_pr_feature_coverage(
+    raw_spec: Mapping[str, Any],
+    *,
+    repo_root: Path,
+    work_item_name: str,
+    proposed_pr_ids: Sequence[str],
+    issues: list[PRSpecificationValidationIssue],
+) -> None:
+    """Require every authoritative feature item to have one proposed-PR owner."""
+    source_path = (
+        repo_root / PROPOSALS_ROOT / work_item_name / "feature-pr-specification.yaml"
+    )
+    if not source_path.is_file():
+        return
+    try:
+        source = _load_yaml_mapping(source_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            PRSpecificationValidationIssue(
+                "invalid_feature_coverage_source",
+                f"Could not read feature coverage source: {exc}",
+                str(source_path),
+            )
+        )
+        return
+
+    authoritative: dict[str, set[str]] = {}
+    for section in _FEATURE_COVERAGE_SECTIONS:
+        ids: set[str] = set()
+        raw_items = source.get(section, [])
+        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
+            continue
+        for index, raw_item in enumerate(raw_items):
+            if not isinstance(raw_item, Mapping):
+                continue
+            item_id = _optional_string(raw_item.get("id"))
+            if item_id is None:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "feature_coverage_id_missing",
+                        "Authoritative feature coverage items require an id.",
+                        f"{source_path}:{section}[{index}].id",
+                    )
+                )
+                continue
+            if item_id in ids:
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "duplicate_feature_coverage_id",
+                        f"Authoritative feature item id {item_id!r} is duplicated.",
+                        f"{source_path}:{section}[{index}].id",
+                    )
+                )
+            ids.add(item_id)
+        if ids:
+            authoritative[section] = ids
+
+    owners: dict[str, dict[str, str]] = {section: {} for section in authoritative}
+    known_pr_ids = _normalize_identifier_set(proposed_pr_ids)
+    for index, raw_pr in enumerate(
+        _coerce_sequence(
+            raw_spec.get("proposed_prs"),
+            path="proposed_prs",
+            issues=issues,
+            issue_code="invalid_proposed_prs_section",
+            issue_message="proposed_prs must be a list of proposed PR mappings.",
+        )
+    ):
+        if not isinstance(raw_pr, Mapping):
+            continue
+        proposed_pr_id = _optional_string(raw_pr.get("id"))
+        if proposed_pr_id is None:
+            continue
+        for section, expected_ids in authoritative.items():
+            raw_values = raw_pr.get(section, [])
+            if not isinstance(raw_values, Sequence) or isinstance(
+                raw_values, (str, bytes)
+            ):
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        "invalid_feature_coverage_section",
+                        f"{section} must be a list of ids in each proposed PR.",
+                        f"proposed_prs[{index}].{section}",
+                    )
+                )
+                continue
+            for value_index, raw_value in enumerate(raw_values):
+                coverage_id = _optional_string(raw_value)
+                path = f"proposed_prs[{index}].{section}[{value_index}]"
+                if coverage_id is None:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "feature_coverage_id_missing",
+                            f"{section} entries must be non-empty ids.",
+                            path,
+                        )
+                    )
+                    continue
+                if coverage_id not in expected_ids:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "unknown_feature_coverage_id",
+                            f"{coverage_id!r} is not an authoritative {section} id.",
+                            path,
+                        )
+                    )
+                    continue
+                if coverage_id in owners[section]:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "duplicate_feature_coverage_assignment",
+                            f"{section} id {coverage_id!r} is assigned to both "
+                            f"{owners[section][coverage_id]!r} and {proposed_pr_id!r}.",
+                            path,
+                        )
+                    )
+                owners[section][coverage_id] = proposed_pr_id
+                if _normalize_identifier(proposed_pr_id) not in known_pr_ids:
+                    issues.append(
+                        PRSpecificationValidationIssue(
+                            "unknown_proposed_pr_id",
+                            f"Proposed PR id {proposed_pr_id!r} is not declared.",
+                            f"proposed_prs[{index}].id",
+                        )
+                    )
+    for section, expected_ids in authoritative.items():
+        missing = sorted(expected_ids - set(owners[section]))
+        if missing:
+            issues.append(
+                PRSpecificationValidationIssue(
+                    "uncovered_feature_items",
+                    f"Every authoritative {section} item must be assigned to a "
+                    f"proposed PR; missing: {', '.join(missing)}.",
+                    f"proposed_prs.*.{section}",
+                )
+            )
 
 
 def _validate_dependency_graph(

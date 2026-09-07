@@ -62,7 +62,7 @@ SUPPORTED_STEP_ACTIONS = frozenset(
         "complete",
     }
 )
-UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step"})
+UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step", "emit_outputs"})
 SUPPORTED_STEP_TYPES = frozenset(
     {"freeform", "predicated", "invoke_tool", "gate", "coding_loop"}
 )

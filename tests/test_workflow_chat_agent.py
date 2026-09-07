@@ -563,9 +563,14 @@ def test_predicated_step_omits_model_next_step_action() -> None:
     )
 
     assert all(name != "next_step" for name, _ in _step_actions(step))
+    assert any(name == "emit_outputs" for name, _ in _step_actions(step))
     assert (
         "next_step"
         not in _step_action_response_schema(step)["properties"]["action"]["enum"]
+    )
+    assert (
+        "emit_outputs"
+        in _step_action_response_schema(step)["properties"]["action"]["enum"]
     )
 
 

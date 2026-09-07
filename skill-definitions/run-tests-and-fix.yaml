@@ -54,8 +54,7 @@ steps:
     and root_causes; each root cause must contain cause, files_to_change, and
     repair_strategy. Do not edit files in this step and do not run commands.
     Return it in the same JSON action object as the final action, for example:
-    {"action":"read_document","file_path":"src/example.py","start_line":1,
-    "end_line":1,"outputs":{"test_diagnosis":{...}}}. Do not return
+    {"action":"emit_outputs","outputs":{"test_diagnosis":{...}}}. Do not return
     next_step; the runtime advances after test_diagnosis is present.
   outputs:
   - name: test_diagnosis
@@ -85,9 +84,8 @@ steps:
     claim the repair is applied. Edit line numbers are 1-based: start_line and
     end_line must be positive integers (1 or greater), never 0; end_line must be
     greater than or equal to start_line. Return outputs.repair_edit in the same
-    JSON action object as the final read_document action, for example:
-    {"action":"read_document","file_path":"src/example.py","start_line":1,
-    "end_line":20,"outputs":{"repair_edit":{"action":"edit",
+    JSON action object as the final action, for example:
+    {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
     "file_edits":[...]}}}. Do not return next_step; the runtime advances after
     repair_edit is present.
     If no repair is needed, set repair_edit to null and explain why.
@@ -135,9 +133,8 @@ steps:
     repair_edit. Re-read any target file needed to determine exact in-bounds
     lines. The output must remain one complete canonical edit action object;
     never use line_number or content, and never apply files in this step.
-    Return it in the top-level outputs object alongside the final read_document
-    action, for example: {"action":"read_document","file_path":"src/example.py",
-    "start_line":1,"end_line":20,"outputs":{"repair_edit":{"action":"edit",
+    Return it in the top-level outputs object with an emit_outputs action, for
+    example: {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
     "file_edits":[...]}}}. Do not return next_step; the runtime advances after
     repair_edit is present. The value must be the full corrected object, not a
     prose description.

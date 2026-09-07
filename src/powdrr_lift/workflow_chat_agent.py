@@ -4920,6 +4920,22 @@ def _build_step_execution_messages(
 
 
 def _action_system_prompt(*, current_step: Any | None = None) -> str:
+    predicated_step = (
+        current_step is not None
+        and getattr(current_step, "step_type", "freeform") == "predicated"
+    )
+    completion_guidance = (
+        "- predicated completion: never return next_step. Choose one declared "
+        "work action and include completed handoff values in the top-level "
+        "outputs object, for example "
+        '{"action":"read_document","file_path":"src/example.py",'
+        '"start_line":1,"end_line":20,"outputs":{"result":{}}}. '
+        "The runtime advances automatically as soon as every required output "
+        "is present; if more work is needed, omit that output and continue.\n"
+        if predicated_step
+        else "- next_step: choose this when the current step is complete and the next "
+        "skill step should receive the accumulated context.\n"
+    )
     if current_step is None or _step_needs_prompt_catalog(
         current_step, "context_types"
     ):
@@ -4992,14 +5008,18 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "returned path; if the error lists candidate files, choose only one of "
         "those exact paths. Never synthesize a filename from a task id, template "
         "id, package name, or related name.\n"
-        "- next_step: choose this when the current step is complete and the next "
-        "skill step should receive the accumulated context.\n"
-        "- complete: choose this when the skill has finished and no more action "
+        + completion_guidance
+        + "- complete: choose this when the skill has finished and no more action "
         "is required. Every later gate in this skill must already have passed; "
         "you cannot complete while a gate remains further ahead.\n"
-        "These next_step and complete rules apply to every step, including steps "
-        "whose optional prompt catalogs are omitted.\n"
-        "If the observer intervention recommends an action, treat that action as "
+        + (
+            "These next_step and complete rules apply to every step, including "
+            "steps whose optional prompt catalogs are omitted.\n"
+            if not predicated_step
+            else "The active step contract is authoritative; do not use actions "
+            "omitted from its action schema.\n"
+        )
+        + "If the observer intervention recommends an action, treat that action as "
         "allowed for this step and choose it directly when appropriate.\n"
         "When the current step declares outputs, provide the completed values "
         "in an outputs object using exactly those declared names. A later step "

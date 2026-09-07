@@ -422,6 +422,17 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "Use complete when the skill is finished" in ordinary_system_prompt
     assert "apply to every step" in ordinary_system_prompt
 
+    predicated_prompt = _action_system_prompt(
+        current_step=SkillStep(
+            description="Produce a result.",
+            step_type="predicated",
+            completion=SkillStepCompletion(("result",)),
+            outputs=(SkillStepOutput(name="result"),),
+        )
+    )
+    assert "never return next_step" in predicated_prompt
+    assert '"outputs"' in predicated_prompt
+
     output_step = SkillStep(
         description="Capture the feature name.",
         outputs=(

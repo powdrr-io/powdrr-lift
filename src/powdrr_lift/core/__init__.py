@@ -55,6 +55,15 @@ from powdrr_lift.core.effective_contract import (
     EffectiveContract,
     resolve_effective_contract,
 )
+from powdrr_lift.core.feature_delivery_contract import (
+    FEATURE_DELIVERY_CONTRACT_SCHEMA_VERSION,
+    FeatureDeliveryAssignment,
+    FeatureDeliveryContract,
+    FeatureDeliveryEffect,
+    FeatureDeliveryPR,
+    build_feature_coverage_handoff,
+    compile_feature_delivery_contract,
+)
 from powdrr_lift.core.action_relationship import (
     BUILTIN_ACTION_RELATIONSHIPS,
     ActionFact,

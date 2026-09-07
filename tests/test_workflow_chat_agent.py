@@ -431,6 +431,8 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
         )
     )
     assert "never return next_step" in predicated_prompt
+    assert "report next_step" not in predicated_prompt
+    assert '"action":"next_step"' not in predicated_prompt
     assert '"outputs"' in predicated_prompt
 
     output_step = SkillStep(

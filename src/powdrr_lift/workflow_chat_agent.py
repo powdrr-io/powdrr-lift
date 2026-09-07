@@ -4935,6 +4935,31 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         else "- next_step: choose this when the current step is complete and the next "
         "skill step should receive the accumulated context.\n"
     )
+    context_completion_guidance = (
+        ""
+        if predicated_step
+        else (
+            "After gathering context, include the relevant findings in "
+            "decisions_and_context and report next_step when the current step is "
+            "complete; do not leave the gathered result only in the tool history.\n"
+        )
+    )
+    goto_next_action_guidance = (
+        ""
+        if predicated_step
+        else (
+            "goto_step takes a step_id matching an id on a step in the current "
+            "skill; next_step has no action-specific fields; "
+        )
+    )
+    next_step_example = (
+        ""
+        if predicated_step
+        else (
+            '{"action":"next_step","decisions_and_context":"...",'
+            '"llm_type":"standard_reasoning"}\n'
+        )
+    )
     if current_step is None or _step_needs_prompt_catalog(
         current_step, "context_types"
     ):
@@ -4965,10 +4990,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "Choose exactly one outcome and use it for the following reason:\n"
         "- gather_context: choose this when checked-in specifications or other "
         "repository context must be discovered before deciding or acting.\n"
-        "After gathering context, include the relevant findings in "
-        "decisions_and_context and report next_step when the current step is "
-        "complete; do not leave the gathered result only in the tool history.\n"
-        "When a feature's proposal must be scoped, pass its feature_id to "
+        + context_completion_guidance
+        + "When a feature's proposal must be scoped, pass its feature_id to "
         "gather_context. It includes current specifications and only YAML files "
         "under docs/proposals/<feature_id>. Do not use fuzzy-match to locate the "
         "feature proposal or substitute another feature's proposal.\n"
@@ -5053,9 +5076,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "and basedpyright-structure takes parameters.path; yaml_edit requires "
         "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "
         "takes "
-        "a skill name from available_skills; goto_step takes a step_id matching "
-        "an id on a step in the current skill; next_step has "
-        "no action-specific fields; read_document requires file_path, non-negative "
+        "a skill name from available_skills; "
+        + goto_next_action_guidance
+        + "read_document requires file_path, non-negative "
         "start_line and end_line for a range of at most 2000 lines. Line 0 means "
         "the beginning of the document, and an end_line beyond EOF is clamped; "
         "complete may include a human-readable text; any action may include an "
@@ -5092,9 +5115,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         '{"action":"read_document","file_path":"docs/proposals/example/system-specification.yaml",'
         '"start_line":1,"end_line":80,"decisions_and_context":"...",'
         '"llm_type":"long_context"}\n'
-        '{"action":"next_step","decisions_and_context":"...",'
-        '"llm_type":"standard_reasoning"}\n'
-        '{"action":"complete","text":"...","decisions_and_context":"...",'
+        + next_step_example
+        + '{"action":"complete","text":"...","decisions_and_context":"...",'
         '"llm_type":"high_reasoning"}\n'
         "Use gather_context when you need to discover information already "
         "specified in checked-in specs before deciding the next action.\n"

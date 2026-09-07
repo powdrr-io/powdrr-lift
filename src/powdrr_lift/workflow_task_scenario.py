@@ -115,6 +115,7 @@ def run_workflow_task_scenario(
     verbose: bool = False,
     stream_live: bool = False,
     guidance: Sequence[str] = (),
+    shared_repo_root: Path | None = None,
 ) -> dict[str, Any]:
     """Run one real task, or every ready task, with scripted LLM output.
 
@@ -126,18 +127,28 @@ def run_workflow_task_scenario(
         raise WorkflowTaskScenarioError(
             f"Workflow directory does not exist: {workflow_source}"
         )
-    temporary = Path(tempfile.mkdtemp(prefix="powdrr-lift-task-scenario-"))
-    repo_root = temporary / "repository"
+    temporary = (
+        Path(tempfile.mkdtemp(prefix="powdrr-lift-task-scenario-"))
+        if shared_repo_root is None
+        else None
+    )
+    repo_root = (
+        (temporary / "repository")
+        if temporary is not None
+        else (shared_repo_root.resolve() if shared_repo_root is not None else None)
+    )
+    assert repo_root is not None
     previous_uv_cache_dir = os.environ.get("UV_CACHE_DIR")
-    os.environ.setdefault("UV_CACHE_DIR", str(temporary / "uv-cache"))
+    if temporary is not None:
+        os.environ.setdefault("UV_CACHE_DIR", str(temporary / "uv-cache"))
     workflow_dir = repo_root / "workflow"
     try:
-        if fixture_root is not None:
+        if fixture_root is not None and not (repo_root / ".git").exists():
             shutil.copytree(
                 fixture_root, repo_root, ignore=shutil.ignore_patterns(".git")
             )
         else:
-            repo_root.mkdir()
+            repo_root.mkdir(parents=True, exist_ok=True)
         if skill_definitions_source is not None:
             if not skill_definitions_source.is_dir():
                 raise WorkflowTaskScenarioError(
@@ -149,9 +160,12 @@ def run_workflow_task_scenario(
                 repo_root / "skill-definitions",
                 ignore=shutil.ignore_patterns(".git"),
             )
+        if workflow_dir.exists():
+            shutil.rmtree(workflow_dir)
         shutil.copytree(workflow_source, workflow_dir)
         _ensure_fixture_source_package(repo_root)
-        _initialize_git_repository(repo_root)
+        if not (repo_root / ".git").exists():
+            _initialize_git_repository(repo_root)
         if guidance:
             guidance_runtime = ExecutionRuntime(
                 "scenario-guidance",
@@ -288,7 +302,8 @@ def run_workflow_task_scenario(
             os.environ.pop("UV_CACHE_DIR", None)
         else:
             os.environ["UV_CACHE_DIR"] = previous_uv_cache_dir
-        shutil.rmtree(temporary, ignore_errors=True)
+        if temporary is not None:
+            shutil.rmtree(temporary, ignore_errors=True)
 
 
 def _initialize_git_repository(repo_root: Path) -> None:

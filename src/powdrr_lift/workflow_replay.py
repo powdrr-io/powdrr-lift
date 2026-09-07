@@ -428,6 +428,20 @@ def render_skill_replay_corpus(
                 repo_root=repo_root,
                 definition_path=definition_path,
             )
+            expectation_error = _replay_expectation_error(
+                bundle, rendered["response_validation"]
+            )
+            if expectation_error is not None:
+                bundles.append(
+                    {
+                        "path": str(path),
+                        "bundle_id": rendered["bundle_id"],
+                        "response_validation": rendered["response_validation"],
+                        "valid": False,
+                        "error": expectation_error,
+                    }
+                )
+                continue
             bundles.append(
                 {
                     "path": str(path),
@@ -446,6 +460,42 @@ def render_skill_replay_corpus(
         "failed": failed,
         "bundles": bundles,
     }
+
+
+def _replay_expectation_error(
+    bundle: Mapping[str, Any], validation: Mapping[str, Any]
+) -> str | None:
+    expected = bundle.get("expected")
+    if expected is None:
+        return None
+    if not isinstance(expected, Mapping):
+        return "bundle expected must be an object."
+    expected_valid = expected.get("response_valid")
+    if expected_valid is not None:
+        if not isinstance(expected_valid, bool):
+            return "bundle expected.response_valid must be a boolean."
+        if validation.get("valid") is not expected_valid:
+            return (
+                "expected response_valid="
+                f"{expected_valid}, got {validation.get('valid')}."
+            )
+    expected_action = expected.get("action")
+    if expected_action is not None:
+        if not isinstance(expected_action, str) or not expected_action:
+            return "bundle expected.action must be a non-empty string."
+        if validation.get("action") != expected_action:
+            return (
+                f"expected action {expected_action!r}, "
+                f"got {validation.get('action')!r}."
+            )
+    expected_error = expected.get("error_contains")
+    if expected_error is not None:
+        if not isinstance(expected_error, str) or not expected_error:
+            return "bundle expected.error_contains must be a non-empty string."
+        actual_error = validation.get("error")
+        if not isinstance(actual_error, str) or expected_error not in actual_error:
+            return f"expected error to contain {expected_error!r}."
+    return None
 
 
 def _validate_replay_bundle(bundle: Mapping[str, Any]) -> None:

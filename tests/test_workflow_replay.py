@@ -158,18 +158,23 @@ steps:
             "tool": "shell",
             "parameters": {"command": ["rg", "--files"]},
         },
-        "expected": {},
+        "expected": {"response_valid": True, "action": "invoke_tool"},
         "redactions": [],
     }
     save_workflow_replay_bundle(corpus_dir / "valid.yaml", bundle)
+    mismatch = dict(bundle)
+    mismatch["id"] = "mismatch-bundle"
+    mismatch["expected"] = {"response_valid": False}
+    save_workflow_replay_bundle(corpus_dir / "mismatch.yaml", mismatch)
     (corpus_dir / "broken.yaml").write_text("not: [valid", encoding="utf-8")
 
     report = render_skill_replay_corpus(corpus_dir, repo_root=tmp_path)
 
-    assert report["bundle_count"] == 2
+    assert report["bundle_count"] == 3
     assert report["passed"] == 1
-    assert report["failed"] == 1
-    assert [item["valid"] for item in report["bundles"]] == [False, True]
+    assert report["failed"] == 2
+    assert [item["valid"] for item in report["bundles"]] == [False, False, True]
+    assert "expected response_valid=False" in report["bundles"][1]["error"]
 
 
 def test_replay_fixture_redaction_removes_credentials_and_absolute_paths() -> None:

@@ -1075,7 +1075,7 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
         "edit": "<repair_edit>",
     }
     assert steps["rerun-all-tests"].gate is not None
-    assert steps["rerun-all-tests"].gate.goto_step == "diagnose-test-results"
+    assert steps["rerun-all-tests"].gate.goto_step == "enrich-test-results"
     assert "do not run it again" in (steps["run-all-tests"].details or "")
     assert "test_tool_result" in (steps["enrich-test-results"].details or "")
     assert "enriched_test_result" in (steps["enrich-test-results"].details or "")

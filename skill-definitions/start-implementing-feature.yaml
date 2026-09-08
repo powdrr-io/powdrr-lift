@@ -1,5 +1,15 @@
 ---
 name: start-implementing-feature
+inputs:
+- name: canonical-feature-name
+- name: candidate-names
+- name: proposed_pr_id
+- name: proposed-pr-id
+- name: proposed-pr-name
+- name: workflow-id
+- name: id
+- name: path
+- name: pull-request-title
 interaction_style: engineering
 when_to_use:
 - When the user is ready to begin implementing a feature.
@@ -24,6 +34,7 @@ steps:
   - name: feature_query
     type: string
     required_for_next_step: true
+    schema: {type: string}
 - id: discover-proposed-feature
   description: Discover proposed feature specification candidates.
   actions: []
@@ -52,6 +63,7 @@ steps:
   - name: proposed_feature_candidates
     type: any
     required_for_next_step: true
+    schema: {type: array, items: {type: object}}
 - id: discover-current-feature
   description: Discover current feature specification candidates.
   actions: []
@@ -80,6 +92,7 @@ steps:
   - name: current_feature_candidates
     type: any
     required_for_next_step: true
+    schema: {type: array, items: {type: object}}
 - id: discover-feature-workflows
   description: Discover execution workflow candidates.
   actions: []
@@ -108,6 +121,7 @@ steps:
   - name: workflow_candidates
     type: any
     required_for_next_step: true
+    schema: {type: array, items: {type: object}}
 - id: select-feature-context
   description: Select the canonical feature and workflow context.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
@@ -150,6 +164,7 @@ steps:
   - name: feature_name
     type: string
     required_for_next_step: true
+    schema: {type: string}
   - name: specification_documents
     type: array
     required_for_next_step: true
@@ -249,6 +264,7 @@ steps:
   - name: proposed_pr_names
     type: any
     required_for_next_step: true
+    schema: {type: array, items: {type: string}}
 - id: generate-proposed-pr-specification
   description: Generate the single proposed PR specification template.
   actions: []
@@ -276,6 +292,7 @@ steps:
   - name: proposed_pr_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: plan-proposed-pr-specification
   description: Define the ordered proposed PR plan.
   actions: [read_document]
@@ -471,6 +488,7 @@ steps:
   - name: verification-command
     type: string
     required_for_next_step: true
+    schema: {type: string}
 - id: instantiate-execution-workflows
   description: Instantiate each missing execution workflow.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -544,6 +562,7 @@ steps:
   - name: instantiated_repository_state
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: verify-workflow-artifacts
   description: Verify workflow artifacts are in the active worktree.
   actions: [edit, yaml_edit, file_management, read_document]
@@ -604,6 +623,7 @@ steps:
   - name: workflow_artifact_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -638,6 +658,7 @@ steps:
   - name: staged_artifact_repository_state
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: prepare-feature-pull-request-dependency
   description: Run finish-pr-prep on the validated planning artifacts.
   step_type: uses_skill
@@ -661,7 +682,7 @@ steps:
     continuing. Do not implement any proposed PR in this skill. After the nested
     skill returns, explicitly publish both handoffs with an `emit_outputs` action,
     copying the exact values returned by the nested skill:
-    {"action":"emit_outputs","outputs":{"final_repository_state":{},"readiness_report":{}}}
+    {"action":"emit_outputs","outputs":{"final_repository_state":{"clean":true,"files":[]},"readiness_report":{"ready":true,"reasons":[],"satisfied_requirements":[]}}}
     Do not return next_step or synthesize either value; the step advances only
     after both declared outputs are explicitly emitted and the readiness report
     is accepted.

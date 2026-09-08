@@ -2,6 +2,12 @@ name: create-pull-request
 when_to_use:
 - When validated staged changes must be committed, pushed, and published as a draft pull request.
 - When an existing pull request for the current branch must receive the prescribed description and updated commit.
+inputs:
+- name: feature-name
+- name: commit-message
+- name: populated-pr-description
+- name: files-to-publish
+- name: base-branch
 steps:
 - description: Generate the pull request description template.
   actions: []
@@ -25,6 +31,7 @@ steps:
   - name: pull_request_description_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - description: Fill in the pull request description template.
   actions: [edit, yaml_edit, file_management, read_document]
   step_type: governed

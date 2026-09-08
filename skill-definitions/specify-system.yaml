@@ -1,5 +1,7 @@
 ---
 name: specify-system
+inputs:
+- name: work-item-name
 when_to_use:
 - When you need to define the system requirements and implementation approach for
   a work item.
@@ -38,6 +40,7 @@ steps:
   - name: system_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-system
   description: Fill out the requirements and approach sections with concise, testable
     statements.
@@ -67,6 +70,7 @@ steps:
   - name: system_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-system
   description: Use yaml_edit to fix every issue reported by the system evaluator.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]

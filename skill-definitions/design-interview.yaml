@@ -404,6 +404,7 @@ steps:
   - name: interview_input_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: store-interview-input
   description: Store all interview outputs as one JSON input document.
   inputs:
@@ -488,6 +489,7 @@ steps:
   - name: interview_input
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: generate-proposal-template
   description: Generate the specification-v1 proposal from the interview input.
   inputs:
@@ -580,6 +582,7 @@ steps:
   - name: proposal_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: evaluate-proposal
   description: Deterministically validate the completed proposal.
   actions: []
@@ -595,6 +598,7 @@ steps:
   - name: proposal_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-proposal
   description: Repair every issue reported by the evaluator.
   actions: [yaml_edit, read_document, gather_context, goto_step]

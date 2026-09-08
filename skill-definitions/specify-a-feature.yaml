@@ -71,14 +71,13 @@ steps:
     records and an approach describing the log writer.
 - id: review-system-context
   description: Review the system context before deciding the feature shape.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
   details: >-
     Run the nested system review skill and use its result to decide whether the
     current system context remains appropriate.
-  uses_skills:
-  - review-system
+  uses_skill:
+    skill: review-system
 - id: evaluate-system-specification
   description: Gate the filled system specification.
   actions: []
@@ -139,14 +138,13 @@ steps:
     and relationship must explain which current requirement or approach it serves.
 - id: review-architecture-context
   description: Review architecture before implementation.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: high_reasoning
   details: >-
     Run the nested architecture review skill and use its result to decide
     whether the current architecture remains appropriate.
-  uses_skills:
-  - review-architecture
+  uses_skill:
+    skill: review-architecture
 - id: evaluate-architecture-specification
   description: Gate the filled architecture specification.
   actions: []
@@ -301,8 +299,7 @@ steps:
     - docs/proposals/<work-item-name>
 - id: prepare-pull-request
   description: Run finish-pr-prep before creating the pull request.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: fast_iteration
   details: >-
     Run finish-pr-prep after the intended specification artifacts are staged by
@@ -314,12 +311,11 @@ steps:
     report must include the current staged-file scope and the complete results of
     every validation obligation; do not synthesize it from memory or treat a
     successful repository-state check as a substitute.
-  uses_skills:
-  - finish-pr-prep
+  uses_skill:
+    skill: finish-pr-prep
 - id: create-feature-pull-request
   description: Create or update the pull request for the validated feature.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `feature`, commit message `Add
@@ -330,5 +326,5 @@ steps:
     The nested skill must stage exactly that list. Do not begin implementation
     in this skill, and do not invoke it if readiness_report is missing or not
     accepted.
-  uses_skills:
-  - create-pull-request
+  uses_skill:
+    skill: create-pull-request

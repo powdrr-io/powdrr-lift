@@ -7,13 +7,12 @@ when_to_use:
 steps:
 - id: review-system-context
   description: Review the system context first.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: high_reasoning
   details: Use the system review flow to confirm the requirements, approach, and current
     constraints.
-  uses_skills:
-  - review-system
+  uses_skill:
+    skill: review-system
 - id: generate-architecture
   description: Generate the architecture specification template.
   actions: []

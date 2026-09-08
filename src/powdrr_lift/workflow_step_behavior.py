@@ -60,6 +60,12 @@ _BEHAVIORS: dict[str, StepBehavior] = {
         runs_gate=False,
         publishes_predicated_outputs=False,
     ),
+    "uses_skill": StepBehavior(
+        "uses_skill",
+        invokes_llm=False,
+        runs_gate=False,
+        publishes_predicated_outputs=False,
+    ),
     "gate": StepBehavior(
         "gate", invokes_llm=False, runs_gate=True, publishes_predicated_outputs=False
     ),

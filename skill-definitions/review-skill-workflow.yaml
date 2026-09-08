@@ -42,7 +42,7 @@ steps:
     Build an inventory table with one row for each target step or task. Preserve
     source order and quote the description and English instructions in that
     row. For each row count explicit
-    tool_invocations, uses_skills or nested workflow calls, and distinct action
+    tool_invocations, uses_skill steps or nested workflow calls, and distinct action
     clauses in the English instructions. Count an action clause whenever the
     text tells the LLM to inspect, decide, edit, invoke, validate, record, ask,
     or report; count conditional branches separately. Mark whether every tool
@@ -176,8 +176,7 @@ steps:
     - <target-definition-path>
 
 - id: finish-pull-request-prep
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   description: Run final pull-request preparation checks.
   llm_type: simple_task
   details: >-
@@ -185,12 +184,11 @@ steps:
     result from `apply-and-publish`. Do not create or update a pull request in
     this step; continue only when the nested skill confirms the final staged
     scope and required checks are clean.
-  uses_skills:
-  - finish-pr-prep
+  uses_skill:
+    skill: finish-pr-prep
 
 - id: create-pull-request
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   description: Create or update the pull request for the reviewed definition.
   llm_type: simple_task
   details: >-
@@ -200,5 +198,5 @@ steps:
     final review report, and validation result to the nested skill. Do not
     report completion until it returns a pull-request URL. Never merge the PR
     or push directly to main.
-  uses_skills:
-  - create-pull-request
+  uses_skill:
+    skill: create-pull-request

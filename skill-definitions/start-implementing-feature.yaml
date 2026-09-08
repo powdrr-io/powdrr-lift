@@ -613,9 +613,17 @@ steps:
   - name: staged_artifact_repository_state
     type: any
     required_for_next_step: true
+- id: prepare-feature-pull-request-dependency
+  description: Run finish-pr-prep on the validated planning artifacts.
+  step_type: uses_skill
+  llm_type: fast_iteration
+  details: >-
+    Run finish-pr-prep before publishing the required preparation handoffs.
+  uses_skill:
+    skill: finish-pr-prep
+
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
-  actions: [invoke_skill]
   step_type: predicated
   llm_type: fast_iteration
   completion:
@@ -632,8 +640,6 @@ steps:
     Do not return next_step or synthesize either value; the step advances only
     after both declared outputs are explicitly emitted and the readiness report
     is accepted.
-  uses_skills:
-  - finish-pr-prep
   outputs:
   - name: final_repository_state
     type: any
@@ -679,7 +685,7 @@ steps:
 - id: create-feature-pull-request
   description: Commit the validated artifacts and open a draft pull request.
   actions: []
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `feature`, commit message `Add
@@ -690,8 +696,8 @@ steps:
     skill must stage exactly that list. Do not advance until it has committed,
     pushed, and created or updated a pull request successfully. Never claim a
     PR is ready without a returned PR URL.
-  uses_skills:
-  - create-pull-request
+  uses_skill:
+    skill: create-pull-request
 - id: handoff-feature-pull-request
   description: Hand the draft pull request to the user for review.
   actions: [edit, yaml_edit, file_management, read_document]

@@ -105,9 +105,11 @@ def _skill_subset(repo_root: Path, root_skill: str, destination: Path) -> Path:
         if isinstance(document, dict):
             for step in document.get("steps", []):
                 if isinstance(step, dict):
-                    nested = step.get("uses_skills", [])
-                    if isinstance(nested, list):
-                        pending.extend(name for name in nested if isinstance(name, str))
+                    deterministic = step.get("uses_skill")
+                    if isinstance(deterministic, dict):
+                        name = deterministic.get("skill")
+                        if isinstance(name, str):
+                            pending.append(name)
     return destination
 
 
@@ -254,10 +256,16 @@ def run_agent_feature_e2e(
     transcript_dir = _rooted(config.transcript_dir, root)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     phases: list[dict[str, Any]] = []
-    answers = config.answers or (
+    default_answer = (
         "Use the requested interaction-file-logging behavior, with sensible defaults "
-        "for unspecified details and no additional feature scope.",
+        "for unspecified details and no additional feature scope. If a workflow "
+        "contract is contradictory, report the contradiction instead of repeating "
+        "an invalid action."
     )
+    # EOF is not an answer. Keep a bounded queue of explicit fallback responses so
+    # prompt_user never receives a silent empty string when a workflow asks again.
+    answers = list(config.answers)
+    answers.extend([default_answer] * max(config.max_turns, 1))
     chat_input = "\n".join((config.feature_request, *answers)) + "\n"
     specify_skills = _skill_subset(
         root,

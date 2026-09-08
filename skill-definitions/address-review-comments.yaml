@@ -113,8 +113,7 @@ steps:
     - powdrr-lift
     - repository-state
 - id: validate-corrections
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   description: Run finish-pr-prep on the final staged changes.
   llm_type: fast_iteration
   details: >-
@@ -123,11 +122,10 @@ steps:
     inspect the edits, restage only the intended files, and rerun finish-pr-prep
     until the final staged state is clean. Do not push while any required check
     is failing.
-  uses_skills:
-  - finish-pr-prep
+  uses_skill:
+    skill: finish-pr-prep
 - description: Commit and push the addressed changes to the existing pull request.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `review-comments`, commit message
@@ -137,5 +135,5 @@ steps:
     Review Feedback Addressed row per actionable comment. Resolve each review
     thread only after its requested change is present and pushed. Never merge
     the pull request or push directly to main.
-  uses_skills:
-  - create-pull-request
+  uses_skill:
+    skill: create-pull-request

@@ -413,6 +413,9 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         raise ValueError("Workflow task entries must include input_state.")
     assignee_type, assignee_role = _required_assignee(data)
     step = skill_step_from_data(data)
+    uses_skills = (
+        _required_string_sequence(data, "uses_skills") if "uses_skills" in data else ()
+    )
     output_state_type = _required_string(data, "output_state_type")
     phase_type = _optional_phase_type(data.get("phase_type"))
     persona_id = _optional_persona_id(data.get("persona_id"))
@@ -429,7 +432,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         details=step.details,
         llm_type=step.llm_type,
         interaction_style=step.interaction_style,
-        uses_skills=step.uses_skills,
+        uses_skills=uses_skills,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
         actions=step.actions,

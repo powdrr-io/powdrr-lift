@@ -165,11 +165,10 @@ steps:
   - tool: ref
     label: pr-prep
 - description: Run the PR-preparation workflow on the final change set.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
-  uses_skills:
-  - finish-pr-prep
+  uses_skill:
+    skill: finish-pr-prep
   details: >-
     Invoke finish-pr-prep after the final fix is complete. Pass it the intended
     staged file set and all validation evidence from this workflow. Allow it to
@@ -177,8 +176,7 @@ steps:
     and test commands. Do not push or update the PR until finish-pr-prep
     reports that the staged change set is ready.
 - description: Commit and push the fixed branch to the existing pull request.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `ci-fix`, commit message `Fix CI
@@ -188,5 +186,5 @@ steps:
     Stack Overflow references as context. Require the CI Failure section and
     verify the pushed head changed. Never claim remote CI is green before
     GitHub reports a successful run.
-  uses_skills:
-  - create-pull-request
+  uses_skill:
+    skill: create-pull-request

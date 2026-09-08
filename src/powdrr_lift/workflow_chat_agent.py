@@ -911,6 +911,9 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def _restore_parent(self) -> None:
         frame = self.skill_stack.pop()
+        child_handoff_records = {
+            name: dict(record) for name, record in self.state.handoff_records.items()
+        }
         if frame.dependency_key is not None:
             self.completed_dependencies.add(frame.dependency_key)
         self.state.selected_skill = frame.parent_skill
@@ -930,6 +933,27 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 name: dict(record)
                 for name, record in (frame.parent_durable_facts or ())
             }
+            for child_name, parent_name, schema in frame.output_bindings:
+                record = child_handoff_records.get(child_name)
+                if record is None or "value" not in record:
+                    raise PowdrrExecutionError(
+                        f"Nested skill did not produce required output {child_name!r}."
+                    )
+                if schema is not None:
+                    schema_error = _json_schema_error(
+                        record["value"], schema, path=f"output {child_name}"
+                    )
+                    if schema_error is not None:
+                        raise PowdrrExecutionError(schema_error)
+                mapped = dict(record)
+                mapped["name"] = parent_name
+                mapped["produced_by"] = {
+                    "step_index": frame.parent_step_index,
+                    "action": "uses_skill",
+                    "skill": frame.child_skill_name,
+                    "output": child_name,
+                }
+                self.state.handoff_records[parent_name] = mapped
         self.current_model = frame.parent_model
         self.provider = frame.parent_provider
         self.provider_role = frame.parent_provider_role
@@ -942,6 +966,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         resume_step_index: int,
         dependency_key: tuple[str, int, str] | None = None,
         clean_context: bool = False,
+        initial_handoff_records: Mapping[str, Mapping[str, Any]] | None = None,
+        output_bindings: tuple[tuple[str, str, Mapping[str, Any] | None], ...] = (),
     ) -> None:
         parent_interaction_style = _effective_interaction_style(
             self.selected_skill,
@@ -976,9 +1002,14 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             parent_durable_facts=(
                 tuple(self.state.durable_facts.items()) if clean_context else None
             ),
+            output_bindings=output_bindings,
         )
         self.state.selected_skill = nested_skill
         self.state.step_index = 0
+        if initial_handoff_records is not None:
+            self.state.handoff_records = {
+                name: dict(record) for name, record in initial_handoff_records.items()
+            }
         self.inherited_interaction_style = parent_interaction_style
 
     def next_request(self) -> WorkflowActionRequest | None:
@@ -1004,10 +1035,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     self.state.runtime.allow_observer_action(
                         asdict(self.observer_allowed_action)
                     )
-            dependency_name = _next_skill_dependency(
-                self.selected_skill,
-                self.current_step_index,
-                self.completed_dependencies,
+            deterministic_uses_skill = getattr(self.current_step, "uses_skill", None)
+            dependency_name = (
+                deterministic_uses_skill.skill
+                if deterministic_uses_skill is not None
+                else None
             )
             if dependency_name is not None:
                 nested_skill = _find_skill_by_name(self.catalog, dependency_name)
@@ -1016,21 +1048,70 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     if nested_skill.skill.adversarial is None
                     else ("adversarial" if nested_skill.skill.adversarial else "normal")
                 )
+                initial_handoff_records: dict[str, dict[str, Any]] | None = None
+                output_bindings: tuple[
+                    tuple[str, str, Mapping[str, Any] | None], ...
+                ] = ()
+                clean_context = False
+                if deterministic_uses_skill is not None:
+                    clean_context = bool(
+                        deterministic_uses_skill.inputs
+                        or deterministic_uses_skill.outputs
+                    )
+                    initial_handoff_records = {} if clean_context else None
+                    for binding in deterministic_uses_skill.inputs:
+                        source = self.state.handoff_records.get(binding.ref)
+                        if source is None or "value" not in source:
+                            raise PowdrrExecutionError(
+                                f"uses_skill input {binding.ref!r} is not available."
+                            )
+                        if binding.schema is not None:
+                            schema_error = _json_schema_error(
+                                source["value"],
+                                binding.schema,
+                                path=f"input {binding.name}",
+                            )
+                            if schema_error is not None:
+                                raise PowdrrExecutionError(schema_error)
+                        if initial_handoff_records is None:
+                            raise PowdrrExecutionError(
+                                "uses_skill inputs require an isolated handoff context."
+                            )
+                        initial_handoff_records[binding.name] = {
+                            **dict(source),
+                            "name": binding.name,
+                            "produced_by": {
+                                "step_index": self.current_step_index,
+                                "action": "uses_skill",
+                                "input": binding.ref,
+                            },
+                        }
+                    output_bindings = tuple(
+                        (binding.name, binding.ref, binding.schema)
+                        for binding in deterministic_uses_skill.outputs
+                    )
                 self._push_skill(
                     nested_skill,
-                    resume_step_index=self.current_step_index,
+                    resume_step_index=self.current_step_index + 1,
                     dependency_key=(
                         str(self.selected_skill.path),
                         self.current_step_index,
                         dependency_name,
                     ),
+                    clean_context=clean_context,
+                    initial_handoff_records=initial_handoff_records,
+                    output_bindings=output_bindings,
                 )
                 self.state.audit_events.append(
                     {
                         "kind": "invoke_skill",
                         "skill": dependency_name,
                         "step_index": self.current_step_index,
-                        "source": "uses_skills",
+                        "source": (
+                            "uses_skill"
+                            if deterministic_uses_skill is not None
+                            else "uses_skill"
+                        ),
                     }
                 )
                 self.provider_role = nested_role
@@ -1964,6 +2045,8 @@ class _SkillExecutionFrame:
     parent_current_file_path: Path | None = None
     parent_handoff_records: tuple[tuple[str, dict[str, Any]], ...] | None = None
     parent_durable_facts: tuple[tuple[str, dict[str, Any]], ...] | None = None
+    output_bindings: tuple[tuple[str, str, Mapping[str, Any] | None], ...] = ()
+    child_skill_name: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -3817,19 +3900,6 @@ def _find_skill_by_name(
     raise PowdrrExecutionError(f"Could not find referenced skill {skill_name!r}.")
 
 
-def _next_skill_dependency(
-    skill: SkillCatalogEntry,
-    step_index: int,
-    completed_dependencies: set[tuple[str, int, str]],
-) -> str | None:
-    step = skill.skill.steps[step_index]
-    for dependency_name in step.uses_skills:
-        dependency_key = (str(skill.path), step_index, dependency_name)
-        if dependency_key not in completed_dependencies:
-            return dependency_name
-    return None
-
-
 def _push_nested_skill(
     stack: list[_SkillExecutionFrame],
     *,
@@ -3849,6 +3919,7 @@ def _push_nested_skill(
     parent_current_file_path: Path | None = None,
     parent_handoff_records: tuple[tuple[str, dict[str, Any]], ...] | None = None,
     parent_durable_facts: tuple[tuple[str, dict[str, Any]], ...] | None = None,
+    output_bindings: tuple[tuple[str, str, Mapping[str, Any] | None], ...] = (),
 ) -> None:
     active_skill_paths = {str(frame.parent_skill.path) for frame in stack}
     active_skill_paths.add(str(current_skill.path))
@@ -3873,6 +3944,8 @@ def _push_nested_skill(
             parent_current_file_path=parent_current_file_path,
             parent_handoff_records=parent_handoff_records,
             parent_durable_facts=parent_durable_facts,
+            output_bindings=output_bindings,
+            child_skill_name=nested_skill.skill.name,
         )
     )
 
@@ -5039,7 +5112,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "action and its reason as a hard constraint: do not return the same action "
         "again, even with different narrative context. Choose a materially "
         "different action or a different valid route through the current step.\n"
-        "When current_step.uses_skills is non-empty, those skills run automatically "
+        "When current_step.uses_skill is present, that skill runs automatically "
         "in the same worktree before you continue the current step. Use invoke_skill "
         "only for an additional listed skill that the current step discovers it "
         "needs.\n"
@@ -5317,12 +5390,8 @@ def _modular_action_system_prompt(
     """Build a compact action prompt with explicitly selected guidance sections."""
     step_actions = _step_actions(current_step)
     action_names = {name for name, _ in step_actions}
-    include_context = "gather_context" in action_names and _step_needs_prompt_catalog(
-        current_step, "context_types"
-    )
-    include_skills = "invoke_skill" in action_names and _step_needs_prompt_catalog(
-        current_step, "skills"
-    )
+    include_context = _step_needs_prompt_catalog(current_step, "context_types")
+    include_skills = _step_needs_prompt_catalog(current_step, "skills")
     action_lines = "\n".join(
         f"- {name}: {instructions}" for name, instructions in step_actions
     )
@@ -5409,15 +5478,15 @@ def _modular_action_system_prompt(
             'Example: {"action":"invoke_skill","skill":"adversarial-review",'
             '"provider_role":"adversarial","clean":true}.\n'
         )
-    nested_skills = tuple(getattr(current_step, "uses_skills", ()) or ())
-    if nested_skills and "invoke_skill" in action_names:
+    nested_skill = getattr(current_step, "uses_skill", None)
+    if nested_skill is not None:
         prompt += (
             "This step delegates to a nested skill; use invoke_skill, "
             "not invoke_tool or an internal CLI command. The only listed nested "
-            f"skills for this step are {json.dumps(list(nested_skills))}. For "
+            f"skill for this step is {json.dumps(nested_skill.skill)}. For "
             "example: "
             '{"action":"invoke_skill","skill":'
-            f"{json.dumps(nested_skills[0])}"
+            f"{json.dumps(nested_skill.skill)}"
             ',"decisions_and_context":"The nested skill should perform its '
             'declared work."}.\n'
         )
@@ -9451,7 +9520,11 @@ def _skill_step_to_data(step: Any) -> dict[str, Any]:
         "description": step.description,
         "step_type": getattr(step, "step_type", "governed"),
         "details": step.details,
-        "uses_skills": list(step.uses_skills),
+        "uses_skill": (
+            step.uses_skill.to_data()
+            if getattr(step, "uses_skill", None) is not None
+            else None
+        ),
     }
     if step.id is not None:
         data["id"] = step.id
@@ -11104,7 +11177,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     if step is None:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
-    nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
+    nested_skill = getattr(step, "uses_skill", None)
     actions = _step_actions(step)
     return {
         "step_type": getattr(step, "step_type", "governed"),
@@ -11125,7 +11198,9 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
         "declared_tool_invocations": [
             _tool_invocation_to_data(invocation) for invocation in invocations
         ],
-        "declared_nested_skills": list(nested_skills),
+        "declared_nested_skill": (
+            nested_skill.to_data() if nested_skill is not None else None
+        ),
         "validation_gate": getattr(step, "validation_gate", None),
         "requires_successful_declared_tool_before_next_step": any(
             invocation.tool == "shell" for invocation in invocations
@@ -11287,7 +11362,7 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
         if (
             getattr(step, "details", None)
             or getattr(step, "tool_invocations", ())
-            or getattr(step, "uses_skills", ())
+            or getattr(step, "uses_skill", None)
         ):
             names.extend(
                 [
@@ -11303,7 +11378,7 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
             names.append("invoke_skill")
         if getattr(step, "tool_invocations", ()):
             names.insert(0, "invoke_tool")
-        if getattr(step, "uses_skills", ()):
+        if getattr(step, "uses_skill", None):
             names.insert(0, "invoke_skill")
         if _validation_gate_enabled(step):
             names = [

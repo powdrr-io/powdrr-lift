@@ -219,11 +219,10 @@ steps:
   - tool: ref
     label: pr-prep
 - description: Run the PR-preparation workflow on the resolved merge.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
-  uses_skills:
-  - finish-pr-prep
+  uses_skill:
+    skill: finish-pr-prep
   details: >-
     Invoke finish-pr-prep only after every conflict is resolved, all conflict
     markers are gone, the intended merge result is staged, and the focused
@@ -232,8 +231,7 @@ steps:
     canonical formatting, lint, type-check, and test commands. Do not push or
     update the PR until finish-pr-prep reports the staged merge is ready.
 - description: Commit and push the resolved branch to the existing pull request.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `merge-conflict`, commit message
@@ -242,5 +240,5 @@ steps:
     file, along with the conflict ledger, and require one Conflict
     Resolution row per conflicted file containing the competing intent,
     selected resolution, and validation. Never create a second PR or merge it.
-  uses_skills:
-  - create-pull-request
+  uses_skill:
+    skill: create-pull-request

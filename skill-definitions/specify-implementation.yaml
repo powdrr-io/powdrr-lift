@@ -6,14 +6,20 @@ when_to_use:
 steps:
 - id: review-implementation-context
   description: Review the system and architecture context first.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: high_reasoning
   details: Confirm the source architecture id and the relevant entities before drafting
     implementation detail.
-  uses_skills:
-  - review-system
-  - review-architecture
+  uses_skill:
+    skill: review-system
+- id: review-architecture-context
+  description: Review the architecture context before drafting implementation detail.
+  step_type: uses_skill
+  llm_type: high_reasoning
+  details: Confirm the source architecture id and relevant entities before drafting
+    implementation detail.
+  uses_skill:
+    skill: review-architecture
 - id: generate-implementation
   description: Generate the implementation specification template.
   actions: []

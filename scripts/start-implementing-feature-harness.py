@@ -469,7 +469,11 @@ def _run_iteration(
         str(args.max_turns),
         *args.workflow_arg,
     ]
-    answers = args.answer or [DEFAULT_ANSWER] * args.max_turns
+    # Keep stdin answerable for the full bounded run.  Closing the stream after
+    # a short custom answer list turns the next prompt_user into an empty answer,
+    # which is indistinguishable from a model/workflow failure.
+    answers = list(args.answer)
+    answers.extend([DEFAULT_ANSWER] * max(args.max_turns, 1))
     transcript.parent.mkdir(parents=True, exist_ok=True)
     transcript_stream = transcript.open("w", encoding="utf-8")
     child_environment = os.environ.copy()

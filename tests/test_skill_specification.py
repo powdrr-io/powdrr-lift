@@ -16,6 +16,8 @@ from powdrr_lift.core import (
     SkillStepOutput,
     SkillStepPreStep,
     SkillToolInvocation,
+    SkillUsesSkill,
+    SkillUsesSkillBinding,
     build_skill_directory_validation_report,
     build_skill_validation_report,
     load_skill,
@@ -25,6 +27,55 @@ from powdrr_lift.core import (
     skill_to_json,
     validate_skill_directory,
 )
+
+
+def test_uses_skill_step_round_trips_explicit_handoff_bindings() -> None:
+    skill = skill_from_data(
+        {
+            "name": "parent",
+            "when_to_use": ["Call a nested skill."],
+            "steps": [
+                {
+                    "description": "Run the child deterministically.",
+                    "step_type": "uses_skill",
+                    "uses_skill": {
+                        "skill": "child",
+                        "inputs": {"request": "feature_request"},
+                        "outputs": {
+                            "result": {
+                                "ref": "child_result",
+                                "schema": {"type": "object"},
+                            }
+                        },
+                    },
+                }
+            ],
+        }
+    )
+
+    contract = skill.steps[0].uses_skill
+    assert isinstance(contract, SkillUsesSkill)
+    assert contract.inputs == (SkillUsesSkillBinding("request", "feature_request"),)
+    assert contract.outputs[0].ref == "child_result"
+    assert skill.steps[0].to_data()["step_type"] == "uses_skill"
+
+
+def test_uses_skill_step_rejects_model_actions() -> None:
+    with pytest.raises(ValueError, match="cannot declare model actions"):
+        skill_from_data(
+            {
+                "name": "invalid",
+                "when_to_use": ["Call a nested skill."],
+                "steps": [
+                    {
+                        "description": "Run the child.",
+                        "step_type": "uses_skill",
+                        "actions": ["invoke_skill"],
+                        "uses_skill": {"skill": "child"},
+                    }
+                ],
+            }
+        )
 
 
 def test_coding_loop_step_round_trips_with_typed_protocol() -> None:

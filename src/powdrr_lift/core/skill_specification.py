@@ -64,7 +64,7 @@ SUPPORTED_STEP_ACTIONS = frozenset(
 )
 UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step", "emit_outputs"})
 SUPPORTED_STEP_TYPES = frozenset(
-    {"governed", "predicated", "invoke_tool", "gate", "coding_loop"}
+    {"governed", "predicated", "uses_skill", "invoke_tool", "gate", "coding_loop"}
 )
 SUPPORTED_INTERACTION_STYLES = frozenset(
     {"engineering", "observational_review", "devils_advocate"}
@@ -266,6 +266,37 @@ class SkillStepCompletion:
 
 
 @dataclass(frozen=True, slots=True)
+class SkillUsesSkillBinding:
+    """One explicit handoff binding for a deterministic nested skill call."""
+
+    name: str
+    ref: str
+    schema: Mapping[str, Any] | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {"name": self.name, "ref": self.ref}
+        if self.schema is not None:
+            data["schema"] = dict(self.schema)
+        return data
+
+
+@dataclass(frozen=True, slots=True)
+class SkillUsesSkill:
+    """A typed, single nested-skill invocation owned by a uses_skill step."""
+
+    skill: str
+    inputs: tuple[SkillUsesSkillBinding, ...] = field(default_factory=tuple)
+    outputs: tuple[SkillUsesSkillBinding, ...] = field(default_factory=tuple)
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "skill": self.skill,
+            "inputs": [binding.to_data() for binding in self.inputs],
+            "outputs": [binding.to_data() for binding in self.outputs],
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SkillStep:
     description: str
     details: str | None = None
@@ -287,6 +318,7 @@ class SkillStep:
     validation_gate: Mapping[str, Any] | None = None
     coding_loop: CodingLoopSpec | None = None
     completion: SkillStepCompletion | None = None
+    uses_skill: SkillUsesSkill | None = None
 
     def __post_init__(self) -> None:
         if self.actions:
@@ -307,6 +339,8 @@ class SkillStep:
             data["interaction_style"] = self.interaction_style
         if self.uses_skills:
             data["uses_skills"] = list(self.uses_skills)
+        if self.uses_skill is not None:
+            data["uses_skill"] = self.uses_skill.to_data()
         if self.tool_invocations:
             data["tool_invocations"] = [
                 tool_invocation.to_data() for tool_invocation in self.tool_invocations
@@ -652,6 +686,7 @@ def build_skill_validation_report(
                     "llm_type",
                     "interaction_style",
                     "uses_skills",
+                    "uses_skill",
                     "tool_invocations",
                     "prompt_catalogs",
                     "actions",
@@ -762,7 +797,7 @@ def build_skill_validation_report(
                         code="invalid_step_type_value",
                         message=(
                             "Skill step step_type must be governed, predicated, "
-                            "invoke_tool, gate, or coding_loop."
+                            "uses_skill, invoke_tool, gate, or coding_loop."
                         ),
                         path=_child_path(step_path, "step_type"),
                     )
@@ -780,6 +815,7 @@ def build_skill_validation_report(
             elif normalized_step_type in {
                 "governed",
                 "predicated",
+                "uses_skill",
                 "invoke_tool",
                 "gate",
             } and isinstance(pre_step, Mapping):
@@ -1207,6 +1243,68 @@ def build_skill_validation_report(
                         continue
                     seen_refs.add(normalized_ref)
 
+            raw_uses_skill = step_mapping.get("uses_skill")
+            if normalized_step_type == "uses_skill":
+                if not isinstance(raw_uses_skill, Mapping):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="missing_uses_skill",
+                            message=(
+                                "uses_skill steps must declare a uses_skill object."
+                            ),
+                            path=_child_path(step_path, "uses_skill"),
+                        )
+                    )
+                elif (
+                    not isinstance(raw_uses_skill.get("skill"), str)
+                    or not raw_uses_skill.get("skill", "").strip()
+                ):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_uses_skill",
+                            message="uses_skill.skill must be a non-empty string.",
+                            path=_child_path(step_path, "uses_skill.skill"),
+                        )
+                    )
+            elif raw_uses_skill is not None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="unexpected_uses_skill",
+                        message="Only uses_skill steps may declare uses_skill.",
+                        path=_child_path(step_path, "uses_skill"),
+                    )
+                )
+            if normalized_step_type == "uses_skill" and uses_skills:
+                issues.append(
+                    SkillValidationIssue(
+                        code="uses_skill_mixed_with_legacy",
+                        message=(
+                            "uses_skill steps must use uses_skill, not uses_skills."
+                        ),
+                        path=_child_path(step_path, "uses_skills"),
+                    )
+                )
+            if normalized_step_type == "uses_skill":
+                if step_mapping.get("actions") not in (None, []):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="uses_skill_actions",
+                            message="uses_skill steps cannot declare model actions.",
+                            path=_child_path(step_path, "actions"),
+                        )
+                    )
+                if raw_uses_skill is not None:
+                    try:
+                        _parse_uses_skill(raw_uses_skill)
+                    except ValueError as exc:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_uses_skill",
+                                message=str(exc),
+                                path=_child_path(step_path, "uses_skill"),
+                            )
+                        )
+
             prompt_catalogs = step_mapping.get("prompt_catalogs")
             if prompt_catalogs is not None:
                 if not isinstance(prompt_catalogs, Sequence) or isinstance(
@@ -1580,14 +1678,19 @@ def _validate_skill_references(
     issues: list[SkillValidationIssue] = []
     for skill_path, skill in contents.step_references:
         for step_index, step in enumerate(skill.steps):
-            for ref_index, referenced_skill in enumerate(step.uses_skills):
-                reference_path = _sequence_path(
-                    skill_path,
-                    "steps",
-                    step_index,
-                    "uses_skills",
-                    ref_index,
-                )
+            references = list(step.uses_skills)
+            if step.uses_skill is not None:
+                references.append(step.uses_skill.skill)
+            for ref_index, referenced_skill in enumerate(references):
+                if step.uses_skill is not None and ref_index == len(references) - 1:
+                    reference_path = _child_path(
+                        _sequence_path(skill_path, "steps", step_index),
+                        "uses_skill.skill",
+                    )
+                else:
+                    reference_path = _sequence_path(
+                        skill_path, "steps", step_index, "uses_skills", ref_index
+                    )
                 if referenced_skill == skill.name:
                     issues.append(
                         SkillValidationIssue(
@@ -1620,7 +1723,10 @@ def _validate_skill_dependency_cycles(
         skill_name: {
             referenced_skill
             for step in skill.steps
-            for referenced_skill in step.uses_skills
+            for referenced_skill in (
+                list(step.uses_skills)
+                + ([step.uses_skill.skill] if step.uses_skill is not None else [])
+            )
             if referenced_skill in contents.skills_by_name
         }
         for skill_name, skill in contents.skills_by_name.items()
@@ -1916,8 +2022,8 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     step_type = _optional_string(data.get("step_type")) or "governed"
     if step_type not in SUPPORTED_STEP_TYPES:
         raise ValueError(
-            "Skill step step_type must be governed, predicated, invoke_tool, gate, "
-            "or coding_loop."
+            "Skill step step_type must be governed, predicated, uses_skill, "
+            "invoke_tool, gate, or coding_loop."
         )
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))
@@ -1947,6 +2053,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     )
     raw_completion = data.get("completion")
     completion = _parse_step_completion(raw_completion)
+    uses_skill = _parse_uses_skill(data.get("uses_skill"))
     raw_validation_gate = data.get("validation_gate")
     if raw_validation_gate is not None and not isinstance(raw_validation_gate, Mapping):
         raise ValueError("Skill step validation_gate must be an object.")
@@ -2011,6 +2118,17 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         raise ValueError("predicated steps must declare a completion object.")
     if step_type != "predicated" and completion is not None:
         raise ValueError("Only predicated steps may declare completion.")
+    if step_type == "uses_skill" and uses_skill is None:
+        raise ValueError("uses_skill steps must declare a uses_skill object.")
+    if step_type != "uses_skill" and uses_skill is not None:
+        raise ValueError("Only uses_skill steps may declare uses_skill.")
+    if step_type == "uses_skill" and uses_skills:
+        raise ValueError("uses_skill steps must use uses_skill, not uses_skills.")
+    if step_type == "uses_skill":
+        if pre_step is not None:
+            raise ValueError("uses_skill steps cannot declare pre_step.")
+        if actions_declared and actions:
+            raise ValueError("uses_skill steps cannot declare model actions.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
     if completion is not None:
@@ -2041,8 +2159,85 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         validation_gate=validation_gate,
         coding_loop=coding_loop,
         completion=completion,
+        uses_skill=uses_skill,
         inputs=inputs,
         outputs=outputs,
+    )
+
+
+def _parse_uses_skill(value: object) -> SkillUsesSkill | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("Skill step uses_skill must be an object.")
+    unknown = set(value) - {"skill", "inputs", "outputs"}
+    if unknown:
+        raise ValueError(
+            "uses_skill contains unsupported fields: "
+            + ", ".join(sorted(str(item) for item in unknown))
+        )
+    skill = _required_string(value, "skill")
+
+    def parse_bindings(raw: object, label: str) -> tuple[SkillUsesSkillBinding, ...]:
+        if raw is None:
+            return ()
+        entries: list[tuple[str, object]]
+        if isinstance(raw, Mapping):
+            entries = [(str(name), item) for name, item in raw.items()]
+        elif isinstance(raw, Sequence) and not isinstance(raw, (str, bytes, bytearray)):
+            entries = []
+            for item in raw:
+                if not isinstance(item, Mapping):
+                    raise ValueError(f"uses_skill.{label} must contain objects.")
+                entries.append((_required_string(item, "name"), item))
+        else:
+            raise ValueError(f"uses_skill.{label} must be an object or array.")
+        result: list[SkillUsesSkillBinding] = []
+        seen: set[str] = set()
+        for name, item in entries:
+            if not name.strip() or name in seen:
+                raise ValueError(
+                    f"uses_skill.{label} names must be unique and non-empty."
+                )
+            seen.add(name)
+            if isinstance(item, str):
+                ref = item.strip()
+                schema = None
+            elif isinstance(item, Mapping):
+                unknown_binding_fields = set(item) - {"name", "ref", "source", "schema"}
+                if unknown_binding_fields:
+                    raise ValueError(
+                        f"uses_skill.{label}.{name} contains unsupported fields: "
+                        + ", ".join(
+                            sorted(str(field) for field in unknown_binding_fields)
+                        )
+                    )
+                ref = _optional_string(item.get("ref"))
+                if ref is None:
+                    ref = _optional_string(item.get("source"))
+                if ref is None:
+                    raise ValueError(f"uses_skill.{label}.{name} must declare ref.")
+                raw_schema = item.get("schema")
+                if raw_schema is not None and not isinstance(raw_schema, Mapping):
+                    raise ValueError(
+                        f"uses_skill.{label}.{name}.schema must be an object."
+                    )
+                schema = dict(raw_schema) if isinstance(raw_schema, Mapping) else None
+                if schema is not None:
+                    schema_error = _output_schema_declaration_error(schema)
+                    if schema_error is not None:
+                        raise ValueError(schema_error)
+            else:
+                raise ValueError(
+                    f"uses_skill.{label}.{name} must be a string or object."
+                )
+            result.append(SkillUsesSkillBinding(name=name, ref=ref, schema=schema))
+        return tuple(result)
+
+    return SkillUsesSkill(
+        skill=skill,
+        inputs=parse_bindings(value.get("inputs"), "inputs"),
+        outputs=parse_bindings(value.get("outputs"), "outputs"),
     )
 
 

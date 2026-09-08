@@ -37,6 +37,7 @@ def test_agent_feature_run_prompts_agent_then_executes_generated_workflows(
     assert result.status == "passed"
     assert calls[0][3] == "workflow-chat"
     assert "I want to specify a feature" in inputs[0]
+    assert inputs[0].count("Use the requested interaction-file-logging behavior") >= 40
     assert any("start-implementing-feature-harness.py" in part for part in calls[1])
     assert "process-workflow-task" in calls[2]
     report = json.loads(

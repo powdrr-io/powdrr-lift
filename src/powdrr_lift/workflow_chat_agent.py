@@ -1216,6 +1216,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     if self.driver.runtime is not None
                     else None
                 ),
+                failed_action=self.last_failed_action,
+                failure_reason=self.last_validation_error,
             )
             response_schema = _step_action_response_schema(self.current_step)
             response_parser = partial(
@@ -1710,7 +1712,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             }
         )
         self.last_validation_error = (
-            validator_data["message"] if validator_data is not None else None
+            validator_data["message"] if validator_data is not None else str(error)
         )
 
     def action_failure_exit_code(self, action: SkillChatAction) -> int:
@@ -4711,6 +4713,8 @@ def _build_step_execution_messages(
     inherited_interaction_style: str | None = None,
     observer_intervention: str | None = None,
     runtime_prompt_context: Mapping[str, Any] | None = None,
+    failed_action: SkillChatAction | None = None,
+    failure_reason: str | None = None,
 ) -> list[dict[str, str]]:
     current_file_context = _current_file_context(
         worktree_root,
@@ -4865,6 +4869,20 @@ def _build_step_execution_messages(
     prompt_data["available_actions"] = [
         name for name, _instructions in _step_actions(current_step)
     ]
+    if failed_action is not None:
+        prompt_data["recovery_required"] = {
+            "rejected_action": json.loads(_workflow_action_signature(failed_action)),
+            "reason": failure_reason
+            or "The previous action was rejected by the workflow contract.",
+            "must_choose_different_action": True,
+            "allowed_actions": prompt_data["available_actions"],
+            "instruction": (
+                "Do not repeat the rejected action, even with different prose. "
+                "Choose one materially different action from allowed_actions, "
+                "or return prompt_user if no allowed action can safely resolve "
+                "the reported issue."
+            ),
+        }
     if "edit" in prompt_data["available_actions"]:
         prompt_data["edit_contract"] = (
             "For edit, return exactly one JSON object with action=edit, a string "
@@ -5329,6 +5347,10 @@ def _modular_action_system_prompt(
         '"is complete."}.\n'
         "Use the field names required by the selected action and do not combine "
         "actions.\n"
+        "If the user payload contains recovery_required, it is authoritative: the "
+        "previous action was rejected. Do not repeat its action or parameters. "
+        "Return one materially different action from allowed_actions, or use "
+        "prompt_user when no safe contract-valid action is available.\n"
     )
     prompt += _interaction_style_prompt(interaction_style)
     if "invoke_tool" in action_names:
@@ -11512,8 +11534,14 @@ def _action_repair_prompt(
             )
     if failed_action is not None:
         prompt += (
-            f"\nThe previous {failed_action.kind} action failed and was not applied. "
-            "Do not repeat it unchanged; return a corrected action. "
+            f"\nRecovery is mandatory: the previous {failed_action.kind} action "
+            "failed and was not applied. Do not repeat that action or an equivalent "
+            "action with only different prose; choose a materially different action "
+            "from the current step's allowed actions. The failure reason was: "
+            + (validation_error or "the action violated the active workflow contract")
+            + ". The rejected action was:\n"
+            + _workflow_action_signature(failed_action)
+            + ". "
             + (
                 "For YAML, prefer yaml_edit with upsert_item, remove_item, "
                 "remove_key, or set_value; use a normal edit with exact line "
@@ -11521,8 +11549,6 @@ def _action_repair_prompt(
                 if {"edit", "yaml_edit"} & action_names
                 else ""
             )
-            + "The rejected action was:\n"
-            f"{_workflow_action_signature(failed_action)}"
         )
     return prompt
 

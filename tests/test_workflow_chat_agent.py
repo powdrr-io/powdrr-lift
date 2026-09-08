@@ -418,6 +418,32 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     assert "available_skills" not in ordinary_prompt
     assert ordinary_prompt["worktree_root"] == "."
     assert "worktree_root" not in ordinary_prompt["previous_workflow_context"]
+
+    rejected = _parse_action_response(
+        {"action": "invoke_skill", "skill": "review-system"}
+    )
+    recovery_prompt = json.loads(
+        _build_step_execution_messages(
+            selected_skill=ordinary_skill,
+            current_step=ordinary_step,
+            current_step_index=0,
+            transcript=[],
+            execution_events=[],
+            execution_context=[],
+            current_file_path=None,
+            worktree_root=tmp_path,
+            catalog=catalog,
+            failed_action=rejected,
+            failure_reason="invoke_skill is not allowed by this step",
+        )[1]["content"]
+    )
+    recovery = recovery_prompt["recovery_required"]
+    assert recovery["rejected_action"]["kind"] == "invoke_skill"
+    assert recovery["rejected_action"]["skill_name"] == "review-system"
+    assert recovery["reason"] == "invoke_skill is not allowed by this step"
+    assert recovery["must_choose_different_action"] is True
+    assert "invoke_skill" not in recovery["allowed_actions"]
+    assert "Do not repeat the rejected action" in recovery["instruction"]
     ordinary_system_prompt = _action_system_prompt(current_step=ordinary_step)
     assert "Use next_step when the current step is complete" in ordinary_system_prompt
     assert "Use complete when the skill is finished" in ordinary_system_prompt
@@ -4961,7 +4987,8 @@ def test_action_repair_prompt_includes_the_rejected_edit() -> None:
 
     assert "previous edit action failed and was not applied" in prompt
     assert '"file_path": "implementation-specification.txt"' in prompt
-    assert "Do not repeat it unchanged" in prompt
+    assert "Do not repeat that action or an equivalent action" in prompt
+    assert "active workflow contract" in prompt
 
 
 def test_action_repair_prompt_explains_validation_errors() -> None:

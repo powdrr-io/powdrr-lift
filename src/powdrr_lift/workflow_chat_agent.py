@@ -88,6 +88,11 @@ from powdrr_lift.execution.builtin_tools import (
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.fuzzy_match import fuzzy_match_json
+from powdrr_lift.interaction_log import (
+    InteractionLog,
+    record_current_human_interaction,
+    set_current_interaction_log,
+)
 from powdrr_lift.intrinsic_edit import (
     APPLY_EDIT_TOOL,
     VALIDATE_EDIT_TOOL,
@@ -2005,9 +2010,19 @@ def _normalize_cache_usage(usage: Mapping[str, Any]) -> dict[str, int] | None:
 class _LLMExchangeRecordingClient:
     """Record every LLM request and response in the active repository root."""
 
-    def __init__(self, client: WorkflowLLMClient, repo_root: Path) -> None:
+    def __init__(
+        self,
+        client: WorkflowLLMClient,
+        repo_root: Path,
+        interaction_log_path: Path | None = None,
+    ) -> None:
         self._client = client
         self._repo_root = repo_root.expanduser().resolve()
+        self._interaction_log = (
+            InteractionLog(interaction_log_path)
+            if interaction_log_path is not None
+            else None
+        )
 
     def complete_json(
         self,
@@ -2032,12 +2047,22 @@ class _LLMExchangeRecordingClient:
                 },
                 serialized_messages=serialized_messages,
             )
+            if self._interaction_log is not None:
+                self._interaction_log.record(
+                    actor="llm",
+                    input_value=messages,
+                    output_value={"error": str(exc), "error_type": type(exc).__name__},
+                )
             raise
         self._write_exchange(
             messages,
             response,
             serialized_messages=_client_serialized_messages(self._client, messages),
         )
+        if self._interaction_log is not None:
+            self._interaction_log.record(
+                actor="llm", input_value=messages, output_value=response
+            )
         return response
 
     def _write_exchange(
@@ -2076,11 +2101,12 @@ class _LLMExchangeRecordingClient:
 def _maybe_record_llm_exchanges(
     client: WorkflowLLMClient,
     repo_root: Path,
+    interaction_log_path: Path | None = None,
 ) -> WorkflowLLMClient:
-    """Apply exchange recording only while the hardcoded diagnostic flag is enabled."""
-    if not _ENABLE_LLM_EXCHANGE_LOGGING:
+    """Apply diagnostic and/or durable interaction recording."""
+    if not _ENABLE_LLM_EXCHANGE_LOGGING and interaction_log_path is None:
         return client
-    return _LLMExchangeRecordingClient(client, repo_root)
+    return _LLMExchangeRecordingClient(client, repo_root, interaction_log_path)
 
 
 def _serialize_exchange(
@@ -2764,6 +2790,9 @@ def run_workflow_chat(
     file_added_callback: Callable[[tuple[str, ...]], None] | None = None,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
+    set_current_interaction_log(
+        configured_repo_root / ".powdrr" / "interaction-log.json"
+    )
     error_log_root = _resolve_project_root(configured_repo_root, configured_repo_root)
     project_root = configured_repo_root
     workflow_context = _load_workflow_context(project_root)
@@ -2798,6 +2827,7 @@ def run_workflow_chat(
                     progress_stream=stderr,
                 ),
                 project_root,
+                project_root / ".powdrr" / "interaction-log.json",
             )
         return clients[key]
 
@@ -3130,6 +3160,7 @@ def run_workflow_chat(
                 progress_stream=stderr,
             ),
             project_root,
+            project_root / ".powdrr" / "interaction-log.json",
         )
         driver.observer = ShadowWorkflowObserver(
             client=observer_client,
@@ -11548,6 +11579,7 @@ def _prompt_user(
             stdout.flush()
     if status_stream is not None:
         print("[workflow] calling LLM...", file=status_stream, flush=True)
+    record_current_human_interaction(prompt, answer)
     return answer
 
 

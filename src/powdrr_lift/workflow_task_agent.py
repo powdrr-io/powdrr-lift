@@ -42,6 +42,7 @@ from powdrr_lift.execution.builtin_tools import (
 )
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import manage_worktree_file
+from powdrr_lift.interaction_log import set_current_interaction_log
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
@@ -1258,6 +1259,9 @@ def run_workflow_task(
     stderr: TextIO,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
+    set_current_interaction_log(
+        configured_repo_root / ".powdrr" / "interaction-log.json"
+    )
     configured_workflow_dir = config.workflow_dir.resolve()
     try:
         configured_workflow_id = config.workflow_id or workflow_id_from_task_id(
@@ -1508,7 +1512,9 @@ def run_workflow_task(
             task_client = _build_workflow_client(config, task)
         if config.verbose:
             task_client = _WorkflowTaskDisplayClient(task_client, stderr=stderr)
-        task_client = _maybe_record_llm_exchanges(task_client, dump_root)
+        task_client = _maybe_record_llm_exchanges(
+            task_client, dump_root, dump_root / ".powdrr" / "interaction-log.json"
+        )
         compaction_client = task_client
         long_context_backup = _long_context_backup_for(model, mappings)
         if not client_was_provided and long_context_backup is not None:
@@ -1522,7 +1528,9 @@ def run_workflow_task(
                     backup_client,
                     stderr=stderr,
                 )
-            compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
+            compaction_client = _maybe_record_llm_exchanges(
+                backup_client, dump_root, dump_root / ".powdrr" / "interaction-log.json"
+            )
 
         driver_events: list[dict[str, Any]] = []
         with runtime.without_action_contract():
@@ -1582,6 +1590,7 @@ def run_workflow_task(
                     observer_mapping,
                 ),
                 dump_root,
+                dump_root / ".powdrr" / "interaction-log.json",
             )
 
             def observer_context(

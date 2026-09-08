@@ -56,6 +56,7 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
+from powdrr_lift.interaction_log import set_current_interaction_log
 from powdrr_lift.test_failure_packet import build_test_failure_packet
 from powdrr_lift.workflow_chat_agent import (
     ALL_LLM_TYPES,
@@ -2126,6 +2127,17 @@ def test_prompt_user_reports_llm_call_after_input() -> None:
     assert status_stream.getvalue() == "[workflow] calling LLM...\n"
 
 
+def test_prompt_user_records_human_interaction(tmp_path: Path) -> None:
+    set_current_interaction_log(tmp_path / ".powdrr" / "interaction-log.json")
+    _prompt_user("Question: ", input_func=lambda: "answer", stdout=io.StringIO())
+
+    document = json.loads(
+        (tmp_path / ".powdrr" / "interaction-log.json").read_text(encoding="utf-8")
+    )
+    assert document["interactions"][0]["actor"] == "human"
+    assert document["interactions"][0]["output"] == "answer"
+
+
 def test_workflow_progress_lists_steps_and_updates_status() -> None:
     stream = io.StringIO()
     progress = _WorkflowProgressDisplay(stream)
@@ -2459,6 +2471,24 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
     assert exchange["input"] == [{"role": "user", "content": "request"}]
     assert exchange["output"] == {"action": "complete", "text": "done"}
     assert exchange["timestamp"]
+
+
+def test_llm_exchange_recorder_writes_shared_interaction_log(
+    tmp_path: Path,
+) -> None:
+    class _FakeClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            return {"action": "complete", "text": "done"}
+
+    log_path = tmp_path / ".powdrr" / "interaction-log.json"
+    recorder = _LLMExchangeRecordingClient(
+        _FakeClient(), tmp_path, interaction_log_path=log_path
+    )
+    recorder.complete_json([{"role": "user", "content": "request"}])
+
+    document = json.loads(log_path.read_text(encoding="utf-8"))
+    assert document["interactions"][0]["actor"] == "llm"
+    assert document["interactions"][0]["output"]["action"] == "complete"
 
 
 def test_llm_exchange_recorder_reuses_client_serialized_messages(

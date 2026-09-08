@@ -1134,6 +1134,9 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         _required_string(data, "assignee_role"),
     )
     step = skill_step_from_data(data)
+    uses_skills = (
+        _required_string_sequence(data, "uses_skills") if "uses_skills" in data else ()
+    )
     output_state_type = _required_string(data, "output_state_type")
     dependent_state = _required_string_sequence(data, "dependent_state")
     phase_type = _optional_phase_type(data.get("phase_type"))
@@ -1151,7 +1154,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         details=step.details,
         llm_type=step.llm_type,
         interaction_style=step.interaction_style,
-        uses_skills=(),
+        uses_skills=uses_skills,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
         actions=step.actions,

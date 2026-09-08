@@ -35,6 +35,30 @@ def test_extract_scripted_responses_supports_live_report_shapes(tmp_path: Path) 
     ]
 
 
+def test_cli_extract_workflow_responses_writes_fixture(tmp_path: Path) -> None:
+    from powdrr_lift.cli import main
+
+    report = tmp_path / "report.json"
+    report.write_text(
+        json.dumps({"llm_exchanges": [{"output": {"action": "next_step"}}]}),
+        encoding="utf-8",
+    )
+    output = tmp_path / "responses.yaml"
+    assert (
+        main(
+            [
+                "extract-workflow-responses",
+                "--report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    assert "action: next_step" in output.read_text(encoding="utf-8")
+
+
 @pytest.mark.skipif(
     os.environ.get("POWDRR_LIVE_LLM_TESTS") != "1",
     reason="Set POWDRR_LIVE_LLM_TESTS=1 to run the live provider scenario.",

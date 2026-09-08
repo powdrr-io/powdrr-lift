@@ -185,6 +185,7 @@ from powdrr_lift.workflow_replay import (
 from powdrr_lift.workflow_scenario import (
     WorkflowScenarioError,
     extract_scripted_responses,
+    extract_scripted_responses_from_report,
     load_workflow_scenario,
     run_workflow_scenario,
 )
@@ -1127,6 +1128,11 @@ def build_parser() -> argparse.ArgumentParser:
             "Write the complete result, including live LLM exchanges and repair "
             "output, to this JSON file."
         ),
+    )
+    workflow_scenario_parser.add_argument(
+        "--extract-responses",
+        type=Path,
+        help="Write parsed model outputs as a replayable YAML/JSON response fixture.",
     )
     workflow_scenario_parser.add_argument(
         "--max-roundtrips",
@@ -3671,6 +3677,20 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
             json.dumps(data, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
+    if args.extract_responses is not None:
+        fixture_path = (
+            args.extract_responses
+            if args.extract_responses.is_absolute()
+            else repo_root / args.extract_responses
+        )
+        fixture_path.parent.mkdir(parents=True, exist_ok=True)
+        fixture_path.write_text(
+            yaml.safe_dump(
+                extract_scripted_responses_from_report(data), sort_keys=False
+            ),
+            encoding="utf-8",
+        )
+        print(f"Wrote scripted responses to {fixture_path}")
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:

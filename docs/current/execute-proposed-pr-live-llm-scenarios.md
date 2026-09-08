@@ -60,3 +60,7 @@ The extractor accepts both live task reports (which store parsed `output`
 objects) and live chat reports (which store assistant JSON messages). Review the
 generated fixture before committing it, then point the scenario at it with
 `responses_file`.
+
+For a live run, generation can be done in one command by adding
+`--extract-responses path/to/fixture.yaml` to `workflow-scenario`; the run still
+writes its normal report when `--report` is supplied.

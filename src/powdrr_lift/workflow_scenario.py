@@ -70,6 +70,13 @@ def extract_scripted_responses(report_path: Path) -> list[dict[str, Any]]:
         raise WorkflowScenarioError(
             f"Could not read scenario report {report_path}: {exc}"
         ) from exc
+    return extract_scripted_responses_from_report(report)
+
+
+def extract_scripted_responses_from_report(
+    report: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Extract replay responses from an already-loaded scenario report."""
     exchanges = report.get("llm_exchanges")
     if not isinstance(exchanges, list):
         raise WorkflowScenarioError("Scenario report does not contain llm_exchanges.")

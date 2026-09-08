@@ -1201,8 +1201,11 @@ def build_parser() -> argparse.ArgumentParser:
     agent_feature_parser.add_argument(
         "--phase-timeout",
         type=float,
-        default=None,
-        help="Optional maximum seconds for each agent/workflow phase.",
+        default=120.0,
+        help=(
+            "Maximum seconds without phase output before stopping it "
+            "(default: 120; resets on output)."
+        ),
     )
     agent_feature_parser.add_argument("--report", type=Path)
     agent_feature_parser.add_argument("--transcript-dir", type=Path)

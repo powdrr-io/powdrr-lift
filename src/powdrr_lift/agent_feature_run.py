@@ -8,9 +8,11 @@ the specification, implementation plan, tests, and product edits.
 from __future__ import annotations
 
 import json
+import selectors
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,7 +43,7 @@ class AgentFeatureRunConfig:
     provider: str = "auto"
     report_path: Path = Path(".powdrr/agent-feature-run/report.json")
     transcript_dir: Path = Path(".powdrr/agent-feature-run/transcripts")
-    phase_timeout: float | None = None
+    phase_timeout: float | None = 120.0
 
 
 @dataclass(frozen=True)
@@ -120,15 +122,20 @@ def _run_phase(
 ) -> dict[str, Any]:
     transcript.parent.mkdir(parents=True, exist_ok=True)
     try:
-        completed = runner(
-            list(command),
-            cwd=cwd,
-            input=input_text,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=timeout,
-        )
+        if runner is subprocess.run and timeout is not None:
+            completed = _run_with_inactivity_timeout(
+                command, cwd=cwd, input_text=input_text, timeout=timeout
+            )
+        else:
+            completed = runner(
+                list(command),
+                cwd=cwd,
+                input=input_text,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=timeout,
+            )
         returncode = completed.returncode
         output = (completed.stdout or "") + (completed.stderr or "")
     except subprocess.TimeoutExpired as exc:
@@ -151,6 +158,51 @@ def _run_phase(
         "transcript": str(transcript),
         "output_tail": output.splitlines()[-40:],
     }
+
+
+def _run_with_inactivity_timeout(
+    command: Sequence[str], *, cwd: Path, input_text: str, timeout: float
+) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        list(command),
+        cwd=cwd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    assert process.stdin is not None
+    assert process.stdout is not None
+    process.stdin.write(input_text)
+    process.stdin.close()
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+    output: list[str] = []
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                process.kill()
+                process.wait()
+                raise subprocess.TimeoutExpired(
+                    command, timeout, output="".join(output)
+                )
+            events = selector.select(remaining)
+            if not events:
+                continue
+            chunk = process.stdout.read(4096)
+            if chunk:
+                output.append(chunk)
+                deadline = time.monotonic() + timeout
+                continue
+            if process.poll() is not None:
+                break
+        return subprocess.CompletedProcess(
+            list(command), process.returncode, "".join(output), ""
+        )
+    finally:
+        selector.close()
 
 
 def run_agent_feature_e2e(

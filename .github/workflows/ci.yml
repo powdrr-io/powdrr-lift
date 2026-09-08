@@ -58,6 +58,17 @@ jobs:
       - name: Run tests
         run: uv run pytest tests
 
+      - name: Run deterministic workflow scenario suite
+        run: ./scripts/run-deterministic-workflow-suite.sh
+
+      - name: Upload deterministic workflow suite report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-workflow-suite-report
+          path: workflow-scenario-suite-report.json
+          if-no-files-found: ignore
+
       - name: Tune changed workflow definitions
         if: github.event_name == 'pull_request'
         env:

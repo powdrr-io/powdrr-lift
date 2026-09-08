@@ -1,6 +1,18 @@
 schema_version: 1
 scenarios:
+  - path: execute-proposed-pr/human-handoff.yaml
+    expected_status: passed
+  - path: execute-proposed-pr/no-change-recovery.yaml
+    expected_status: passed
+  - path: execute-proposed-pr/scope-repair.yaml
+    expected_status: passed
   - path: execute-proposed-pr/task-001-context.yaml
     expected_status: passed
+  - path: execute-proposed-pr/task-001-invalid-output.yaml
+    expected_status: passed
+  - path: execute-proposed-pr/task-001-malformed-action.yaml
+    expected_status: passed
   - path: execute-proposed-pr/task-002-plan.yaml
+    expected_status: passed
+  - path: execute-proposed-pr/task-all.yaml
     expected_status: passed

@@ -1135,6 +1135,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write parsed model outputs as a replayable YAML/JSON response fixture.",
     )
     workflow_scenario_parser.add_argument(
+        "--verify-extracted",
+        action="store_true",
+        help="Replay extracted responses immediately and fail if replay does not pass.",
+    )
+    workflow_scenario_parser.add_argument(
         "--max-roundtrips",
         type=int,
         help="Override the scenario roundtrip limit for an investigative run.",
@@ -3691,6 +3696,28 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
             encoding="utf-8",
         )
         print(f"Wrote scripted responses to {fixture_path}")
+        if args.verify_extracted:
+            if scenario.get("execution_mode") == "workflow_chain":
+                print(
+                    "--verify-extracted currently supports single-phase "
+                    "scenarios only.",
+                    file=sys.stderr,
+                )
+                return 1
+            replay = dict(scenario)
+            replay["provider"] = {
+                "mode": "scripted",
+                "responses": extract_scripted_responses_from_report(data),
+            }
+            replay_result = run_workflow_scenario(
+                replay,
+                scenario_path=scenario_path,
+                repo_root=repo_root,
+                keep_failed=args.keep_failed,
+            )
+            if replay_result.status != "passed":
+                print("Extracted response replay failed.", file=sys.stderr)
+                return 1
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:

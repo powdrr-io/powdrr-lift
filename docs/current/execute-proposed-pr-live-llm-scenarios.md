@@ -64,3 +64,7 @@ generated fixture before committing it, then point the scenario at it with
 For a live run, generation can be done in one command by adding
 `--extract-responses path/to/fixture.yaml` to `workflow-scenario`; the run still
 writes its normal report when `--report` is supplied.
+
+Add `--verify-extracted` to immediately replay the emitted responses through the
+same single-phase scenario. Recording fails if the fixture cannot complete the
+scenario, which makes transcript generation a self-checking operation.

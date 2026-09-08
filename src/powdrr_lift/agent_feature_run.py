@@ -41,7 +41,7 @@ class AgentFeatureRunConfig:
     provider: str = "auto"
     report_path: Path = Path(".powdrr/agent-feature-run/report.json")
     transcript_dir: Path = Path(".powdrr/agent-feature-run/transcripts")
-    phase_timeout: float = 900.0
+    phase_timeout: float | None = None
 
 
 @dataclass(frozen=True)
@@ -116,7 +116,7 @@ def _run_phase(
     input_text: str = "",
     transcript: Path,
     runner: Runner,
-    timeout: float,
+    timeout: float | None,
 ) -> dict[str, Any]:
     transcript.parent.mkdir(parents=True, exist_ok=True)
     try:

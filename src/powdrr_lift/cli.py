@@ -13,6 +13,12 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.agent_feature_run import (
+    DEFAULT_FEATURE_NAME,
+    DEFAULT_FEATURE_REQUEST,
+    AgentFeatureRunConfig,
+    run_agent_feature_e2e,
+)
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
@@ -1170,6 +1176,41 @@ def build_parser() -> argparse.ArgumentParser:
     scenario_suite_parser.add_argument("--report", type=Path)
     scenario_suite_parser.add_argument("--json", action="store_true")
     scenario_suite_parser.set_defaults(func=_run_workflow_scenario_suite)
+
+    agent_feature_parser = subparsers.add_parser(
+        "agent-feature-e2e",
+        help=(
+            "Prompt the live Powdrr agent to specify and implement a feature, "
+            "run its generated workflows, and verify the resulting artifacts."
+        ),
+    )
+    agent_feature_parser.add_argument("--repo-root", type=Path)
+    agent_feature_parser.add_argument("--feature-name", default=DEFAULT_FEATURE_NAME)
+    agent_feature_parser.add_argument(
+        "--feature-request", default=DEFAULT_FEATURE_REQUEST
+    )
+    agent_feature_parser.add_argument(
+        "--answer", action="append", default=[], help="Answer a live agent follow-up."
+    )
+    agent_feature_parser.add_argument(
+        "--provider", choices=["auto", *ALL_PROVIDERS], default="auto"
+    )
+    agent_feature_parser.add_argument("--max-turns", type=int, default=40)
+    agent_feature_parser.add_argument("--workflow-roundtrips", type=int, default=128)
+    agent_feature_parser.add_argument("--start-iterations", type=int, default=10)
+    agent_feature_parser.add_argument(
+        "--phase-timeout",
+        type=float,
+        default=120.0,
+        help=(
+            "Maximum seconds without phase output before stopping it "
+            "(default: 120; resets on output)."
+        ),
+    )
+    agent_feature_parser.add_argument("--report", type=Path)
+    agent_feature_parser.add_argument("--transcript-dir", type=Path)
+    agent_feature_parser.add_argument("--json", action="store_true")
+    agent_feature_parser.set_defaults(func=_run_agent_feature_e2e)
 
     extract_responses_parser = subparsers.add_parser(
         "extract-workflow-responses",
@@ -3799,6 +3840,33 @@ def _run_workflow_scenario_suite(args: argparse.Namespace) -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(reports, indent=2) + "\n", encoding="utf-8")
     return 1 if failed else 0
+
+
+def _run_agent_feature_e2e(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    result = run_agent_feature_e2e(
+        AgentFeatureRunConfig(
+            repo_root=repo_root,
+            feature_request=args.feature_request,
+            feature_name=args.feature_name,
+            answers=tuple(args.answer),
+            max_turns=args.max_turns,
+            workflow_roundtrips=args.workflow_roundtrips,
+            start_iterations=args.start_iterations,
+            phase_timeout=args.phase_timeout,
+            provider=args.provider,
+            report_path=args.report or Path(".powdrr/agent-feature-run/report.json"),
+            transcript_dir=args.transcript_dir
+            or Path(".powdrr/agent-feature-run/transcripts"),
+        )
+    )
+    if args.json:
+        print(json.dumps(result.to_data(), indent=2, ensure_ascii=False))
+    else:
+        print(f"Agent feature run {result.status}; report: {result.report_path}")
+        for phase in result.phases:
+            print(f"{phase['name']}: returncode={phase['returncode']}")
+    return 0 if result.status == "passed" else 1
 
 
 def _extract_workflow_responses(args: argparse.Namespace) -> int:

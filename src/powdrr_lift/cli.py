@@ -1198,6 +1198,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_feature_parser.add_argument("--max-turns", type=int, default=40)
     agent_feature_parser.add_argument("--workflow-roundtrips", type=int, default=128)
     agent_feature_parser.add_argument("--start-iterations", type=int, default=10)
+    agent_feature_parser.add_argument(
+        "--phase-timeout",
+        type=float,
+        default=900.0,
+        help="Maximum seconds for each agent/workflow phase (default: 900).",
+    )
     agent_feature_parser.add_argument("--report", type=Path)
     agent_feature_parser.add_argument("--transcript-dir", type=Path)
     agent_feature_parser.add_argument("--json", action="store_true")
@@ -3844,6 +3850,7 @@ def _run_agent_feature_e2e(args: argparse.Namespace) -> int:
             max_turns=args.max_turns,
             workflow_roundtrips=args.workflow_roundtrips,
             start_iterations=args.start_iterations,
+            phase_timeout=args.phase_timeout,
             provider=args.provider,
             report_path=args.report or Path(".powdrr/agent-feature-run/report.json"),
             transcript_dir=args.transcript_dir

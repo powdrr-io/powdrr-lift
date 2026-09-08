@@ -13,6 +13,7 @@ from powdrr_lift.agent_feature_run import (
 def test_agent_feature_run_prompts_agent_then_executes_generated_workflows(
     tmp_path: Path,
 ) -> None:
+    _write_skill_fixtures(tmp_path)
     workflow_root = tmp_path / "docs/workflows/interaction-file-log"
     workflow_root.mkdir(parents=True)
     (workflow_root / "interaction-file-log-core-task-001.yaml").write_text(
@@ -46,6 +47,7 @@ def test_agent_feature_run_prompts_agent_then_executes_generated_workflows(
 
 
 def test_agent_feature_run_stops_after_specification_failure(tmp_path: Path) -> None:
+    _write_skill_fixtures(tmp_path)
     calls: list[list[str]] = []
 
     def failing_runner(
@@ -62,3 +64,12 @@ def test_agent_feature_run_stops_after_specification_failure(tmp_path: Path) -> 
     assert result.status == "failed"
     assert len(calls) == 1
     assert result.phases[0]["name"] == "specify-a-feature"
+
+
+def _write_skill_fixtures(repo_root: Path) -> None:
+    skills = repo_root / "skill-definitions"
+    skills.mkdir()
+    for name in ("specify-a-feature", "start-implementing-feature"):
+        (skills / f"{name}.yaml").write_text(
+            f"name: {name}\nsteps: []\n", encoding="utf-8"
+        )

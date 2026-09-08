@@ -117,6 +117,7 @@ from powdrr_lift.workflow_chat_agent import (
     _prompt_step_context,
     _prompt_transcript,
     _prompt_user,
+    _read_openai_response,
     _record_durable_fact,
     _record_dynamic_validation_result,
     _repair_response_fingerprint,
@@ -9505,6 +9506,51 @@ def test_openai_chat_client_consumes_sse_content_and_reports_progress(
 
     assert client.complete_json([{"role": "user", "content": "hello"}]) == {"ok": True}
     assert "received streamed LLM data" in progress.getvalue()
+
+
+def test_openai_streaming_response_is_bounded_before_json_parse(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeResponse:
+        headers = {"Content-Type": "text/event-stream"}
+
+        def readline(self) -> bytes:
+            return next(self._lines, b"")
+
+        _lines = iter(
+            [
+                b'data: {"choices":[{"delta":{"content":"x"}}]}\n',
+                b"\n",
+                b'data: {"choices":[{"delta":{"content":"y"}}]}\n',
+                b"\n",
+            ]
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workflow_chat_agent._MAX_STREAM_CHUNKS",
+        1,
+    )
+
+    with pytest.raises(RuntimeError, match="exceeded the bounded output limit"):
+        _read_openai_response(_FakeResponse(), progress_stream=None)
+
+
+def test_openai_streaming_response_requires_completion_marker() -> None:
+    class _FakeResponse:
+        headers = {"Content-Type": "text/event-stream"}
+
+        def readline(self) -> bytes:
+            return next(self._lines, b"")
+
+        _lines = iter(
+            [
+                b'data: {"choices":[{"delta":{"content":"{\\"ok\\":true}"}}]}\n',
+                b"\n",
+            ]
+        )
+
+    with pytest.raises(RuntimeError, match="ended before a completion marker"):
+        _read_openai_response(_FakeResponse(), progress_stream=None)
 
 
 def _build_skill() -> Skill:

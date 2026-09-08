@@ -141,3 +141,82 @@ task_templates:
     snapshot = json.loads(paths[0].read_text(encoding="utf-8"))
     assert snapshot["workflow_template"] == "execute"
     assert snapshot["step_type"] == "invoke_tool"
+
+
+def test_definition_analysis_reports_missing_handoff_and_schema(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: handoff
+when_to_use: [Test handoffs.]
+steps:
+  - id: produce
+    description: Produce a result.
+    outputs:
+      - name: result
+        required_for_next_step: true
+  - id: consume
+    description: Consume the result.
+    inputs:
+      - name: missing
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert {issue.code for issue in report.issues} >= {
+        "missing_output_schema",
+        "missing_handoff_input",
+    }
+
+
+def test_definition_analysis_reports_unreachable_steps(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: control-flow
+when_to_use: [Test control flow.]
+steps:
+  - id: first
+    description: Jump over the second step.
+    next_step_override: last
+  - id: skipped
+    description: This step is unreachable.
+  - id: last
+    description: Finish.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "unreachable_step" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_validates_examples_against_step_contract(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: predicated
+when_to_use: [Test predicated actions.]
+steps:
+  - id: inspect
+    description: Inspect.
+    step_type: predicated
+    completion:
+      required_outputs: [answer]
+    outputs:
+      - name: answer
+        required_for_next_step: true
+        schema: {type: string}
+    details: 'Return {"action":"next_step"}.'
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "invalid_action_example" in {issue.code for issue in report.issues}

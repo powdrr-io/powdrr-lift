@@ -1151,7 +1151,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         details=step.details,
         llm_type=step.llm_type,
         interaction_style=step.interaction_style,
-        uses_skills=step.uses_skills,
+        uses_skills=(),
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
         actions=step.actions,

@@ -2135,6 +2135,7 @@ def _parse_uses_skill(value: object) -> SkillUsesSkill | None:
                     f"uses_skill.{label} names must be unique and non-empty."
                 )
             seen.add(name)
+            ref: str | None
             if isinstance(item, str):
                 ref = item.strip()
                 schema = None

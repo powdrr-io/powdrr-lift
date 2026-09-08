@@ -28,6 +28,12 @@ from powdrr_lift.core import (
 )
 
 
+def uses_skill_name(step: SkillStep) -> str:
+    contract = step.uses_skill
+    assert contract is not None
+    return contract.skill
+
+
 def test_uses_skill_step_round_trips_explicit_handoff_bindings() -> None:
     skill = skill_from_data(
         {
@@ -911,7 +917,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "<work-item-name>",
     ]
     assert step("fill-system-specification").step_type == "freeform"
-    assert step("review-system-context").uses_skill.skill == "review-system"
+    assert uses_skill_name(step("review-system-context")) == "review-system"
     assert step("evaluate-system-specification").step_type == "gate"
     assert command("evaluate-system-specification") == [
         "powdrr-lift",
@@ -927,7 +933,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--all-entity-types",
     ]
     assert step("fill-architecture-specification").step_type == "freeform"
-    assert step("review-architecture-context").uses_skill.skill == "review-architecture"
+    assert uses_skill_name(step("review-architecture-context")) == "review-architecture"
     assert step("evaluate-architecture-specification").step_type == "gate"
     assert command("evaluate-architecture-specification") == [
         "powdrr-lift",
@@ -964,8 +970,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ("powdrr-lift", "repository-state"),
         ("add", "docs/proposals/<work-item-name>"),
     ]
-    assert step("prepare-pull-request").uses_skill.skill == "finish-pr-prep"
-    assert step("create-feature-pull-request").uses_skill.skill == "create-pull-request"
+    assert uses_skill_name(step("prepare-pull-request")) == "finish-pr-prep"
+    assert uses_skill_name(step("create-feature-pull-request")) == "create-pull-request"
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:
@@ -1124,8 +1130,8 @@ def test_review_skill_workflow_ends_with_pull_request_creation() -> None:
         "add",
         "<target-definition-path>",
     )
-    assert skill.steps[-2].uses_skill.skill == "finish-pr-prep"
-    assert skill.steps[-1].uses_skill.skill == "create-pull-request"
+    assert uses_skill_name(skill.steps[-2]) == "finish-pr-prep"
+    assert uses_skill_name(skill.steps[-1]) == "create-pull-request"
     assert "skill-workflow-review" in (skill.steps[-1].details or "")
     assert "pull-request URL" in (skill.steps[-1].details or "")
 
@@ -1145,7 +1151,7 @@ def test_pr_description_generators_are_used_by_pr_skills() -> None:
         skill = load_skill(skills_dir / f"{skill_name}.yaml")
         assert any(
             step.uses_skill is not None
-            and step.uses_skill.skill == "create-pull-request"
+            and uses_skill_name(step) == "create-pull-request"
             and kind in (step.details or "")
             and "files_to_publish" in (step.details or "")
             for step in skill.steps
@@ -1236,8 +1242,8 @@ def test_checked_in_address_review_comments_skill_matches_flow() -> None:
     assert "resolved, outdated, and current comments" in (skill.steps[0].details or "")
     assert "design, entities, relationships" in (skill.steps[1].details or "")
     assert "system-specification" in (skill.steps[2].details or "")
-    assert skill.steps[4].uses_skill.skill == "finish-pr-prep"
-    assert skill.steps[5].uses_skill.skill == "create-pull-request"
+    assert uses_skill_name(skill.steps[4]) == "finish-pr-prep"
+    assert uses_skill_name(skill.steps[5]) == "create-pull-request"
 
 
 def test_checked_in_feature_test_coverage_review_skill_matches_review_flow() -> None:
@@ -1558,7 +1564,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert prepare_details is not None
     assert '"action":"emit_outputs"' in prepare_details
     assert "copying the exact values" in prepare_details
-    assert step("create-feature-pull-request").uses_skill.skill == "create-pull-request"
+    assert uses_skill_name(step("create-feature-pull-request")) == "create-pull-request"
 
 
 def test_checked_in_bootstrap_skill_verifies_discovered_tools() -> None:

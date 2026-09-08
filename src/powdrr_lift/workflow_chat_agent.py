@@ -1048,7 +1048,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     if nested_skill.skill.adversarial is None
                     else ("adversarial" if nested_skill.skill.adversarial else "normal")
                 )
-                initial_handoff_records = None
+                initial_handoff_records: dict[str, dict[str, Any]] | None = None
                 output_bindings: tuple[
                     tuple[str, str, Mapping[str, Any] | None], ...
                 ] = ()
@@ -1073,6 +1073,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                             )
                             if schema_error is not None:
                                 raise PowdrrExecutionError(schema_error)
+                        if initial_handoff_records is None:
+                            raise PowdrrExecutionError(
+                                "uses_skill inputs require an isolated handoff context."
+                            )
                         initial_handoff_records[binding.name] = {
                             **dict(source),
                             "name": binding.name,

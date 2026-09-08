@@ -138,7 +138,11 @@ steps:
     output is required for this step; emit it only when this step has actually
     selected a canonical feature. Pass the selected specification documents,
     workflow documents, canonical feature name, and missing-document findings
-    to the next step. The canonical specification filenames are exactly
+    to the next step. Emit `specification_documents` as the exact existing
+    file paths for the canonical documents, `workflow_documents` as the exact
+    existing workflow file paths, and `missing_documents` as exact paths that
+    are absent. These are arrays of file paths, never directory paths. The
+    canonical specification filenames are exactly
     system-specification.yaml, architecture-specification.yaml,
     implementation-specification.yaml, and proposed-pr-specification.yaml;
     never invent specification-v1.yaml or another filename from the schema name.
@@ -146,6 +150,27 @@ steps:
   - name: feature_name
     type: string
     required_for_next_step: true
+  - name: specification_documents
+    type: array
+    required_for_next_step: true
+    schema:
+      type: array
+      items:
+        type: string
+  - name: workflow_documents
+    type: array
+    required_for_next_step: true
+    schema:
+      type: array
+      items:
+        type: string
+  - name: missing_documents
+    type: array
+    required_for_next_step: true
+    schema:
+      type: array
+      items:
+        type: string
 - id: bootstrap-project-structure
   description: Bootstrap the project-wide module and tool structure.
   actions: [invoke_skill]

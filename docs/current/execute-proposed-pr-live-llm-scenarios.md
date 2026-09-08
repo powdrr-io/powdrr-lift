@@ -64,3 +64,19 @@ generated fixture before committing it, then point the scenario at it with
 For a live run, generation can be done in one command by adding
 `--extract-responses path/to/fixture.yaml` to `workflow-scenario`; the run still
 writes its normal report when `--report` is supplied.
+
+Add `--verify-extracted` to immediately replay the emitted responses through the
+same single-phase scenario. Recording fails if the fixture cannot complete the
+scenario, which makes transcript generation a self-checking operation.
+
+For CI, list deterministic scenarios in a manifest and replay them together:
+
+```bash
+uv run powdrr-lift workflow-scenario-suite \
+  --manifest workflow-evals/scenarios/manifest.yaml \
+  --repo-root .
+```
+
+Each manifest entry names a scenario and may declare its expected status. This
+gives skill and workflow changes one regression command that exercises the
+recorded fixtures as a suite.

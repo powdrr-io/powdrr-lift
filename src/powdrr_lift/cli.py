@@ -1135,6 +1135,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write parsed model outputs as a replayable YAML/JSON response fixture.",
     )
     workflow_scenario_parser.add_argument(
+        "--verify-extracted",
+        action="store_true",
+        help="Replay extracted responses immediately and fail if replay does not pass.",
+    )
+    workflow_scenario_parser.add_argument(
         "--max-roundtrips",
         type=int,
         help="Override the scenario roundtrip limit for an investigative run.",
@@ -1155,6 +1160,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the complete scenario result as JSON.",
     )
     workflow_scenario_parser.set_defaults(func=_run_workflow_scenario)
+
+    scenario_suite_parser = subparsers.add_parser(
+        "workflow-scenario-suite",
+        help="Replay a checked-in manifest of deterministic workflow scenarios.",
+    )
+    scenario_suite_parser.add_argument("--manifest", required=True, type=Path)
+    scenario_suite_parser.add_argument("--repo-root", type=Path)
+    scenario_suite_parser.add_argument("--json", action="store_true")
+    scenario_suite_parser.set_defaults(func=_run_workflow_scenario_suite)
 
     extract_responses_parser = subparsers.add_parser(
         "extract-workflow-responses",
@@ -3691,6 +3705,28 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
             encoding="utf-8",
         )
         print(f"Wrote scripted responses to {fixture_path}")
+        if args.verify_extracted:
+            if scenario.get("execution_mode") == "workflow_chain":
+                print(
+                    "--verify-extracted currently supports single-phase "
+                    "scenarios only.",
+                    file=sys.stderr,
+                )
+                return 1
+            replay = dict(scenario)
+            replay["provider"] = {
+                "mode": "scripted",
+                "responses": extract_scripted_responses_from_report(data),
+            }
+            replay_result = run_workflow_scenario(
+                replay,
+                scenario_path=scenario_path,
+                repo_root=repo_root,
+                keep_failed=args.keep_failed,
+            )
+            if replay_result.status != "passed":
+                print("Extracted response replay failed.", file=sys.stderr)
+                return 1
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:
@@ -3705,6 +3741,57 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
         if result.worktree_root is not None:
             print(f"Retained failed scenario repository: {result.worktree_root}")
     return 0 if result.status == "passed" else 1
+
+
+def _run_workflow_scenario_suite(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    manifest_path = (
+        args.manifest if args.manifest.is_absolute() else repo_root / args.manifest
+    )
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, Mapping) or manifest.get("schema_version") != 1:
+            raise WorkflowScenarioError(
+                "Scenario suite manifest schema_version must be 1."
+            )
+        entries = manifest.get("scenarios")
+        if not isinstance(entries, list) or not entries:
+            raise WorkflowScenarioError("Scenario suite manifest requires scenarios.")
+        reports: list[dict[str, Any]] = []
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, Mapping):
+                raise WorkflowScenarioError(
+                    f"Scenario suite entry {index} must be an object."
+                )
+            scenario_path = Path(str(entry.get("path", "")))
+            if not scenario_path.is_absolute():
+                scenario_path = manifest_path.parent / scenario_path
+            scenario = load_workflow_scenario(scenario_path)
+            if scenario.get("provider", {}).get("mode") == "live":
+                raise WorkflowScenarioError(
+                    f"Scenario suite cannot include live scenario: {scenario_path}"
+                )
+            result = run_workflow_scenario(
+                scenario, scenario_path=scenario_path, repo_root=repo_root
+            )
+            expected = str(entry.get("expected_status", "passed"))
+            reports.append(
+                {
+                    "path": str(scenario_path),
+                    "status": result.status,
+                    "expected_status": expected,
+                }
+            )
+        failed = [item for item in reports if item["status"] != item["expected_status"]]
+    except (OSError, TypeError, ValueError, WorkflowScenarioError) as exc:
+        print(f"Workflow scenario suite failed: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(reports, indent=2))
+    else:
+        for report in reports:
+            print(f"{report['status']}: {report['path']}")
+    return 1 if failed else 0
 
 
 def _extract_workflow_responses(args: argparse.Namespace) -> int:

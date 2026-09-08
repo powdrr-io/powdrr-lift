@@ -10,6 +10,7 @@ import pytest
 
 from powdrr_lift.workflow_scenario import (
     WorkflowScenarioError,
+    WorkflowScenarioResult,
     extract_scripted_responses,
     load_workflow_scenario,
     run_workflow_scenario,
@@ -57,6 +58,83 @@ def test_cli_extract_workflow_responses_writes_fixture(tmp_path: Path) -> None:
         == 0
     )
     assert "action: next_step" in output.read_text(encoding="utf-8")
+
+
+def test_cli_verify_extracted_replays_the_generated_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from powdrr_lift.cli import main
+
+    scenario = tmp_path / "live.yaml"
+    scenario.write_text(
+        """\
+schema_version: 1
+id: live-record
+definition: skill.yaml
+execution_mode: workflow_chat
+request: Record this.
+provider: {mode: live, provider: openai}
+expect: {}
+""",
+        encoding="utf-8",
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_run(
+        scenario_data: dict[str, object], **_kwargs: object
+    ) -> WorkflowScenarioResult:
+        calls.append(scenario_data)
+        return WorkflowScenarioResult(
+            scenario_id="live-record",
+            definition="skill.yaml",
+            status="passed",
+            assertions=(),
+            execution_events=(),
+            audit_events=(),
+            roundtrips=1,
+            llm_exchanges=({"output": {"action": "next_step"}},),
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.run_workflow_scenario", fake_run)
+    output = tmp_path / "responses.yaml"
+    assert (
+        main(
+            [
+                "workflow-scenario",
+                "--scenario",
+                str(scenario),
+                "--repo-root",
+                str(tmp_path),
+                "--extract-responses",
+                str(output),
+                "--verify-extracted",
+            ]
+        )
+        == 0
+    )
+    assert len(calls) == 2
+    assert calls[1]["provider"] == {
+        "mode": "scripted",
+        "responses": [{"action": "next_step"}],
+    }
+
+
+def test_checked_in_workflow_scenario_suite_passes() -> None:
+    from powdrr_lift.cli import main
+
+    repository_root = Path(__file__).resolve().parents[1]
+    assert (
+        main(
+            [
+                "workflow-scenario-suite",
+                "--manifest",
+                str(repository_root / "workflow-evals/scenarios/manifest.yaml"),
+                "--repo-root",
+                str(repository_root),
+            ]
+        )
+        == 0
+    )
 
 
 @pytest.mark.skipif(

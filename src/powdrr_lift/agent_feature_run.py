@@ -8,6 +8,7 @@ the specification, implementation plan, tests, and product edits.
 from __future__ import annotations
 
 import json
+import os
 import selectors
 import shutil
 import subprocess
@@ -191,9 +192,9 @@ def _run_with_inactivity_timeout(
             events = selector.select(remaining)
             if not events:
                 continue
-            chunk = process.stdout.read(4096)
+            chunk = os.read(process.stdout.fileno(), 4096)
             if chunk:
-                output.append(chunk)
+                output.append(chunk.decode("utf-8", errors="replace"))
                 deadline = time.monotonic() + timeout
                 continue
             if process.poll() is not None:

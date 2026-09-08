@@ -119,6 +119,24 @@ expect: {}
     }
 
 
+def test_checked_in_workflow_scenario_suite_passes() -> None:
+    from powdrr_lift.cli import main
+
+    repository_root = Path(__file__).resolve().parents[1]
+    assert (
+        main(
+            [
+                "workflow-scenario-suite",
+                "--manifest",
+                str(repository_root / "workflow-evals/scenarios/manifest.yaml"),
+                "--repo-root",
+                str(repository_root),
+            ]
+        )
+        == 0
+    )
+
+
 @pytest.mark.skipif(
     os.environ.get("POWDRR_LIVE_LLM_TESTS") != "1",
     reason="Set POWDRR_LIVE_LLM_TESTS=1 to run the live provider scenario.",

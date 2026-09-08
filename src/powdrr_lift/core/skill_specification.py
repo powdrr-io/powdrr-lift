@@ -64,7 +64,15 @@ SUPPORTED_STEP_ACTIONS = frozenset(
 )
 UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step", "emit_outputs"})
 SUPPORTED_STEP_TYPES = frozenset(
-    {"governed", "predicated", "uses_skill", "invoke_tool", "gate", "coding_loop"}
+    {
+        "governed",
+        "freeform",
+        "predicated",
+        "uses_skill",
+        "invoke_tool",
+        "gate",
+        "coding_loop",
+    }
 )
 SUPPORTED_INTERACTION_STYLES = frozenset(
     {"engineering", "observational_review", "devils_advocate"}
@@ -323,7 +331,7 @@ class SkillStep:
     def __post_init__(self) -> None:
         if self.actions:
             object.__setattr__(self, "actions_declared", True)
-        if self.uses_skill is not None and self.step_type == "freeform":
+        if self.uses_skill is not None and self.step_type in {"freeform", "governed"}:
             object.__setattr__(self, "step_type", "uses_skill")
 
     def to_data(self) -> dict[str, Any]:
@@ -1957,6 +1965,8 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     step_id = _optional_string(data.get("id"))
     description = _required_string(data, "description")
     step_type = _optional_string(data.get("step_type")) or "governed"
+    if step_type == "freeform":
+        step_type = "governed"
     if step_type not in SUPPORTED_STEP_TYPES:
         raise ValueError(
             "Skill step step_type must be governed, predicated, uses_skill, "

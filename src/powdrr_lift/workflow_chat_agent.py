@@ -5390,12 +5390,8 @@ def _modular_action_system_prompt(
     """Build a compact action prompt with explicitly selected guidance sections."""
     step_actions = _step_actions(current_step)
     action_names = {name for name, _ in step_actions}
-    include_context = "gather_context" in action_names and _step_needs_prompt_catalog(
-        current_step, "context_types"
-    )
-    include_skills = "invoke_skill" in action_names and _step_needs_prompt_catalog(
-        current_step, "skills"
-    )
+    include_context = _step_needs_prompt_catalog(current_step, "context_types")
+    include_skills = _step_needs_prompt_catalog(current_step, "skills")
     action_lines = "\n".join(
         f"- {name}: {instructions}" for name, instructions in step_actions
     )
@@ -5483,7 +5479,7 @@ def _modular_action_system_prompt(
             '"provider_role":"adversarial","clean":true}.\n'
         )
     nested_skill = getattr(current_step, "uses_skill", None)
-    if nested_skill is not None and "invoke_skill" in action_names:
+    if nested_skill is not None:
         prompt += (
             "This step delegates to a nested skill; use invoke_skill, "
             "not invoke_tool or an internal CLI command. The only listed nested "

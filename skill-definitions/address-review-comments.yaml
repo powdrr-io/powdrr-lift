@@ -9,7 +9,7 @@ when_to_use:
 steps:
 - description: Inspect the pull request and collect its review comments.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: long_context
   details: >-
     Resolve the current pull request from the worktree branch and inspect its
@@ -43,7 +43,7 @@ steps:
     - query=<review-thread-query>
 - id: classify-comments
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   description: Classify each comment against the feature contract.
   llm_type: high_reasoning
   details: >-
@@ -59,7 +59,7 @@ steps:
     authoritative specification rather than silently guessing.
 - id: update-specifications
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   description: Update the v1 specification for design-level feedback.
   llm_type: standard_reasoning
   details: >-
@@ -89,7 +89,7 @@ steps:
     - <work-item-name>
 - id: implement-corrections
   actions: [invoke_tool, edit, yaml_edit, read_document, goto_step]
-  step_type: freeform
+  step_type: governed
   description: Implement and test every actionable review correction.
   llm_type: high_reasoning
   details: >-

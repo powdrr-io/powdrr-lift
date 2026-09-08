@@ -7,7 +7,7 @@ steps:
 - id: capture-feature-name
   description: Capture the feature name.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Choose a stable kebab-case feature name and reuse this exact name as the
@@ -26,7 +26,7 @@ steps:
 - id: capture-feature-context
   description: Capture the feature goal and success criteria.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Parse the request and conversation for the named feature's outcomes, edge
@@ -62,7 +62,7 @@ steps:
 - id: fill-system-specification
   description: Fill the system requirements and approach.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: >-
     Use yaml_edit to fill the generated YAML with the feature's requirements
@@ -127,7 +127,7 @@ steps:
 - id: fill-architecture-specification
   description: Fill the architecture entities and relationships.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Use yaml_edit to capture the entity model before review; do not invoke tools
@@ -193,7 +193,7 @@ steps:
 - id: fill-implementation-specification
   description: Fill the implementation features and decisions.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: Use yaml_edit to complete the generated implementation template; do not invoke tools or rewrite the YAML as prose, then choose next_step.
 - id: evaluate-implementation-specification
@@ -242,7 +242,7 @@ steps:
 - id: repair-feature-specifications
   description: Fix every reported specification issue with yaml_edit.
   actions: [edit, yaml_edit, file_management, read_document, gather_context, goto_step]
-  step_type: freeform
+  step_type: governed
   llm_type: fast_iteration
   details: >-
     Review only the latest deterministic evaluator result and fix every reported
@@ -283,7 +283,7 @@ steps:
 - id: stage-specification-artifacts
   description: Stage the validated specification artifacts for pull request preparation.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: Inspect the worktree and stage only the validated specification
     artifacts under docs/proposals/<work-item-name>/. Do not commit or create the

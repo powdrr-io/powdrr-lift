@@ -223,7 +223,7 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
-                "step_type": "freeform",
+                "step_type": "governed",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
             },
@@ -235,7 +235,7 @@ def test_skill_round_trips_through_json() -> None:
             },
             {
                 "description": "Summarize the result.",
-                "step_type": "freeform",
+                "step_type": "governed",
             },
         ],
     }
@@ -391,7 +391,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 if (path.name, index) in expected_predicated_steps
                 else "uses_skill"
                 if "uses_skill" in step
-                else "freeform"
+                else "governed"
             )
             assert step["step_type"] == expected_step_type, (
                 f"{path}:{step_key}[{index}]"
@@ -907,7 +907,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         assert pre_step is not None
         return list(pre_step.template["command"])
 
-    assert step("capture-feature-name").step_type == "freeform"
+    assert step("capture-feature-name").step_type == "governed"
     assert step("capture-feature-name").outputs[0].name == "work_item_name"
     assert step("generate-system-specification").step_type == "invoke_tool"
     assert command("generate-system-specification") == [
@@ -916,7 +916,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--work-item-name",
         "<work-item-name>",
     ]
-    assert step("fill-system-specification").step_type == "freeform"
+    assert step("fill-system-specification").step_type == "governed"
     assert uses_skill_name(step("review-system-context")) == "review-system"
     assert step("evaluate-system-specification").step_type == "gate"
     assert command("evaluate-system-specification") == [
@@ -932,7 +932,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "<work-item-name>",
         "--all-entity-types",
     ]
-    assert step("fill-architecture-specification").step_type == "freeform"
+    assert step("fill-architecture-specification").step_type == "governed"
     assert uses_skill_name(step("review-architecture-context")) == "review-architecture"
     assert step("evaluate-architecture-specification").step_type == "gate"
     assert command("evaluate-architecture-specification") == [
@@ -947,7 +947,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--work-item-name",
         "<work-item-name>",
     ]
-    assert step("fill-implementation-specification").step_type == "freeform"
+    assert step("fill-implementation-specification").step_type == "governed"
     assert step("evaluate-implementation-specification").step_type == "gate"
     assert command("evaluate-implementation-specification") == [
         "powdrr-lift",
@@ -1039,7 +1039,7 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert steps["enrich-test-results"].outputs[0].name == "enriched_test_result"
     assert steps["enrich-test-results"].outputs[0].required_for_next_step
     assert steps["diagnose-test-results"].inputs[0].name == "enriched_test_result"
-    assert steps["diagnose-test-results"].step_type == "freeform"
+    assert steps["diagnose-test-results"].step_type == "governed"
     assert steps["diagnose-test-results"].completion is None
     assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
     assert steps["diagnose-test-results"].outputs[0].required_for_next_step
@@ -1380,7 +1380,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         assert discovery_step.pre_step.template["tool"] == "fuzzy-match"
         assert discovery_step.outputs[0].name == output_name
         assert discovery_step.outputs[0].required_for_next_step
-    assert step("select-feature-context").step_type == "freeform"
+    assert step("select-feature-context").step_type == "governed"
     assert step("select-feature-context").outputs[0].name == "feature_name"
     assert step("select-feature-context").outputs[0].required_for_next_step
     select_details = step("select-feature-context").details
@@ -1470,7 +1470,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert "Do not pass workflow dependencies manually" in instantiate_details
     assert "unified proposed-PR specification" in instantiate_details
     dependency_step = step("verify-workflow-dependencies")
-    assert dependency_step.step_type == "freeform"
+    assert dependency_step.step_type == "governed"
     dependency_details = dependency_step.details
     assert dependency_details is not None
     assert "depends_on_workflows" in dependency_details
@@ -1616,7 +1616,7 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
     )
     steps_by_id = {step.id: step for step in skill.steps if step.id is not None}
     assert steps_by_id["generate-system"].step_type == "invoke_tool"
-    assert steps_by_id["fill-system"].step_type == "freeform"
+    assert steps_by_id["fill-system"].step_type == "governed"
     assert steps_by_id["evaluate-system"].step_type == "invoke_tool"
     assert steps_by_id["gate-system"].step_type == "gate"
     assert steps_by_id["generate-system"].pre_step is not None
@@ -1652,7 +1652,7 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
     )
     steps_by_id = {step.id: step for step in skill.steps if step.id is not None}
     assert steps_by_id["generate-architecture"].step_type == "invoke_tool"
-    assert steps_by_id["fill-architecture"].step_type == "freeform"
+    assert steps_by_id["fill-architecture"].step_type == "governed"
     assert steps_by_id["evaluate-architecture"].step_type == "invoke_tool"
     assert steps_by_id["gate-architecture"].step_type == "gate"
     assert steps_by_id["generate-architecture"].pre_step is not None

@@ -48,7 +48,7 @@ steps:
   description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: >-
     Use the yaml_edit action for every YAML change. Its shape is
@@ -76,7 +76,7 @@ steps:
 - id: repair-implementation
   description: Use yaml_edit to fix every issue reported by the implementation evaluator.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: freeform
+  step_type: governed
   llm_type: fast_iteration
   details: >-
     Review the deterministic evaluator result and correct every reported issue

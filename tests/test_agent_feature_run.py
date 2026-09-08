@@ -10,14 +10,6 @@ from powdrr_lift.agent_feature_run import (
 )
 
 
-def _runner(calls: list[list[str]]):
-    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        calls.append(command)
-        return subprocess.CompletedProcess(command, 0, "ok\n", "")
-
-    return run
-
-
 def test_agent_feature_run_prompts_agent_then_executes_generated_workflows(
     tmp_path: Path,
 ) -> None:

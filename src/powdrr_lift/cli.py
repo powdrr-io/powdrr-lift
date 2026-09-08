@@ -184,6 +184,7 @@ from powdrr_lift.workflow_replay import (
 )
 from powdrr_lift.workflow_scenario import (
     WorkflowScenarioError,
+    extract_scripted_responses,
     load_workflow_scenario,
     run_workflow_scenario,
 )
@@ -1148,6 +1149,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the complete scenario result as JSON.",
     )
     workflow_scenario_parser.set_defaults(func=_run_workflow_scenario)
+
+    extract_responses_parser = subparsers.add_parser(
+        "extract-workflow-responses",
+        help=(
+            "Convert a live workflow scenario report into a scripted response fixture."
+        ),
+    )
+    extract_responses_parser.add_argument("--report", required=True, type=Path)
+    extract_responses_parser.add_argument("--output", required=True, type=Path)
+    extract_responses_parser.set_defaults(func=_extract_workflow_responses)
 
     definition_validation_parser = subparsers.add_parser(
         "validate-workflow-definition",
@@ -3674,6 +3685,18 @@ def _run_workflow_scenario(args: argparse.Namespace) -> int:
         if result.worktree_root is not None:
             print(f"Retained failed scenario repository: {result.worktree_root}")
     return 0 if result.status == "passed" else 1
+
+
+def _extract_workflow_responses(args: argparse.Namespace) -> int:
+    try:
+        responses = extract_scripted_responses(args.report)
+    except WorkflowScenarioError as exc:
+        print(f"Could not extract workflow responses: {exc}", file=sys.stderr)
+        return 1
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(yaml.safe_dump(responses, sort_keys=False), encoding="utf-8")
+    print(f"Wrote {len(responses)} scripted responses to {args.output}")
+    return 0
 
 
 def _run_validate_workflow_definition(args: argparse.Namespace) -> int:

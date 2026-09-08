@@ -31,3 +31,32 @@ when it is repeating actions without material progress. Add
 Runs are isolated in a temporary repository and do not mutate a real worktree.
 Use deterministic scenarios for CI regression coverage after changing
 guidance.
+
+## Scripted response fixtures
+
+Large deterministic transcripts can be kept in a separate JSON or YAML file:
+
+```yaml
+provider:
+  mode: scripted
+  responses_file: fixtures/interaction-file-log-specification.yaml
+```
+
+The file must contain a top-level list of response objects. A scenario must
+provide exactly one of `responses` or `responses_file`; the referenced path is
+resolved relative to the scenario file. Chain phases use the same format. This
+keeps the scenario readable while making the exact model transcript reviewable,
+diffable, and reusable.
+
+Generate that fixture from a live report with:
+
+```bash
+uv run powdrr-lift extract-workflow-responses \
+  --report /tmp/live-report.json \
+  --output workflow-evals/scenarios/fixtures/interaction-file-log.yaml
+```
+
+The extractor accepts both live task reports (which store parsed `output`
+objects) and live chat reports (which store assistant JSON messages). Review the
+generated fixture before committing it, then point the scenario at it with
+`responses_file`.

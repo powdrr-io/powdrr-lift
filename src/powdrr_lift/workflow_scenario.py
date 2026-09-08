@@ -62,6 +62,44 @@ class WorkflowScenarioError(ValueError):
     """Raised when a scenario is malformed or cannot be run safely."""
 
 
+def extract_scripted_responses(report_path: Path) -> list[dict[str, Any]]:
+    """Extract parsed model outputs from a live scenario report for replay."""
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise WorkflowScenarioError(
+            f"Could not read scenario report {report_path}: {exc}"
+        ) from exc
+    exchanges = report.get("llm_exchanges")
+    if not isinstance(exchanges, list):
+        raise WorkflowScenarioError("Scenario report does not contain llm_exchanges.")
+    responses: list[dict[str, Any]] = []
+    for index, exchange in enumerate(exchanges):
+        response: Any = None
+        if isinstance(exchange, Mapping) and isinstance(
+            exchange.get("output"), Mapping
+        ):
+            response = exchange["output"]
+        elif isinstance(exchange, list):
+            for message in reversed(exchange):
+                if isinstance(message, Mapping) and message.get("role") == "assistant":
+                    content = message.get("content")
+                    if isinstance(content, str):
+                        try:
+                            parsed = json.loads(content)
+                        except json.JSONDecodeError:
+                            continue
+                        if isinstance(parsed, Mapping):
+                            response = parsed
+                            break
+        if not isinstance(response, Mapping):
+            raise WorkflowScenarioError(
+                f"Scenario report exchange {index} has no parsed assistant output."
+            )
+        responses.append(dict(response))
+    return responses
+
+
 @dataclass(frozen=True, slots=True)
 class WorkflowScenarioResult:
     """Machine-readable result of one isolated scripted scenario."""
@@ -154,8 +192,10 @@ def run_workflow_scenario(
         )
     provider = _mapping(scenario.get("provider"), "scenario provider")
     provider_mode = _required_text(provider.get("mode"), "scenario provider.mode")
-    responses = _mapping_sequence(
-        provider.get("responses"), "scenario provider.responses"
+    responses = (
+        _scenario_responses(provider, scenario_path.parent, "scenario provider")
+        if provider_mode == "scripted"
+        else []
     )
     fixture = scenario.get("fixture")
     fixture_path = (
@@ -987,9 +1027,10 @@ def _run_workflow_chain_scenario(
                         if (source_root / "skill-definitions").is_dir()
                         else None
                     ),
-                    responses=_mapping_sequence(
-                        phase_provider.get("responses"),
-                        f"scenario phases[{phase_index}].provider.responses",
+                    responses=_scenario_responses(
+                        phase_provider,
+                        scenario_path.parent,
+                        f"scenario phases[{phase_index}].provider",
                     ),
                     task_id=_optional_text(phase.get("task_id")),
                     expected_output_state=phase.get("expected_output_state"),
@@ -1019,9 +1060,10 @@ def _run_workflow_chain_scenario(
             phase_provider = _mapping(
                 phase.get("provider"), f"scenario phases[{phase_index}].provider"
             )
-            phase_responses = _mapping_sequence(
-                phase_provider.get("responses"),
-                f"scenario phases[{phase_index}].provider.responses",
+            phase_responses = _scenario_responses(
+                phase_provider,
+                scenario_path.parent,
+                f"scenario phases[{phase_index}].provider",
             )
             execution = _run_scripted_skill(
                 definition_path=definition_path,
@@ -1247,9 +1289,8 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
                     raise WorkflowScenarioError(
                         "workflow_chain currently requires scripted phase providers."
                     )
-                _mapping_sequence(
-                    phase_provider.get("responses"),
-                    f"scenario phases[{index}].provider.responses",
+                _validate_response_source(
+                    phase_provider, f"scenario phases[{index}].provider"
                 )
                 _mapping(
                     phase_mapping.get("expect", {}), f"scenario phases[{index}].expect"
@@ -1277,9 +1318,8 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
                 raise WorkflowScenarioError(
                     "workflow_chain currently requires scripted phase providers."
                 )
-            _mapping_sequence(
-                phase_provider.get("responses"),
-                f"scenario phases[{index}].provider.responses",
+            _validate_response_source(
+                phase_provider, f"scenario phases[{index}].provider"
             )
             _mapping(
                 phase_mapping.get("expect", {}), f"scenario phases[{index}].expect"
@@ -1296,7 +1336,7 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
                 "scenario provider.mode must be scripted or live."
             )
         if provider_mode == "scripted":
-            _mapping_sequence(provider.get("responses"), "scenario provider.responses")
+            _validate_response_source(provider, "scenario provider")
         if provider_mode == "live" and provider.get("provider") is not None:
             _required_text(provider.get("provider"), "scenario provider.provider")
     _mapping(scenario.get("expect"), "scenario expect")
@@ -1321,6 +1361,44 @@ def _mapping_sequence(value: Any, label: str) -> list[Mapping[str, Any]]:
     ):
         raise WorkflowScenarioError(f"{label} must be a list of objects.")
     return list(value)
+
+
+def _validate_response_source(provider: Mapping[str, Any], label: str) -> None:
+    responses = provider.get("responses")
+    response_file = provider.get("responses_file")
+    if responses is not None and response_file is not None:
+        raise WorkflowScenarioError(
+            f"{label} may set responses or responses_file, not both."
+        )
+    if responses is None and response_file is None:
+        raise WorkflowScenarioError(f"{label} requires responses or responses_file.")
+    if response_file is not None:
+        _required_text(response_file, f"{label}.responses_file")
+    else:
+        _mapping_sequence(responses, f"{label}.responses")
+
+
+def _scenario_responses(
+    provider: Mapping[str, Any], base: Path, label: str
+) -> list[Mapping[str, Any]]:
+    _validate_response_source(provider, label)
+    response_file = provider.get("responses_file")
+    if response_file is None:
+        return _mapping_sequence(provider.get("responses"), f"{label}.responses")
+    path = _resolve_path(response_file, base)
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise WorkflowScenarioError(
+            f"Could not read {label}.responses_file {path}: {exc}"
+        ) from exc
+    try:
+        data = json.loads(raw) if path.suffix == ".json" else yaml.safe_load(raw)
+    except (json.JSONDecodeError, yaml.YAMLError) as exc:
+        raise WorkflowScenarioError(
+            f"Could not parse {label}.responses_file {path}: {exc}"
+        ) from exc
+    return _mapping_sequence(data, f"{label}.responses_file")
 
 
 def _template_values(value: Any) -> dict[str, str]:

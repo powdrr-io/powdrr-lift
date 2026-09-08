@@ -10,9 +10,29 @@ import pytest
 
 from powdrr_lift.workflow_scenario import (
     WorkflowScenarioError,
+    extract_scripted_responses,
     load_workflow_scenario,
     run_workflow_scenario,
 )
+
+
+def test_extract_scripted_responses_supports_live_report_shapes(tmp_path: Path) -> None:
+    report = tmp_path / "report.json"
+    report.write_text(
+        json.dumps(
+            {
+                "llm_exchanges": [
+                    {"output": {"action": "next_step"}},
+                    [{"role": "assistant", "content": '{"action":"complete"}'}],
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert extract_scripted_responses(report) == [
+        {"action": "next_step"},
+        {"action": "complete"},
+    ]
 
 
 @pytest.mark.skipif(
@@ -185,6 +205,20 @@ steps:
         encoding="utf-8",
     )
     scenario_path = repo_root / "chain.yaml"
+    (repo_root / "produce-responses.yaml").write_text(
+        """\
+- action: edit
+  file_path: artifact.json
+  edits:
+    - kind: add
+      start_line: 1
+      end_line: 1
+      text: '{\"ok\": true}'
+  outputs: {artifact: {ok: true}}
+- action: next_step
+""",
+        encoding="utf-8",
+    )
     scenario_path.write_text(
         """\
 schema_version: 1
@@ -196,16 +230,7 @@ phases:
     request: Produce the artifact.
     provider:
       mode: scripted
-      responses:
-        - action: edit
-          file_path: artifact.json
-          edits:
-            - kind: add
-              start_line: 1
-              end_line: 1
-              text: '{"ok": true}'
-          outputs: {artifact: {ok: true}}
-        - action: next_step
+      responses_file: produce-responses.yaml
     expect:
       outcome: complete
       required_files: [artifact.json]

@@ -84,6 +84,7 @@ from powdrr_lift.workflow_chat_agent import (
     _available_work_item_documents,
     _available_work_item_names,
     _backup_model_for,
+    _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
     _catalog_entry_to_data,
@@ -118,6 +119,7 @@ from powdrr_lift.workflow_chat_agent import (
     _prompt_user,
     _record_durable_fact,
     _record_dynamic_validation_result,
+    _repair_response_fingerprint,
     _request_token_budget,
     _require_coding_loop_verification,
     _resolve_api_key,
@@ -3144,6 +3146,42 @@ def test_invalid_gather_context_type_is_repairable() -> None:
             None,
             None,
         )
+
+
+def test_gather_context_shape_error_includes_a_corrective_example() -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=r'"types": \["requirements"\]',
+    ):
+        _parse_workflow_action_gather_context(
+            {"keywords": ["interaction"]},
+            None,
+            None,
+        )
+
+
+def test_repair_fingerprint_detects_replayed_payload() -> None:
+    payload = {"action": "gather_context", "keywords": ["interaction"]}
+
+    assert _repair_response_fingerprint([], payload) == _repair_response_fingerprint(
+        [{"role": "user", "content": "different history"}], payload
+    )
+
+
+def test_repair_prompt_tells_model_not_to_repeat_invalid_payload() -> None:
+    prompt = _build_json_repair_messages(
+        [{"role": "user", "content": "Return an action."}],
+        context="workflow execution",
+        error_message=(
+            "Workflow gather_context action types must be an array. Return a JSON "
+            'array in the "types" field, for example "types": ["requirements"].'
+        ),
+        repair_instructions='Use exactly one JSON object with an "action" field.',
+        previous_payload={"action": "gather_context", "keywords": ["interaction"]},
+    )
+
+    assert "Do not repeat that response" in prompt[-1]["content"]
+    assert '"types": ["requirements"]' in prompt[-1]["content"]
 
 
 def test_llm_type_mapping_selects_deepinfra_model() -> None:

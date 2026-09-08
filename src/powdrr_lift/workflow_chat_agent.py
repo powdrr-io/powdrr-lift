@@ -9621,7 +9621,9 @@ def _required_action_string_sequence(
         (str, bytes, bytearray),
     ):
         raise PowdrrExecutionError(
-            f"Workflow gather_context action {field_name} must be an array."
+            f"Workflow gather_context action {field_name} must be an array. "
+            f"Return a JSON array in the {field_name!r} field, for example "
+            f'"{field_name}": ["requirements"].'
         )
 
     normalized_values = tuple(
@@ -10007,6 +10009,7 @@ def _complete_json_with_repair(
     empty_question_reprompts = 0
     empty_response_reprompts = 0
     last_repair_fingerprint: tuple[str, str] | None = None
+    repeated_repair_count = 0
     while True:
         _verbose_json(
             stderr,
@@ -10163,6 +10166,10 @@ def _complete_json_with_repair(
                         repaired_payload,
                     )
                     if repair_fingerprint == last_repair_fingerprint:
+                        repeated_repair_count += 1
+                    else:
+                        repeated_repair_count = 0
+                    if repeated_repair_count >= 5:
                         print(
                             f"{context} made no progress during response repair; "
                             "stopping.",
@@ -10319,6 +10326,10 @@ def _complete_json_with_repair(
                     repaired_payload,
                 )
                 if repair_fingerprint == last_repair_fingerprint:
+                    repeated_repair_count += 1
+                else:
+                    repeated_repair_count = 0
+                if repeated_repair_count >= 5:
                     print(
                         f"{context} made no progress during response repair; stopping.",
                         file=stderr,
@@ -10375,7 +10386,9 @@ def _complete_json_with_repair(
                     "response directly."
                 ),
                 repair_instructions=repair_instructions,
-                previous_payload=payload,
+                previous_payload=(
+                    repaired_payload if repaired_payload is not None else payload
+                ),
             )
             continue
             retry = _prompt_user(
@@ -11081,8 +11094,12 @@ def _repair_response_fingerprint(
     messages: Sequence[dict[str, str]],
     payload: dict[str, Any],
 ) -> tuple[str, str]:
+    # The prompt history necessarily grows on every repair attempt.  Including
+    # it in the fingerprint therefore made an identical malformed payload look
+    # like progress forever.  Compare the response itself so a provider that
+    # keeps replaying the same invalid action is stopped deterministically.
     return (
-        json.dumps(messages, ensure_ascii=False, sort_keys=True),
+        "response",
         json.dumps(payload, ensure_ascii=False, sort_keys=True),
     )
 
@@ -11103,6 +11120,10 @@ def _build_json_repair_messages(
     if previous_payload is not None:
         repair_message += (
             f"\nPrevious response:\n{_serialize_prompt_json(previous_payload)}"
+        )
+        repair_message += (
+            "\nDo not repeat that response. Change the field named by the "
+            "validation error and return the complete corrected object."
         )
     repaired_messages = list(messages)
     if previous_payload is not None:

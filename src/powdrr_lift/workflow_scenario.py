@@ -144,6 +144,14 @@ def run_workflow_scenario(
     _validate_scenario(scenario)
     source_root = resolve_repo_root(repo_root)
     scenario_id = _required_text(scenario.get("id"), "scenario id")
+    if scenario.get("execution_mode") == "workflow_chain":
+        _validate_workflow_chain_paths(scenario, source_root)
+        return _run_workflow_chain_scenario(
+            scenario,
+            scenario_path=scenario_path,
+            source_root=source_root,
+            keep_failed=keep_failed,
+        )
     provider = _mapping(scenario.get("provider"), "scenario provider")
     provider_mode = _required_text(provider.get("mode"), "scenario provider.mode")
     responses = _mapping_sequence(
@@ -307,7 +315,9 @@ def run_workflow_scenario(
         )
 
     temporary_root = Path(tempfile.mkdtemp(prefix="powdrr-lift-scenario-"))
-    worktree_root = temporary_root / "repository"
+    # Resolve the temporary path so macOS's /var -> /private/var symlink does
+    # not make paths produced by the execution strategy compare unequal.
+    worktree_root = (temporary_root / "repository").resolve()
     try:
         _build_fixture_repository(worktree_root, fixture_path)
         if guidance:
@@ -814,8 +824,304 @@ def _evaluate_assertions(
     return assertions
 
 
+def _evaluate_task_phase_assertions(
+    expect: Mapping[str, Any], result: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    assertions: list[dict[str, Any]] = []
+    if "outcome" in expect:
+        actual = "complete" if result.get("exit_code") == 0 else "failed"
+        assertions.append(
+            _assert("outcome", actual == expect["outcome"], expect["outcome"], actual)
+        )
+    if "all_tasks_completed" in expect:
+        actual_bool = bool(result.get("all_tasks_completed"))
+        assertions.append(
+            _assert(
+                "all_tasks_completed",
+                actual_bool == expect["all_tasks_completed"],
+                expect["all_tasks_completed"],
+                actual_bool,
+            )
+        )
+    if "output_matches" in expect:
+        actual_bool = bool(result.get("output_matches"))
+        assertions.append(
+            _assert(
+                "output_matches",
+                actual_bool == expect["output_matches"],
+                expect["output_matches"],
+                actual_bool,
+            )
+        )
+    if not assertions:
+        assertions.append(
+            _assert(
+                "task_phase",
+                result.get("exit_code") == 0,
+                "complete",
+                result.get("exit_code"),
+            )
+        )
+    return assertions
+
+
+def _evaluate_command_phase_assertions(
+    expect: Mapping[str, Any], result: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    assertions: list[dict[str, Any]] = []
+    expected_exit = expect.get("exit_code", 0)
+    if not isinstance(expected_exit, int) or isinstance(expected_exit, bool):
+        raise WorkflowScenarioError(
+            "command phase expect.exit_code must be an integer."
+        )
+    actual_exit = result["exit_code"]
+    assertions.append(
+        _assert("exit_code", actual_exit == expected_exit, expected_exit, actual_exit)
+    )
+    if "stdout_contains" in expect:
+        needle = _required_text(
+            expect["stdout_contains"], "command phase stdout_contains"
+        )
+        assertions.append(
+            _assert(
+                "stdout_contains", needle in result["stdout"], needle, result["stdout"]
+            )
+        )
+    if "stderr_contains" in expect:
+        needle = _required_text(
+            expect["stderr_contains"], "command phase stderr_contains"
+        )
+        assertions.append(
+            _assert(
+                "stderr_contains", needle in result["stderr"], needle, result["stderr"]
+            )
+        )
+    return assertions
+
+
 def _scenario_failed_marker(worktree_root: Path) -> bool:
     return (worktree_root / ".scenario-failed").is_file()
+
+
+def _run_workflow_chain_scenario(
+    scenario: Mapping[str, Any],
+    *,
+    scenario_path: Path,
+    source_root: Path,
+    keep_failed: bool,
+) -> WorkflowScenarioResult:
+    """Run scripted workflow-chat phases against one shared fixture repository."""
+    scenario_id = _required_text(scenario.get("id"), "scenario id")
+    fixture = scenario.get("fixture")
+    fixture_path = (
+        _resolve_path(fixture, scenario_path.parent)
+        if isinstance(fixture, str) and fixture
+        else None
+    )
+    if fixture_path is not None and not fixture_path.is_dir():
+        raise WorkflowScenarioError(f"Scenario fixture does not exist: {fixture_path}")
+    temporary_root = Path(tempfile.mkdtemp(prefix="powdrr-lift-chain-scenario-"))
+    worktree_root = (temporary_root / "repository").resolve()
+    _build_fixture_repository(worktree_root, fixture_path)
+    all_events: list[dict[str, Any]] = []
+    all_audit_events: list[dict[str, Any]] = []
+    all_exchanges: list[Any] = []
+    assertions: list[dict[str, Any]] = []
+    roundtrips = 0
+    status = "passed"
+    last_definition = ""
+    try:
+        for phase_index, raw_phase in enumerate(scenario["phases"]):
+            phase = _mapping(raw_phase, f"scenario phases[{phase_index}]")
+            if phase.get("execution_mode", "workflow_chat") == "command":
+                try:
+                    completed = subprocess.run(
+                        phase["command"],
+                        cwd=worktree_root,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=phase.get("timeout_seconds", 120),
+                    )
+                    command_result = {
+                        "exit_code": completed.returncode,
+                        "stdout": completed.stdout,
+                        "stderr": completed.stderr,
+                        "command": list(phase["command"]),
+                    }
+                except subprocess.TimeoutExpired as error:
+                    stderr = error.stderr or ""
+                    if isinstance(stderr, bytes):
+                        stderr = stderr.decode(errors="replace")
+                    command_result = {
+                        "exit_code": 124,
+                        "stdout": error.stdout or "",
+                        "stderr": f"{stderr}command timed out",
+                        "command": list(phase["command"]),
+                    }
+                phase_assertions = _evaluate_command_phase_assertions(
+                    _mapping(phase.get("expect", {}), "phase expect"),
+                    command_result,
+                )
+                assertions.extend(
+                    {"phase": phase_index, **item} for item in phase_assertions
+                )
+                if not all(item["passed"] for item in phase_assertions):
+                    status = "failed"
+                    break
+                continue
+            if phase.get("execution_mode", "workflow_chat") == "workflow_task":
+                phase_provider = _mapping(
+                    phase.get("provider"), f"scenario phases[{phase_index}].provider"
+                )
+                task_result = run_workflow_task_scenario(
+                    workflow_source=_resolve_path(
+                        _required_text(
+                            phase.get("workflow_dir"),
+                            f"scenario phases[{phase_index}].workflow_dir",
+                        ),
+                        source_root,
+                    ),
+                    skill_definitions_source=(
+                        source_root / "skill-definitions"
+                        if (source_root / "skill-definitions").is_dir()
+                        else None
+                    ),
+                    responses=_mapping_sequence(
+                        phase_provider.get("responses"),
+                        f"scenario phases[{phase_index}].provider.responses",
+                    ),
+                    task_id=_optional_text(phase.get("task_id")),
+                    expected_output_state=phase.get("expected_output_state"),
+                    run_all=bool(phase.get("run_all", False)),
+                    shared_repo_root=worktree_root,
+                )
+                roundtrips += int(task_result["roundtrips"])
+                phase_assertions = _evaluate_task_phase_assertions(
+                    _mapping(phase.get("expect", {}), "phase expect"), task_result
+                )
+                assertions.extend(
+                    {"phase": phase_index, **item} for item in phase_assertions
+                )
+                if task_result["exit_code"] != 0 or not all(
+                    item["passed"] for item in phase_assertions
+                ):
+                    status = "failed"
+                    break
+                continue
+            definition_path = _resolve_path(
+                _required_text(
+                    phase.get("definition"),
+                    f"scenario phases[{phase_index}].definition",
+                ),
+                source_root,
+            )
+            phase_provider = _mapping(
+                phase.get("provider"), f"scenario phases[{phase_index}].provider"
+            )
+            phase_responses = _mapping_sequence(
+                phase_provider.get("responses"),
+                f"scenario phases[{phase_index}].provider.responses",
+            )
+            execution = _run_scripted_skill(
+                definition_path=definition_path,
+                worktree_root=worktree_root,
+                root_intent=_required_text(
+                    phase.get("request"), f"scenario phases[{phase_index}].request"
+                ),
+                responses=phase_responses,
+                max_roundtrips=len(phase_responses) + 1,
+                initial_inputs=_mapping(phase.get("inputs", {}), "phase inputs"),
+            )
+            phase_events = [
+                {"phase": phase_index, "phase_id": phase.get("id"), **event}
+                for event in execution.execution_events
+            ]
+            all_events.extend(phase_events)
+            all_audit_events.extend(execution.audit_events)
+            all_exchanges.extend(execution.llm_exchanges)
+            roundtrips += execution.roundtrips
+            last_definition = str(definition_path)
+            phase_assertions = _evaluate_assertions(
+                _mapping(phase.get("expect", {}), "phase expect"),
+                skill=execution.skill,
+                exit_code=execution.exit_code,
+                execution_events=execution.execution_events,
+                audit_events=execution.audit_events,
+                roundtrips=execution.roundtrips,
+                worktree_root=worktree_root,
+            )
+            assertions.extend(
+                {"phase": phase_index, **assertion} for assertion in phase_assertions
+            )
+            if execution.exit_code != 0 or not all(
+                assertion["passed"] for assertion in phase_assertions
+            ):
+                status = "failed"
+                break
+        final_expect = _mapping(scenario.get("expect", {}), "scenario expect")
+        if last_definition:
+            final_skill = load_skill(Path(last_definition))
+            final_assertions = _evaluate_assertions(
+                final_expect,
+                skill=final_skill,
+                exit_code=0 if status == "passed" else 1,
+                execution_events=all_events,
+                audit_events=all_audit_events,
+                roundtrips=roundtrips,
+                worktree_root=worktree_root,
+            )
+            assertions.extend({"phase": "final", **item} for item in final_assertions)
+            if not all(item["passed"] for item in final_assertions):
+                status = "failed"
+        return WorkflowScenarioResult(
+            scenario_id=scenario_id,
+            definition=last_definition,
+            status=status,
+            assertions=tuple(assertions),
+            execution_events=tuple(all_events),
+            audit_events=tuple(all_audit_events),
+            roundtrips=roundtrips,
+            llm_exchanges=tuple(all_exchanges),
+            worktree_root=worktree_root if status == "failed" and keep_failed else None,
+        )
+    finally:
+        if status == "passed" or not keep_failed:
+            shutil.rmtree(temporary_root, ignore_errors=True)
+
+
+def _validate_workflow_chain_paths(
+    scenario: Mapping[str, Any], source_root: Path
+) -> None:
+    """Validate every phase reference before creating or mutating a fixture."""
+    for index, raw_phase in enumerate(scenario["phases"]):
+        phase = _mapping(raw_phase, f"scenario phases[{index}]")
+        if phase.get("execution_mode", "workflow_chat") == "command":
+            continue
+        if phase.get("execution_mode", "workflow_chat") == "workflow_task":
+            path = _resolve_path(
+                _required_text(
+                    phase.get("workflow_dir"),
+                    f"scenario phases[{index}].workflow_dir",
+                ),
+                source_root,
+            )
+            if not path.is_dir():
+                raise WorkflowScenarioError(
+                    f"Scenario phase workflow directory does not exist: {path}"
+                )
+        else:
+            path = _resolve_path(
+                _required_text(
+                    phase.get("definition"),
+                    f"scenario phases[{index}].definition",
+                ),
+                source_root,
+            )
+            if not path.is_file():
+                raise WorkflowScenarioError(
+                    f"Scenario phase definition does not exist: {path}"
+                )
 
 
 def _action_fingerprint(event: Mapping[str, Any]) -> str:
@@ -867,18 +1173,132 @@ def _validate_scenario(scenario: Mapping[str, Any]) -> None:
             raise WorkflowScenarioError("workflow_task run_all must be a boolean.")
         if not run_all:
             _required_text(scenario.get("task_id"), "task_id")
+    elif mode == "workflow_chain":
+        phases = scenario.get("phases")
+        if not isinstance(phases, list) or not phases:
+            raise WorkflowScenarioError("workflow_chain requires non-empty phases.")
+        phase_ids: set[str] = set()
+        for index, phase in enumerate(phases):
+            phase_mapping = _mapping(phase, f"scenario phases[{index}]")
+            phase_mode = phase_mapping.get("execution_mode", "workflow_chat")
+            phase_id = _required_text(
+                phase_mapping.get("id"), f"scenario phases[{index}].id"
+            )
+            if phase_id in phase_ids:
+                raise WorkflowScenarioError(
+                    f"scenario phases[{index}].id must be unique: {phase_id}."
+                )
+            phase_ids.add(phase_id)
+            if phase_mode not in {"workflow_chat", "workflow_task", "command"}:
+                raise WorkflowScenarioError(
+                    f"scenario phases[{index}].execution_mode must be "
+                    "workflow_chat, workflow_task, or command."
+                )
+            if phase_mode == "command":
+                command = phase_mapping.get("command")
+                if (
+                    not isinstance(command, list)
+                    or not command
+                    or not all(isinstance(item, str) and item for item in command)
+                ):
+                    raise WorkflowScenarioError(
+                        f"scenario phases[{index}].command must be a non-empty "
+                        "list of strings."
+                    )
+                timeout = phase_mapping.get("timeout_seconds", 120)
+                if (
+                    not isinstance(timeout, (int, float))
+                    or isinstance(timeout, bool)
+                    or timeout <= 0
+                ):
+                    raise WorkflowScenarioError(
+                        f"scenario phases[{index}].timeout_seconds must be positive."
+                    )
+                _mapping(
+                    phase_mapping.get("expect", {}),
+                    f"scenario phases[{index}].expect",
+                )
+                continue
+            if phase_mode == "workflow_task":
+                _required_text(
+                    phase_mapping.get("workflow_dir"),
+                    f"scenario phases[{index}].workflow_dir",
+                )
+                run_all = phase_mapping.get("run_all", False)
+                if not isinstance(run_all, bool):
+                    raise WorkflowScenarioError(
+                        f"scenario phases[{index}].run_all must be a boolean."
+                    )
+                if not run_all:
+                    _required_text(
+                        phase_mapping.get("task_id"),
+                        f"scenario phases[{index}].task_id",
+                    )
+                phase_provider = _mapping(
+                    phase_mapping.get("provider"), f"scenario phases[{index}].provider"
+                )
+                if (
+                    _required_text(
+                        phase_provider.get("mode"),
+                        f"scenario phases[{index}].provider.mode",
+                    )
+                    != "scripted"
+                ):
+                    raise WorkflowScenarioError(
+                        "workflow_chain currently requires scripted phase providers."
+                    )
+                _mapping_sequence(
+                    phase_provider.get("responses"),
+                    f"scenario phases[{index}].provider.responses",
+                )
+                _mapping(
+                    phase_mapping.get("expect", {}), f"scenario phases[{index}].expect"
+                )
+                continue
+            _required_text(
+                phase_mapping.get("definition"),
+                f"scenario phases[{index}].definition",
+            )
+            _required_text(
+                phase_mapping.get("request"),
+                f"scenario phases[{index}].request",
+            )
+            phase_provider = _mapping(
+                phase_mapping.get("provider"),
+                f"scenario phases[{index}].provider",
+            )
+            if (
+                _required_text(
+                    phase_provider.get("mode"),
+                    f"scenario phases[{index}].provider.mode",
+                )
+                != "scripted"
+            ):
+                raise WorkflowScenarioError(
+                    "workflow_chain currently requires scripted phase providers."
+                )
+            _mapping_sequence(
+                phase_provider.get("responses"),
+                f"scenario phases[{index}].provider.responses",
+            )
+            _mapping(
+                phase_mapping.get("expect", {}), f"scenario phases[{index}].expect"
+            )
     else:
         raise WorkflowScenarioError(
-            "execution_mode must be workflow_chat or workflow_task."
+            "execution_mode must be workflow_chat, workflow_task, or workflow_chain."
         )
-    provider = _mapping(scenario.get("provider"), "scenario provider")
-    provider_mode = _required_text(provider.get("mode"), "scenario provider.mode")
-    if provider_mode not in {"scripted", "live"}:
-        raise WorkflowScenarioError("scenario provider.mode must be scripted or live.")
-    if provider_mode == "scripted":
-        _mapping_sequence(provider.get("responses"), "scenario provider.responses")
-    if provider_mode == "live" and provider.get("provider") is not None:
-        _required_text(provider.get("provider"), "scenario provider.provider")
+    if mode != "workflow_chain":
+        provider = _mapping(scenario.get("provider"), "scenario provider")
+        provider_mode = _required_text(provider.get("mode"), "scenario provider.mode")
+        if provider_mode not in {"scripted", "live"}:
+            raise WorkflowScenarioError(
+                "scenario provider.mode must be scripted or live."
+            )
+        if provider_mode == "scripted":
+            _mapping_sequence(provider.get("responses"), "scenario provider.responses")
+        if provider_mode == "live" and provider.get("provider") is not None:
+            _required_text(provider.get("provider"), "scenario provider.provider")
     _mapping(scenario.get("expect"), "scenario expect")
 
 

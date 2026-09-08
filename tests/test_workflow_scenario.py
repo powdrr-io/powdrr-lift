@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from powdrr_lift.workflow_scenario import (
+    WorkflowScenarioError,
     load_workflow_scenario,
     run_workflow_scenario,
 )
@@ -118,8 +119,8 @@ provider:
       tool: shell
       parameters:
         command: [git, status, --short]
-    - action: complete
       text: Status inspected.
+    - action: complete
 expect:
   outcome: complete
   visited_steps:
@@ -149,6 +150,130 @@ expect:
     assert result.roundtrips == 2
     assert result.worktree_root is None
     assert all(assertion["passed"] for assertion in result.assertions)
+
+
+def test_workflow_chain_preserves_one_fixture_across_skill_phases(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "candidate"
+    skills_dir = repo_root / "skill-definitions"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "produce.yaml").write_text(
+        """\
+name: produce
+when_to_use: [Produce an artifact.]
+steps:
+  - id: produce
+    description: Produce the artifact.
+    actions: [edit]
+    outputs:
+      - name: artifact
+        type: object
+        required_for_next_step: true
+""",
+        encoding="utf-8",
+    )
+    (skills_dir / "verify.yaml").write_text(
+        """\
+name: verify
+when_to_use: [Verify an artifact.]
+steps:
+  - id: verify
+    description: Verify the artifact.
+    actions: [read_document]
+""",
+        encoding="utf-8",
+    )
+    scenario_path = repo_root / "chain.yaml"
+    scenario_path.write_text(
+        """\
+schema_version: 1
+id: shared-fixture-chain
+execution_mode: workflow_chain
+phases:
+  - id: produce
+    definition: skill-definitions/produce.yaml
+    request: Produce the artifact.
+    provider:
+      mode: scripted
+      responses:
+        - action: edit
+          file_path: artifact.json
+          edits:
+            - kind: add
+              start_line: 1
+              end_line: 1
+              text: '{"ok": true}'
+          outputs: {artifact: {ok: true}}
+        - action: next_step
+    expect:
+      outcome: complete
+      required_files: [artifact.json]
+  - id: verify
+    definition: skill-definitions/verify.yaml
+    request: Verify the artifact.
+    provider:
+      mode: scripted
+      responses:
+        - action: read_document
+          file_path: artifact.json
+          start_line: 1
+          end_line: 1
+        - action: next_step
+    expect:
+      outcome: complete
+      required_actions: [{kind: read_document, file_path: artifact.json}]
+  - id: verify-command
+    execution_mode: command
+    command:
+      - python
+      - -c
+      - "import json; assert json.load(open('artifact.json'))['ok']"
+    expect: {exit_code: 0}
+expect:
+  required_files: [artifact.json]
+""",
+        encoding="utf-8",
+    )
+
+    result = run_workflow_scenario(
+        load_workflow_scenario(scenario_path),
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+    )
+
+    assert result.status == "passed", result.stderr
+    assert result.roundtrips == 4
+    assert all(assertion["passed"] for assertion in result.assertions)
+
+
+def test_workflow_chain_rejects_duplicate_phase_ids_before_execution(
+    tmp_path: Path,
+) -> None:
+    scenario = {
+        "schema_version": 1,
+        "id": "duplicate-phases",
+        "execution_mode": "workflow_chain",
+        "phases": [
+            {
+                "id": "same",
+                "definition": "one.yaml",
+                "request": "one",
+                "provider": {"mode": "scripted", "responses": []},
+            },
+            {
+                "id": "same",
+                "definition": "two.yaml",
+                "request": "two",
+                "provider": {"mode": "scripted", "responses": []},
+            },
+        ],
+        "expect": {},
+    }
+    with pytest.raises(WorkflowScenarioError, match="must be unique"):
+        run_workflow_scenario(
+            scenario, scenario_path=tmp_path / "scenario.yaml", repo_root=tmp_path
+        )
 
 
 def test_failed_scenario_reports_trajectory_assertion_and_retains_fixture(

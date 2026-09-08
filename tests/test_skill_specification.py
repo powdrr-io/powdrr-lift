@@ -15,7 +15,6 @@ from powdrr_lift.core import (
     SkillStepInput,
     SkillStepOutput,
     SkillStepPreStep,
-    SkillToolInvocation,
     SkillUsesSkill,
     SkillUsesSkillBinding,
     build_skill_directory_validation_report,
@@ -190,20 +189,7 @@ def test_skill_round_trips_through_json() -> None:
             SkillStep(
                 description="Pull in the system context.",
                 details="Use the system spec and related context.",
-                uses_skills=("specify-system",),
-                prompt_catalogs=("context_types", "skills"),
-                tool_invocations=(
-                    SkillToolInvocation(
-                        tool="internal",
-                        command=(
-                            "powdrr-lift",
-                            "system-specification",
-                            "--work-item-name",
-                            "<work-item-name>",
-                        ),
-                    ),
-                ),
-                actions=("invoke_tool",),
+                uses_skill=SkillUsesSkill("specify-system"),
             ),
             SkillStep(
                 description="Summarize the result.",
@@ -231,32 +217,19 @@ def test_skill_round_trips_through_json() -> None:
         "steps": [
             {
                 "description": "Capture the feature goal.",
-                "step_type": "governed",
+                "step_type": "freeform",
                 "id": "capture-goal",
                 "details": "Record the user-visible outcome first.",
             },
             {
                 "description": "Pull in the system context.",
-                "step_type": "governed",
+                "step_type": "uses_skill",
                 "details": "Use the system spec and related context.",
-                "uses_skills": ["specify-system"],
-                "prompt_catalogs": ["context_types", "skills"],
-                "tool_invocations": [
-                    {
-                        "tool": "internal",
-                        "command": [
-                            "powdrr-lift",
-                            "system-specification",
-                            "--work-item-name",
-                            "<work-item-name>",
-                        ],
-                    }
-                ],
-                "actions": ["invoke_tool"],
+                "uses_skill": {"skill": "specify-system"},
             },
             {
                 "description": "Summarize the result.",
-                "step_type": "governed",
+                "step_type": "freeform",
             },
         ],
     }
@@ -351,9 +324,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("review-system.yaml", 4),
                 ("review-architecture.yaml", 2),
                 ("review-architecture.yaml", 4),
-                ("specify-implementation.yaml", 1),
-                ("specify-implementation.yaml", 3),
-                ("specify-implementation.yaml", 3),
+                ("specify-implementation.yaml", 2),
+                ("specify-implementation.yaml", 4),
+                ("specify-implementation.yaml", 4),
                 ("execute-proposed-pr.yaml", 0),
                 ("run-tests-and-fix.yaml", 0),
                 ("run-tests-and-fix.yaml", 4),
@@ -383,7 +356,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
-                ("specify-implementation.yaml", 5),
+                ("specify-implementation.yaml", 6),
                 ("start-implementing-feature.yaml", 6),
                 ("start-implementing-feature.yaml", 12),
                 ("specify-a-feature.yaml", 5),
@@ -399,7 +372,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
             expected_predicated_steps = {
                 ("run-tests-and-fix.yaml", 3),
                 ("run-tests-and-fix.yaml", 5),
-                ("start-implementing-feature.yaml", 23),
+                ("start-implementing-feature.yaml", 24),
             } | {("design-interview.yaml", index) for index in range(20)}
             expected_step_type = (
                 "coding_loop"
@@ -410,7 +383,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 if (path.name, index) in expected_gate_steps
                 else "predicated"
                 if (path.name, index) in expected_predicated_steps
-                else "governed"
+                else "uses_skill"
+                if "uses_skill" in step
+                else "freeform"
             )
             assert step["step_type"] == expected_step_type, (
                 f"{path}:{step_key}[{index}]"
@@ -795,7 +770,7 @@ def test_skill_directory_validation_accepts_references(tmp_path: Path) -> None:
             steps=(
                 SkillStep(
                     description="Gather the system context.",
-                    uses_skills=("specify-system",),
+                    uses_skill=SkillUsesSkill("specify-system"),
                 ),
             ),
         ),
@@ -887,7 +862,7 @@ def test_skill_directory_validation_rejects_unknown_reference(
             steps=(
                 SkillStep(
                     description="Gather the system context.",
-                    uses_skills=("specify-system",),
+                    uses_skill=SkillUsesSkill("specify-system"),
                 ),
             ),
         ),
@@ -899,7 +874,7 @@ def test_skill_directory_validation_rejects_unknown_reference(
     assert report.validation_successful is False
     assert [issue.code for issue in report.issues] == ["missing_skill_reference"]
     assert report.issues[0].path == (
-        f"{skills_dir / 'specify-a-feature.json'}.steps[0].uses_skills[0]"
+        f"{skills_dir / 'specify-a-feature.json'}.steps[0].uses_skill.skill"
     )
 
 
@@ -926,7 +901,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         assert pre_step is not None
         return list(pre_step.template["command"])
 
-    assert step("capture-feature-name").step_type == "governed"
+    assert step("capture-feature-name").step_type == "freeform"
     assert step("capture-feature-name").outputs[0].name == "work_item_name"
     assert step("generate-system-specification").step_type == "invoke_tool"
     assert command("generate-system-specification") == [
@@ -935,8 +910,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--work-item-name",
         "<work-item-name>",
     ]
-    assert step("fill-system-specification").step_type == "governed"
-    assert step("review-system-context").uses_skills == ("review-system",)
+    assert step("fill-system-specification").step_type == "freeform"
+    assert step("review-system-context").uses_skill.skill == "review-system"
     assert step("evaluate-system-specification").step_type == "gate"
     assert command("evaluate-system-specification") == [
         "powdrr-lift",
@@ -951,8 +926,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "<work-item-name>",
         "--all-entity-types",
     ]
-    assert step("fill-architecture-specification").step_type == "governed"
-    assert step("review-architecture-context").uses_skills == ("review-architecture",)
+    assert step("fill-architecture-specification").step_type == "freeform"
+    assert step("review-architecture-context").uses_skill.skill == "review-architecture"
     assert step("evaluate-architecture-specification").step_type == "gate"
     assert command("evaluate-architecture-specification") == [
         "powdrr-lift",
@@ -966,7 +941,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "--work-item-name",
         "<work-item-name>",
     ]
-    assert step("fill-implementation-specification").step_type == "governed"
+    assert step("fill-implementation-specification").step_type == "freeform"
     assert step("evaluate-implementation-specification").step_type == "gate"
     assert command("evaluate-implementation-specification") == [
         "powdrr-lift",
@@ -989,8 +964,8 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         ("powdrr-lift", "repository-state"),
         ("add", "docs/proposals/<work-item-name>"),
     ]
-    assert step("prepare-pull-request").uses_skills == ("finish-pr-prep",)
-    assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
+    assert step("prepare-pull-request").uses_skill.skill == "finish-pr-prep"
+    assert step("create-feature-pull-request").uses_skill.skill == "create-pull-request"
 
 
 def test_checked_in_skill_definitions_directory_is_valid() -> None:
@@ -1058,7 +1033,7 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     assert steps["enrich-test-results"].outputs[0].name == "enriched_test_result"
     assert steps["enrich-test-results"].outputs[0].required_for_next_step
     assert steps["diagnose-test-results"].inputs[0].name == "enriched_test_result"
-    assert steps["diagnose-test-results"].step_type == "governed"
+    assert steps["diagnose-test-results"].step_type == "freeform"
     assert steps["diagnose-test-results"].completion is None
     assert steps["diagnose-test-results"].outputs[0].name == "test_diagnosis"
     assert steps["diagnose-test-results"].outputs[0].required_for_next_step
@@ -1149,8 +1124,8 @@ def test_review_skill_workflow_ends_with_pull_request_creation() -> None:
         "add",
         "<target-definition-path>",
     )
-    assert skill.steps[-2].uses_skills == ("finish-pr-prep",)
-    assert skill.steps[-1].uses_skills == ("create-pull-request",)
+    assert skill.steps[-2].uses_skill.skill == "finish-pr-prep"
+    assert skill.steps[-1].uses_skill.skill == "create-pull-request"
     assert "skill-workflow-review" in (skill.steps[-1].details or "")
     assert "pull-request URL" in (skill.steps[-1].details or "")
 
@@ -1169,7 +1144,8 @@ def test_pr_description_generators_are_used_by_pr_skills() -> None:
     for skill_name, kind in expected_kinds.items():
         skill = load_skill(skills_dir / f"{skill_name}.yaml")
         assert any(
-            "create-pull-request" in (step.uses_skills or ())
+            step.uses_skill is not None
+            and step.uses_skill.skill == "create-pull-request"
             and kind in (step.details or "")
             and "files_to_publish" in (step.details or "")
             for step in skill.steps
@@ -1260,8 +1236,8 @@ def test_checked_in_address_review_comments_skill_matches_flow() -> None:
     assert "resolved, outdated, and current comments" in (skill.steps[0].details or "")
     assert "design, entities, relationships" in (skill.steps[1].details or "")
     assert "system-specification" in (skill.steps[2].details or "")
-    assert skill.steps[4].uses_skills == ("finish-pr-prep",)
-    assert skill.steps[5].uses_skills == ("create-pull-request",)
+    assert skill.steps[4].uses_skill.skill == "finish-pr-prep"
+    assert skill.steps[5].uses_skill.skill == "create-pull-request"
 
 
 def test_checked_in_feature_test_coverage_review_skill_matches_review_flow() -> None:
@@ -1398,7 +1374,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         assert discovery_step.pre_step.template["tool"] == "fuzzy-match"
         assert discovery_step.outputs[0].name == output_name
         assert discovery_step.outputs[0].required_for_next_step
-    assert step("select-feature-context").step_type == "governed"
+    assert step("select-feature-context").step_type == "freeform"
     assert step("select-feature-context").outputs[0].name == "feature_name"
     assert step("select-feature-context").outputs[0].required_for_next_step
     select_details = step("select-feature-context").details
@@ -1406,7 +1382,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert "directory's basename as the canonical feature_name" in select_details
     assert "docs/workflows/<canonical-feature-name>" in select_details
     assert "do not ask the user which workflow path to use" in select_details
-    assert step("bootstrap-project-structure").uses_skills == ()
+    assert step("bootstrap-project-structure").uses_skill is None
     assert step("bootstrap-project-structure").pre_step is not None
     assert step("generate-proposed-pr-specification").step_type == "invoke_tool"
     assert step("plan-proposed-prs").outputs[0].name == "proposed_pr_names"
@@ -1488,7 +1464,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert "Do not pass workflow dependencies manually" in instantiate_details
     assert "unified proposed-PR specification" in instantiate_details
     dependency_step = step("verify-workflow-dependencies")
-    assert dependency_step.step_type == "governed"
+    assert dependency_step.step_type == "freeform"
     dependency_details = dependency_step.details
     assert dependency_details is not None
     assert "depends_on_workflows" in dependency_details
@@ -1520,8 +1496,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     )
     prepare_step = step("prepare-feature-pull-request")
     assert prepare_step.step_type == "predicated"
-    assert prepare_step.actions == ("invoke_skill",)
-    assert prepare_step.uses_skills == ("finish-pr-prep",)
+    assert prepare_step.actions == ()
     assert prepare_step.completion is not None
     assert prepare_step.completion.required_outputs == (
         "final_repository_state",
@@ -1583,7 +1558,7 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert prepare_details is not None
     assert '"action":"emit_outputs"' in prepare_details
     assert "copying the exact values" in prepare_details
-    assert step("create-feature-pull-request").uses_skills == ("create-pull-request",)
+    assert step("create-feature-pull-request").uses_skill.skill == "create-pull-request"
 
 
 def test_checked_in_bootstrap_skill_verifies_discovered_tools() -> None:
@@ -1635,7 +1610,7 @@ def test_checked_in_review_system_skill_definition_matches_review_flow() -> None
     )
     steps_by_id = {step.id: step for step in skill.steps if step.id is not None}
     assert steps_by_id["generate-system"].step_type == "invoke_tool"
-    assert steps_by_id["fill-system"].step_type == "governed"
+    assert steps_by_id["fill-system"].step_type == "freeform"
     assert steps_by_id["evaluate-system"].step_type == "invoke_tool"
     assert steps_by_id["gate-system"].step_type == "gate"
     assert steps_by_id["generate-system"].pre_step is not None
@@ -1671,7 +1646,7 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
     )
     steps_by_id = {step.id: step for step in skill.steps if step.id is not None}
     assert steps_by_id["generate-architecture"].step_type == "invoke_tool"
-    assert steps_by_id["fill-architecture"].step_type == "governed"
+    assert steps_by_id["fill-architecture"].step_type == "freeform"
     assert steps_by_id["evaluate-architecture"].step_type == "invoke_tool"
     assert steps_by_id["gate-architecture"].step_type == "gate"
     assert steps_by_id["generate-architecture"].pre_step is not None

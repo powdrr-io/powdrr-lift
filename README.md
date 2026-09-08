@@ -283,7 +283,8 @@ invocation starts from the primary checkout.
 
 - Use `when_to_use` to describe the situations where the skill applies.
 - Use `steps` to list the ordered actions to follow.
-- A step can reference other skills with `uses_skills`; referenced skills run in
+- A step can reference one other skill with `step_type: uses_skill`; the
+  referenced skill runs in
   the same worktree before the parent step continues.
 - The skill loader can validate a directory of skills and ensure every
   referenced skill exists.

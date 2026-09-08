@@ -7,13 +7,12 @@ when_to_use:
 steps:
 - id: review-system-context
   description: Review the system context first.
-  actions: [invoke_skill]
-  step_type: governed
+  step_type: uses_skill
   llm_type: high_reasoning
   details: Use the system review flow to confirm the requirements, approach, and current
     constraints.
-  uses_skills:
-  - review-system
+  uses_skill:
+    skill: review-system
 - id: generate-architecture
   description: Generate the architecture specification template.
   actions: []
@@ -44,7 +43,7 @@ steps:
   description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Use the yaml_edit action for every YAML change. Its shape is
@@ -73,7 +72,7 @@ steps:
 - id: repair-architecture
   description: Use yaml_edit to fix every issue reported by the architecture evaluator.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: governed
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Review only the latest deterministic evaluator result and correct every

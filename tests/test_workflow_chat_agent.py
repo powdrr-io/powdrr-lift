@@ -32,6 +32,7 @@ from powdrr_lift.core import (
     SkillStepPreStep,
     SkillStepRequiredAction,
     SkillToolInvocation,
+    SkillUsesSkill,
     load_skill,
     save_skill,
 )
@@ -381,7 +382,7 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
     gather_step = SkillStep(
         description="Gather context and invoke the nested review skill.",
         details="Use gather_context before continuing.",
-        uses_skills=("review-system",),
+        uses_skill=SkillUsesSkill("review-system"),
         prompt_catalogs=("context_types", "skills"),
     )
     ordinary_skill = SkillCatalogEntry(
@@ -568,7 +569,8 @@ def test_execution_event_prompt_uses_only_current_step_events() -> None:
 def test_modular_action_prompt_requires_invoke_skill_for_nested_steps() -> None:
     prompt = _modular_action_system_prompt(
         SkillStep(
-            description="Run the preparation skill.", uses_skills=("finish-pr-prep",)
+            description="Run the preparation skill.",
+            uses_skill=SkillUsesSkill("finish-pr-prep"),
         )
     )
 
@@ -581,7 +583,7 @@ def test_explicit_empty_step_does_not_infer_legacy_actions() -> None:
         SkillStep(
             description="Wait for the engine-owned result.",
             details="Legacy inference must not reopen this contract.",
-            uses_skills=("unrelated-skill",),
+            uses_skill=SkillUsesSkill("unrelated-skill"),
             actions_declared=True,
         )
     )
@@ -3694,7 +3696,7 @@ def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
             steps=(
                 SkillStep(
                     description="Run the child first.",
-                    uses_skills=("child",),
+                    uses_skill=SkillUsesSkill("child"),
                 ),
             ),
         ),
@@ -6061,11 +6063,11 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 return generic_response
             elif 20 <= self._call_index <= 21:
                 current_step = cast(dict[str, object], prompt["current_step"])
-                nested_skills = current_step.get("uses_skills", [])
-                if isinstance(nested_skills, list) and nested_skills:
+                nested_skill = current_step.get("uses_skill")
+                if isinstance(nested_skill, dict) and nested_skill.get("skill"):
                     nested_response = {
                         "action": "invoke_skill",
-                        "skill": nested_skills[0],
+                        "skill": nested_skill["skill"],
                     }
                 else:
                     nested_response = {"action": "next_step"}
@@ -6810,7 +6812,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._pr_push_invoked = False
             self._pr_create_invoked = False
             self._pr_update_invoked = False
-            self._start_invoked_steps: set[int] = set()
+            self._start_invoked_steps: set[str] = set()
             self._bootstrap_invoked_steps: set[int] = set()
             self._finish_invoked_steps: set[int] = set()
             self._finish_validation_commands: list[list[str]] | None = None
@@ -7063,7 +7065,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "outputs": {"feature_query": "display-related-photos"},
                     }
                 tool_invocations = prompt["current_step"].get("tool_invocations", [])
-                if tool_invocations and step_index not in self._start_invoked_steps:
+                if tool_invocations and step_id not in self._start_invoked_steps:
                     invocation = next(
                         (
                             item
@@ -7072,7 +7074,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         ),
                         tool_invocations[0],
                     )
-                    self._start_invoked_steps.add(step_index)
+                    self._start_invoked_steps.add(str(step_id))
                     self._call_index += 1
                     command = [
                         str(part)
@@ -7156,7 +7158,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 if (
                     prompt["current_step"].get("id")
                     == "generate-implementation-specifications"
-                    and step_index in self._start_invoked_steps
+                    and str(step_id) in self._start_invoked_steps
                 ):
                     self._call_index += 1
                     return {

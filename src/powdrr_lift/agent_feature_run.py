@@ -105,9 +105,6 @@ def _skill_subset(repo_root: Path, root_skill: str, destination: Path) -> Path:
         if isinstance(document, dict):
             for step in document.get("steps", []):
                 if isinstance(step, dict):
-                    nested = step.get("uses_skills", [])
-                    if isinstance(nested, list):
-                        pending.extend(name for name in nested if isinstance(name, str))
                     deterministic = step.get("uses_skill")
                     if isinstance(deterministic, dict):
                         name = deterministic.get("skill")

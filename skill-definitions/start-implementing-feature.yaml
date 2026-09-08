@@ -11,7 +11,7 @@ steps:
 - id: capture-feature-query
   description: Capture the feature name to search for.
   actions: []
-  step_type: governed
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Extract the feature name or identifier from the user's request without
@@ -111,7 +111,7 @@ steps:
 - id: select-feature-context
   description: Select the canonical feature and workflow context.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: governed
+  step_type: freeform
   llm_type: standard_reasoning
   details: >-
     Review all three deterministic search results. Filter them to the best
@@ -149,7 +149,7 @@ steps:
 - id: bootstrap-project-structure
   description: Bootstrap the project-wide module and tool structure.
   actions: [invoke_skill]
-  step_type: governed
+  step_type: freeform
   llm_type: standard_reasoning
   pre_step:
     action: invoke_tool
@@ -193,7 +193,7 @@ steps:
 - id: plan-proposed-prs
   description: Plan the proposed PR implementation sequence.
   actions: [read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     This is a planning-only step. Do not create, edit, rename, or delete the
@@ -254,7 +254,7 @@ steps:
 - id: plan-proposed-pr-specification
   description: Define the ordered proposed PR plan.
   actions: [read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     This is a planning-only judgment. Do not edit YAML and do not inspect,
@@ -331,7 +331,7 @@ steps:
 - id: allocate-proposed-pr-effects
   description: Allocate authoritative effects to the planned PRs.
   actions: []
-  step_type: governed
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Use the validated proposed_pr_plan and runtime-owned authoritative_effects
@@ -399,7 +399,7 @@ steps:
   description: Repair every reported proposed PR specification issue.
   actions: [read_document, goto_step]
   next_step_override: evaluate-proposed-pr-specification
-  step_type: governed
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Do not repair YAML. Review the structured issues selected by the runtime
@@ -413,7 +413,7 @@ steps:
 - id: plan-workflow-instantiation
   description: Plan execution workflow instantiation.
   actions: [gather_context, edit, yaml_edit, file_management, read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: simple_task
   details: >-
     For each validated proposed PR, inspect whether its matching workflow
@@ -449,7 +449,7 @@ steps:
 - id: instantiate-execution-workflows
   description: Instantiate each missing execution workflow.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Invoke instantiate-workflow once for each missing workflow using the
@@ -483,7 +483,7 @@ steps:
 - id: verify-workflow-dependencies
   description: Verify workflow-level dependency metadata.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: governed
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Compare the dependency relationships in the unified proposed-PR file with every
@@ -522,7 +522,7 @@ steps:
 - id: verify-workflow-artifacts
   description: Verify workflow artifacts are in the active worktree.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: fast_iteration
   details: >-
     Confirm from the repository-state result that every generated workflow task
@@ -534,7 +534,7 @@ steps:
 - id: review-workflow-proposed-pr-links
   description: Review the bidirectional workflow and proposed-PR mapping.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: governed
+  step_type: freeform
   llm_type: high_reasoning
   details: >-
     Build an exact mapping table from every validated proposed-PR specification
@@ -582,7 +582,7 @@ steps:
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: simple_task
   details: >-
     Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the
@@ -613,9 +613,17 @@ steps:
   - name: staged_artifact_repository_state
     type: any
     required_for_next_step: true
+- id: prepare-feature-pull-request-dependency
+  description: Run finish-pr-prep on the validated planning artifacts.
+  step_type: uses_skill
+  llm_type: fast_iteration
+  details: >-
+    Run finish-pr-prep before publishing the required preparation handoffs.
+  uses_skill:
+    skill: finish-pr-prep
+
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
-  actions: [invoke_skill]
   step_type: predicated
   llm_type: fast_iteration
   completion:
@@ -632,8 +640,6 @@ steps:
     Do not return next_step or synthesize either value; the step advances only
     after both declared outputs are explicitly emitted and the readiness report
     is accepted.
-  uses_skills:
-  - finish-pr-prep
   outputs:
   - name: final_repository_state
     type: any
@@ -679,7 +685,7 @@ steps:
 - id: create-feature-pull-request
   description: Commit the validated artifacts and open a draft pull request.
   actions: []
-  step_type: governed
+  step_type: uses_skill
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `feature`, commit message `Add
@@ -690,11 +696,11 @@ steps:
     skill must stage exactly that list. Do not advance until it has committed,
     pushed, and created or updated a pull request successfully. Never claim a
     PR is ready without a returned PR URL.
-  uses_skills:
-  - create-pull-request
+  uses_skill:
+    skill: create-pull-request
 - id: handoff-feature-pull-request
   description: Hand the draft pull request to the user for review.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: governed
+  step_type: freeform
   llm_type: standard_reasoning
   details: Show the pull request URL. Summarize the selected feature, every proposed PR, every execution workflow, and their dependency relationships. State that implementation has not begun and the draft pull request is ready for review.

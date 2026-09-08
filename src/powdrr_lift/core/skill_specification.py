@@ -289,11 +289,12 @@ class SkillUsesSkill:
     outputs: tuple[SkillUsesSkillBinding, ...] = field(default_factory=tuple)
 
     def to_data(self) -> dict[str, Any]:
-        return {
-            "skill": self.skill,
-            "inputs": [binding.to_data() for binding in self.inputs],
-            "outputs": [binding.to_data() for binding in self.outputs],
-        }
+        data: dict[str, Any] = {"skill": self.skill}
+        if self.inputs:
+            data["inputs"] = [binding.to_data() for binding in self.inputs]
+        if self.outputs:
+            data["outputs"] = [binding.to_data() for binding in self.outputs]
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,7 +303,6 @@ class SkillStep:
     details: str | None = None
     llm_type: str | None = None
     interaction_style: str | None = None
-    uses_skills: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[str, ...] = field(default_factory=tuple)
@@ -323,6 +323,8 @@ class SkillStep:
     def __post_init__(self) -> None:
         if self.actions:
             object.__setattr__(self, "actions_declared", True)
+        if self.uses_skill is not None and self.step_type == "freeform":
+            object.__setattr__(self, "step_type", "uses_skill")
 
     def to_data(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -337,8 +339,6 @@ class SkillStep:
             data["llm_type"] = self.llm_type
         if self.interaction_style is not None:
             data["interaction_style"] = self.interaction_style
-        if self.uses_skills:
-            data["uses_skills"] = list(self.uses_skills)
         if self.uses_skill is not None:
             data["uses_skill"] = self.uses_skill.to_data()
         if self.tool_invocations:
@@ -685,7 +685,6 @@ def build_skill_validation_report(
                     "details",
                     "llm_type",
                     "interaction_style",
-                    "uses_skills",
                     "uses_skill",
                     "tool_invocations",
                     "prompt_catalogs",
@@ -1191,58 +1190,6 @@ def build_skill_validation_report(
                             )
                         )
 
-            uses_skills = step_mapping.get("uses_skills")
-            if uses_skills is None:
-                uses_skills = ()
-            if not isinstance(uses_skills, Sequence) or isinstance(
-                uses_skills,
-                (str, bytes, bytearray),
-            ):
-                issues.append(
-                    SkillValidationIssue(
-                        code="invalid_uses_skills_type",
-                        message="Skill step uses_skills must be an array.",
-                        path=_child_path(step_path, "uses_skills"),
-                    )
-                )
-            else:
-                seen_refs: set[str] = set()
-                for ref_index, ref_value in enumerate(uses_skills):
-                    normalized_ref = _optional_string(ref_value)
-                    if normalized_ref is None:
-                        issues.append(
-                            SkillValidationIssue(
-                                code="invalid_uses_skills_item",
-                                message=(
-                                    "Skill step uses_skills must contain non-empty "
-                                    "strings."
-                                ),
-                                path=_sequence_path(
-                                    step_path,
-                                    "uses_skills",
-                                    ref_index,
-                                ),
-                            )
-                        )
-                        continue
-                    if normalized_ref in seen_refs:
-                        issues.append(
-                            SkillValidationIssue(
-                                code="duplicate_uses_skill",
-                                message=(
-                                    "Skill step uses_skills must not contain "
-                                    "duplicates."
-                                ),
-                                path=_sequence_path(
-                                    step_path,
-                                    "uses_skills",
-                                    ref_index,
-                                ),
-                            )
-                        )
-                        continue
-                    seen_refs.add(normalized_ref)
-
             raw_uses_skill = step_mapping.get("uses_skill")
             if normalized_step_type == "uses_skill":
                 if not isinstance(raw_uses_skill, Mapping):
@@ -1274,16 +1221,6 @@ def build_skill_validation_report(
                         path=_child_path(step_path, "uses_skill"),
                     )
                 )
-            if normalized_step_type == "uses_skill" and uses_skills:
-                issues.append(
-                    SkillValidationIssue(
-                        code="uses_skill_mixed_with_legacy",
-                        message=(
-                            "uses_skill steps must use uses_skill, not uses_skills."
-                        ),
-                        path=_child_path(step_path, "uses_skills"),
-                    )
-                )
             if normalized_step_type == "uses_skill":
                 if step_mapping.get("actions") not in (None, []):
                     issues.append(
@@ -1291,6 +1228,14 @@ def build_skill_validation_report(
                             code="uses_skill_actions",
                             message="uses_skill steps cannot declare model actions.",
                             path=_child_path(step_path, "actions"),
+                        )
+                    )
+                if step_mapping.get("prompt_catalogs"):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="uses_skill_prompt_catalogs",
+                            message="uses_skill steps cannot declare prompt_catalogs.",
+                            path=_child_path(step_path, "prompt_catalogs"),
                         )
                     )
                 if raw_uses_skill is not None:
@@ -1678,41 +1623,34 @@ def _validate_skill_references(
     issues: list[SkillValidationIssue] = []
     for skill_path, skill in contents.step_references:
         for step_index, step in enumerate(skill.steps):
-            references = list(step.uses_skills)
-            if step.uses_skill is not None:
-                references.append(step.uses_skill.skill)
-            for ref_index, referenced_skill in enumerate(references):
-                if step.uses_skill is not None and ref_index == len(references) - 1:
-                    reference_path = _child_path(
-                        _sequence_path(skill_path, "steps", step_index),
-                        "uses_skill.skill",
+            if step.uses_skill is None:
+                continue
+            referenced_skill = step.uses_skill.skill
+            reference_path = _child_path(
+                _sequence_path(skill_path, "steps", step_index),
+                "uses_skill.skill",
+            )
+            if referenced_skill == skill.name:
+                issues.append(
+                    SkillValidationIssue(
+                        code="self_dependency",
+                        message=(
+                            f"Skill {skill.name!r} cannot reference itself from a step."
+                        ),
+                        path=reference_path,
                     )
-                else:
-                    reference_path = _sequence_path(
-                        skill_path, "steps", step_index, "uses_skills", ref_index
+                )
+            elif referenced_skill not in contents.skills_by_name:
+                issues.append(
+                    SkillValidationIssue(
+                        code="missing_skill_reference",
+                        message=(
+                            f"Skill {skill.name!r} references unknown skill "
+                            f"{referenced_skill!r}."
+                        ),
+                        path=reference_path,
                     )
-                if referenced_skill == skill.name:
-                    issues.append(
-                        SkillValidationIssue(
-                            code="self_dependency",
-                            message=(
-                                f"Skill {skill.name!r} cannot reference itself "
-                                "from a step."
-                            ),
-                            path=reference_path,
-                        )
-                    )
-                elif referenced_skill not in contents.skills_by_name:
-                    issues.append(
-                        SkillValidationIssue(
-                            code="missing_skill_reference",
-                            message=(
-                                f"Skill {skill.name!r} references unknown skill "
-                                f"{referenced_skill!r}."
-                            ),
-                            path=reference_path,
-                        )
-                    )
+                )
     return issues
 
 
@@ -1724,8 +1662,7 @@ def _validate_skill_dependency_cycles(
             referenced_skill
             for step in skill.steps
             for referenced_skill in (
-                list(step.uses_skills)
-                + ([step.uses_skill.skill] if step.uses_skill is not None else [])
+                [step.uses_skill.skill] if step.uses_skill is not None else []
             )
             if referenced_skill in contents.skills_by_name
         }
@@ -2035,7 +1972,6 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
             + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
             + "."
         )
-    uses_skills = _optional_string_sequence(data.get("uses_skills"))
     tool_invocations = _optional_tool_invocations(
         data.get("tool_invocations"),
     )
@@ -2122,13 +2058,13 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         raise ValueError("uses_skill steps must declare a uses_skill object.")
     if step_type != "uses_skill" and uses_skill is not None:
         raise ValueError("Only uses_skill steps may declare uses_skill.")
-    if step_type == "uses_skill" and uses_skills:
-        raise ValueError("uses_skill steps must use uses_skill, not uses_skills.")
     if step_type == "uses_skill":
         if pre_step is not None:
             raise ValueError("uses_skill steps cannot declare pre_step.")
         if actions_declared and actions:
             raise ValueError("uses_skill steps cannot declare model actions.")
+        if prompt_catalogs:
+            raise ValueError("uses_skill steps cannot declare prompt_catalogs.")
     inputs = _parse_step_inputs(data.get("inputs"))
     outputs = _parse_step_outputs(data.get("outputs"))
     if completion is not None:
@@ -2148,7 +2084,6 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         details=details,
         llm_type=llm_type,
         interaction_style=interaction_style,
-        uses_skills=uses_skills,
         tool_invocations=tool_invocations,
         prompt_catalogs=prompt_catalogs,
         actions=actions,
@@ -2560,7 +2495,7 @@ def _optional_string_sequence(value: object) -> tuple[str, ...]:
     if value is None:
         return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
-        raise ValueError("Skill step uses_skills must be an array.")
+        raise ValueError("Value must be an array of strings.")
     return tuple(_required_string({"value": item}, "value") for item in value)
 
 

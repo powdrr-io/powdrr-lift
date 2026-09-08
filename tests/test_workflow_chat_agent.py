@@ -84,6 +84,7 @@ from powdrr_lift.workflow_chat_agent import (
     _available_work_item_documents,
     _available_work_item_names,
     _backup_model_for,
+    _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
     _catalog_entry_to_data,
@@ -118,6 +119,7 @@ from powdrr_lift.workflow_chat_agent import (
     _prompt_user,
     _record_durable_fact,
     _record_dynamic_validation_result,
+    _repair_response_fingerprint,
     _request_token_budget,
     _require_coding_loop_verification,
     _resolve_api_key,
@@ -2361,6 +2363,55 @@ def test_oversized_context_uses_long_context_backup_model(
     assert clients == ["long-context-model"]
 
 
+def test_repeated_invalid_response_switches_to_backup_model() -> None:
+    class _FakeClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            _ = messages
+            return {"action": "gather_context", "keywords": ["interaction"]}
+
+    clients: list[str] = []
+
+    def client_for(model: str, provider: str) -> _FakeClient:
+        clients.append(f"{provider}:{model}")
+        return _FakeClient()
+
+    result, model, provider = _complete_json_with_model_fallback(
+        client_for=client_for,
+        messages=[{"role": "user", "content": "Return an action."}],
+        context="workflow execution",
+        model="primary-model",
+        provider="openai",
+        parser=lambda _payload: (_ for _ in ()).throw(
+            RuntimeError("types must be an array")
+        ),
+        repair_instructions='Return an action with a "types" array.',
+        config=SkillChatConfig(skills_dir=Path("skills")),
+        input_func=lambda: "abort",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        model_mappings=(
+            (
+                "standard_reasoning",
+                LLMModelMapping(
+                    "primary-model",
+                    provider="openai",
+                    backup_model=LLMModelMapping(
+                        "backup-model",
+                        provider="openai",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert result is None
+    assert (model, provider) == ("backup-model", "openai")
+    assert clients == [
+        "openai:primary-model",
+        "openai:backup-model",
+    ]
+
+
 def test_llm_mapping_rejects_unsupported_provider() -> None:
     with pytest.raises(RuntimeError, match="not supported for provider 'openai'"):
         _resolve_llm_mapping(
@@ -3144,6 +3195,42 @@ def test_invalid_gather_context_type_is_repairable() -> None:
             None,
             None,
         )
+
+
+def test_gather_context_shape_error_includes_a_corrective_example() -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=r'"types": \["requirements"\]',
+    ):
+        _parse_workflow_action_gather_context(
+            {"keywords": ["interaction"]},
+            None,
+            None,
+        )
+
+
+def test_repair_fingerprint_detects_replayed_payload() -> None:
+    payload = {"action": "gather_context", "keywords": ["interaction"]}
+
+    assert _repair_response_fingerprint([], payload) == _repair_response_fingerprint(
+        [{"role": "user", "content": "different history"}], payload
+    )
+
+
+def test_repair_prompt_tells_model_not_to_repeat_invalid_payload() -> None:
+    prompt = _build_json_repair_messages(
+        [{"role": "user", "content": "Return an action."}],
+        context="workflow execution",
+        error_message=(
+            "Workflow gather_context action types must be an array. Return a JSON "
+            'array in the "types" field, for example "types": ["requirements"].'
+        ),
+        repair_instructions='Use exactly one JSON object with an "action" field.',
+        previous_payload={"action": "gather_context", "keywords": ["interaction"]},
+    )
+
+    assert "Do not repeat that response" in prompt[-1]["content"]
+    assert '"types": ["requirements"]' in prompt[-1]["content"]
 
 
 def test_llm_type_mapping_selects_deepinfra_model() -> None:

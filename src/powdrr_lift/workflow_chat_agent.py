@@ -189,6 +189,7 @@ _MAX_PROMPT_FILE_LINES = 200
 _MAX_PROMPT_FILE_CHARS = 16000
 _MAX_PROMPT_STEP_CONTEXT_ENTRIES = 24
 _MAX_PROMPT_STEP_CONTEXT_CHARS = 16000
+_MAX_REPEATED_REPAIR_ATTEMPTS = 5
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"
@@ -2740,6 +2741,10 @@ def _estimate_message_tokens(
 
 class _ModelUnavailableError(ProviderExecutionError):
     pass
+
+
+class _SemanticRepairExhaustedError(_ModelUnavailableError):
+    """Raised when a model repeats an invalid structured response."""
 
 
 class _EmptyProviderResponseError(ProviderExecutionError):
@@ -9621,7 +9626,9 @@ def _required_action_string_sequence(
         (str, bytes, bytearray),
     ):
         raise PowdrrExecutionError(
-            f"Workflow gather_context action {field_name} must be an array."
+            f"Workflow gather_context action {field_name} must be an array. "
+            f"Return a JSON array in the {field_name!r} field, for example "
+            f'"{field_name}": ["requirements"].'
         )
 
     normalized_values = tuple(
@@ -9955,11 +9962,19 @@ def _complete_json_with_model_fallback(
                     file=stderr,
                 )
                 return None, active_model, active_provider
-            print(
-                f"{context} model {active_model!r} is unavailable: {exc}. "
-                f"Switching to backup model {backup_model.model!r}.",
-                file=stderr,
-            )
+                if isinstance(exc, _SemanticRepairExhaustedError):
+                    print(
+                        f"{context} semantic repair was exhausted for "
+                        f"{active_model!r}: {exc}. Switching to backup model "
+                        f"{backup_model.model!r}.",
+                        file=stderr,
+                    )
+                else:
+                    print(
+                        f"{context} model {active_model!r} is unavailable: {exc}. "
+                        f"Switching to backup model {backup_model.model!r}.",
+                        file=stderr,
+                    )
             attempted_models.add(backup_model.model.casefold())
             active_model = backup_model.model
             active_provider = backup_model.provider
@@ -10007,6 +10022,7 @@ def _complete_json_with_repair(
     empty_question_reprompts = 0
     empty_response_reprompts = 0
     last_repair_fingerprint: tuple[str, str] | None = None
+    repeated_repair_count = 0
     while True:
         _verbose_json(
             stderr,
@@ -10163,12 +10179,19 @@ def _complete_json_with_repair(
                         repaired_payload,
                     )
                     if repair_fingerprint == last_repair_fingerprint:
+                        repeated_repair_count += 1
+                    else:
+                        repeated_repair_count = 0
+                    if repeated_repair_count >= _MAX_REPEATED_REPAIR_ATTEMPTS:
                         print(
                             f"{context} made no progress during response repair; "
-                            "stopping.",
+                            "switching to the configured fallback model.",
                             file=stderr,
                         )
-                        return None
+                        raise _SemanticRepairExhaustedError(
+                            f"{context} repeated the same invalid response "
+                            f"{_MAX_REPEATED_REPAIR_ATTEMPTS} times"
+                        ) from None
                     last_repair_fingerprint = repair_fingerprint
                     try:
                         return parser(repaired_payload)
@@ -10319,11 +10342,19 @@ def _complete_json_with_repair(
                     repaired_payload,
                 )
                 if repair_fingerprint == last_repair_fingerprint:
+                    repeated_repair_count += 1
+                else:
+                    repeated_repair_count = 0
+                if repeated_repair_count >= _MAX_REPEATED_REPAIR_ATTEMPTS:
                     print(
-                        f"{context} made no progress during response repair; stopping.",
+                        f"{context} made no progress during response repair; "
+                        "switching to the configured fallback model.",
                         file=stderr,
                     )
-                    return None
+                    raise _SemanticRepairExhaustedError(
+                        f"{context} repeated the same invalid response "
+                        f"{_MAX_REPEATED_REPAIR_ATTEMPTS} times"
+                    ) from None
                 last_repair_fingerprint = repair_fingerprint
                 try:
                     return parser(repaired_payload)
@@ -10375,7 +10406,9 @@ def _complete_json_with_repair(
                     "response directly."
                 ),
                 repair_instructions=repair_instructions,
-                previous_payload=payload,
+                previous_payload=(
+                    repaired_payload if repaired_payload is not None else payload
+                ),
             )
             continue
             retry = _prompt_user(
@@ -11081,8 +11114,12 @@ def _repair_response_fingerprint(
     messages: Sequence[dict[str, str]],
     payload: dict[str, Any],
 ) -> tuple[str, str]:
+    # The prompt history necessarily grows on every repair attempt.  Including
+    # it in the fingerprint therefore made an identical malformed payload look
+    # like progress forever.  Compare the response itself so a provider that
+    # keeps replaying the same invalid action is stopped deterministically.
     return (
-        json.dumps(messages, ensure_ascii=False, sort_keys=True),
+        "response",
         json.dumps(payload, ensure_ascii=False, sort_keys=True),
     )
 
@@ -11103,6 +11140,10 @@ def _build_json_repair_messages(
     if previous_payload is not None:
         repair_message += (
             f"\nPrevious response:\n{_serialize_prompt_json(previous_payload)}"
+        )
+        repair_message += (
+            "\nDo not repeat that response. Change the field named by the "
+            "validation error and return the complete corrected object."
         )
     repaired_messages = list(messages)
     if previous_payload is not None:

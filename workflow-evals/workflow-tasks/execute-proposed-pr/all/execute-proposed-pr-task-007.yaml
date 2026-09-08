@@ -9,5 +9,5 @@ assignee_role: coder
 output_state_type: completeness-repair-state
 description: Repair specification completeness gaps
 workflow_template: execute-proposed-pr
-step_type: freeform
+step_type: governed
 

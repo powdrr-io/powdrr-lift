@@ -28,7 +28,7 @@ steps:
     required_for_next_step: true
 - description: Confirm the staged pull request scope.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Invoke the declared shell command exactly once. The action must use the
@@ -47,7 +47,7 @@ steps:
     - --stat
 - description: Discover validation tools for the staged languages.
   actions: [gather_context, edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
@@ -74,7 +74,7 @@ steps:
     required_for_next_step: true
 - description: Run the final formatting, lint, type-check, and test passes.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   inputs:
   - name: validation_tool_obligations
     type: any

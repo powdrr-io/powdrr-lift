@@ -15,7 +15,7 @@ description: Repair specification completeness gaps
 workflow_template: execute-proposed-pr
 phase_type: specify
 persona_id: architect
-step_type: freeform
+step_type: governed
 details: 'Perform exactly one action only when the completeness review identifies
   a gap: edit the approved files to close the listed gap. Do not run tests or broaden
   scope here; later deterministic checks provide evidence. If the review is complete,

@@ -10,7 +10,7 @@ when_to_use:
 steps:
 - description: Discover the pull request and establish the exact change surface.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: long_context
   details: >-
     Inspect the referenced pull request's title, body, labels, commits, complete
@@ -47,7 +47,7 @@ steps:
     - <head-sha>
 - description: Identify code made dead or duplicative by the pull request.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     For every candidate, trace definitions to all call sites, imports, registrations,
@@ -92,7 +92,7 @@ steps:
     - path=<candidate-python-file>
 - description: Validate each candidate and prepare precise inline findings.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Validate the candidate with the narrowest useful checks: inspect call-graph or
@@ -123,7 +123,7 @@ steps:
     - <repository-paths>
 - description: Post every actionable dead-code or duplication finding inline.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Check the target PR's existing review threads and inline comments before
@@ -164,7 +164,7 @@ steps:
     - side=RIGHT
 - description: Verify the posted review and report the audit result.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: >-
     Re-read the target PR's inline comments after posting and verify every intended

@@ -19,7 +19,7 @@ description: Implement the planned product code
 workflow_template: execute-proposed-pr
 phase_type: build
 persona_id: engineer
-step_type: freeform
+step_type: governed
 details: 'Perform exactly one action: edit the approved product files to implement
   the proposed behavior and satisfy the failing tests. Make the smallest safe change;
   do not weaken or delete tests, run validation, or clean unrelated files. Use one

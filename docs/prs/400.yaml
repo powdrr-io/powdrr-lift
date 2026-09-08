@@ -13,7 +13,7 @@ workflow:
   - create-pull-request
   steps:
   - description: Discover proposed feature specification candidates.
-    step_type: freeform
+    step_type: governed
     id: discover-proposed-feature
     details: Invoke only the declared fuzzy-match command once for docs/proposals
       using the feature name from the user's request. Do not invoke internal, shell,
@@ -33,7 +33,7 @@ workflow:
       - '2'
       - -print
   - description: Discover current feature specification candidates.
-    step_type: freeform
+    step_type: governed
     id: discover-current-feature
     details: Invoke only the declared fuzzy-match command once for docs/current using
       the feature name from the user's request. Do not invoke internal, shell, or
@@ -53,7 +53,7 @@ workflow:
       - '2'
       - -print
   - description: Discover execution workflow candidates.
-    step_type: freeform
+    step_type: governed
     id: discover-feature-workflows
     details: Invoke only the declared fuzzy-match command once for docs/workflows
       using the feature name from the user's request. Do not invoke internal, shell,
@@ -73,7 +73,7 @@ workflow:
       - '3'
       - -print
   - description: Select the canonical feature and workflow context.
-    step_type: freeform
+    step_type: governed
     id: select-feature-context
     details: 'Review all three deterministic search results. Filter them to the best
       matching feature directory and workflow directories. Normalize case, spaces,
@@ -104,7 +104,7 @@ workflow:
       required_for_next_step: true
       scope: skill
   - description: Bootstrap the project-wide module and tool structure.
-    step_type: freeform
+    step_type: governed
     id: bootstrap-project-structure
     details: Invoke bootstrap-code-structure with the selected feature context. The
       nested skill is project-wide and must not ask for a feature or target module.
@@ -133,7 +133,7 @@ workflow:
       retry_context: The project-structure artifact is not available in the active
         worktree. Rerun bootstrap-code-structure, then retry this gate.
   - description: Plan the proposed PR implementation sequence.
-    step_type: freeform
+    step_type: governed
     id: plan-proposed-prs
     details: If proposed PR specifications or implementation specifications already
       exist in the selected feature context, inspect them, reuse them, and pass their
@@ -157,7 +157,7 @@ workflow:
       required_for_next_step: true
       scope: skill
   - description: Generate one implementation specification per proposed PR.
-    step_type: freeform
+    step_type: governed
     id: generate-implementation-specifications
     details: For each name in proposed_pr_names that lacks an implementation specification,
       invoke the declared implementation-specification command exactly once with its
@@ -188,7 +188,7 @@ workflow:
       required_for_next_step: true
       scope: skill
   - description: Fill every implementation specification.
-    step_type: freeform
+    step_type: governed
     id: fill-implementation-specifications
     details: For each path in implementation_specification_paths, replace every placeholder
       and fill every required field using the selected feature, project-structure,
@@ -219,7 +219,7 @@ workflow:
         - evaluate
         - docs/proposals/<feature-name>
   - description: Repair every reported implementation specification issue.
-    step_type: freeform
+    step_type: governed
     id: repair-implementation-specifications
     details: Review the deterministic evaluator result and repair every reported issue
       with yaml_edit. Use the evaluator's corrective guidance and exact file paths.
@@ -251,7 +251,7 @@ workflow:
         evaluator result, repair every affected YAML with yaml_edit, and rerun deterministic
         evaluation before continuing.
   - description: Plan execution workflow instantiation.
-    step_type: freeform
+    step_type: governed
     id: plan-workflow-instantiation
     details: For each validated proposed PR, inspect whether its matching workflow
       already exists and reuse it when present. For each missing workflow, inspect
@@ -268,7 +268,7 @@ workflow:
       proposed-PR relationship onward.
     llm_type: simple_task
   - description: Instantiate each missing execution workflow.
-    step_type: freeform
+    step_type: governed
     id: instantiate-execution-workflows
     details: Invoke instantiate-workflow once for each missing workflow using the
       invocation plan. Use templates/execute-proposed-pr.yaml, pass every template-specific
@@ -305,7 +305,7 @@ workflow:
         - powdrr-lift
         - repository-state
   - description: Verify workflow artifacts are in the active worktree.
-    step_type: freeform
+    step_type: governed
     id: verify-workflow-artifacts
     details: Confirm from the repository-state result that every generated workflow
       task file and <workflow-id>-workflow.yaml is under docs/workflows/ in this active
@@ -315,7 +315,7 @@ workflow:
       or create a pull request.
     llm_type: fast_iteration
   - description: Review the bidirectional workflow and proposed-PR mapping.
-    step_type: freeform
+    step_type: governed
     id: review-workflow-proposed-pr-links
     details: 'Build an exact mapping table from every validated proposed-PR specification
       in docs/proposals/<feature-name>/ to its execution workflow in docs/workflows/<feature-name>/.
@@ -352,7 +352,7 @@ workflow:
         - evaluate
         - docs/proposals/<feature-name>
   - description: Stage the validated implementation and workflow artifacts.
-    step_type: freeform
+    step_type: governed
     id: stage-validated-artifacts
     details: Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the
       intrinsic git add action, review the staged paths, and do not commit or create
@@ -378,7 +378,7 @@ workflow:
         - powdrr-lift
         - repository-state
   - description: Run finish-pr-prep on the validated planning artifacts.
-    step_type: freeform
+    step_type: governed
     id: prepare-feature-pull-request
     details: Run finish-pr-prep after the validated planning artifacts are staged.
       If cleanup changes files, restage only those artifacts before continuing. Do
@@ -387,7 +387,7 @@ workflow:
     uses_skills:
     - finish-pr-prep
   - description: Commit the validated artifacts and open a draft pull request.
-    step_type: freeform
+    step_type: governed
     id: create-feature-pull-request
     details: Invoke create-pull-request with pr-kind `feature`, commit message `Add
       <feature-name> implementation workflow`, and pull-request title `<pull-request-title>`.
@@ -400,7 +400,7 @@ workflow:
     uses_skills:
     - create-pull-request
   - description: Hand the draft pull request to the user for review.
-    step_type: freeform
+    step_type: governed
     id: handoff-feature-pull-request
     details: Show the pull request URL. Summarize the selected feature specification,
       every proposed-PR implementation specification, every execution workflow, and

@@ -15,7 +15,7 @@ description: Repair final diff scope issues
 workflow_template: execute-proposed-pr
 phase_type: resolve_findings
 persona_id: engineer
-step_type: freeform
+step_type: governed
 details: 'Perform exactly one action only when the scope review identifies a finding:
   edit or remove only the reported out-of-scope content. Do not run checks or stage
   files here. If the review is clean, make no edit. For a file removal, use one file_management

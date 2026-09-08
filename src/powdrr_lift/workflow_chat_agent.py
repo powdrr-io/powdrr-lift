@@ -154,6 +154,7 @@ from powdrr_lift.workflow_replay import (
     build_workflow_replay_state,
     definition_content_sha256,
 )
+from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
@@ -993,9 +994,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             self.current_step_index = self.state.step_index
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
+            step_behavior = behavior_for_step(self.current_step)
             if self.state.runtime is not None:
                 self.state.runtime.install_step_scope(
-                    _runtime_step_actions(self.current_step),
+                    step_behavior.runtime_actions(self.current_step.actions),
                     enforce_empty=getattr(self.current_step, "actions_declared", False),
                 )
                 if self.observer_allowed_action is not None:
@@ -1047,7 +1049,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     skill=self.selected_skill,
                     step_index=self.current_step_index,
                 )
-            if self.current_step.step_type == "gate":
+            if step_behavior.runs_gate:
                 if self.state.runtime is not None:
                     self.state.runtime.install_step_scope(frozenset())
                 try:
@@ -1068,7 +1070,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            _runtime_step_actions(self.current_step),
+                            step_behavior.runtime_actions(self.current_step.actions),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 if passed:
@@ -1134,7 +1136,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.state.runtime is not None:
                         self.state.runtime.install_step_scope(
-                            _runtime_step_actions(self.current_step),
+                            step_behavior.runtime_actions(self.current_step.actions),
                             enforce_empty=self.current_step.actions_declared,
                         )
                 pre_step_event = _latest_deterministic_pre_step(
@@ -1155,13 +1157,14 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 )
                 if generated_file_path is not None:
                     self.state.current_file_path = generated_file_path
-                if (
-                    self.current_step.step_type == "predicated"
-                    and _predicated_step_complete(self.current_step, self.state)
+                if step_behavior.auto_advance_after_pre_step(
+                    completion_satisfied=_predicated_step_complete(
+                        self.current_step, self.state
+                    )
                 ):
                     _advance_predicated_step(self.state, self.current_step)
                     continue
-                if self.current_step.step_type == "invoke_tool":
+                if not step_behavior.invokes_llm:
                     self.state.step_index += 1
                     continue
             step_mapping = (
@@ -1398,6 +1401,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             raise PowdrrExecutionError(str(exc), cause_error=exc) from exc
 
     def _execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
+        step_behavior = behavior_for_step(self.current_step)
         action_signature = _workflow_action_signature(action)
         observer_action_authorized = observer_action_matches(
             action, self.observer_allowed_action
@@ -1611,8 +1615,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 }
             )
         _reset_validation_gate_after_correction(action, self.state)
-        if self.current_step.step_type == "predicated" and _predicated_step_complete(
-            self.current_step, self.state
+        if step_behavior.auto_advance_after_action(
+            completion_satisfied=_predicated_step_complete(
+                self.current_step, self.state
+            )
         ):
             _advance_predicated_step(self.state, self.current_step)
         self.last_failed_action = None
@@ -4939,8 +4945,7 @@ def _build_step_execution_messages(
 
 def _action_system_prompt(*, current_step: Any | None = None) -> str:
     predicated_step = (
-        current_step is not None
-        and getattr(current_step, "step_type", "freeform") == "predicated"
+        current_step is not None and behavior_for_step(current_step).is_predicated
     )
     completion_guidance = (
         "- predicated completion: never return next_step. Choose one declared "
@@ -5534,7 +5539,7 @@ def _modular_action_system_prompt(
             "before next_step or complete. A prose summary is not a tool invocation.\n"
         )
     if (
-        getattr(current_step, "step_type", "freeform") == "invoke_tool"
+        not behavior_for_step(current_step).invokes_llm
         and getattr(current_step, "pre_step", None) is None
     ):
         prompt += (
@@ -7757,7 +7762,8 @@ def _validate_workflow_step_transition(
     state: _WorkflowExecutionState | None = None,
 ) -> None:
     """Prevent the LLM from skipping a step's required tool invocation."""
-    if state is not None and getattr(step, "step_type", "freeform") == "predicated":
+    behavior = behavior_for_step(step)
+    if state is not None and behavior.is_predicated:
         for requirement in getattr(
             getattr(step, "completion", None), "required_actions", ()
         ):
@@ -7772,7 +7778,7 @@ def _validate_workflow_step_transition(
                     f"{requirement.action} action(s) matching its required parameters."
                 )
     if action.kind == "emit_outputs":
-        if getattr(step, "step_type", "freeform") != "predicated":
+        if not behavior.is_predicated:
             raise PowdrrExecutionError(
                 "emit_outputs is valid only for predicated steps."
             )
@@ -7814,10 +7820,7 @@ def _validate_workflow_step_transition(
                     "Cannot emit_outputs until required action evidence is recorded: "
                     + ", ".join(missing)
                 )
-    if (
-        getattr(step, "step_type", "freeform") == "predicated"
-        and action.kind == "next_step"
-    ):
+    if behavior.rejects_model_transition(action.kind):
         raise PowdrrExecutionError(
             "Predicated steps advance automatically when their completion "
             "predicate is satisfied; next_step is not a valid model action."
@@ -7857,7 +7860,7 @@ def _validate_workflow_step_transition(
         later_gates = tuple(
             step.id or f"index {index}"
             for index, step in enumerate(state.selected_skill.skill.steps)
-            if index > current_step_index and step.step_type == "gate"
+            if index > current_step_index and behavior_for_step(step).runs_gate
         )
         if later_gates:
             raise PowdrrExecutionError(
@@ -9446,7 +9449,7 @@ def _validate_internal_command(command: object) -> None:
 def _skill_step_to_data(step: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "description": step.description,
-        "step_type": getattr(step, "step_type", "freeform"),
+        "step_type": getattr(step, "step_type", "governed"),
         "details": step.details,
         "uses_skills": list(step.uses_skills),
     }
@@ -11104,7 +11107,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     nested_skills = tuple(getattr(step, "uses_skills", ()) or ())
     actions = _step_actions(step)
     return {
-        "step_type": getattr(step, "step_type", "freeform"),
+        "step_type": getattr(step, "step_type", "governed"),
         "coding_loop": (
             step.coding_loop.to_data()
             if getattr(step, "coding_loop", None) is not None
@@ -11132,6 +11135,7 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
 
 def _step_action_response_schema(step: Any) -> dict[str, Any]:
     """Derive a strict provider envelope from the active step contract."""
+    behavior = behavior_for_step(step)
     outputs = tuple(getattr(step, "outputs", ()) or ())
     output_properties = {
         output.name: (
@@ -11157,10 +11161,7 @@ def _step_action_response_schema(step: Any) -> dict[str, Any]:
             "next_step",
             "complete",
         ):
-            if (
-                legacy_action == "next_step"
-                and getattr(step, "step_type", "freeform") == "predicated"
-            ):
+            if legacy_action == "next_step" and behavior.is_predicated:
                 continue
             if legacy_action not in action_names:
                 action_names.append(legacy_action)
@@ -11233,7 +11234,7 @@ def _step_action_response_schema(step: Any) -> dict[str, Any]:
                 for output in outputs
                 if output.required_for_next_step
                 or (
-                    getattr(step, "step_type", "freeform") == "predicated"
+                    behavior.is_predicated
                     and getattr(step, "completion", None) is not None
                     and output.name in step.completion.required_outputs
                 )
@@ -11274,6 +11275,7 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
 
 def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     """Return declared actions plus the universal prompt and advance actions."""
+    behavior = behavior_for_step(step)
     declared = tuple(getattr(step, "actions", ()) or ())
     if declared or getattr(step, "actions_declared", False):
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
@@ -11311,19 +11313,16 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
                 "file_management",
                 "prompt_user",
             ]
-        if getattr(step, "step_type", "freeform") == "invoke_tool":
+        if not behavior.invokes_llm:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
     action_names = {name for name, _ in actions}
-    if getattr(step, "step_type", "freeform") == "predicated":
+    if behavior.is_predicated:
         actions.append(("emit_outputs", _DEFAULT_ACTION_INSTRUCTIONS["emit_outputs"]))
         action_names.add("emit_outputs")
     if "prompt_user" not in action_names:
         actions.append(("prompt_user", "Ask one necessary human question."))
-    if (
-        "next_step" not in action_names
-        and getattr(step, "step_type", "freeform") != "predicated"
-    ):
+    if "next_step" not in action_names and not behavior.is_predicated:
         actions.append(("next_step", "Advance only after this step is complete."))
     outputs = tuple(
         output
@@ -11344,25 +11343,11 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
 def _declared_action_names(step: Any) -> tuple[str, ...]:
     # next_step is an implicit runtime action; its output-specific guidance is
     # rendered only when the step declares required handoff outputs.
+    behavior = behavior_for_step(step)
     names = [name for name, _ in _step_actions(step)]
-    if (
-        "next_step" not in names
-        and getattr(step, "step_type", "freeform") != "predicated"
-    ):
+    if "next_step" not in names and not behavior.is_predicated:
         names.append("next_step")
     return tuple(names)
-
-
-def _runtime_step_actions(step: Any) -> frozenset[str]:
-    """Include predicated output publication in the runtime action scope.
-
-    ``next_step`` remains an implicit transition for every contracted step; the
-    runtime permits it separately in ``ExecutionRuntime.validate_action``.
-    """
-    actions = frozenset(getattr(step, "actions", ()) or ())
-    if getattr(step, "step_type", "freeform") == "predicated":
-        return actions | {"emit_outputs"}
-    return actions
 
 
 def _action_repair_prompt(
@@ -11373,8 +11358,7 @@ def _action_repair_prompt(
     validation_error: str | None = None,
 ) -> str:
     predicated = (
-        current_step is not None
-        and getattr(current_step, "step_type", "freeform") == "predicated"
+        current_step is not None and behavior_for_step(current_step).is_predicated
     )
     empty_response_guidance = (
         "If the original action response was empty, return a valid action that "

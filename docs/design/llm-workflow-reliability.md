@@ -111,7 +111,7 @@ prompt detail when the exact procedure does not need to be model-selected:
 
 ## Predicated steps
 
-`freeform` remains the compatibility mode where the model may choose
+`governed` remains the compatibility mode where the model may choose
 `next_step`. New workflows can opt into a deterministic completion boundary with
 `step_type: predicated`:
 
@@ -146,13 +146,13 @@ nested-task execution. After their deterministic pre-step is recorded, the
 runtime advances directly.
 
 The first three `start-implementing-feature` discovery steps are converted from
-broad freeform steps to atomic fuzzy-match nodes. One small judgment node extracts
+broad governed steps to atomic fuzzy-match nodes. One small judgment node extracts
 `feature_query` from the user's request; the three searches consume that named
 value and publish named result outputs for canonical feature selection.
 
 This changes the ownership boundary without introducing a general completion-
 predicate language. Existing output, tool-invocation, validation-gate, and
-transition checks remain active for freeform steps. General declarative completion
+transition checks remain active for governed steps. General declarative completion
 predicates are follow-on work.
 
 ### Expected result
@@ -203,7 +203,7 @@ before-and-after measurement because the repository baseline changed between
 runs.
 
 The ≤36 total-roundtrip target was not met. The run demonstrates that converting
-atomic steps removes those calls reliably, while the remaining freeform and
+atomic steps removes those calls reliably, while the remaining governed and
 nested validation/publication workflows dominate the total. In particular,
 validation still uses one model call for every obligation, and publication has a
 readiness requirement that the active workflow cannot satisfy. Runtime-batched

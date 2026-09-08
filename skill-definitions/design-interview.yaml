@@ -475,7 +475,7 @@ steps:
     type: any
     required: true
   actions: [edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Read the generated interview_input_template. Replace its complete contents
@@ -598,7 +598,7 @@ steps:
 - id: repair-proposal
   description: Repair every issue reported by the evaluator.
   actions: [yaml_edit, read_document, gather_context, goto_step]
-  step_type: freeform
+  step_type: governed
   llm_type: fast_iteration
   details: >-
     Review only the latest evaluator result and use yaml_edit to fix every issue

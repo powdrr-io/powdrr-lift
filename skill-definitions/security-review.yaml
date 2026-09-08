@@ -8,7 +8,7 @@ when_to_use:
 steps:
 - description: Discover the pull request, feature scope, and security-relevant change surface.
   actions: [gather_context, invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   prompt_catalogs: [context_types]
   llm_type: long_context
   details: >-
@@ -39,7 +39,7 @@ steps:
     - --patch
 - description: Build a threat model for the changed behavior.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Use OWASP's methodology-neutral four questions: what are we working on,
@@ -65,7 +65,7 @@ steps:
     - <changed-files-or-repository>
 - description: Review identity, access control, and session boundaries.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Check authentication flows, token and session lifecycle, password or key
@@ -81,7 +81,7 @@ steps:
     insufficient-privilege cases where applicable.
 - description: Review input, output, and execution safety.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Trace every untrusted source, including HTTP parameters and headers,
@@ -97,7 +97,7 @@ steps:
     strings, and confused-deputy behavior.
 - description: Review cryptography, secrets, privacy, and data lifecycle.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Check that cryptography uses approved, authenticated algorithms and safe
@@ -111,7 +111,7 @@ steps:
     integrations receive more data than intended.
 - description: Review configuration, dependencies, and supply-chain controls.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Check secure defaults, production configuration, debug behavior, CORS,
@@ -134,7 +134,7 @@ steps:
     - <head-sha>
 - description: Review resilience, observability, and security test evidence.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Check denial-of-service surfaces: unbounded input, expensive parsing or
@@ -155,7 +155,7 @@ steps:
     label: security-review
 - description: Evaluate findings against current OWASP guidance and severity.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Use OWASP ASVS 5.0.0 as the detailed verification baseline and cite the
@@ -188,7 +188,7 @@ steps:
     - https://owasp.org/www-project-threat-modeling/
 - description: Post actionable security findings as inline pull-request comments.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Check existing unresolved review threads before posting. Post every
@@ -229,7 +229,7 @@ steps:
     - side=RIGHT
 - description: Verify the security review and report residual risk.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: >-
     Confirm every intended finding is posted to the current PR diff, each

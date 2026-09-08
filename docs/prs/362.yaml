@@ -29,7 +29,7 @@ workflow:
         - --kind
         - feature
   - description: Fill in the pull request description template.
-    step_type: freeform
+    step_type: governed
     details: Fill every section of the returned template using the validated work
       item, changed files, decisions, review or CI evidence, and exact checks that
       were actually run. Preserve useful existing pull request content when updating
@@ -43,7 +43,7 @@ workflow:
       window.
     llm_type: high_reasoning
   - description: Stage the exact files that belong in the pull request.
-    step_type: freeform
+    step_type: governed
     details: Read the `files_to_publish` list from workflow context. It is authoritative
       for this pull request. Verify every listed path exists or is an intended new
       file, then invoke `git add` with exactly those paths. Do not use `git add .`,
@@ -58,7 +58,7 @@ workflow:
       - add
       - <files-to-publish>
   - description: Commit the validated changes.
-    step_type: freeform
+    step_type: governed
     details: Confirm with `git diff --cached --name-only` that the exact `files_to_publish`
       list is staged and that the staged diff is non-empty. If any intended file is
       missing or any unrelated file is staged, correct the staging before continuing.
@@ -77,7 +77,7 @@ workflow:
       - -m
       - <commit-message>
   - description: Push the committed changes.
-    step_type: freeform
+    step_type: governed
     details: Push the current feature branch with its upstream set. Verify that the
       remote branch contains the committed `HEAD` before continuing. Do not create
       or update a pull request in this step; leave the completed body in workflow
@@ -92,7 +92,7 @@ workflow:
       - origin
       - HEAD
   - description: Create a draft pull request when none exists.
-    step_type: freeform
+    step_type: governed
     details: 'First verify that the current branch has at least one committed change
       relative to the exact base branch. If `git rev-list --count <base-branch>..HEAD`
       is zero, do not invoke `gh pr create`: inspect `git status`, stage the intended
@@ -117,7 +117,7 @@ workflow:
       - --body
       - <populated-pr-description>
   - description: Update the existing pull request.
-    step_type: freeform
+    step_type: governed
     details: Use this step only when a pull request already exists for the current
       branch. Invoke `gh pr edit <pr-reference> --title <pull-request-title> --body
       <populated-pr-description>` using the completed body from the previous steps.

@@ -14,7 +14,7 @@ workflow:
   - create-pull-request
   steps:
   - description: Capture the feature name.
-    step_type: freeform
+    step_type: governed
     id: capture-feature-name
     details: 'Choose a stable kebab-case feature name and reuse this exact name as
       the work-item name for every generated document. If the name is clear from the
@@ -31,7 +31,7 @@ workflow:
       required_for_next_step: true
       scope: skill
   - description: Capture the feature goal and success criteria.
-    step_type: freeform
+    step_type: governed
     id: capture-feature-context
     details: 'Parse the request and conversation for the named feature''s outcomes,
       edge cases, tests, constraints, and any other details needed for a properly
@@ -60,7 +60,7 @@ workflow:
         - --work-item-name
         - <work-item-name>
   - description: Fill the system requirements and approach.
-    step_type: freeform
+    step_type: governed
     id: fill-system-specification
     details: Use yaml_edit to fill the generated YAML with the feature's requirements
       and approach; do not invoke tools or rewrite the YAML as prose, then choose
@@ -68,7 +68,7 @@ workflow:
       and an approach describing the log writer.
     llm_type: standard_reasoning
   - description: Review the system context before deciding the feature shape.
-    step_type: freeform
+    step_type: governed
     id: review-system-context
     details: Run the nested system review skill and use its result to decide whether
       the current system context remains appropriate.
@@ -114,7 +114,7 @@ workflow:
         - <work-item-name>
         - --all-entity-types
   - description: Fill the architecture entities and relationships.
-    step_type: freeform
+    step_type: governed
     id: fill-architecture-specification
     details: 'Use yaml_edit to capture the entity model before review; do not invoke
       tools or rewrite the YAML as prose, then choose next_step. Keep the model small:
@@ -124,7 +124,7 @@ workflow:
       must explain which current requirement or approach it serves.'
     llm_type: high_reasoning
   - description: Review architecture before implementation.
-    step_type: freeform
+    step_type: governed
     id: review-architecture-context
     details: Run the nested architecture review skill and use its result to decide
       whether the current architecture remains appropriate.
@@ -169,7 +169,7 @@ workflow:
         - --work-item-name
         - <work-item-name>
   - description: Fill the implementation features and decisions.
-    step_type: freeform
+    step_type: governed
     id: fill-implementation-specification
     details: Use yaml_edit to complete the generated implementation template; do not
       invoke tools or rewrite the YAML as prose, then choose next_step.
@@ -214,7 +214,7 @@ workflow:
         - --work-item-name
         - <work-item-name>
   - description: Fill the proposed PR specification template.
-    step_type: freeform
+    step_type: governed
     id: fill-pr-specification
     details: Fill the single generated proposed-pr-specification.yaml with an ordered
       proposed_prs entry for every proposed PR. For each entry, record dependent_prs,
@@ -240,7 +240,7 @@ workflow:
         - evaluate
         - docs/proposals/<work-item-name>
   - description: Fix every reported specification issue with yaml_edit.
-    step_type: freeform
+    step_type: governed
     id: repair-feature-specifications
     details: 'Review only the latest deterministic evaluator result and fix every
       reported issue with yaml_edit; do not reuse an older LLM explanation after the
@@ -293,7 +293,7 @@ workflow:
         the affected YAML with yaml_edit, and rerun deterministic evaluation before
         continuing.
   - description: Stage the validated specification artifacts for pull request preparation.
-    step_type: freeform
+    step_type: governed
     id: stage-specification-artifacts
     details: Inspect the worktree and stage only the validated specification artifacts
       under docs/proposals/<work-item-name>/. Do not commit or create the pull request
@@ -309,7 +309,7 @@ workflow:
       - add
       - docs/proposals/<work-item-name>
   - description: Run finish-pr-prep before creating the pull request.
-    step_type: freeform
+    step_type: governed
     id: prepare-pull-request
     details: Run finish-pr-prep after the intended specification artifacts are staged
       by returning an invoke_skill action for the listed finish-pr-prep skill. Do
@@ -320,7 +320,7 @@ workflow:
     uses_skills:
     - finish-pr-prep
   - description: Create or update the pull request for the validated feature.
-    step_type: freeform
+    step_type: governed
     id: create-feature-pull-request
     details: Invoke create-pull-request with pr-kind `feature`, commit message `Add
       <work-item-name> feature specification`, and pull-request title `<pull-request-title>`.

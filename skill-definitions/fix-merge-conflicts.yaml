@@ -7,7 +7,7 @@ when_to_use:
 steps:
 - description: Inspect the pull request and confirm its GitHub merge status.
   actions: [gather_context, invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Resolve the repository and pull request from the user's reference. Confirm
@@ -37,7 +37,7 @@ steps:
     - --patch
 - description: Fetch the target branch and reproduce the merge conflict locally.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Verify the current worktree and branch before fetching. Fetch the PR head
@@ -71,7 +71,7 @@ steps:
     - repository-state
 - description: Inventory each conflict and attribute the competing changes.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Enumerate every unmerged path and conflict marker. For each conflict,
@@ -118,7 +118,7 @@ steps:
     - --oneline
 - description: Gather the relevant pull-request and commit context for each side.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   prompt_catalogs: [context_types]
   llm_type: long_context
   details: >-
@@ -168,7 +168,7 @@ steps:
     - --patch
 - id: plan-resolutions
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   description: Plan the semantic resolution before editing conflict markers.
   llm_type: high_reasoning
   details: >-
@@ -183,7 +183,7 @@ steps:
     intent cannot be determined safely, ask one precise question.
 - id: verify-resolutions
   actions: [invoke_tool, edit, yaml_edit, read_document, goto_step]
-  step_type: freeform
+  step_type: governed
   description: Apply and verify the conflict resolutions.
   llm_type: fast_iteration
   details: >-
@@ -220,7 +220,7 @@ steps:
     label: pr-prep
 - description: Run the PR-preparation workflow on the resolved merge.
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   uses_skills:
   - finish-pr-prep
@@ -233,7 +233,7 @@ steps:
     update the PR until finish-pr-prep reports the staged merge is ready.
 - description: Commit and push the resolved branch to the existing pull request.
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Invoke create-pull-request with pr-kind `merge-conflict`, commit message

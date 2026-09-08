@@ -135,6 +135,7 @@ from powdrr_lift.workflow_observer import (
     compact_observer_mapping,
     observer_action_matches,
 )
+from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
 _TASK_PROMPT_INPUT_REFERENCE_RE = re.compile(r"\binput_state\.([A-Za-z0-9_-]+)\b")
@@ -3150,16 +3151,17 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.current_step_index = frame.step_index
             self.current_step = frame.skill.skill.steps[frame.step_index]
             step = self.current_step
+            step_behavior = behavior_for_step(step)
             if self.runtime is not None:
                 self.runtime.install_step_scope(
-                    frozenset(getattr(step, "actions", ())),
+                    step_behavior.runtime_actions(getattr(step, "actions", ())),
                     enforce_empty=getattr(step, "actions_declared", False),
                 )
                 self.runtime.set_action_contract(
-                    frozenset(getattr(step, "actions", ())),
+                    step_behavior.runtime_actions(getattr(step, "actions", ())),
                     enforce_empty=getattr(step, "actions_declared", False),
                 )
-            if step.step_type == "gate":
+            if step_behavior.runs_gate:
                 if step.gate is None:
                     raise PowdrrExecutionError("gate steps require gate settings.")
                 if self.runtime is not None:
@@ -3187,7 +3189,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 finally:
                     if self.runtime is not None:
                         self.runtime.install_step_scope(
-                            frozenset(step.actions),
+                            step_behavior.runtime_actions(step.actions),
                             enforce_empty=step.actions_declared,
                         )
                 target_index = frame.step_index + 1
@@ -3209,7 +3211,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     )
                 frame.step_index = target_index
                 continue
-            if step.step_type == "invoke_tool" and step.pre_step is not None:
+            if not step_behavior.invokes_llm and step.pre_step is not None:
                 with (
                     self.runtime.without_action_contract()
                     if self.runtime is not None

@@ -8,7 +8,7 @@ steps:
 - description: Gather the entities, entity relationships, invariants, and guidance
     context.
   actions: [gather_context, edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   prompt_catalogs: [context_types]
   llm_type: simple_task
   details: >-
@@ -18,7 +18,7 @@ steps:
     as context types; those are not valid catalog tokens.
 - description: Decide whether the current architecture specification needs to change.
   actions: [edit, yaml_edit, file_management, read_document, complete]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Compare the gathered entity model against the new needs. If the existing
@@ -52,7 +52,7 @@ steps:
 - id: fill-architecture
   description: Fill the architecture specification with the required updates.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Use yaml_edit for every YAML change. Include complete operations using
@@ -79,12 +79,12 @@ steps:
 - id: repair-architecture
   description: Repair every reported architecture specification issue.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: freeform
+  step_type: governed
   llm_type: fast_iteration
   details: >-
     Use yaml_edit actions to fix every issue reported by evaluation. If there
     are no issues, choose next_step without changing the file. Do not use
-    invoke_tool in this freeform repair step; the next deterministic step reruns
+    invoke_tool in this governed repair step; the next deterministic step reruns
     the evaluator. If evaluation reports invalid YAML/structure or you are
     stuck, restart generation with {"action":"goto_step","step_id":"generate-architecture"}
     instead of repeating the same repair.

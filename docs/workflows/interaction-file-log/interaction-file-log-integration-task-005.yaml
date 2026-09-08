@@ -17,7 +17,7 @@ description: Run all tests and fix failures
 workflow_template: execute-proposed-pr
 phase_type: validate
 persona_id: engineer
-step_type: freeform
+step_type: governed
 details: 'Invoke run-tests-and-fix exactly once to run the complete test suite and
   repair approved product and test files. If it reports a failure without repairing
   it, do not invoke the skill again unchanged: inspect the reported failure, make

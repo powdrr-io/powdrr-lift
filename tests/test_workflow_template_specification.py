@@ -69,7 +69,7 @@ def test_workflow_template_round_trips_through_json() -> None:
         "task_templates": [
             {
                 "description": "Generate one task per changed file.",
-                "step_type": "freeform",
+                "step_type": "governed",
                 "interaction_style": "engineering",
                 "complexity": "medium",
                 "input_state": {"files": []},
@@ -84,7 +84,7 @@ def test_workflow_template_round_trips_through_json() -> None:
             },
             {
                 "description": "Validate the aggregated results.",
-                "step_type": "freeform",
+                "step_type": "governed",
                 "complexity": "high",
                 "input_state": {"ready": "<upstream-task-0>.state"},
                 "assignee_type": "agent",
@@ -149,7 +149,7 @@ def test_workflow_template_validation_rejects_skill_and_pre_step_together() -> N
                 "task_templates": [
                     {
                         "description": "Run the nested validation skill.",
-                        "step_type": "freeform",
+                        "step_type": "governed",
                         "uses_skills": ["some-skill"],
                         "pre_step": {
                             "action": "invoke_tool",
@@ -411,15 +411,15 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
         for index, task in enumerate(template.task_templates)
         if task.step_type == "invoke_tool"
     ] == list(invoke_tool_indexes)
-    freeform_details = "\n".join(
+    governed_details = "\n".join(
         task.details or ""
         for task in template.task_templates
-        if task.step_type == "freeform"
+        if task.step_type == "governed"
     )
-    assert freeform_details.count("Perform exactly one action") >= 5
-    assert '"action":"edit"' in freeform_details
-    assert '"action":"file_management"' in freeform_details
-    assert '"action":"next_step"' in freeform_details
+    assert governed_details.count("Perform exactly one action") >= 5
+    assert '"action":"edit"' in governed_details
+    assert '"action":"file_management"' in governed_details
+    assert '"action":"next_step"' in governed_details
     for task in template.task_templates[1:]:
         assert "upstream_task_outputs" not in (task.details or "")
         assert "runtime task ID" not in (task.details or "")

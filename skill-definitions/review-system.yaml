@@ -8,14 +8,14 @@ when_to_use:
 steps:
 - description: Gather the requirements and approach context.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   prompt_catalogs: [context_types]
   llm_type: simple_task
   details: Use the requirements and approach context to understand the new needs before
     judging the system specification.
 - description: Decide whether the current system specification needs to change.
   actions: [edit, yaml_edit, file_management, read_document, complete]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Compare the gathered requirements and approach against the new needs. If
@@ -48,7 +48,7 @@ steps:
 - id: fill-system
   description: Fill the system requirements and approach sections.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: >-
     Use yaml_edit for every YAML change. Include complete operations using
@@ -75,7 +75,7 @@ steps:
 - id: repair-system
   description: Repair every reported system specification issue.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: freeform
+  step_type: governed
   llm_type: fast_iteration
   details: >-
     Use yaml_edit actions to fix every issue reported by evaluation. If there
@@ -84,7 +84,7 @@ steps:
     replace. Use remove_item only for an existing item id from the current
     document. Template comments and boilerplate are removed as a side effect of
     any valid yaml_edit rewrite; do not treat comments as list items. Do not use
-    invoke_tool in this freeform repair step; the next deterministic step reruns
+    invoke_tool in this governed repair step; the next deterministic step reruns
     the evaluator. If evaluation reports invalid YAML/structure or you are
     stuck, restart generation with {"action":"goto_step","step_id":"generate-system"}
     instead of repeating the same repair.

@@ -9,5 +9,5 @@ assignee_role: architect
 output_state_type: specification-completeness-state
 description: Review specification completeness
 workflow_template: execute-proposed-pr
-step_type: freeform
+step_type: governed
 

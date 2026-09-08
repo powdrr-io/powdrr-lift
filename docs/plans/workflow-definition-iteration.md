@@ -331,7 +331,7 @@ Checks should include:
 - Every placeholder in details, examples, pre-steps, and tool invocations maps
   to a declared input or deterministic runtime value.
 - Every output consumed by a later step is declared and produced.
-- Completion conditions are explicit for freeform steps.
+- Completion conditions are explicit for governed steps.
 - `goto_step` targets exist and point backward.
 - Gate retry targets point backward and cannot bypass another required gate.
 - A step does not tell the LLM to invoke a deterministic pre-step again.

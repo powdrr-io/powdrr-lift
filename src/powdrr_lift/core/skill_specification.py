@@ -64,7 +64,7 @@ SUPPORTED_STEP_ACTIONS = frozenset(
 )
 UNIVERSAL_STEP_ACTIONS = frozenset({"prompt_user", "next_step", "emit_outputs"})
 SUPPORTED_STEP_TYPES = frozenset(
-    {"freeform", "predicated", "invoke_tool", "gate", "coding_loop"}
+    {"governed", "predicated", "invoke_tool", "gate", "coding_loop"}
 )
 SUPPORTED_INTERACTION_STYLES = frozenset(
     {"engineering", "observational_review", "devils_advocate"}
@@ -281,7 +281,7 @@ class SkillStep:
     id: str | None = None
     inputs: tuple[SkillStepInput, ...] = field(default_factory=tuple)
     outputs: tuple[SkillStepOutput, ...] = field(default_factory=tuple)
-    step_type: str = "freeform"
+    step_type: str = "governed"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
     validation_gate: Mapping[str, Any] | None = None
@@ -754,14 +754,14 @@ def build_skill_validation_report(
                         )
                     )
 
-            step_type = step_mapping.get("step_type", "freeform")
+            step_type = step_mapping.get("step_type", "governed")
             normalized_step_type = _optional_string(step_type)
             if normalized_step_type not in SUPPORTED_STEP_TYPES:
                 issues.append(
                     SkillValidationIssue(
                         code="invalid_step_type_value",
                         message=(
-                            "Skill step step_type must be freeform, predicated, "
+                            "Skill step step_type must be governed, predicated, "
                             "invoke_tool, gate, or coding_loop."
                         ),
                         path=_child_path(step_path, "step_type"),
@@ -778,7 +778,7 @@ def build_skill_validation_report(
                     )
                 )
             elif normalized_step_type in {
-                "freeform",
+                "governed",
                 "predicated",
                 "invoke_tool",
                 "gate",
@@ -1913,10 +1913,11 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     """Parse the reusable executable-step shape used by skills and workflows."""
     step_id = _optional_string(data.get("id"))
     description = _required_string(data, "description")
-    step_type = _optional_string(data.get("step_type")) or "freeform"
+    step_type = _optional_string(data.get("step_type")) or "governed"
     if step_type not in SUPPORTED_STEP_TYPES:
         raise ValueError(
-            "Skill step step_type must be freeform, predicated, invoke_tool, or gate."
+            "Skill step step_type must be governed, predicated, invoke_tool, gate, "
+            "or coding_loop."
         )
     details = _optional_string(data.get("details"))
     llm_type = _optional_string(data.get("llm_type"))

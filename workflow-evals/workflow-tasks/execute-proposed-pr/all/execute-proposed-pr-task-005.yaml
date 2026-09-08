@@ -9,5 +9,5 @@ assignee_role: reviewer
 output_state_type: all-tests-results-state
 description: Run all tests and fix failures
 workflow_template: execute-proposed-pr
-step_type: freeform
+step_type: governed
 

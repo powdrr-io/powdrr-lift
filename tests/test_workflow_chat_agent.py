@@ -6728,7 +6728,16 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             },
             {
                 "action": "next_step",
-                "outputs": {"feature_name": "display-related-photos"},
+                "outputs": {
+                    "feature_name": "display-related-photos",
+                    "specification_documents": [
+                        "docs/proposals/display-related-photos/system-specification.yaml",
+                        "docs/proposals/display-related-photos/architecture-specification.yaml",
+                        "docs/proposals/display-related-photos/implementation-specification.yaml",
+                    ],
+                    "workflow_documents": [],
+                    "missing_documents": [],
+                },
                 "decisions_and_context": "The canonical feature context is selected.",
             },
             {
@@ -7093,7 +7102,12 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     self._call_index += 1
                     return {
                         "action": "next_step",
-                        "outputs": {"feature_name": "display-related-photos"},
+                        "outputs": {
+                            "feature_name": "display-related-photos",
+                            "specification_documents": [],
+                            "workflow_documents": [],
+                            "missing_documents": [],
+                        },
                     }
                 if prompt["current_step"].get("id") == "plan-proposed-prs":
                     self._call_index += 1
@@ -8542,6 +8556,31 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
     assert "Invoking" not in stderr.getvalue()
 
 
+def test_execute_shell_tool_falls_back_when_rtk_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.shutil.which", lambda _: None)
+    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+        run.return_value.returncode = 0
+        run.return_value.stdout = ""
+        run.return_value.stderr = ""
+        _execute_shell_tool(
+            {"command": ["powdrr-lift", "evaluate", "docs/proposals/demo"]},
+            worktree_root=tmp_path,
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+            verbose=False,
+            announce=False,
+        )
+
+    assert run.call_args.args[0] == [
+        "powdrr-lift",
+        "evaluate",
+        "docs/proposals/demo",
+    ]
+
+
 def test_python_tool_variants_follow_declared_dependency_groups(
     tmp_path: Path,
 ) -> None:
@@ -9192,6 +9231,16 @@ def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checko
     assert cast(list[str], captured["cmd"])[2].startswith("workflow-chat-")
     assert captured["cwd"] == repo_root.resolve()
     assert "Creating dedicated worktree" in stderr.getvalue()
+
+
+def test_worktree_marker_file_is_treated_as_dedicated(tmp_path: Path) -> None:
+    worktree = tmp_path / "temporary-worktree"
+    worktree.mkdir()
+    (worktree / ".git").write_text("gitdir: /tmp/gitdir\n", encoding="utf-8")
+
+    from powdrr_lift.workflow_chat_agent import _is_dedicated_worktree
+
+    assert _is_dedicated_worktree(worktree) is True
 
 
 def test_anthropic_chat_client_sends_messages_api_request(

@@ -1383,6 +1383,12 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert step("select-feature-context").step_type == "governed"
     assert step("select-feature-context").outputs[0].name == "feature_name"
     assert step("select-feature-context").outputs[0].required_for_next_step
+    assert [output.name for output in step("select-feature-context").outputs] == [
+        "feature_name",
+        "specification_documents",
+        "workflow_documents",
+        "missing_documents",
+    ]
     select_details = step("select-feature-context").details
     assert select_details is not None
     assert "directory's basename as the canonical feature_name" in select_details

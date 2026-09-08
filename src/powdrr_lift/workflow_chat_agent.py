@@ -3872,7 +3872,12 @@ def _resolve_project_root(configured_repo_root: Path, worktree_root: Path) -> Pa
 
 
 def _is_dedicated_worktree(repo_root: Path) -> bool:
-    return ".worktrees" in repo_root.parts
+    # Git worktrees created outside the repository's conventional .worktrees
+    # directory (for example, the feature-run harness's temporary worktree)
+    # still have a file .git marker. Treat them as dedicated so untracked
+    # harness fixtures remain visible instead of creating a second worktree
+    # from HEAD and silently dropping those fixtures.
+    return ".worktrees" in repo_root.parts or (repo_root / ".git").is_file()
 
 
 def _generate_worktree_branch_name() -> str:
@@ -9554,7 +9559,11 @@ def _required_shell_command_item(value: object) -> str:
 
 def _wrap_shell_command(command: str) -> str:
     """Run a shell tool command through rtk without wrapping it twice."""
-    if _shell_command_starts_with_rtk(command) or _shell_command_is_unwrapped(command):
+    if (
+        shutil.which("rtk") is None
+        or _shell_command_starts_with_rtk(command)
+        or _shell_command_is_unwrapped(command)
+    ):
         return command
     return f"rtk {command}"
 
@@ -9564,7 +9573,9 @@ def _rtk_command_display(command: str) -> str:
 
 
 def _wrap_argument_command(command: list[str]) -> list[str]:
-    if command and (command[0] == "rtk" or command[0] in _RTK_BYPASS_COMMANDS):
+    if shutil.which("rtk") is None or (
+        command and (command[0] == "rtk" or command[0] in _RTK_BYPASS_COMMANDS)
+    ):
         return command
     return ["rtk", *command]
 

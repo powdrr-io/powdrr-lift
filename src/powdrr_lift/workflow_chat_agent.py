@@ -189,6 +189,7 @@ _MAX_PROMPT_FILE_LINES = 200
 _MAX_PROMPT_FILE_CHARS = 16000
 _MAX_PROMPT_STEP_CONTEXT_ENTRIES = 24
 _MAX_PROMPT_STEP_CONTEXT_CHARS = 16000
+_MAX_REPEATED_REPAIR_ATTEMPTS = 5
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"
@@ -2740,6 +2741,10 @@ def _estimate_message_tokens(
 
 class _ModelUnavailableError(ProviderExecutionError):
     pass
+
+
+class _SemanticRepairExhaustedError(_ModelUnavailableError):
+    """Raised when a model repeats an invalid structured response."""
 
 
 class _EmptyProviderResponseError(ProviderExecutionError):
@@ -9957,11 +9962,19 @@ def _complete_json_with_model_fallback(
                     file=stderr,
                 )
                 return None, active_model, active_provider
-            print(
-                f"{context} model {active_model!r} is unavailable: {exc}. "
-                f"Switching to backup model {backup_model.model!r}.",
-                file=stderr,
-            )
+                if isinstance(exc, _SemanticRepairExhaustedError):
+                    print(
+                        f"{context} semantic repair was exhausted for "
+                        f"{active_model!r}: {exc}. Switching to backup model "
+                        f"{backup_model.model!r}.",
+                        file=stderr,
+                    )
+                else:
+                    print(
+                        f"{context} model {active_model!r} is unavailable: {exc}. "
+                        f"Switching to backup model {backup_model.model!r}.",
+                        file=stderr,
+                    )
             attempted_models.add(backup_model.model.casefold())
             active_model = backup_model.model
             active_provider = backup_model.provider
@@ -10169,13 +10182,16 @@ def _complete_json_with_repair(
                         repeated_repair_count += 1
                     else:
                         repeated_repair_count = 0
-                    if repeated_repair_count >= 5:
+                    if repeated_repair_count >= _MAX_REPEATED_REPAIR_ATTEMPTS:
                         print(
                             f"{context} made no progress during response repair; "
-                            "stopping.",
+                            "switching to the configured fallback model.",
                             file=stderr,
                         )
-                        return None
+                        raise _SemanticRepairExhaustedError(
+                            f"{context} repeated the same invalid response "
+                            f"{_MAX_REPEATED_REPAIR_ATTEMPTS} times"
+                        ) from None
                     last_repair_fingerprint = repair_fingerprint
                     try:
                         return parser(repaired_payload)
@@ -10329,12 +10345,16 @@ def _complete_json_with_repair(
                     repeated_repair_count += 1
                 else:
                     repeated_repair_count = 0
-                if repeated_repair_count >= 5:
+                if repeated_repair_count >= _MAX_REPEATED_REPAIR_ATTEMPTS:
                     print(
-                        f"{context} made no progress during response repair; stopping.",
+                        f"{context} made no progress during response repair; "
+                        "switching to the configured fallback model.",
                         file=stderr,
                     )
-                    return None
+                    raise _SemanticRepairExhaustedError(
+                        f"{context} repeated the same invalid response "
+                        f"{_MAX_REPEATED_REPAIR_ATTEMPTS} times"
+                    ) from None
                 last_repair_fingerprint = repair_fingerprint
                 try:
                     return parser(repaired_payload)

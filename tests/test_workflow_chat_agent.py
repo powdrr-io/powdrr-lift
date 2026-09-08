@@ -2363,6 +2363,55 @@ def test_oversized_context_uses_long_context_backup_model(
     assert clients == ["long-context-model"]
 
 
+def test_repeated_invalid_response_switches_to_backup_model() -> None:
+    class _FakeClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            _ = messages
+            return {"action": "gather_context", "keywords": ["interaction"]}
+
+    clients: list[str] = []
+
+    def client_for(model: str, provider: str) -> _FakeClient:
+        clients.append(f"{provider}:{model}")
+        return _FakeClient()
+
+    result, model, provider = _complete_json_with_model_fallback(
+        client_for=client_for,
+        messages=[{"role": "user", "content": "Return an action."}],
+        context="workflow execution",
+        model="primary-model",
+        provider="openai",
+        parser=lambda _payload: (_ for _ in ()).throw(
+            RuntimeError("types must be an array")
+        ),
+        repair_instructions='Return an action with a "types" array.',
+        config=SkillChatConfig(skills_dir=Path("skills")),
+        input_func=lambda: "abort",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        model_mappings=(
+            (
+                "standard_reasoning",
+                LLMModelMapping(
+                    "primary-model",
+                    provider="openai",
+                    backup_model=LLMModelMapping(
+                        "backup-model",
+                        provider="openai",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert result is None
+    assert (model, provider) == ("backup-model", "openai")
+    assert clients == [
+        "openai:primary-model",
+        "openai:backup-model",
+    ]
+
+
 def test_llm_mapping_rejects_unsupported_provider() -> None:
     with pytest.raises(RuntimeError, match="not supported for provider 'openai'"):
         _resolve_llm_mapping(

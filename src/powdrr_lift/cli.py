@@ -1167,6 +1167,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scenario_suite_parser.add_argument("--manifest", required=True, type=Path)
     scenario_suite_parser.add_argument("--repo-root", type=Path)
+    scenario_suite_parser.add_argument("--report", type=Path)
     scenario_suite_parser.add_argument("--json", action="store_true")
     scenario_suite_parser.set_defaults(func=_run_workflow_scenario_suite)
 
@@ -3791,6 +3792,12 @@ def _run_workflow_scenario_suite(args: argparse.Namespace) -> int:
     else:
         for report in reports:
             print(f"{report['status']}: {report['path']}")
+    if args.report is not None:
+        report_path = (
+            args.report if args.report.is_absolute() else repo_root / args.report
+        )
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(reports, indent=2) + "\n", encoding="utf-8")
     return 1 if failed else 0
 
 

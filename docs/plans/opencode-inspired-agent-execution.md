@@ -472,7 +472,7 @@ skills, interaction style, and clean input packet. Their effective tools and
 actions still come from the engine-owned phase envelope intersected with the
 current skill step and policy. Persona prose never expands capability.
 
-Review coordination should use typed findings rather than a shared freeform
+Review coordination should use typed findings rather than a shared governed
 conversation. Each finding should contain a stable ID, reviewer role, severity,
 category, affected criterion or code location, evidence, requested change, and
 disposition. The Engineer returns a resolution for every blocking finding;
@@ -978,7 +978,7 @@ should need to restate those mechanics.
 
 `run-tests-and-fix` should remain a reusable deterministic repair workflow, but
 its test results and repair edits should update the shared obligation ledger and
-checkpoint state. Its freeform diagnosis can become the recovery policy for a
+checkpoint state. Its governed diagnosis can become the recovery policy for a
 failed test obligation used by the Engineer rather than an independently
 orchestrated loop or a Validator persona with authority over results.
 

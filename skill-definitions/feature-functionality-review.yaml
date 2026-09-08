@@ -8,7 +8,7 @@ when_to_use:
 steps:
 - description: Discover the referenced pull request and its feature relationship.
   actions: [gather_context, invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: long_context
   details: >-
     Inspect the referenced PR's title, body, labels, commits, changed files,
@@ -39,7 +39,7 @@ steps:
     - --patch
 - description: Decide whether the referenced PR is the final proposed PR.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   prompt_catalogs: [context_types]
   llm_type: high_reasoning
   details: >-
@@ -58,7 +58,7 @@ steps:
     status rather than relying only on PR prose.
 - description: Review the current PR against the selected functionality scope.
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     For an intermediate PR, compare the complete diff and surrounding code
@@ -84,7 +84,7 @@ steps:
     the feature is complete.
 - description: Post every actionable finding as an inline pull-request comment.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Post each actionable finding directly to the referenced PR using the
@@ -127,7 +127,7 @@ steps:
     - side=RIGHT
 - description: Verify the posted review and report the audit result.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: >-
     Confirm that every intended finding exists on the target PR, is attached

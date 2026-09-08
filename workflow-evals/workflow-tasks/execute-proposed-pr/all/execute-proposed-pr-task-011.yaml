@@ -9,5 +9,5 @@ assignee_role: reviewer
 output_state_type: final-scope-review-state
 description: Review the final diff for scope
 workflow_template: execute-proposed-pr
-step_type: freeform
+step_type: governed
 

@@ -1088,7 +1088,7 @@ steps:
 - id: inspect
   description: Inspect the fixture.
   actions: [invoke_tool, complete]
-  step_type: freeform
+  step_type: governed
   tool_invocations:
   - tool: shell
     command: [git, status, --short]

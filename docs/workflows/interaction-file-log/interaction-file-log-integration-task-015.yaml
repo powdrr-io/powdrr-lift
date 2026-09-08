@@ -30,7 +30,7 @@ description: Finish pull request preparation
 workflow_template: execute-proposed-pr
 phase_type: publish_pr
 persona_id: engineering-manager
-step_type: freeform
+step_type: governed
 details: 'The listed finish-pr-prep skill runs automatically because it is declared
   in uses_skills. Do not return invoke_skill for it; doing so is recursive and will
   be rejected. Do not independently edit, stage, commit, push, or create a pull request

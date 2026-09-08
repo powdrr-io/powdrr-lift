@@ -9,5 +9,5 @@ assignee_role: coder
 output_state_type: generated-test-diffs-state
 description: Generate the planned tests
 workflow_template: execute-proposed-pr
-step_type: freeform
+step_type: governed
 

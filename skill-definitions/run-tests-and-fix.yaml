@@ -39,7 +39,7 @@ steps:
     required_for_next_step: true
 - id: diagnose-test-results
   description: Produce a traceback-supported diagnosis from structured test results.
-  step_type: freeform
+  step_type: governed
   inputs:
   - name: enriched_test_result
     type: any

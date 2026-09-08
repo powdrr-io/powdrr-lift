@@ -11,7 +11,7 @@ when_to_use:
 steps:
 - description: Discover the pull request and establish the exact change surface.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: long_context
   details: >-
     This is an adversarial review; the workflow selects its provider from the
@@ -45,7 +45,7 @@ steps:
     - <head-sha>
 - description: Challenge framework and dependency choices.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Act as a senior engineer educating a junior engineer on production-level
@@ -77,7 +77,7 @@ steps:
     - <changed-files>
 - description: Challenge readability and control-flow complexity.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Review all added and materially changed code for readability regressions:
@@ -109,7 +109,7 @@ steps:
     - --check
 - description: Validate findings and teach the production-level alternative.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: high_reasoning
   details: >-
     Validate each candidate against the complete diff, surrounding call sites,
@@ -139,7 +139,7 @@ steps:
     - <repository-paths>
 - description: Post actionable findings as inline pull-request comments.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: simple_task
   details: >-
     Check existing review threads and inline comments before posting. Post each
@@ -180,7 +180,7 @@ steps:
     - side=RIGHT
 - description: Verify the adversarial review and report the result.
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   llm_type: standard_reasoning
   details: >-
     Re-read the target PR's comments and verify every intended finding is

@@ -10,7 +10,7 @@ when_to_use:
 steps:
 - id: resolve-target
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   prompt_catalogs: [skills]
   description: Resolve and read the target definition.
   llm_type: long_context
@@ -35,7 +35,7 @@ steps:
     - -print
 - id: inventory-steps
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   description: Inventory every target step and its execution surface.
   llm_type: standard_reasoning
   details: >-
@@ -52,7 +52,7 @@ steps:
     instructions from repository conventions.
 - id: score-steps
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   description: Score directive quality and identify scope-preserving rewrites.
   llm_type: high_reasoning
   details: >-
@@ -69,7 +69,7 @@ steps:
     state the smallest safe change and the requirement it preserves.
 - id: draft-rewrites
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   description: Draft concise, directive replacement steps.
   llm_type: high_reasoning
   details: >-
@@ -85,7 +85,7 @@ steps:
     preserved requirements for every rewrite.
 - id: independent-review
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   description: Obtain an independent adversarial completeness review.
   llm_type: high_reasoning
   details: >-
@@ -106,7 +106,7 @@ steps:
     is running.
 - id: reconcile-rewrites
   actions: [edit, yaml_edit, file_management, read_document, goto_step]
-  step_type: freeform
+  step_type: governed
   description: Reconcile feedback and iterate until the rewrite is complete.
   llm_type: high_reasoning
   details: >-
@@ -121,7 +121,7 @@ steps:
     invocation instructions, and a complete preserved-requirement list.
 - id: apply-and-publish
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   description: Apply and validate the accepted definition.
   llm_type: fast_iteration
   details: >-
@@ -137,7 +137,7 @@ steps:
 
 - id: verify-target-change
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   description: Confirm the reviewed definition changed before preparing a pull request.
   llm_type: simple_task
   details: >-
@@ -159,7 +159,7 @@ steps:
 
 - id: stage-for-pull-request
   actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: freeform
+  step_type: governed
   description: Stage the reviewed definition for pull-request preparation.
   llm_type: simple_task
   details: >-
@@ -177,7 +177,7 @@ steps:
 
 - id: finish-pull-request-prep
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   description: Run final pull-request preparation checks.
   llm_type: simple_task
   details: >-
@@ -190,7 +190,7 @@ steps:
 
 - id: create-pull-request
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   description: Create or update the pull request for the reviewed definition.
   llm_type: simple_task
   details: >-

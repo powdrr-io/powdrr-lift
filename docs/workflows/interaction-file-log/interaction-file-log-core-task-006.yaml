@@ -21,7 +21,7 @@ description: Review specification completeness
 workflow_template: execute-proposed-pr
 phase_type: review_specifications
 persona_id: specification-reviewer
-step_type: freeform
+step_type: governed
 details: 'Perform exactly one action: compare the implementation and test evidence
   to every proposed PR requirement and acceptance criterion. Do not edit files or
   run commands. Return a criterion-by-criterion review in one next_step action, using

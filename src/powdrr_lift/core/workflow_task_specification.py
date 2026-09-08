@@ -93,7 +93,7 @@ class WorkflowTask:
     output_state_type: str = "state"
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
-    step_type: str = "freeform"
+    step_type: str = "governed"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
     coding_loop: CodingLoopSpec | None = None
@@ -675,13 +675,13 @@ def build_workflow_task_validation_report(
             )
         )
 
-    step_type = raw_task.get("step_type", "freeform")
+    step_type = raw_task.get("step_type", "governed")
     if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
         issues.append(
             WorkflowTaskValidationIssue(
                 code="invalid_step_type_value",
                 message=(
-                    "Workflow task step_type must be freeform, invoke_tool, gate, "
+                    "Workflow task step_type must be governed, invoke_tool, gate, "
                     "or coding_loop."
                 ),
                 path=_format_child_path(source_path, "step_type"),
@@ -723,7 +723,7 @@ def build_workflow_task_validation_report(
                 path=_format_child_path(source_path, "tool_invocations"),
             )
         )
-    elif step_type in {"freeform", "coding_loop"} and pre_step is not None:
+    elif step_type in {"governed", "coding_loop"} and pre_step is not None:
         issues.append(
             WorkflowTaskValidationIssue(
                 code="unexpected_pre_step",

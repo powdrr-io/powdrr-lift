@@ -80,7 +80,7 @@ task_templates:
   phase_type: plan_pr
   persona_id: engineer
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -143,7 +143,7 @@ task_templates:
   phase_type: review_specifications
   persona_id: specification-reviewer
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: architect
@@ -169,7 +169,7 @@ task_templates:
   phase_type: specify
   persona_id: architect
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: coder
@@ -271,7 +271,7 @@ task_templates:
   phase_type: review_pr
   persona_id: code-reviewer
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
@@ -302,7 +302,7 @@ task_templates:
   phase_type: resolve_findings
   persona_id: engineer
   actions: [edit, yaml_edit, file_management, read_document]
-  step_type: freeform
+  step_type: governed
   complexity: medium
   assignee_type: agent
   assignee_role: coder
@@ -390,7 +390,7 @@ task_templates:
   phase_type: publish_pr
   persona_id: engineering-manager
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer

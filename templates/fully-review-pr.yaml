@@ -9,7 +9,7 @@ how_to_fill_this_out:
 task_templates:
 - description: Review feature functionality and completeness
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
@@ -31,7 +31,7 @@ task_templates:
   - functionality-review-complete
 - description: Review feature test coverage
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
@@ -54,7 +54,7 @@ task_templates:
   - test-coverage-review-complete
 - description: Review pull request security
   actions: [invoke_skill]
-  step_type: freeform
+  step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: reviewer

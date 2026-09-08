@@ -9,5 +9,5 @@ assignee_role: reviewer
 output_state_type: no-change-state
 description: Recover after a no-change action
 workflow_template: execute-proposed-pr
-step_type: freeform
+step_type: governed
 

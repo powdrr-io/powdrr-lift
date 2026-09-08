@@ -11,7 +11,7 @@ assignee_role: architect
 output_state_type: detailed-execution-plan-state
 description: Create the execution plan
 workflow_template: execute-proposed-pr
-step_type: freeform
+step_type: governed
 details: >-
   Perform exactly one action: create the ordered execution plan from the supplied
   proposed PR context. Do not edit files, run commands, or rediscover context.

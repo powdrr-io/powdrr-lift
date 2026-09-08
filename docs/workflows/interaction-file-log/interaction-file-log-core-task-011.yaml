@@ -19,7 +19,7 @@ description: Review the final diff for scope
 workflow_template: execute-proposed-pr
 phase_type: review_pr
 persona_id: code-reviewer
-step_type: freeform
+step_type: governed
 details: 'Perform exactly one action: inspect the complete diff and identify debug
   code, generated artifacts, secrets, unrelated edits, or missing intended files.
   Do not edit or stage files. Use the structured Git intrinsic for status, never a

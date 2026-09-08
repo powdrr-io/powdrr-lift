@@ -17,7 +17,7 @@ description: Generate the planned tests
 workflow_template: execute-proposed-pr
 phase_type: build
 persona_id: engineer
-step_type: freeform
+step_type: governed
 details: 'Perform exactly one action: edit only the test files named by the execution
   plan. Add focused tests for the acceptance criteria and required edge cases; do
   not edit product code, run tests, or review unrelated files. Use one edit action,

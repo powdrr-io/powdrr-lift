@@ -179,6 +179,7 @@ def _run_with_inactivity_timeout(
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
     output: list[str] = []
+    pending = ""
     deadline = time.monotonic() + timeout
     try:
         while True:
@@ -194,8 +195,17 @@ def _run_with_inactivity_timeout(
                 continue
             chunk = os.read(process.stdout.fileno(), 4096)
             if chunk:
-                output.append(chunk.decode("utf-8", errors="replace"))
-                deadline = time.monotonic() + timeout
+                text = chunk.decode("utf-8", errors="replace")
+                output.append(text)
+                pending += text
+                lines = pending.splitlines(keepends=True)
+                pending = (
+                    lines.pop()
+                    if lines and not lines[-1].endswith(("\n", "\r"))
+                    else ""
+                )
+                if any(_is_semantic_progress(line) for line in lines):
+                    deadline = time.monotonic() + timeout
                 continue
             if process.poll() is not None:
                 break
@@ -204,6 +214,28 @@ def _run_with_inactivity_timeout(
         )
     finally:
         selector.close()
+
+
+def _is_semantic_progress(line: str) -> bool:
+    """Ignore per-token telemetry; reset only on workflow-level progress."""
+    stripped = line.strip()
+    if not stripped or stripped.startswith("received streamed LLM data"):
+        return False
+    if stripped.startswith(("waiting for ", "Status: waiting")):
+        return False
+    return any(
+        marker in stripped
+        for marker in (
+            "[workflow] roundtrip",
+            "[powdrr-file-added]",
+            "Workflow progress:",
+            "Workflow gate",
+            "Attempting file edit",
+            "✓",
+            "completed",
+            "passed",
+        )
+    )
 
 
 def run_agent_feature_e2e(

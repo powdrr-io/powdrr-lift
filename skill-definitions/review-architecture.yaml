@@ -1,5 +1,7 @@
 ---
 name: review-architecture
+inputs:
+- name: work-item-name
 interaction_style: observational_review
 when_to_use:
 - When new needs may require updating the current architecture specification.
@@ -49,6 +51,7 @@ steps:
   - name: architecture_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-architecture
   description: Fill the architecture specification with the required updates.
   actions: [edit, yaml_edit, file_management, read_document]
@@ -76,6 +79,7 @@ steps:
   - name: architecture_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-architecture
   description: Repair every reported architecture specification issue.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]

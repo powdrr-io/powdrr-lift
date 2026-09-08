@@ -1,5 +1,8 @@
 ---
 name: specify-implementation
+inputs:
+- name: work-item-name
+- name: architecture-id
 when_to_use:
 - When an architecture specification already exists and you need implementation detail.
 - When the TUI should guide the user through a synchronous implementation flow.
@@ -44,6 +47,7 @@ steps:
   - name: implementation_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-implementation
   description: Fill out the feature and decision sections so they stay aligned with
     the architecture id.
@@ -73,6 +77,7 @@ steps:
   - name: implementation_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-implementation
   description: Use yaml_edit to fix every issue reported by the implementation evaluator.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]

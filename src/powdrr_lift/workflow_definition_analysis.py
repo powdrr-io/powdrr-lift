@@ -268,6 +268,11 @@ def _validate_step_examples(
     issues: list[WorkflowDefinitionIssue] = []
     decoder = json.JSONDecoder()
     for match in _ACTION_START.finditer(details):
+        # A step description may embed an action inside another example. Only
+        # validate top-level action examples; output schemas cover nested data.
+        prefix = details[: match.start()]
+        if prefix.count("{") != prefix.count("}"):
+            continue
         try:
             action_data, _ = decoder.raw_decode(details[match.start() :])
         except json.JSONDecodeError as exc:
@@ -388,7 +393,13 @@ def _validate_handoffs(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIss
         changed = False
         for item in ir.steps:
             if item.index and item.predecessors:
-                incoming = [available_out[index] for index in item.predecessors]
+                incoming = [
+                    available_out[index]
+                    for index in item.predecessors
+                    if index < item.index
+                ]
+                if not incoming:
+                    continue
                 candidate = set.intersection(*(set(values) for values in incoming))
                 if available_in[item.index] != candidate:
                     available_in[item.index] = candidate
@@ -437,7 +448,10 @@ def _validate_handoffs(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIss
 
 
 def _guaranteed_outputs(step: SkillStep) -> set[str]:
-    outputs = {output.name for output in step.outputs if output.required_for_next_step}
+    # Handoff records persist in workflow state after publication.  A later
+    # step may therefore depend on any declared output, not only outputs marked
+    # as required for the immediate next step.
+    outputs = {output.name for output in step.outputs}
     if step.completion is not None:
         outputs.update(step.completion.required_outputs)
     return outputs

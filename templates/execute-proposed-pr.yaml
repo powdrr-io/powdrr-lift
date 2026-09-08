@@ -50,6 +50,7 @@ task_templates:
   llm_type: long_context
   input_state:
     proposed_pr: <proposed-pr-id>
+    verification-command: <verification-command>
     # This is the proposal directory under docs/proposals, not a semantic
     # feature entity ID from feature_ids or a nested features section.
     feature_id: <work-item-name>
@@ -270,7 +271,7 @@ task_templates:
 - description: Review the final diff for scope
   phase_type: review_pr
   persona_id: code-reviewer
-  actions: [edit, yaml_edit, file_management, read_document]
+  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
   step_type: governed
   complexity: medium
   assignee_type: agent
@@ -355,7 +356,7 @@ task_templates:
 - description: Verify the pull request file set
   phase_type: confirm_readiness
   persona_id: code-reviewer
-  actions: []
+  actions: [invoke_tool]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent

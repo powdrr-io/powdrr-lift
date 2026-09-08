@@ -1,5 +1,7 @@
 ---
 name: review-system
+inputs:
+- name: work-item-name
 interaction_style: observational_review
 when_to_use:
 - When new needs may require updating the current system specification.
@@ -45,6 +47,7 @@ steps:
   - name: system_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-system
   description: Fill the system requirements and approach sections.
   actions: [edit, yaml_edit, file_management, read_document]
@@ -72,6 +75,7 @@ steps:
   - name: system_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-system
   description: Repair every reported system specification issue.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]

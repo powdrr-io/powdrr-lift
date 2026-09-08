@@ -1,5 +1,7 @@
 ---
 name: finish-pr-prep
+inputs:
+- name: language-label
 when_to_use:
 - When staged changes must be validated immediately before creating or updating a
   pull request.
@@ -26,6 +28,7 @@ steps:
   - name: staged_repository_status
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - description: Confirm the staged pull request scope.
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed
@@ -72,6 +75,7 @@ steps:
   - name: validation_tool_obligations
     type: any
     required_for_next_step: true
+    schema: {type: array, items: {type: object}}
 - description: Run the final formatting, lint, type-check, and test passes.
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed
@@ -147,6 +151,8 @@ steps:
   - name: final_repository_state
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
   - name: readiness_report
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}

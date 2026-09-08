@@ -8,6 +8,29 @@ when_to_use:
   implementation begins.
 - When actionable design findings must be reported directly on GitHub as inline
   pull-request comments.
+inputs:
+- name: pr-reference
+- name: feature-id
+- name: number
+- name: owner
+- name: repo
+- name: current-head-sha
+- name: changed-file
+- name: changed-line
+- name: finding
+- name: mechanism-or-symbol
+- name: intent-finding
+- name: assumption-finding-and-question
+- name: traceability-finding
+- name: existing-mechanism-finding
+- name: refactoring-finding
+- name: unnecessary-scope-finding
+- name: security-finding-with-attack-path
+- name: performance-finding-with-workload
+- name: entity-lifecycle-finding
+- name: dependency-finding
+- name: compatibility-or-failure-finding
+- name: testability-or-operability-finding
 steps:
 - id: discover-design-scope
   description: Discover the pull request and establish the authoritative design scope.
@@ -42,6 +65,7 @@ steps:
   - name: design_review_ledger
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
   tool_invocations:
   - tool: gh
     command:

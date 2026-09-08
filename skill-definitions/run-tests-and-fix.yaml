@@ -13,6 +13,7 @@ steps:
   - name: test_tool_result
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
   pre_step:
     action: invoke_tool
     template:
@@ -37,6 +38,7 @@ steps:
   - name: enriched_test_result
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: diagnose-test-results
   description: Produce a traceback-supported diagnosis from structured test results.
   step_type: governed
@@ -55,6 +57,7 @@ steps:
   - name: test_diagnosis
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: produce-repair-edit
   description: Produce one deferred edit for all diagnosed failures.
   step_type: predicated
@@ -76,7 +79,7 @@ steps:
     repair_edit; do not apply it yet. Derive
     exact ranges from the returned numbered lines. The edit must be a complete
     canonical action object, never a partial edit or prose. Use this exact shape:
-    {"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}
+    {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit","file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}}}
     Every inner kind is the string add, remove, or replace. Never use line_number,
     content, or an object in kind. Include every required file in one file_edits
     array. Do not guess line 1, use traceback line numbers as edit ranges, or
@@ -85,7 +88,7 @@ steps:
     greater than or equal to start_line. Return outputs.repair_edit in the same
     JSON action object as the final action, for example:
     {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
-    "file_edits":[...]}}}. Do not return next_step; the runtime advances after
+    "file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}}}. Do not return next_step; the runtime advances after
     repair_edit is present.
     If no repair is needed, emit an edit object with an empty file_edits array
     and explain why in decisions_and_context.
@@ -138,6 +141,7 @@ steps:
   - name: edit_validation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-invalid-edit
   description: Correct the deferred edit using deterministic validation feedback.
   step_type: predicated
@@ -165,7 +169,7 @@ steps:
     never use line_number or content, and never apply files in this step.
     Return it in the top-level outputs object with an emit_outputs action, for
     example: {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
-    "file_edits":[...]}}}. Do not return next_step; the runtime advances after
+    "file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}}}. Do not return next_step; the runtime advances after
     repair_edit is present. The value must be the full corrected object, not a
     prose description.
   outputs:
@@ -212,6 +216,7 @@ steps:
   - name: applied_edit
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: rerun-all-tests
   description: Rerun the complete suite after applying the repair.
   step_type: gate
@@ -226,7 +231,12 @@ steps:
     template:
       tool: shell
       command: [uv, run, --extra, dev, pytest, -q]
+  outputs:
+  - name: test_tool_result
+    type: any
+    required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
   gate:
     outcome: {path: returncode, equals: 0}
-    goto_step: diagnose-test-results
+    goto_step: enrich-test-results
     retry_context: The repaired suite still fails; diagnose the new result and produce a different deferred edit.

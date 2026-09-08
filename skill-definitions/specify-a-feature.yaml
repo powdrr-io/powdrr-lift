@@ -1,5 +1,7 @@
 ---
 name: specify-a-feature
+inputs:
+- name: pull-request-title
 when_to_use:
 - When the user needs a concrete feature plan.
 - When the flow must gather context and drive implementation.
@@ -23,6 +25,7 @@ steps:
   - name: work_item_name
     type: string
     required_for_next_step: true
+    schema: {type: string}
 - id: capture-feature-context
   description: Capture the feature goal and success criteria.
   actions: [edit, yaml_edit, file_management, read_document]
@@ -59,6 +62,7 @@ steps:
   - name: system_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-system-specification
   description: Fill the system requirements and approach.
   actions: [edit, yaml_edit, file_management, read_document]
@@ -124,6 +128,7 @@ steps:
   - name: architecture_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-architecture-specification
   description: Fill the architecture entities and relationships.
   actions: [edit, yaml_edit, file_management, read_document]
@@ -190,6 +195,7 @@ steps:
   - name: implementation_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-implementation-specification
   description: Fill the implementation features and decisions.
   actions: [edit, yaml_edit, file_management, read_document]
@@ -239,6 +245,7 @@ steps:
   - name: specification_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-feature-specifications
   description: Fix every reported specification issue with yaml_edit.
   actions: [edit, yaml_edit, file_management, read_document, gather_context, goto_step]

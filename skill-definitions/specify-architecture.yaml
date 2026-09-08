@@ -1,5 +1,8 @@
 ---
 name: specify-architecture
+inputs:
+- name: work-item-name
+- name: allowed-type
 when_to_use:
 - When the work item already has requirements and approach and needs an architecture
   specification.
@@ -39,6 +42,7 @@ steps:
   - name: architecture_specification_template
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: fill-architecture
   description: Fill out entities, relationships, invariants, and guidance using only
     the allowed entity types.
@@ -69,6 +73,7 @@ steps:
   - name: architecture_evaluation
     type: any
     required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: repair-architecture
   description: Use yaml_edit to fix every issue reported by the architecture evaluator.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]

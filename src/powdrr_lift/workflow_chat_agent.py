@@ -189,6 +189,8 @@ _MAX_PROMPT_FILE_LINES = 200
 _MAX_PROMPT_FILE_CHARS = 16000
 _MAX_PROMPT_STEP_CONTEXT_ENTRIES = 24
 _MAX_PROMPT_STEP_CONTEXT_CHARS = 16000
+_MAX_STREAM_CHUNKS = 4096
+_MAX_STREAM_CONTENT_CHARS = 131072
 _MAX_REPEATED_REPAIR_ATTEMPTS = 5
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 _INTERNAL_TOOL = "internal"
@@ -2354,6 +2356,7 @@ def _read_openai_response(
     response_metadata: dict[str, Any] | None = None
     event_data: list[str] = []
     chunk_count = 0
+    stream_complete = False
     while True:
         line = response.readline()
         if not line:
@@ -2368,6 +2371,7 @@ def _read_openai_response(
         event_payload = "\n".join(event_data)
         event_data.clear()
         if event_payload == "[DONE]":
+            stream_complete = True
             break
         try:
             event = json.loads(event_payload)
@@ -2385,6 +2389,8 @@ def _read_openai_response(
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
             continue
+        if first_choice.get("finish_reason") is not None:
+            stream_complete = True
         delta = first_choice.get("delta")
         if not isinstance(delta, dict):
             continue
@@ -2392,6 +2398,17 @@ def _read_openai_response(
         if isinstance(content, str):
             content_parts.append(content)
             chunk_count += 1
+            content_length = sum(len(part) for part in content_parts)
+            if (
+                chunk_count > _MAX_STREAM_CHUNKS
+                or content_length > _MAX_STREAM_CONTENT_CHARS
+            ):
+                excerpt = "".join(content_parts)[:256]
+                raise _ModelUnavailableError(
+                    "OpenAI streaming response exceeded the bounded output limit "
+                    f"({chunk_count} chunks, {content_length} characters); "
+                    f"partial content prefix: {excerpt!r}"
+                )
             if progress_stream is not None:
                 print(
                     f"received streamed LLM data ({chunk_count} chunks)...",
@@ -2405,6 +2422,11 @@ def _read_openai_response(
         )
     if not content_parts:
         raise PowdrrExecutionError("OpenAI streaming response content was empty.")
+    if not stream_complete:
+        raise _ModelUnavailableError(
+            "OpenAI streaming response ended before a completion marker; "
+            f"received {chunk_count} content chunks"
+        )
     response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
     return json.dumps(response_metadata)
 
@@ -10042,6 +10064,8 @@ def _complete_json_with_repair(
         except RuntimeError as exc:
             if error_recorder is not None:
                 error_recorder(exc, None)
+            if isinstance(exc, _ModelUnavailableError):
+                raise
             if isinstance(exc, LocalModelRuntimeError):
                 raise
             if _is_model_unavailable_error(exc):

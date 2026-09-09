@@ -909,6 +909,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
     clean_room_repair_pending: bool = False
+    clean_room_repair_used: bool = False
     repair_prompt_manifest: RepairPromptManifest | None = None
 
     @property
@@ -1137,6 +1138,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 or self.state.step_checkpoint.identity != checkpoint_identity
             ):
                 self.state.stalled_step_context = []
+                self.clean_room_repair_used = False
                 self.repair_prompt_manifest = None
                 _begin_step_checkpoint(
                     self.state,
@@ -1296,7 +1298,29 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             request_action = None
             if self.clean_room_repair_pending:
+                if self.clean_room_repair_used:
+                    self.clean_room_repair_pending = False
+                    self.state.execution_events.append(
+                        {
+                            "kind": "repair_exhausted",
+                            "stage": "clean_room",
+                            "step_index": self.current_step_index,
+                            "reason": (
+                                "The clean-room repair budget for this step was "
+                                "already consumed."
+                            ),
+                        }
+                    )
+                    raise PowdrrExecutionError(
+                        "Workflow repair exhausted after one clean-room attempt.",
+                        error_code="semantic_repair_exhausted",
+                        remediation=(
+                            "Review rejected strategies and provide a deterministic "
+                            "action or revise the step contract."
+                        ),
+                    )
                 self.clean_room_repair_pending = False
+                self.clean_room_repair_used = True
                 recovery_context = {
                     "objective": self.current_step.description,
                     "step": _current_step_contract(self.current_step),

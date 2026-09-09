@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 
@@ -304,10 +304,10 @@ steps:
 
     report = analyze_workflow_definition(definition)
 
-    assert report.validation_successful
+    assert not report.validation_successful
     issues = {issue.code: issue for issue in report.issues}
-    assert issues["model_owned_deterministic_action"].severity == "warning"
-    assert issues["idempotent_action_without_auto_advance"].severity == "warning"
+    assert issues["model_owned_deterministic_action"].severity == "error"
+    assert issues["idempotent_action_without_auto_advance"].severity == "error"
 
 
 def test_definition_analysis_warns_on_non_progress_cycle(tmp_path: Path) -> None:
@@ -347,14 +347,14 @@ steps:
         encoding="utf-8",
     )
     stdout = StringIO()
+    stderr = StringIO()
 
-    with redirect_stdout(stdout):
+    with redirect_stdout(stdout), redirect_stderr(stderr):
         exit_code = main(["validate-workflow-definition", str(definition)])
 
-    assert exit_code == 0
-    output = stdout.getvalue()
-    assert "Workflow definition valid" in output
-    assert "idempotent_action_without_auto_advance" in output
+    assert exit_code == 1
+    assert "Workflow definition invalid" in stderr.getvalue()
+    assert "idempotent_action_without_auto_advance" in stderr.getvalue()
 
 
 def test_definition_analysis_warns_on_repeated_read_cycle(tmp_path: Path) -> None:

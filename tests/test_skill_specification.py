@@ -359,6 +359,9 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("design-interview.yaml", 20),
                 ("design-interview.yaml", 22),
                 ("design-interview.yaml", 23),
+                ("bootstrap-code-structure.yaml", 5),
+                ("review-skill-workflow.yaml", 8),
+                ("specify-a-feature.yaml", 16),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -964,13 +967,13 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
         "evaluate",
         "docs/proposals/<work-item-name>",
     ]
-    assert [
-        invocation.command
-        for invocation in step("stage-specification-artifacts").tool_invocations
-    ] == [
-        ("powdrr-lift", "repository-state"),
-        ("add", "docs/proposals/<work-item-name>"),
-    ]
+    stage = step("stage-specification-artifacts")
+    assert stage.pre_step is not None
+    assert stage.pre_step.template == {
+        "tool": "git",
+        "operation": "add",
+        "paths": ["docs/proposals/<work-item-name>"],
+    }
     assert uses_skill_name(step("prepare-pull-request")) == "finish-pr-prep"
     assert uses_skill_name(step("create-feature-pull-request")) == "create-pull-request"
 
@@ -1127,10 +1130,12 @@ def test_review_skill_workflow_ends_with_pull_request_creation() -> None:
         "<target-definition-path>",
     )
     assert "choose `complete`" in (skill.steps[-4].details or "")
-    assert skill.steps[-3].tool_invocations[0].command == (
-        "add",
-        "<target-definition-path>",
-    )
+    assert skill.steps[-3].pre_step is not None
+    assert skill.steps[-3].pre_step.template == {
+        "tool": "git",
+        "operation": "add",
+        "paths": ["<target-definition-path>"],
+    }
     assert uses_skill_name(skill.steps[-2]) == "finish-pr-prep"
     assert uses_skill_name(skill.steps[-1]) == "create-pull-request"
     assert "skill-workflow-review" in (skill.steps[-1].details or "")

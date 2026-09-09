@@ -314,7 +314,8 @@ def _validate_liveness(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIss
             continue
         for invocation in step.tool_invocations:
             effect = capability_effect(invocation.to_data())
-            if not is_fixed_deterministic(effect):
+            invocation_data = invocation.to_data()
+            if not is_fixed_deterministic(effect) or _has_placeholder(invocation_data):
                 continue
             step_path = f"{path}.steps[{item.index}]"
             operation = effect.operation if effect is not None else "operation"
@@ -326,7 +327,7 @@ def _validate_liveness(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIss
                         "tool invocation. Move it to a deterministic pre-step or "
                         "declare why LLM judgment is required.",
                         f"{step_path}.tool_invocations",
-                        severity="warning",
+                        severity="error",
                     )
                 )
             if is_idempotent(effect) and step.completion is None:
@@ -338,7 +339,7 @@ def _validate_liveness(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIss
                         "it to a runner-owned pre-step or add a machine-owned "
                         "success transition.",
                         f"{step_path}.tool_invocations",
-                        severity="warning",
+                        severity="error",
                         remediation="Convert the action to a runner-owned pre-step or add a machine-owned success transition.",
                     )
                 )
@@ -346,6 +347,10 @@ def _validate_liveness(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIss
     issues.extend(_validate_abstract_graph(ir, path))
     issues.extend(_validate_non_progress_cycles(ir, path))
     return issues
+
+
+def _has_placeholder(value: Any) -> bool:
+    return any("<" in text and ">" in text for _, text in _walk_strings(value))
 
 
 def _validate_unknown_effects(

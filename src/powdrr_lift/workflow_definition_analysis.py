@@ -299,6 +299,7 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                 if ir is not None:
                     issues.extend(_validate_handoffs(ir, path))
                     issues.extend(_validate_liveness(ir, path))
+                    issues.extend(_validate_rendered_prompt_contract(skill, path))
             else:
                 issues.extend(_validate_raw_liveness(data, path))
     return WorkflowDefinitionReport(path, kind, tuple(issues))
@@ -499,11 +500,19 @@ def compare_prompt_snapshot_contract(
 ) -> tuple[WorkflowDefinitionIssue, ...]:
     """Compare a rendered prompt snapshot with the structured step authority."""
     messages = snapshot.get("messages", [])
-    text = "\n".join(
+    contents = [
         str(message.get("content", ""))
         for message in messages
-        if isinstance(message, Mapping)
-    )
+        if isinstance(message, Mapping) and message.get("role") == "user"
+    ]
+    details = step.details or step.description
+    relevant = [content for content in contents if details in content]
+    if not relevant:
+        return ()
+    # The production prompt may include global action catalogs and policy
+    # prose. Compare only the step's own rendered authority, never those
+    # shared catalogs, so a catalog entry cannot create a false contradiction.
+    text = details
     declared = set(step.actions)
     declared.update(
         invocation.operation or (invocation.command[0] if invocation.command else "")
@@ -526,6 +535,44 @@ def compare_prompt_snapshot_contract(
                 )
             )
     return tuple(issues)
+
+
+def _validate_rendered_prompt_contract(
+    skill: Skill, definition_path: Path
+) -> list[WorkflowDefinitionIssue]:
+    """Run prompt-contract checks in memory using the production prompt builder."""
+    try:
+        from powdrr_lift.workflow_chat_agent import (
+            SkillCatalogEntry,
+            _build_step_execution_messages,
+        )
+
+        entry = SkillCatalogEntry(definition_path, skill)
+        issues: list[WorkflowDefinitionIssue] = []
+        for index, step in enumerate(skill.steps):
+            messages = _build_step_execution_messages(
+                selected_skill=entry,
+                current_step=step,
+                current_step_index=index,
+                transcript=[{"role": "user", "content": "<root-intent>"}],
+                execution_events=[],
+                execution_context=[],
+                handoff_records={},
+                durable_facts={},
+                current_file_path=None,
+                worktree_root=resolve_repo_root(None),
+                catalog=(entry,),
+            )
+            issues.extend(
+                compare_prompt_snapshot_contract(
+                    step,
+                    {"messages": messages},
+                    f"{definition_path}.steps[{index}]",
+                )
+            )
+        return issues
+    except (ImportError, OSError, RuntimeError, ValueError):
+        return []
 
 
 def _validate_template_liveness(

@@ -15,7 +15,7 @@ does not create files, invoke tools, contact providers, or mutate Git state.
 | Coding-loop bounds | positive bound and stopping-condition checks | unbounded-loop fixture |
 | Nested skills | call graph SCCs, required outputs, effect summaries | nested-call validation path |
 | Templates | symbolic checks plus pure representative placeholder instantiation | template validation path |
-| Prompt authority | prose checks plus rendered-snapshot contract comparison helper | forbidden-action fixture |
+| Prompt authority | prose checks plus in-memory production rendered-snapshot contract comparison during validation | forbidden-action fixture |
 | Baselines and CI | versioned owner/reason/expiry baseline schema; errors are never suppressible | baseline suppression fixture; CI invokes `--baseline` |
 | Diagnostics and CLI | stable codes, severity, state, cycle, entry path, remediation; JSON and text output | CLI and JSON tests |
 

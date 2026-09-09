@@ -39,6 +39,26 @@ steps:
     assert report.validation_successful
 
 
+def test_definition_analysis_covers_instantiated_tasks_and_workflow_metadata() -> None:
+    repository_root = Path(__file__).parents[1]
+    task = (
+        repository_root
+        / "docs/workflows/interaction-file-log/interaction-file-log-core-task-001.yaml"
+    )
+    workflow = (
+        repository_root
+        / "docs/workflows/interaction-file-log/interaction-file-log-core-workflow.yaml"
+    )
+
+    task_report = analyze_workflow_definition(task)
+    workflow_report = analyze_workflow_definition(workflow)
+
+    assert task_report.kind == "workflow_task"
+    assert task_report.validation_successful
+    assert workflow_report.kind == "workflow_instance"
+    assert workflow_report.validation_successful
+
+
 def test_definition_analysis_reports_invalid_examples_and_unbound_placeholders(
     tmp_path: Path,
 ) -> None:

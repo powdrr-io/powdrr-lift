@@ -5951,7 +5951,10 @@ def _modular_action_system_prompt(
             'of mapping keys, such as ["title"] or ["metadata","owner"], never a '
             "JSON pointer such as /title. For list sections, use one upsert_item per "
             "item with section, id, and a complete value mapping. Return yaml_edit "
-            'directly with action="yaml_edit"; never wrap it in invoke_tool.\n'
+            'directly with action="yaml_edit"; never wrap it in invoke_tool. '
+            "Before proposing yaml_edit, verify that file_path exists using the "
+            "declared read/list action or a generator result; yaml_edit cannot create "
+            "a missing document, and inventing a filename is invalid.\n"
         )
     if current_step.tool_invocations and "invoke_tool" in action_names:
         prompt += (
@@ -11263,6 +11266,14 @@ def _workflow_edit_failure_feedback(
             "If the structural operations cannot express the repair, use a normal "
             "edit with exact line ranges, preserve YAML indentation and section "
             "headers, and rerun the validator."
+        )
+    if action.kind == "yaml_edit" and "does not exist" in str(error):
+        feedback += (
+            " This target is absent and no change was applied. yaml_edit cannot "
+            "create a document: do not retry this file_path or invent a name such "
+            "as requirements.yaml. First use the declared read/list or generator "
+            "action to identify or create the exact repository-relative YAML path, "
+            "then apply yaml_edit to that existing path."
         )
     return feedback
 

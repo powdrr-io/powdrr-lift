@@ -5126,6 +5126,35 @@ def test_edit_failure_feedback_distinguishes_yaml_from_range_errors() -> None:
     assert "current file has 70 lines" in range_feedback
 
 
+def test_missing_yaml_feedback_requires_discovery_before_retry() -> None:
+    action = _parse_action_response(
+        {
+            "action": "yaml_edit",
+            "file_path": "requirements.yaml",
+            "operations": [
+                {
+                    "op": "upsert_item",
+                    "section": "requirements",
+                    "id": "req-1",
+                    "value": {"description": "record interactions"},
+                }
+            ],
+        }
+    )
+
+    feedback = _workflow_edit_failure_feedback(
+        action,
+        PowdrrExecutionError(
+            "yaml_edit target 'requirements.yaml' does not exist; no file was changed."
+        ),
+        None,
+    )
+
+    assert "yaml_edit cannot create a document" in feedback
+    assert "do not retry this file_path" in feedback
+    assert "declared read/list or generator action" in feedback
+
+
 def test_action_repair_prompt_includes_the_rejected_edit() -> None:
     action = _parse_action_response(
         {

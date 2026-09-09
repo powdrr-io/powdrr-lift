@@ -1236,6 +1236,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     definition_validation_parser.add_argument("definition", type=Path)
     definition_validation_parser.add_argument("--json", action="store_true")
+    definition_validation_parser.add_argument(
+        "--liveness", action="store_true", help="Enable static liveness diagnostics."
+    )
     definition_validation_parser.set_defaults(func=_run_validate_workflow_definition)
 
     definitions_validation_parser = subparsers.add_parser(
@@ -1245,6 +1248,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     definitions_validation_parser.add_argument("paths", nargs="+", type=Path)
     definitions_validation_parser.add_argument("--json", action="store_true")
+    definitions_validation_parser.add_argument(
+        "--liveness", action="store_true", help="Enable static liveness diagnostics."
+    )
     definitions_validation_parser.set_defaults(func=_run_validate_workflow_definitions)
 
     prompt_snapshot_parser = subparsers.add_parser(

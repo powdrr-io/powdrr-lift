@@ -269,6 +269,9 @@ steps:
       required_outputs: [answer]
     outputs:
       - name: answer
+        schema: {type: string}
+    outputs:
+      - name: answer
         required_for_next_step: true
         schema: {type: string}
     details: 'Return {"action":"next_step"}.'
@@ -352,3 +355,95 @@ steps:
     output = stdout.getvalue()
     assert "Workflow definition valid" in output
     assert "idempotent_action_without_auto_advance" in output
+
+
+def test_definition_analysis_warns_on_repeated_read_cycle(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: read-loop
+when_to_use: [Read repeatedly.]
+steps:
+  - id: read
+    description: Read the same document.
+    actions: [read_document]
+    next_step_override: read
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "non_progress_cycle" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_reports_unobservable_completion(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: missing-output
+when_to_use: [Complete.]
+steps:
+  - id: complete
+    description: Complete only when a missing output exists.
+    step_type: predicated
+    completion:
+      required_outputs: [answer]
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "unobservable_completion" in {issue.code for issue in report.issues}
+    assert "terminal_state_without_completion" in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_definition_analysis_reports_unbounded_coding_loop(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: loop
+when_to_use: [Loop.]
+steps:
+  - id: loop
+    description: Keep coding forever.
+    step_type: coding_loop
+    coding_loop:
+      goal: Make changes.
+      verification: [{id: check, command: check}]
+      stopping_conditions: [verified]
+      max_iterations: 0
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "unbounded_coding_loop" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_reports_unknown_shell_effect(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: shell
+when_to_use: [Run a command.]
+steps:
+  - id: run
+    description: Run a command.
+    tool_invocations:
+      - tool: shell
+        command: [custom-command]
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    issue = next(
+        issue for issue in report.issues if issue.code == "unknown_shell_effect"
+    )
+    assert issue.severity == "warning"

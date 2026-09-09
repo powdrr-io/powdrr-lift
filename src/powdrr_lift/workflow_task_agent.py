@@ -5,9 +5,10 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
+from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -124,9 +125,11 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMTimeoutExhausted,
     WorkflowStepRunner,
     assert_material_repair_prompt,
-    build_clean_room_repair_prompt,
+    build_clean_room_action_parameters_prompt,
+    build_clean_room_action_selection_prompt,
     build_repair_prompt_manifest,
     complete_json_with_timeout_retry,
+    complete_two_pass_action,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_signature,
@@ -358,6 +361,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def next_request(self) -> WorkflowActionRequest:
         while True:
+            selection_messages = None
+            selection_schema = None
+            parameter_messages_for = None
+            parameter_schema_for = None
             messages = _build_task_messages(
                 self.workflow,
                 self.task,
@@ -401,22 +408,53 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         }
                     ],
                 }
-                clean_messages, manifest = build_clean_room_repair_prompt(
-                    context=json.dumps(
-                        recovery_context, ensure_ascii=False, separators=(",", ":")
-                    ),
-                    error_message=(
-                        self.response_correction
-                        or "The previous workflow strategy failed to make progress."
-                    ),
-                    repair_instructions=(
-                        "Choose one legal action that materially advances the task. "
-                        "Do not repeat a rejected strategy. Return the complete "
-                        "workflow action object."
-                    ),
-                    allowed_actions=allowed_actions,
-                    model=self.model,
+                context_json = json.dumps(
+                    recovery_context, ensure_ascii=False, separators=(",", ":")
                 )
+                error_message = self.response_correction or (
+                    "The previous workflow strategy failed to make progress."
+                )
+                selection_messages, selection_schema, manifest = (
+                    build_clean_room_action_selection_prompt(
+                        context=context_json,
+                        error_message=error_message,
+                        allowed_actions=allowed_actions,
+                        model=self.model,
+                    )
+                )
+
+                def parameter_schema_for(selected_action: str) -> Mapping[str, Any]:
+                    return {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": [selected_action],
+                            }
+                        },
+                        "required": ["action"],
+                        "additionalProperties": True,
+                    }
+
+                def _parameter_messages(
+                    selected_action: str,
+                    context: str = context_json,
+                    error: str = error_message,
+                    schema_for: Callable[
+                        [str], Mapping[str, Any]
+                    ] = parameter_schema_for,
+                    model: str = self.model,
+                ) -> list[dict[str, str]]:
+                    parameter_messages, _ = build_clean_room_action_parameters_prompt(
+                        context=context,
+                        error_message=error,
+                        selected_action=selected_action,
+                        response_schema=schema_for(selected_action),
+                        model=model,
+                    )
+                    return parameter_messages
+
+                parameter_messages_for = _parameter_messages
                 if self.repair_prompt_manifest is None:
                     raise ProgrammerInvariantError(
                         "Clean-room repair requested without a prior task prompt "
@@ -427,12 +465,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.events.append(
                     {
                         "kind": "repair_attempt",
-                        "stage": "clean_room",
+                        "stage": "clean_room_action_selection",
                         "prompt_manifest": manifest.to_data(),
                     }
                 )
                 self.repair_prompt_manifest = manifest
-                messages = clean_messages
+                messages = selection_messages
             else:
                 self.repair_prompt_manifest = build_repair_prompt_manifest(
                     messages,
@@ -475,6 +513,19 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 and estimated_input_tokens + 1024 < limits.context_window
             ):
                 _print_waiting_for_model(self.stderr, self.model)
+                request_action = None
+                if selection_messages is not None:
+                    assert selection_schema is not None
+                    assert parameter_messages_for is not None
+                    assert parameter_schema_for is not None
+                    request_action = partial(
+                        self._request_two_pass_action,
+                        selection_messages,
+                        selection_schema=selection_schema,
+                        parameter_messages_for=parameter_messages_for,
+                        parameter_schema_for=parameter_schema_for,
+                        allowed_actions=allowed_actions,
+                    )
                 return WorkflowActionRequest(
                     client=self.client,
                     messages=messages,
@@ -483,6 +534,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stderr=self.stderr,
                     max_timeout_retries=self.config.max_timeout_retries,
                     timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                    request_action=request_action,
                 )
 
             print(
@@ -522,6 +574,29 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 flush=True,
             )
             self.response_correction = None
+
+    def _request_two_pass_action(
+        self,
+        selection_messages: list[dict[str, str]],
+        *,
+        selection_schema: Mapping[str, Any],
+        parameter_messages_for: Callable[[str], list[dict[str, str]]],
+        parameter_schema_for: Callable[[str], Mapping[str, Any]],
+        allowed_actions: Sequence[str],
+    ) -> WorkflowAction:
+        return complete_two_pass_action(
+            self.client,
+            selection_messages=selection_messages,
+            selection_schema=selection_schema,
+            parameter_messages_for=parameter_messages_for,
+            parameter_schema_for=parameter_schema_for,
+            parser=_parse_action_response,
+            allowed_actions=allowed_actions,
+            model=self.model,
+            stderr=self.stderr,
+            max_timeout_retries=self.config.max_timeout_retries,
+            timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+        )
 
     def material_state(self, action: WorkflowAction) -> object:
         return _task_action_material_state(action, self.repo_root)

@@ -231,6 +231,198 @@ def build_clean_room_repair_prompt(
     )
 
 
+def build_clean_room_action_selection_prompt(
+    *,
+    context: str,
+    error_message: str,
+    allowed_actions: Sequence[str],
+    model: str = "",
+) -> tuple[list[dict[str, str]], Mapping[str, Any], RepairPromptManifest]:
+    """Build the first pass of constrained recovery: choose a legal action kind."""
+    actions = tuple(dict.fromkeys(allowed_actions))
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": list(actions)},
+        },
+        "required": ["action"],
+        "additionalProperties": False,
+    }
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are selecting a recovery action for a stalled workflow. "
+                "Choose exactly one action name from the supplied enum. Do not "
+                "provide parameters, prose, or a complete action object."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "execution_mode": "clean_room_repair",
+                    "repair_stage": "action_selection",
+                    "context": context,
+                    "failure": error_message,
+                    "allowed_actions": list(actions),
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+        },
+    ]
+    manifest = build_repair_prompt_manifest(
+        messages,
+        profile="constrained_action_selection",
+        source_sections=("context", "failure", "allowed_actions"),
+        history_policy="none",
+        allowed_actions=actions,
+        response_schema=schema,
+        reasoning_mode="action_selection",
+        model=model,
+    )
+    return messages, schema, manifest
+
+
+def build_clean_room_action_parameters_prompt(
+    *,
+    context: str,
+    error_message: str,
+    selected_action: str,
+    response_schema: Mapping[str, Any],
+    model: str = "",
+) -> tuple[list[dict[str, str]], RepairPromptManifest]:
+    """Build the second pass of recovery for one already-selected action."""
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are supplying parameters for one previously selected workflow "
+                "action. Return exactly one complete JSON action object. The action "
+                f"must be {selected_action!r}; do not choose another action, add "
+                "prose, or return markdown."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "execution_mode": "clean_room_repair",
+                    "repair_stage": "action_parameters",
+                    "selected_action": selected_action,
+                    "context": context,
+                    "failure": error_message,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+        },
+    ]
+    manifest = build_repair_prompt_manifest(
+        messages,
+        profile="constrained_action_parameters",
+        source_sections=("context", "failure", "selected_action"),
+        history_policy="none",
+        allowed_actions=(selected_action,),
+        response_schema=response_schema,
+        reasoning_mode="action_parameters",
+        model=model,
+    )
+    return messages, manifest
+
+
+def complete_two_pass_action(
+    client: WorkflowLLMClient,
+    *,
+    selection_messages: list[dict[str, str]],
+    selection_schema: Mapping[str, Any],
+    parameter_messages_for: Callable[[str], list[dict[str, str]]],
+    parameter_schema_for: Callable[[str], Mapping[str, Any]],
+    parser: Callable[[dict[str, Any]], Any],
+    allowed_actions: Sequence[str],
+    model: str,
+    stderr: Any,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
+) -> Any:
+    """Select an action kind, then request only that action's payload.
+
+    A complete payload from a scripted/legacy client remains accepted so the
+    recovery contract can be introduced without breaking deterministic tests.
+    Provider-backed recovery still uses two calls whenever the first response is
+    only an action selection.
+    """
+    selection = complete_json_with_timeout_retry(
+        client,
+        selection_messages,
+        model=model,
+        stderr=stderr,
+        max_timeout_retries=max_timeout_retries,
+        timeout_backoff_seconds=timeout_backoff_seconds,
+        response_schema=selection_schema,
+    )
+    selected = selection.get("action")
+    actions = tuple(dict.fromkeys(allowed_actions))
+    if not isinstance(selected, str) or (actions and selected not in actions):
+        raise RuntimeError("Recovery action selection was not a legal action name.")
+    if (
+        len(selection) > 1
+        or not actions
+        or selected in {"next_step", "complete", "emit_outputs"}
+    ):
+        return parser(selection)
+    payload = complete_json_with_timeout_retry(
+        client,
+        parameter_messages_for(selected),
+        model=model,
+        stderr=stderr,
+        max_timeout_retries=max_timeout_retries,
+        timeout_backoff_seconds=timeout_backoff_seconds,
+        response_schema=parameter_schema_for(selected),
+    )
+    if payload.get("action") != selected:
+        raise RuntimeError(
+            f"Recovery parameter response selected {payload.get('action')!r}; "
+            f"expected {selected!r}."
+        )
+    return parser(payload)
+
+
+def constrain_action_response_schema(
+    response_schema: Mapping[str, Any], selected_action: str
+) -> dict[str, Any]:
+    """Return a provider schema containing only the selected action's fields."""
+    schema = json.loads(json.dumps(response_schema))
+    properties = schema.get("properties", {})
+    common = {name for name in ("action", "decisions_and_context", "llm_type")}
+    fields_by_action = {
+        "gather_context": {"types", "feature_id", "keywords", "filters"},
+        "prompt_user": {"text"},
+        "edit": {"file_path", "edits", "file_edits"},
+        "yaml_edit": {"file_path", "operations"},
+        "file_management": {"operation", "file_path", "destination_path"},
+        "invoke_skill": {"skill", "provider_role", "clean", "context"},
+        "invoke_tool": {"tool", "parameters"},
+        "read_document": {"file_path", "start_line", "end_line"},
+        "list_files": {"directory", "pattern", "recursive"},
+        "goto_step": {"step_id"},
+        "next_step": {"output_state"},
+        "complete": {"text"},
+        "emit_outputs": {"outputs"},
+    }
+    keep = common | fields_by_action.get(selected_action, set())
+    schema["properties"] = {
+        name: value for name, value in properties.items() if name in keep
+    }
+    action_schema = schema["properties"].get("action", {})
+    schema["properties"]["action"] = {**action_schema, "enum": [selected_action]}
+    schema["required"] = [name for name in schema.get("required", []) if name in keep]
+    if "action" not in schema["required"]:
+        schema["required"].insert(0, "action")
+    return schema
+
+
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 

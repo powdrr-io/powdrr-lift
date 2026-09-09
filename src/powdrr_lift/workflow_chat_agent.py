@@ -120,8 +120,11 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMHTTPError,
     WorkflowStepRunner,
     assert_material_repair_prompt,
-    build_clean_room_repair_prompt,
+    build_clean_room_action_parameters_prompt,
+    build_clean_room_action_selection_prompt,
     build_repair_prompt_manifest,
+    complete_two_pass_action,
+    constrain_action_response_schema,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_failure_signature,
@@ -1291,6 +1294,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             response_parser = partial(
                 _parse_action_response_with_schema, schema=response_schema
             )
+            request_action = None
             if self.clean_room_repair_pending:
                 self.clean_room_repair_pending = False
                 recovery_context = {
@@ -1304,22 +1308,54 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "rejected_strategies": self.state.stalled_step_context,
                     "allowed_actions": list(_declared_action_names(self.current_step)),
                 }
-                messages, manifest = build_clean_room_repair_prompt(
-                    context=json.dumps(
-                        recovery_context, ensure_ascii=False, separators=(",", ":")
-                    ),
-                    error_message=(
-                        self.last_validation_error
-                        or "The previous strategy made no material progress."
-                    ),
-                    repair_instructions=(
-                        "Choose a materially different legal action. Do not repeat "
-                        "any rejected strategy. Return the complete action object."
-                    ),
-                    response_schema=response_schema,
-                    allowed_actions=_declared_action_names(self.current_step),
-                    model=self.current_model,
+                context_json = json.dumps(
+                    recovery_context, ensure_ascii=False, separators=(",", ":")
                 )
+                selection_messages, selection_schema, manifest = (
+                    build_clean_room_action_selection_prompt(
+                        context=context_json,
+                        error_message=(
+                            self.last_validation_error
+                            or "The previous strategy made no material progress."
+                        ),
+                        allowed_actions=_declared_action_names(self.current_step),
+                        model=self.current_model,
+                    )
+                )
+                parameter_context = context_json
+                parameter_error = (
+                    self.last_validation_error
+                    or "The previous strategy made no material progress."
+                )
+
+                def parameter_messages_for(
+                    selected_action: str,
+                    context: str = parameter_context,
+                    error: str = parameter_error,
+                    schema: Mapping[str, Any] = response_schema,
+                    model: str = self.current_model,
+                ) -> list[dict[str, str]]:
+                    parameter_messages, _parameter_manifest = (
+                        build_clean_room_action_parameters_prompt(
+                            context=context,
+                            error_message=error,
+                            selected_action=selected_action,
+                            response_schema=constrain_action_response_schema(
+                                schema, selected_action
+                            ),
+                            model=model,
+                        )
+                    )
+                    return parameter_messages
+
+                def parameter_schema_for(
+                    selected_action: str, schema: Mapping[str, Any] = response_schema
+                ) -> Mapping[str, Any]:
+                    return constrain_action_response_schema(schema, selected_action)
+
+                messages = selection_messages
+                # The manifest records the first, deliberately constrained pass;
+                # the parameter pass is recorded when the request is executed.
                 if self.repair_prompt_manifest is None:
                     raise RuntimeError(
                         "Clean-room repair requested without a prior prompt manifest."
@@ -1328,12 +1364,21 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.state.execution_events.append(
                     {
                         "kind": "repair_attempt",
-                        "stage": "clean_room",
+                        "stage": "clean_room_action_selection",
                         "step_index": self.current_step_index,
                         "prompt_manifest": manifest.to_data(),
                     }
                 )
                 self.repair_prompt_manifest = manifest
+                request_action = partial(
+                    self._request_two_pass_action,
+                    selection_messages,
+                    selection_schema=selection_schema,
+                    parameter_messages_for=parameter_messages_for,
+                    parameter_schema_for=parameter_schema_for,
+                    parser=response_parser,
+                    allowed_actions=_declared_action_names(self.current_step),
+                )
             else:
                 messages = _build_step_execution_messages(
                     selected_skill=self.selected_skill,
@@ -1380,6 +1425,12 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     reasoning_mode="direct_action",
                     model=self.current_model,
                 )
+                request_action = partial(
+                    self._request_action,
+                    messages,
+                    response_schema=response_schema,
+                    parser=response_parser,
+                )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
                 messages=messages,
@@ -1389,13 +1440,32 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 max_timeout_retries=0,
                 timeout_backoff_seconds=0,
                 response_schema=response_schema,
-                request_action=partial(
-                    self._request_action,
-                    messages,
-                    response_schema=response_schema,
-                    parser=response_parser,
-                ),
+                request_action=request_action,
             )
+
+    def _request_two_pass_action(
+        self,
+        selection_messages: list[dict[str, str]],
+        *,
+        selection_schema: Mapping[str, Any],
+        parameter_messages_for: Callable[[str], list[dict[str, str]]],
+        parameter_schema_for: Callable[[str], Mapping[str, Any]],
+        parser: Callable[[dict[str, Any]], SkillChatAction],
+        allowed_actions: Sequence[str],
+    ) -> SkillChatAction:
+        return complete_two_pass_action(
+            self.client_for_model(self.current_model, self.provider),
+            selection_messages=selection_messages,
+            selection_schema=selection_schema,
+            parameter_messages_for=parameter_messages_for,
+            parameter_schema_for=parameter_schema_for,
+            parser=parser,
+            allowed_actions=allowed_actions,
+            model=self.current_model,
+            stderr=self.stderr,
+            max_timeout_retries=0,
+            timeout_backoff_seconds=0,
+        )
 
     def _request_action(
         self,

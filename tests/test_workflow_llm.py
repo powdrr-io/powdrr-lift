@@ -14,9 +14,13 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMActionEngine,
     WorkflowStepRunner,
     assert_material_repair_prompt,
+    build_clean_room_action_parameters_prompt,
+    build_clean_room_action_selection_prompt,
     build_clean_room_repair_prompt,
     build_repair_prompt_manifest,
     complete_json_with_timeout_retry,
+    complete_two_pass_action,
+    constrain_action_response_schema,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_signature,
@@ -75,6 +79,63 @@ def test_material_repair_prompt_rejects_cosmetic_changes() -> None:
         assert error.error_code == "repair_prompt_not_materially_different"
     else:
         raise AssertionError("cosmetic repair prompt change was accepted")
+
+
+def test_two_pass_repair_selects_then_constrains_action_parameters() -> None:
+    class _Client:
+        def __init__(self) -> None:
+            self.messages: list[list[dict[str, str]]] = []
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            self.messages.append(messages)
+            if len(self.messages) == 1:
+                return {"action": "edit"}
+            return {"action": "edit", "file_path": "README.md"}
+
+    client = _Client()
+    selection_messages, selection_schema, _ = build_clean_room_action_selection_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        allowed_actions=("edit", "complete"),
+    )
+    parameter_schema = constrain_action_response_schema(
+        {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["edit", "complete"]},
+                "file_path": {"type": "string"},
+                "text": {"type": "string"},
+            },
+            "required": ["action"],
+        },
+        "edit",
+    )
+    parameter_messages, _ = build_clean_room_action_parameters_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        selected_action="edit",
+        response_schema=parameter_schema,
+    )
+
+    action = complete_two_pass_action(
+        client,
+        selection_messages=selection_messages,
+        selection_schema=selection_schema,
+        parameter_messages_for=lambda _action: parameter_messages,
+        parameter_schema_for=lambda _action: parameter_schema,
+        parser=lambda payload: payload,
+        allowed_actions=("edit", "complete"),
+        model="test-model",
+        stderr=None,
+        max_timeout_retries=0,
+        timeout_backoff_seconds=0,
+    )
+
+    assert action["action"] == "edit"
+    assert len(client.messages) == 2
+    assert '"repair_stage":"action_selection"' in client.messages[0][1]["content"]
+    assert '"repair_stage":"action_parameters"' in client.messages[1][1]["content"]
+    assert parameter_schema["properties"]["action"]["enum"] == ["edit"]
 
 
 def test_prompt_size_breakdown_reports_execution_mode_and_top_level_fields() -> None:

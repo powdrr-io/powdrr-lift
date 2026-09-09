@@ -1456,10 +1456,44 @@ class WorkflowStepRunner:
             or directive.stage is not RepairStage.DETERMINISTIC
         ):
             return None
-        deterministic = getattr(strategy, "apply_deterministic_repair", None)
+        deterministic = getattr(strategy, "deterministic_repair_action", None)
         if not callable(deterministic):
             return None
-        return deterministic(failure, directive)
+        action = deterministic(failure, directive)
+        if action is None:
+            return None
+        proposal_errors = self.kernel.validate_proposal(action)
+        if self.runtime is not None:
+            proposal_errors = (
+                *proposal_errors,
+                *self.runtime.validate_action(str(getattr(action, "kind", ""))),
+            )
+        if proposal_errors:
+            error = PowdrrExecutionError(
+                " ".join(proposal_errors),
+                error_code="deterministic_repair_not_allowed",
+            )
+            strategy.record_action_error(action, error)
+            self.kernel.fail(action, error)
+            self._sync_runtime()
+            return None
+        self.kernel.propose(action)
+        self._sync_runtime()
+        self._record_shadow("action_proposed", action)
+        try:
+            self.kernel.start(action)
+            self._sync_runtime()
+            outcome = strategy.execute_action(action)
+        except PowdrrExecutionError as error:
+            self.kernel.fail(action, error)
+            self._sync_runtime()
+            self._record_shadow("action_failed", action, error_code=error.error_code)
+            strategy.record_action_error(action, error)
+            return None
+        self.kernel.complete(action)
+        self._sync_runtime()
+        self._record_shadow("action_completed", action)
+        return outcome
 
     def _record_shadow(
         self,

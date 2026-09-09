@@ -746,11 +746,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             self.terminalized = True
             self.terminal_exit_code = 1
 
-    def apply_deterministic_repair(
+    def deterministic_repair_action(
         self,
         failure: RepairFailure,
         directive: RepairDirective,
-    ) -> WorkflowActionOutcome | None:
+    ) -> WorkflowAction | None:
         """Apply only the durable output-state repair already proven by the task."""
         if (
             failure.error_code != "deterministic_output_state_mismatch"
@@ -772,11 +772,9 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
         if repaired is None or repaired.get("action") != "next_step":
             return None
-        return self.execute_action(
-            WorkflowAction(
-                kind="next_step",
-                output_state=repaired.get("output_state"),
-            )
+        return WorkflowAction(
+            kind="next_step",
+            output_state=repaired.get("output_state"),
         )
 
     def no_progress_threshold_exit_code(

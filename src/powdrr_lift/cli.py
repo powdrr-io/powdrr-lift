@@ -1193,7 +1193,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--answer", action="append", default=[], help="Answer a live agent follow-up."
     )
     agent_feature_parser.add_argument(
-        "--provider", choices=["auto", *ALL_PROVIDERS], default="auto"
+        "--provider",
+        choices=["auto", *ALL_PROVIDERS],
+        default="deepinfra-cheap",
+        help="LLM provider for every live phase (default: deepinfra-cheap).",
     )
     agent_feature_parser.add_argument("--max-turns", type=int, default=40)
     agent_feature_parser.add_argument("--workflow-roundtrips", type=int, default=128)

@@ -11,8 +11,12 @@ uv run powdrr-lift agent-feature-e2e \
   --feature-request 'I want to specify a feature where all human and LLM interactions are written to a file log
 
 interaction-file-logging, capture all human and llm interaction inputs and outputs. format should be json, use a hidden directory like .powdrr and file name "interaction-log.json". Interactions are what was the input and output of every interaction with the user or with the LLM.' \
+  --provider deepinfra-cheap \
   --answer 'Use sensible defaults for unspecified details and keep the feature narrowly scoped.'
 ```
+
+The live harness defaults to `deepinfra-cheap`; pass `--provider` explicitly to
+select another configured provider.
 
 The runner performs these phases in order:
 

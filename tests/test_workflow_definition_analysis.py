@@ -9,6 +9,7 @@ from powdrr_lift.cli import main
 from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     analyze_workflow_definitions,
+    apply_liveness_baseline,
     discover_workflow_definitions,
     render_skill_prompt_snapshots,
 )
@@ -447,3 +448,42 @@ steps:
         issue for issue in report.issues if issue.code == "unknown_shell_effect"
     )
     assert issue.severity == "warning"
+
+
+def test_liveness_baseline_suppresses_advisory_diagnostics_only(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: shell
+when_to_use: [Run a command.]
+steps:
+  - id: run
+    description: Run a command.
+    tool_invocations:
+      - tool: shell
+        command: [custom-command]
+""",
+        encoding="utf-8",
+    )
+    report = analyze_workflow_definitions([definition])
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "issues": [
+                    {
+                        "definition": str(definition),
+                        "code": "unknown_shell_effect",
+                        "path": f"{definition}.steps[0].tool_invocations",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    filtered = apply_liveness_baseline(report, baseline)
+
+    assert filtered.validation_successful
+    assert filtered.reports[0].issues == ()

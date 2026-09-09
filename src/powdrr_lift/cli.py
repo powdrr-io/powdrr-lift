@@ -153,6 +153,7 @@ from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
 from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     analyze_workflow_definitions,
+    apply_liveness_baseline,
     render_skill_prompt_snapshots,
 )
 from powdrr_lift.workflow_definition_comparison import (
@@ -1239,6 +1240,7 @@ def build_parser() -> argparse.ArgumentParser:
     definition_validation_parser.add_argument(
         "--liveness", action="store_true", help="Enable static liveness diagnostics."
     )
+    definition_validation_parser.add_argument("--baseline", type=Path)
     definition_validation_parser.set_defaults(func=_run_validate_workflow_definition)
 
     definitions_validation_parser = subparsers.add_parser(
@@ -1251,6 +1253,7 @@ def build_parser() -> argparse.ArgumentParser:
     definitions_validation_parser.add_argument(
         "--liveness", action="store_true", help="Enable static liveness diagnostics."
     )
+    definitions_validation_parser.add_argument("--baseline", type=Path)
     definitions_validation_parser.set_defaults(func=_run_validate_workflow_definitions)
 
     prompt_snapshot_parser = subparsers.add_parser(
@@ -3919,6 +3922,7 @@ def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
 
 def _run_validate_workflow_definitions(args: argparse.Namespace) -> int:
     report = analyze_workflow_definitions(args.paths)
+    report = apply_liveness_baseline(report, args.baseline)
     if args.json:
         print(json.dumps(report.to_data(), indent=2, ensure_ascii=False))
     else:

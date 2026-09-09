@@ -66,6 +66,58 @@ class AbstractTransition:
     description: str
 
 
+@dataclass(frozen=True, slots=True)
+class SkillEffectSummary:
+    """Interprocedural summary used for nested-skill liveness checks."""
+
+    name: str
+    required_inputs: frozenset[str]
+    produced_outputs: frozenset[str]
+    reads: frozenset[str]
+    writes: frozenset[str]
+    may_prompt: bool
+    may_return: bool
+    may_fail: bool
+
+
+def summarize_skill(skill: Any) -> SkillEffectSummary:
+    required = frozenset(item.name for item in skill.inputs if item.required)
+    outputs = frozenset(output.name for step in skill.steps for output in step.outputs)
+    reads: set[str] = set()
+    writes: set[str] = set()
+    may_prompt = False
+    may_fail = False
+    for step in skill.steps:
+        may_prompt |= "prompt_user" in step.actions
+        may_fail |= step.gate is not None
+        for action in step.actions:
+            if action in {"read_document", "list_files", "gather_context"}:
+                reads.add("files" if action != "gather_context" else "context")
+            if action in {"edit", "yaml_edit", "file_management"}:
+                writes.add("files")
+        for invocation in step.tool_invocations:
+            effect = capability_effect(invocation.to_data())
+            if effect is not None:
+                reads.update(effect.reads)
+                writes.update(effect.writes)
+        pre_effect = effect_for_pre_step(
+            step.pre_step.to_data() if step.pre_step else None
+        )
+        if pre_effect is not None:
+            reads.update(pre_effect.reads)
+            writes.update(pre_effect.writes)
+    return SkillEffectSummary(
+        skill.name,
+        required,
+        outputs,
+        frozenset(reads),
+        frozenset(writes),
+        may_prompt,
+        True,
+        may_fail,
+    )
+
+
 def effect_registry() -> Mapping[tuple[str, str], CapabilityEffect]:
     """Return the immutable-by-convention registry used by static analysis."""
     return _EFFECTS
@@ -366,4 +418,65 @@ def expand_abstract_transitions(
                 f"{step.id or state.step_index} -> {successor}",
             )
         )
+    if step.gate is not None and step.gate.goto_step:
+        retry_target = next(
+            (successor for successor in item.successors if successor != item.index + 1),
+            None,
+        )
+        if retry_target is not None:
+            retry_state = AbstractWorkflowState(
+                retry_target,
+                state.successful_actions,
+                state.satisfied_conditions,
+                state.available_outputs,
+                state.changed_domains,
+                state.validation_epoch,
+                state.bounded_iterations,
+            )
+            transitions.append(
+                AbstractTransition(
+                    state,
+                    retry_state,
+                    "correctable_failure",
+                    False,
+                    f"{step.id or state.step_index} retry -> {retry_target}",
+                )
+            )
+    if any(
+        is_idempotent(effect)
+        and f"{state.step_index}:{effect.operation}" in state.successful_actions
+        for effect in effects
+    ):
+        transitions = [
+            AbstractTransition(
+                transition.source,
+                transition.target,
+                "success_without_progress",
+                False,
+                transition.description,
+            )
+            for transition in transitions
+            if transition.outcome == "success_with_progress"
+        ]
     return tuple(transitions)
+
+
+def build_abstract_execution_graph(
+    ir: Any, *, max_states: int = 4096
+) -> Mapping[AbstractWorkflowState, tuple[AbstractTransition, ...]]:
+    """Reach the fixed point of the finite abstract transition system."""
+    initial = AbstractWorkflowState(0)
+    graph: dict[AbstractWorkflowState, tuple[AbstractTransition, ...]] = {}
+    queue = [initial]
+    while queue and len(graph) < max_states:
+        state = queue.pop(0)
+        if state in graph:
+            continue
+        transitions = expand_abstract_transitions(ir, state)
+        graph[state] = transitions
+        queue.extend(
+            transition.target
+            for transition in transitions
+            if transition.target not in graph
+        )
+    return graph

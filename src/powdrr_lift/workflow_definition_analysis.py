@@ -25,10 +25,9 @@ from powdrr_lift.core.workflow_template_specification import (
     build_workflow_template_validation_report,
 )
 from powdrr_lift.workflow_liveness import (
-    AbstractWorkflowState,
+    build_abstract_execution_graph,
     capability_effect,
     effect_for_pre_step,
-    expand_abstract_transitions,
     is_fixed_deterministic,
     is_idempotent,
 )
@@ -46,6 +45,7 @@ class WorkflowDefinitionIssue:
     state: Mapping[str, Any] | None = None
     cycle: tuple[str, ...] = ()
     remediation: str | None = None
+    entry_path: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, object]:
         data: dict[str, object] = {
@@ -60,6 +60,8 @@ class WorkflowDefinitionIssue:
             data["cycle"] = list(self.cycle)
         if self.remediation is not None:
             data["remediation"] = self.remediation
+        if self.entry_path:
+            data["entry_path"] = list(self.entry_path)
         return data
 
 
@@ -163,6 +165,42 @@ def analyze_workflow_definitions(paths: Sequence[Path]) -> WorkflowDefinitionsRe
             )
         reports = updated
     return WorkflowDefinitionsReport(tuple(reports))
+
+
+def apply_liveness_baseline(
+    report: WorkflowDefinitionsReport, baseline_path: Path | None
+) -> WorkflowDefinitionsReport:
+    """Suppress only previously recorded advisory diagnostics.
+
+    Errors are never suppressed.  The baseline therefore supports incremental
+    warning rollout while ensuring a newly introduced proven error fails CI.
+    """
+    if baseline_path is None:
+        return report
+    try:
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return report
+    entries = baseline.get("issues", []) if isinstance(baseline, Mapping) else []
+    known = {
+        (str(item.get("definition")), str(item.get("code")), str(item.get("path")))
+        for item in entries
+        if isinstance(item, Mapping)
+    }
+    filtered: list[WorkflowDefinitionReport] = []
+    for definition_report in report.reports:
+        issues = tuple(
+            issue
+            for issue in definition_report.issues
+            if issue.severity == "error"
+            or (str(definition_report.definition), issue.code, issue.path) not in known
+        )
+        filtered.append(
+            WorkflowDefinitionReport(
+                definition_report.definition, definition_report.kind, issues
+            )
+        )
+    return WorkflowDefinitionsReport(tuple(filtered))
 
 
 def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
@@ -428,6 +466,40 @@ def _validate_prompt_authority(
     return issues
 
 
+def compare_prompt_snapshot_contract(
+    step: SkillStep, snapshot: Mapping[str, Any], path: str
+) -> tuple[WorkflowDefinitionIssue, ...]:
+    """Compare a rendered prompt snapshot with the structured step authority."""
+    messages = snapshot.get("messages", [])
+    text = "\n".join(
+        str(message.get("content", ""))
+        for message in messages
+        if isinstance(message, Mapping)
+    )
+    declared = set(step.actions)
+    declared.update(
+        invocation.operation or (invocation.command[0] if invocation.command else "")
+        for invocation in step.tool_invocations
+    )
+    issues: list[WorkflowDefinitionIssue] = []
+    for action in ("edit", "yaml_edit", "file_management", "read_document"):
+        if (
+            action in text
+            and action not in declared
+            and action not in {"read_document" if step.inputs else ""}
+        ):
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "forbidden_verification_action",
+                    f"Rendered prompt prescribes {action!r}, absent from the step contract.",
+                    f"{path}.messages",
+                    severity="warning",
+                    remediation="Move the requirement into structured actions or remove it from the prompt.",
+                )
+            )
+    return tuple(issues)
+
+
 def _validate_template_liveness(
     data: Mapping[str, Any], path: Path
 ) -> list[WorkflowDefinitionIssue]:
@@ -679,7 +751,45 @@ def _validate_step_contract(
                     remediation="Redirect the retry to a step that writes a domain observed by the gate.",
                 )
             )
+        elif retry_target is not None:
+            retry_step = ir.steps[retry_target].step
+            retry_writes = _step_write_domains(retry_step)
+            observed = _gate_observed_domains(step.gate.outcome)
+            if observed and not observed.intersection(retry_writes):
+                issues.append(
+                    WorkflowDefinitionIssue(
+                        "retry_without_relevant_effect",
+                        "Gate retry path writes no domain observed by the failed gate: "
+                        + ", ".join(sorted(observed)),
+                        f"{step_path}.gate.goto_step",
+                        severity="warning",
+                        remediation="Redirect to a corrective step that changes a gate-observed domain.",
+                    )
+                )
     return issues
+
+
+def _step_write_domains(step: SkillStep) -> frozenset[str]:
+    domains: set[str] = set()
+    for invocation in step.tool_invocations:
+        effect = capability_effect(invocation.to_data())
+        if effect is not None:
+            domains.update(effect.writes)
+    effect = effect_for_pre_step(step.pre_step.to_data() if step.pre_step else None)
+    return frozenset((*domains, *(effect.writes if effect is not None else ())))
+
+
+def _gate_observed_domains(outcome: Mapping[str, Any]) -> frozenset[str]:
+    path = outcome.get("path")
+    if not isinstance(path, str):
+        return frozenset()
+    if "returncode" in path or "validation" in path:
+        return frozenset({"validation"})
+    if "file" in path or "path" in path:
+        return frozenset({"files"})
+    if "clean" in path or "repository" in path:
+        return frozenset({"repository"})
+    return frozenset({path})
 
 
 def _validate_abstract_graph(
@@ -688,16 +798,9 @@ def _validate_abstract_graph(
     """Explore the finite abstract graph and report terminal sinks."""
     if not ir.steps:
         return []
-    initial = AbstractWorkflowState(0)
-    queue = [initial]
-    seen: set[AbstractWorkflowState] = set()
     issues: list[WorkflowDefinitionIssue] = []
-    while queue and len(seen) < 4096:
-        state = queue.pop(0)
-        if state in seen:
-            continue
-        seen.add(state)
-        transitions = expand_abstract_transitions(ir, state)
+    graph = build_abstract_execution_graph(ir)
+    for state, transitions in graph.items():
         item = ir.steps[state.step_index]
         missing_completion = (
             set(item.step.completion.required_outputs) - state.available_outputs
@@ -718,9 +821,6 @@ def _validate_abstract_graph(
                     remediation="Add a producer, a terminal transition, or an explicit blocked outcome.",
                 )
             )
-        for transition in transitions:
-            if transition.target not in seen:
-                queue.append(transition.target)
     return issues
 
 
@@ -758,9 +858,27 @@ def _validate_non_progress_cycles(
                 severity="warning",
                 cycle=tuple(ir.steps[index].step_id for index in sorted(component)),
                 remediation="Add a bounded exit, relevant corrective action, or terminal blocked outcome.",
+                entry_path=_shortest_entry_path(ir, first),
             )
         )
     return issues
+
+
+def _shortest_entry_path(ir: WorkflowIR, target: int) -> tuple[str, ...]:
+    queue: list[tuple[int, tuple[str, ...]]] = (
+        [(0, (ir.steps[0].step_id,))] if ir.steps else []
+    )
+    seen: set[int] = set()
+    while queue:
+        current, path = queue.pop(0)
+        if current == target:
+            return path
+        if current in seen:
+            continue
+        seen.add(current)
+        for successor in ir.steps[current].successors:
+            queue.append((successor, (*path, ir.steps[successor].step_id)))
+    return ()
 
 
 def _step_can_produce_progress(step: SkillStep) -> bool:

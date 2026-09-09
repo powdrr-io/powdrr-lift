@@ -110,7 +110,9 @@ from powdrr_lift.workflow_git import (
 from powdrr_lift.workflow_llm import (
     DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,
+    ProgrammerInvariantError,
     ProgressDecision,
+    RepairPromptManifest,
     WorkflowAction,
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -121,6 +123,9 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMClient,
     WorkflowLLMTimeoutExhausted,
     WorkflowStepRunner,
+    assert_material_repair_prompt,
+    build_clean_room_repair_prompt,
+    build_repair_prompt_manifest,
     complete_json_with_timeout_retry,
     prompt_size_breakdown,
     prune_execution_events,
@@ -347,6 +352,9 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     observer_intervention: str | None = None
     observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
+    clean_room_repair_pending: bool = False
+    clean_room_repair_used: bool = False
+    repair_prompt_manifest: RepairPromptManifest | None = None
 
     def next_request(self) -> WorkflowActionRequest:
         while True:
@@ -363,6 +371,84 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 ),
                 observer_intervention=self.observer_intervention,
             )
+            if self.clean_room_repair_pending and not self.clean_room_repair_used:
+                self.clean_room_repair_pending = False
+                self.clean_room_repair_used = True
+                runtime_actions = (
+                    self.runtime.allowed_actions() if self.runtime is not None else ()
+                )
+                allowed_actions = tuple(runtime_actions or ())
+                recovery_context = {
+                    "task_id": self.task.task_id,
+                    "objective": self.task.description,
+                    "details": self.task.details,
+                    "input_state": self.task.input_state,
+                    "output_state_type": self.task.output_state_type,
+                    "allowed_actions": list(allowed_actions),
+                    "recent_failures": [
+                        {
+                            key: event.get(key)
+                            for key in ("kind", "action_kind", "tool", "error")
+                            if key in event
+                        }
+                        for event in self.events[-6:]
+                        if event.get("kind")
+                        in {
+                            "validation_error",
+                            "action_error",
+                            "tool_error",
+                            "no_progress",
+                        }
+                    ],
+                }
+                clean_messages, manifest = build_clean_room_repair_prompt(
+                    context=json.dumps(
+                        recovery_context, ensure_ascii=False, separators=(",", ":")
+                    ),
+                    error_message=(
+                        self.response_correction
+                        or "The previous workflow strategy failed to make progress."
+                    ),
+                    repair_instructions=(
+                        "Choose one legal action that materially advances the task. "
+                        "Do not repeat a rejected strategy. Return the complete "
+                        "workflow action object."
+                    ),
+                    allowed_actions=allowed_actions,
+                    model=self.model,
+                )
+                if self.repair_prompt_manifest is None:
+                    raise ProgrammerInvariantError(
+                        "Clean-room repair requested without a prior task prompt "
+                        "manifest.",
+                        error_code="repair_prompt_manifest_missing",
+                    )
+                assert_material_repair_prompt(self.repair_prompt_manifest, manifest)
+                self.events.append(
+                    {
+                        "kind": "repair_attempt",
+                        "stage": "clean_room",
+                        "prompt_manifest": manifest.to_data(),
+                    }
+                )
+                self.repair_prompt_manifest = manifest
+                messages = clean_messages
+            else:
+                self.repair_prompt_manifest = build_repair_prompt_manifest(
+                    messages,
+                    profile="normal_full_context",
+                    source_sections=(
+                        "task",
+                        "workflow_context",
+                        "events",
+                        "runtime_state",
+                        "available_tools",
+                        "available_skills",
+                    ),
+                    history_policy="bounded",
+                    reasoning_mode="direct_action",
+                    model=self.model,
+                )
             limits = _model_limits_for(self.mapping_provider, self.model)
             estimated_input_tokens = _estimate_message_tokens(messages)
             print(
@@ -563,6 +649,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.response_correction = (
             f"The previous response was invalid: {error} {guidance}"
         )
+        if not self.clean_room_repair_used:
+            self.clean_room_repair_pending = True
         print(
             "Workflow task response needs repair; requesting a corrected "
             "JSON response from the LLM.",
@@ -1098,6 +1186,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
         self.response_correction = _action_response_correction(action, error)
+        if not self.clean_room_repair_used:
+            self.clean_room_repair_pending = True
         record_workflow_llm_error(
             self.error_log_root,
             execution_mode="process_workflow_task",
@@ -1141,6 +1231,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _ = action
         if observation.correction is not None:
             self.response_correction = observation.correction
+            if not self.clean_room_repair_used:
+                self.clean_room_repair_pending = True
         return outcome
 
     def exhausted_roundtrips_exit_code(self) -> int:

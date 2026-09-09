@@ -109,6 +109,7 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgressDecision,
     ProviderExecutionError,
+    RepairDirective,
     RepairExhaustionReport,
     RepairPromptManifest,
     WorkflowActionObservation,
@@ -877,7 +878,6 @@ class _ChatActionProgressStrategy(WorkflowActionProgressStrategy[SkillChatAction
             kind="correction",
             source="no_progress",
         )
-
 
 @dataclass(slots=True)
 class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
@@ -1681,6 +1681,19 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         observation: WorkflowActionObservation,
     ) -> None:
         _ChatActionProgressStrategy(self.state).record_no_progress(action, observation)
+
+    def record_repair_directive(self, directive: RepairDirective) -> None:
+        """Persist the shared runner's stage decision at the chat boundary."""
+        self.state.execution_events.append(
+            {
+                "kind": "repair_directive",
+                "stage": directive.stage.value,
+                "attempt": directive.attempt,
+                "reason": directive.reason,
+                "allowed_actions": list(directive.allowed_actions),
+                "step_index": self.current_step_index,
+            }
+        )
 
     def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         try:

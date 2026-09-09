@@ -113,6 +113,7 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgrammerInvariantError,
     ProgressDecision,
+    RepairDirective,
     RepairExhaustionReport,
     RepairPromptManifest,
     WorkflowAction,
@@ -673,6 +674,18 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stderr=self.stderr,
         ).record_no_progress(action, observation)
         self.response_correction = observation.correction
+
+    def record_repair_directive(self, directive: RepairDirective) -> None:
+        """Persist the shared runner's stage decision for durable replay."""
+        self.events.append(
+            {
+                "kind": "repair_directive",
+                "stage": directive.stage.value,
+                "attempt": directive.attempt,
+                "reason": directive.reason,
+                "allowed_actions": list(directive.allowed_actions),
+            }
+        )
 
     def no_progress_threshold_exit_code(
         self,

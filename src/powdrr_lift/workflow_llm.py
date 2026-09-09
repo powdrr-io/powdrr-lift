@@ -960,6 +960,18 @@ def _coding_loop_identity(strategy: Any) -> tuple[Any, ...]:
     )
 
 
+def _boundary_id(strategy: Any) -> str:
+    """Return a stable task/step identity for semantic repair state."""
+    task_id = getattr(getattr(strategy, "task", None), "task_id", None)
+    if task_id is not None:
+        return f"task:{task_id}:{getattr(strategy, 'current_step_index', None)}"
+    skill = getattr(strategy, "selected_skill", None)
+    return (
+        f"skill:{getattr(skill, 'path', '<unknown>')}:"
+        f"{getattr(strategy, 'current_step_index', None)}"
+    )
+
+
 class WorkflowShadowRecorder(Protocol):
     """Optional best-effort event sink used while the kernel is in shadow mode."""
 
@@ -990,6 +1002,7 @@ class WorkflowStepRunner:
         legacy_compatibility: bool = False,
         phase_type: str = "build",
         actor_id: str = "workflow-agent",
+        repair_policy: RepairPolicy | None = None,
     ) -> None:
         self.action_engine = WorkflowLLMActionEngine(
             max_stalled_roundtrips=max_stalled_roundtrips
@@ -999,6 +1012,8 @@ class WorkflowStepRunner:
         self.runtime = runtime
         self.phase_type = phase_type
         self.actor_id = actor_id
+        self.repair_coordinator = WorkflowRepairCoordinator(repair_policy)
+        self.last_repair_directive: RepairDirective | None = None
         if runtime is None and not legacy_compatibility:
             raise ProgrammerInvariantError(
                 "WorkflowStepRunner requires an ExecutionRuntime for normal execution.",
@@ -1035,6 +1050,7 @@ class WorkflowStepRunner:
             request = strategy.next_request()
             if request is None:
                 return 0
+            self.repair_coordinator.begin_boundary(_boundary_id(strategy))
             roundtrips += 1
             try:
                 action = (
@@ -1064,6 +1080,14 @@ class WorkflowStepRunner:
                 # These failures are not model-correctable action errors.
                 raise
             except RuntimeError as exc:
+                self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        RepairFailureClass.RESPONSE,
+                        getattr(exc, "error_code", type(exc).__name__),
+                        str(exc),
+                    ),
+                )
                 if self.observer is not None:
                     try:
                         self.observer.response_failed(exc)
@@ -1096,6 +1120,15 @@ class WorkflowStepRunner:
                     remediation="perform the required follow-up action first",
                 )
                 strategy.record_action_error(action, error)
+                self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        RepairFailureClass.PROPOSAL,
+                        error.error_code,
+                        str(error),
+                        action_signature=signature(action),
+                    ),
+                )
                 self.kernel.fail(action, error)
                 self._sync_runtime()
                 if self.observer is not None:
@@ -1145,6 +1178,15 @@ class WorkflowStepRunner:
                     ),
                 )
                 strategy.record_action_error(action, exc)
+                self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        RepairFailureClass.EXECUTION,
+                        exc.error_code,
+                        str(exc),
+                        action_signature=signature(action),
+                    ),
+                )
                 failure_decision = None
                 if self.observer is not None:
                     try:
@@ -1179,6 +1221,15 @@ class WorkflowStepRunner:
             )
             if not observation.made_progress:
                 strategy.record_no_progress(action, observation)
+                self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        RepairFailureClass.NO_PROGRESS,
+                        "no_progress",
+                        observation.correction or "The action made no progress.",
+                        action_signature=signature(action),
+                    ),
+                )
                 if observation.decision is ProgressDecision.THRESHOLD:
                     stop_after_stall = getattr(
                         strategy, "no_progress_threshold_exit_code", None
@@ -1210,7 +1261,21 @@ class WorkflowStepRunner:
                 return outcome.exit_code
             if not outcome.continue_running:
                 return 0
-        return strategy.exhausted_roundtrips_exit_code()
+        return 0
+
+    def _record_semantic_failure(
+        self,
+        strategy: WorkflowExecutionStrategy,
+        failure: RepairFailure,
+    ) -> None:
+        try:
+            directive = self.repair_coordinator.record_failure(failure)
+        except ProgrammerInvariantError:
+            return
+        self.last_repair_directive = directive
+        apply_directive = getattr(strategy, "record_repair_directive", None)
+        if callable(apply_directive):
+            apply_directive(directive)
 
     def _record_shadow(
         self,

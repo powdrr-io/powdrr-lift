@@ -645,14 +645,17 @@ def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> N
             return 7
 
     strategy = _StalledStrategy()
+    driver = WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True)
     assert (
-        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+        driver.run(
             strategy,
             max_roundtrips=None,
             signature=workflow_action_signature,
         )
         == 7
     )
+    assert driver.last_repair_directive is not None
+    assert driver.last_repair_directive.stage is RepairStage.CLEAN_ROOM
 
 
 def test_execution_driver_never_crashes_when_observer_fails() -> None:

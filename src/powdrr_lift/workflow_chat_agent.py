@@ -9429,7 +9429,32 @@ def _structured_intrinsic_pre_step_parameters(
     tool: str, parameters: Mapping[str, Any]
 ) -> dict[str, Any]:
     """Translate declarative pre-step commands to structured actions."""
+    if tool == GIT_TOOL and parameters.get("operation") == "add":
+        paths = parameters.get("paths")
+        if (
+            isinstance(paths, Sequence)
+            and not isinstance(paths, (str, bytes, bytearray))
+            and paths
+            and all(isinstance(path, str) and path for path in paths)
+        ):
+            return {"operation": "add", "paths": list(paths)}
+        raise PowdrrExecutionError(
+            "Intrinsic git add pre-steps require a non-empty paths list."
+        )
     command = parameters.get("command")
+    if (
+        tool == GIT_TOOL
+        and isinstance(command, Sequence)
+        and not isinstance(command, (str, bytes, bytearray))
+        and len(command) >= 2
+        and command[0] == "add"
+    ):
+        paths = list(command[1:])
+        if all(isinstance(path, str) and path for path in paths):
+            return {"operation": "add", "paths": paths}
+        raise PowdrrExecutionError(
+            "Intrinsic git add pre-steps require non-empty string paths."
+        )
     if tool == GIT_TOOL and command == ["status", "--short"]:
         return {"operation": "status"}
     raise PowdrrExecutionError(

@@ -626,21 +626,23 @@ steps:
     schema: {type: object, additionalProperties: true}
 - id: stage-validated-artifacts
   description: Stage the validated implementation and workflow artifacts.
-  actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: governed
+  actions: []
+  step_type: invoke_tool
   llm_type: simple_task
   details: >-
-    Stage only docs/proposals/<feature-name>/ and docs/workflows/ with the
-    intrinsic git add action. Do not run another Git command in this step;
-    the following deterministic verify-staged-artifacts step reviews the staged
-    paths. Do not commit or create a pull request yet. Use
-    {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["docs/proposals/<feature-name>","docs/workflows"]}}.
-  tool_invocations:
-  - tool: git
-    command:
-    - add
-    - docs/proposals/<feature-name>
-    - docs/workflows
+    Deterministically stage only docs/proposals/<feature-name>/ and
+    docs/workflows/. The runner owns this idempotent staging operation; do not
+    ask the LLM to invoke git add or repeat it. The following deterministic
+    verify-staged-artifacts step reviews the staged paths. Do not commit or
+    create a pull request yet.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: git
+      command:
+      - add
+      - docs/proposals/<feature-name>
+      - docs/workflows
 - id: verify-staged-artifacts
   description: Verify the staged artifact set.
   actions: []

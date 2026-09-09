@@ -941,6 +941,56 @@ def test_deterministic_shell_pre_step_accepts_empty_successful_result(
     assert events[0]["result"]["stdout"].strip() == ""
 
 
+def test_deterministic_git_add_pre_step_stages_declared_paths(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=tmp_path,
+        check=True,
+    )
+    docs = tmp_path / "docs" / "proposals" / "feature"
+    docs.mkdir(parents=True)
+    artifact = docs / "specification.yaml"
+    artifact.write_text("id: feature\n", encoding="utf-8")
+    step = SkillStep(
+        description="Stage validated artifacts.",
+        step_type="invoke_tool",
+        pre_step=SkillStepPreStep(
+            action="invoke_tool",
+            template={
+                "tool": "git",
+                "operation": "add",
+                "paths": ["docs/proposals/feature"],
+            },
+        ),
+    )
+    events: list[dict[str, Any]] = []
+
+    _run_deterministic_pre_step(
+        step,
+        skill_name="start-implementing-feature",
+        worktree_root=tmp_path,
+        execution_events=events,
+        execution_context=[],
+        handoff_records={},
+        step_index=0,
+        workflow_context=None,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert events[0]["result"]["returncode"] == 0
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert staged.stdout.splitlines() == ["docs/proposals/feature/specification.yaml"]
+
+
 def test_gate_reports_fresh_result_separately_from_llm_commentary(
     tmp_path: Path,
 ) -> None:

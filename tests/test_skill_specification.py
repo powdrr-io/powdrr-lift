@@ -351,6 +351,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("start-implementing-feature.yaml", 17),
                 ("start-implementing-feature.yaml", 20),
                 ("start-implementing-feature.yaml", 22),
+                ("start-implementing-feature.yaml", 21),
                 ("specify-a-feature.yaml", 2),
                 ("specify-a-feature.yaml", 6),
                 ("specify-a-feature.yaml", 10),
@@ -1497,11 +1498,18 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
         "powdrr-lift",
         "repository-state",
     )
-    assert step("stage-validated-artifacts").tool_invocations[0].command == (
-        "add",
-        "docs/proposals/<feature-name>",
-        "docs/workflows",
-    )
+    stage_step = step("stage-validated-artifacts")
+    assert stage_step.step_type == "invoke_tool"
+    assert stage_step.actions == ()
+    assert stage_step.pre_step is not None
+    assert stage_step.pre_step.template == {
+        "tool": "git",
+        "command": [
+            "add",
+            "docs/proposals/<feature-name>",
+            "docs/workflows",
+        ],
+    }
     assert pre_step_command("verify-staged-artifacts") == (
         "powdrr-lift",
         "repository-state",

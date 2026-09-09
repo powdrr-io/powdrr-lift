@@ -7,6 +7,7 @@ from typing import Any
 from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
     ProgrammerInvariantError,
+    RepairExhaustionReport,
     RepairFailure,
     RepairFailureClass,
     RepairPolicy,
@@ -106,6 +107,30 @@ def test_deterministic_repair_only_returns_allowlisted_terminal_actions() -> Non
         allowed_actions=("edit",),
         legacy_action={"action": "edit", "file_path": "README.md"},
     ) == {"action": "edit", "file_path": "README.md"}
+
+
+def test_repair_exhaustion_report_is_durable_and_complete() -> None:
+    report = RepairExhaustionReport(
+        boundary_id="skill:step-2",
+        objective="implement the feature",
+        final_state={"files_changed": []},
+        failures=({"code": "no_progress"},),
+        prompt_manifests=({"profile": "clean_room_replan"},),
+        rejected_strategies=({"action": "edit"},),
+        allowed_actions=("read_document",),
+        reason="No safe repair remains.",
+    ).to_data()
+
+    assert report == {
+        "boundary_id": "skill:step-2",
+        "objective": "implement the feature",
+        "final_state": {"files_changed": []},
+        "failures": [{"code": "no_progress"}],
+        "prompt_manifests": [{"profile": "clean_room_replan"}],
+        "rejected_strategies": [{"action": "edit"}],
+        "allowed_actions": ["read_document"],
+        "reason": "No safe repair remains.",
+    }
 
 
 def test_clean_room_repair_prompt_excludes_conversation_and_records_profile() -> None:

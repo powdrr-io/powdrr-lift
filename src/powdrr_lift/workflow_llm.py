@@ -137,6 +137,32 @@ class RepairDirective:
     allowed_actions: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class RepairExhaustionReport:
+    """Structured terminal record for a boundary with no safe recovery left."""
+
+    boundary_id: str
+    objective: str
+    final_state: Mapping[str, Any]
+    failures: tuple[Mapping[str, Any], ...] = ()
+    prompt_manifests: tuple[Mapping[str, Any], ...] = ()
+    rejected_strategies: tuple[Mapping[str, Any], ...] = ()
+    allowed_actions: tuple[str, ...] = ()
+    reason: str = ""
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "boundary_id": self.boundary_id,
+            "objective": self.objective,
+            "final_state": dict(self.final_state),
+            "failures": [dict(item) for item in self.failures],
+            "prompt_manifests": [dict(item) for item in self.prompt_manifests],
+            "rejected_strategies": [dict(item) for item in self.rejected_strategies],
+            "allowed_actions": list(self.allowed_actions),
+            "reason": self.reason,
+        }
+
+
 class WorkflowRepairCoordinator:
     """Pure bounded state machine for semantic recovery decisions."""
 

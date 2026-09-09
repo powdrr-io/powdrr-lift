@@ -109,6 +109,7 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgressDecision,
     ProviderExecutionError,
+    RepairExhaustionReport,
     RepairPromptManifest,
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -1300,6 +1301,35 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             if self.clean_room_repair_pending:
                 if self.clean_room_repair_used:
                     self.clean_room_repair_pending = False
+                    repair_attempts = tuple(
+                        event.get("prompt_manifest", {})
+                        for event in self.state.execution_events
+                        if event.get("kind") == "repair_attempt"
+                        and event.get("step_index") == self.current_step_index
+                    )
+                    exhaustion_report = RepairExhaustionReport(
+                        boundary_id=(
+                            f"{self.selected_skill.path}:{self.current_step_index}"
+                        ),
+                        objective=self.current_step.description,
+                        final_state={
+                            "step_index": self.current_step_index,
+                            "current_file": (
+                                str(self.state.current_file_path)
+                                if self.state.current_file_path is not None
+                                else None
+                            ),
+                        },
+                        failures=tuple(self.state.stalled_step_context),
+                        prompt_manifests=repair_attempts,
+                        rejected_strategies=tuple(self.state.stalled_step_context),
+                        allowed_actions=tuple(
+                            _declared_action_names(self.current_step)
+                        ),
+                        reason=(
+                            "The clean-room repair budget for this step was consumed."
+                        ),
+                    )
                     self.state.execution_events.append(
                         {
                             "kind": "repair_exhausted",
@@ -1309,6 +1339,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                                 "The clean-room repair budget for this step was "
                                 "already consumed."
                             ),
+                            "report": exhaustion_report.to_data(),
                         }
                     )
                     raise PowdrrExecutionError(

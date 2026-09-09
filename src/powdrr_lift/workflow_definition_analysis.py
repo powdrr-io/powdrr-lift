@@ -20,6 +20,11 @@ from powdrr_lift.core.skill_specification import Skill, SkillStep, skill_step_fr
 from powdrr_lift.core.workflow_template_specification import (
     build_workflow_template_validation_report,
 )
+from powdrr_lift.workflow_liveness import (
+    capability_effect,
+    is_fixed_deterministic,
+    is_idempotent,
+)
 
 _PLACEHOLDER = re.compile(r"<([A-Za-z0-9_-]+)>")
 _ACTION_START = re.compile(r'\{\s*"action"\s*:')
@@ -202,7 +207,130 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                 issues.extend(compiler_issues)
                 if ir is not None:
                     issues.extend(_validate_handoffs(ir, path))
+                    issues.extend(_validate_liveness(ir, path))
     return WorkflowDefinitionReport(path, kind, tuple(issues))
+
+
+def _validate_liveness(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIssue]:
+    """Find high-confidence model-owned actions that can repeat without progress."""
+    issues: list[WorkflowDefinitionIssue] = []
+    for item in ir.steps:
+        step = item.step
+        if step.step_type not in {"governed", "coding_loop"}:
+            continue
+        for invocation in step.tool_invocations:
+            effect = capability_effect(invocation.to_data())
+            if not is_fixed_deterministic(effect):
+                continue
+            step_path = f"{path}.steps[{item.index}]"
+            operation = effect.operation if effect is not None else "operation"
+            if step.pre_step is None:
+                issues.append(
+                    WorkflowDefinitionIssue(
+                        "model_owned_deterministic_action",
+                        f"{operation} is deterministic but is exposed as an LLM-owned "
+                        "tool invocation. Move it to a deterministic pre-step or "
+                        "declare why LLM judgment is required.",
+                        f"{step_path}.tool_invocations",
+                        severity="warning",
+                    )
+                )
+            if is_idempotent(effect) and step.completion is None:
+                issues.append(
+                    WorkflowDefinitionIssue(
+                        "idempotent_action_without_auto_advance",
+                        f"{operation} can succeed repeatedly without changing "
+                        "abstract state while this step remains active. Convert "
+                        "it to a runner-owned pre-step or add a machine-owned "
+                        "success transition.",
+                        f"{step_path}.tool_invocations",
+                        severity="warning",
+                    )
+                )
+    issues.extend(_validate_non_progress_cycles(ir, path))
+    return issues
+
+
+def _validate_non_progress_cycles(
+    ir: WorkflowIR, path: Path
+) -> list[WorkflowDefinitionIssue]:
+    """Warn on CFG cycles with no declared progress-producing action."""
+    issues: list[WorkflowDefinitionIssue] = []
+    for component in _strongly_connected_components(ir):
+        if len(component) == 1:
+            index = next(iter(component))
+            if index not in ir.steps[index].successors:
+                continue
+        if any(_step_can_produce_progress(ir.steps[index].step) for index in component):
+            continue
+        first = min(component)
+        ids = ", ".join(ir.steps[index].step_id for index in sorted(component))
+        issues.append(
+            WorkflowDefinitionIssue(
+                "non_progress_cycle",
+                f"Reachable cycle ({ids}) has no declared action that can change "
+                "workflow state, repository state, validation state, or human "
+                "input.",
+                f"{path}.steps[{first}]",
+                severity="warning",
+            )
+        )
+    return issues
+
+
+def _step_can_produce_progress(step: SkillStep) -> bool:
+    if step.step_type in {"invoke_tool", "gate", "uses_skill", "predicated"}:
+        return True
+    if any(
+        action
+        in {"edit", "yaml_edit", "file_management", "prompt_user", "invoke_skill"}
+        for action in step.actions
+    ):
+        return True
+    for invocation in step.tool_invocations:
+        effect = capability_effect(invocation.to_data())
+        if effect is None or effect.writes or effect.produces:
+            return True
+    return False
+
+
+def _strongly_connected_components(ir: WorkflowIR) -> tuple[frozenset[int], ...]:
+    """Return CFG strongly connected components using Tarjan's algorithm."""
+    successors = {item.index: item.successors for item in ir.steps}
+    index = 0
+    indices: dict[int, int] = {}
+    lowlinks: dict[int, int] = {}
+    stack: list[int] = []
+    on_stack: set[int] = set()
+    components: list[frozenset[int]] = []
+
+    def visit(node: int) -> None:
+        nonlocal index
+        indices[node] = index
+        lowlinks[node] = index
+        index += 1
+        stack.append(node)
+        on_stack.add(node)
+        for successor in successors[node]:
+            if successor not in indices:
+                visit(successor)
+                lowlinks[node] = min(lowlinks[node], lowlinks[successor])
+            elif successor in on_stack:
+                lowlinks[node] = min(lowlinks[node], indices[successor])
+        if lowlinks[node] == indices[node]:
+            component: set[int] = set()
+            while True:
+                member = stack.pop()
+                on_stack.remove(member)
+                component.add(member)
+                if member == node:
+                    break
+            components.append(frozenset(component))
+
+    for item in ir.steps:
+        if item.index not in indices:
+            visit(item.index)
+    return tuple(components)
 
 
 def render_skill_prompt_snapshots(

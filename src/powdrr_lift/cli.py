@@ -3899,12 +3899,15 @@ def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
     data = report.to_data()
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
-    elif report.validation_successful:
-        print(f"Workflow definition valid: {report.definition}")
     else:
-        print(f"Workflow definition invalid: {report.definition}", file=sys.stderr)
+        status = "valid" if report.validation_successful else "invalid"
+        stream = sys.stdout if report.validation_successful else sys.stderr
+        print(f"Workflow definition {status}: {report.definition}", file=stream)
         for issue in report.issues:
-            print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
+            print(
+                f"{issue.path}: {issue.code}: {issue.message}",
+                file=sys.stderr if issue.severity == "error" else sys.stdout,
+            )
     return 0 if report.validation_successful else 1
 
 
@@ -3914,12 +3917,19 @@ def _run_validate_workflow_definitions(args: argparse.Namespace) -> int:
         print(json.dumps(report.to_data(), indent=2, ensure_ascii=False))
     else:
         for definition_report in report.reports:
-            if definition_report.validation_successful:
-                print(f"Workflow definition valid: {definition_report.definition}")
-                continue
-            print(f"Workflow definition invalid: {definition_report.definition}")
+            status = "valid" if definition_report.validation_successful else "invalid"
+            stream = (
+                sys.stdout if definition_report.validation_successful else sys.stderr
+            )
+            print(
+                f"Workflow definition {status}: {definition_report.definition}",
+                file=stream,
+            )
             for issue in definition_report.issues:
-                print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
+                print(
+                    f"{issue.path}: {issue.code}: {issue.message}",
+                    file=(sys.stderr if issue.severity == "error" else sys.stdout),
+                )
         if not report.reports:
             print("No workflow definitions found.", file=sys.stderr)
     return 0 if report.validation_successful and report.reports else 1

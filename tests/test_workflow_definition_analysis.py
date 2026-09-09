@@ -279,3 +279,76 @@ steps:
     report = analyze_workflow_definition(definition)
 
     assert "invalid_action_example" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_warns_on_model_owned_idempotent_git_add(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: stage
+when_to_use: [Stage files.]
+steps:
+  - id: stage
+    description: Stage the files.
+    tool_invocations:
+      - tool: git
+        command: [add, docs/proposal.yaml]
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert report.validation_successful
+    issues = {issue.code: issue for issue in report.issues}
+    assert issues["model_owned_deterministic_action"].severity == "warning"
+    assert issues["idempotent_action_without_auto_advance"].severity == "warning"
+
+
+def test_definition_analysis_warns_on_non_progress_cycle(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: loop
+when_to_use: [Loop.]
+steps:
+  - id: loop
+    description: Repeat the same observation.
+    next_step_override: loop
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "non_progress_cycle" in {issue.code for issue in report.issues}
+
+
+def test_definition_validation_cli_prints_liveness_warnings(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: stage
+when_to_use: [Stage files.]
+steps:
+  - id: stage
+    description: Stage the files.
+    tool_invocations:
+      - tool: git
+        command: [add, docs/proposal.yaml]
+""",
+        encoding="utf-8",
+    )
+    stdout = StringIO()
+
+    with redirect_stdout(stdout):
+        exit_code = main(["validate-workflow-definition", str(definition)])
+
+    assert exit_code == 0
+    output = stdout.getvalue()
+    assert "Workflow definition valid" in output
+    assert "idempotent_action_without_auto_advance" in output

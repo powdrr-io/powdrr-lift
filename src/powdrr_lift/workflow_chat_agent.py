@@ -109,6 +109,7 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgressDecision,
     ProviderExecutionError,
+    RepairContext,
     RepairDirective,
     RepairExhaustionReport,
     RepairPromptManifest,
@@ -1702,6 +1703,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "failure_class": directive.failure_class.value,
                 "error_code": directive.error_code,
                 "target_signature": directive.target_signature,
+                "material_state_fingerprint": directive.material_state_fingerprint,
+                "rejected_strategy_signatures": list(
+                    directive.rejected_strategy_signatures
+                ),
                 "step_index": self.current_step_index,
             }
         )
@@ -1753,6 +1758,40 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             self.terminalized = True
             self.terminal_exit_code = 1
+
+    def repair_context(self) -> RepairContext:
+        material_state = {
+            "skill": self.selected_skill.path,
+            "step_index": self.current_step_index,
+            "current_file_path": self.state.current_file_path,
+            "handoff_records": self.state.handoff_records,
+            "durable_facts": self.state.durable_facts,
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(material_state, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        rejected = tuple(
+            signature
+            for event in self.state.execution_events
+            if event.get("kind") == "repair_attempt"
+            for signature in (
+                [event["target_signature"]] if event.get("target_signature") else []
+            )
+        )
+        return RepairContext(
+            execution_id=str(self.state.selected_skill.path),
+            boundary_id=f"{self.selected_skill.path}:{self.current_step_index}",
+            objective=str(
+                getattr(self.current_step, "description", None)
+                or getattr(self.current_step, "id", "current step")
+            ),
+            deterministic_state=material_state,
+            allowed_actions=tuple(self.state.runtime.allowed_actions() or ())
+            if self.state.runtime is not None
+            else (),
+            rejected_strategies=rejected,
+            material_state_fingerprint=fingerprint,
+        )
 
     def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         try:

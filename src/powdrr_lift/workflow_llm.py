@@ -180,6 +180,23 @@ class RepairFailure:
 
 
 @dataclass(frozen=True, slots=True)
+class RepairContext:
+    """Typed, adapter-neutral state supplied to semantic repair decisions."""
+
+    execution_id: str = ""
+    boundary_id: str = ""
+    objective: str = ""
+    deterministic_state: Mapping[str, Any] = field(default_factory=dict)
+    allowed_actions: tuple[str, ...] = ()
+    action_schemas: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    required_outputs: tuple[str, ...] = ()
+    open_obligations: tuple[Mapping[str, Any], ...] = ()
+    rejected_strategies: tuple[str, ...] = ()
+    last_material_progress: Mapping[str, Any] | None = None
+    material_state_fingerprint: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class RepairDirective:
     """The adapter-independent result of recording one semantic failure."""
 
@@ -192,6 +209,8 @@ class RepairDirective:
     failure_class: RepairFailureClass = RepairFailureClass.EXECUTION
     error_code: str = "unknown"
     target_signature: str | None = None
+    material_state_fingerprint: str = ""
+    rejected_strategy_signatures: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,7 +260,8 @@ class WorkflowRepairCoordinator:
         self.policy = policy or RepairPolicy()
         self.boundary_id: str | None = None
         self.attempts: list[RepairDirective] = []
-        self._identities: set[tuple[str, str | None, str | None]] = set()
+        self._identities: set[tuple[str, str | None, str | None, str]] = set()
+        self.last_context: RepairContext | None = None
 
     def begin_boundary(self, boundary_id: str) -> None:
         if boundary_id != self.boundary_id:
@@ -254,11 +274,17 @@ class WorkflowRepairCoordinator:
         failure: RepairFailure,
         *,
         allowed_actions: Sequence[str] = (),
+        context: RepairContext | None = None,
     ) -> RepairDirective:
+        self.last_context = context
+        context_fingerprint = (
+            context.material_state_fingerprint if context is not None else ""
+        )
         identity = (
             failure.error_code,
             failure.action_signature,
             failure.target_signature,
+            context_fingerprint,
         )
         if identity in self._identities:
             raise ProgrammerInvariantError(
@@ -276,7 +302,11 @@ class WorkflowRepairCoordinator:
             stage=stage,
             attempt=len(self.attempts) + 1,
             reason=failure.message,
-            allowed_actions=tuple(dict.fromkeys(allowed_actions)),
+            allowed_actions=tuple(
+                dict.fromkeys(
+                    context.allowed_actions if context is not None else allowed_actions
+                )
+            ),
             prompt_profile=_prompt_profile_for_stage(stage),
             model_policy=(
                 "backup_model"
@@ -286,6 +316,10 @@ class WorkflowRepairCoordinator:
             failure_class=failure.classification,
             error_code=failure.error_code,
             target_signature=failure.target_signature,
+            material_state_fingerprint=context_fingerprint,
+            rejected_strategy_signatures=(
+                context.rejected_strategies if context is not None else ()
+            ),
         )
         self.attempts.append(directive)
         return directive
@@ -351,6 +385,16 @@ class WorkflowRepairCoordinator:
             failure_class=failure.classification,
             error_code=failure.error_code,
             target_signature=failure.target_signature,
+            material_state_fingerprint=(
+                self.last_context.material_state_fingerprint
+                if self.last_context is not None
+                else ""
+            ),
+            rejected_strategy_signatures=(
+                self.last_context.rejected_strategies
+                if self.last_context is not None
+                else ()
+            ),
         )
 
 
@@ -1435,6 +1479,13 @@ class WorkflowStepRunner:
             directive = self.repair_coordinator.record_failure(
                 failure,
                 allowed_actions=allowed_actions or (),
+                context=(
+                    repair_context()
+                    if callable(
+                        repair_context := getattr(strategy, "repair_context", None)
+                    )
+                    else None
+                ),
             )
         except ProgrammerInvariantError:
             return None

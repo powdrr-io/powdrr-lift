@@ -7,6 +7,7 @@ from typing import Any
 from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
     ProgrammerInvariantError,
+    RepairContext,
     RepairExhaustionReport,
     RepairFailure,
     RepairFailureClass,
@@ -66,6 +67,8 @@ def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
     assert targeted.stage == RepairStage.TARGETED
     assert targeted.prompt_profile == "targeted_schema_correction"
     assert targeted.model_policy == "current_model"
+
+
     assert (
         coordinator.record_failure(
             RepairFailure(
@@ -89,6 +92,31 @@ def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
 
     coordinator.begin_boundary("step-2")
     assert coordinator.record_failure(response_failure).attempt == 1
+
+
+def test_repair_context_allows_same_target_after_material_state_changes() -> None:
+    coordinator = WorkflowRepairCoordinator()
+    coordinator.begin_boundary("step-1")
+    failure = RepairFailure(
+        RepairFailureClass.ACTION_EXECUTION,
+        "file_not_found",
+        "missing target",
+        target_signature="file:README.md",
+    )
+    first = coordinator.record_failure(
+        failure,
+        context=RepairContext(
+            boundary_id="step-1", material_state_fingerprint="before"
+        ),
+    )
+    second = coordinator.record_failure(
+        failure,
+        context=RepairContext(
+            boundary_id="step-1", material_state_fingerprint="after"
+        ),
+    )
+    assert first.attempt == 1
+    assert second.attempt == 2
 
 
 def test_repair_coordinator_escalates_to_fallback_then_handoff() -> None:

@@ -113,6 +113,7 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgrammerInvariantError,
     ProgressDecision,
+    RepairContext,
     RepairDirective,
     RepairExhaustionReport,
     RepairFailure,
@@ -696,6 +697,10 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "failure_class": directive.failure_class.value,
                 "error_code": directive.error_code,
                 "target_signature": directive.target_signature,
+                "material_state_fingerprint": directive.material_state_fingerprint,
+                "rejected_strategy_signatures": list(
+                    directive.rejected_strategy_signatures
+                ),
             }
         )
         if self.terminalized:
@@ -745,6 +750,37 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             self.terminalized = True
             self.terminal_exit_code = 1
+
+    def repair_context(self) -> RepairContext:
+        material_state = {
+            "task_status": self.task.status.value,
+            "input_state": self.task.input_state,
+            "output_state": self.task.output_state,
+            "current_file_path": self.compacted_context,
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(material_state, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        rejected = tuple(
+            signature
+            for event in self.events
+            if event.get("kind") == "repair_attempt"
+            for signature in (
+                [event["target_signature"]] if event.get("target_signature") else []
+            )
+        )
+        return RepairContext(
+            execution_id=self.task.task_id,
+            boundary_id=self.task.task_id,
+            objective=self.task.description,
+            deterministic_state=material_state,
+            allowed_actions=tuple(self.runtime.allowed_actions() or ())
+            if self.runtime is not None
+            else (),
+            required_outputs=(self.task.output_state_type,),
+            rejected_strategies=rejected,
+            material_state_fingerprint=fingerprint,
+        )
 
     def deterministic_repair_action(
         self,

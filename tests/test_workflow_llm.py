@@ -24,6 +24,7 @@ from powdrr_lift.workflow_llm import (
     build_clean_room_action_selection_prompt,
     build_clean_room_repair_prompt,
     build_repair_prompt_manifest,
+    classify_repair_failure,
     complete_json_with_timeout_retry,
     complete_two_pass_action,
     constrain_action_response_schema,
@@ -32,6 +33,19 @@ from powdrr_lift.workflow_llm import (
     resolve_deterministic_repair,
     workflow_action_signature,
 )
+
+
+def test_repair_failure_classification_uses_codes_not_error_text() -> None:
+    assert (
+        classify_repair_failure(
+            "workflow_action_not_allowed", default=RepairFailureClass.RESPONSE
+        )
+        is RepairFailureClass.ACTION_CONTRACT
+    )
+    assert (
+        classify_repair_failure("no_progress", default=RepairFailureClass.EXECUTION)
+        is RepairFailureClass.NO_MATERIAL_PROGRESS
+    )
 
 
 def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:

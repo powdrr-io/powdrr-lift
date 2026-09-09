@@ -119,6 +119,40 @@ class RepairFailureClass(StrEnum):
     COMPLETION_BLOCKED = "completion_blocked"
 
 
+def classify_repair_failure(
+    error_code: str,
+    *,
+    default: RepairFailureClass,
+) -> RepairFailureClass:
+    """Map stable error codes to repair classes without parsing messages."""
+    code = error_code.casefold()
+    if code in {"timeout", "rate_limit", "provider_overloaded"}:
+        return RepairFailureClass.TRANSPORT_TRANSIENT
+    if code in {"authentication", "unsupported_model", "provider_unavailable"}:
+        return RepairFailureClass.TRANSPORT_TERMINAL
+    if code in {"empty_response", "incomplete_response"}:
+        return RepairFailureClass.RESPONSE_EMPTY
+    if code in {"invalid_json", "invalid_response_json", "non_object_response"}:
+        return RepairFailureClass.RESPONSE_SYNTAX
+    if code in {"response_schema", "invalid_action_shape", "missing_action"}:
+        return RepairFailureClass.RESPONSE_SCHEMA
+    if code in {"workflow_action_not_allowed", "action_not_allowed"}:
+        return RepairFailureClass.ACTION_CONTRACT
+    if code in {
+        "precondition_failed",
+        "file_not_found",
+        "relationship_obligation_open",
+    }:
+        return RepairFailureClass.ACTION_PRECONDITION
+    if code in {"no_progress", "stalled_action"}:
+        return RepairFailureClass.NO_MATERIAL_PROGRESS
+    if code in {"validation_regression", "issue_unchanged"}:
+        return RepairFailureClass.VALIDATION_REGRESSION
+    if code in {"completion_blocked", "output_state_missing"}:
+        return RepairFailureClass.COMPLETION_BLOCKED
+    return default
+
+
 @dataclass(frozen=True, slots=True)
 class RepairPolicy:
     """Bound semantic recovery independently from transport retries."""
@@ -1171,7 +1205,10 @@ class WorkflowStepRunner:
                 deterministic_outcome = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
-                        RepairFailureClass.RESPONSE,
+                        classify_repair_failure(
+                            getattr(exc, "error_code", type(exc).__name__),
+                            default=RepairFailureClass.RESPONSE,
+                        ),
                         getattr(exc, "error_code", type(exc).__name__),
                         str(exc),
                     ),
@@ -1213,7 +1250,9 @@ class WorkflowStepRunner:
                 deterministic_outcome = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
-                        RepairFailureClass.PROPOSAL,
+                        classify_repair_failure(
+                            error.error_code, default=RepairFailureClass.PROPOSAL
+                        ),
                         error.error_code,
                         str(error),
                         action_signature=signature(action),
@@ -1273,7 +1312,9 @@ class WorkflowStepRunner:
                 deterministic_outcome = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
-                        RepairFailureClass.EXECUTION,
+                        classify_repair_failure(
+                            exc.error_code, default=RepairFailureClass.ACTION_EXECUTION
+                        ),
                         exc.error_code,
                         str(exc),
                         action_signature=signature(action),
@@ -1318,7 +1359,10 @@ class WorkflowStepRunner:
                 deterministic_outcome = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
-                        RepairFailureClass.NO_PROGRESS,
+                        classify_repair_failure(
+                            "no_progress",
+                            default=RepairFailureClass.NO_MATERIAL_PROGRESS,
+                        ),
                         "no_progress",
                         observation.correction or "The action made no progress.",
                         action_signature=signature(action),

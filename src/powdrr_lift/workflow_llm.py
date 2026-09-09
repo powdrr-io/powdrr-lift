@@ -9,11 +9,13 @@ keep only presentation and human-handoff policy.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from powdrr_lift.errors import (
@@ -77,6 +79,744 @@ _PROMPT_SIZE_CHARS_PER_TOKEN = 3
 # A caller may opt into an unlimited loop for deterministic harnesses, but
 # production entry points must always provide a finite budget.
 DEFAULT_MAX_ROUNDTRIPS = 128
+
+
+class RepairStage(StrEnum):
+    """Semantic recovery stages shared by workflow adapters."""
+
+    TARGETED = "targeted"
+    CLEAN_ROOM = "clean_room"
+    SELECT_ACTION = "select_action"
+    FILL_ACTION = "fill_action"
+    DETERMINISTIC = "deterministic"
+    MODEL_FALLBACK = "model_fallback"
+    HUMAN_HANDOFF = "human_handoff"
+    EXHAUSTED = "exhausted"
+
+
+class RepairFailureClass(StrEnum):
+    """Stable categories used to select the first recovery strategy.
+
+    The broad values remain supported for callers that have not migrated their
+    error codes yet.  New adapters should use the specific categories so the
+    coordinator can make a deterministic first-stage decision.
+    """
+
+    RESPONSE = "response"
+    PROPOSAL = "proposal"
+    EXECUTION = "execution"
+    NO_PROGRESS = "no_progress"
+    TRANSPORT_TRANSIENT = "transport_transient"
+    TRANSPORT_TERMINAL = "transport_terminal"
+    RESPONSE_EMPTY = "response_empty"
+    RESPONSE_SYNTAX = "response_syntax"
+    RESPONSE_SCHEMA = "response_schema"
+    ACTION_CONTRACT = "action_contract"
+    ACTION_PRECONDITION = "action_precondition"
+    ACTION_EXECUTION = "action_execution"
+    NO_MATERIAL_PROGRESS = "no_material_progress"
+    VALIDATION_REGRESSION = "validation_regression"
+    COMPLETION_BLOCKED = "completion_blocked"
+
+
+def classify_repair_failure(
+    error_code: str,
+    *,
+    default: RepairFailureClass,
+) -> RepairFailureClass:
+    """Map stable error codes to repair classes without parsing messages."""
+    code = error_code.casefold()
+    if code in {"timeout", "rate_limit", "provider_overloaded"}:
+        return RepairFailureClass.TRANSPORT_TRANSIENT
+    if code in {"authentication", "unsupported_model", "provider_unavailable"}:
+        return RepairFailureClass.TRANSPORT_TERMINAL
+    if code in {"empty_response", "incomplete_response"}:
+        return RepairFailureClass.RESPONSE_EMPTY
+    if code in {"invalid_json", "invalid_response_json", "non_object_response"}:
+        return RepairFailureClass.RESPONSE_SYNTAX
+    if code in {"response_schema", "invalid_action_shape", "missing_action"}:
+        return RepairFailureClass.RESPONSE_SCHEMA
+    if code in {"workflow_action_not_allowed", "action_not_allowed"}:
+        return RepairFailureClass.ACTION_CONTRACT
+    if code in {
+        "precondition_failed",
+        "file_not_found",
+        "relationship_obligation_open",
+    }:
+        return RepairFailureClass.ACTION_PRECONDITION
+    if code in {"no_progress", "stalled_action"}:
+        return RepairFailureClass.NO_MATERIAL_PROGRESS
+    if code in {"validation_regression", "issue_unchanged"}:
+        return RepairFailureClass.VALIDATION_REGRESSION
+    if code in {"completion_blocked", "output_state_missing"}:
+        return RepairFailureClass.COMPLETION_BLOCKED
+    return default
+
+
+@dataclass(frozen=True, slots=True)
+class RepairPolicy:
+    """Bound semantic recovery independently from transport retries."""
+
+    targeted_attempts: int = 1
+    clean_room_attempts: int = 1
+    action_selection_attempts: int = 1
+    parameter_attempts: int = 1
+    deterministic_recovery: bool = True
+    model_fallback_attempts: int = 1
+    allow_human_handoff: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class RepairFailure:
+    """Failure facts supplied to the shared recovery coordinator."""
+
+    classification: RepairFailureClass
+    error_code: str
+    message: str
+    action_signature: str | None = None
+    target_signature: str | None = None
+    action_payload: Mapping[str, Any] | None = None
+    remediation: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RepairContext:
+    """Typed, adapter-neutral state supplied to semantic repair decisions."""
+
+    execution_id: str = ""
+    boundary_id: str = ""
+    objective: str = ""
+    deterministic_state: Mapping[str, Any] = field(default_factory=dict)
+    allowed_actions: tuple[str, ...] = ()
+    action_schemas: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    required_outputs: tuple[str, ...] = ()
+    open_obligations: tuple[Mapping[str, Any], ...] = ()
+    rejected_strategies: tuple[str, ...] = ()
+    last_material_progress: Mapping[str, Any] | None = None
+    material_state_fingerprint: str = ""
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "execution_id": self.execution_id,
+            "boundary_id": self.boundary_id,
+            "objective": self.objective,
+            "deterministic_state": _repair_json_safe(self.deterministic_state),
+            "allowed_actions": list(self.allowed_actions),
+            "action_schemas": _repair_json_safe(self.action_schemas),
+            "required_outputs": list(self.required_outputs),
+            "open_obligations": _repair_json_safe(self.open_obligations),
+            "rejected_strategies": list(self.rejected_strategies),
+            "last_material_progress": (
+                _repair_json_safe(self.last_material_progress)
+                if self.last_material_progress is not None
+                else None
+            ),
+            "material_state_fingerprint": self.material_state_fingerprint,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RepairDirective:
+    """The adapter-independent result of recording one semantic failure."""
+
+    stage: RepairStage
+    attempt: int
+    reason: str
+    allowed_actions: tuple[str, ...] = ()
+    prompt_profile: str = "normal_full_context"
+    model_policy: str = "current_model"
+    failure_class: RepairFailureClass = RepairFailureClass.EXECUTION
+    error_code: str = "unknown"
+    target_signature: str | None = None
+    material_state_fingerprint: str = ""
+    rejected_strategy_signatures: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RepairExhaustionReport:
+    """Structured terminal record for a boundary with no safe recovery left."""
+
+    boundary_id: str
+    objective: str
+    final_state: Mapping[str, Any]
+    failures: tuple[Mapping[str, Any], ...] = ()
+    prompt_manifests: tuple[Mapping[str, Any], ...] = ()
+    rejected_strategies: tuple[Mapping[str, Any], ...] = ()
+    allowed_actions: tuple[str, ...] = ()
+    reason: str = ""
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "boundary_id": self.boundary_id,
+            "objective": self.objective,
+            "final_state": dict(self.final_state),
+            "failures": [dict(item) for item in self.failures],
+            "prompt_manifests": [dict(item) for item in self.prompt_manifests],
+            "rejected_strategies": [dict(item) for item in self.rejected_strategies],
+            "allowed_actions": list(self.allowed_actions),
+            "reason": self.reason,
+        }
+
+
+def _repair_json_safe(value: Any) -> Any:
+    """Normalize context values for durable JSON events and prompt payloads."""
+    return json.loads(json.dumps(value, ensure_ascii=False, default=str))
+
+
+def _prompt_profile_for_stage(stage: RepairStage) -> str:
+    profiles = {
+        RepairStage.TARGETED: "targeted_schema_correction",
+        RepairStage.CLEAN_ROOM: "clean_room_replan",
+        RepairStage.SELECT_ACTION: "constrained_action_selection",
+        RepairStage.FILL_ACTION: "constrained_action_parameters",
+        RepairStage.DETERMINISTIC: "deterministic_recovery",
+        RepairStage.MODEL_FALLBACK: "clean_room_replan",
+        RepairStage.HUMAN_HANDOFF: "human_recovery_question",
+        RepairStage.EXHAUSTED: "repair_exhausted",
+    }
+    return profiles[stage]
+
+
+class WorkflowRepairCoordinator:
+    """Pure bounded state machine for semantic recovery decisions."""
+
+    def __init__(self, policy: RepairPolicy | None = None) -> None:
+        self.policy = policy or RepairPolicy()
+        self.boundary_id: str | None = None
+        self.attempts: list[RepairDirective] = []
+        self._identities: set[tuple[str, str | None, str | None, str]] = set()
+        self.last_context: RepairContext | None = None
+
+    def begin_boundary(self, boundary_id: str) -> None:
+        if boundary_id != self.boundary_id:
+            self.boundary_id = boundary_id
+            self.attempts.clear()
+            self._identities.clear()
+
+    def record_failure(
+        self,
+        failure: RepairFailure,
+        *,
+        allowed_actions: Sequence[str] = (),
+        context: RepairContext | None = None,
+    ) -> RepairDirective:
+        self.last_context = context
+        context_fingerprint = (
+            context.material_state_fingerprint if context is not None else ""
+        )
+        identity = (
+            failure.error_code,
+            failure.action_signature,
+            failure.target_signature,
+            context_fingerprint,
+        )
+        if identity in self._identities:
+            raise ProgrammerInvariantError(
+                "Duplicate semantic repair failure was recorded.",
+                error_code="duplicate_repair_attempt",
+                remediation="Advance material state or change the repair strategy.",
+            )
+        self._identities.add(identity)
+        stage = self._next_stage(failure)
+        used = sum(item.stage == stage for item in self.attempts)
+        limit = self._limit_for(stage)
+        if used >= limit:
+            return self._exhausted(failure, allowed_actions)
+        directive = RepairDirective(
+            stage=stage,
+            attempt=len(self.attempts) + 1,
+            reason=failure.message,
+            allowed_actions=tuple(
+                dict.fromkeys(
+                    context.allowed_actions if context is not None else allowed_actions
+                )
+            ),
+            prompt_profile=_prompt_profile_for_stage(stage),
+            model_policy=(
+                "backup_model"
+                if stage == RepairStage.MODEL_FALLBACK
+                else "current_model"
+            ),
+            failure_class=failure.classification,
+            error_code=failure.error_code,
+            target_signature=failure.target_signature,
+            material_state_fingerprint=context_fingerprint,
+            rejected_strategy_signatures=(
+                context.rejected_strategies if context is not None else ()
+            ),
+        )
+        self.attempts.append(directive)
+        return directive
+
+    def _next_stage(self, failure: RepairFailure) -> RepairStage:
+        targeted_classes = {
+            RepairFailureClass.RESPONSE,
+            RepairFailureClass.RESPONSE_EMPTY,
+            RepairFailureClass.RESPONSE_SYNTAX,
+            RepairFailureClass.RESPONSE_SCHEMA,
+        }
+        first = (
+            RepairStage.TARGETED
+            if failure.classification in targeted_classes
+            else RepairStage.CLEAN_ROOM
+        )
+        stages = (
+            (
+                first,
+                RepairStage.CLEAN_ROOM,
+                RepairStage.DETERMINISTIC,
+                RepairStage.MODEL_FALLBACK,
+            )
+            if first == RepairStage.TARGETED
+            else (
+                RepairStage.CLEAN_ROOM,
+                RepairStage.DETERMINISTIC,
+                RepairStage.MODEL_FALLBACK,
+            )
+        )
+        for stage in stages:
+            if sum(item.stage == stage for item in self.attempts) < self._limit_for(
+                stage
+            ):
+                return stage
+        if self.policy.allow_human_handoff:
+            return RepairStage.HUMAN_HANDOFF
+        return RepairStage.EXHAUSTED
+
+    def _limit_for(self, stage: RepairStage) -> int:
+        if stage == RepairStage.TARGETED:
+            return max(0, self.policy.targeted_attempts)
+        if stage == RepairStage.CLEAN_ROOM:
+            return max(0, self.policy.clean_room_attempts)
+        if stage == RepairStage.MODEL_FALLBACK:
+            return max(0, self.policy.model_fallback_attempts)
+        if stage == RepairStage.DETERMINISTIC:
+            return 1 if self.policy.deterministic_recovery else 0
+        if stage == RepairStage.HUMAN_HANDOFF:
+            return 1 if self.policy.allow_human_handoff else 0
+        return 0
+
+    def _exhausted(
+        self, failure: RepairFailure, allowed_actions: Sequence[str]
+    ) -> RepairDirective:
+        return RepairDirective(
+            stage=RepairStage.EXHAUSTED,
+            attempt=len(self.attempts) + 1,
+            reason=f"Recovery exhausted for {failure.error_code}: {failure.message}",
+            allowed_actions=tuple(dict.fromkeys(allowed_actions)),
+            prompt_profile=_prompt_profile_for_stage(RepairStage.EXHAUSTED),
+            model_policy="stop",
+            failure_class=failure.classification,
+            error_code=failure.error_code,
+            target_signature=failure.target_signature,
+            material_state_fingerprint=(
+                self.last_context.material_state_fingerprint
+                if self.last_context is not None
+                else ""
+            ),
+            rejected_strategy_signatures=(
+                self.last_context.rejected_strategies
+                if self.last_context is not None
+                else ()
+            ),
+        )
+
+
+def resolve_deterministic_repair(
+    *,
+    error_code: str,
+    allowed_actions: Sequence[str],
+    completion_satisfied: bool = False,
+    output_state: Any = None,
+    legacy_action: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Return only allowlisted repairs whose payload requires no model judgment."""
+    allowed = set(allowed_actions)
+    if completion_satisfied and "emit_outputs" in allowed:
+        return {"action": "emit_outputs", "outputs": output_state}
+    if completion_satisfied and "next_step" in allowed:
+        return {"action": "next_step", "output_state": output_state}
+    if (
+        error_code == "deterministic_output_state_mismatch"
+        and output_state is not None
+        and "next_step" in allowed
+    ):
+        return {"action": "next_step", "output_state": output_state}
+    if error_code == "legacy_action_shape" and legacy_action is not None:
+        action = legacy_action.get("action")
+        if isinstance(action, str) and action in allowed:
+            return dict(legacy_action)
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class RepairPromptManifest:
+    """Auditable description of the information and contract in a repair prompt."""
+
+    profile: str
+    source_sections: tuple[str, ...]
+    history_policy: str
+    allowed_actions: tuple[str, ...]
+    response_schema_fingerprint: str
+    reasoning_mode: str
+    model: str
+    message_fingerprint: str
+    structural_fingerprint: str
+    estimated_tokens: int
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "profile": self.profile,
+            "source_sections": list(self.source_sections),
+            "history_policy": self.history_policy,
+            "allowed_actions": list(self.allowed_actions),
+            "response_schema_fingerprint": self.response_schema_fingerprint,
+            "reasoning_mode": self.reasoning_mode,
+            "model": self.model,
+            "message_fingerprint": self.message_fingerprint,
+            "structural_fingerprint": self.structural_fingerprint,
+            "estimated_tokens": self.estimated_tokens,
+        }
+
+
+def build_repair_prompt_manifest(
+    messages: Sequence[Mapping[str, str]],
+    *,
+    profile: str,
+    source_sections: Sequence[str] = (),
+    history_policy: str,
+    allowed_actions: Sequence[str] = (),
+    response_schema: Mapping[str, Any] | None = None,
+    reasoning_mode: str = "direct_action",
+    model: str = "",
+) -> RepairPromptManifest:
+    """Describe a repair prompt using stable structural and content fingerprints."""
+    serialized = json.dumps(list(messages), ensure_ascii=False, sort_keys=True)
+    schema_serialized = json.dumps(
+        response_schema or {}, ensure_ascii=False, sort_keys=True
+    )
+    structure = {
+        "profile": profile,
+        "source_sections": sorted(set(source_sections)),
+        "history_policy": history_policy,
+        "allowed_actions": sorted(set(allowed_actions)),
+        "response_schema": schema_serialized,
+        "reasoning_mode": reasoning_mode,
+        "model": model,
+    }
+    return RepairPromptManifest(
+        profile=profile,
+        source_sections=tuple(sorted(set(source_sections))),
+        history_policy=history_policy,
+        allowed_actions=tuple(sorted(set(allowed_actions))),
+        response_schema_fingerprint=_sha256(schema_serialized),
+        reasoning_mode=reasoning_mode,
+        model=model,
+        message_fingerprint=_sha256(serialized),
+        structural_fingerprint=_sha256(
+            json.dumps(structure, ensure_ascii=False, sort_keys=True)
+        ),
+        estimated_tokens=_prompt_size_tokens(serialized),
+    )
+
+
+def assert_material_repair_prompt(
+    previous: RepairPromptManifest,
+    current: RepairPromptManifest,
+) -> None:
+    """Reject semantic repair prompts that only differ cosmetically."""
+    if previous.message_fingerprint == current.message_fingerprint:
+        raise ProgrammerInvariantError(
+            "Repair prompt was identical to the previous prompt.",
+            error_code="repair_prompt_not_distinct",
+            remediation="Use a different repair prompt profile and context.",
+        )
+    material_change = previous.profile != current.profile and (
+        previous.history_policy != current.history_policy
+        or set(current.allowed_actions) < set(previous.allowed_actions)
+        or previous.response_schema_fingerprint != current.response_schema_fingerprint
+        or previous.reasoning_mode != current.reasoning_mode
+        or set(current.source_sections) != set(previous.source_sections)
+        or previous.model != current.model
+    )
+    if not material_change:
+        raise ProgrammerInvariantError(
+            "Repair prompt did not make a material structural change.",
+            error_code="repair_prompt_not_materially_different",
+            remediation=(
+                "Change the prompt profile, remove history, narrow the action "
+                "space, change the response schema, or change reasoning mode."
+            ),
+        )
+
+
+def build_clean_room_repair_prompt(
+    *,
+    context: str,
+    error_message: str,
+    repair_instructions: str,
+    response_schema: Mapping[str, Any] | None = None,
+    allowed_actions: Sequence[str] = (),
+    model: str = "",
+) -> tuple[list[dict[str, str]], RepairPromptManifest]:
+    """Build a recovery prompt from structured facts without conversation history."""
+    recovery = {
+        "execution_mode": "clean_room_repair",
+        "context": context,
+        "failure": error_message,
+        "repair_instructions": repair_instructions,
+        "allowed_actions": list(allowed_actions),
+    }
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are recovering a stalled workflow boundary using a clean-room "
+                "repair. Do not continue "
+                "the previous conversation. Choose one legal action that materially "
+                "advances the supplied task. Return only the complete JSON object "
+                "required by the supplied response contract."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(recovery, ensure_ascii=False, separators=(",", ":")),
+        },
+    ]
+    return messages, build_repair_prompt_manifest(
+        messages,
+        profile="clean_room_replan",
+        source_sections=(
+            "context",
+            "failure",
+            "repair_instructions",
+            "allowed_actions",
+        ),
+        history_policy="none",
+        allowed_actions=allowed_actions,
+        response_schema=response_schema,
+        reasoning_mode="clean_room_action",
+        model=model,
+    )
+
+
+def build_clean_room_action_selection_prompt(
+    *,
+    context: str,
+    error_message: str,
+    allowed_actions: Sequence[str],
+    model: str = "",
+) -> tuple[list[dict[str, str]], Mapping[str, Any], RepairPromptManifest]:
+    """Build the first pass of constrained recovery: choose a legal action kind."""
+    actions = tuple(dict.fromkeys(allowed_actions))
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": list(actions)},
+        },
+        "required": ["action"],
+        "additionalProperties": False,
+    }
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are selecting a recovery action for a stalled workflow. "
+                "Choose exactly one action name from the supplied enum. Do not "
+                "provide parameters, prose, or a complete action object."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "execution_mode": "clean_room_repair",
+                    "repair_stage": "action_selection",
+                    "context": context,
+                    "failure": error_message,
+                    "allowed_actions": list(actions),
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+        },
+    ]
+    manifest = build_repair_prompt_manifest(
+        messages,
+        profile="constrained_action_selection",
+        source_sections=("context", "failure", "allowed_actions"),
+        history_policy="none",
+        allowed_actions=actions,
+        response_schema=schema,
+        reasoning_mode="action_selection",
+        model=model,
+    )
+    return messages, schema, manifest
+
+
+def build_clean_room_action_parameters_prompt(
+    *,
+    context: str,
+    error_message: str,
+    selected_action: str,
+    response_schema: Mapping[str, Any],
+    model: str = "",
+) -> tuple[list[dict[str, str]], RepairPromptManifest]:
+    """Build the second pass of recovery for one already-selected action."""
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are supplying parameters for one previously selected workflow "
+                "action. Return exactly one complete JSON action object. The action "
+                f"must be {selected_action!r}; do not choose another action, add "
+                "prose, or return markdown."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "execution_mode": "clean_room_repair",
+                    "repair_stage": "action_parameters",
+                    "selected_action": selected_action,
+                    "context": context,
+                    "failure": error_message,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+        },
+    ]
+    manifest = build_repair_prompt_manifest(
+        messages,
+        profile="constrained_action_parameters",
+        source_sections=("context", "failure", "selected_action"),
+        history_policy="none",
+        allowed_actions=(selected_action,),
+        response_schema=response_schema,
+        reasoning_mode="action_parameters",
+        model=model,
+    )
+    return messages, manifest
+
+
+def complete_two_pass_action(
+    client: WorkflowLLMClient,
+    *,
+    selection_messages: list[dict[str, str]],
+    selection_schema: Mapping[str, Any],
+    parameter_messages_for: Callable[[str], list[dict[str, str]]],
+    parameter_schema_for: Callable[[str], Mapping[str, Any]],
+    parser: Callable[[dict[str, Any]], Any],
+    allowed_actions: Sequence[str],
+    model: str,
+    stderr: Any,
+    max_timeout_retries: int,
+    timeout_backoff_seconds: float,
+    fallback_client: WorkflowLLMClient | None = None,
+    fallback_model: str | None = None,
+) -> Any:
+    """Select an action kind, then request only that action's payload.
+
+    A complete payload from a scripted/legacy client remains accepted so the
+    recovery contract can be introduced without breaking deterministic tests.
+    Provider-backed recovery still uses two calls whenever the first response is
+    only an action selection.
+    """
+    selection = complete_json_with_timeout_retry(
+        client,
+        selection_messages,
+        model=model,
+        stderr=stderr,
+        max_timeout_retries=max_timeout_retries,
+        timeout_backoff_seconds=timeout_backoff_seconds,
+        response_schema=selection_schema,
+    )
+    selected = selection.get("action")
+    actions = tuple(dict.fromkeys(allowed_actions))
+    if not isinstance(selected, str) or (actions and selected not in actions):
+        raise RuntimeError("Recovery action selection was not a legal action name.")
+    if (
+        len(selection) > 1
+        or not actions
+        or selected in {"next_step", "complete", "emit_outputs"}
+    ):
+        return parser(selection)
+    parameter_messages = parameter_messages_for(selected)
+    parameter_schema = parameter_schema_for(selected)
+    try:
+        payload = complete_json_with_timeout_retry(
+            client,
+            parameter_messages,
+            model=model,
+            stderr=stderr,
+            max_timeout_retries=max_timeout_retries,
+            timeout_backoff_seconds=timeout_backoff_seconds,
+            response_schema=parameter_schema,
+        )
+        if payload.get("action") != selected:
+            raise RuntimeError(
+                f"Recovery parameter response selected {payload.get('action')!r}; "
+                f"expected {selected!r}."
+            )
+        return parser(payload)
+    except RuntimeError:
+        if fallback_client is None or not fallback_model or fallback_model == model:
+            raise
+        fallback_payload = complete_json_with_timeout_retry(
+            fallback_client,
+            parameter_messages,
+            model=fallback_model,
+            stderr=stderr,
+            max_timeout_retries=max_timeout_retries,
+            timeout_backoff_seconds=timeout_backoff_seconds,
+            response_schema=parameter_schema,
+        )
+        if fallback_payload.get("action") != selected:
+            raise RuntimeError(
+                f"Fallback recovery selected {fallback_payload.get('action')!r}; "
+                f"expected {selected!r}."
+            ) from None
+        return parser(fallback_payload)
+
+
+def constrain_action_response_schema(
+    response_schema: Mapping[str, Any], selected_action: str
+) -> dict[str, Any]:
+    """Return a provider schema containing only the selected action's fields."""
+    schema = json.loads(json.dumps(response_schema))
+    properties = schema.get("properties", {})
+    common = {name for name in ("action", "decisions_and_context", "llm_type")}
+    fields_by_action = {
+        "gather_context": {"types", "feature_id", "keywords", "filters"},
+        "prompt_user": {"text"},
+        "edit": {"file_path", "edits", "file_edits"},
+        "yaml_edit": {"file_path", "operations"},
+        "file_management": {"operation", "file_path", "destination_path"},
+        "invoke_skill": {"skill", "provider_role", "clean", "context"},
+        "invoke_tool": {"tool", "parameters"},
+        "read_document": {"file_path", "start_line", "end_line"},
+        "list_files": {"directory", "pattern", "recursive"},
+        "goto_step": {"step_id"},
+        "next_step": {"output_state"},
+        "complete": {"text"},
+        "emit_outputs": {"outputs"},
+    }
+    keep = common | fields_by_action.get(selected_action, set())
+    schema["properties"] = {
+        name: value for name, value in properties.items() if name in keep
+    }
+    action_schema = schema["properties"].get("action", {})
+    schema["properties"]["action"] = {**action_schema, "enum": [selected_action]}
+    schema["required"] = [name for name in schema.get("required", []) if name in keep]
+    if "action" not in schema["required"]:
+        schema["required"].insert(0, "action")
+    return schema
+
+
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -415,6 +1155,18 @@ def _coding_loop_identity(strategy: Any) -> tuple[Any, ...]:
     )
 
 
+def _boundary_id(strategy: Any) -> str:
+    """Return a stable task/step identity for semantic repair state."""
+    task_id = getattr(getattr(strategy, "task", None), "task_id", None)
+    if task_id is not None:
+        return f"task:{task_id}:{getattr(strategy, 'current_step_index', None)}"
+    skill = getattr(strategy, "selected_skill", None)
+    return (
+        f"skill:{getattr(skill, 'path', '<unknown>')}:"
+        f"{getattr(strategy, 'current_step_index', None)}"
+    )
+
+
 class WorkflowShadowRecorder(Protocol):
     """Optional best-effort event sink used while the kernel is in shadow mode."""
 
@@ -445,6 +1197,7 @@ class WorkflowStepRunner:
         legacy_compatibility: bool = False,
         phase_type: str = "build",
         actor_id: str = "workflow-agent",
+        repair_policy: RepairPolicy | None = None,
     ) -> None:
         self.action_engine = WorkflowLLMActionEngine(
             max_stalled_roundtrips=max_stalled_roundtrips
@@ -454,6 +1207,9 @@ class WorkflowStepRunner:
         self.runtime = runtime
         self.phase_type = phase_type
         self.actor_id = actor_id
+        self.repair_coordinator = WorkflowRepairCoordinator(repair_policy)
+        self.last_repair_directive: RepairDirective | None = None
+        self._last_repair_failure: RepairFailure | None = None
         if runtime is None and not legacy_compatibility:
             raise ProgrammerInvariantError(
                 "WorkflowStepRunner requires an ExecutionRuntime for normal execution.",
@@ -489,7 +1245,9 @@ class WorkflowStepRunner:
                     return 2
             request = strategy.next_request()
             if request is None:
-                return 0
+                terminal_exit_code = getattr(strategy, "terminal_exit_code", None)
+                return terminal_exit_code if isinstance(terminal_exit_code, int) else 0
+            self.repair_coordinator.begin_boundary(_boundary_id(strategy))
             roundtrips += 1
             try:
                 action = (
@@ -519,12 +1277,28 @@ class WorkflowStepRunner:
                 # These failures are not model-correctable action errors.
                 raise
             except RuntimeError as exc:
+                directive = self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        classify_repair_failure(
+                            getattr(exc, "error_code", type(exc).__name__),
+                            default=RepairFailureClass.RESPONSE,
+                        ),
+                        getattr(exc, "error_code", type(exc).__name__),
+                        str(exc),
+                    ),
+                )
                 if self.observer is not None:
                     try:
                         self.observer.response_failed(exc)
                     except Exception:
                         pass
                 strategy.record_response_error(exc, self.action_engine.last_payload)
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
+                )
+                if deterministic_outcome is not None:
+                    return deterministic_outcome.exit_code or 0
                 continue
 
             strategy.report_roundtrip(roundtrips, action)
@@ -551,8 +1325,25 @@ class WorkflowStepRunner:
                     remediation="perform the required follow-up action first",
                 )
                 strategy.record_action_error(action, error)
+                directive = self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        classify_repair_failure(
+                            error.error_code, default=RepairFailureClass.PROPOSAL
+                        ),
+                        error.error_code,
+                        str(error),
+                        action_signature=signature(action),
+                        target_signature=workflow_action_target_signature(action),
+                    ),
+                )
                 self.kernel.fail(action, error)
                 self._sync_runtime()
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
+                )
+                if deterministic_outcome is not None:
+                    return deterministic_outcome.exit_code or 0
                 if self.observer is not None:
                     try:
                         proposal_decision = self.observer.action_failed(action, error)
@@ -600,6 +1391,18 @@ class WorkflowStepRunner:
                     ),
                 )
                 strategy.record_action_error(action, exc)
+                directive = self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        classify_repair_failure(
+                            exc.error_code, default=RepairFailureClass.ACTION_EXECUTION
+                        ),
+                        exc.error_code,
+                        str(exc),
+                        action_signature=signature(action),
+                        target_signature=workflow_action_target_signature(action),
+                    ),
+                )
                 failure_decision = None
                 if self.observer is not None:
                     try:
@@ -610,6 +1413,11 @@ class WorkflowStepRunner:
                     apply_decision = getattr(strategy, "apply_observer_decision", None)
                     if callable(apply_decision):
                         apply_decision(failure_decision, action, None)
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
+                )
+                if deterministic_outcome is not None:
+                    return deterministic_outcome.exit_code or 0
                 if (
                     self.action_engine.record_action_failure(
                         action,
@@ -634,6 +1442,24 @@ class WorkflowStepRunner:
             )
             if not observation.made_progress:
                 strategy.record_no_progress(action, observation)
+                directive = self._record_semantic_failure(
+                    strategy,
+                    RepairFailure(
+                        classify_repair_failure(
+                            "no_progress",
+                            default=RepairFailureClass.NO_MATERIAL_PROGRESS,
+                        ),
+                        "no_progress",
+                        observation.correction or "The action made no progress.",
+                        action_signature=signature(action),
+                        target_signature=workflow_action_target_signature(action),
+                    ),
+                )
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
+                )
+                if deterministic_outcome is not None:
+                    return deterministic_outcome.exit_code or 0
                 if observation.decision is ProgressDecision.THRESHOLD:
                     stop_after_stall = getattr(
                         strategy, "no_progress_threshold_exit_code", None
@@ -665,7 +1491,87 @@ class WorkflowStepRunner:
                 return outcome.exit_code
             if not outcome.continue_running:
                 return 0
-        return strategy.exhausted_roundtrips_exit_code()
+        return 0
+
+    def _record_semantic_failure(
+        self,
+        strategy: WorkflowExecutionStrategy,
+        failure: RepairFailure,
+    ) -> RepairDirective | None:
+        self._last_repair_failure = failure
+        try:
+            allowed_actions = (
+                self.runtime.allowed_actions() if self.runtime is not None else ()
+            )
+            directive = self.repair_coordinator.record_failure(
+                failure,
+                allowed_actions=allowed_actions or (),
+                context=(
+                    repair_context()
+                    if callable(
+                        repair_context := getattr(strategy, "repair_context", None)
+                    )
+                    else None
+                ),
+            )
+        except ProgrammerInvariantError:
+            return None
+        self.last_repair_directive = directive
+        apply_directive = getattr(strategy, "record_repair_directive", None)
+        if callable(apply_directive):
+            apply_directive(directive)
+        return directive
+
+    def _apply_deterministic_repair(
+        self,
+        strategy: WorkflowExecutionStrategy,
+        directive: RepairDirective | None,
+        failure: RepairFailure | None,
+    ) -> WorkflowActionOutcome | None:
+        if (
+            directive is None
+            or failure is None
+            or directive.stage is not RepairStage.DETERMINISTIC
+        ):
+            return None
+        deterministic = getattr(strategy, "deterministic_repair_action", None)
+        if not callable(deterministic):
+            return None
+        action = deterministic(failure, directive)
+        if action is None:
+            return None
+        proposal_errors = self.kernel.validate_proposal(action)
+        if self.runtime is not None:
+            proposal_errors = (
+                *proposal_errors,
+                *self.runtime.validate_action(str(getattr(action, "kind", ""))),
+            )
+        if proposal_errors:
+            error = PowdrrExecutionError(
+                " ".join(proposal_errors),
+                error_code="deterministic_repair_not_allowed",
+            )
+            strategy.record_action_error(action, error)
+            self.kernel.fail(action, error)
+            self._sync_runtime()
+            return None
+        self.kernel.propose(action)
+        self._sync_runtime()
+        self._record_shadow("action_proposed", action)
+        try:
+            self.kernel.start(action)
+            self._sync_runtime()
+            outcome = strategy.execute_action(action)
+        except PowdrrExecutionError as error:
+            self.kernel.fail(action, error)
+            self._sync_runtime()
+            self._record_shadow("action_failed", action, error_code=error.error_code)
+            strategy.record_action_error(action, error)
+            return None
+        self.kernel.complete(action)
+        self._sync_runtime()
+        self._record_shadow("action_completed", action)
+        return outcome
 
     def _record_shadow(
         self,
@@ -843,6 +1749,33 @@ def workflow_action_failure_signature[ActionT](
     for field_name in ("decisions_and_context", "llm_type", "outputs"):
         value.pop(field_name, None)
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def workflow_action_target_signature(action: object) -> str:
+    """Return a stable resource-level identity for rejected action strategies."""
+    kind = str(getattr(action, "kind", "action"))
+    target_fields = {
+        "file_path": getattr(action, "file_path", None),
+        "file_paths": tuple(
+            getattr(edit, "file_path", "") for edit in getattr(action, "file_edits", ())
+        ),
+        "tool": getattr(action, "tool", None),
+        "skill_name": getattr(action, "skill_name", None),
+        "step_id": getattr(action, "step_id", None),
+        "destination_path": getattr(action, "destination_path", None),
+        "file_operation": getattr(action, "file_operation", None),
+    }
+    target = {
+        name: value
+        for name, value in target_fields.items()
+        if value not in (None, "", ())
+    }
+    return json.dumps(
+        {"kind": kind, "target": target},
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    )
 
 
 def workflow_action_summary(action: object) -> str:

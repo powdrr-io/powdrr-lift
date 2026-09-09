@@ -6,17 +6,446 @@ from typing import Any
 
 from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
+    ProgrammerInvariantError,
+    RepairContext,
+    RepairExhaustionReport,
+    RepairFailure,
+    RepairFailureClass,
+    RepairPolicy,
+    RepairStage,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionRequest,
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
+    WorkflowRepairCoordinator,
     WorkflowStepRunner,
+    assert_material_repair_prompt,
+    build_clean_room_action_parameters_prompt,
+    build_clean_room_action_selection_prompt,
+    build_clean_room_repair_prompt,
+    build_repair_prompt_manifest,
+    classify_repair_failure,
     complete_json_with_timeout_retry,
+    complete_two_pass_action,
+    constrain_action_response_schema,
     prompt_size_breakdown,
     prune_execution_events,
+    resolve_deterministic_repair,
     workflow_action_signature,
+    workflow_action_target_signature,
 )
+
+
+def test_repair_failure_classification_uses_codes_not_error_text() -> None:
+    assert (
+        classify_repair_failure(
+            "workflow_action_not_allowed", default=RepairFailureClass.RESPONSE
+        )
+        is RepairFailureClass.ACTION_CONTRACT
+    )
+
+
+def test_target_signature_omits_material_parameter_and_narrative_changes() -> None:
+    first = {"kind": "edit", "file_path": "src/app.py"}
+    second = {"kind": "edit", "file_path": "src/app.py"}
+    assert workflow_action_target_signature(first) == workflow_action_target_signature(
+        second
+    )
+    assert (
+        classify_repair_failure("no_progress", default=RepairFailureClass.EXECUTION)
+        is RepairFailureClass.NO_MATERIAL_PROGRESS
+    )
+
+
+def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
+    coordinator = WorkflowRepairCoordinator(
+        RepairPolicy(
+            targeted_attempts=1,
+            clean_room_attempts=1,
+            deterministic_recovery=False,
+            model_fallback_attempts=0,
+            allow_human_handoff=False,
+        )
+    )
+    coordinator.begin_boundary("step-1")
+    response_failure = RepairFailure(
+        RepairFailureClass.RESPONSE, "invalid_json", "response was not JSON"
+    )
+    targeted = coordinator.record_failure(response_failure)
+    assert targeted.stage == RepairStage.TARGETED
+    assert targeted.prompt_profile == "targeted_schema_correction"
+    assert targeted.model_policy == "current_model"
+
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.EXECUTION,
+                "action_failed",
+                "edit failed",
+                action_signature="edit:file-a",
+            )
+        ).stage
+        == RepairStage.CLEAN_ROOM
+    )
+    exhausted = coordinator.record_failure(
+        RepairFailure(
+            RepairFailureClass.EXECUTION,
+            "action_failed_again",
+            "another action failed",
+            action_signature="edit:file-b",
+        )
+    )
+    assert exhausted.stage == RepairStage.EXHAUSTED
+
+    coordinator.begin_boundary("step-2")
+    assert coordinator.record_failure(response_failure).attempt == 1
+
+
+def test_repair_context_allows_same_target_after_material_state_changes() -> None:
+    coordinator = WorkflowRepairCoordinator()
+    coordinator.begin_boundary("step-1")
+    failure = RepairFailure(
+        RepairFailureClass.ACTION_EXECUTION,
+        "file_not_found",
+        "missing target",
+        target_signature="file:README.md",
+    )
+    first = coordinator.record_failure(
+        failure,
+        context=RepairContext(
+            boundary_id="step-1", material_state_fingerprint="before"
+        ),
+    )
+    second = coordinator.record_failure(
+        failure,
+        context=RepairContext(boundary_id="step-1", material_state_fingerprint="after"),
+    )
+    assert first.attempt == 1
+    assert second.attempt == 2
+
+
+def test_repair_context_serializes_replay_inputs() -> None:
+    context = RepairContext(
+        execution_id="execution",
+        boundary_id="step",
+        objective="recover",
+        allowed_actions=("next_step",),
+        required_outputs=("result",),
+        rejected_strategies=("edit:file",),
+        material_state_fingerprint="state-hash",
+    )
+    assert context.to_data() == {
+        "execution_id": "execution",
+        "boundary_id": "step",
+        "objective": "recover",
+        "deterministic_state": {},
+        "allowed_actions": ["next_step"],
+        "action_schemas": {},
+        "required_outputs": ["result"],
+        "open_obligations": [],
+        "rejected_strategies": ["edit:file"],
+        "last_material_progress": None,
+        "material_state_fingerprint": "state-hash",
+    }
+
+
+def test_repair_coordinator_escalates_to_fallback_then_handoff() -> None:
+    coordinator = WorkflowRepairCoordinator(RepairPolicy(deterministic_recovery=False))
+    coordinator.begin_boundary("step-1")
+    assert (
+        coordinator.record_failure(
+            RepairFailure(RepairFailureClass.RESPONSE, "bad_json", "bad response")
+        ).stage
+        is RepairStage.TARGETED
+    )
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.EXECUTION,
+                "edit_failed",
+                "edit failed",
+                action_signature="edit:a",
+            )
+        ).stage
+        is RepairStage.CLEAN_ROOM
+    )
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.EXECUTION,
+                "tool_failed",
+                "tool failed",
+                action_signature="tool:b",
+            )
+        ).stage
+        is RepairStage.MODEL_FALLBACK
+    )
+    assert coordinator.attempts[-1].prompt_profile == "clean_room_replan"
+    assert coordinator.attempts[-1].model_policy == "backup_model"
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.NO_PROGRESS,
+                "no_progress",
+                "still stalled",
+                action_signature="read:c",
+            )
+        ).stage
+        is RepairStage.HUMAN_HANDOFF
+    )
+
+
+def test_repair_coordinator_selects_deterministic_stage_before_model_fallback() -> None:
+    coordinator = WorkflowRepairCoordinator()
+    coordinator.begin_boundary("step-1")
+    coordinator.record_failure(
+        RepairFailure(RepairFailureClass.EXECUTION, "first", "first failure")
+    )
+    deterministic = coordinator.record_failure(
+        RepairFailure(
+            RepairFailureClass.EXECUTION,
+            "second",
+            "deterministic repair is safe",
+            action_signature="different-action",
+        )
+    )
+    assert deterministic.stage is RepairStage.DETERMINISTIC
+    assert deterministic.prompt_profile == "deterministic_recovery"
+
+
+def test_repair_coordinator_rejects_duplicate_failure_identity() -> None:
+    coordinator = WorkflowRepairCoordinator()
+    coordinator.begin_boundary("step-1")
+    failure = RepairFailure(
+        RepairFailureClass.NO_PROGRESS,
+        "no_progress",
+        "same action repeated",
+        action_signature="edit:file-a",
+    )
+    coordinator.record_failure(failure)
+    try:
+        coordinator.record_failure(failure)
+    except ProgrammerInvariantError as error:
+        assert error.error_code == "duplicate_repair_attempt"
+    else:
+        raise AssertionError("duplicate repair failure was accepted")
+
+
+def test_deterministic_repair_only_returns_allowlisted_terminal_actions() -> None:
+    assert resolve_deterministic_repair(
+        error_code="completion_satisfied",
+        allowed_actions=("emit_outputs",),
+        completion_satisfied=True,
+        output_state={"answer": 42},
+    ) == {"action": "emit_outputs", "outputs": {"answer": 42}}
+    assert (
+        resolve_deterministic_repair(
+            error_code="completion_satisfied",
+            allowed_actions=("edit",),
+            completion_satisfied=True,
+            output_state={"answer": 42},
+        )
+        is None
+    )
+    assert resolve_deterministic_repair(
+        error_code="legacy_action_shape",
+        allowed_actions=("edit",),
+        legacy_action={"action": "edit", "file_path": "README.md"},
+    ) == {"action": "edit", "file_path": "README.md"}
+    assert resolve_deterministic_repair(
+        error_code="deterministic_output_state_mismatch",
+        allowed_actions=("next_step",),
+        output_state={"result": True},
+    ) == {"action": "next_step", "output_state": {"result": True}}
+
+
+def test_repair_exhaustion_report_is_durable_and_complete() -> None:
+    report = RepairExhaustionReport(
+        boundary_id="skill:step-2",
+        objective="implement the feature",
+        final_state={"files_changed": []},
+        failures=({"code": "no_progress"},),
+        prompt_manifests=({"profile": "clean_room_replan"},),
+        rejected_strategies=({"action": "edit"},),
+        allowed_actions=("read_document",),
+        reason="No safe repair remains.",
+    ).to_data()
+
+    assert report == {
+        "boundary_id": "skill:step-2",
+        "objective": "implement the feature",
+        "final_state": {"files_changed": []},
+        "failures": [{"code": "no_progress"}],
+        "prompt_manifests": [{"profile": "clean_room_replan"}],
+        "rejected_strategies": [{"action": "edit"}],
+        "allowed_actions": ["read_document"],
+        "reason": "No safe repair remains.",
+    }
+
+
+def test_clean_room_repair_prompt_excludes_conversation_and_records_profile() -> None:
+    original = [
+        {"role": "system", "content": "normal instructions"},
+        {
+            "role": "user",
+            "content": '{"objective":"keep-objective","canary":"old-history"}',
+        },
+        {"role": "assistant", "content": '{"action":"bad","canary":"old-payload"}'},
+    ]
+    previous = build_repair_prompt_manifest(
+        original,
+        profile="normal_full_context",
+        source_sections=("conversation",),
+        history_policy="full",
+        allowed_actions=("edit", "read_document"),
+        reasoning_mode="direct_action",
+    )
+    repaired, current = build_clean_room_repair_prompt(
+        context="workflow execution",
+        error_message="bad action",
+        repair_instructions="Choose a legal action.",
+        allowed_actions=("read_document",),
+    )
+
+    assert len(repaired) == 2
+    assert all("old-history" not in message["content"] for message in repaired)
+    assert all("old-payload" not in message["content"] for message in repaired)
+    assert current.profile == "clean_room_replan"
+    assert current.history_policy == "none"
+    assert_material_repair_prompt(previous, current)
+
+
+def test_material_repair_prompt_rejects_cosmetic_changes() -> None:
+    first = build_repair_prompt_manifest(
+        [{"role": "user", "content": "one"}],
+        profile="targeted_schema_correction",
+        history_policy="full",
+        reasoning_mode="direct_action",
+    )
+    second = build_repair_prompt_manifest(
+        [{"role": "user", "content": "two"}],
+        profile="targeted_schema_correction",
+        history_policy="full",
+        reasoning_mode="direct_action",
+    )
+
+    try:
+        assert_material_repair_prompt(first, second)
+    except ProgrammerInvariantError as error:
+        assert error.error_code == "repair_prompt_not_materially_different"
+    else:
+        raise AssertionError("cosmetic repair prompt change was accepted")
+
+
+def test_two_pass_repair_selects_then_constrains_action_parameters() -> None:
+    class _Client:
+        def __init__(self) -> None:
+            self.messages: list[list[dict[str, str]]] = []
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            self.messages.append(messages)
+            if len(self.messages) == 1:
+                return {"action": "edit"}
+            return {"action": "edit", "file_path": "README.md"}
+
+    client = _Client()
+    selection_messages, selection_schema, _ = build_clean_room_action_selection_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        allowed_actions=("edit", "complete"),
+    )
+    parameter_schema = constrain_action_response_schema(
+        {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["edit", "complete"]},
+                "file_path": {"type": "string"},
+                "text": {"type": "string"},
+            },
+            "required": ["action"],
+        },
+        "edit",
+    )
+    parameter_messages, _ = build_clean_room_action_parameters_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        selected_action="edit",
+        response_schema=parameter_schema,
+    )
+
+    action = complete_two_pass_action(
+        client,
+        selection_messages=selection_messages,
+        selection_schema=selection_schema,
+        parameter_messages_for=lambda _action: parameter_messages,
+        parameter_schema_for=lambda _action: parameter_schema,
+        parser=lambda payload: payload,
+        allowed_actions=("edit", "complete"),
+        model="test-model",
+        stderr=None,
+        max_timeout_retries=0,
+        timeout_backoff_seconds=0,
+    )
+
+    assert action["action"] == "edit"
+    assert len(client.messages) == 2
+    assert '"repair_stage":"action_selection"' in client.messages[0][1]["content"]
+    assert '"repair_stage":"action_parameters"' in client.messages[1][1]["content"]
+    assert parameter_schema["properties"]["action"]["enum"] == ["edit"]
+
+
+def test_two_pass_repair_uses_distinct_model_for_parameter_fallback() -> None:
+    class _Client:
+        def __init__(self, responses: list[dict[str, Any]]) -> None:
+            self.responses = responses
+            self.calls = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            _ = messages
+            response = self.responses[min(self.calls, len(self.responses) - 1)]
+            self.calls += 1
+            return response
+
+    primary = _Client([{"action": "edit"}, {"action": "complete"}])
+    fallback = _Client([{"action": "edit", "file_path": "README.md"}])
+    selection_messages, selection_schema, _ = build_clean_room_action_selection_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        allowed_actions=("edit",),
+    )
+    parameter_messages, _ = build_clean_room_action_parameters_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        selected_action="edit",
+        response_schema={
+            "type": "object",
+            "properties": {"action": {"type": "string", "enum": ["edit"]}},
+            "required": ["action"],
+        },
+    )
+
+    action = complete_two_pass_action(
+        primary,
+        selection_messages=selection_messages,
+        selection_schema=selection_schema,
+        parameter_messages_for=lambda _action: parameter_messages,
+        parameter_schema_for=lambda _action: {
+            "type": "object",
+            "properties": {"action": {"type": "string", "enum": ["edit"]}},
+            "required": ["action"],
+        },
+        parser=lambda payload: payload,
+        allowed_actions=("edit",),
+        model="primary",
+        stderr=None,
+        max_timeout_retries=0,
+        timeout_backoff_seconds=0,
+        fallback_client=fallback,
+        fallback_model="fallback",
+    )
+
+    assert action["file_path"] == "README.md"
 
 
 def test_prompt_size_breakdown_reports_execution_mode_and_top_level_fields() -> None:
@@ -114,7 +543,7 @@ class _ExecutionStrategy(WorkflowExecutionStrategy):
         self.executed: list[str] = []
         self.observations: list[WorkflowActionObservation] = []
 
-    def next_request(self) -> WorkflowActionRequest:
+    def next_request(self) -> WorkflowActionRequest | None:
         return WorkflowActionRequest(
             client=self.client,
             messages=[{"role": "user", "content": "run"}],
@@ -312,6 +741,26 @@ def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None
     ]
 
 
+def test_execution_driver_honors_adapter_terminal_repair_exit_code() -> None:
+    class _TerminalStrategy(_ExecutionStrategy):
+        terminalized = True
+        terminal_exit_code: int | None = 17
+
+        def next_request(self) -> None:
+            return None
+
+    strategy = _TerminalStrategy()
+
+    assert (
+        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+            strategy,
+            max_roundtrips=3,
+            signature=workflow_action_signature,
+        )
+        == 17
+    )
+
+
 def test_execution_driver_bounds_coding_loop_iterations() -> None:
     class _CodingLoopStrategy(_ExecutionStrategy):
         current_step_index = 0
@@ -367,14 +816,17 @@ def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> N
             return 7
 
     strategy = _StalledStrategy()
+    driver = WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True)
     assert (
-        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+        driver.run(
             strategy,
             max_roundtrips=None,
             signature=workflow_action_signature,
         )
         == 7
     )
+    assert driver.last_repair_directive is not None
+    assert driver.last_repair_directive.stage is RepairStage.CLEAN_ROOM
 
 
 def test_execution_driver_never_crashes_when_observer_fails() -> None:
@@ -421,6 +873,7 @@ def test_execution_driver_supports_a_shared_model_fallback_request() -> None:
 
     def next_request() -> WorkflowActionRequest:
         request = original_next_request()
+        assert request is not None
         return WorkflowActionRequest(
             client=request.client,
             messages=request.messages,

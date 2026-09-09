@@ -109,6 +109,11 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgressDecision,
     ProviderExecutionError,
+    RepairContext,
+    RepairDirective,
+    RepairExhaustionReport,
+    RepairPromptManifest,
+    RepairStage,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
@@ -118,6 +123,12 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMExecutionAborted,
     WorkflowLLMHTTPError,
     WorkflowStepRunner,
+    assert_material_repair_prompt,
+    build_clean_room_action_parameters_prompt,
+    build_clean_room_action_selection_prompt,
+    build_repair_prompt_manifest,
+    complete_two_pass_action,
+    constrain_action_response_schema,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_failure_signature,
@@ -901,6 +912,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     observer_intervention: str | None = None
     observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
+    clean_room_repair_pending: bool = False
+    clean_room_repair_used: bool = False
+    repair_prompt_manifest: RepairPromptManifest | None = None
+    terminalized: bool = False
+    terminal_exit_code: int | None = None
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -1016,6 +1032,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.inherited_interaction_style = parent_interaction_style
 
     def next_request(self) -> WorkflowActionRequest | None:
+        if self.terminalized:
+            return None
         while True:
             if self.state.step_index >= len(self.selected_skill.skill.steps):
                 if not self.skill_stack:
@@ -1128,6 +1146,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 or self.state.step_checkpoint.identity != checkpoint_identity
             ):
                 self.state.stalled_step_context = []
+                self.clean_room_repair_used = False
+                self.repair_prompt_manifest = None
                 _begin_step_checkpoint(
                     self.state,
                     skill=self.selected_skill,
@@ -1280,36 +1300,201 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_skill=parent_skill,
                 parent_step_index=parent_step_index,
             )
-            messages = _build_step_execution_messages(
-                selected_skill=self.selected_skill,
-                current_step=self.current_step,
-                current_step_index=self.current_step_index,
-                transcript=self.state.transcript,
-                execution_events=self.state.execution_events,
-                execution_context=self.state.execution_context,
-                handoff_records=self.state.handoff_records,
-                durable_facts=self.state.durable_facts,
-                current_file_path=self.state.current_file_path,
-                worktree_root=self.state.worktree_root,
-                catalog=self.catalog,
-                workflow_context=self.workflow_context,
-                current_file_context_cache=self.state.current_file_context_cache,
-                validation_gate=_validation_gate_prompt_data(self.state),
-                stalled_step_context=self.state.stalled_step_context,
-                inherited_interaction_style=self.inherited_interaction_style,
-                observer_intervention=self.observer_intervention,
-                runtime_prompt_context=(
-                    self.driver.runtime.prompt_context()
-                    if self.driver.runtime is not None
-                    else None
-                ),
-                failed_action=self.last_failed_action,
-                failure_reason=self.last_validation_error,
-            )
             response_schema = _step_action_response_schema(self.current_step)
             response_parser = partial(
                 _parse_action_response_with_schema, schema=response_schema
             )
+            request_action = None
+            if self.clean_room_repair_pending:
+                if self.clean_room_repair_used:
+                    self.clean_room_repair_pending = False
+                    repair_attempts = tuple(
+                        event.get("prompt_manifest", {})
+                        for event in self.state.execution_events
+                        if event.get("kind") == "repair_attempt"
+                        and event.get("step_index") == self.current_step_index
+                    )
+                    exhaustion_report = RepairExhaustionReport(
+                        boundary_id=(
+                            f"{self.selected_skill.path}:{self.current_step_index}"
+                        ),
+                        objective=self.current_step.description,
+                        final_state={
+                            "step_index": self.current_step_index,
+                            "current_file": (
+                                str(self.state.current_file_path)
+                                if self.state.current_file_path is not None
+                                else None
+                            ),
+                        },
+                        failures=tuple(self.state.stalled_step_context),
+                        prompt_manifests=repair_attempts,
+                        rejected_strategies=tuple(self.state.stalled_step_context),
+                        allowed_actions=tuple(
+                            _declared_action_names(self.current_step)
+                        ),
+                        reason=(
+                            "The clean-room repair budget for this step was consumed."
+                        ),
+                    )
+                    self.state.execution_events.append(
+                        {
+                            "kind": "repair_exhausted",
+                            "stage": "clean_room",
+                            "step_index": self.current_step_index,
+                            "reason": (
+                                "The clean-room repair budget for this step was "
+                                "already consumed."
+                            ),
+                            "report": exhaustion_report.to_data(),
+                        }
+                    )
+                    raise PowdrrExecutionError(
+                        "Workflow repair exhausted after one clean-room attempt.",
+                        error_code="semantic_repair_exhausted",
+                        remediation=(
+                            "Review rejected strategies and provide a deterministic "
+                            "action or revise the step contract."
+                        ),
+                    )
+                self.clean_room_repair_pending = False
+                self.clean_room_repair_used = True
+                recovery_context = {
+                    "objective": self.current_step.description,
+                    "step": _current_step_contract(self.current_step),
+                    "current_file": (
+                        str(self.state.current_file_path)
+                        if self.state.current_file_path is not None
+                        else None
+                    ),
+                    "rejected_strategies": self.state.stalled_step_context,
+                    "allowed_actions": list(_declared_action_names(self.current_step)),
+                    "repair_context": self.repair_context().to_data(),
+                }
+                context_json = json.dumps(
+                    recovery_context, ensure_ascii=False, separators=(",", ":")
+                )
+                selection_messages, selection_schema, manifest = (
+                    build_clean_room_action_selection_prompt(
+                        context=context_json,
+                        error_message=(
+                            self.last_validation_error
+                            or "The previous strategy made no material progress."
+                        ),
+                        allowed_actions=_declared_action_names(self.current_step),
+                        model=self.current_model,
+                    )
+                )
+                parameter_context = context_json
+                parameter_error = (
+                    self.last_validation_error
+                    or "The previous strategy made no material progress."
+                )
+
+                def parameter_messages_for(
+                    selected_action: str,
+                    context: str = parameter_context,
+                    error: str = parameter_error,
+                    schema: Mapping[str, Any] = response_schema,
+                    model: str = self.current_model,
+                ) -> list[dict[str, str]]:
+                    parameter_messages, _parameter_manifest = (
+                        build_clean_room_action_parameters_prompt(
+                            context=context,
+                            error_message=error,
+                            selected_action=selected_action,
+                            response_schema=constrain_action_response_schema(
+                                schema, selected_action
+                            ),
+                            model=model,
+                        )
+                    )
+                    return parameter_messages
+
+                def parameter_schema_for(
+                    selected_action: str, schema: Mapping[str, Any] = response_schema
+                ) -> Mapping[str, Any]:
+                    return constrain_action_response_schema(schema, selected_action)
+
+                messages = selection_messages
+                # The manifest records the first, deliberately constrained pass;
+                # the parameter pass is recorded when the request is executed.
+                if self.repair_prompt_manifest is None:
+                    raise RuntimeError(
+                        "Clean-room repair requested without a prior prompt manifest."
+                    )
+                assert_material_repair_prompt(self.repair_prompt_manifest, manifest)
+                self.state.execution_events.append(
+                    {
+                        "kind": "repair_attempt",
+                        "stage": "clean_room_action_selection",
+                        "step_index": self.current_step_index,
+                        "prompt_manifest": manifest.to_data(),
+                    }
+                )
+                self.repair_prompt_manifest = manifest
+                request_action = partial(
+                    self._request_two_pass_action,
+                    selection_messages,
+                    selection_schema=selection_schema,
+                    parameter_messages_for=parameter_messages_for,
+                    parameter_schema_for=parameter_schema_for,
+                    parser=response_parser,
+                    allowed_actions=_declared_action_names(self.current_step),
+                    fallback_mapping=step_mapping.backup_model,
+                )
+            else:
+                messages = _build_step_execution_messages(
+                    selected_skill=self.selected_skill,
+                    current_step=self.current_step,
+                    current_step_index=self.current_step_index,
+                    transcript=self.state.transcript,
+                    execution_events=self.state.execution_events,
+                    execution_context=self.state.execution_context,
+                    handoff_records=self.state.handoff_records,
+                    durable_facts=self.state.durable_facts,
+                    current_file_path=self.state.current_file_path,
+                    worktree_root=self.state.worktree_root,
+                    catalog=self.catalog,
+                    workflow_context=self.workflow_context,
+                    current_file_context_cache=self.state.current_file_context_cache,
+                    validation_gate=_validation_gate_prompt_data(self.state),
+                    stalled_step_context=self.state.stalled_step_context,
+                    inherited_interaction_style=self.inherited_interaction_style,
+                    observer_intervention=self.observer_intervention,
+                    runtime_prompt_context=(
+                        self.driver.runtime.prompt_context()
+                        if self.driver.runtime is not None
+                        else None
+                    ),
+                    failed_action=self.last_failed_action,
+                    failure_reason=self.last_validation_error,
+                )
+                self.repair_prompt_manifest = build_repair_prompt_manifest(
+                    messages,
+                    profile="normal_full_context",
+                    source_sections=(
+                        "step",
+                        "transcript",
+                        "execution_events",
+                        "execution_context",
+                        "handoffs",
+                        "durable_facts",
+                        "current_file",
+                        "validation_gate",
+                    ),
+                    history_policy="full",
+                    allowed_actions=_declared_action_names(self.current_step),
+                    response_schema=response_schema,
+                    reasoning_mode="direct_action",
+                    model=self.current_model,
+                )
+                request_action = partial(
+                    self._request_action,
+                    messages,
+                    response_schema=response_schema,
+                    parser=response_parser,
+                )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
                 messages=messages,
@@ -1319,13 +1504,42 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 max_timeout_retries=0,
                 timeout_backoff_seconds=0,
                 response_schema=response_schema,
-                request_action=partial(
-                    self._request_action,
-                    messages,
-                    response_schema=response_schema,
-                    parser=response_parser,
-                ),
+                request_action=request_action,
             )
+
+    def _request_two_pass_action(
+        self,
+        selection_messages: list[dict[str, str]],
+        *,
+        selection_schema: Mapping[str, Any],
+        parameter_messages_for: Callable[[str], list[dict[str, str]]],
+        parameter_schema_for: Callable[[str], Mapping[str, Any]],
+        parser: Callable[[dict[str, Any]], SkillChatAction],
+        allowed_actions: Sequence[str],
+        fallback_mapping: LLMModelMapping | None,
+    ) -> SkillChatAction:
+        fallback_client = (
+            self.client_for_model(fallback_mapping.model, fallback_mapping.provider)
+            if fallback_mapping is not None
+            else None
+        )
+        return complete_two_pass_action(
+            self.client_for_model(self.current_model, self.provider),
+            selection_messages=selection_messages,
+            selection_schema=selection_schema,
+            parameter_messages_for=parameter_messages_for,
+            parameter_schema_for=parameter_schema_for,
+            parser=parser,
+            allowed_actions=allowed_actions,
+            model=self.current_model,
+            stderr=self.stderr,
+            max_timeout_retries=0,
+            timeout_backoff_seconds=0,
+            fallback_client=fallback_client,
+            fallback_model=(
+                fallback_mapping.model if fallback_mapping is not None else None
+            ),
+        )
 
     def _request_action(
         self,
@@ -1475,6 +1689,111 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         observation: WorkflowActionObservation,
     ) -> None:
         _ChatActionProgressStrategy(self.state).record_no_progress(action, observation)
+
+    def record_repair_directive(self, directive: RepairDirective) -> None:
+        """Persist the shared runner's stage decision at the chat boundary."""
+        self.state.execution_events.append(
+            {
+                "kind": "repair_attempt",
+                "stage": directive.stage.value,
+                "attempt": directive.attempt,
+                "reason": directive.reason,
+                "allowed_actions": list(directive.allowed_actions),
+                "prompt_profile": directive.prompt_profile,
+                "model_policy": directive.model_policy,
+                "failure_class": directive.failure_class.value,
+                "error_code": directive.error_code,
+                "target_signature": directive.target_signature,
+                "material_state_fingerprint": directive.material_state_fingerprint,
+                "rejected_strategy_signatures": list(
+                    directive.rejected_strategy_signatures
+                ),
+                "repair_context": self.repair_context().to_data(),
+                "step_index": self.current_step_index,
+            }
+        )
+        if self.terminalized:
+            return
+        if directive.stage in {RepairStage.HUMAN_HANDOFF, RepairStage.EXHAUSTED}:
+            report = RepairExhaustionReport(
+                boundary_id=(
+                    f"skill:{self.selected_skill.path}:{self.current_step_index}"
+                ),
+                objective=str(
+                    getattr(self.current_step, "description", None)
+                    or getattr(self.current_step, "id", "current step")
+                ),
+                final_state={
+                    "step_index": self.current_step_index,
+                    "current_file_path": self.state.current_file_path,
+                },
+                failures=tuple(
+                    event
+                    for event in self.state.execution_events
+                    if event.get("kind")
+                    in {"validation_error", "action_error", "tool_error", "no_progress"}
+                ),
+                prompt_manifests=tuple(
+                    event.get("prompt_manifest", {})
+                    for event in self.state.execution_events
+                    if event.get("kind") == "repair_attempt"
+                ),
+                rejected_strategies=(),
+                allowed_actions=tuple(
+                    self.state.runtime.allowed_actions() or ()
+                    if self.state.runtime is not None
+                    else ()
+                ),
+                reason=directive.reason,
+            )
+            self.state.execution_events.append(
+                {
+                    "kind": "repair_exhausted",
+                    "stage": directive.stage.value,
+                    "report": report.to_data(),
+                }
+            )
+            print(
+                "Workflow stopped: semantic repair needs human review or was "
+                "exhausted. See the repair_exhausted event for the report.",
+                file=self.stderr,
+            )
+            self.terminalized = True
+            self.terminal_exit_code = 1
+
+    def repair_context(self) -> RepairContext:
+        material_state = {
+            "skill": self.selected_skill.path,
+            "step_index": self.current_step_index,
+            "current_file_path": self.state.current_file_path,
+            "handoff_records": self.state.handoff_records,
+            "durable_facts": self.state.durable_facts,
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(material_state, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        rejected = tuple(
+            signature
+            for event in self.state.execution_events
+            if event.get("kind") == "repair_attempt"
+            for signature in (
+                [event["target_signature"]] if event.get("target_signature") else []
+            )
+        )
+        return RepairContext(
+            execution_id=str(self.state.selected_skill.path),
+            boundary_id=f"{self.selected_skill.path}:{self.current_step_index}",
+            objective=str(
+                getattr(self.current_step, "description", None)
+                or getattr(self.current_step, "id", "current step")
+            ),
+            deterministic_state=material_state,
+            allowed_actions=tuple(self.state.runtime.allowed_actions() or ())
+            if self.state.runtime is not None
+            else (),
+            rejected_strategies=rejected,
+            material_state_fingerprint=fingerprint,
+        )
 
     def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         try:
@@ -1934,6 +2253,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             ),
         }
         self.state.stalled_step_context.append(stall_record)
+        self.clean_room_repair_pending = True
         self.state.execution_events.append(
             {
                 "kind": "stalled_step_retry",

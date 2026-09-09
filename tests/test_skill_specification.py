@@ -1399,11 +1399,13 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert step("generate-proposed-pr-specification").step_type == "invoke_tool"
     assert step("plan-proposed-prs").outputs[0].name == "proposed_pr_names"
     assert step("plan-proposed-prs").outputs[0].required_for_next_step
-    assert step("plan-proposed-prs").actions == ("read_document",)
+    assert step("plan-proposed-prs").actions == ("invoke_tool", "read_document")
     plan_details = step("plan-proposed-prs").details
     assert plan_details is not None
     assert "planning-only step" in plan_details
     assert "Do not create, edit, rename, or delete" in plan_details
+    assert "basedpyright-structure" in plan_details
+    assert "basedpyright-symbol" in plan_details
     assert step("generate-proposed-pr-specification").pre_step is not None
     assert pre_step_command("generate-proposed-pr-specification") == (
         "powdrr-lift",

@@ -113,6 +113,7 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgrammerInvariantError,
     ProgressDecision,
+    RepairExhaustionReport,
     RepairPromptManifest,
     WorkflowAction,
     WorkflowActionObservation,
@@ -1294,12 +1295,53 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
 
     def action_failure_exit_code(self, action: WorkflowAction) -> int:
-        _ = action
+        report = self._repair_exhaustion_report(
+            reason="Repeated corrective-action failures exhausted the repair budget.",
+            action=action,
+        )
+        self.events.append(
+            {
+                "kind": "repair_exhausted",
+                "stage": "semantic_repair",
+                "report": report.to_data(),
+            }
+        )
         print(
             "Workflow task stopped after repeated corrective-action failures.",
             file=self.stderr,
         )
         return 1
+
+    def _repair_exhaustion_report(
+        self, *, reason: str, action: WorkflowAction | None = None
+    ) -> RepairExhaustionReport:
+        failures = tuple(
+            event
+            for event in self.events
+            if event.get("kind")
+            in {"validation_error", "action_error", "tool_error", "no_progress"}
+        )
+        manifests = tuple(
+            event.get("prompt_manifest", {})
+            for event in self.events
+            if event.get("kind") == "repair_attempt"
+        )
+        return RepairExhaustionReport(
+            boundary_id=self.task.task_id,
+            objective=self.task.description,
+            final_state={
+                "task_status": self.task.status.value,
+                "output_state": self.task.output_state,
+                "last_action": action.kind if action is not None else None,
+            },
+            failures=failures,
+            prompt_manifests=manifests,
+            rejected_strategies=failures,
+            allowed_actions=tuple(self.runtime.allowed_actions() or ())
+            if self.runtime is not None
+            else (),
+            reason=reason,
+        )
 
     def observe_outcome(
         self,
@@ -1315,6 +1357,15 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         return outcome
 
     def exhausted_roundtrips_exit_code(self) -> int:
+        self.events.append(
+            {
+                "kind": "repair_exhausted",
+                "stage": "roundtrip_limit",
+                "report": self._repair_exhaustion_report(
+                    reason="The configured workflow roundtrip budget was exhausted."
+                ).to_data(),
+            }
+        )
         print(
             "Workflow task "
             f"{self.task.task_id} stopped after reaching the configured "

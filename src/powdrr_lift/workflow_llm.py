@@ -141,6 +141,8 @@ class RepairFailure:
     message: str
     action_signature: str | None = None
     target_signature: str | None = None
+    action_payload: Mapping[str, Any] | None = None
+    remediation: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +155,9 @@ class RepairDirective:
     allowed_actions: tuple[str, ...] = ()
     prompt_profile: str = "normal_full_context"
     model_policy: str = "current_model"
+    failure_class: RepairFailureClass = RepairFailureClass.EXECUTION
+    error_code: str = "unknown"
+    target_signature: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,6 +249,9 @@ class WorkflowRepairCoordinator:
                 if stage == RepairStage.MODEL_FALLBACK
                 else "current_model"
             ),
+            failure_class=failure.classification,
+            error_code=failure.error_code,
+            target_signature=failure.target_signature,
         )
         self.attempts.append(directive)
         return directive
@@ -295,6 +303,9 @@ class WorkflowRepairCoordinator:
             allowed_actions=tuple(dict.fromkeys(allowed_actions)),
             prompt_profile=_prompt_profile_for_stage(RepairStage.EXHAUSTED),
             model_policy="stop",
+            failure_class=failure.classification,
+            error_code=failure.error_code,
+            target_signature=failure.target_signature,
         )
 
 

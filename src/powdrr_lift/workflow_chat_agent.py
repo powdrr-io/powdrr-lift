@@ -126,6 +126,7 @@ from powdrr_lift.workflow_llm import (
     assert_material_repair_prompt,
     build_clean_room_action_parameters_prompt,
     build_clean_room_action_selection_prompt,
+    build_clean_room_repair_prompt,
     build_repair_prompt_manifest,
     complete_two_pass_action,
     constrain_action_response_schema,
@@ -11462,28 +11463,36 @@ def _build_json_repair_messages(
     repair_instructions: str,
     previous_payload: dict[str, Any] | None,
 ) -> list[dict[str, str]]:
-    repair_message = (
-        f"The previous {context} response was invalid because: {error_message}\n"
-        f"{repair_instructions}\n"
-        "Return only a corrected JSON object with no markdown or commentary."
+    # All model-required correction requests use the same clean-room builder as
+    # semantic action recovery.  The original conversation is deliberately not
+    # carried forward: it was the context in which the invalid response was
+    # produced.  Retain only the structured failure facts needed to correct it.
+    recovery_context = json.dumps(
+        {
+            "response_context": context,
+            "previous_response": previous_payload,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
     )
-    if previous_payload is not None:
-        repair_message += (
-            f"\nPrevious response:\n{_serialize_prompt_json(previous_payload)}"
-        )
-        repair_message += (
-            "\nDo not repeat that response. Change the field named by the "
-            "validation error and return the complete corrected object."
-        )
-    repaired_messages = list(messages)
-    if previous_payload is not None:
-        repaired_messages.append(
-            {
-                "role": "assistant",
-                "content": _serialize_prompt_json(previous_payload),
-            }
-        )
-    repaired_messages.append({"role": "user", "content": repair_message})
+    repaired_messages, _manifest = build_clean_room_repair_prompt(
+        context=recovery_context,
+        error_message=error_message,
+        repair_instructions=(
+            repair_instructions
+            + (
+                " Return only a complete corrected JSON object with no markdown or "
+                "commentary."
+            )
+            + (
+                " Do not repeat that response; change the field identified "
+                "by the validation error."
+                if previous_payload is not None
+                else ""
+            )
+        ),
+        model="json-repair",
+    )
     return repaired_messages
 
 

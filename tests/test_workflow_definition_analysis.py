@@ -42,6 +42,26 @@ steps:
     assert report.validation_successful
 
 
+def test_definition_analysis_covers_instantiated_tasks_and_workflow_metadata() -> None:
+    repository_root = Path(__file__).parents[1]
+    task = (
+        repository_root
+        / "docs/workflows/interaction-file-log/interaction-file-log-core-task-001.yaml"
+    )
+    workflow = (
+        repository_root
+        / "docs/workflows/interaction-file-log/interaction-file-log-core-workflow.yaml"
+    )
+
+    task_report = analyze_workflow_definition(task)
+    workflow_report = analyze_workflow_definition(workflow)
+
+    assert task_report.kind == "workflow_task"
+    assert task_report.validation_successful
+    assert workflow_report.kind == "workflow_instance"
+    assert workflow_report.validation_successful
+
+
 def test_definition_analysis_reports_invalid_examples_and_unbound_placeholders(
     tmp_path: Path,
 ) -> None:
@@ -311,6 +331,26 @@ steps:
     issues = {issue.code: issue for issue in report.issues}
     assert issues["model_owned_deterministic_action"].severity == "error"
     assert issues["idempotent_action_without_auto_advance"].severity == "error"
+
+
+def test_definition_analysis_rejects_empty_repair_action_space(tmp_path: Path) -> None:
+    definition = tmp_path / "empty-actions.yaml"
+    definition.write_text(
+        """\
+name: empty-actions
+when_to_use: [Test repairability.]
+steps:
+  - id: blocked
+    description: No legal recovery action.
+    actions: []
+    actions_declared: true
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "empty_repair_action_space" in {issue.code for issue in report.issues}
 
 
 def test_definition_analysis_warns_on_non_progress_cycle(tmp_path: Path) -> None:

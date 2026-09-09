@@ -1131,6 +1131,8 @@ def test_process_workflow_task_repairs_invalid_json_response(
     assert "response_correction" not in client.messages[1][1]["content"]
     assert "Expecting value" in client.messages[1][1]["content"]
     assert "not valid JSON" in client.messages[1][1]["content"]
+    assert '"execution_mode":"clean_room_repair"' in client.messages[1][1]["content"]
+    assert '"events"' not in client.messages[1][1]["content"]
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
         TaskStatus.COMPLETED
     )

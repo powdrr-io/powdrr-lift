@@ -5,9 +5,10 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, replace
+from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -110,7 +111,14 @@ from powdrr_lift.workflow_git import (
 from powdrr_lift.workflow_llm import (
     DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,
+    ProgrammerInvariantError,
     ProgressDecision,
+    RepairContext,
+    RepairDirective,
+    RepairExhaustionReport,
+    RepairFailure,
+    RepairPromptManifest,
+    RepairStage,
     WorkflowAction,
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -121,9 +129,15 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMClient,
     WorkflowLLMTimeoutExhausted,
     WorkflowStepRunner,
+    assert_material_repair_prompt,
+    build_clean_room_action_parameters_prompt,
+    build_clean_room_action_selection_prompt,
+    build_repair_prompt_manifest,
     complete_json_with_timeout_retry,
+    complete_two_pass_action,
     prompt_size_breakdown,
     prune_execution_events,
+    resolve_deterministic_repair,
     workflow_action_signature,
     workflow_action_summary,
 )
@@ -339,6 +353,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     stderr: TextIO
     action_engine: WorkflowLLMActionEngine
     events: list[dict[str, Any]]
+    repair_fallback_client: WorkflowLLMClient | None
+    repair_fallback_model: str | None
     runtime: ExecutionRuntime | None = None
     deterministic_output_state: Any = None
     requires_deterministic_output_state: bool = False
@@ -347,9 +363,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     observer_intervention: str | None = None
     observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
+    clean_room_repair_pending: bool = False
+    clean_room_repair_used: bool = False
+    repair_prompt_manifest: RepairPromptManifest | None = None
+    terminalized: bool = False
+    terminal_exit_code: int | None = None
 
-    def next_request(self) -> WorkflowActionRequest:
+    def next_request(self) -> WorkflowActionRequest | None:
+        if self.terminalized:
+            return None
         while True:
+            selection_messages = None
+            selection_schema = None
+            parameter_messages_for = None
+            parameter_schema_for = None
             messages = _build_task_messages(
                 self.workflow,
                 self.task,
@@ -363,6 +390,116 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 ),
                 observer_intervention=self.observer_intervention,
             )
+            if self.clean_room_repair_pending and not self.clean_room_repair_used:
+                self.clean_room_repair_pending = False
+                self.clean_room_repair_used = True
+                runtime_actions = (
+                    self.runtime.allowed_actions() if self.runtime is not None else ()
+                )
+                allowed_actions = tuple(runtime_actions or ())
+                recovery_context = {
+                    "task_id": self.task.task_id,
+                    "objective": self.task.description,
+                    "details": self.task.details,
+                    "input_state": self.task.input_state,
+                    "output_state_type": self.task.output_state_type,
+                    "allowed_actions": list(allowed_actions),
+                    "repair_context": self.repair_context().to_data(),
+                    "recent_failures": [
+                        {
+                            key: event.get(key)
+                            for key in ("kind", "action_kind", "tool", "error")
+                            if key in event
+                        }
+                        for event in self.events[-6:]
+                        if event.get("kind")
+                        in {
+                            "validation_error",
+                            "action_error",
+                            "tool_error",
+                            "no_progress",
+                        }
+                    ],
+                }
+                context_json = json.dumps(
+                    recovery_context, ensure_ascii=False, separators=(",", ":")
+                )
+                error_message = self.response_correction or (
+                    "The previous workflow strategy failed to make progress."
+                )
+                selection_messages, selection_schema, manifest = (
+                    build_clean_room_action_selection_prompt(
+                        context=context_json,
+                        error_message=error_message,
+                        allowed_actions=allowed_actions,
+                        model=self.model,
+                    )
+                )
+
+                def parameter_schema_for(selected_action: str) -> Mapping[str, Any]:
+                    return {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": [selected_action],
+                            }
+                        },
+                        "required": ["action"],
+                        "additionalProperties": True,
+                    }
+
+                def _parameter_messages(
+                    selected_action: str,
+                    context: str = context_json,
+                    error: str = error_message,
+                    schema_for: Callable[
+                        [str], Mapping[str, Any]
+                    ] = parameter_schema_for,
+                    model: str = self.model,
+                ) -> list[dict[str, str]]:
+                    parameter_messages, _ = build_clean_room_action_parameters_prompt(
+                        context=context,
+                        error_message=error,
+                        selected_action=selected_action,
+                        response_schema=schema_for(selected_action),
+                        model=model,
+                    )
+                    return parameter_messages
+
+                parameter_messages_for = _parameter_messages
+                if self.repair_prompt_manifest is None:
+                    raise ProgrammerInvariantError(
+                        "Clean-room repair requested without a prior task prompt "
+                        "manifest.",
+                        error_code="repair_prompt_manifest_missing",
+                    )
+                assert_material_repair_prompt(self.repair_prompt_manifest, manifest)
+                self.events.append(
+                    {
+                        "kind": "repair_attempt",
+                        "stage": "clean_room_action_selection",
+                        "prompt_manifest": manifest.to_data(),
+                    }
+                )
+                self.repair_prompt_manifest = manifest
+                messages = selection_messages
+            else:
+                self.repair_prompt_manifest = build_repair_prompt_manifest(
+                    messages,
+                    profile="normal_full_context",
+                    source_sections=(
+                        "task",
+                        "workflow_context",
+                        "events",
+                        "runtime_state",
+                        "available_tools",
+                        "available_skills",
+                    ),
+                    history_policy="bounded",
+                    reasoning_mode="direct_action",
+                    model=self.model,
+                )
             limits = _model_limits_for(self.mapping_provider, self.model)
             estimated_input_tokens = _estimate_message_tokens(messages)
             print(
@@ -389,6 +526,19 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 and estimated_input_tokens + 1024 < limits.context_window
             ):
                 _print_waiting_for_model(self.stderr, self.model)
+                request_action = None
+                if selection_messages is not None:
+                    assert selection_schema is not None
+                    assert parameter_messages_for is not None
+                    assert parameter_schema_for is not None
+                    request_action = partial(
+                        self._request_two_pass_action,
+                        selection_messages,
+                        selection_schema=selection_schema,
+                        parameter_messages_for=parameter_messages_for,
+                        parameter_schema_for=parameter_schema_for,
+                        allowed_actions=allowed_actions,
+                    )
                 return WorkflowActionRequest(
                     client=self.client,
                     messages=messages,
@@ -397,6 +547,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     stderr=self.stderr,
                     max_timeout_retries=self.config.max_timeout_retries,
                     timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+                    request_action=request_action,
                 )
 
             print(
@@ -436,6 +587,31 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 flush=True,
             )
             self.response_correction = None
+
+    def _request_two_pass_action(
+        self,
+        selection_messages: list[dict[str, str]],
+        *,
+        selection_schema: Mapping[str, Any],
+        parameter_messages_for: Callable[[str], list[dict[str, str]]],
+        parameter_schema_for: Callable[[str], Mapping[str, Any]],
+        allowed_actions: Sequence[str],
+    ) -> WorkflowAction:
+        return complete_two_pass_action(
+            self.client,
+            selection_messages=selection_messages,
+            selection_schema=selection_schema,
+            parameter_messages_for=parameter_messages_for,
+            parameter_schema_for=parameter_schema_for,
+            parser=_parse_action_response,
+            allowed_actions=allowed_actions,
+            model=self.model,
+            stderr=self.stderr,
+            max_timeout_retries=self.config.max_timeout_retries,
+            timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+            fallback_client=self.repair_fallback_client,
+            fallback_model=self.repair_fallback_model,
+        )
 
     def material_state(self, action: WorkflowAction) -> object:
         return _task_action_material_state(action, self.repo_root)
@@ -508,6 +684,137 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         ).record_no_progress(action, observation)
         self.response_correction = observation.correction
 
+    def record_repair_directive(self, directive: RepairDirective) -> None:
+        """Persist the shared runner's stage decision for durable replay."""
+        self.events.append(
+            {
+                "kind": "repair_attempt",
+                "stage": directive.stage.value,
+                "attempt": directive.attempt,
+                "reason": directive.reason,
+                "allowed_actions": list(directive.allowed_actions),
+                "prompt_profile": directive.prompt_profile,
+                "model_policy": directive.model_policy,
+                "failure_class": directive.failure_class.value,
+                "error_code": directive.error_code,
+                "target_signature": directive.target_signature,
+                "material_state_fingerprint": directive.material_state_fingerprint,
+                "rejected_strategy_signatures": list(
+                    directive.rejected_strategy_signatures
+                ),
+                "repair_context": self.repair_context().to_data(),
+            }
+        )
+        if self.terminalized:
+            return
+        if directive.stage is RepairStage.HUMAN_HANDOFF:
+            question = (
+                "The workflow repair ladder needs a human decision before it can "
+                f"continue: {directive.reason}"
+            )
+            human_input = {
+                "human_task": {
+                    "description": question,
+                    "role": "reviewer",
+                    "input_state": {
+                        "question": question,
+                        "task": self.task.to_data(),
+                        "repair_directive": asdict(directive),
+                    },
+                    "output_state_type": "human-response-state",
+                },
+                "incorporation_instructions": (
+                    "Use the human response to choose and validate the next "
+                    "workflow action."
+                ),
+                "follow_up_task": {
+                    "description": self.task.description,
+                    "role": self.task.assignee_role.value,
+                    "input_state": self.task.input_state,
+                    "output_state_type": self.task.output_state_type,
+                },
+            }
+            self._handoff(human_input, "Semantic repair requires human review.")
+            self.terminalized = True
+            self.terminal_exit_code = 0
+        elif directive.stage is RepairStage.EXHAUSTED:
+            report = self._repair_exhaustion_report(reason=directive.reason)
+            self.events.append(
+                {
+                    "kind": "repair_exhausted",
+                    "stage": directive.stage.value,
+                    "report": report.to_data(),
+                }
+            )
+            print(
+                "Workflow task stopped: the semantic repair ladder was exhausted.",
+                file=self.stderr,
+            )
+            self.terminalized = True
+            self.terminal_exit_code = 1
+
+    def repair_context(self) -> RepairContext:
+        material_state = {
+            "task_status": self.task.status.value,
+            "input_state": self.task.input_state,
+            "output_state": self.task.output_state,
+            "current_file_path": self.compacted_context,
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(material_state, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        rejected = tuple(
+            signature
+            for event in self.events
+            if event.get("kind") == "repair_attempt"
+            for signature in (
+                [event["target_signature"]] if event.get("target_signature") else []
+            )
+        )
+        return RepairContext(
+            execution_id=self.task.task_id,
+            boundary_id=self.task.task_id,
+            objective=self.task.description,
+            deterministic_state=material_state,
+            allowed_actions=tuple(self.runtime.allowed_actions() or ())
+            if self.runtime is not None
+            else (),
+            required_outputs=(self.task.output_state_type,),
+            rejected_strategies=rejected,
+            material_state_fingerprint=fingerprint,
+        )
+
+    def deterministic_repair_action(
+        self,
+        failure: RepairFailure,
+        directive: RepairDirective,
+    ) -> WorkflowAction | None:
+        """Apply only the durable output-state repair already proven by the task."""
+        if (
+            failure.error_code != "deterministic_output_state_mismatch"
+            or directive.stage is not RepairStage.DETERMINISTIC
+            or not self.requires_deterministic_output_state
+            or self.deterministic_output_state is None
+            or "next_step"
+            not in (
+                self.runtime.allowed_actions() or () if self.runtime is not None else ()
+            )
+        ):
+            return None
+        repaired = resolve_deterministic_repair(
+            error_code=failure.error_code,
+            allowed_actions=(self.runtime.allowed_actions() or ())
+            if self.runtime is not None
+            else (),
+            output_state=self.deterministic_output_state,
+        )
+        if repaired is None or repaired.get("action") != "next_step":
+            return None
+        return WorkflowAction(
+            kind="next_step",
+            output_state=repaired.get("output_state"),
+        )
+
     def no_progress_threshold_exit_code(
         self,
         action: WorkflowAction,
@@ -563,6 +870,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.response_correction = (
             f"The previous response was invalid: {error} {guidance}"
         )
+        if not self.clean_room_repair_used:
+            self.clean_room_repair_pending = True
         print(
             "Workflow task response needs repair; requesting a corrected "
             "JSON response from the LLM.",
@@ -1098,6 +1407,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
         self.response_correction = _action_response_correction(action, error)
+        if not self.clean_room_repair_used:
+            self.clean_room_repair_pending = True
         record_workflow_llm_error(
             self.error_log_root,
             execution_mode="process_workflow_task",
@@ -1125,12 +1436,53 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
 
     def action_failure_exit_code(self, action: WorkflowAction) -> int:
-        _ = action
+        report = self._repair_exhaustion_report(
+            reason="Repeated corrective-action failures exhausted the repair budget.",
+            action=action,
+        )
+        self.events.append(
+            {
+                "kind": "repair_exhausted",
+                "stage": "semantic_repair",
+                "report": report.to_data(),
+            }
+        )
         print(
             "Workflow task stopped after repeated corrective-action failures.",
             file=self.stderr,
         )
         return 1
+
+    def _repair_exhaustion_report(
+        self, *, reason: str, action: WorkflowAction | None = None
+    ) -> RepairExhaustionReport:
+        failures = tuple(
+            event
+            for event in self.events
+            if event.get("kind")
+            in {"validation_error", "action_error", "tool_error", "no_progress"}
+        )
+        manifests = tuple(
+            event.get("prompt_manifest", {})
+            for event in self.events
+            if event.get("kind") == "repair_attempt"
+        )
+        return RepairExhaustionReport(
+            boundary_id=self.task.task_id,
+            objective=self.task.description,
+            final_state={
+                "task_status": self.task.status.value,
+                "output_state": self.task.output_state,
+                "last_action": action.kind if action is not None else None,
+            },
+            failures=failures,
+            prompt_manifests=manifests,
+            rejected_strategies=failures,
+            allowed_actions=tuple(self.runtime.allowed_actions() or ())
+            if self.runtime is not None
+            else (),
+            reason=reason,
+        )
 
     def observe_outcome(
         self,
@@ -1141,9 +1493,20 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         _ = action
         if observation.correction is not None:
             self.response_correction = observation.correction
+            if not self.clean_room_repair_used:
+                self.clean_room_repair_pending = True
         return outcome
 
     def exhausted_roundtrips_exit_code(self) -> int:
+        self.events.append(
+            {
+                "kind": "repair_exhausted",
+                "stage": "roundtrip_limit",
+                "report": self._repair_exhaustion_report(
+                    reason="The configured workflow roundtrip budget was exhausted."
+                ).to_data(),
+            }
+        )
         print(
             "Workflow task "
             f"{self.task.task_id} stopped after reaching the configured "
@@ -1507,6 +1870,20 @@ def run_workflow_task(
             task_client = client
         else:
             task_client = _build_workflow_client(config, task)
+        repair_fallback_client = None
+        repair_fallback_model = None
+        if not client_was_provided and mapping.backup_model is not None:
+            repair_fallback_model = mapping.backup_model.model
+            repair_fallback_client = _build_workflow_client_for_mapping(
+                config,
+                task,
+                mapping.backup_model,
+            )
+            if config.verbose:
+                repair_fallback_client = _WorkflowTaskDisplayClient(
+                    repair_fallback_client,
+                    stderr=stderr,
+                )
         if config.verbose:
             task_client = _WorkflowTaskDisplayClient(task_client, stderr=stderr)
         task_client = _maybe_record_llm_exchanges(task_client, dump_root)
@@ -1555,6 +1932,8 @@ def run_workflow_task(
             error_log_root=dump_root,
             client=task_client,
             compaction_client=compaction_client,
+            repair_fallback_client=repair_fallback_client,
+            repair_fallback_model=repair_fallback_model,
             model=model,
             mapping_provider=mapping.provider,
             stdout=stdout,

@@ -22,6 +22,9 @@ from powdrr_lift.core import (
     resolve_repo_root,
 )
 from powdrr_lift.core.skill_specification import Skill, SkillStep, skill_step_from_data
+from powdrr_lift.core.workflow_task_specification import (
+    build_workflow_task_validation_report,
+)
 from powdrr_lift.core.workflow_template_specification import (
     build_workflow_template_validation_report,
 )
@@ -370,6 +373,13 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
         base_issues = build_workflow_template_validation_report(
             json.dumps(data), source_path=path
         ).issues
+    elif "task_id" in data:
+        kind = "workflow_task"
+        task_report = build_workflow_task_validation_report(raw, source_path=path)
+        base_issues = task_report.issues
+    elif "workflow_relative_directory" in data:
+        kind = "workflow_instance"
+        base_issues = ()
     else:
         kind = "unknown"
         base_issues = None
@@ -378,7 +388,10 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
         issues.append(
             WorkflowDefinitionIssue(
                 code="unsupported_definition_kind",
-                message="Definition must contain steps or task_templates.",
+                message=(
+                    "Definition must contain steps, task_templates, task_id, "
+                    "or workflow_relative_directory."
+                ),
                 path=str(path),
             )
         )
@@ -399,6 +412,7 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                 continue
             step_path = f"{path}.{step_key}[{index}]"
             issues.extend(_validate_step_examples(step, step_path))
+            issues.extend(_validate_repairability(step, step_path))
             if declared:
                 issues.extend(_validate_step_placeholders(step, step_path, declared))
         if kind == "skill":
@@ -415,6 +429,8 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                     issues.extend(_validate_rendered_prompt_contract(skill, path))
             else:
                 issues.extend(_validate_raw_liveness(data, path))
+    if kind == "workflow_task":
+        issues.extend(_validate_repairability(data, str(path)))
     return WorkflowDefinitionReport(path, kind, tuple(issues))
 
 
@@ -1249,6 +1265,32 @@ def _strongly_connected_components(ir: WorkflowIR) -> tuple[frozenset[int], ...]
         if item.index not in indices:
             visit(item.index)
     return tuple(components)
+
+
+def _validate_repairability(
+    step: Mapping[str, Any], step_path: str
+) -> list[WorkflowDefinitionIssue]:
+    """Reject definitions that cannot produce a legal recovery action."""
+    issues: list[WorkflowDefinitionIssue] = []
+    actions = step.get("actions")
+    if (
+        step.get("actions_declared") is True
+        and isinstance(actions, list)
+        and not actions
+        and step.get("pre_step") is None
+        and step.get("step_type") != "invoke_tool"
+    ):
+        issues.append(
+            WorkflowDefinitionIssue(
+                "empty_repair_action_space",
+                "An explicitly declared action catalog cannot be empty; action "
+                "selection would have no legal enum value.",
+                f"{step_path}.actions",
+            )
+        )
+    # ``emit_outputs`` is a universal action added by the step behavior layer
+    # for every predicated step, even when omitted from the authored catalog.
+    return issues
 
 
 def render_skill_prompt_snapshots(

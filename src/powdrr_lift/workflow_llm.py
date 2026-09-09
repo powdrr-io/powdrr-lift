@@ -9,6 +9,7 @@ keep only presentation and human-handoff policy.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import time
@@ -77,6 +78,147 @@ _PROMPT_SIZE_CHARS_PER_TOKEN = 3
 # A caller may opt into an unlimited loop for deterministic harnesses, but
 # production entry points must always provide a finite budget.
 DEFAULT_MAX_ROUNDTRIPS = 128
+
+
+@dataclass(frozen=True, slots=True)
+class RepairPromptManifest:
+    """Auditable description of the information and contract in a repair prompt."""
+
+    profile: str
+    source_sections: tuple[str, ...]
+    history_policy: str
+    allowed_actions: tuple[str, ...]
+    response_schema_fingerprint: str
+    reasoning_mode: str
+    model: str
+    message_fingerprint: str
+    structural_fingerprint: str
+    estimated_tokens: int
+
+
+def build_repair_prompt_manifest(
+    messages: Sequence[Mapping[str, str]],
+    *,
+    profile: str,
+    source_sections: Sequence[str] = (),
+    history_policy: str,
+    allowed_actions: Sequence[str] = (),
+    response_schema: Mapping[str, Any] | None = None,
+    reasoning_mode: str = "direct_action",
+    model: str = "",
+) -> RepairPromptManifest:
+    """Describe a repair prompt using stable structural and content fingerprints."""
+    serialized = json.dumps(list(messages), ensure_ascii=False, sort_keys=True)
+    schema_serialized = json.dumps(
+        response_schema or {}, ensure_ascii=False, sort_keys=True
+    )
+    structure = {
+        "profile": profile,
+        "source_sections": sorted(set(source_sections)),
+        "history_policy": history_policy,
+        "allowed_actions": sorted(set(allowed_actions)),
+        "response_schema": schema_serialized,
+        "reasoning_mode": reasoning_mode,
+        "model": model,
+    }
+    return RepairPromptManifest(
+        profile=profile,
+        source_sections=tuple(sorted(set(source_sections))),
+        history_policy=history_policy,
+        allowed_actions=tuple(sorted(set(allowed_actions))),
+        response_schema_fingerprint=_sha256(schema_serialized),
+        reasoning_mode=reasoning_mode,
+        model=model,
+        message_fingerprint=_sha256(serialized),
+        structural_fingerprint=_sha256(
+            json.dumps(structure, ensure_ascii=False, sort_keys=True)
+        ),
+        estimated_tokens=_prompt_size_tokens(serialized),
+    )
+
+
+def assert_material_repair_prompt(
+    previous: RepairPromptManifest,
+    current: RepairPromptManifest,
+) -> None:
+    """Reject semantic repair prompts that only differ cosmetically."""
+    if previous.message_fingerprint == current.message_fingerprint:
+        raise ProgrammerInvariantError(
+            "Repair prompt was identical to the previous prompt.",
+            error_code="repair_prompt_not_distinct",
+            remediation="Use a different repair prompt profile and context.",
+        )
+    material_change = previous.profile != current.profile and (
+        previous.history_policy != current.history_policy
+        or set(current.allowed_actions) < set(previous.allowed_actions)
+        or previous.response_schema_fingerprint != current.response_schema_fingerprint
+        or previous.reasoning_mode != current.reasoning_mode
+        or set(current.source_sections) != set(previous.source_sections)
+        or previous.model != current.model
+    )
+    if not material_change:
+        raise ProgrammerInvariantError(
+            "Repair prompt did not make a material structural change.",
+            error_code="repair_prompt_not_materially_different",
+            remediation=(
+                "Change the prompt profile, remove history, narrow the action "
+                "space, change the response schema, or change reasoning mode."
+            ),
+        )
+
+
+def build_clean_room_repair_prompt(
+    *,
+    context: str,
+    error_message: str,
+    repair_instructions: str,
+    response_schema: Mapping[str, Any] | None = None,
+    allowed_actions: Sequence[str] = (),
+    model: str = "",
+) -> tuple[list[dict[str, str]], RepairPromptManifest]:
+    """Build a recovery prompt from structured facts without conversation history."""
+    recovery = {
+        "execution_mode": "clean_room_repair",
+        "context": context,
+        "failure": error_message,
+        "repair_instructions": repair_instructions,
+        "allowed_actions": list(allowed_actions),
+    }
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are recovering a stalled workflow boundary using a clean-room "
+                "repair. Do not continue "
+                "the previous conversation. Choose one legal action that materially "
+                "advances the supplied task. Return only the complete JSON object "
+                "required by the supplied response contract."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(recovery, ensure_ascii=False, separators=(",", ":")),
+        },
+    ]
+    return messages, build_repair_prompt_manifest(
+        messages,
+        profile="clean_room_replan",
+        source_sections=(
+            "context",
+            "failure",
+            "repair_instructions",
+            "allowed_actions",
+        ),
+        history_policy="none",
+        allowed_actions=allowed_actions,
+        response_schema=response_schema,
+        reasoning_mode="clean_room_action",
+        model=model,
+    )
+
+
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)

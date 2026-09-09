@@ -6,17 +6,75 @@ from typing import Any
 
 from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
+    ProgrammerInvariantError,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionRequest,
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
     WorkflowStepRunner,
+    assert_material_repair_prompt,
+    build_clean_room_repair_prompt,
+    build_repair_prompt_manifest,
     complete_json_with_timeout_retry,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_signature,
 )
+
+
+def test_clean_room_repair_prompt_excludes_conversation_and_records_profile() -> None:
+    original = [
+        {"role": "system", "content": "normal instructions"},
+        {
+            "role": "user",
+            "content": '{"objective":"keep-objective","canary":"old-history"}',
+        },
+        {"role": "assistant", "content": '{"action":"bad","canary":"old-payload"}'},
+    ]
+    previous = build_repair_prompt_manifest(
+        original,
+        profile="normal_full_context",
+        source_sections=("conversation",),
+        history_policy="full",
+        allowed_actions=("edit", "read_document"),
+        reasoning_mode="direct_action",
+    )
+    repaired, current = build_clean_room_repair_prompt(
+        context="workflow execution",
+        error_message="bad action",
+        repair_instructions="Choose a legal action.",
+        allowed_actions=("read_document",),
+    )
+
+    assert len(repaired) == 2
+    assert all("old-history" not in message["content"] for message in repaired)
+    assert all("old-payload" not in message["content"] for message in repaired)
+    assert current.profile == "clean_room_replan"
+    assert current.history_policy == "none"
+    assert_material_repair_prompt(previous, current)
+
+
+def test_material_repair_prompt_rejects_cosmetic_changes() -> None:
+    first = build_repair_prompt_manifest(
+        [{"role": "user", "content": "one"}],
+        profile="targeted_schema_correction",
+        history_policy="full",
+        reasoning_mode="direct_action",
+    )
+    second = build_repair_prompt_manifest(
+        [{"role": "user", "content": "two"}],
+        profile="targeted_schema_correction",
+        history_policy="full",
+        reasoning_mode="direct_action",
+    )
+
+    try:
+        assert_material_repair_prompt(first, second)
+    except ProgrammerInvariantError as error:
+        assert error.error_code == "repair_prompt_not_materially_different"
+    else:
+        raise AssertionError("cosmetic repair prompt change was accepted")
 
 
 def test_prompt_size_breakdown_reports_execution_mode_and_top_level_fields() -> None:

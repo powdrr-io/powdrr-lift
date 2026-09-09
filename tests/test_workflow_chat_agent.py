@@ -6038,6 +6038,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
             self._call_index = 0
             self._nested_validation_index = 0
             self._nested_invoked_steps: set[tuple[str, int, str]] = set()
+            self._design_interview_gathered_steps: set[str] = set()
 
         def _assert_selection_prompt(self, messages: list[dict[str, str]]) -> None:
             prompt = json.loads(messages[1]["content"])
@@ -6082,6 +6083,137 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                         "paths": ["docs/proposals/display-related-photos"],
                     },
                 }
+            if (
+                self._call_index > 0
+                and prompt["selected_skill"]["name"] == "design-interview"
+            ):
+                current_step = cast(dict[str, object], prompt["current_step"])
+                available_actions = prompt.get("available_actions", [])
+                events = cast(
+                    list[dict[str, object]], prompt.get("execution_events", [])
+                )
+                if (
+                    isinstance(available_actions, list)
+                    and "gather_context" in available_actions
+                ):
+                    required = cast(
+                        list[dict[str, object]],
+                        cast(dict[str, object], current_step.get("completion", {})).get(
+                            "required_actions", []
+                        ),
+                    )
+                    required_type = ""
+                    if required:
+                        required_parameters = cast(
+                            dict[str, object], required[0].get("parameters", {})
+                        )
+                        required_types = cast(
+                            list[object], required_parameters.get("types", [])
+                        )
+                        if required_types:
+                            required_type = str(required_types[0])
+                    if str(current_step.get("id")) == "gather-proposed-prs":
+                        required_type = "proposed-prs"
+                    parameters = {
+                        "types": [
+                            required_type
+                            or {
+                                "gather-entity-relationships": "entity-relationships",
+                                "gather-human-decisions": "human-decisions",
+                                "gather-acceptance-criteria": "acceptance_criteria",
+                                "gather-expected-tests": "expected_tests",
+                                "gather-required-test-cases": "required_test_cases",
+                                "gather-expected-outcomes": "expected_outcomes",
+                                "gather-non-goals": "non_goals",
+                                "gather-proposed-prs": "proposed-prs",
+                                "gather-invariants": "invariants",
+                            }.get(
+                                str(current_step.get("id", "")),
+                                str(current_step.get("id", ""))
+                                .removeprefix("gather-")
+                                .replace("-", "_"),
+                            )
+                        ]
+                    }
+                    current_step_id = str(current_step.get("id", ""))
+                    latest_action = prompt.get("latest_action")
+                    if any(
+                        event.get("action", event.get("kind")) == "gather_context"
+                        for event in events
+                    ) or (
+                        isinstance(latest_action, dict)
+                        and latest_action.get("action", latest_action.get("kind"))
+                        == "gather_context"
+                    ):
+                        self._design_interview_gathered_steps.add(current_step_id)
+                    if current_step_id not in self._design_interview_gathered_steps:
+                        self._call_index += 1
+                        return {"action": "gather_context", **parameters}
+                    completion = cast(
+                        dict[str, object], current_step.get("completion", {})
+                    )
+                    required_outputs = cast(
+                        list[str], completion.get("required_outputs", [])
+                    )
+                    declared_outputs = cast(
+                        list[dict[str, object]], current_step.get("outputs", [])
+                    )
+                    output_name = {
+                        "gather-guidance": "guidance_edits",
+                        "gather-features": "features_edits",
+                        "gather-entity-relationships": "entity_relationships_edits",
+                        "gather-invariants": "invariants_edits",
+                        "gather-human-decisions": "human_decisions_edits",
+                        "gather-intent": "intent_edits",
+                        "gather-intents": "intents_edits",
+                        "gather-acceptance-criteria": "acceptance_criteria_edits",
+                        "gather-expected-tests": "expected_tests_edits",
+                        "gather-required-test-cases": "required_test_cases_edits",
+                        "gather-expected-outcomes": "expected_outcomes_edits",
+                        "gather-non-goals": "non_goals_edits",
+                        "gather-risks": "risks_edits",
+                        "gather-decisions": "decisions_edits",
+                        "gather-proposed-prs": "proposed_prs_edits",
+                        "gather-modules": "modules_edits",
+                        "gather-tools": "tools_edits",
+                    }.get(
+                        str(current_step.get("id")),
+                        str(required_outputs[0])
+                        if required_outputs
+                        else str(declared_outputs[0]["name"])
+                        if declared_outputs
+                        else f"{str(current_step.get('id', '')).removeprefix('gather-')}_edits",
+                    )
+                    self._call_index += 1
+                    return {
+                        "action": "emit_outputs",
+                        "outputs": {output_name: {"added": [], "deleted": []}},
+                    }
+                if current_step.get("id") == "store-interview-input":
+                    latest_action = prompt.get("latest_action")
+                    self._call_index += 1
+                    if (
+                        isinstance(latest_action, dict)
+                        and latest_action.get("kind") == "edit"
+                    ):
+                        return {
+                            "action": "next_step",
+                            "outputs": {"interview_input": {}},
+                        }
+                    return {
+                        "action": "edit",
+                        "file_path": "docs/proposals/display-related-photos/design-interview-input.json",
+                        "edits": [
+                            {
+                                "kind": "replace",
+                                "start_line": 1,
+                                "end_line": 1,
+                                "text": "{}",
+                            }
+                        ],
+                    }
+                self._call_index += 1
+                return {"action": "next_step"}
             if (
                 self._call_index > 0
                 and prompt["selected_skill"]["name"] != "specify-a-feature"
@@ -6208,7 +6340,17 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 assert prompt["selected_skill"]["name"] == "specify-a-feature"
                 step_id = current_step.get("id")
                 latest_action = prompt.get("latest_action")
-                if step_id in {
+                if step_id == "capture-feature-context":
+                    generic_response = {
+                        "action": "next_step",
+                        "outputs": {
+                            "feature_description": (
+                                "Build exports and display related photos in the feature view."
+                            )
+                        },
+                        "decisions_and_context": "Feature context captured.",
+                    }
+                elif step_id in {
                     "fill-system-specification",
                     "fill-architecture-specification",
                     "fill-implementation-specification",
@@ -6304,41 +6446,14 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     ),
                 }
             elif self._call_index == 3:
-                prompt = self._assert_execution_prompt(
-                    messages,
-                    expected_step_index=1,
-                    expected_step_description=step_descriptions[1],
-                    expected_context_suffix=(
-                        "Goal captured: display related photos; success criteria: "
-                        "show related photos in the UI."
-                    ),
-                    expected_event_count=2,
-                    expected_last_event_kind="next_step",
-                )
-                current_step = cast(dict[str, object], prompt["current_step"])
-                tool_invocations = cast(
-                    list[dict[str, object]], current_step["tool_invocations"]
-                )
-                assert tool_invocations[0]["command"] == [
-                    "powdrr-lift",
-                    "system-specification",
-                    "--work-item-name",
-                    "<work-item-name>",
-                ]
                 response = {
-                    "action": "invoke_tool",
-                    "tool": "internal",
-                    "parameters": {
-                        "command": [
-                            "powdrr-lift",
-                            "system-specification",
-                            "--work-item-name",
-                            "display-related-photos",
-                        ],
+                    "action": "next_step",
+                    "outputs": {
+                        "feature_description": (
+                            "Build exports and display related photos in the feature view."
+                        )
                     },
-                    "decisions_and_context": (
-                        "Start system spec generation for display-related-photos."
-                    ),
+                    "decisions_and_context": "Feature context captured.",
                 }
             elif self._call_index == 4:
                 prompt = self._assert_execution_prompt(

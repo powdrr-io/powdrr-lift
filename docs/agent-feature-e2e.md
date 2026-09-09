@@ -25,7 +25,8 @@ The runner performs these phases in order:
    artifacts.
 3. Every generated PR workflow is handed to `process-workflow-task`, so the
    agent performs the planned test, implementation, review, and validation work.
-4. All four feature specification documents are evaluated.
+4. The generated `feature-pr-specification.yaml` is evaluated after the design
+   interview completes.
 
 The report and phase transcripts are written under
 `.powdrr/agent-feature-run/`. They are deliberately separate from deliverable

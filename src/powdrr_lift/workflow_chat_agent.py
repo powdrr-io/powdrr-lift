@@ -1707,6 +1707,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "rejected_strategy_signatures": list(
                     directive.rejected_strategy_signatures
                 ),
+                "repair_context": self.repair_context().to_data(),
                 "step_index": self.current_step_index,
             }
         )

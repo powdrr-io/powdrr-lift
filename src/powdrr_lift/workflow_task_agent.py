@@ -701,6 +701,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "rejected_strategy_signatures": list(
                     directive.rejected_strategy_signatures
                 ),
+                "repair_context": self.repair_context().to_data(),
             }
         )
         if self.terminalized:

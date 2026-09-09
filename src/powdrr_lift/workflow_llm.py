@@ -195,6 +195,27 @@ class RepairContext:
     last_material_progress: Mapping[str, Any] | None = None
     material_state_fingerprint: str = ""
 
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "execution_id": self.execution_id,
+            "boundary_id": self.boundary_id,
+            "objective": self.objective,
+            "deterministic_state": dict(self.deterministic_state),
+            "allowed_actions": list(self.allowed_actions),
+            "action_schemas": {
+                name: dict(schema) for name, schema in self.action_schemas.items()
+            },
+            "required_outputs": list(self.required_outputs),
+            "open_obligations": [dict(item) for item in self.open_obligations],
+            "rejected_strategies": list(self.rejected_strategies),
+            "last_material_progress": (
+                dict(self.last_material_progress)
+                if self.last_material_progress is not None
+                else None
+            ),
+            "material_state_fingerprint": self.material_state_fingerprint,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class RepairDirective:

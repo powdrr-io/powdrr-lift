@@ -116,6 +116,31 @@ def test_repair_context_allows_same_target_after_material_state_changes() -> Non
     assert second.attempt == 2
 
 
+def test_repair_context_serializes_replay_inputs() -> None:
+    context = RepairContext(
+        execution_id="execution",
+        boundary_id="step",
+        objective="recover",
+        allowed_actions=("next_step",),
+        required_outputs=("result",),
+        rejected_strategies=("edit:file",),
+        material_state_fingerprint="state-hash",
+    )
+    assert context.to_data() == {
+        "execution_id": "execution",
+        "boundary_id": "step",
+        "objective": "recover",
+        "deterministic_state": {},
+        "allowed_actions": ["next_step"],
+        "action_schemas": {},
+        "required_outputs": ["result"],
+        "open_obligations": [],
+        "rejected_strategies": ["edit:file"],
+        "last_material_progress": None,
+        "material_state_fingerprint": "state-hash",
+    }
+
+
 def test_repair_coordinator_escalates_to_fallback_then_handoff() -> None:
     coordinator = WorkflowRepairCoordinator(RepairPolicy(deterministic_recovery=False))
     coordinator.begin_boundary("step-1")

@@ -56,7 +56,7 @@ jobs:
         run: uv run mypy src tests
 
       - name: Statically compile workflow definitions
-        run: uv run powdrr-lift validate-workflow-definitions skill-definitions templates
+        run: uv run powdrr-lift validate-workflow-definitions skill-definitions templates --liveness --baseline .github/workflow-liveness-baseline.json
 
       - name: Run tests
         run: uv run pytest tests

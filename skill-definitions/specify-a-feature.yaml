@@ -289,21 +289,17 @@ steps:
       YAML with yaml_edit, and rerun deterministic evaluation before continuing.
 - id: stage-specification-artifacts
   description: Stage the validated specification artifacts for pull request preparation.
-  actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: governed
+  step_type: invoke_tool
   llm_type: simple_task
   details: Inspect the worktree and stage only the validated specification
     artifacts under docs/proposals/<work-item-name>/. Do not commit or create the
     pull request yet.
-  tool_invocations:
-  - tool: internal
-    command:
-    - powdrr-lift
-    - repository-state
-  - tool: git
-    command:
-    - add
-    - docs/proposals/<work-item-name>
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: git
+      operation: add
+      paths: [docs/proposals/<work-item-name>]
 - id: prepare-pull-request
   description: Run finish-pr-prep before creating the pull request.
   step_type: uses_skill

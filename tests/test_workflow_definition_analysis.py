@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 
@@ -9,6 +9,7 @@ from powdrr_lift.cli import main
 from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     analyze_workflow_definitions,
+    apply_liveness_baseline,
     discover_workflow_definitions,
     render_skill_prompt_snapshots,
 )
@@ -269,6 +270,9 @@ steps:
       required_outputs: [answer]
     outputs:
       - name: answer
+        schema: {type: string}
+    outputs:
+      - name: answer
         required_for_next_step: true
         schema: {type: string}
     details: 'Return {"action":"next_step"}.'
@@ -279,3 +283,210 @@ steps:
     report = analyze_workflow_definition(definition)
 
     assert "invalid_action_example" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_warns_on_model_owned_idempotent_git_add(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: stage
+when_to_use: [Stage files.]
+steps:
+  - id: stage
+    description: Stage the files.
+    tool_invocations:
+      - tool: git
+        command: [add, docs/proposal.yaml]
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert not report.validation_successful
+    issues = {issue.code: issue for issue in report.issues}
+    assert issues["model_owned_deterministic_action"].severity == "error"
+    assert issues["idempotent_action_without_auto_advance"].severity == "error"
+
+
+def test_definition_analysis_warns_on_non_progress_cycle(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: loop
+when_to_use: [Loop.]
+steps:
+  - id: loop
+    description: Repeat the same observation.
+    next_step_override: loop
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "non_progress_cycle" in {issue.code for issue in report.issues}
+
+
+def test_definition_validation_cli_prints_liveness_warnings(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: stage
+when_to_use: [Stage files.]
+steps:
+  - id: stage
+    description: Stage the files.
+    tool_invocations:
+      - tool: git
+        command: [add, docs/proposal.yaml]
+""",
+        encoding="utf-8",
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        exit_code = main(["validate-workflow-definition", str(definition)])
+
+    assert exit_code == 1
+    assert "Workflow definition invalid" in stderr.getvalue()
+    assert "idempotent_action_without_auto_advance" in stderr.getvalue()
+
+
+def test_definition_analysis_warns_on_repeated_read_cycle(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: read-loop
+when_to_use: [Read repeatedly.]
+steps:
+  - id: read
+    description: Read the same document.
+    actions: [read_document]
+    next_step_override: read
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "non_progress_cycle" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_reports_unobservable_completion(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: missing-output
+when_to_use: [Complete.]
+steps:
+  - id: complete
+    description: Complete only when a missing output exists.
+    step_type: predicated
+    completion:
+      required_outputs: [answer]
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "unobservable_completion" in {issue.code for issue in report.issues}
+    assert "terminal_state_without_completion" in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_definition_analysis_reports_unbounded_coding_loop(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: loop
+when_to_use: [Loop.]
+steps:
+  - id: loop
+    description: Keep coding forever.
+    step_type: coding_loop
+    coding_loop:
+      goal: Make changes.
+      verification: [{id: check, command: check}]
+      stopping_conditions: [verified]
+      max_iterations: 0
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "unbounded_coding_loop" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_reports_unknown_shell_effect(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: shell
+when_to_use: [Run a command.]
+steps:
+  - id: run
+    description: Run a command.
+    tool_invocations:
+      - tool: shell
+        command: [custom-command]
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    issue = next(
+        issue for issue in report.issues if issue.code == "unknown_shell_effect"
+    )
+    assert issue.severity == "warning"
+
+
+def test_liveness_baseline_suppresses_advisory_diagnostics_only(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: shell
+when_to_use: [Run a command.]
+steps:
+  - id: run
+    description: Run a command.
+    tool_invocations:
+      - tool: shell
+        command: [custom-command]
+""",
+        encoding="utf-8",
+    )
+    report = analyze_workflow_definitions([definition])
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "issues": [
+                    {
+                        "definition": str(definition),
+                        "code": "unknown_shell_effect",
+                        "path": f"{definition}.steps[0].tool_invocations",
+                        "owner": "workflow-platform",
+                        "reason": "Legacy shell capability rollout.",
+                        "expires": "2099-12-31",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    filtered = apply_liveness_baseline(report, baseline)
+
+    assert filtered.validation_successful
+    assert filtered.reports[0].issues == ()

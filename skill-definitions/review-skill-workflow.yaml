@@ -158,8 +158,7 @@ steps:
     - <target-definition-path>
 
 - id: stage-for-pull-request
-  actions: [invoke_tool, edit, yaml_edit, read_document]
-  step_type: governed
+  step_type: invoke_tool
   description: Stage the reviewed definition for pull-request preparation.
   llm_type: simple_task
   details: >-
@@ -169,11 +168,12 @@ steps:
     Verify the staged names with `git diff --cached --name-only`; do not stage
     logs, caches, or unrelated files. Do not create or update a pull request in
     this step.
-  tool_invocations:
-  - tool: git
-    command:
-    - add
-    - <target-definition-path>
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: git
+      operation: add
+      paths: [<target-definition-path>]
 
 - id: finish-pull-request-prep
   step_type: uses_skill

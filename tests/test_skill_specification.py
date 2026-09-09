@@ -910,6 +910,7 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
     interview = step("conduct-design-interview")
     assert interview.step_type == "uses_skill"
     assert uses_skill_name(interview) == "design-interview"
+    assert interview.uses_skill is not None
     assert [(binding.name, binding.ref) for binding in interview.uses_skill.inputs] == [
         ("work_item_name", "work_item_name"),
         ("feature_description", "feature_description"),

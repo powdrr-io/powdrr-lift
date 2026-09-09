@@ -6319,7 +6319,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 ):
                     self._nested_invoked_steps.add(nested_key)
                     invocation = cast(dict[str, object], invocation)
-                    parameters = (
+                    invocation_parameters: dict[str, object] = (
                         {"operation": invocation["operation"]}
                         if "operation" in invocation
                         else {"command": invocation["command"]}
@@ -6327,7 +6327,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                     return {
                         "action": "invoke_tool",
                         "tool": invocation["tool"],
-                        "parameters": parameters,
+                        "parameters": invocation_parameters,
                     }
                 return {
                     "action": "next_step",
@@ -6341,7 +6341,7 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 step_id = current_step.get("id")
                 latest_action = prompt.get("latest_action")
                 if step_id == "capture-feature-context":
-                    generic_response = {
+                    generic_response: dict[str, object] = {
                         "action": "next_step",
                         "outputs": {
                             "feature_description": (

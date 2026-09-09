@@ -1331,6 +1331,7 @@ class WorkflowStepRunner:
                         error.error_code,
                         str(error),
                         action_signature=signature(action),
+                        target_signature=workflow_action_target_signature(action),
                     ),
                 )
                 self.kernel.fail(action, error)
@@ -1396,6 +1397,7 @@ class WorkflowStepRunner:
                         exc.error_code,
                         str(exc),
                         action_signature=signature(action),
+                        target_signature=workflow_action_target_signature(action),
                     ),
                 )
                 failure_decision = None
@@ -1447,6 +1449,7 @@ class WorkflowStepRunner:
                         "no_progress",
                         observation.correction or "The action made no progress.",
                         action_signature=signature(action),
+                        target_signature=workflow_action_target_signature(action),
                     ),
                 )
                 deterministic_outcome = self._apply_deterministic_repair(
@@ -1743,6 +1746,33 @@ def workflow_action_failure_signature[ActionT](
     for field_name in ("decisions_and_context", "llm_type", "outputs"):
         value.pop(field_name, None)
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def workflow_action_target_signature(action: object) -> str:
+    """Return a stable resource-level identity for rejected action strategies."""
+    kind = str(getattr(action, "kind", "action"))
+    target_fields = {
+        "file_path": getattr(action, "file_path", None),
+        "file_paths": tuple(
+            getattr(edit, "file_path", "") for edit in getattr(action, "file_edits", ())
+        ),
+        "tool": getattr(action, "tool", None),
+        "skill_name": getattr(action, "skill_name", None),
+        "step_id": getattr(action, "step_id", None),
+        "destination_path": getattr(action, "destination_path", None),
+        "file_operation": getattr(action, "file_operation", None),
+    }
+    target = {
+        name: value
+        for name, value in target_fields.items()
+        if value not in (None, "", ())
+    }
+    return json.dumps(
+        {"kind": kind, "target": target},
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    )
 
 
 def workflow_action_summary(action: object) -> str:

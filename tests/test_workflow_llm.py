@@ -33,6 +33,7 @@ from powdrr_lift.workflow_llm import (
     prune_execution_events,
     resolve_deterministic_repair,
     workflow_action_signature,
+    workflow_action_target_signature,
 )
 
 
@@ -42,6 +43,14 @@ def test_repair_failure_classification_uses_codes_not_error_text() -> None:
             "workflow_action_not_allowed", default=RepairFailureClass.RESPONSE
         )
         is RepairFailureClass.ACTION_CONTRACT
+    )
+
+
+def test_target_signature_omits_material_parameter_and_narrative_changes() -> None:
+    first = {"kind": "edit", "file_path": "src/app.py"}
+    second = {"kind": "edit", "file_path": "src/app.py"}
+    assert workflow_action_target_signature(first) == workflow_action_target_signature(
+        second
     )
     assert (
         classify_repair_failure("no_progress", default=RepairFailureClass.EXECUTION)

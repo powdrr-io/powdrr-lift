@@ -426,6 +426,8 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[1].input_state["proposed_pr_context"] == (
         "<upstream-task-0>.proposed-pr-context-state"
     )
+    assert "basedpyright-structure" in (template.task_templates[1].details or "")
+    assert "basedpyright-symbol" in (template.task_templates[1].details or "")
     assert template.task_templates[2].uses_skills == ()
     assert template.task_templates[2].step_type == "coding_loop"
     assert template.task_templates[2].actions == (
@@ -439,6 +441,8 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[2].coding_loop.verification[0].command == (
         "<verification-command>"
     )
+    assert "basedpyright-structure" in (template.task_templates[2].details or "")
+    assert "basedpyright-symbol" in (template.task_templates[2].details or "")
     assert template.task_templates[2].input_state["proposed_pr_context"] == (
         "<upstream-task-0>.proposed-pr-context-state"
     )

@@ -61,6 +61,46 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
     assert result["output_matches"] is True
 
 
+def test_task_scenario_replays_clean_room_repair_stage(tmp_path: Path) -> None:
+    workflow = WorkflowInstance.create(
+        tmp_path / "source-workflow",
+        (
+            WorkflowTask(
+                task_id="repair-task",
+                status=TaskStatus.OPEN,
+                complexity=TaskComplexity.LOW,
+                input_state={},
+                description="Complete after a failed edit.",
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.ARCHITECT,
+                output_state_type="result",
+                actions=("edit", "complete"),
+            ),
+        ),
+    )
+
+    result = run_workflow_task_scenario(
+        workflow_source=workflow.directory,
+        task_id="repair-task",
+        responses=[
+            {
+                "action": "edit",
+                "file_path": "missing.txt",
+                "edits": [{"kind": "replace", "start_line": 1, "text": "x"}],
+            },
+            {"action": "complete", "output_state": {"result": {"ok": True}}},
+        ],
+        expected_output_state={"result": {"ok": True}},
+    )
+
+    assert result["exit_code"] == 0
+    assert result["output_matches"] is True
+    assert len(result["exchanges"]) == 2
+    clean_prompt = json.loads(result["exchanges"][1][1]["content"])
+    assert clean_prompt["execution_mode"] == "clean_room_repair"
+    assert clean_prompt["repair_stage"] == "action_selection"
+
+
 def _coding_task_agent_reacts_to_failure_and_verifies_the_fix(
     tmp_path: Path,
 ) -> None:

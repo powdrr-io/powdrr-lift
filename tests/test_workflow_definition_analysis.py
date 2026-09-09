@@ -279,3 +279,23 @@ steps:
     report = analyze_workflow_definition(definition)
 
     assert "invalid_action_example" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_rejects_empty_repair_action_space(tmp_path: Path) -> None:
+    definition = tmp_path / "empty-actions.yaml"
+    definition.write_text(
+        """\
+name: empty-actions
+when_to_use: [Test repairability.]
+steps:
+  - id: blocked
+    description: No legal recovery action.
+    actions: []
+    actions_declared: true
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "empty_repair_action_space" in {issue.code for issue in report.issues}

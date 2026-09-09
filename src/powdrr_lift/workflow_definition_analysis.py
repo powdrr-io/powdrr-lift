@@ -190,6 +190,7 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                 continue
             step_path = f"{path}.{step_key}[{index}]"
             issues.extend(_validate_step_examples(step, step_path))
+            issues.extend(_validate_repairability(step, step_path))
             if declared:
                 issues.extend(_validate_step_placeholders(step, step_path, declared))
         if kind == "skill":
@@ -203,6 +204,30 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                 if ir is not None:
                     issues.extend(_validate_handoffs(ir, path))
     return WorkflowDefinitionReport(path, kind, tuple(issues))
+
+
+def _validate_repairability(
+    step: Mapping[str, Any], step_path: str
+) -> list[WorkflowDefinitionIssue]:
+    """Reject definitions that cannot produce a legal recovery action."""
+    issues: list[WorkflowDefinitionIssue] = []
+    actions = step.get("actions")
+    if (
+        step.get("actions_declared") is True
+        and isinstance(actions, list)
+        and not actions
+    ):
+        issues.append(
+            WorkflowDefinitionIssue(
+                "empty_repair_action_space",
+                "An explicitly declared action catalog cannot be empty; action "
+                "selection would have no legal enum value.",
+                f"{step_path}.actions",
+            )
+        )
+    # ``emit_outputs`` is a universal action added by the step behavior layer
+    # for every predicated step, even when omitted from the authored catalog.
+    return issues
 
 
 def render_skill_prompt_snapshots(

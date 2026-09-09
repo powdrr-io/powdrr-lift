@@ -3281,7 +3281,35 @@ def test_repair_prompt_tells_model_not_to_repeat_invalid_payload() -> None:
     )
 
     assert "Do not repeat that response" in prompt[-1]["content"]
-    assert '"types": ["requirements"]' in prompt[-1]["content"]
+    repair_envelope = json.loads(prompt[-1]["content"])
+    assert '"types": ["requirements"]' in repair_envelope["failure"]
+
+
+def test_json_repair_uses_clean_room_prompt_without_original_history() -> None:
+    prompt = _build_json_repair_messages(
+        [
+            {"role": "system", "content": "old conversation secret"},
+            {"role": "user", "content": "old request"},
+        ],
+        context="workflow execution",
+        error_message="invalid action",
+        repair_instructions="Return a legal action.",
+        previous_payload={"action": "bad", "canary": "old-payload"},
+    )
+
+    assert len(prompt) == 2
+    assert prompt[0]["role"] == "system"
+    assert "clean-room repair" in prompt[0]["content"]
+    assert all(
+        "old conversation secret" not in message["content"] for message in prompt
+    )
+    assert all("old request" not in message["content"] for message in prompt)
+    repair_envelope = json.loads(prompt[1]["content"])
+    repair_context = json.loads(repair_envelope["context"])
+    assert repair_context["previous_response"] == {
+        "action": "bad",
+        "canary": "old-payload",
+    }
 
 
 def test_llm_type_mapping_selects_deepinfra_model() -> None:
@@ -6044,6 +6072,16 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             cast(list[list[dict[str, str]]], captured["messages"]).append(messages)
             prompt = json.loads(messages[1]["content"])
+            if prompt.get("execution_mode") == "clean_room_repair":
+                self._call_index += 1
+                return {
+                    "action": "invoke_tool",
+                    "tool": "git",
+                    "parameters": {
+                        "operation": "add",
+                        "paths": ["docs/proposals/display-related-photos"],
+                    },
+                }
             if (
                 self._call_index > 0
                 and prompt["selected_skill"]["name"] != "specify-a-feature"
@@ -6984,6 +7022,20 @@ def test_cli_workflow_chat_end_to_end_specify_and_start_feature_with_mocked_llm_
                 messages
             )
             prompt = json.loads(messages[1]["content"])
+            if prompt.get("execution_mode") == "clean_room_repair":
+                context = json.loads(prompt["context"])
+                previous = context.get("previous_response")
+                self._call_index += 1
+                if isinstance(previous, dict):
+                    parameters = previous.get("parameters")
+                    if isinstance(parameters, dict):
+                        parameters = dict(parameters)
+                        for field in ("pr_reference", "head", "base"):
+                            parameters.pop(field, None)
+                        previous = dict(previous)
+                        previous["parameters"] = parameters
+                    return previous
+                return {"action": "next_step"}
             if self._call_index == 0:
                 assert prompt["conversation"][0]["content"] == (
                     "Start implementing display related photos"

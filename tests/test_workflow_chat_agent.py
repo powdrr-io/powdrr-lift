@@ -606,6 +606,38 @@ def test_predicated_step_omits_model_next_step_action() -> None:
     )
 
 
+def test_predicated_step_switches_to_emit_only_after_context_action() -> None:
+    step = SkillStep(
+        description="Gather context, judge it, and publish the result.",
+        step_type="predicated",
+        actions=("gather_context",),
+        actions_declared=True,
+        completion=SkillStepCompletion(
+            ("result",),
+            (SkillStepRequiredAction("gather_context", exactly=1),),
+        ),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+
+    before = [name for name, _ in _step_actions(step, step_index=0)]
+    after = [
+        name
+        for name, _ in _step_actions(
+            step,
+            execution_events=[{"kind": "gather_context", "step_index": 0}],
+            step_index=0,
+        )
+    ]
+
+    assert before == ["gather_context", "prompt_user"]
+    assert after == ["emit_outputs"]
+    assert _step_action_response_schema(
+        step,
+        execution_events=[{"kind": "gather_context", "step_index": 0}],
+        step_index=0,
+    )["properties"]["action"]["enum"] == ["emit_outputs"]
+
+
 def test_predicated_step_advances_after_current_step_outputs(tmp_path: Path) -> None:
     predicated = SkillStep(
         description="Produce the result.",

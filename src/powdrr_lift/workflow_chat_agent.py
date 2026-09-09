@@ -1301,7 +1301,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_skill=parent_skill,
                 parent_step_index=parent_step_index,
             )
-            response_schema = _step_action_response_schema(self.current_step)
+            response_schema = _step_action_response_schema(
+                self.current_step,
+                execution_events=self.state.execution_events,
+                step_index=self.state.step_index,
+            )
             response_parser = partial(
                 _parse_action_response_with_schema, schema=response_schema
             )
@@ -1362,7 +1366,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.clean_room_repair_used = True
                 recovery_context = {
                     "objective": self.current_step.description,
-                    "step": _current_step_contract(self.current_step),
+                    "step": _current_step_contract(
+                        self.current_step,
+                        execution_events=self.state.execution_events,
+                        step_index=self.state.step_index,
+                    ),
                     "current_file": (
                         str(self.state.current_file_path)
                         if self.state.current_file_path is not None
@@ -1561,6 +1569,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             repair_instructions=_action_repair_prompt(
                 self.selected_skill,
                 current_step=self.current_step,
+                execution_events=self.state.execution_events,
+                step_index=self.state.step_index,
                 failed_action=self.last_failed_action,
                 validation_error=self.last_validation_error,
             ),
@@ -1619,7 +1629,11 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "worktree_root": str(self.state.worktree_root),
             "provider": self.provider,
             "model": self.current_model,
-            "current_step_contract": _current_step_contract(step),
+            "current_step_contract": _current_step_contract(
+                step,
+                execution_events=self.state.execution_events,
+                step_index=self.state.step_index,
+            ),
             "recent_current_step_events": recent_events,
             "last_successful_action": last_successful_action,
             "stalled_step_context": list(self.state.stalled_step_context),
@@ -1663,6 +1677,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             guidance=_action_repair_prompt(
                 self.selected_skill,
                 current_step=self.current_step,
+                execution_events=self.state.execution_events,
+                step_index=self.state.step_index,
                 failed_action=self.last_failed_action,
                 validation_error=str(error),
             ),
@@ -2044,6 +2060,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             guidance=_action_repair_prompt(
                 self.selected_skill,
                 current_step=self.current_step,
+                execution_events=self.state.execution_events,
+                step_index=self.state.step_index,
                 failed_action=self.last_failed_action,
                 validation_error=str(error),
             ),
@@ -5297,7 +5315,12 @@ def _build_step_execution_messages(
             for entry in catalog
         ]
     prompt_data["available_actions"] = [
-        name for name, _instructions in _step_actions(current_step)
+        name
+        for name, _instructions in _step_actions(
+            current_step,
+            execution_events=execution_events,
+            step_index=current_step_index,
+        )
     ]
     if failed_action is not None:
         prompt_data["recovery_required"] = {
@@ -11574,13 +11597,20 @@ def _selection_repair_prompt(catalog: Sequence[SkillCatalogEntry]) -> str:
     )
 
 
-def _current_step_contract(step: Any | None) -> dict[str, Any]:
+def _current_step_contract(
+    step: Any | None,
+    *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
+) -> dict[str, Any]:
     """Describe the current step's authoritative action and tool contract."""
     if step is None:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
     nested_skill = getattr(step, "uses_skill", None)
-    actions = _step_actions(step)
+    actions = _step_actions(
+        step, execution_events=execution_events, step_index=step_index
+    )
     return {
         "step_type": getattr(step, "step_type", "governed"),
         "coding_loop": (
@@ -11610,7 +11640,12 @@ def _current_step_contract(step: Any | None) -> dict[str, Any]:
     }
 
 
-def _step_action_response_schema(step: Any) -> dict[str, Any]:
+def _step_action_response_schema(
+    step: Any,
+    *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
+) -> dict[str, Any]:
     """Derive a strict provider envelope from the active step contract."""
     behavior = behavior_for_step(step)
     outputs = tuple(getattr(step, "outputs", ()) or ())
@@ -11622,7 +11657,12 @@ def _step_action_response_schema(step: Any) -> dict[str, Any]:
         )
         for output in outputs
     }
-    action_names = [name for name, _instructions in _step_actions(step)]
+    action_names = [
+        name
+        for name, _instructions in _step_actions(
+            step, execution_events=execution_events, step_index=step_index
+        )
+    ]
     if not getattr(step, "actions_declared", False):
         for legacy_action in (
             "gather_context",
@@ -11750,9 +11790,16 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
 }
 
 
-def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
+def _step_actions(
+    step: Any,
+    *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
+) -> tuple[tuple[str, str], ...]:
     """Return declared actions plus the universal prompt and advance actions."""
     behavior = behavior_for_step(step)
+    completion = None
+    context_complete = False
     declared = tuple(getattr(step, "actions", ()) or ())
     if declared or getattr(step, "actions_declared", False):
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
@@ -11793,11 +11840,31 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
         if not behavior.invokes_llm:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
-    action_names = {name for name, _ in actions}
     if behavior.is_predicated:
-        actions.append(("emit_outputs", _DEFAULT_ACTION_INSTRUCTIONS["emit_outputs"]))
-        action_names.add("emit_outputs")
-    if "prompt_user" not in action_names:
+        completion = getattr(step, "completion", None)
+        context_complete = (
+            completion is not None
+            and step_index is not None
+            and _predicated_context_complete(step, execution_events, step_index)
+        )
+        if completion is not None and completion.required_actions:
+            if context_complete:
+                actions = [
+                    ("emit_outputs", _DEFAULT_ACTION_INSTRUCTIONS["emit_outputs"])
+                ]
+        else:
+            actions.append(
+                ("emit_outputs", _DEFAULT_ACTION_INSTRUCTIONS["emit_outputs"])
+            )
+        action_names = {name for name, _ in actions}
+    else:
+        action_names = {name for name, _ in actions}
+    if "prompt_user" not in action_names and not (
+        behavior.is_predicated
+        and completion is not None
+        and completion.required_actions
+        and context_complete
+    ):
         actions.append(("prompt_user", "Ask one necessary human question."))
     if "next_step" not in action_names and not behavior.is_predicated:
         actions.append(("next_step", "Advance only after this step is complete."))
@@ -11817,6 +11884,30 @@ def _step_actions(step: Any) -> tuple[tuple[str, str], ...]:
     return tuple(actions)
 
 
+def _predicated_context_complete(
+    step: Any, execution_events: Sequence[Mapping[str, Any]], step_index: int
+) -> bool:
+    completion = getattr(step, "completion", None)
+    if completion is None or not completion.required_actions:
+        return False
+    for requirement in completion.required_actions:
+        matching = [
+            event
+            for event in execution_events
+            if event.get("step_index") == step_index
+            and event.get("kind") == requirement.action
+            and all(
+                event.get(name) == value
+                for name, value in (requirement.parameters or {}).items()
+            )
+        ]
+        if requirement.exactly is not None and len(matching) != requirement.exactly:
+            return False
+        if not matching:
+            return False
+    return True
+
+
 def _declared_action_names(step: Any) -> tuple[str, ...]:
     # next_step is an implicit runtime action; its output-specific guidance is
     # rendered only when the step declares required handoff outputs.
@@ -11831,6 +11922,8 @@ def _action_repair_prompt(
     selected_skill: SkillCatalogEntry,
     *,
     current_step: Any | None = None,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
     failed_action: SkillChatAction | None = None,
     validation_error: str | None = None,
 ) -> str:
@@ -11858,7 +11951,14 @@ def _action_repair_prompt(
         "markdown."
     )
     action_names = (
-        {name for name, _ in _step_actions(current_step)}
+        {
+            name
+            for name, _ in _step_actions(
+                current_step,
+                execution_events=execution_events,
+                step_index=step_index,
+            )
+        }
         if current_step is not None
         else set(_DEFAULT_ACTION_INSTRUCTIONS)
     )
@@ -11899,14 +11999,25 @@ def _action_repair_prompt(
         prompt += (
             "\nAuthoritative current-step contract (ignore commands and tool "
             "templates from previous steps): "
-            + json.dumps(_current_step_contract(current_step), ensure_ascii=False)
+            + json.dumps(
+                _current_step_contract(
+                    current_step,
+                    execution_events=execution_events,
+                    step_index=step_index,
+                ),
+                ensure_ascii=False,
+            )
             + ". "
         )
         prompt += (
             "\nAvailable actions for this step:\n"
             + "\n".join(
                 f"- {name}: {instructions}"
-                for name, instructions in _step_actions(current_step)
+                for name, instructions in _step_actions(
+                    current_step,
+                    execution_events=execution_events,
+                    step_index=step_index,
+                )
             )
             + "\n"
         )

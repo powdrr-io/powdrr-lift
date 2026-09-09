@@ -194,6 +194,11 @@ def test_deterministic_repair_only_returns_allowlisted_terminal_actions() -> Non
         allowed_actions=("edit",),
         legacy_action={"action": "edit", "file_path": "README.md"},
     ) == {"action": "edit", "file_path": "README.md"}
+    assert resolve_deterministic_repair(
+        error_code="deterministic_output_state_mismatch",
+        allowed_actions=("next_step",),
+        output_state={"result": True},
+    ) == {"action": "next_step", "output_state": {"result": True}}
 
 
 def test_repair_exhaustion_report_is_durable_and_complete() -> None:

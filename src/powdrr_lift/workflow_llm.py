@@ -368,6 +368,12 @@ def resolve_deterministic_repair(
         return {"action": "emit_outputs", "outputs": output_state}
     if completion_satisfied and "next_step" in allowed:
         return {"action": "next_step", "output_state": output_state}
+    if (
+        error_code == "deterministic_output_state_mismatch"
+        and output_state is not None
+        and "next_step" in allowed
+    ):
+        return {"action": "next_step", "output_state": output_state}
     if error_code == "legacy_action_shape" and legacy_action is not None:
         action = legacy_action.get("action")
         if isinstance(action, str) and action in allowed:

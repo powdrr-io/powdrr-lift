@@ -136,6 +136,7 @@ from powdrr_lift.workflow_llm import (
     complete_two_pass_action,
     prompt_size_breakdown,
     prune_execution_events,
+    resolve_deterministic_repair,
     workflow_action_signature,
     workflow_action_summary,
 )
@@ -762,10 +763,19 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
         ):
             return None
+        repaired = resolve_deterministic_repair(
+            error_code=failure.error_code,
+            allowed_actions=(self.runtime.allowed_actions() or ())
+            if self.runtime is not None
+            else (),
+            output_state=self.deterministic_output_state,
+        )
+        if repaired is None or repaired.get("action") != "next_step":
+            return None
         return self.execute_action(
             WorkflowAction(
                 kind="next_step",
-                output_state=self.deterministic_output_state,
+                output_state=repaired.get("output_state"),
             )
         )
 

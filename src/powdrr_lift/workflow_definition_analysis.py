@@ -79,6 +79,53 @@ class WorkflowIR:
     initial_inputs: frozenset[str]
 
 
+@dataclass(frozen=True, slots=True)
+class WorkflowDefinitionsReport:
+    """Repository-wide result for statically compiling definitions."""
+
+    reports: tuple[WorkflowDefinitionReport, ...]
+
+    @property
+    def validation_successful(self) -> bool:
+        return all(report.validation_successful for report in self.reports)
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "validation_successful": self.validation_successful,
+            "definition_count": len(self.reports),
+            "reports": [report.to_data() for report in self.reports],
+        }
+
+
+def discover_workflow_definitions(paths: Sequence[Path]) -> tuple[Path, ...]:
+    """Return supported definition files below files or directories."""
+    discovered: set[Path] = set()
+    for path in paths:
+        if path.is_file():
+            if path.suffix.lower() in {".yaml", ".yml", ".json"}:
+                discovered.add(path)
+            continue
+        if path.is_dir():
+            discovered.update(
+                candidate
+                for candidate in path.rglob("*")
+                if candidate.is_file()
+                and candidate.suffix.lower() in {".yaml", ".yml", ".json"}
+                and ".git" not in candidate.relative_to(path).parts
+            )
+    return tuple(sorted(discovered))
+
+
+def analyze_workflow_definitions(paths: Sequence[Path]) -> WorkflowDefinitionsReport:
+    """Statically analyze every supported definition under ``paths``."""
+    return WorkflowDefinitionsReport(
+        tuple(
+            analyze_workflow_definition(path)
+            for path in discover_workflow_definitions(paths)
+        )
+    )
+
+
 def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
     """Validate a skill or workflow template and flag deterministic confusion risks."""
     try:

@@ -5,8 +5,11 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
+from powdrr_lift.cli import main
 from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
+    analyze_workflow_definitions,
+    discover_workflow_definitions,
     render_skill_prompt_snapshots,
 )
 
@@ -116,6 +119,62 @@ steps:
 
     assert exit_code == 0
     assert json.loads(stdout.getvalue())["validation_successful"] is True
+
+
+def test_definition_discovery_recurses_and_ignores_unsupported_files(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "skill.yaml").write_text("name: x\nsteps: []\n", encoding="utf-8")
+    (tmp_path / "nested" / "template.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "notes.txt").write_text("not a definition", encoding="utf-8")
+
+    assert discover_workflow_definitions([tmp_path]) == (
+        tmp_path / "nested" / "template.json",
+        tmp_path / "skill.yaml",
+    )
+
+
+def test_batch_definition_analysis_reports_all_definitions(tmp_path: Path) -> None:
+    valid = tmp_path / "valid.yaml"
+    valid.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect
+    description: Inspect files.
+""",
+        encoding="utf-8",
+    )
+    invalid = tmp_path / "invalid.yaml"
+    invalid.write_text("steps: not-a-list\n", encoding="utf-8")
+
+    report = analyze_workflow_definitions([tmp_path])
+
+    assert len(report.reports) == 2
+    assert not report.validation_successful
+    assert report.reports[0].definition == invalid
+    assert report.reports[1].definition == valid
+
+
+def test_batch_definition_validation_cli_fails_for_any_invalid_definition(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "valid.yaml").write_text(
+        "name: inspect\nwhen_to_use: [Inspect.]\nsteps:\n  - description: Inspect.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "invalid.yaml").write_text("steps: invalid\n", encoding="utf-8")
+    stdout = StringIO()
+
+    with redirect_stdout(stdout):
+        exit_code = main(["validate-workflow-definitions", str(tmp_path), "--json"])
+
+    assert exit_code == 1
+    report = json.loads(stdout.getvalue())
+    assert report["definition_count"] == 2
+    assert report["validation_successful"] is False
 
 
 def test_prompt_snapshots_support_workflow_templates(tmp_path: Path) -> None:

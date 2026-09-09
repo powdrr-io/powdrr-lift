@@ -36,7 +36,12 @@ from powdrr_lift.workflow_llm import (
 
 def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
     coordinator = WorkflowRepairCoordinator(
-        RepairPolicy(targeted_attempts=1, clean_room_attempts=1)
+        RepairPolicy(
+            targeted_attempts=1,
+            clean_room_attempts=1,
+            model_fallback_attempts=0,
+            allow_human_handoff=False,
+        )
     )
     coordinator.begin_boundary("step-1")
     response_failure = RepairFailure(
@@ -66,6 +71,50 @@ def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
 
     coordinator.begin_boundary("step-2")
     assert coordinator.record_failure(response_failure).attempt == 1
+
+
+def test_repair_coordinator_escalates_to_fallback_then_handoff() -> None:
+    coordinator = WorkflowRepairCoordinator()
+    coordinator.begin_boundary("step-1")
+    assert (
+        coordinator.record_failure(
+            RepairFailure(RepairFailureClass.RESPONSE, "bad_json", "bad response")
+        ).stage
+        is RepairStage.TARGETED
+    )
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.EXECUTION,
+                "edit_failed",
+                "edit failed",
+                action_signature="edit:a",
+            )
+        ).stage
+        is RepairStage.CLEAN_ROOM
+    )
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.EXECUTION,
+                "tool_failed",
+                "tool failed",
+                action_signature="tool:b",
+            )
+        ).stage
+        is RepairStage.MODEL_FALLBACK
+    )
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.NO_PROGRESS,
+                "no_progress",
+                "still stalled",
+                action_signature="read:c",
+            )
+        ).stage
+        is RepairStage.HUMAN_HANDOFF
+    )
 
 
 def test_repair_coordinator_rejects_duplicate_failure_identity() -> None:

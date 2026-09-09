@@ -196,7 +196,7 @@ class WorkflowRepairCoordinator:
                 remediation="Advance material state or change the repair strategy.",
             )
         self._identities.add(identity)
-        stage = self._stage_for(failure)
+        stage = self._next_stage(failure)
         used = sum(item.stage == stage for item in self.attempts)
         limit = self._limit_for(stage)
         if used >= limit:
@@ -210,16 +210,35 @@ class WorkflowRepairCoordinator:
         self.attempts.append(directive)
         return directive
 
-    def _stage_for(self, failure: RepairFailure) -> RepairStage:
-        if failure.classification == RepairFailureClass.RESPONSE:
-            return RepairStage.TARGETED
-        return RepairStage.CLEAN_ROOM
+    def _next_stage(self, failure: RepairFailure) -> RepairStage:
+        first = (
+            RepairStage.TARGETED
+            if failure.classification == RepairFailureClass.RESPONSE
+            else RepairStage.CLEAN_ROOM
+        )
+        stages = (
+            (first, RepairStage.CLEAN_ROOM, RepairStage.MODEL_FALLBACK)
+            if first == RepairStage.TARGETED
+            else (RepairStage.CLEAN_ROOM, RepairStage.MODEL_FALLBACK)
+        )
+        for stage in stages:
+            if sum(item.stage == stage for item in self.attempts) < self._limit_for(
+                stage
+            ):
+                return stage
+        if self.policy.allow_human_handoff:
+            return RepairStage.HUMAN_HANDOFF
+        return RepairStage.EXHAUSTED
 
     def _limit_for(self, stage: RepairStage) -> int:
         if stage == RepairStage.TARGETED:
             return max(0, self.policy.targeted_attempts)
         if stage == RepairStage.CLEAN_ROOM:
             return max(0, self.policy.clean_room_attempts)
+        if stage == RepairStage.MODEL_FALLBACK:
+            return max(0, self.policy.model_fallback_attempts)
+        if stage == RepairStage.HUMAN_HANDOFF:
+            return 1 if self.policy.allow_human_handoff else 0
         return 0
 
     def _exhausted(

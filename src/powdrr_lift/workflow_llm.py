@@ -95,6 +95,20 @@ class RepairPromptManifest:
     structural_fingerprint: str
     estimated_tokens: int
 
+    def to_data(self) -> dict[str, object]:
+        return {
+            "profile": self.profile,
+            "source_sections": list(self.source_sections),
+            "history_policy": self.history_policy,
+            "allowed_actions": list(self.allowed_actions),
+            "response_schema_fingerprint": self.response_schema_fingerprint,
+            "reasoning_mode": self.reasoning_mode,
+            "model": self.model,
+            "message_fingerprint": self.message_fingerprint,
+            "structural_fingerprint": self.structural_fingerprint,
+            "estimated_tokens": self.estimated_tokens,
+        }
+
 
 def build_repair_prompt_manifest(
     messages: Sequence[Mapping[str, str]],

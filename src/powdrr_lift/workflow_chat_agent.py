@@ -109,6 +109,7 @@ from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgressDecision,
     ProviderExecutionError,
+    RepairPromptManifest,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
@@ -118,7 +119,9 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMExecutionAborted,
     WorkflowLLMHTTPError,
     WorkflowStepRunner,
+    assert_material_repair_prompt,
     build_clean_room_repair_prompt,
+    build_repair_prompt_manifest,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_failure_signature,
@@ -903,6 +906,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
     clean_room_repair_pending: bool = False
+    repair_prompt_manifest: RepairPromptManifest | None = None
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -1130,6 +1134,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 or self.state.step_checkpoint.identity != checkpoint_identity
             ):
                 self.state.stalled_step_context = []
+                self.repair_prompt_manifest = None
                 _begin_step_checkpoint(
                     self.state,
                     skill=self.selected_skill,
@@ -1299,7 +1304,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "rejected_strategies": self.state.stalled_step_context,
                     "allowed_actions": list(_declared_action_names(self.current_step)),
                 }
-                messages, _manifest = build_clean_room_repair_prompt(
+                messages, manifest = build_clean_room_repair_prompt(
                     context=json.dumps(
                         recovery_context, ensure_ascii=False, separators=(",", ":")
                     ),
@@ -1315,6 +1320,20 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     allowed_actions=_declared_action_names(self.current_step),
                     model=self.current_model,
                 )
+                if self.repair_prompt_manifest is None:
+                    raise RuntimeError(
+                        "Clean-room repair requested without a prior prompt manifest."
+                    )
+                assert_material_repair_prompt(self.repair_prompt_manifest, manifest)
+                self.state.execution_events.append(
+                    {
+                        "kind": "repair_attempt",
+                        "stage": "clean_room",
+                        "step_index": self.current_step_index,
+                        "prompt_manifest": manifest.to_data(),
+                    }
+                )
+                self.repair_prompt_manifest = manifest
             else:
                 messages = _build_step_execution_messages(
                     selected_skill=self.selected_skill,
@@ -1341,6 +1360,25 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     ),
                     failed_action=self.last_failed_action,
                     failure_reason=self.last_validation_error,
+                )
+                self.repair_prompt_manifest = build_repair_prompt_manifest(
+                    messages,
+                    profile="normal_full_context",
+                    source_sections=(
+                        "step",
+                        "transcript",
+                        "execution_events",
+                        "execution_context",
+                        "handoffs",
+                        "durable_facts",
+                        "current_file",
+                        "validation_gate",
+                    ),
+                    history_policy="full",
+                    allowed_actions=_declared_action_names(self.current_step),
+                    response_schema=response_schema,
+                    reasoning_mode="direct_action",
+                    model=self.current_model,
                 )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),

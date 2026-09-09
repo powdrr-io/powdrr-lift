@@ -10,6 +10,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -181,11 +182,19 @@ def apply_liveness_baseline(
         baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return report
-    entries = baseline.get("issues", []) if isinstance(baseline, Mapping) else []
+    if not isinstance(baseline, Mapping) or baseline.get("version") != 1:
+        return report
+    entries = baseline.get("issues", [])
+    if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
+        return report
     known = {
         (str(item.get("definition")), str(item.get("code")), str(item.get("path")))
         for item in entries
         if isinstance(item, Mapping)
+        and isinstance(item.get("owner"), str)
+        and isinstance(item.get("reason"), str)
+        and isinstance(item.get("expires"), str)
+        and _baseline_not_expired(str(item["expires"]))
     }
     filtered: list[WorkflowDefinitionReport] = []
     for definition_report in report.reports:
@@ -201,6 +210,13 @@ def apply_liveness_baseline(
             )
         )
     return WorkflowDefinitionsReport(tuple(filtered))
+
+
+def _baseline_not_expired(value: str) -> bool:
+    try:
+        return date.fromisoformat(value) >= date.today()
+    except ValueError:
+        return False
 
 
 def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
@@ -260,6 +276,7 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
         )
         if kind == "workflow_template":
             issues.extend(_validate_template_liveness(data, path))
+            issues.extend(_validate_instantiated_template_liveness(data, path))
     step_key = "steps" if kind == "skill" else "task_templates"
     steps = data.get(step_key)
     if isinstance(steps, Sequence) and not isinstance(steps, (str, bytes)):
@@ -396,10 +413,8 @@ def _validate_unknown_effects(
 ) -> list[WorkflowDefinitionIssue]:
     issues: list[WorkflowDefinitionIssue] = []
     for invocation in item.step.tool_invocations:
-        if (
-            invocation.tool == "shell"
-            and capability_effect(invocation.to_data()) is None
-        ):
+        effect = capability_effect(invocation.to_data())
+        if invocation.tool == "shell" and effect is None:
             issues.append(
                 WorkflowDefinitionIssue(
                     "unknown_shell_effect",
@@ -407,6 +422,16 @@ def _validate_unknown_effects(
                     f"{path}.steps[{item.index}].tool_invocations",
                     severity="warning",
                     remediation="Use a bounded capability or declare checked-in effect metadata for this command.",
+                )
+            )
+        elif invocation.tool != "shell" and effect is None:
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "missing_capability_effect",
+                    f"Bounded capability {invocation.tool!r} has no declared effect summary.",
+                    f"{path}.steps[{item.index}].tool_invocations",
+                    severity="warning",
+                    remediation="Register deterministic/read/write metadata for this operation.",
                 )
             )
     return issues
@@ -425,6 +450,9 @@ def _validate_prompt_authority(
     )
     if item.step.pre_step is not None:
         declared.add(item.step.pre_step.action)
+        template_operation = item.step.pre_step.template.get("operation")
+        if isinstance(template_operation, str):
+            declared.add(template_operation)
     issues: list[WorkflowDefinitionIssue] = []
     for action in (
         "edit",
@@ -546,6 +574,49 @@ def _validate_template_liveness(
                 )
             )
     return issues
+
+
+def _validate_instantiated_template_liveness(
+    data: Mapping[str, Any], path: Path
+) -> list[WorkflowDefinitionIssue]:
+    """Validate a representative pure instantiation without writing files."""
+    substitutions = {
+        "work-item-name": "static-liveness-fixture",
+        "workflow-instance-name": "static-liveness-fixture",
+    }
+    instantiated = _substitute_static_values(data, substitutions)
+    if not isinstance(instantiated, Mapping):
+        return []
+    issues = _validate_template_liveness(instantiated, path)
+    return [
+        WorkflowDefinitionIssue(
+            issue.code,
+            issue.message,
+            issue.path.replace(str(path), f"{path}#instantiated"),
+            issue.severity,
+            issue.state,
+            issue.cycle,
+            issue.remediation,
+            issue.entry_path,
+        )
+        for issue in issues
+    ]
+
+
+def _substitute_static_values(value: Any, substitutions: Mapping[str, str]) -> Any:
+    if isinstance(value, str):
+        result = value
+        for key, replacement in substitutions.items():
+            result = result.replace(f"<{key}>", replacement)
+        return result
+    if isinstance(value, Mapping):
+        return {
+            key: _substitute_static_values(item, substitutions)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_substitute_static_values(item, substitutions) for item in value]
+    return value
 
 
 def _validate_skill_call_graph(

@@ -476,6 +476,9 @@ steps:
                         "definition": str(definition),
                         "code": "unknown_shell_effect",
                         "path": f"{definition}.steps[0].tool_invocations",
+                        "owner": "workflow-platform",
+                        "reason": "Legacy shell capability rollout.",
+                        "expires": "2099-12-31",
                     }
                 ],
             }

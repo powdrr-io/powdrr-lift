@@ -266,6 +266,10 @@ _EFFECTS: dict[tuple[str, str], CapabilityEffect] = {
     ),
 }
 
+_DECLARED_UNKNOWN_EFFECT_TOOLS = frozenset(
+    {"internal", "gh", "ref", "basedpyright-structure", "basedpyright-symbol"}
+)
+
 
 def capability_effect(invocation: Mapping[str, Any]) -> CapabilityEffect | None:
     """Return a bounded effect summary without executing the invocation."""
@@ -279,6 +283,15 @@ def capability_effect(invocation: Mapping[str, Any]) -> CapabilityEffect | None:
     if not isinstance(command, Sequence) or isinstance(
         command, (str, bytes, bytearray)
     ):
+        if tool in _DECLARED_UNKNOWN_EFFECT_TOOLS:
+            return CapabilityEffect(
+                str(operation or "reference"),
+                "unknown",
+                "unknown",
+                frozenset(),
+                frozenset(),
+                frozenset({"tool_result"}),
+            )
         return None
     if not command or not all(isinstance(item, str) for item in command):
         return None
@@ -289,7 +302,27 @@ def capability_effect(invocation: Mapping[str, Any]) -> CapabilityEffect | None:
         operation = "fuzzy-match"
     if tool == "enrich":
         operation = "enrich"
-    return _EFFECTS.get((tool, operation))
+    effect = _EFFECTS.get((tool, operation))
+    if effect is not None:
+        return effect
+    if tool in _DECLARED_UNKNOWN_EFFECT_TOOLS:
+        reads = frozenset({"remote_repository"}) if tool == "gh" else frozenset()
+        writes = (
+            frozenset({"validation"})
+            if tool.startswith("basedpyright")
+            or "evaluate" in operation
+            or "validate" in operation
+            else frozenset()
+        )
+        return CapabilityEffect(
+            operation,
+            "unknown",
+            "unknown",
+            reads,
+            writes,
+            frozenset({"tool_result"}),
+        )
+    return None
 
 
 def is_fixed_deterministic(effect: CapabilityEffect | None) -> bool:

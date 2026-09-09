@@ -68,7 +68,6 @@ def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
     assert targeted.prompt_profile == "targeted_schema_correction"
     assert targeted.model_policy == "current_model"
 
-
     assert (
         coordinator.record_failure(
             RepairFailure(
@@ -111,9 +110,7 @@ def test_repair_context_allows_same_target_after_material_state_changes() -> Non
     )
     second = coordinator.record_failure(
         failure,
-        context=RepairContext(
-            boundary_id="step-1", material_state_fingerprint="after"
-        ),
+        context=RepairContext(boundary_id="step-1", material_state_fingerprint="after"),
     )
     assert first.attempt == 1
     assert second.attempt == 2

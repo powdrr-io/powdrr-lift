@@ -4537,8 +4537,6 @@ def _run_deterministic_pre_step(
             raise PowdrrExecutionError("Invoke tool pre-step template requires a tool.")
         parameters = dict(template)
         parameters.pop("tool", None)
-        if tool in {GIT_TOOL, GH_TOOL}:
-            parameters = _structured_intrinsic_pre_step_parameters(tool, parameters)
         if tool == ENRICH_TOOL:
             parameters.pop("tool", None)
             _wire_previous_tool_output(parameters, execution_events, handoff_records)
@@ -9423,18 +9421,6 @@ def _validate_coding_loop_action(
                 "changed after the checks passed. Run the declared verification "
                 "commands again before choosing next_step."
             )
-
-
-def _structured_intrinsic_pre_step_parameters(
-    tool: str, parameters: Mapping[str, Any]
-) -> dict[str, Any]:
-    """Translate declarative pre-step commands to structured actions."""
-    command = parameters.get("command")
-    if tool == GIT_TOOL and command == ["status", "--short"]:
-        return {"operation": "status"}
-    raise PowdrrExecutionError(
-        f"Intrinsic {tool} pre-steps must declare a supported structured operation."
-    )
 
 
 def _normalize_noop_git_commit_result(

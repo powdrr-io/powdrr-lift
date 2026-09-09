@@ -1141,6 +1141,7 @@ class WorkflowStepRunner:
         self.actor_id = actor_id
         self.repair_coordinator = WorkflowRepairCoordinator(repair_policy)
         self.last_repair_directive: RepairDirective | None = None
+        self._last_repair_failure: RepairFailure | None = None
         if runtime is None and not legacy_compatibility:
             raise ProgrammerInvariantError(
                 "WorkflowStepRunner requires an ExecutionRuntime for normal execution.",
@@ -1208,7 +1209,7 @@ class WorkflowStepRunner:
                 # These failures are not model-correctable action errors.
                 raise
             except RuntimeError as exc:
-                deterministic_outcome = self._record_semantic_failure(
+                directive = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
                         classify_repair_failure(
@@ -1225,6 +1226,9 @@ class WorkflowStepRunner:
                     except Exception:
                         pass
                 strategy.record_response_error(exc, self.action_engine.last_payload)
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
+                )
                 if deterministic_outcome is not None:
                     return deterministic_outcome.exit_code or 0
                 continue
@@ -1253,7 +1257,7 @@ class WorkflowStepRunner:
                     remediation="perform the required follow-up action first",
                 )
                 strategy.record_action_error(action, error)
-                deterministic_outcome = self._record_semantic_failure(
+                directive = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
                         classify_repair_failure(
@@ -1266,6 +1270,9 @@ class WorkflowStepRunner:
                 )
                 self.kernel.fail(action, error)
                 self._sync_runtime()
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
+                )
                 if deterministic_outcome is not None:
                     return deterministic_outcome.exit_code or 0
                 if self.observer is not None:
@@ -1315,7 +1322,7 @@ class WorkflowStepRunner:
                     ),
                 )
                 strategy.record_action_error(action, exc)
-                deterministic_outcome = self._record_semantic_failure(
+                directive = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
                         classify_repair_failure(
@@ -1336,6 +1343,9 @@ class WorkflowStepRunner:
                     apply_decision = getattr(strategy, "apply_observer_decision", None)
                     if callable(apply_decision):
                         apply_decision(failure_decision, action, None)
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
+                )
                 if deterministic_outcome is not None:
                     return deterministic_outcome.exit_code or 0
                 if (
@@ -1362,7 +1372,7 @@ class WorkflowStepRunner:
             )
             if not observation.made_progress:
                 strategy.record_no_progress(action, observation)
-                deterministic_outcome = self._record_semantic_failure(
+                directive = self._record_semantic_failure(
                     strategy,
                     RepairFailure(
                         classify_repair_failure(
@@ -1373,6 +1383,9 @@ class WorkflowStepRunner:
                         observation.correction or "The action made no progress.",
                         action_signature=signature(action),
                     ),
+                )
+                deterministic_outcome = self._apply_deterministic_repair(
+                    strategy, directive, self._last_repair_failure
                 )
                 if deterministic_outcome is not None:
                     return deterministic_outcome.exit_code or 0
@@ -1413,7 +1426,8 @@ class WorkflowStepRunner:
         self,
         strategy: WorkflowExecutionStrategy,
         failure: RepairFailure,
-    ) -> WorkflowActionOutcome | None:
+    ) -> RepairDirective | None:
+        self._last_repair_failure = failure
         try:
             allowed_actions = (
                 self.runtime.allowed_actions() if self.runtime is not None else ()
@@ -1428,13 +1442,24 @@ class WorkflowStepRunner:
         apply_directive = getattr(strategy, "record_repair_directive", None)
         if callable(apply_directive):
             apply_directive(directive)
-        if directive.stage is RepairStage.DETERMINISTIC:
-            deterministic = getattr(strategy, "apply_deterministic_repair", None)
-            if callable(deterministic):
-                outcome = deterministic(failure, directive)
-                if outcome is not None:
-                    return outcome
-        return None
+        return directive
+
+    def _apply_deterministic_repair(
+        self,
+        strategy: WorkflowExecutionStrategy,
+        directive: RepairDirective | None,
+        failure: RepairFailure | None,
+    ) -> WorkflowActionOutcome | None:
+        if (
+            directive is None
+            or failure is None
+            or directive.stage is not RepairStage.DETERMINISTIC
+        ):
+            return None
+        deterministic = getattr(strategy, "apply_deterministic_repair", None)
+        if not callable(deterministic):
+            return None
+        return deterministic(failure, directive)
 
     def _record_shadow(
         self,

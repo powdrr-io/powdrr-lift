@@ -10,8 +10,10 @@ from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     analyze_workflow_definitions,
     apply_liveness_baseline,
+    apply_warning_budget,
     discover_workflow_definitions,
     render_skill_prompt_snapshots,
+    warning_report_data,
 )
 
 
@@ -450,6 +452,29 @@ steps:
     assert issue.severity == "warning"
 
 
+def test_definition_analysis_resolves_known_shell_effect_metadata(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: shell
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect
+    description: Inspect files.
+    tool_invocations:
+      - tool: shell
+        command: [rg, -n, pattern, src]
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "unknown_shell_effect" not in {issue.code for issue in report.issues}
+
+
 def test_liveness_baseline_suppresses_advisory_diagnostics_only(tmp_path: Path) -> None:
     definition = tmp_path / "skill.yaml"
     definition.write_text(
@@ -490,3 +515,31 @@ steps:
 
     assert filtered.validation_successful
     assert filtered.reports[0].issues == ()
+
+
+def test_warning_budget_fails_on_new_advisory(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: shell
+when_to_use: [Run a command.]
+steps:
+  - id: run
+    description: Run a command.
+    tool_invocations:
+      - tool: shell
+        command: [custom-command]
+""",
+        encoding="utf-8",
+    )
+    report = analyze_workflow_definitions([definition])
+    budget = tmp_path / "budget.json"
+    budget.write_text(json.dumps({"version": 1, "counts": {}}), encoding="utf-8")
+
+    checked = apply_warning_budget(report, budget)
+
+    assert not checked.validation_successful
+    assert "liveness_warning_budget_exceeded" in {
+        issue.code for issue in checked.reports[0].issues
+    }
+    assert warning_report_data(report)["counts"] == {"unknown_shell_effect": 1}

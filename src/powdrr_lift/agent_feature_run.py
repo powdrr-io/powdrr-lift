@@ -41,7 +41,7 @@ class AgentFeatureRunConfig:
     max_turns: int = 40
     workflow_roundtrips: int = 128
     start_iterations: int = 10
-    provider: str = "auto"
+    provider: str = "deepinfra-cheap"
     report_path: Path = Path(".powdrr/agent-feature-run/report.json")
     transcript_dir: Path = Path(".powdrr/agent-feature-run/transcripts")
     phase_timeout: float | None = 120.0

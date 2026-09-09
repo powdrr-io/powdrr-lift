@@ -404,6 +404,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     "input_state": self.task.input_state,
                     "output_state_type": self.task.output_state_type,
                     "allowed_actions": list(allowed_actions),
+                    "repair_context": self.repair_context().to_data(),
                     "recent_failures": [
                         {
                             key: event.get(key)

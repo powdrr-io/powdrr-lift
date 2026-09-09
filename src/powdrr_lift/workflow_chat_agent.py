@@ -1369,6 +1369,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     ),
                     "rejected_strategies": self.state.stalled_step_context,
                     "allowed_actions": list(_declared_action_names(self.current_step)),
+                    "repair_context": self.repair_context().to_data(),
                 }
                 context_json = json.dumps(
                     recovery_context, ensure_ascii=False, separators=(",", ":")

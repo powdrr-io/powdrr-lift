@@ -39,6 +39,7 @@ def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
         RepairPolicy(
             targeted_attempts=1,
             clean_room_attempts=1,
+            deterministic_recovery=False,
             model_fallback_attempts=0,
             allow_human_handoff=False,
         )
@@ -77,7 +78,7 @@ def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
 
 
 def test_repair_coordinator_escalates_to_fallback_then_handoff() -> None:
-    coordinator = WorkflowRepairCoordinator()
+    coordinator = WorkflowRepairCoordinator(RepairPolicy(deterministic_recovery=False))
     coordinator.begin_boundary("step-1")
     assert (
         coordinator.record_failure(
@@ -120,6 +121,24 @@ def test_repair_coordinator_escalates_to_fallback_then_handoff() -> None:
         ).stage
         is RepairStage.HUMAN_HANDOFF
     )
+
+
+def test_repair_coordinator_selects_deterministic_stage_before_model_fallback() -> None:
+    coordinator = WorkflowRepairCoordinator()
+    coordinator.begin_boundary("step-1")
+    coordinator.record_failure(
+        RepairFailure(RepairFailureClass.EXECUTION, "first", "first failure")
+    )
+    deterministic = coordinator.record_failure(
+        RepairFailure(
+            RepairFailureClass.EXECUTION,
+            "second",
+            "deterministic repair is safe",
+            action_signature="different-action",
+        )
+    )
+    assert deterministic.stage is RepairStage.DETERMINISTIC
+    assert deterministic.prompt_profile == "deterministic_recovery"
 
 
 def test_repair_coordinator_rejects_duplicate_failure_identity() -> None:

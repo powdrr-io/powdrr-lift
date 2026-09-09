@@ -115,6 +115,7 @@ from powdrr_lift.workflow_llm import (
     ProgressDecision,
     RepairDirective,
     RepairExhaustionReport,
+    RepairFailure,
     RepairPromptManifest,
     RepairStage,
     WorkflowAction,
@@ -743,6 +744,30 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             )
             self.terminalized = True
             self.terminal_exit_code = 1
+
+    def apply_deterministic_repair(
+        self,
+        failure: RepairFailure,
+        directive: RepairDirective,
+    ) -> WorkflowActionOutcome | None:
+        """Apply only the durable output-state repair already proven by the task."""
+        if (
+            failure.error_code != "deterministic_output_state_mismatch"
+            or directive.stage.value != "deterministic"
+            or not self.requires_deterministic_output_state
+            or self.deterministic_output_state is None
+            or "next_step"
+            not in (
+                self.runtime.allowed_actions() or () if self.runtime is not None else ()
+            )
+        ):
+            return None
+        return self.execute_action(
+            WorkflowAction(
+                kind="next_step",
+                output_state=self.deterministic_output_state,
+            )
+        )
 
     def no_progress_threshold_exit_code(
         self,

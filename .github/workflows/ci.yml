@@ -55,6 +55,9 @@ jobs:
       - name: Run type checker
         run: uv run mypy src tests
 
+      - name: Statically compile workflow definitions
+        run: uv run powdrr-lift validate-workflow-definitions skill-definitions templates
+
       - name: Run tests
         run: uv run pytest tests
 

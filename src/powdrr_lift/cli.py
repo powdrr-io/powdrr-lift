@@ -1205,10 +1205,10 @@ def build_parser() -> argparse.ArgumentParser:
     agent_feature_parser.add_argument(
         "--phase-timeout",
         type=float,
-        default=120.0,
+        default=None,
         help=(
-            "Maximum seconds without phase output before stopping it "
-            "(default: 120; resets on output)."
+            "Optional maximum seconds without semantic phase progress before "
+            "stopping it (default: no timeout; resets on progress)."
         ),
     )
     agent_feature_parser.add_argument("--report", type=Path)

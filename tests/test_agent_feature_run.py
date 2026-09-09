@@ -2,12 +2,30 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 from powdrr_lift.agent_feature_run import (
     AgentFeatureRunConfig,
+    _run_with_inactivity_timeout,
     run_agent_feature_e2e,
 )
+
+
+def test_agent_feature_run_has_no_default_phase_timeout(tmp_path: Path) -> None:
+    assert AgentFeatureRunConfig(repo_root=tmp_path).phase_timeout is None
+
+
+def test_unbounded_phase_reader_waits_for_process_exit(tmp_path: Path) -> None:
+    result = _run_with_inactivity_timeout(
+        [sys.executable, "-c", "print('semantic progress')"],
+        cwd=tmp_path,
+        input_text="",
+        timeout=None,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == "semantic progress\n"
 
 
 def test_agent_feature_run_prompts_agent_then_executes_generated_workflows(

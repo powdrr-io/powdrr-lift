@@ -232,7 +232,7 @@ steps:
       create the artifact in the same worktree, then retry this gate.
 - id: plan-proposed-prs
   description: Plan the proposed PR implementation sequence.
-  actions: [read_document]
+  actions: [invoke_tool, read_document]
   step_type: governed
   llm_type: high_reasoning
   details: >-
@@ -259,7 +259,15 @@ steps:
     dependencies in the instantiation plan. Do not generate one proposed-PR
     file per PR. Before next_step, return
     exactly one output named proposed_pr_names containing every stable proposed
-    PR name. Do not rely on decisions_and_context for this handoff.
+    PR name. Do not rely on decisions_and_context for this handoff. When a
+    proposed PR touches Python source or tests, inspect each implementation area
+    with the bounded `basedpyright-structure` tool and resolve key symbols with
+    `basedpyright-symbol` before finalizing its file and dependency plan. Use
+    those read-only tools instead of inferring module boundaries from text
+    matches alone. Skip them only when the proposed PR has no Python paths. Use
+    these exact action shapes:
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/example.py"}}
+    and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"Example"}}.
   outputs:
   - name: proposed_pr_names
     type: any

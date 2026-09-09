@@ -482,6 +482,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert tasks[0].actions == ()
     assert tasks[0].actions_declared is True
     assert tasks[1].actions == (
+        "invoke_tool",
         "edit",
         "yaml_edit",
         "file_management",

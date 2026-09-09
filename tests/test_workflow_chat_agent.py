@@ -3609,6 +3609,15 @@ def test_workflow_execution_retries_stalled_step_with_clean_context(
         for message in exchange
         if message["role"] == "user"
     )
+    clean_room_prompts = [
+        json.loads(message["content"])
+        for exchange in captured_messages
+        for message in exchange
+        if message["role"] == "user"
+        and '"execution_mode":"clean_room_repair"' in message["content"]
+    ]
+    assert clean_room_prompts
+    assert all("stalled_step_context" not in prompt for prompt in clean_room_prompts)
 
 
 def test_cli_workflow_chat_defaults_to_glm_5_2(

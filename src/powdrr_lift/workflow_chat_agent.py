@@ -118,6 +118,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMExecutionAborted,
     WorkflowLLMHTTPError,
     WorkflowStepRunner,
+    build_clean_room_repair_prompt,
     prompt_size_breakdown,
     prune_execution_events,
     workflow_action_failure_signature,
@@ -901,6 +902,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     observer_intervention: str | None = None
     observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
+    clean_room_repair_pending: bool = False
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -1280,36 +1282,66 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 parent_skill=parent_skill,
                 parent_step_index=parent_step_index,
             )
-            messages = _build_step_execution_messages(
-                selected_skill=self.selected_skill,
-                current_step=self.current_step,
-                current_step_index=self.current_step_index,
-                transcript=self.state.transcript,
-                execution_events=self.state.execution_events,
-                execution_context=self.state.execution_context,
-                handoff_records=self.state.handoff_records,
-                durable_facts=self.state.durable_facts,
-                current_file_path=self.state.current_file_path,
-                worktree_root=self.state.worktree_root,
-                catalog=self.catalog,
-                workflow_context=self.workflow_context,
-                current_file_context_cache=self.state.current_file_context_cache,
-                validation_gate=_validation_gate_prompt_data(self.state),
-                stalled_step_context=self.state.stalled_step_context,
-                inherited_interaction_style=self.inherited_interaction_style,
-                observer_intervention=self.observer_intervention,
-                runtime_prompt_context=(
-                    self.driver.runtime.prompt_context()
-                    if self.driver.runtime is not None
-                    else None
-                ),
-                failed_action=self.last_failed_action,
-                failure_reason=self.last_validation_error,
-            )
             response_schema = _step_action_response_schema(self.current_step)
             response_parser = partial(
                 _parse_action_response_with_schema, schema=response_schema
             )
+            if self.clean_room_repair_pending:
+                self.clean_room_repair_pending = False
+                recovery_context = {
+                    "objective": self.current_step.description,
+                    "step": _current_step_contract(self.current_step),
+                    "current_file": (
+                        str(self.state.current_file_path)
+                        if self.state.current_file_path is not None
+                        else None
+                    ),
+                    "rejected_strategies": self.state.stalled_step_context,
+                    "allowed_actions": list(_declared_action_names(self.current_step)),
+                }
+                messages, _manifest = build_clean_room_repair_prompt(
+                    context=json.dumps(
+                        recovery_context, ensure_ascii=False, separators=(",", ":")
+                    ),
+                    error_message=(
+                        self.last_validation_error
+                        or "The previous strategy made no material progress."
+                    ),
+                    repair_instructions=(
+                        "Choose a materially different legal action. Do not repeat "
+                        "any rejected strategy. Return the complete action object."
+                    ),
+                    response_schema=response_schema,
+                    allowed_actions=_declared_action_names(self.current_step),
+                    model=self.current_model,
+                )
+            else:
+                messages = _build_step_execution_messages(
+                    selected_skill=self.selected_skill,
+                    current_step=self.current_step,
+                    current_step_index=self.current_step_index,
+                    transcript=self.state.transcript,
+                    execution_events=self.state.execution_events,
+                    execution_context=self.state.execution_context,
+                    handoff_records=self.state.handoff_records,
+                    durable_facts=self.state.durable_facts,
+                    current_file_path=self.state.current_file_path,
+                    worktree_root=self.state.worktree_root,
+                    catalog=self.catalog,
+                    workflow_context=self.workflow_context,
+                    current_file_context_cache=self.state.current_file_context_cache,
+                    validation_gate=_validation_gate_prompt_data(self.state),
+                    stalled_step_context=self.state.stalled_step_context,
+                    inherited_interaction_style=self.inherited_interaction_style,
+                    observer_intervention=self.observer_intervention,
+                    runtime_prompt_context=(
+                        self.driver.runtime.prompt_context()
+                        if self.driver.runtime is not None
+                        else None
+                    ),
+                    failed_action=self.last_failed_action,
+                    failure_reason=self.last_validation_error,
+                )
             return WorkflowActionRequest(
                 client=self.client_for_model(self.current_model, self.provider),
                 messages=messages,
@@ -1934,6 +1966,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             ),
         }
         self.state.stalled_step_context.append(stall_record)
+        self.clean_room_repair_pending = True
         self.state.execution_events.append(
             {
                 "kind": "stalled_step_retry",

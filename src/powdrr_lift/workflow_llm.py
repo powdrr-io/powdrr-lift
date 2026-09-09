@@ -207,6 +207,27 @@ class WorkflowRepairCoordinator:
         )
 
 
+def resolve_deterministic_repair(
+    *,
+    error_code: str,
+    allowed_actions: Sequence[str],
+    completion_satisfied: bool = False,
+    output_state: Any = None,
+    legacy_action: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Return only allowlisted repairs whose payload requires no model judgment."""
+    allowed = set(allowed_actions)
+    if completion_satisfied and "emit_outputs" in allowed:
+        return {"action": "emit_outputs", "outputs": output_state}
+    if completion_satisfied and "next_step" in allowed:
+        return {"action": "next_step", "output_state": output_state}
+    if error_code == "legacy_action_shape" and legacy_action is not None:
+        action = legacy_action.get("action")
+        if isinstance(action, str) and action in allowed:
+            return dict(legacy_action)
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class RepairPromptManifest:
     """Auditable description of the information and contract in a repair prompt."""

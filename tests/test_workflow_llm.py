@@ -28,6 +28,7 @@ from powdrr_lift.workflow_llm import (
     constrain_action_response_schema,
     prompt_size_breakdown,
     prune_execution_events,
+    resolve_deterministic_repair,
     workflow_action_signature,
 )
 
@@ -82,6 +83,29 @@ def test_repair_coordinator_rejects_duplicate_failure_identity() -> None:
         assert error.error_code == "duplicate_repair_attempt"
     else:
         raise AssertionError("duplicate repair failure was accepted")
+
+
+def test_deterministic_repair_only_returns_allowlisted_terminal_actions() -> None:
+    assert resolve_deterministic_repair(
+        error_code="completion_satisfied",
+        allowed_actions=("emit_outputs",),
+        completion_satisfied=True,
+        output_state={"answer": 42},
+    ) == {"action": "emit_outputs", "outputs": {"answer": 42}}
+    assert (
+        resolve_deterministic_repair(
+            error_code="completion_satisfied",
+            allowed_actions=("edit",),
+            completion_satisfied=True,
+            output_state={"answer": 42},
+        )
+        is None
+    )
+    assert resolve_deterministic_repair(
+        error_code="legacy_action_shape",
+        allowed_actions=("edit",),
+        legacy_action={"action": "edit", "file_path": "README.md"},
+    ) == {"action": "edit", "file_path": "README.md"}
 
 
 def test_clean_room_repair_prompt_excludes_conversation_and_records_profile() -> None:

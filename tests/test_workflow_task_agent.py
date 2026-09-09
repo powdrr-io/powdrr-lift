@@ -657,7 +657,8 @@ def test_nested_skill_repairs_malformed_edit_action_in_place(
         "Workflow edit action edit kind must be a string"
         in client.messages[2][1]["content"]
     )
-    assert "Nested skill action response needs repair" in stderr.getvalue()
+    assert "Nested skill action response needs clean-room repair" in stderr.getvalue()
+    assert '"execution_mode":"clean_room_repair"' in client.messages[2][1]["content"]
     error_records = [
         json.loads(line)
         for line in (tmp_path / "workflow-llm-errors.jsonl").read_text().splitlines()

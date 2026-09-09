@@ -872,6 +872,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         )
         if not self.clean_room_repair_used:
             self.clean_room_repair_pending = True
+
         print(
             "Workflow task response needs repair; requesting a corrected "
             "JSON response from the LLM.",
@@ -3511,6 +3512,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     current_step_index: int = 0
     driver: WorkflowStepRunner | None = None
     runtime: ExecutionRuntime | None = None
+    response_correction: str | None = None
+    clean_room_repair_pending: bool = False
+    clean_room_repair_used: bool = False
+    repair_prompt_manifest: RepairPromptManifest | None = None
+    _repair_step_identity: tuple[str, int] | None = None
 
     def _restore_completed_skill(self, frame: _NestedSkillExecutionFrame) -> None:
         if frame.clean_context:
@@ -3529,6 +3535,13 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             self.current_skill = frame.skill
             self.current_step_index = frame.step_index
             self.current_step = frame.skill.skill.steps[frame.step_index]
+            repair_step_identity = (frame.skill.skill.name, frame.step_index)
+            if repair_step_identity != self._repair_step_identity:
+                self._repair_step_identity = repair_step_identity
+                self.response_correction = None
+                self.clean_room_repair_pending = False
+                self.clean_room_repair_used = False
+                self.repair_prompt_manifest = None
             step = self.current_step
             step_behavior = behavior_for_step(step)
             if self.runtime is not None:
@@ -3612,27 +3625,169 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     )
                 frame.step_index += 1
                 continue
+            messages = _build_step_execution_messages(
+                selected_skill=frame.skill,
+                current_step=step,
+                current_step_index=frame.step_index,
+                transcript=self.transcript,
+                execution_events=self.execution_events,
+                execution_context=self.execution_context,
+                handoff_records=self.handoff_records,
+                current_file_path=None,
+                worktree_root=self.repo_root,
+                catalog=self.catalog,
+            )
+            selection_messages = None
+            selection_schema = None
+            parameter_messages_for = None
+            parameter_schema_for = None
+            allowed_actions = tuple(
+                (self.runtime.allowed_actions() or ())
+                if self.runtime is not None
+                else ()
+            )
+            if self.clean_room_repair_pending and not self.clean_room_repair_used:
+                self.clean_room_repair_pending = False
+                self.clean_room_repair_used = True
+                recovery_context = {
+                    "task_id": self.task.task_id,
+                    "skill": frame.skill.skill.name,
+                    "step_id": getattr(step, "id", None),
+                    "step_index": frame.step_index,
+                    "objective": getattr(step, "description", None),
+                    "allowed_actions": list(allowed_actions),
+                    "execution_context": list(self.execution_context[-8:]),
+                    "recent_failures": [
+                        {
+                            key: event.get(key)
+                            for key in ("kind", "action_kind", "tool", "error")
+                            if key in event
+                        }
+                        for event in self.execution_events[-8:]
+                        if event.get("kind")
+                        in {"llm_output_error", "action_error", "no_progress"}
+                    ],
+                }
+                context_json = json.dumps(
+                    recovery_context, ensure_ascii=False, separators=(",", ":")
+                )
+                error_message = self.response_correction or (
+                    "The previous nested workflow strategy failed to make progress."
+                )
+                selection_messages, selection_schema, manifest = (
+                    build_clean_room_action_selection_prompt(
+                        context=context_json,
+                        error_message=error_message,
+                        allowed_actions=allowed_actions,
+                        model="nested-skill",
+                    )
+                )
+
+                def parameter_schema_for(selected_action: str) -> Mapping[str, Any]:
+                    return {
+                        "type": "object",
+                        "properties": {
+                            "action": {"type": "string", "enum": [selected_action]}
+                        },
+                        "required": ["action"],
+                        "additionalProperties": True,
+                    }
+
+                def _parameter_messages(
+                    selected_action: str,
+                    context: str = context_json,
+                    error: str = error_message,
+                    schema_for: Callable[
+                        [str], Mapping[str, Any]
+                    ] = parameter_schema_for,
+                ) -> list[dict[str, str]]:
+                    parameter_messages, _ = build_clean_room_action_parameters_prompt(
+                        context=context,
+                        error_message=error,
+                        selected_action=selected_action,
+                        response_schema=schema_for(selected_action),
+                        model="nested-skill",
+                    )
+                    return parameter_messages
+
+                parameter_messages_for = _parameter_messages
+                if self.repair_prompt_manifest is None:
+                    self.repair_prompt_manifest = build_repair_prompt_manifest(
+                        messages,
+                        profile="normal_full_context",
+                        source_sections=("skill", "step", "transcript", "events"),
+                        history_policy="bounded",
+                        reasoning_mode="direct_action",
+                        model="nested-skill",
+                    )
+                assert_material_repair_prompt(self.repair_prompt_manifest, manifest)
+                self.repair_prompt_manifest = manifest
+                self.execution_events.append(
+                    {
+                        "kind": "repair_attempt",
+                        "stage": "clean_room_action_selection",
+                        "skill": frame.skill.skill.name,
+                        "step_id": getattr(step, "id", None),
+                        "prompt_manifest": manifest.to_data(),
+                    }
+                )
+                messages = selection_messages
+            else:
+                self.repair_prompt_manifest = build_repair_prompt_manifest(
+                    messages,
+                    profile="normal_full_context",
+                    source_sections=("skill", "step", "transcript", "events"),
+                    history_policy="bounded",
+                    reasoning_mode="direct_action",
+                    model="nested-skill",
+                )
+            request_action = None
+            if selection_messages is not None:
+                assert selection_schema is not None
+                assert parameter_messages_for is not None
+                assert parameter_schema_for is not None
+                request_action = partial(
+                    self._request_two_pass_action,
+                    selection_messages,
+                    selection_schema=selection_schema,
+                    parameter_messages_for=parameter_messages_for,
+                    parameter_schema_for=parameter_schema_for,
+                    allowed_actions=allowed_actions,
+                )
             return WorkflowActionRequest(
                 client=self.client,
-                messages=_build_step_execution_messages(
-                    selected_skill=frame.skill,
-                    current_step=step,
-                    current_step_index=frame.step_index,
-                    transcript=self.transcript,
-                    execution_events=self.execution_events,
-                    execution_context=self.execution_context,
-                    handoff_records=self.handoff_records,
-                    current_file_path=None,
-                    worktree_root=self.repo_root,
-                    catalog=self.catalog,
-                ),
+                messages=messages,
                 parser=_parse_action_response,
                 model="nested-skill",
                 stderr=self.stderr,
                 max_timeout_retries=self.max_timeout_retries,
                 timeout_backoff_seconds=self.timeout_backoff_seconds,
+                request_action=request_action,
             )
         return None
+
+    def _request_two_pass_action(
+        self,
+        selection_messages: list[dict[str, str]],
+        *,
+        selection_schema: Mapping[str, Any],
+        parameter_messages_for: Callable[[str], list[dict[str, str]]],
+        parameter_schema_for: Callable[[str], Mapping[str, Any]],
+        allowed_actions: Sequence[str],
+    ) -> WorkflowAction:
+        return complete_two_pass_action(
+            self.client,
+            selection_messages=selection_messages,
+            selection_schema=selection_schema,
+            parameter_messages_for=parameter_messages_for,
+            parameter_schema_for=parameter_schema_for,
+            parser=_parse_action_response,
+            allowed_actions=allowed_actions,
+            model="nested-skill",
+            stderr=self.stderr,
+            max_timeout_retries=self.max_timeout_retries,
+            timeout_backoff_seconds=self.timeout_backoff_seconds,
+        )
 
     def material_state(self, action: WorkflowAction) -> object:
         if action.kind not in {"edit", "invoke_tool"}:
@@ -3669,6 +3824,54 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             flush=True,
         )
 
+    def repair_context(self) -> RepairContext:
+        step = self.current_step
+        state = {
+            "skill": self.current_skill.skill.name if self.current_skill else None,
+            "step_id": getattr(step, "id", None),
+            "step_index": self.current_step_index,
+            "execution_events": self.execution_events[-8:],
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(state, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        return RepairContext(
+            execution_id=self.task.task_id,
+            boundary_id=(
+                f"{self.current_skill.skill.name}:{self.current_step_index}"
+                if self.current_skill
+                else self.task.task_id
+            ),
+            objective=getattr(step, "description", None) or self.task.description,
+            deterministic_state=state,
+            allowed_actions=tuple(
+                (self.runtime.allowed_actions() or ())
+                if self.runtime is not None
+                else ()
+            ),
+            required_outputs=tuple(
+                output.name for output in getattr(step, "outputs", ())
+            ),
+            material_state_fingerprint=fingerprint,
+        )
+
+    def record_repair_directive(self, directive: RepairDirective) -> None:
+        self.execution_events.append(
+            {
+                "kind": "repair_attempt",
+                "stage": directive.stage.value,
+                "attempt": directive.attempt,
+                "reason": directive.reason,
+                "allowed_actions": list(directive.allowed_actions),
+                "prompt_profile": directive.prompt_profile,
+                "model_policy": directive.model_policy,
+                "failure_class": directive.failure_class.value,
+                "error_code": directive.error_code,
+                "target_signature": directive.target_signature,
+                "repair_context": self.repair_context().to_data(),
+            }
+        )
+
     def record_no_progress(
         self,
         action: WorkflowAction,
@@ -3686,6 +3889,9 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             "The previous nested workflow action made no progress; choose "
             "a different action or next_step."
         )
+        self.response_correction = observation.correction
+        if not self.clean_room_repair_used:
+            self.clean_room_repair_pending = True
 
     def record_response_error(
         self,
@@ -3719,15 +3925,6 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.execution_context.append(
                     "A deterministic JSON update repaired the interview input. "
                     "Do not return edit again; choose next_step."
-                )
-                self.transcript.append(
-                    {
-                        "role": "user",
-                        "content": (
-                            "The interview JSON was repaired deterministically. "
-                            "Do not repeat edit; choose next_step."
-                        ),
-                    }
                 )
                 return
         correction = _nested_action_response_correction(
@@ -3770,15 +3967,13 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             }
         )
         self.execution_context.append(correction)
-        if payload is not None:
-            self.transcript.append(
-                {
-                    "role": "assistant",
-                    "content": json.dumps(payload, ensure_ascii=False),
-                }
-            )
-        self.transcript.append({"role": "user", "content": correction})
-        print(f"Nested skill action response needs repair: {error}", file=self.stderr)
+        self.response_correction = correction
+        if not self.clean_room_repair_used:
+            self.clean_room_repair_pending = True
+        print(
+            f"Nested skill action response needs clean-room repair: {error}",
+            file=self.stderr,
+        )
 
     def execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
         if self.current_skill is None or self.current_step is None:
@@ -4102,14 +4297,9 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                         "source": "deterministic_repair",
                     }
                 )
-                self.transcript.append(
-                    {
-                        "role": "user",
-                        "content": (
-                            "The interview JSON was repaired deterministically. "
-                            "Do not repeat edit; choose next_step."
-                        ),
-                    }
+                self.execution_context.append(
+                    "A deterministic JSON update repaired the interview input. "
+                    "Do not return edit again; choose next_step."
                 )
                 return
         correction = _nested_action_response_correction(
@@ -4136,20 +4326,14 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             }
         )
         self.execution_context.append(correction)
-        self.transcript.append(
-            {
-                "role": "assistant",
-                "content": json.dumps(
-                    json.loads(workflow_action_signature(action)), ensure_ascii=False
-                ),
-            }
-        )
-        self.transcript.append({"role": "user", "content": correction})
+        self.response_correction = correction
+        if not self.clean_room_repair_used:
+            self.clean_room_repair_pending = True
         print(
             "Nested skill action failed for "
             f"{self.current_skill.skill.name if self.current_skill else '<unknown>'}/"
             f"{getattr(self.current_step, 'id', '<unknown>')} "
-            f"({action.kind}): {error}; requesting a corrected action.",
+            f"({action.kind}): {error}; requesting clean-room repair.",
             file=self.stderr,
         )
 
@@ -4189,7 +4373,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
         observation: WorkflowActionObservation,
         outcome: WorkflowActionOutcome,
     ) -> WorkflowActionOutcome:
-        _ = action, observation
+        _ = action
+        if observation.correction is not None:
+            self.response_correction = observation.correction
+            if not self.clean_room_repair_used:
+                self.clean_room_repair_pending = True
         return outcome
 
     def exhausted_roundtrips_exit_code(self) -> int:

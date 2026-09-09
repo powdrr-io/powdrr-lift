@@ -684,7 +684,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         """Persist the shared runner's stage decision for durable replay."""
         self.events.append(
             {
-                "kind": "repair_directive",
+                "kind": "repair_attempt",
                 "stage": directive.stage.value,
                 "attempt": directive.attempt,
                 "reason": directive.reason,

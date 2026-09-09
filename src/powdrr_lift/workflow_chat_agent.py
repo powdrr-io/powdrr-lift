@@ -1692,7 +1692,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         """Persist the shared runner's stage decision at the chat boundary."""
         self.state.execution_events.append(
             {
-                "kind": "repair_directive",
+                "kind": "repair_attempt",
                 "stage": directive.stage.value,
                 "attempt": directive.attempt,
                 "reason": directive.reason,

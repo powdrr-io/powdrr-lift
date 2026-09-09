@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schemas/specification-v1
-id: '2026-09-01'
+id: '2026-09-08'
 title: Interaction File Log Architecture
 entities:
 - id: interaction-log

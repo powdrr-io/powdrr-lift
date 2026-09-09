@@ -753,7 +753,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         """Apply only the durable output-state repair already proven by the task."""
         if (
             failure.error_code != "deterministic_output_state_mismatch"
-            or directive.stage.value != "deterministic"
+            or directive.stage is not RepairStage.DETERMINISTIC
             or not self.requires_deterministic_output_state
             or self.deterministic_output_state is None
             or "next_step"

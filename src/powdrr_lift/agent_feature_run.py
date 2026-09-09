@@ -44,7 +44,7 @@ class AgentFeatureRunConfig:
     provider: str = "deepinfra-cheap"
     report_path: Path = Path(".powdrr/agent-feature-run/report.json")
     transcript_dir: Path = Path(".powdrr/agent-feature-run/transcripts")
-    phase_timeout: float | None = 120.0
+    phase_timeout: float | None = None
 
 
 @dataclass(frozen=True)
@@ -125,7 +125,7 @@ def _run_phase(
 ) -> dict[str, Any]:
     transcript.parent.mkdir(parents=True, exist_ok=True)
     try:
-        if runner is subprocess.run and timeout is not None:
+        if runner is subprocess.run:
             completed = _run_with_inactivity_timeout(
                 command, cwd=cwd, input_text=input_text, timeout=timeout
             )
@@ -164,7 +164,7 @@ def _run_phase(
 
 
 def _run_with_inactivity_timeout(
-    command: Sequence[str], *, cwd: Path, input_text: str, timeout: float
+    command: Sequence[str], *, cwd: Path, input_text: str, timeout: float | None
 ) -> subprocess.CompletedProcess[str]:
     process = subprocess.Popen(
         list(command),
@@ -182,15 +182,16 @@ def _run_with_inactivity_timeout(
     selector.register(process.stdout, selectors.EVENT_READ)
     output: list[str] = []
     pending = ""
-    deadline = time.monotonic() + timeout
+    timeout_seconds = timeout if timeout is not None else 0.0
+    deadline = time.monotonic() + timeout_seconds if timeout is not None else None
     try:
         while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
                 process.kill()
                 process.wait()
                 raise subprocess.TimeoutExpired(
-                    command, timeout, output="".join(output)
+                    command, timeout_seconds, output="".join(output)
                 )
             events = selector.select(remaining)
             if not events:
@@ -206,8 +207,10 @@ def _run_with_inactivity_timeout(
                     if lines and not lines[-1].endswith(("\n", "\r"))
                     else ""
                 )
-                if any(_is_semantic_progress(line) for line in lines):
-                    deadline = time.monotonic() + timeout
+                if deadline is not None and any(
+                    _is_semantic_progress(line) for line in lines
+                ):
+                    deadline = time.monotonic() + timeout_seconds
                 continue
             if process.poll() is not None:
                 break

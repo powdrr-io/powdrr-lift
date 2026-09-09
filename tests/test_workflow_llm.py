@@ -47,7 +47,10 @@ def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
     response_failure = RepairFailure(
         RepairFailureClass.RESPONSE, "invalid_json", "response was not JSON"
     )
-    assert coordinator.record_failure(response_failure).stage == RepairStage.TARGETED
+    targeted = coordinator.record_failure(response_failure)
+    assert targeted.stage == RepairStage.TARGETED
+    assert targeted.prompt_profile == "targeted_schema_correction"
+    assert targeted.model_policy == "current_model"
     assert (
         coordinator.record_failure(
             RepairFailure(
@@ -104,6 +107,8 @@ def test_repair_coordinator_escalates_to_fallback_then_handoff() -> None:
         ).stage
         is RepairStage.MODEL_FALLBACK
     )
+    assert coordinator.attempts[-1].prompt_profile == "clean_room_replan"
+    assert coordinator.attempts[-1].model_policy == "backup_model"
     assert (
         coordinator.record_failure(
             RepairFailure(

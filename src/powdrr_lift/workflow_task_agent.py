@@ -689,6 +689,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "attempt": directive.attempt,
                 "reason": directive.reason,
                 "allowed_actions": list(directive.allowed_actions),
+                "prompt_profile": directive.prompt_profile,
+                "model_policy": directive.model_policy,
             }
         )
         if self.terminalized:

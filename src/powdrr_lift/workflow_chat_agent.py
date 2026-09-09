@@ -1697,6 +1697,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "attempt": directive.attempt,
                 "reason": directive.reason,
                 "allowed_actions": list(directive.allowed_actions),
+                "prompt_profile": directive.prompt_profile,
+                "model_policy": directive.model_policy,
                 "step_index": self.current_step_index,
             }
         )

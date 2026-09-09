@@ -95,12 +95,28 @@ class RepairStage(StrEnum):
 
 
 class RepairFailureClass(StrEnum):
-    """Stable categories used to select the first recovery strategy."""
+    """Stable categories used to select the first recovery strategy.
+
+    The broad values remain supported for callers that have not migrated their
+    error codes yet.  New adapters should use the specific categories so the
+    coordinator can make a deterministic first-stage decision.
+    """
 
     RESPONSE = "response"
     PROPOSAL = "proposal"
     EXECUTION = "execution"
     NO_PROGRESS = "no_progress"
+    TRANSPORT_TRANSIENT = "transport_transient"
+    TRANSPORT_TERMINAL = "transport_terminal"
+    RESPONSE_EMPTY = "response_empty"
+    RESPONSE_SYNTAX = "response_syntax"
+    RESPONSE_SCHEMA = "response_schema"
+    ACTION_CONTRACT = "action_contract"
+    ACTION_PRECONDITION = "action_precondition"
+    ACTION_EXECUTION = "action_execution"
+    NO_MATERIAL_PROGRESS = "no_material_progress"
+    VALIDATION_REGRESSION = "validation_regression"
+    COMPLETION_BLOCKED = "completion_blocked"
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +151,8 @@ class RepairDirective:
     attempt: int
     reason: str
     allowed_actions: tuple[str, ...] = ()
+    prompt_profile: str = "normal_full_context"
+    model_policy: str = "current_model"
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +179,20 @@ class RepairExhaustionReport:
             "allowed_actions": list(self.allowed_actions),
             "reason": self.reason,
         }
+
+
+def _prompt_profile_for_stage(stage: RepairStage) -> str:
+    profiles = {
+        RepairStage.TARGETED: "targeted_schema_correction",
+        RepairStage.CLEAN_ROOM: "clean_room_replan",
+        RepairStage.SELECT_ACTION: "constrained_action_selection",
+        RepairStage.FILL_ACTION: "constrained_action_parameters",
+        RepairStage.DETERMINISTIC: "deterministic_recovery",
+        RepairStage.MODEL_FALLBACK: "clean_room_replan",
+        RepairStage.HUMAN_HANDOFF: "human_recovery_question",
+        RepairStage.EXHAUSTED: "repair_exhausted",
+    }
+    return profiles[stage]
 
 
 class WorkflowRepairCoordinator:
@@ -206,14 +238,26 @@ class WorkflowRepairCoordinator:
             attempt=len(self.attempts) + 1,
             reason=failure.message,
             allowed_actions=tuple(dict.fromkeys(allowed_actions)),
+            prompt_profile=_prompt_profile_for_stage(stage),
+            model_policy=(
+                "backup_model"
+                if stage == RepairStage.MODEL_FALLBACK
+                else "current_model"
+            ),
         )
         self.attempts.append(directive)
         return directive
 
     def _next_stage(self, failure: RepairFailure) -> RepairStage:
+        targeted_classes = {
+            RepairFailureClass.RESPONSE,
+            RepairFailureClass.RESPONSE_EMPTY,
+            RepairFailureClass.RESPONSE_SYNTAX,
+            RepairFailureClass.RESPONSE_SCHEMA,
+        }
         first = (
             RepairStage.TARGETED
-            if failure.classification == RepairFailureClass.RESPONSE
+            if failure.classification in targeted_classes
             else RepairStage.CLEAN_ROOM
         )
         stages = (
@@ -249,6 +293,8 @@ class WorkflowRepairCoordinator:
             attempt=len(self.attempts) + 1,
             reason=f"Recovery exhausted for {failure.error_code}: {failure.message}",
             allowed_actions=tuple(dict.fromkeys(allowed_actions)),
+            prompt_profile=_prompt_profile_for_stage(RepairStage.EXHAUSTED),
+            model_policy="stop",
         )
 
 

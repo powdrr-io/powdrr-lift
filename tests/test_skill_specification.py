@@ -352,16 +352,12 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("start-implementing-feature.yaml", 20),
                 ("start-implementing-feature.yaml", 22),
                 ("start-implementing-feature.yaml", 21),
-                ("specify-a-feature.yaml", 2),
-                ("specify-a-feature.yaml", 6),
-                ("specify-a-feature.yaml", 10),
-                ("specify-a-feature.yaml", 13),
+                ("specify-a-feature.yaml", 3),
                 ("design-interview.yaml", 20),
                 ("design-interview.yaml", 22),
                 ("design-interview.yaml", 23),
                 ("bootstrap-code-structure.yaml", 5),
                 ("review-skill-workflow.yaml", 8),
-                ("specify-a-feature.yaml", 16),
             }
             expected_gate_steps = {
                 ("specify-system.yaml", 5),
@@ -369,10 +365,6 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("specify-implementation.yaml", 6),
                 ("start-implementing-feature.yaml", 6),
                 ("start-implementing-feature.yaml", 12),
-                ("specify-a-feature.yaml", 5),
-                ("specify-a-feature.yaml", 9),
-                ("specify-a-feature.yaml", 12),
-                ("specify-a-feature.yaml", 15),
                 ("review-system.yaml", 6),
                 ("review-architecture.yaml", 6),
                 ("run-tests-and-fix.yaml", 6),
@@ -383,6 +375,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("run-tests-and-fix.yaml", 3),
                 ("run-tests-and-fix.yaml", 5),
                 ("start-implementing-feature.yaml", 24),
+                ("specify-a-feature.yaml", 1),
             } | {("design-interview.yaml", index) for index in range(20)}
             expected_step_type = (
                 "coding_loop"
@@ -913,59 +906,14 @@ def test_specify_feature_skill_file_is_checked_in() -> None:
 
     assert step("capture-feature-name").step_type == "governed"
     assert step("capture-feature-name").outputs[0].name == "work_item_name"
-    assert step("generate-system-specification").step_type == "invoke_tool"
-    assert command("generate-system-specification") == [
-        "powdrr-lift",
-        "system-specification",
-        "--work-item-name",
-        "<work-item-name>",
-    ]
-    assert step("fill-system-specification").step_type == "governed"
-    assert uses_skill_name(step("review-system-context")) == "review-system"
-    assert step("evaluate-system-specification").step_type == "gate"
-    assert command("evaluate-system-specification") == [
-        "powdrr-lift",
-        "evaluate",
-        "docs/proposals/<work-item-name>/system-specification.yaml",
-    ]
-    assert step("generate-architecture-specification").step_type == "invoke_tool"
-    assert command("generate-architecture-specification") == [
-        "powdrr-lift",
-        "architecture-specification",
-        "--work-item-name",
-        "<work-item-name>",
-        "--all-entity-types",
-    ]
-    assert step("fill-architecture-specification").step_type == "governed"
-    assert uses_skill_name(step("review-architecture-context")) == "review-architecture"
-    assert step("evaluate-architecture-specification").step_type == "gate"
-    assert command("evaluate-architecture-specification") == [
-        "powdrr-lift",
-        "evaluate",
-        "docs/proposals/<work-item-name>/architecture-specification.yaml",
-    ]
-    assert step("generate-implementation-specification").step_type == "invoke_tool"
-    assert command("generate-implementation-specification") == [
-        "powdrr-lift",
-        "implementation-specification",
-        "--work-item-name",
-        "<work-item-name>",
-    ]
-    assert step("fill-implementation-specification").step_type == "governed"
-    assert step("evaluate-implementation-specification").step_type == "gate"
-    assert command("evaluate-implementation-specification") == [
-        "powdrr-lift",
-        "evaluate",
-        "docs/proposals/<work-item-name>/implementation-specification.yaml",
-    ]
-    assert all(
-        candidate not in {item.id for item in skill.steps}
-        for candidate in ("generate-pr-specification", "fill-pr-specification")
-    )
-    assert command("evaluate-feature-specifications") == [
-        "powdrr-lift",
-        "evaluate",
-        "docs/proposals/<work-item-name>",
+    assert step("capture-feature-context").outputs[0].name == "feature_description"
+    interview = step("conduct-design-interview")
+    assert interview.step_type == "uses_skill"
+    assert uses_skill_name(interview) == "design-interview"
+    assert interview.uses_skill is not None
+    assert [(binding.name, binding.ref) for binding in interview.uses_skill.inputs] == [
+        ("work_item_name", "work_item_name"),
+        ("feature_description", "feature_description"),
     ]
     stage = step("stage-specification-artifacts")
     assert stage.pre_step is not None

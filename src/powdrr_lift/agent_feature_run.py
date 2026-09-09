@@ -366,12 +366,7 @@ def run_agent_feature_e2e(
 
     if phases and phases[-1]["returncode"] == 0:
         proposal_dir = root / "docs" / "proposals" / config.feature_name
-        for document in (
-            "system-specification.yaml",
-            "architecture-specification.yaml",
-            "implementation-specification.yaml",
-            "proposed-pr-specification.yaml",
-        ):
+        for document in ("feature-pr-specification.yaml",):
             phases.append(
                 _run_phase(
                     name=f"verify:{document}",

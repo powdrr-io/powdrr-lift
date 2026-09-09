@@ -28,8 +28,10 @@ steps:
     schema: {type: string}
 - id: capture-feature-context
   description: Capture the feature goal and success criteria.
-  actions: [edit, yaml_edit, file_management, read_document]
-  step_type: governed
+  actions: []
+  step_type: predicated
+  completion:
+    required_outputs: [feature_description]
   llm_type: high_reasoning
   details: >-
     Parse the request and conversation for the named feature's outcomes, edge
@@ -37,263 +39,41 @@ steps:
     detailed plan. Use your best judgment to identify what is still missing.
     If the request already provides a detail, retain it without asking again.
     Otherwise ask one focused question with a prompt_user action; repeat this
-    step after each answer until the plan has enough context. For example:
-    {"action":"prompt_user","text":"What should this feature record, what should happen when it fails, and how will we test it?"}
-- id: generate-system-specification
-  description: Generate the system specification template.
-  actions: []
-  step_type: invoke_tool
-  llm_type: simple_task
-  details: >-
-    Invoke the declared system-specification generator exactly once; do not edit
-    the generated file. It overwrites unreadable/invalid existing content and
-    merges readable values into the fresh template while restoring instructions
-    and missing default fields.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - system-specification
-      - "--work-item-name"
-      - "<work-item-name>"
+    step after each answer until the plan has enough context. Then emit_outputs
+    with feature_description containing the complete feature request and any
+    confirmed answers, for example:
+    {"action":"emit_outputs","outputs":{"feature_description":"..."}}
   outputs:
-  - name: system_specification_template
-    type: any
+  - name: feature_description
+    type: string
     required_for_next_step: true
-    schema: {type: object, additionalProperties: true}
-- id: fill-system-specification
-  description: Fill the system requirements and approach.
-  actions: [edit, yaml_edit, file_management, read_document]
-  step_type: governed
-  llm_type: standard_reasoning
-  details: >-
-    Use yaml_edit to fill the generated YAML with the feature's requirements
-    and approach; do not invoke tools or rewrite the YAML as prose, then choose
-    next_step. For example, add a requirement describing durable interaction
-    records and an approach describing the log writer.
-- id: review-system-context
-  description: Review the system context before deciding the feature shape.
-  step_type: uses_skill
-  llm_type: simple_task
-  details: >-
-    Run the nested system review skill and use its result to decide whether the
-    current system context remains appropriate.
-  uses_skill:
-    skill: review-system
-- id: evaluate-system-specification
-  description: Gate the filled system specification.
-  actions: []
-  step_type: gate
-  llm_type: simple_task
-  details: The gate passes only when the system evaluator reports zero issues.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - evaluate
-      - docs/proposals/<work-item-name>/system-specification.yaml
-  gate:
-    outcome:
-      path: returncode
-      equals: 0
-    goto_step: repair-feature-specifications
-    retry_context: >-
-      System evaluation reported issues. Repair the affected YAML with yaml_edit,
-      then rerun the complete specification evaluation gate.
-- id: generate-architecture-specification
-  description: Generate the architecture specification template.
-  actions: []
-  step_type: invoke_tool
-  llm_type: simple_task
-  details: >-
-    Invoke the declared architecture-specification generator exactly once with
-    all entity types; do not edit the generated file. It overwrites
-    unreadable/invalid existing content and merges readable values into the fresh
-    template while restoring instructions and missing default fields.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - architecture-specification
-      - "--work-item-name"
-      - "<work-item-name>"
-      - "--all-entity-types"
-  outputs:
-  - name: architecture_specification_template
-    type: any
-    required_for_next_step: true
-    schema: {type: object, additionalProperties: true}
-- id: fill-architecture-specification
-  description: Fill the architecture entities and relationships.
-  actions: [edit, yaml_edit, file_management, read_document]
-  step_type: governed
-  llm_type: high_reasoning
-  details: >-
-    Use yaml_edit to capture the entity model before review; do not invoke tools
-    or rewrite the YAML as prose, then choose next_step. Keep the model small:
-    derive entities, modules, tools, relationships, invariants, and guidance
-    only from the current feature requirements and approach. Do not copy example
-    domain entities, relationships, or ids from another feature. Every entity
-    and relationship must explain which current requirement or approach it serves.
-- id: review-architecture-context
-  description: Review architecture before implementation.
+    schema: {type: string, minLength: 1}
+- id: conduct-design-interview
+  description: Run the deterministic design interview and generate the validated proposal.
   step_type: uses_skill
   llm_type: high_reasoning
   details: >-
-    Run the nested architecture review skill and use its result to decide
-    whether the current architecture remains appropriate.
+    Invoke design-interview through this typed uses_skill step. It owns all
+    repository-context gathering, interview outputs, proposal generation, and
+    deterministic validation. Do not invoke specify-system,
+    specify-architecture, or specify-implementation separately.
   uses_skill:
-    skill: review-architecture
-- id: evaluate-architecture-specification
-  description: Gate the filled architecture specification.
-  actions: []
-  step_type: gate
-  llm_type: simple_task
-  details: The gate passes only when the architecture evaluator reports zero issues.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - evaluate
-      - docs/proposals/<work-item-name>/architecture-specification.yaml
-  gate:
-    outcome:
-      path: returncode
-      equals: 0
-    goto_step: repair-feature-specifications
-    retry_context: >-
-      Architecture evaluation reported issues. Repair the affected YAML with
-      yaml_edit, then rerun the complete specification evaluation gate.
-- id: generate-implementation-specification
-  description: Generate the implementation specification template.
-  actions: []
-  step_type: invoke_tool
-  llm_type: simple_task
-  details: >-
-    Invoke the declared implementation-specification generator exactly once; do
-    not edit the generated file. It overwrites unreadable/invalid existing
-    content and merges readable values into the fresh template while restoring
-    instructions and missing default fields.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - implementation-specification
-      - "--work-item-name"
-      - "<work-item-name>"
-  outputs:
-  - name: implementation_specification_template
-    type: any
-    required_for_next_step: true
-    schema: {type: object, additionalProperties: true}
-- id: fill-implementation-specification
-  description: Fill the implementation features and decisions.
-  actions: [edit, yaml_edit, file_management, read_document]
-  step_type: governed
-  llm_type: standard_reasoning
-  details: Use yaml_edit to complete the generated implementation template; do not invoke tools or rewrite the YAML as prose, then choose next_step.
-- id: evaluate-implementation-specification
-  description: Gate the filled implementation specification.
-  actions: []
-  step_type: gate
-  llm_type: simple_task
-  details: The gate passes only when the implementation evaluator reports zero issues.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - evaluate
-      - docs/proposals/<work-item-name>/implementation-specification.yaml
-  gate:
-    outcome:
-      path: returncode
-      equals: 0
-    goto_step: repair-feature-specifications
-    retry_context: >-
-      Implementation evaluation reported issues. Repair the affected YAML with
-      yaml_edit, then rerun the complete specification evaluation gate.
-- id: evaluate-feature-specifications
-  description: Deterministically evaluate every generated specification before implementation.
-  actions: []
-  step_type: invoke_tool
-  llm_type: simple_task
-  details: >-
-    Invoke the declared evaluator exactly once for the specification directory.
-    It discovers every recognized spec-v1 YAML file. Pass the complete result to
-    the repair step; do not edit files here.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - evaluate
-      - docs/proposals/<work-item-name>
-  outputs:
-  - name: specification_evaluation
-    type: any
-    required_for_next_step: true
-    schema: {type: object, additionalProperties: true}
-- id: repair-feature-specifications
-  description: Fix every reported specification issue with yaml_edit.
-  actions: [edit, yaml_edit, file_management, read_document, gather_context, goto_step]
-  step_type: governed
-  llm_type: fast_iteration
-  details: >-
-    Review only the latest deterministic evaluator result and fix every reported
-    issue with yaml_edit; do not reuse an older LLM explanation after the gate
-    has rerun. Each action must include the YAML file_path and a non-empty
-    operations array. Use set_value with a JSON path array for scalar changes and
-    upsert_item with section, id, and a complete value mapping for list entries.
-    If any evaluator reports invalid YAML/structure or you are stuck, restart
-    the matching generator with a goto_step action. Use
-    {"action":"goto_step","step_id":"generate-system-specification"},
-    {"action":"goto_step","step_id":"generate-architecture-specification"},
-    {"action":"goto_step","step_id":"generate-implementation-specification"},
-    for the affected file. Do not repeat the same repair indefinitely.
-    For example: {"action":"yaml_edit","file_path":"docs/proposals/<work-item-name>/system-specification.yaml","operations":[{"op":"set_value","path":["id"],"value":"system-id"},{"op":"upsert_item","section":"requirements","id":"requirement-id","value":{"description":"...","state":"added"}}]}. Repeat the repair/evaluation loop until every required spec-v1 document evaluates cleanly. Do not begin implementation or create a pull request while any required specification remains invalid. Do not invoke tools other than gather_context in this repair step; gather_context is allowed when the latest evaluator result reports a missing or unknown id. Use the evaluator's suggested context types and keywords, then apply the correction without guessing. The evaluator result is the authoritative issue context and the next gate reruns the deterministic evaluator. If an exact existing id is needed, use gather_context or read_document, then apply yaml_edit without guessing. For entity_type_not_allowed, use the exact allowed_entity_types list from the latest evaluator result and edit only the reported entities[N].type path. Never confuse that field with entity_relationships[*].source or target: those fields contain entity ids and must not be changed to entity type names. Never alternate between File and Source file, change a different entity, or modify a value that already matches the latest allowed list. After the edit, choose next_step so deterministic evaluation can verify the current file; do not claim that your own reasoning proves validation passed.
-- id: gate-feature-specifications
-  description: Confirm that every generated specification evaluates cleanly.
-  actions: []
-  step_type: gate
-  llm_type: simple_task
-  details: The gate passes only when the directory evaluator exits successfully with zero issues.
-  pre_step:
-    action: invoke_tool
-    template:
-      tool: internal
-      command:
-      - powdrr-lift
-      - evaluate
-      - docs/proposals/<work-item-name>
-  gate:
-    outcome:
-      path: returncode
-      equals: 0
-    goto_step: evaluate-feature-specifications
-    retry_context: >-
-      The specification gate failed because one or more spec-v1 files still have
-      validation issues. Inspect the latest evaluator result, repair the affected
-      YAML with yaml_edit, and rerun deterministic evaluation before continuing.
+    skill: design-interview
+    inputs:
+    - name: work_item_name
+      ref: work_item_name
+      schema: {type: string, minLength: 1}
+    - name: feature_description
+      ref: feature_description
+      schema: {type: string, minLength: 1}
 - id: stage-specification-artifacts
-  description: Stage the validated specification artifacts for pull request preparation.
+  description: Stage the validated design-interview proposal for pull request preparation.
   step_type: invoke_tool
   llm_type: simple_task
-  details: Inspect the worktree and stage only the validated specification
-    artifacts under docs/proposals/<work-item-name>/. Do not commit or create the
-    pull request yet.
+  details: >-
+    Stage only the validated proposal and interview input under
+    docs/proposals/<work-item-name>/. Do not stage logs, caches, or unrelated
+    files; do not commit or create the pull request in this step.
   pre_step:
     action: invoke_tool
     template:
@@ -317,7 +97,7 @@ steps:
   uses_skill:
     skill: finish-pr-prep
 - id: create-feature-pull-request
-  description: Create or update the pull request for the validated feature.
+  description: Create or update the pull request for the validated feature proposal.
   step_type: uses_skill
   llm_type: simple_task
   details: >-
@@ -326,8 +106,8 @@ steps:
     `<pull-request-title>`. Pass a `files_to_publish` context list containing
     every validated specification document, along with the validated
     specification documents, feature intent, and the accepted readiness_report.
-    The nested skill must stage exactly that list. Do not begin implementation
-    in this skill, and do not invoke it if readiness_report is missing or not
+    The nested skill must stage exactly that list. Do not begin implementation in
+    this skill, and do not invoke it if readiness_report is missing or not
     accepted.
   uses_skill:
     skill: create-pull-request

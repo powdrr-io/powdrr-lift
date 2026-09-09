@@ -3419,7 +3419,7 @@ def test_cli_download_qwen_model_uses_repository_cache(
     assert capsys.readouterr().out == f"Qwen model cached at {model_path}\n"
 
 
-def test_workflow_execution_allows_more_roundtrips_than_max_turns(
+def test_workflow_execution_terminalizes_unrepairable_actions(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3428,7 +3428,12 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
     skills_dir = repo_root / "skill-definitions"
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
-    save_skill(_build_skill(), skill_path)
+    skill = _build_skill()
+    skill = replace(
+        skill,
+        steps=(replace(skill.steps[0], actions=("invoke_tool",)), *skill.steps[1:]),
+    )
+    save_skill(skill, skill_path)
 
     class _FakeOpenAIClient:
         def __init__(self, **_: object) -> None:
@@ -3490,13 +3495,10 @@ def test_workflow_execution_allows_more_roundtrips_than_max_turns(
         ),
     )
 
-    assert exit_code == 0
-    assert "Done." in stdout.getvalue()
-    assert any(
+    assert exit_code == 1
+    assert "semantic repair" in stderr.getvalue()
+    assert not any(
         status.startswith("roundtrip 7: next_step") for status in progress_statuses
-    )
-    assert any(
-        status.startswith("roundtrip 8: complete") for status in progress_statuses
     )
 
 

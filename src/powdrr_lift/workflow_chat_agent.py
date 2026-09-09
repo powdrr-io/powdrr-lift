@@ -112,6 +112,7 @@ from powdrr_lift.workflow_llm import (
     RepairDirective,
     RepairExhaustionReport,
     RepairPromptManifest,
+    RepairStage,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
@@ -913,6 +914,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     clean_room_repair_pending: bool = False
     clean_room_repair_used: bool = False
     repair_prompt_manifest: RepairPromptManifest | None = None
+    terminalized: bool = False
+    terminal_exit_code: int | None = None
 
     @property
     def selected_skill(self) -> SkillCatalogEntry:
@@ -1028,6 +1031,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.inherited_interaction_style = parent_interaction_style
 
     def next_request(self) -> WorkflowActionRequest | None:
+        if self.terminalized:
+            return None
         while True:
             if self.state.step_index >= len(self.selected_skill.skill.steps):
                 if not self.skill_stack:
@@ -1695,6 +1700,54 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "step_index": self.current_step_index,
             }
         )
+        if self.terminalized:
+            return
+        if directive.stage in {RepairStage.HUMAN_HANDOFF, RepairStage.EXHAUSTED}:
+            report = RepairExhaustionReport(
+                boundary_id=(
+                    f"skill:{self.selected_skill.path}:{self.current_step_index}"
+                ),
+                objective=str(
+                    getattr(self.current_step, "description", None)
+                    or getattr(self.current_step, "id", "current step")
+                ),
+                final_state={
+                    "step_index": self.current_step_index,
+                    "current_file_path": self.state.current_file_path,
+                },
+                failures=tuple(
+                    event
+                    for event in self.state.execution_events
+                    if event.get("kind")
+                    in {"validation_error", "action_error", "tool_error", "no_progress"}
+                ),
+                prompt_manifests=tuple(
+                    event.get("prompt_manifest", {})
+                    for event in self.state.execution_events
+                    if event.get("kind") == "repair_attempt"
+                ),
+                rejected_strategies=(),
+                allowed_actions=tuple(
+                    self.state.runtime.allowed_actions() or ()
+                    if self.state.runtime is not None
+                    else ()
+                ),
+                reason=directive.reason,
+            )
+            self.state.execution_events.append(
+                {
+                    "kind": "repair_exhausted",
+                    "stage": directive.stage.value,
+                    "report": report.to_data(),
+                }
+            )
+            print(
+                "Workflow stopped: semantic repair needs human review or was "
+                "exhausted. See the repair_exhausted event for the report.",
+                file=self.stderr,
+            )
+            self.terminalized = True
+            self.terminal_exit_code = 1
 
     def execute_action(self, action: SkillChatAction) -> WorkflowActionOutcome:
         try:

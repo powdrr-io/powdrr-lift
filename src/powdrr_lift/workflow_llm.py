@@ -1068,7 +1068,8 @@ class WorkflowStepRunner:
                     return 2
             request = strategy.next_request()
             if request is None:
-                return 0
+                terminal_exit_code = getattr(strategy, "terminal_exit_code", None)
+                return terminal_exit_code if isinstance(terminal_exit_code, int) else 0
             self.repair_coordinator.begin_boundary(_boundary_id(strategy))
             roundtrips += 1
             try:

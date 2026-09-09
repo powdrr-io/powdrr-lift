@@ -441,7 +441,7 @@ class _ExecutionStrategy(WorkflowExecutionStrategy):
         self.executed: list[str] = []
         self.observations: list[WorkflowActionObservation] = []
 
-    def next_request(self) -> WorkflowActionRequest:
+    def next_request(self) -> WorkflowActionRequest | None:
         return WorkflowActionRequest(
             client=self.client,
             messages=[{"role": "user", "content": "run"}],
@@ -639,6 +639,26 @@ def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None
     ]
 
 
+def test_execution_driver_honors_adapter_terminal_repair_exit_code() -> None:
+    class _TerminalStrategy(_ExecutionStrategy):
+        terminalized = True
+        terminal_exit_code: int | None = 17
+
+        def next_request(self) -> None:
+            return None
+
+    strategy = _TerminalStrategy()
+
+    assert (
+        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+            strategy,
+            max_roundtrips=3,
+            signature=workflow_action_signature,
+        )
+        == 17
+    )
+
+
 def test_execution_driver_bounds_coding_loop_iterations() -> None:
     class _CodingLoopStrategy(_ExecutionStrategy):
         current_step_index = 0
@@ -751,6 +771,7 @@ def test_execution_driver_supports_a_shared_model_fallback_request() -> None:
 
     def next_request() -> WorkflowActionRequest:
         request = original_next_request()
+        assert request is not None
         return WorkflowActionRequest(
             client=request.client,
             messages=request.messages,

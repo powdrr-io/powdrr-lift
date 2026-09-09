@@ -116,6 +116,7 @@ from powdrr_lift.workflow_llm import (
     RepairDirective,
     RepairExhaustionReport,
     RepairPromptManifest,
+    RepairStage,
     WorkflowAction,
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -362,8 +363,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     clean_room_repair_pending: bool = False
     clean_room_repair_used: bool = False
     repair_prompt_manifest: RepairPromptManifest | None = None
+    terminalized: bool = False
+    terminal_exit_code: int | None = None
 
-    def next_request(self) -> WorkflowActionRequest:
+    def next_request(self) -> WorkflowActionRequest | None:
+        if self.terminalized:
+            return None
         while True:
             selection_messages = None
             selection_schema = None
@@ -686,6 +691,53 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "allowed_actions": list(directive.allowed_actions),
             }
         )
+        if self.terminalized:
+            return
+        if directive.stage is RepairStage.HUMAN_HANDOFF:
+            question = (
+                "The workflow repair ladder needs a human decision before it can "
+                f"continue: {directive.reason}"
+            )
+            human_input = {
+                "human_task": {
+                    "description": question,
+                    "role": "reviewer",
+                    "input_state": {
+                        "question": question,
+                        "task": self.task.to_data(),
+                        "repair_directive": asdict(directive),
+                    },
+                    "output_state_type": "human-response-state",
+                },
+                "incorporation_instructions": (
+                    "Use the human response to choose and validate the next "
+                    "workflow action."
+                ),
+                "follow_up_task": {
+                    "description": self.task.description,
+                    "role": self.task.assignee_role.value,
+                    "input_state": self.task.input_state,
+                    "output_state_type": self.task.output_state_type,
+                },
+            }
+            self._handoff(human_input, "Semantic repair requires human review.")
+            self.terminalized = True
+            self.terminal_exit_code = 0
+        elif directive.stage is RepairStage.EXHAUSTED:
+            report = self._repair_exhaustion_report(reason=directive.reason)
+            self.events.append(
+                {
+                    "kind": "repair_exhausted",
+                    "stage": directive.stage.value,
+                    "report": report.to_data(),
+                }
+            )
+            print(
+                "Workflow task stopped: the semantic repair ladder was exhausted.",
+                file=self.stderr,
+            )
+            self.terminalized = True
+            self.terminal_exit_code = 1
 
     def no_progress_threshold_exit_code(
         self,

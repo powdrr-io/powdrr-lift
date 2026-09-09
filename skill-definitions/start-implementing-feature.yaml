@@ -639,8 +639,8 @@ steps:
     action: invoke_tool
     template:
       tool: git
-      command:
-      - add
+      operation: add
+      paths:
       - docs/proposals/<feature-name>
       - docs/workflows
 - id: verify-staged-artifacts

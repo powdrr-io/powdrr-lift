@@ -4537,8 +4537,6 @@ def _run_deterministic_pre_step(
             raise PowdrrExecutionError("Invoke tool pre-step template requires a tool.")
         parameters = dict(template)
         parameters.pop("tool", None)
-        if tool in {GIT_TOOL, GH_TOOL}:
-            parameters = _structured_intrinsic_pre_step_parameters(tool, parameters)
         if tool == ENRICH_TOOL:
             parameters.pop("tool", None)
             _wire_previous_tool_output(parameters, execution_events, handoff_records)
@@ -9423,43 +9421,6 @@ def _validate_coding_loop_action(
                 "changed after the checks passed. Run the declared verification "
                 "commands again before choosing next_step."
             )
-
-
-def _structured_intrinsic_pre_step_parameters(
-    tool: str, parameters: Mapping[str, Any]
-) -> dict[str, Any]:
-    """Translate declarative pre-step commands to structured actions."""
-    if tool == GIT_TOOL and parameters.get("operation") == "add":
-        paths = parameters.get("paths")
-        if (
-            isinstance(paths, Sequence)
-            and not isinstance(paths, (str, bytes, bytearray))
-            and paths
-            and all(isinstance(path, str) and path for path in paths)
-        ):
-            return {"operation": "add", "paths": list(paths)}
-        raise PowdrrExecutionError(
-            "Intrinsic git add pre-steps require a non-empty paths list."
-        )
-    command = parameters.get("command")
-    if (
-        tool == GIT_TOOL
-        and isinstance(command, Sequence)
-        and not isinstance(command, (str, bytes, bytearray))
-        and len(command) >= 2
-        and command[0] == "add"
-    ):
-        paths = list(command[1:])
-        if all(isinstance(path, str) and path for path in paths):
-            return {"operation": "add", "paths": paths}
-        raise PowdrrExecutionError(
-            "Intrinsic git add pre-steps require non-empty string paths."
-        )
-    if tool == GIT_TOOL and command == ["status", "--short"]:
-        return {"operation": "status"}
-    raise PowdrrExecutionError(
-        f"Intrinsic {tool} pre-steps must declare a supported structured operation."
-    )
 
 
 def _normalize_noop_git_commit_result(

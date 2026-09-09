@@ -21,9 +21,7 @@ steps:
     action: invoke_tool
     template:
       tool: git
-      command:
-      - status
-      - --short
+      operation: status
   outputs:
   - name: staged_repository_status
     type: any

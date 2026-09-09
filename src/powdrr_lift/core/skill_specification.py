@@ -2660,6 +2660,8 @@ def _validate_gather_context_pre_step(
             )
             return
         allowed_keys = {"tool", "command", "operation", "cwd", "env"}
+        if template.get("tool") == "git":
+            allowed_keys |= {"paths", "source", "destination", "branch", "message"}
         if template.get("tool") == "enrich":
             allowed_keys = {"tool", "format", "tool_output"}
         elif template.get("tool") in {"validate_edit", "apply_edit"}:
@@ -2726,6 +2728,20 @@ def _validate_gather_context_pre_step(
                         ),
                         path=_child_path(
                             _child_path(pre_step_path, "template"), "edit"
+                        ),
+                    )
+                )
+            return
+        if tool in {"git", "gh"} and template.get("operation") is not None:
+            if _optional_string(template.get("operation")) is None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="invalid_pre_step_operation",
+                        message=(
+                            "Intrinsic pre-step operations must be non-empty strings."
+                        ),
+                        path=_child_path(
+                            _child_path(pre_step_path, "template"), "operation"
                         ),
                     )
                 )

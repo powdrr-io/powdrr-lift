@@ -99,6 +99,7 @@ def test_task_scenario_replays_clean_room_repair_stage(tmp_path: Path) -> None:
     clean_prompt = json.loads(result["exchanges"][1][1]["content"])
     assert clean_prompt["execution_mode"] == "clean_room_repair"
     assert clean_prompt["repair_stage"] == "action_selection"
+    assert "repair_context" in json.loads(clean_prompt["context"])
 
 
 def _coding_task_agent_reacts_to_failure_and_verifies_the_fix(

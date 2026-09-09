@@ -15,6 +15,7 @@ import json
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Literal, Protocol, TypeVar, cast
 
 from powdrr_lift.errors import (
@@ -78,6 +79,132 @@ _PROMPT_SIZE_CHARS_PER_TOKEN = 3
 # A caller may opt into an unlimited loop for deterministic harnesses, but
 # production entry points must always provide a finite budget.
 DEFAULT_MAX_ROUNDTRIPS = 128
+
+
+class RepairStage(StrEnum):
+    """Semantic recovery stages shared by workflow adapters."""
+
+    TARGETED = "targeted"
+    CLEAN_ROOM = "clean_room"
+    SELECT_ACTION = "select_action"
+    FILL_ACTION = "fill_action"
+    DETERMINISTIC = "deterministic"
+    MODEL_FALLBACK = "model_fallback"
+    HUMAN_HANDOFF = "human_handoff"
+    EXHAUSTED = "exhausted"
+
+
+class RepairFailureClass(StrEnum):
+    """Stable categories used to select the first recovery strategy."""
+
+    RESPONSE = "response"
+    PROPOSAL = "proposal"
+    EXECUTION = "execution"
+    NO_PROGRESS = "no_progress"
+
+
+@dataclass(frozen=True, slots=True)
+class RepairPolicy:
+    """Bound semantic recovery independently from transport retries."""
+
+    targeted_attempts: int = 1
+    clean_room_attempts: int = 1
+    action_selection_attempts: int = 1
+    parameter_attempts: int = 1
+    deterministic_recovery: bool = True
+    model_fallback_attempts: int = 1
+    allow_human_handoff: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class RepairFailure:
+    """Failure facts supplied to the shared recovery coordinator."""
+
+    classification: RepairFailureClass
+    error_code: str
+    message: str
+    action_signature: str | None = None
+    target_signature: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RepairDirective:
+    """The adapter-independent result of recording one semantic failure."""
+
+    stage: RepairStage
+    attempt: int
+    reason: str
+    allowed_actions: tuple[str, ...] = ()
+
+
+class WorkflowRepairCoordinator:
+    """Pure bounded state machine for semantic recovery decisions."""
+
+    def __init__(self, policy: RepairPolicy | None = None) -> None:
+        self.policy = policy or RepairPolicy()
+        self.boundary_id: str | None = None
+        self.attempts: list[RepairDirective] = []
+        self._identities: set[tuple[str, str | None, str | None]] = set()
+
+    def begin_boundary(self, boundary_id: str) -> None:
+        if boundary_id != self.boundary_id:
+            self.boundary_id = boundary_id
+            self.attempts.clear()
+            self._identities.clear()
+
+    def record_failure(
+        self,
+        failure: RepairFailure,
+        *,
+        allowed_actions: Sequence[str] = (),
+    ) -> RepairDirective:
+        identity = (
+            failure.error_code,
+            failure.action_signature,
+            failure.target_signature,
+        )
+        if identity in self._identities:
+            raise ProgrammerInvariantError(
+                "Duplicate semantic repair failure was recorded.",
+                error_code="duplicate_repair_attempt",
+                remediation="Advance material state or change the repair strategy.",
+            )
+        self._identities.add(identity)
+        stage = self._stage_for(failure)
+        used = sum(item.stage == stage for item in self.attempts)
+        limit = self._limit_for(stage)
+        if used >= limit:
+            return self._exhausted(failure, allowed_actions)
+        directive = RepairDirective(
+            stage=stage,
+            attempt=len(self.attempts) + 1,
+            reason=failure.message,
+            allowed_actions=tuple(dict.fromkeys(allowed_actions)),
+        )
+        self.attempts.append(directive)
+        return directive
+
+    def _stage_for(self, failure: RepairFailure) -> RepairStage:
+        if failure.classification == RepairFailureClass.RESPONSE:
+            return RepairStage.TARGETED
+        return RepairStage.CLEAN_ROOM
+
+    def _limit_for(self, stage: RepairStage) -> int:
+        if stage == RepairStage.TARGETED:
+            return max(0, self.policy.targeted_attempts)
+        if stage == RepairStage.CLEAN_ROOM:
+            return max(0, self.policy.clean_room_attempts)
+        return 0
+
+    def _exhausted(
+        self, failure: RepairFailure, allowed_actions: Sequence[str]
+    ) -> RepairDirective:
+        return RepairDirective(
+            stage=RepairStage.EXHAUSTED,
+            attempt=len(self.attempts) + 1,
+            reason=f"Recovery exhausted for {failure.error_code}: {failure.message}",
+            allowed_actions=tuple(dict.fromkeys(allowed_actions)),
+        )
 
 
 @dataclass(frozen=True, slots=True)

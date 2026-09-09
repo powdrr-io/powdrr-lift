@@ -7,11 +7,16 @@ from typing import Any
 from powdrr_lift.workflow_execution import ProgressDecision
 from powdrr_lift.workflow_llm import (
     ProgrammerInvariantError,
+    RepairFailure,
+    RepairFailureClass,
+    RepairPolicy,
+    RepairStage,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionRequest,
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
+    WorkflowRepairCoordinator,
     WorkflowStepRunner,
     assert_material_repair_prompt,
     build_clean_room_action_parameters_prompt,
@@ -25,6 +30,58 @@ from powdrr_lift.workflow_llm import (
     prune_execution_events,
     workflow_action_signature,
 )
+
+
+def test_repair_coordinator_is_bounded_and_resets_at_boundaries() -> None:
+    coordinator = WorkflowRepairCoordinator(
+        RepairPolicy(targeted_attempts=1, clean_room_attempts=1)
+    )
+    coordinator.begin_boundary("step-1")
+    response_failure = RepairFailure(
+        RepairFailureClass.RESPONSE, "invalid_json", "response was not JSON"
+    )
+    assert coordinator.record_failure(response_failure).stage == RepairStage.TARGETED
+    assert (
+        coordinator.record_failure(
+            RepairFailure(
+                RepairFailureClass.EXECUTION,
+                "action_failed",
+                "edit failed",
+                action_signature="edit:file-a",
+            )
+        ).stage
+        == RepairStage.CLEAN_ROOM
+    )
+    exhausted = coordinator.record_failure(
+        RepairFailure(
+            RepairFailureClass.EXECUTION,
+            "action_failed_again",
+            "another action failed",
+            action_signature="edit:file-b",
+        )
+    )
+    assert exhausted.stage == RepairStage.EXHAUSTED
+
+    coordinator.begin_boundary("step-2")
+    assert coordinator.record_failure(response_failure).attempt == 1
+
+
+def test_repair_coordinator_rejects_duplicate_failure_identity() -> None:
+    coordinator = WorkflowRepairCoordinator()
+    coordinator.begin_boundary("step-1")
+    failure = RepairFailure(
+        RepairFailureClass.NO_PROGRESS,
+        "no_progress",
+        "same action repeated",
+        action_signature="edit:file-a",
+    )
+    coordinator.record_failure(failure)
+    try:
+        coordinator.record_failure(failure)
+    except ProgrammerInvariantError as error:
+        assert error.error_code == "duplicate_repair_attempt"
+    else:
+        raise AssertionError("duplicate repair failure was accepted")
 
 
 def test_clean_room_repair_prompt_excludes_conversation_and_records_profile() -> None:

@@ -347,6 +347,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     stderr: TextIO
     action_engine: WorkflowLLMActionEngine
     events: list[dict[str, Any]]
+    repair_fallback_client: WorkflowLLMClient | None
+    repair_fallback_model: str | None
     runtime: ExecutionRuntime | None = None
     deterministic_output_state: Any = None
     requires_deterministic_output_state: bool = False
@@ -596,6 +598,8 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stderr=self.stderr,
             max_timeout_retries=self.config.max_timeout_retries,
             timeout_backoff_seconds=self.config.timeout_backoff_seconds,
+            fallback_client=self.repair_fallback_client,
+            fallback_model=self.repair_fallback_model,
         )
 
     def material_state(self, action: WorkflowAction) -> object:
@@ -1674,6 +1678,20 @@ def run_workflow_task(
             task_client = client
         else:
             task_client = _build_workflow_client(config, task)
+        repair_fallback_client = None
+        repair_fallback_model = None
+        if not client_was_provided and mapping.backup_model is not None:
+            repair_fallback_model = mapping.backup_model.model
+            repair_fallback_client = _build_workflow_client_for_mapping(
+                config,
+                task,
+                mapping.backup_model,
+            )
+            if config.verbose:
+                repair_fallback_client = _WorkflowTaskDisplayClient(
+                    repair_fallback_client,
+                    stderr=stderr,
+                )
         if config.verbose:
             task_client = _WorkflowTaskDisplayClient(task_client, stderr=stderr)
         task_client = _maybe_record_llm_exchanges(task_client, dump_root)
@@ -1722,6 +1740,8 @@ def run_workflow_task(
             error_log_root=dump_root,
             client=task_client,
             compaction_client=compaction_client,
+            repair_fallback_client=repair_fallback_client,
+            repair_fallback_model=repair_fallback_model,
             model=model,
             mapping_provider=mapping.provider,
             stdout=stdout,

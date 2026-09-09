@@ -153,7 +153,10 @@ from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
 from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     analyze_workflow_definitions,
+    apply_liveness_baseline,
+    apply_warning_budget,
     render_skill_prompt_snapshots,
+    warning_report_data,
 )
 from powdrr_lift.workflow_definition_comparison import (
     WorkflowComparisonError,
@@ -1236,6 +1239,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     definition_validation_parser.add_argument("definition", type=Path)
     definition_validation_parser.add_argument("--json", action="store_true")
+    definition_validation_parser.add_argument(
+        "--liveness", action="store_true", help="Enable static liveness diagnostics."
+    )
+    definition_validation_parser.add_argument("--baseline", type=Path)
     definition_validation_parser.set_defaults(func=_run_validate_workflow_definition)
 
     definitions_validation_parser = subparsers.add_parser(
@@ -1245,6 +1252,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     definitions_validation_parser.add_argument("paths", nargs="+", type=Path)
     definitions_validation_parser.add_argument("--json", action="store_true")
+    definitions_validation_parser.add_argument(
+        "--liveness", action="store_true", help="Enable static liveness diagnostics."
+    )
+    definitions_validation_parser.add_argument("--baseline", type=Path)
+    definitions_validation_parser.add_argument("--warning-budget", type=Path)
+    definitions_validation_parser.add_argument("--warning-report", type=Path)
     definitions_validation_parser.set_defaults(func=_run_validate_workflow_definitions)
 
     prompt_snapshot_parser = subparsers.add_parser(
@@ -3899,27 +3912,46 @@ def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
     data = report.to_data()
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
-    elif report.validation_successful:
-        print(f"Workflow definition valid: {report.definition}")
     else:
-        print(f"Workflow definition invalid: {report.definition}", file=sys.stderr)
+        status = "valid" if report.validation_successful else "invalid"
+        stream = sys.stdout if report.validation_successful else sys.stderr
+        print(f"Workflow definition {status}: {report.definition}", file=stream)
         for issue in report.issues:
-            print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
+            print(
+                f"{issue.path}: {issue.code}: {issue.message}",
+                file=sys.stderr if issue.severity == "error" else sys.stdout,
+            )
     return 0 if report.validation_successful else 1
 
 
 def _run_validate_workflow_definitions(args: argparse.Namespace) -> int:
     report = analyze_workflow_definitions(args.paths)
+    report = apply_liveness_baseline(report, args.baseline)
+    report = apply_warning_budget(report, args.warning_budget)
+    if args.warning_report is not None:
+        args.warning_report.parent.mkdir(parents=True, exist_ok=True)
+        args.warning_report.write_text(
+            json.dumps(warning_report_data(report), indent=2, ensure_ascii=False)
+            + "\n",
+            encoding="utf-8",
+        )
     if args.json:
         print(json.dumps(report.to_data(), indent=2, ensure_ascii=False))
     else:
         for definition_report in report.reports:
-            if definition_report.validation_successful:
-                print(f"Workflow definition valid: {definition_report.definition}")
-                continue
-            print(f"Workflow definition invalid: {definition_report.definition}")
+            status = "valid" if definition_report.validation_successful else "invalid"
+            stream = (
+                sys.stdout if definition_report.validation_successful else sys.stderr
+            )
+            print(
+                f"Workflow definition {status}: {definition_report.definition}",
+                file=stream,
+            )
             for issue in definition_report.issues:
-                print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
+                print(
+                    f"{issue.path}: {issue.code}: {issue.message}",
+                    file=(sys.stderr if issue.severity == "error" else sys.stdout),
+                )
         if not report.reports:
             print("No workflow definitions found.", file=sys.stderr)
     return 0 if report.validation_successful and report.reports else 1

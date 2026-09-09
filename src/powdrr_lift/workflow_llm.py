@@ -200,16 +200,14 @@ class RepairContext:
             "execution_id": self.execution_id,
             "boundary_id": self.boundary_id,
             "objective": self.objective,
-            "deterministic_state": dict(self.deterministic_state),
+            "deterministic_state": _repair_json_safe(self.deterministic_state),
             "allowed_actions": list(self.allowed_actions),
-            "action_schemas": {
-                name: dict(schema) for name, schema in self.action_schemas.items()
-            },
+            "action_schemas": _repair_json_safe(self.action_schemas),
             "required_outputs": list(self.required_outputs),
-            "open_obligations": [dict(item) for item in self.open_obligations],
+            "open_obligations": _repair_json_safe(self.open_obligations),
             "rejected_strategies": list(self.rejected_strategies),
             "last_material_progress": (
-                dict(self.last_material_progress)
+                _repair_json_safe(self.last_material_progress)
                 if self.last_material_progress is not None
                 else None
             ),
@@ -258,6 +256,11 @@ class RepairExhaustionReport:
             "allowed_actions": list(self.allowed_actions),
             "reason": self.reason,
         }
+
+
+def _repair_json_safe(value: Any) -> Any:
+    """Normalize context values for durable JSON events and prompt payloads."""
+    return json.loads(json.dumps(value, ensure_ascii=False, default=str))
 
 
 def _prompt_profile_for_stage(stage: RepairStage) -> str:

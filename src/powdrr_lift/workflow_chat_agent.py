@@ -879,6 +879,7 @@ class _ChatActionProgressStrategy(WorkflowActionProgressStrategy[SkillChatAction
             source="no_progress",
         )
 
+
 @dataclass(slots=True)
 class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     """Interactive adapter around the shared action-roundtrip driver."""

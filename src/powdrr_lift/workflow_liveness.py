@@ -296,12 +296,25 @@ def capability_effect(invocation: Mapping[str, Any]) -> CapabilityEffect | None:
     if not command or not all(isinstance(item, str) for item in command):
         return None
     operation = command[0]
+    if tool == "internal" and command[0] == "powdrr-lift" and len(command) >= 2:
+        operation = command[1]
+    if tool == "shell":
+        return _shell_capability_effect(command)
     if tool == "gh" and len(command) >= 2 and command[0] == "pr":
         operation = f"pr_{command[1]}"
     if tool == "fuzzy-match":
         operation = "fuzzy-match"
     if tool == "enrich":
         operation = "enrich"
+    if tool == "internal" and operation == "repository-state":
+        return CapabilityEffect(
+            operation,
+            "unknown",
+            "unknown",
+            frozenset({"repository"}),
+            frozenset(),
+            frozenset({"tool_result"}),
+        )
     effect = _EFFECTS.get((tool, operation))
     if effect is not None:
         return effect
@@ -322,6 +335,121 @@ def capability_effect(invocation: Mapping[str, Any]) -> CapabilityEffect | None:
             writes,
             frozenset({"tool_result"}),
         )
+    return None
+
+
+def _shell_capability_effect(command: Sequence[str]) -> CapabilityEffect | None:
+    """Resolve the checked-in effect metadata for known shell commands.
+
+    Shell remains an escape hatch: arbitrary commands intentionally return
+    ``None`` and continue to produce an advisory diagnostic.  Repository
+    definitions use a small, explicit set of read, validation, and GitHub
+    operations; recording those effects here lets the analyzer reason about
+    them without executing them.
+    """
+    if not command:
+        return None
+    executable = command[0]
+    operation = executable
+    writes: frozenset[str] = frozenset()
+    reads: frozenset[str] = frozenset({"files"})
+    # Shell commands are bounded by this registry, but their environment and
+    # output are still not fixed enough to treat them as model-owned
+    # deterministic actions.
+    determinism = "unknown"
+    idempotence = "idempotent"
+    produces = frozenset({"tool_result"})
+
+    if executable in {"rg", "ruff", "mypy", "pytest", "pyright", "basedpyright"}:
+        operation = executable
+        writes = frozenset({"validation"}) if executable != "rg" else frozenset()
+        return CapabilityEffect(
+            operation,
+            "conditional" if writes else determinism,
+            idempotence,
+            reads,
+            writes,
+            produces,
+            success_postconditions=("validation_recorded",) if writes else (),
+        )
+    if executable == "curl":
+        return CapabilityEffect(
+            "curl",
+            "conditional",
+            "idempotent",
+            frozenset({"remote_repository"}),
+            frozenset(),
+            frozenset({"context", "tool_result"}),
+        )
+    if executable == "gh":
+        operation = command[1] if len(command) > 1 else "gh"
+        writes = frozenset({"remote_repository"}) if "POST" in command else frozenset()
+        return CapabilityEffect(
+            operation,
+            "conditional",
+            "non_idempotent" if writes else "idempotent",
+            frozenset({"remote_repository"}),
+            writes,
+            frozenset({"context", "tool_result"}),
+        )
+    if executable == "git" and len(command) > 1:
+        operation = command[1]
+        if operation in {"status", "diff", "log", "blame"}:
+            return CapabilityEffect(
+                operation,
+                determinism,
+                idempotence,
+                frozenset({"repository"}),
+                frozenset(),
+                frozenset({"context", "tool_result"}),
+            )
+        if operation == "add":
+            return CapabilityEffect(
+                operation,
+                determinism,
+                idempotence,
+                frozenset({"files"}),
+                frozenset({"repository_index"}),
+                produces,
+                success_postconditions=("paths_staged",),
+            )
+        if operation in {"fetch", "pull"}:
+            return CapabilityEffect(
+                operation,
+                "conditional",
+                "idempotent",
+                frozenset({"remote_repository"}),
+                frozenset({"repository"}),
+                produces,
+            )
+        if operation == "merge":
+            return CapabilityEffect(
+                operation,
+                "conditional",
+                "conditional",
+                frozenset({"repository"}),
+                frozenset({"repository", "files"}),
+                produces,
+            )
+        if operation == "commit":
+            return CapabilityEffect(
+                operation,
+                "conditional",
+                "non_idempotent",
+                frozenset({"repository_index"}),
+                frozenset({"repository_history"}),
+                produces,
+                success_postconditions=("commit_created",),
+            )
+        if operation == "push":
+            return CapabilityEffect(
+                operation,
+                "conditional",
+                "conditional",
+                frozenset({"repository_history"}),
+                frozenset({"remote_repository"}),
+                produces,
+            )
     return None
 
 
@@ -437,7 +565,6 @@ def expand_abstract_transitions(
         "list_files",
         "invoke_tool",
         "next_step",
-        "goto_step",
     }
     progress = bool(new_domains or material_produces or outputs or progress_actions)
     action_ids = frozenset(

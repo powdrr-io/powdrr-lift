@@ -154,7 +154,9 @@ from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,
     analyze_workflow_definitions,
     apply_liveness_baseline,
+    apply_warning_budget,
     render_skill_prompt_snapshots,
+    warning_report_data,
 )
 from powdrr_lift.workflow_definition_comparison import (
     WorkflowComparisonError,
@@ -1254,6 +1256,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--liveness", action="store_true", help="Enable static liveness diagnostics."
     )
     definitions_validation_parser.add_argument("--baseline", type=Path)
+    definitions_validation_parser.add_argument("--warning-budget", type=Path)
+    definitions_validation_parser.add_argument("--warning-report", type=Path)
     definitions_validation_parser.set_defaults(func=_run_validate_workflow_definitions)
 
     prompt_snapshot_parser = subparsers.add_parser(
@@ -3923,6 +3927,14 @@ def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
 def _run_validate_workflow_definitions(args: argparse.Namespace) -> int:
     report = analyze_workflow_definitions(args.paths)
     report = apply_liveness_baseline(report, args.baseline)
+    report = apply_warning_budget(report, args.warning_budget)
+    if args.warning_report is not None:
+        args.warning_report.parent.mkdir(parents=True, exist_ok=True)
+        args.warning_report.write_text(
+            json.dumps(warning_report_data(report), indent=2, ensure_ascii=False)
+            + "\n",
+            encoding="utf-8",
+        )
     if args.json:
         print(json.dumps(report.to_data(), indent=2, ensure_ascii=False))
     else:

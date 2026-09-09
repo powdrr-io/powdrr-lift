@@ -56,7 +56,15 @@ jobs:
         run: uv run mypy src tests
 
       - name: Statically compile workflow definitions
-        run: uv run powdrr-lift validate-workflow-definitions skill-definitions templates --liveness --baseline .github/workflow-liveness-baseline.json
+        run: uv run powdrr-lift validate-workflow-definitions skill-definitions templates --liveness --baseline .github/workflow-liveness-baseline.json --warning-budget .github/workflow-liveness-warning-budget.json --warning-report workflow-liveness-warning-report.json
+
+      - name: Upload workflow liveness warning report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-liveness-warning-report
+          path: workflow-liveness-warning-report.json
+          if-no-files-found: ignore
 
       - name: Run tests
         run: uv run pytest tests

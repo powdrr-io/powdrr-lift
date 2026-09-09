@@ -221,6 +221,97 @@ def apply_liveness_baseline(
     return WorkflowDefinitionsReport(tuple(filtered))
 
 
+def warning_counts(report: WorkflowDefinitionsReport) -> dict[str, int]:
+    """Return advisory counts after baseline suppression."""
+    counts: dict[str, int] = {}
+    for definition_report in report.reports:
+        for issue in definition_report.issues:
+            if issue.severity == "warning":
+                counts[issue.code] = counts.get(issue.code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def apply_warning_budget(
+    report: WorkflowDefinitionsReport, budget_path: Path | None
+) -> WorkflowDefinitionsReport:
+    """Fail when advisory counts exceed the checked-in CI budget."""
+    if budget_path is None:
+        return report
+    try:
+        budget = json.loads(budget_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _append_report_issue(
+            report,
+            WorkflowDefinitionIssue(
+                "liveness_warning_budget_error",
+                f"Cannot read warning budget {budget_path}: {exc}",
+                str(budget_path),
+            ),
+        )
+    counts = budget.get("counts") if isinstance(budget, Mapping) else None
+    if not isinstance(counts, Mapping):
+        return _append_report_issue(
+            report,
+            WorkflowDefinitionIssue(
+                "liveness_warning_budget_error",
+                "Warning budget must contain a counts object.",
+                str(budget_path),
+            ),
+        )
+    observed = warning_counts(report)
+    issues: list[WorkflowDefinitionIssue] = []
+    for code, count in observed.items():
+        allowed = counts.get(code, 0)
+        if not isinstance(allowed, int) or allowed < 0:
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "liveness_warning_budget_error",
+                    f"Warning budget for {code!r} must be a non-negative integer.",
+                    str(budget_path),
+                )
+            )
+        elif count > allowed:
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "liveness_warning_budget_exceeded",
+                    f"Advisory count for {code!r} is {count}, above the budget of {allowed}.",
+                    str(budget_path),
+                    remediation="Repair the advisory or raise the budget with an explicit review.",
+                )
+            )
+    return _append_report_issues(report, issues)
+
+
+def warning_report_data(report: WorkflowDefinitionsReport) -> dict[str, object]:
+    """Return the compact JSON payload written by CI for trend inspection."""
+    counts = warning_counts(report)
+    return {
+        "version": 1,
+        "validation_successful": report.validation_successful,
+        "warning_count": sum(counts.values()),
+        "counts": counts,
+    }
+
+
+def _append_report_issue(
+    report: WorkflowDefinitionsReport, issue: WorkflowDefinitionIssue
+) -> WorkflowDefinitionsReport:
+    return _append_report_issues(report, [issue])
+
+
+def _append_report_issues(
+    report: WorkflowDefinitionsReport,
+    issues: Sequence[WorkflowDefinitionIssue],
+) -> WorkflowDefinitionsReport:
+    if not issues or not report.reports:
+        return report
+    first = report.reports[0]
+    updated = WorkflowDefinitionReport(
+        first.definition, first.kind, (*first.issues, *issues)
+    )
+    return WorkflowDefinitionsReport((updated, *report.reports[1:]))
+
+
 def _baseline_should_keep(
     issue: WorkflowDefinitionIssue,
     definition: str,
@@ -481,11 +572,17 @@ def _validate_prompt_authority(
         invocation.operation or (invocation.command[0] if invocation.command else "")
         for invocation in item.step.tool_invocations
     )
+    for invocation in item.step.tool_invocations:
+        if invocation.tool == "git" and invocation.operation == "add":
+            declared.add("git add")
     if item.step.pre_step is not None:
         declared.add(item.step.pre_step.action)
+        template_tool = item.step.pre_step.template.get("tool")
         template_operation = item.step.pre_step.template.get("operation")
         if isinstance(template_operation, str):
             declared.add(template_operation)
+            if template_tool == "git" and template_operation == "add":
+                declared.add("git add")
     issues: list[WorkflowDefinitionIssue] = []
     for action in (
         "edit",
@@ -508,9 +605,19 @@ def _validate_prompt_authority(
             details,
             flags=re.IGNORECASE,
         )
+        # A prohibition is policy text, not an executable instruction.  Also
+        # avoid treating a noun such as "deferred edit" as an action request.
+        positive_directive = re.search(
+            rf"\b(?:use|invoke|run|perform|call)\b[^.\n]{{0,60}}"
+            rf"\b{re.escape(action)}\b|"
+            rf"\b(?:must|should)\s+(?:then\s+)?{re.escape(action)}\b",
+            details,
+            flags=re.IGNORECASE,
+        )
         if (
             mentioned
             and directed
+            and positive_directive
             and not denied
             and action.replace(" ", "_") not in declared
             and action not in declared
@@ -553,7 +660,7 @@ def compare_prompt_snapshot_contract(
     issues: list[WorkflowDefinitionIssue] = []
     for action in ("edit", "yaml_edit", "file_management", "read_document"):
         if (
-            action in text
+            _has_positive_prompt_directive(text, action)
             and action not in declared
             and action not in {"read_document" if step.inputs else ""}
         ):
@@ -567,6 +674,26 @@ def compare_prompt_snapshot_contract(
                 )
             )
     return tuple(issues)
+
+
+def _has_positive_prompt_directive(text: str, action: str) -> bool:
+    """Return whether prompt prose positively instructs the action."""
+    if re.search(
+        rf"\b(?:do not|don't|never|avoid|without)\b[^.\n]{{0,60}}"
+        rf"\b{re.escape(action)}\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return False
+    return bool(
+        re.search(
+            rf"\b(?:use|invoke|run|perform|call)\b[^.\n]{{0,60}}"
+            rf"\b{re.escape(action)}\b|"
+            rf"\b(?:must|should)\s+(?:then\s+)?{re.escape(action)}\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 def _validate_rendered_prompt_contract(
@@ -639,10 +766,23 @@ def _validate_template_liveness(
             if isinstance(task.get("actions"), list)
             else set()
         )
+        pre_step = task.get("pre_step")
+        pre_template = (
+            pre_step.get("template") if isinstance(pre_step, Mapping) else None
+        )
+        structured_git_add = (
+            isinstance(pre_template, Mapping)
+            and pre_template.get("tool") == "git"
+            and pre_template.get("operation") == "add"
+        )
+        structured_git_add = structured_git_add or (
+            isinstance(details, str) and '"operation":"add"' in details.replace(" ", "")
+        )
         if (
             isinstance(details, str)
             and "git add" in details.casefold()
             and "git_add" not in actions
+            and not structured_git_add
         ):
             issues.append(
                 WorkflowDefinitionIssue(

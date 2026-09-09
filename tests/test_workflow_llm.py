@@ -219,6 +219,59 @@ def test_two_pass_repair_selects_then_constrains_action_parameters() -> None:
     assert parameter_schema["properties"]["action"]["enum"] == ["edit"]
 
 
+def test_two_pass_repair_uses_distinct_model_for_parameter_fallback() -> None:
+    class _Client:
+        def __init__(self, responses: list[dict[str, Any]]) -> None:
+            self.responses = responses
+            self.calls = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            _ = messages
+            response = self.responses[min(self.calls, len(self.responses) - 1)]
+            self.calls += 1
+            return response
+
+    primary = _Client([{"action": "edit"}, {"action": "complete"}])
+    fallback = _Client([{"action": "edit", "file_path": "README.md"}])
+    selection_messages, selection_schema, _ = build_clean_room_action_selection_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        allowed_actions=("edit",),
+    )
+    parameter_messages, _ = build_clean_room_action_parameters_prompt(
+        context="change the README",
+        error_message="the previous action stalled",
+        selected_action="edit",
+        response_schema={
+            "type": "object",
+            "properties": {"action": {"type": "string", "enum": ["edit"]}},
+            "required": ["action"],
+        },
+    )
+
+    action = complete_two_pass_action(
+        primary,
+        selection_messages=selection_messages,
+        selection_schema=selection_schema,
+        parameter_messages_for=lambda _action: parameter_messages,
+        parameter_schema_for=lambda _action: {
+            "type": "object",
+            "properties": {"action": {"type": "string", "enum": ["edit"]}},
+            "required": ["action"],
+        },
+        parser=lambda payload: payload,
+        allowed_actions=("edit",),
+        model="primary",
+        stderr=None,
+        max_timeout_retries=0,
+        timeout_backoff_seconds=0,
+        fallback_client=fallback,
+        fallback_model="fallback",
+    )
+
+    assert action["file_path"] == "README.md"
+
+
 def test_prompt_size_breakdown_reports_execution_mode_and_top_level_fields() -> None:
     messages = [
         {"role": "system", "content": "rules"},

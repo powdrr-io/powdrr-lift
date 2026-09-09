@@ -493,6 +493,8 @@ def complete_two_pass_action(
     stderr: Any,
     max_timeout_retries: int,
     timeout_backoff_seconds: float,
+    fallback_client: WorkflowLLMClient | None = None,
+    fallback_model: str | None = None,
 ) -> Any:
     """Select an action kind, then request only that action's payload.
 
@@ -520,21 +522,42 @@ def complete_two_pass_action(
         or selected in {"next_step", "complete", "emit_outputs"}
     ):
         return parser(selection)
-    payload = complete_json_with_timeout_retry(
-        client,
-        parameter_messages_for(selected),
-        model=model,
-        stderr=stderr,
-        max_timeout_retries=max_timeout_retries,
-        timeout_backoff_seconds=timeout_backoff_seconds,
-        response_schema=parameter_schema_for(selected),
-    )
-    if payload.get("action") != selected:
-        raise RuntimeError(
-            f"Recovery parameter response selected {payload.get('action')!r}; "
-            f"expected {selected!r}."
+    parameter_messages = parameter_messages_for(selected)
+    parameter_schema = parameter_schema_for(selected)
+    try:
+        payload = complete_json_with_timeout_retry(
+            client,
+            parameter_messages,
+            model=model,
+            stderr=stderr,
+            max_timeout_retries=max_timeout_retries,
+            timeout_backoff_seconds=timeout_backoff_seconds,
+            response_schema=parameter_schema,
         )
-    return parser(payload)
+        if payload.get("action") != selected:
+            raise RuntimeError(
+                f"Recovery parameter response selected {payload.get('action')!r}; "
+                f"expected {selected!r}."
+            )
+        return parser(payload)
+    except RuntimeError:
+        if fallback_client is None or not fallback_model or fallback_model == model:
+            raise
+        fallback_payload = complete_json_with_timeout_retry(
+            fallback_client,
+            parameter_messages,
+            model=fallback_model,
+            stderr=stderr,
+            max_timeout_retries=max_timeout_retries,
+            timeout_backoff_seconds=timeout_backoff_seconds,
+            response_schema=parameter_schema,
+        )
+        if fallback_payload.get("action") != selected:
+            raise RuntimeError(
+                f"Fallback recovery selected {fallback_payload.get('action')!r}; "
+                f"expected {selected!r}."
+            ) from None
+        return parser(fallback_payload)
 
 
 def constrain_action_response_schema(

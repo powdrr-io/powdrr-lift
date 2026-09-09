@@ -1402,6 +1402,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     parameter_schema_for=parameter_schema_for,
                     parser=response_parser,
                     allowed_actions=_declared_action_names(self.current_step),
+                    fallback_mapping=step_mapping.backup_model,
                 )
             else:
                 messages = _build_step_execution_messages(
@@ -1476,7 +1477,13 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         parameter_schema_for: Callable[[str], Mapping[str, Any]],
         parser: Callable[[dict[str, Any]], SkillChatAction],
         allowed_actions: Sequence[str],
+        fallback_mapping: LLMModelMapping | None,
     ) -> SkillChatAction:
+        fallback_client = (
+            self.client_for_model(fallback_mapping.model, fallback_mapping.provider)
+            if fallback_mapping is not None
+            else None
+        )
         return complete_two_pass_action(
             self.client_for_model(self.current_model, self.provider),
             selection_messages=selection_messages,
@@ -1489,6 +1496,10 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             stderr=self.stderr,
             max_timeout_retries=0,
             timeout_backoff_seconds=0,
+            fallback_client=fallback_client,
+            fallback_model=(
+                fallback_mapping.model if fallback_mapping is not None else None
+            ),
         )
 
     def _request_action(

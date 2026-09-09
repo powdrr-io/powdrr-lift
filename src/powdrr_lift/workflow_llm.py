@@ -1346,7 +1346,13 @@ class WorkflowStepRunner:
         failure: RepairFailure,
     ) -> None:
         try:
-            directive = self.repair_coordinator.record_failure(failure)
+            allowed_actions = (
+                self.runtime.allowed_actions() if self.runtime is not None else ()
+            )
+            directive = self.repair_coordinator.record_failure(
+                failure,
+                allowed_actions=allowed_actions or (),
+            )
         except ProgrammerInvariantError:
             return
         self.last_repair_directive = directive

@@ -31,6 +31,7 @@ from powdrr_lift.workflow_liveness import (
     effect_for_pre_step,
     is_fixed_deterministic,
     is_idempotent,
+    runtime_static_conformance,
 )
 
 _PLACEHOLDER = re.compile(r"<([A-Za-z0-9_-]+)>")
@@ -187,22 +188,30 @@ def apply_liveness_baseline(
     entries = baseline.get("issues", [])
     if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
         return report
-    known = {
-        (str(item.get("definition")), str(item.get("code")), str(item.get("path")))
-        for item in entries
-        if isinstance(item, Mapping)
-        and isinstance(item.get("owner"), str)
-        and isinstance(item.get("reason"), str)
-        and isinstance(item.get("expires"), str)
-        and _baseline_not_expired(str(item["expires"]))
-    }
+    limits: dict[tuple[str, str, str], int] = {}
+    for item in entries:
+        if not isinstance(item, Mapping):
+            continue
+        if not all(
+            isinstance(item.get(field), str)
+            for field in ("definition", "code", "path", "owner", "reason", "expires")
+        ) or not _baseline_not_expired(str(item["expires"])):
+            continue
+        maximum = item.get("max_count", 1)
+        if isinstance(maximum, int) and maximum >= 0:
+            limits[(str(item["definition"]), str(item["code"]), str(item["path"]))] = (
+                maximum
+            )
+    seen: dict[tuple[str, str, str], int] = {}
     filtered: list[WorkflowDefinitionReport] = []
     for definition_report in report.reports:
         issues = tuple(
             issue
             for issue in definition_report.issues
             if issue.severity == "error"
-            or (str(definition_report.definition), issue.code, issue.path) not in known
+            or _baseline_should_keep(
+                issue, str(definition_report.definition), limits, seen
+            )
         )
         filtered.append(
             WorkflowDefinitionReport(
@@ -210,6 +219,19 @@ def apply_liveness_baseline(
             )
         )
     return WorkflowDefinitionsReport(tuple(filtered))
+
+
+def _baseline_should_keep(
+    issue: WorkflowDefinitionIssue,
+    definition: str,
+    limits: Mapping[tuple[str, str, str], int],
+    seen: dict[tuple[str, str, str], int],
+) -> bool:
+    key = (definition, issue.code, issue.path)
+    if key not in limits:
+        return True
+    seen[key] = seen.get(key, 0) + 1
+    return seen[key] > limits[key]
 
 
 def _baseline_not_expired(value: str) -> bool:
@@ -362,6 +384,16 @@ def _validate_raw_liveness(
 def _validate_liveness(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIssue]:
     """Find high-confidence model-owned actions that can repeat without progress."""
     issues: list[WorkflowDefinitionIssue] = []
+    for mismatch in runtime_static_conformance(ir):
+        issues.append(
+            WorkflowDefinitionIssue(
+                "runtime_static_contract_drift",
+                mismatch,
+                str(path),
+                severity="error",
+                remediation="Update the static contract or the production step behavior together.",
+            )
+        )
     for item in ir.steps:
         step = item.step
         issues.extend(_validate_unknown_effects(item, path))
@@ -664,6 +696,16 @@ def _substitute_static_values(value: Any, substitutions: Mapping[str, str]) -> A
     if isinstance(value, list):
         return [_substitute_static_values(item, substitutions) for item in value]
     return value
+
+
+def instantiate_template_contract(
+    definition: Mapping[str, Any], substitutions: Mapping[str, str]
+) -> Mapping[str, Any]:
+    """Return a pure instantiated template contract without filesystem writes."""
+    result = _substitute_static_values(definition, substitutions)
+    if not isinstance(result, Mapping):
+        raise ValueError("Template contract must remain a mapping after substitution.")
+    return result
 
 
 def _validate_skill_call_graph(

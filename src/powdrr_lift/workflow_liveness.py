@@ -395,6 +395,23 @@ def step_control_contracts(ir: Any) -> tuple[StepControlContract, ...]:
     return tuple(contracts)
 
 
+def runtime_static_conformance(ir: Any) -> tuple[str, ...]:
+    """Compare static ownership with the production step behavior policy."""
+    from powdrr_lift.workflow_step_behavior import behavior_for_step
+
+    mismatches: list[str] = []
+    for contract, item in zip(step_control_contracts(ir), ir.steps, strict=True):
+        behavior = behavior_for_step(item.step)
+        expected_owner = "runner" if not behavior.invokes_llm else "llm"
+        if contract.owner != expected_owner:
+            mismatches.append(
+                f"{contract.step_id}: static owner {contract.owner} != runtime {expected_owner}"
+            )
+        if behavior.runs_gate != (item.step.step_type == "gate"):
+            mismatches.append(f"{contract.step_id}: gate policy mismatch")
+    return tuple(mismatches)
+
+
 def expand_abstract_transitions(
     ir: Any, state: AbstractWorkflowState
 ) -> tuple[AbstractTransition, ...]:

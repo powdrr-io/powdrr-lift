@@ -6514,6 +6514,33 @@ def test_selection_context_lists_matched_existing_specification_documents(
     ) == tuple(payload["work_item_context"]["documents"]["interaction-file-log"])
 
 
+def test_git_status_is_allowed_when_step_declares_git_operation() -> None:
+    skill = load_skill(
+        Path(__file__).parents[1] / "skill-definitions" / "create-pull-request.yaml"
+    )
+    action = WorkflowAction(
+        kind="invoke_tool",
+        tool="git",
+        parameters={"operation": "status"},
+    )
+
+    _validate_workflow_action_for_step(action, skill.steps[2])
+
+
+def test_git_status_does_not_allow_other_undeclared_git_operations() -> None:
+    skill = load_skill(
+        Path(__file__).parents[1] / "skill-definitions" / "create-pull-request.yaml"
+    )
+    action = WorkflowAction(
+        kind="invoke_tool",
+        tool="git",
+        parameters={"operation": "push", "branch": "main"},
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="does not match"):
+        _validate_workflow_action_for_step(action, skill.steps[2])
+
+
 def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
     skill_path = (
         Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.yaml"

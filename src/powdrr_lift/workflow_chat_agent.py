@@ -8544,6 +8544,12 @@ def _validate_workflow_action_for_step_unwrapped(
     )
     if action.tool in {GIT_TOOL, GH_TOOL}:
         operation = action.parameters.get("operation")
+        if (
+            action.tool == GIT_TOOL
+            and operation == "status"
+            and any(invocation.tool == GIT_TOOL for invocation in matching_invocations)
+        ):
+            return
         if any(
             invocation.operation == operation
             for invocation in matching_invocations

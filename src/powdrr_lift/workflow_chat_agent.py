@@ -5614,8 +5614,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "greater than or equal to start_line. Prefer yaml_edit for .yaml or .yml "
         "files, but use edit as "
         "a fallback when a structural operation cannot express the repair. "
-        "file_management requires operation (delete, move, or rename) and "
-        "file_path; move and rename also require destination_path.\n"
+        "file_management requires operation (delete, move, or rename). Delete "
+        "accepts the target in file_path or destination_path; move and rename "
+        "require file_path and destination_path.\n"
         "invoke_tool requires a tool listed in the current step's "
         "tool_invocations. Shell and internal require parameters.command as a "
         "non-empty string or string array. The intrinsic git and gh tools use "
@@ -5873,8 +5874,9 @@ def _modular_action_system_prompt(
         )
     if "file_management" in action_names:
         prompt += (
-            "file_management uses operation delete, move, or rename plus a relative "
-            "file_path; move and rename also require destination_path. Never use '..' "
+            "file_management uses operation delete, move, or rename plus relative "
+            "paths. Delete accepts the target in file_path or destination_path; move "
+            "and rename require both file_path and destination_path. Never use '..' "
             "or absolute paths.\n"
         )
     if "goto_step" in action_names:
@@ -9414,9 +9416,22 @@ def _parse_workflow_action_file_management(
             "file_management operation must be delete, move, or rename."
         )
     file_path = payload.get("file_path")
+    # Some models use the move/rename field name for the target of a delete.
+    # Treat it as the source path for delete, while keeping the internal action
+    # canonical so execution and event recording remain unchanged.
+    if operation == "delete" and (
+        not isinstance(file_path, str) or not file_path.strip()
+    ):
+        file_path = payload.get("destination_path")
     if not isinstance(file_path, str) or not file_path.strip():
-        raise PowdrrExecutionError("file_management action requires file_path.")
+        raise PowdrrExecutionError(
+            "file_management action requires file_path or destination_path for delete."
+            if operation == "delete"
+            else "file_management action requires file_path."
+        )
     destination_path = payload.get("destination_path")
+    if operation == "delete":
+        destination_path = None
     if operation in {"move", "rename"} and (
         not isinstance(destination_path, str) or not destination_path.strip()
     ):

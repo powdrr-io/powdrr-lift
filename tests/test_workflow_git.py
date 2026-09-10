@@ -18,6 +18,7 @@ from powdrr_lift.workflow_git import (
     load_workflow_git_state,
     resolve_git_repository_root,
     save_workflow_git_state,
+    synchronize_workflow_initialization,
     task_branch_name,
     workflow_dependencies_completion,
     workflow_id_from_task_id,
@@ -125,6 +126,44 @@ def test_workflow_dependency_requires_merged_integration_pull_request(
         ("core: integration PR for powdrr/core is not merged",),
     )
     assert workflow_dependencies_completion(tmp_path, state) == (True, ())
+
+
+def test_force_synchronization_resets_stale_integration_branch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[tuple[Path, list[str]]] = []
+
+    def fake_run_git(repo: Path, arguments: list[str]) -> str:
+        calls.append((repo, arguments))
+        if arguments == ["branch", "--show-current"]:
+            return "powdrr/feature-17"
+        return ""
+
+    monkeypatch.setattr(workflow_git, "_run_git", fake_run_git)
+
+    synchronize_workflow_initialization(tmp_path / "integration", tmp_path, force=True)
+
+    assert calls == [
+        (tmp_path.resolve(), ["branch", "--show-current"]),
+        (
+            (tmp_path / "integration").resolve(),
+            ["reset", "--hard", "powdrr/feature-17"],
+        ),
+        (
+            (tmp_path / "integration").resolve(),
+            ["branch", "--show-current"],
+        ),
+        (
+            (tmp_path / "integration").resolve(),
+            [
+                "push",
+                "--force-with-lease",
+                "--set-upstream",
+                "origin",
+                "powdrr/feature-17",
+            ],
+        ),
+    ]
 
 
 def test_create_task_worktree_starts_from_integration_branch(tmp_path: Path) -> None:

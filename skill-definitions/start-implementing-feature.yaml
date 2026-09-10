@@ -515,6 +515,7 @@ steps:
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed
   llm_type: simple_task
+  tool_invocation_packages: [git_readonly_and_additive]
   details: >-
     Invoke instantiate-workflow once for each missing workflow using the
     invocation plan. Use templates/execute-proposed-pr.yaml, pass every
@@ -528,7 +529,11 @@ steps:
     writing workflow files into this active worktree. Stop if a returned
     workflow directory is outside the active worktree. Pass every created or
     reused workflow identity onward. Relationships use semantic identifiers;
-    never add file or directory pointers.
+    never add file or directory pointers. If initialization reports a
+    non-fast-forward merge because the dedicated integration branch is stale,
+    retry the exact invocation once with `--force`; this resets only that
+    dedicated integration branch to the current generated source commit and
+    uses lease-protected push. Do not use `--force` for any other command.
   tool_invocations:
   - tool: internal
     command:
@@ -544,6 +549,21 @@ steps:
     - verification-command=<verification-command>
     - --template
     - templates/execute-proposed-pr.yaml
+  - tool: internal
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - <feature-name>
+    - --workflow-instance-name
+    - <proposed-pr-name>
+    - --template-value
+    - proposed-pr-id=<proposed-pr-name>
+    - --template-value
+    - verification-command=<verification-command>
+    - --template
+    - templates/execute-proposed-pr.yaml
+    - --force
 - id: verify-workflow-dependencies
   description: Verify workflow-level dependency metadata.
   actions: [edit, yaml_edit, file_management, read_document, goto_step]

@@ -390,8 +390,16 @@ def commit_and_push_workflow_initialization(
 def synchronize_workflow_initialization(
     integration_worktree: str | Path,
     source_worktree: str | Path,
+    *,
+    force: bool = False,
 ) -> None:
-    """Make the integration branch contain the active workflow commit."""
+    """Make the integration branch contain the active workflow commit.
+
+    A normal initialization is a fast-forward only operation.  ``force`` is an
+    explicit recovery mode for a stale integration branch: it resets that
+    dedicated branch to the newly generated source commit and updates its
+    remote with lease protection.  It never operates on a protected branch.
+    """
     integration_path = Path(integration_worktree).resolve()
     source_path = Path(source_worktree).resolve()
     source_branch = _run_git(source_path, ["branch", "--show-current"])
@@ -400,12 +408,15 @@ def synchronize_workflow_initialization(
             "Cannot initialize a workflow from a protected branch; use a "
             "dedicated feature worktree."
         )
-    _run_git(integration_path, ["merge", "--ff-only", source_branch])
+    if force:
+        _run_git(integration_path, ["reset", "--hard", source_branch])
+    else:
+        _run_git(integration_path, ["merge", "--ff-only", source_branch])
     integration_branch = _run_git(integration_path, ["branch", "--show-current"])
-    _run_git(
-        integration_path,
-        ["push", "--set-upstream", "origin", integration_branch],
-    )
+    push_command = ["push", "--set-upstream", "origin", integration_branch]
+    if force:
+        push_command.insert(1, "--force-with-lease")
+    _run_git(integration_path, push_command)
 
 
 def _load_workflow_git_state_from_branch(

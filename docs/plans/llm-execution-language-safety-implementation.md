@@ -192,6 +192,7 @@ class OperationStatus(StrEnum):
     DENIED = "denied"
     CANCELLED = "cancelled"
 
+
 @dataclass(frozen=True)
 class OperationRecord:
     operation_id: str

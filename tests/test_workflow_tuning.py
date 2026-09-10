@@ -29,6 +29,10 @@ when_to_use: [Inspect files.]
 steps:
   - id: inspect
     description: Inspect files.
+    actions: [invoke_tool]
+    outputs:
+      - name: result
+        type: string
     tool_invocations:
       - tool: shell
         command: [rg, --files]

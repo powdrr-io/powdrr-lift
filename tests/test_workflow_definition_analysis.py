@@ -147,6 +147,9 @@ when_to_use: [Inspect files.]
 steps:
   - id: inspect
     description: Inspect the feature.
+    outputs:
+      - name: result
+        type: string
     inputs:
       - name: feature_id
     details: >-
@@ -175,6 +178,9 @@ when_to_use: [Inspect files.]
 steps:
   - id: inspect
     description: Inspect files.
+    outputs:
+      - name: result
+        type: string
 """,
         encoding="utf-8",
     )
@@ -206,6 +212,9 @@ when_to_use: [Inspect files.]
 steps:
   - id: inspect
     description: Inspect files.
+    outputs:
+      - name: result
+        type: string
 """,
         encoding="utf-8",
     )
@@ -427,6 +436,28 @@ steps:
     assert "empty_repair_action_space" in {issue.code for issue in report.issues}
 
 
+def test_definition_analysis_rejects_read_only_step_without_discrete_outcome(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: read-only
+when_to_use: [Read a document.]
+steps:
+  - id: inspect
+    description: Inspect the document and continue.
+    actions: [read_document]
+    details: Return next_step after reviewing the document.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "missing_discrete_outcome" in {issue.code for issue in report.issues}
+
+
 def test_definition_analysis_warns_on_non_progress_cycle(tmp_path: Path) -> None:
     definition = tmp_path / "skill.yaml"
     definition.write_text(
@@ -551,6 +582,10 @@ when_to_use: [Run a command.]
 steps:
   - id: run
     description: Run a command.
+    actions: [invoke_tool]
+    outputs:
+      - name: result
+        type: string
     tool_invocations:
       - tool: shell
         command: [custom-command]
@@ -598,6 +633,9 @@ when_to_use: [Run a command.]
 steps:
   - id: run
     description: Run a command.
+    outputs:
+      - name: result
+        type: string
     tool_invocations:
       - tool: shell
         command: [custom-command]

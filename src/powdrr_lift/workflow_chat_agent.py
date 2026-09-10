@@ -8556,6 +8556,11 @@ def _validate_workflow_action_for_step_unwrapped(
             for invocation in matching_invocations
         ):
             return
+    if action.tool in {"basedpyright-symbol", "basedpyright-structure"}:
+        # BasedPyright is a structured builtin: symbol lookup uses `query` and
+        # structure lookup uses `path`, rather than the generic command shape.
+        # The builtin adapter performs the parameter validation and execution.
+        return
     if not matching_invocations:
         supported_tools = sorted(
             {invocation.tool for invocation in supported_invocations}

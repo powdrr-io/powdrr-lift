@@ -177,6 +177,43 @@ steps:
     assert "does not match" in (result.error or "")
 
 
+def test_probe_allows_structured_basedpyright_tool_invocations(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: inspect-python
+when_to_use: [Inspect Python structure.]
+steps:
+  - id: inspect
+    description: Inspect the Python file.
+    actions: [invoke_tool]
+    tool_invocations:
+      - tool: basedpyright-structure
+        command: [path=<python-file>]
+""",
+        encoding="utf-8",
+    )
+    probe = build_workflow_prompt_probe(definition, repo_root=tmp_path, step_index=0)
+
+    result = probe_workflow_step(
+        _Client(
+            {
+                "action": "invoke_tool",
+                "tool": "basedpyright-structure",
+                "parameters": {"path": "src/example.py"},
+            }
+        ),
+        probe,
+        model="test-model",
+    )[0]
+
+    assert result.valid
+    assert result.action is not None
+    assert result.action["tool"] == "basedpyright-structure"
+
+
 def test_probe_builds_workflow_template_task_prompt(tmp_path: Path) -> None:
     definition = tmp_path / "workflow.yaml"
     definition.write_text(

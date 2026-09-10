@@ -39,6 +39,28 @@ from powdrr_lift.workflow_liveness import (
 
 _PLACEHOLDER = re.compile(r"<([A-Za-z0-9_-]+)>")
 _ACTION_START = re.compile(r'\{\s*"action"\s*:')
+_ACTION_NAMES = frozenset(
+    {
+        "gather_context",
+        "prompt_user",
+        "edit",
+        "yaml_edit",
+        "file_management",
+        "invoke_skill",
+        "invoke_tool",
+        "read_document",
+        "list_files",
+        "goto_step",
+        "next_step",
+        "complete",
+        "emit_outputs",
+    }
+)
+_ACTION_REQUEST = re.compile(
+    r"\b(?:return|choose|respond with|finish with|advance with)\b"
+    r"[^.!?\n]{0,180}",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1518,6 +1540,7 @@ def _validate_step_examples(
     if not isinstance(details, str):
         return []
     issues: list[WorkflowDefinitionIssue] = []
+    example_actions: set[str] = set()
     decoder = json.JSONDecoder()
     for match in _ACTION_START.finditer(details):
         # A step description may embed an action inside another example. Only
@@ -1565,6 +1588,9 @@ def _validate_step_examples(
                     step_index=0,
                 ),
             )
+            action_name = action_data.get("action")
+            if isinstance(action_name, str):
+                example_actions.add(action_name)
         except RuntimeError as exc:
             issues.append(
                 WorkflowDefinitionIssue(
@@ -1573,7 +1599,43 @@ def _validate_step_examples(
                     f"{step_path}.details",
                 )
             )
+    for action_name in sorted(_requested_action_names(details) - example_actions):
+        issues.append(
+            WorkflowDefinitionIssue(
+                "missing_action_example",
+                f"Step prose requests {action_name!r} but details contain no "
+                "valid JSON example for that action.",
+                f"{step_path}.details",
+                remediation=(
+                    "Add the exact top-level JSON action object the model must "
+                    f"return for {action_name!r}; prose-only action instructions "
+                    "are not sufficient."
+                ),
+            )
+        )
     return issues
+
+
+def _requested_action_names(details: str) -> set[str]:
+    """Find positive action requests in prose, excluding JSON examples."""
+    requested: set[str] = set()
+    for match in _ACTION_REQUEST.finditer(details):
+        prefix = details[max(0, match.start() - 16) : match.start()].lower()
+        if re.search(r"(?:do not|don't|never)\s+$", prefix):
+            continue
+        prose = match.group(0).lower()
+        for action_name in _ACTION_NAMES:
+            if re.search(rf"\b{re.escape(action_name)}\b", prose):
+                requested.add(action_name)
+    for match in re.finditer(
+        r"\b(?:use|invoke|perform)\s+(?:the\s+)?"
+        r"(goto_step|next_step|complete|emit_outputs|prompt_user|edit|"
+        r"yaml_edit|file_management|invoke_tool|invoke_skill)\s+action\b",
+        details,
+        re.IGNORECASE,
+    ):
+        requested.add(match.group(1).lower())
+    return requested
 
 
 def _compile_skill(

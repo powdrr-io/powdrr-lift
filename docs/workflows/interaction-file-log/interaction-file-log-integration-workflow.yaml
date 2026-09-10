@@ -18,4 +18,4 @@ relationships:
   target_id: interaction-file-log-integration
   cardinality: exactly_one
   invariant_id: workflow-implements-target
-  source_id: interaction-file-log-integration-12
+  source_id: interaction-file-log-integration-13

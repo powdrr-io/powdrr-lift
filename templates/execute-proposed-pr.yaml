@@ -88,11 +88,9 @@ task_templates:
   llm_type: high_reasoning
   tool_invocations:
   - tool: basedpyright-structure
-    command:
-    - path=<python-file>
+    operation: inspect_structure
   - tool: basedpyright-symbol
-    command:
-    - query=<symbol>
+    operation: resolve_symbol
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: []
@@ -108,8 +106,8 @@ task_templates:
     Python boundaries from text search alone. These are read-only inspections,
     not substitutes for the declared verification command. Skip them only when
     the proposed PR has no Python paths. Use invoke_tool with these exact shapes:
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/example.py"}}
-    and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"Example"}}.
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"operation":"inspect_structure","path":"src/example.py"}}
+    and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"operation":"resolve_symbol","query":"Example"}}.
     After the inspections, return the plan in the required next_step action.
     If a required decision is missing, use one prompt_user action instead of
     inventing it. When the plan is complete, return exactly this next_step shape,

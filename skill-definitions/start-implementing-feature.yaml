@@ -235,6 +235,11 @@ steps:
   actions: [invoke_tool, read_document]
   step_type: governed
   llm_type: high_reasoning
+  tool_invocations:
+  - tool: basedpyright-structure
+    operation: inspect_structure
+  - tool: basedpyright-symbol
+    operation: resolve_symbol
   details: >-
     This is a planning-only step. Do not create, edit, rename, or delete the
     proposed PR specification; the following deterministic generation step owns
@@ -266,8 +271,8 @@ steps:
     those read-only tools instead of inferring module boundaries from text
     matches alone. Skip them only when the proposed PR has no Python paths. Use
     these exact action shapes:
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/example.py"}}
-    and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"Example"}}.
+    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"operation":"inspect_structure","path":"src/example.py"}}
+    and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"operation":"resolve_symbol","query":"Example"}}.
   outputs:
   - name: proposed_pr_names
     type: any

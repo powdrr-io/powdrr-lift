@@ -987,6 +987,23 @@ def _validate_step_contract(
     step = item.step
     step_path = f"{path}.steps[{item.index}]"
     issues: list[WorkflowDefinitionIssue] = []
+    if (
+        "invoke_tool" in step.actions
+        and not step.tool_invocations
+        and not step.tool_invocation_packages
+        and step.pre_step is None
+        and step.validation_gate is None
+        and step.step_type not in {"invoke_tool", "gate"}
+    ):
+        issues.append(
+            WorkflowDefinitionIssue(
+                "undeclared_invoke_tool_action",
+                "The step allows invoke_tool but declares no model-owned tool "
+                "invocations or deterministic pre-step.",
+                f"{step_path}.actions",
+                remediation="Declare tool_invocations/tool_invocation_packages or remove invoke_tool from actions.",
+            )
+        )
     if step.completion is not None:
         declared = {output.name for output in step.outputs}
         missing = set(step.completion.required_outputs) - declared

@@ -471,6 +471,7 @@ def _substitute_tool_invocation(
 ) -> SkillToolInvocation:
     return SkillToolInvocation(
         tool=invocation.tool,
+        operation=invocation.operation,
         command=tuple(
             _substitute_workflow_placeholders(item, substitutions)
             for item in invocation.command

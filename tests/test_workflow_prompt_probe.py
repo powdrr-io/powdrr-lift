@@ -25,6 +25,80 @@ class _Client:
         return self.response
 
 
+def test_probe_marks_non_llm_step_passing_without_calling_model(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: deterministic
+when_to_use: [Run deterministic work.]
+steps:
+  - id: run-check
+    description: Run the deterministic check.
+    step_type: gate
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: shell
+        command: ["true"]
+    gate:
+      outcome: {path: returncode, equals: 0}
+      goto_step: run-check
+      retry_context: The check failed.
+""",
+        encoding="utf-8",
+    )
+
+    probe = build_workflow_prompt_probe(definition, repo_root=tmp_path, step_index=0)
+    client = _Client({"action": "complete"})
+
+    results = probe_workflow_step(client, probe, model="test-model")
+
+    assert results[0].valid
+    assert not probe.requires_llm
+    assert results[0].deterministic_result == {"passed": True}
+    assert client.messages == []
+
+
+def test_probe_runs_predicated_deterministic_pre_step_into_prompt(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: predicated
+when_to_use: [Run predicated work.]
+steps:
+  - id: collect
+    description: Collect the result.
+    step_type: predicated
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: shell
+        command: ["true"]
+    completion:
+      required_outputs: [result]
+    outputs:
+      - name: result
+        type: object
+        required_for_next_step: true
+""",
+        encoding="utf-8",
+    )
+
+    probe = build_workflow_prompt_probe(definition, repo_root=tmp_path, step_index=0)
+
+    assert probe.requires_llm
+    assert probe.deterministic_result is not None
+    assert any(
+        event.get("kind") == "deterministic_pre_step"
+        for event in probe.execution_events
+    )
+    prompt = "\n".join(message["content"] for message in probe.messages)
+    assert "deterministic_pre_step" in prompt
+    assert "emit_outputs" in probe.response_schema["properties"]["action"]["enum"]
+
+
 def test_probe_builds_skill_prompt_and_validates_action(tmp_path: Path) -> None:
     definition = tmp_path / "skill.yaml"
     definition.write_text(

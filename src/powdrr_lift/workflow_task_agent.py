@@ -7,7 +7,7 @@ import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
@@ -138,6 +138,7 @@ from powdrr_lift.workflow_llm import (
     prompt_size_breakdown,
     prune_execution_events,
     resolve_deterministic_repair,
+    workflow_action_failure_signature,
     workflow_action_signature,
     workflow_action_summary,
 )
@@ -153,6 +154,29 @@ from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
 _TASK_PROMPT_INPUT_REFERENCE_RE = re.compile(r"\binput_state\.([A-Za-z0-9_-]+)\b")
+_MISSING_STALLED_ACTION = object()
+
+
+def _reject_repeated_stalled_action(
+    action: WorkflowAction,
+    stalled_actions: dict[str, object],
+    material_state: object,
+) -> None:
+    """Reject a retry unless the action or state has materially changed."""
+    action_signature = workflow_action_failure_signature(
+        action, signature=workflow_action_signature
+    )
+    previous_state = stalled_actions.get(action_signature, _MISSING_STALLED_ACTION)
+    if previous_state is _MISSING_STALLED_ACTION:
+        return
+    if previous_state == material_state:
+        raise PowdrrExecutionError(
+            "This action was already identified as stalled for the current "
+            "step. Choose a materially different action; changing only "
+            "decisions_and_context is not sufficient.",
+            error_code="stalled_action",
+        )
+    del stalled_actions[action_signature]
 
 
 def _task_prompt_input_values(input_state: Any) -> dict[str, str]:
@@ -280,6 +304,7 @@ class _TaskActionProgressStrategy(WorkflowActionProgressStrategy[WorkflowAction]
     repo_root: Path
     events: list[dict[str, Any]]
     stderr: TextIO
+    stalled_actions: dict[str, object] = field(default_factory=dict)
 
     def material_state(self, action: WorkflowAction) -> object:
         return _task_action_material_state(action, self.repo_root)
@@ -290,10 +315,15 @@ class _TaskActionProgressStrategy(WorkflowActionProgressStrategy[WorkflowAction]
         observation: WorkflowActionObservation,
     ) -> None:
         assert observation.correction is not None
+        action_signature = workflow_action_failure_signature(
+            action, signature=workflow_action_signature
+        )
+        self.stalled_actions[action_signature] = self.material_state(action)
         self.events.append(
             {
                 "kind": "no_progress",
                 "action_kind": action.kind,
+                "action_signature": action_signature,
                 "message": observation.correction,
             }
         )
@@ -363,6 +393,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     observer_intervention: str | None = None
     observer_allowed_action: ObserverActionRecommendation | None = None
     observer_rejected_action_signature: str | None = None
+    stalled_actions: dict[str, object] = field(default_factory=dict)
     clean_room_repair_pending: bool = False
     clean_room_repair_used: bool = False
     repair_prompt_manifest: RepairPromptManifest | None = None
@@ -681,6 +712,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             repo_root=self.repo_root,
             events=self.events,
             stderr=self.stderr,
+            stalled_actions=self.stalled_actions,
         ).record_no_progress(action, observation)
         self.response_correction = observation.correction
 
@@ -907,6 +939,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "The observer rejected this exact action after it failed to "
                 "make progress. Choose a materially different action."
             )
+        _reject_repeated_stalled_action(
+            action,
+            self.stalled_actions,
+            _task_action_material_state(action, self.repo_root),
+        )
         _validate_coding_loop_action(
             self.task,
             self.events,
@@ -3517,6 +3554,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
     clean_room_repair_used: bool = False
     repair_prompt_manifest: RepairPromptManifest | None = None
     _repair_step_identity: tuple[str, int] | None = None
+    stalled_actions: dict[str, object] = field(default_factory=dict)
 
     def _restore_completed_skill(self, frame: _NestedSkillExecutionFrame) -> None:
         if frame.clean_context:
@@ -3542,6 +3580,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 self.clean_room_repair_pending = False
                 self.clean_room_repair_used = False
                 self.repair_prompt_manifest = None
+                self.stalled_actions.clear()
             step = self.current_step
             step_behavior = behavior_for_step(step)
             if self.runtime is not None:
@@ -3877,11 +3916,16 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
         action: WorkflowAction,
         observation: WorkflowActionObservation,
     ) -> None:
+        action_signature = workflow_action_failure_signature(
+            action, signature=workflow_action_signature
+        )
+        self.stalled_actions[action_signature] = self.material_state(action)
         self.execution_events.append(
             {
                 "kind": "no_progress",
                 "skill": self.current_skill.skill.name if self.current_skill else None,
                 "action_kind": action.kind,
+                "action_signature": action_signature,
                 "message": observation.correction,
             }
         )
@@ -3980,6 +4024,11 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             raise PowdrrExecutionError("Nested skill action has no active step.")
         frame = self.stack[-1]
         step = self.current_step
+        _reject_repeated_stalled_action(
+            action,
+            self.stalled_actions,
+            self.material_state(action),
+        )
         if (
             action.kind == "next_step"
             and not action.outputs

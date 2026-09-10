@@ -86,6 +86,13 @@ task_templates:
   assignee_type: agent
   assignee_role: architect
   llm_type: high_reasoning
+  tool_invocations:
+  - tool: basedpyright-structure
+    command:
+    - path=<python-file>
+  - tool: basedpyright-symbol
+    command:
+    - query=<symbol>
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: []

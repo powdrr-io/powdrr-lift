@@ -88,11 +88,9 @@ task_templates:
   llm_type: high_reasoning
   tool_invocations:
   - tool: basedpyright-structure
-    command:
-    - path=<python-file>
+    command: [path]
   - tool: basedpyright-symbol
-    command:
-    - query=<symbol>
+    command: [query]
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: []

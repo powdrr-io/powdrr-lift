@@ -19,7 +19,9 @@ steps:
     source tree, run discovery commands, generate a template, edit the
     artifact, validate it, stage it, or invoke any nested skill. If the artifact
     does not exist, record that result and choose next_step so the discovery
-    step can begin.
+    step can begin. Return exactly one of these actions:
+    {"action":"complete","text":"Reused the existing project-structure artifact."}
+    or {"action":"next_step"}.
 - description: Discover the project-wide modules, tools, tests, and development commands.
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed
@@ -110,7 +112,9 @@ steps:
     evidence. Preserve accurate existing ids and descriptions. Do not invent
     modules or tools unsupported by repository evidence. Verify every tool
     command against the successful invocation evidence from the discovery
-    step, including its working directory and required arguments. If a
+    step, including its working directory and required arguments. Use the edit
+    action to write the artifact, for example:
+    {"action":"edit","file_path":"docs/project_structure/project-structure.yaml","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"<project-structure-yaml>"}]}. If a
     command cannot be run safely, document the exact reason and the safest
     verified syntax instead of guessing. Use the edit action to write the
     artifact and pass the changed path and edit summary onward.
@@ -131,7 +135,8 @@ steps:
     artifact, then run the conflict-marker and diff checks once. If any check
     fails, edit or restage the affected artifact before rerunning that check;
     never repeat an unchanged command. After all checks succeed, record the
-    results and choose `next_step` immediately. Do not run a
+    results and choose `next_step` immediately. Return {"action":"next_step"}
+    after recording the results. Do not run a
     feature-specific architecture validator or require a feature/work-item
     name.
   tool_invocations:
@@ -177,8 +182,9 @@ steps:
     Invoke finish-pr-prep after the validated project-structure artifact is
     staged. After it returns, choose next_step only after its required
     readiness outputs are present. If cleanup changes files, restage only
-    docs/project_structure/project-structure.yaml before continuing. Do not
-    include unrelated files or begin feature implementation.
+    docs/project_structure/project-structure.yaml before continuing. Return
+    {"action":"next_step"} after the nested skill returns. Do not include
+    unrelated files or begin feature implementation.
   uses_skill:
     skill: finish-pr-prep
 - description: Commit the project-structure artifact and open a draft pull request.

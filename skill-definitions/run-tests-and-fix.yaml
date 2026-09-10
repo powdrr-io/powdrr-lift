@@ -8,7 +8,8 @@ steps:
   description: Run the complete test suite and preserve its raw tool result.
   step_type: invoke_tool
   llm_type: simple_task
-  details: The deterministic pre-step has already run pytest. Return next_step; do not run it again.
+  details: The deterministic pre-step has already run pytest. Return
+    {"action":"next_step","outputs":{"test_tool_result":{}}}; do not run it again.
   outputs:
   - name: test_tool_result
     type: any
@@ -27,7 +28,8 @@ steps:
     type: any
     required: true
   llm_type: simple_task
-  details: The deterministic pre-step has already called enrich with the exact test_tool_result and stored enriched_test_result. Return next_step; do not call enrich again.
+  details: The deterministic pre-step has already called enrich with the exact test_tool_result and stored enriched_test_result. Return
+    {"action":"next_step","outputs":{"enriched_test_result":{}}}; do not call enrich again.
   pre_step:
     action: invoke_tool
     template:
@@ -52,7 +54,8 @@ steps:
     root cause. List only approved source or test files that require changes.
     Return next_step with test_diagnosis containing classification, failing_tests,
     and root_causes; each root cause must contain cause, files_to_change, and
-    repair_strategy. Do not edit files in this step and do not run commands.
+    repair_strategy. Return {"action":"next_step","outputs":{"test_diagnosis":{}}}.
+    Do not edit files in this step and do not run commands.
   outputs:
   - name: test_diagnosis
     type: any
@@ -171,7 +174,8 @@ steps:
     example: {"action":"emit_outputs","outputs":{"repair_edit":{"action":"edit",
     "file_edits":[{"file_path":"src/example.py","edits":[{"kind":"replace","start_line":12,"end_line":14,"text":"corrected implementation"}]}]}}}. Do not return next_step; the runtime advances after
     repair_edit is present. The value must be the full corrected object, not a
-    prose description.
+    prose description. The top-level action is exactly the example above; the
+    nested edit is not a separate returned action.
   outputs:
   - name: repair_edit
     type: object
@@ -206,7 +210,8 @@ steps:
     type: any
     required: true
   llm_type: simple_task
-  details: The deterministic pre-step applies the already validated repair_edit. Return next_step; do not edit manually or run tests here.
+  details: The deterministic pre-step applies the already validated repair_edit. Return
+    {"action":"next_step"}; do not edit manually or run tests here.
   pre_step:
     action: invoke_tool
     template:

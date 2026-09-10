@@ -484,7 +484,8 @@ steps:
     every *_edits input exactly as received. The dictionary must contain one
     {"added": [...], "deleted": [...]} object for each category. Return exactly
     one edit action for docs/proposals/<work-item-name>/design-interview-input.json;
-    do not edit YAML yet.
+    do not edit YAML yet. Return exactly:
+    {"action":"edit","file_path":"docs/proposals/<work-item-name>/design-interview-input.json","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"complete interview input JSON"}]}.
   outputs:
   - name: interview_input
     type: any
@@ -607,7 +608,8 @@ steps:
   details: >-
     Review only the latest evaluator result and use yaml_edit to fix every issue
     in the proposal. Use gather_context only for missing or unknown references.
-    Then choose next_step so evaluate-proposal reruns.
+    Then choose next_step so evaluate-proposal reruns. Return
+    {"action":"next_step"} after the repair.
 - id: gate-proposal
   description: Confirm that the proposal validates cleanly.
   actions: []

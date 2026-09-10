@@ -204,7 +204,8 @@ steps:
     exists, choose next_step and reuse it; do not
     invoke any nested skill. If the gate routed here because the artifact is
     missing, invoke exactly the listed bootstrap-code-structure skill once,
-    then choose next_step after it returns. The nested skill is project-wide
+    then choose next_step after it returns. Return {"action":"next_step"} in
+    either successful branch. The nested skill is project-wide
     and must not ask for a feature or target module. Never invoke bootstrap
     merely because this step is present: the gate result is authoritative.
 - id: confirm-project-structure
@@ -329,6 +330,7 @@ steps:
     section/id/action triples, schema, work-item id, feature ids, paths,
     comments, or persisted-document fields. The runtime validates the complete
     plan before exposing authoritative effects to the later allocation phase.
+    Return exactly {"action":"next_step","outputs":{"proposed_pr_plan":{"proposed_prs":[{"id":"proposed-pr-id","intent":"Implement the change","justification":"Required by the feature","dependent_pr_ids":[]}]}}}.
   outputs:
   - name: proposed_pr_plan
     type: object
@@ -405,6 +407,7 @@ steps:
     schema, feature ids, or other persisted-document fields. Runtime code
     resolves each reference, validates total and exact allocation, compiles the
     read-only compatibility document, validates it, and only then writes it.
+    Return exactly {"action":"next_step","outputs":{"effect_allocation":{"assignments":[{"effect_ref":"effect-ref","proposed_pr_id":"proposed-pr-id"}]}}}.
   inputs:
   - name: proposed_pr_plan
     type: object
@@ -534,6 +537,16 @@ steps:
     retry the exact invocation once with `--force`; this resets only that
     dedicated integration branch to the current generated source commit and
     uses lease-protected push. Do not use `--force` for any other command.
+    After every invocation succeeds, record its exact returned workflow identity.
+    Before advancing, emit one `workflow_instantiation_report` output containing
+    every requested workflow exactly once. Each entry must copy the command result
+    fields without invention and include `workflow_id`, `workflow_directory`,
+    `integration_branch`, `integration_worktree`, `task_count`, and `reused`.
+    Set `reused` to true when the command reports an existing idempotent workflow
+    and false when it creates one. Use this exact handoff shape:
+    {"action":"next_step","outputs":{"workflow_instantiation_report":{"workflows":[{"workflow_id":"<id>","workflow_directory":"<path>","integration_branch":"powdrr/<id>","integration_worktree":"<path>","task_count":0,"reused":false}]}},"decisions_and_context":"Recorded every successful workflow instantiation result."}
+    Do not advance after a failed invocation, do not invoke a new instance name,
+    and do not put the successful identities only in decisions_and_context.
   tool_invocations:
   - tool: internal
     command:
@@ -564,11 +577,44 @@ steps:
     - --template
     - templates/execute-proposed-pr.yaml
     - --force
+  outputs:
+  - name: workflow_instantiation_report
+    type: any
+    required_for_next_step: true
+    schema:
+      type: object
+      additionalProperties: false
+      properties:
+        workflows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              workflow_id: {type: string}
+              workflow_directory: {type: string}
+              integration_branch: {type: string}
+              integration_worktree: {type: string}
+              task_count: {type: integer}
+              reused: {type: boolean}
+            required:
+            - workflow_id
+            - workflow_directory
+            - integration_branch
+            - integration_worktree
+            - task_count
+            - reused
+      required: [workflows]
 - id: verify-workflow-dependencies
   description: Verify workflow-level dependency metadata.
   actions: [read_document, goto_step]
   step_type: governed
   llm_type: fast_iteration
+  inputs:
+  - name: workflow_instantiation_report
+    type: any
+    required: true
+    source: previous_step
   details: >-
     Compare the dependency relationships in the unified proposed-PR file with every
     generated or reused `<proposed_pr_id>-workflow.yaml` in

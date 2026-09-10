@@ -147,6 +147,9 @@ when_to_use: [Inspect files.]
 steps:
   - id: inspect
     description: Inspect the feature.
+    outputs:
+      - name: result
+        type: string
     inputs:
       - name: feature_id
     details: >-
@@ -164,6 +167,62 @@ steps:
     }
 
 
+def test_definition_analysis_requires_examples_for_actions_requested_in_prose(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect
+    description: Inspect the feature.
+    actions: [read_document]
+    outputs:
+      - name: result
+        type: string
+    details: Return the result with exactly one next_step action.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "missing_action_example" in {issue.code for issue in report.issues}
+    issue = next(
+        issue for issue in report.issues if issue.code == "missing_action_example"
+    )
+    assert "next_step" in issue.message
+
+
+def test_definition_analysis_accepts_exact_action_example_for_prose_request(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect
+    description: Inspect the feature.
+    actions: [read_document]
+    outputs:
+      - name: result
+        type: string
+    details: >-
+      Return the result with exactly one next_step action:
+      {"action":"next_step","output_state":{"result":"inspected"}}.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "missing_action_example" not in {issue.code for issue in report.issues}
+
+
 def test_prompt_snapshots_use_production_builder_and_normalize_repository_root(
     tmp_path: Path,
 ) -> None:
@@ -175,6 +234,9 @@ when_to_use: [Inspect files.]
 steps:
   - id: inspect
     description: Inspect files.
+    outputs:
+      - name: result
+        type: string
 """,
         encoding="utf-8",
     )
@@ -206,6 +268,9 @@ when_to_use: [Inspect files.]
 steps:
   - id: inspect
     description: Inspect files.
+    outputs:
+      - name: result
+        type: string
 """,
         encoding="utf-8",
     )
@@ -427,6 +492,28 @@ steps:
     assert "empty_repair_action_space" in {issue.code for issue in report.issues}
 
 
+def test_definition_analysis_rejects_read_only_step_without_discrete_outcome(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: read-only
+when_to_use: [Read a document.]
+steps:
+  - id: inspect
+    description: Inspect the document and continue.
+    actions: [read_document]
+    details: Return next_step after reviewing the document.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "missing_discrete_outcome" in {issue.code for issue in report.issues}
+
+
 def test_definition_analysis_warns_on_non_progress_cycle(tmp_path: Path) -> None:
     definition = tmp_path / "skill.yaml"
     definition.write_text(
@@ -551,6 +638,10 @@ when_to_use: [Run a command.]
 steps:
   - id: run
     description: Run a command.
+    actions: [invoke_tool]
+    outputs:
+      - name: result
+        type: string
     tool_invocations:
       - tool: shell
         command: [custom-command]
@@ -598,6 +689,9 @@ when_to_use: [Run a command.]
 steps:
   - id: run
     description: Run a command.
+    outputs:
+      - name: result
+        type: string
     tool_invocations:
       - tool: shell
         command: [custom-command]

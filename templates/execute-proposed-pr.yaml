@@ -158,7 +158,8 @@ task_templates:
     when the change contains no Python files.
     Finish with next_step and implementation-and-test-state containing the
     changed paths, test coverage, and final verification evidence; next_step is
-    rejected until the latest automatic verification passes.
+    rejected until the latest automatic verification passes. Return exactly
+    {"action":"next_step","output_state":{"implementation-and-test-state":{"changed_paths":[],"test_coverage":[],"verification":{}}}}.
     Use only the documented top-level action shapes. For edits, use
     {"action":"edit","file_path":"relative/path","edits":[{"kind":"replace","start_line":1,"end_line":1,"text":"..."}]}; for multiple files use file_edits with one file_path per entry. For commands, use invoke_tool with tool shell and parameters.command as a string or argv array. Do not nest action fields under parameters or use old/new/content edit fields.
   output_state_type: implementation-and-test-state
@@ -210,7 +211,8 @@ task_templates:
     {"action":"edit","file_path":"tests/test_feature.py","edits":[{"kind":"add","start_line":1,"end_line":1,"text":"missing acceptance test"}],"decisions_and_context":"Added the missing coverage identified by completeness review."}
     After the edit result is returned, or immediately when no repair is needed,
     finish this task with next_step and output_state containing
-    completeness-repair-state.
+    completeness-repair-state. Return exactly
+    {"action":"next_step","output_state":{"completeness-repair-state":{"repaired":true}}}.
   output_state_type: completeness-repair-state
   dependent_state:
   - completeness-repair-complete
@@ -238,6 +240,7 @@ task_templates:
     Assign the deterministic formatter result to formatting-check-state. Do not
     fix files in this step. Finish with next_step and output_state exactly
     containing that typed state, including the command, return code, and result.
+    Return exactly {"action":"next_step","output_state":{"formatting-check-state":{"command":["ruff","format","--check","."],"returncode":0,"result":""}}}.
   output_state_type: formatting-check-state
   dependent_state:
   - formatting-checked
@@ -263,7 +266,8 @@ task_templates:
   details: >-
     Assign the deterministic lint result to lint-check-state. Do not fix files in
     this step. Finish with next_step and output_state exactly containing that
-    typed state, including the command, return code, and result.
+    typed state, including the command, return code, and result. Return exactly
+    {"action":"next_step","output_state":{"lint-check-state":{"command":["ruff","check","."],"returncode":0,"result":""}}}.
   output_state_type: lint-check-state
   dependent_state:
   - lint-checked
@@ -288,7 +292,8 @@ task_templates:
   details: >-
     Assign the deterministic type-check result to type-check-state. Do not fix
     files in this step. Finish with next_step and output_state exactly containing
-    that typed state, including the command, return code, and result.
+    that typed state, including the command, return code, and result. Return
+    exactly {"action":"next_step","output_state":{"type-check-state":{"command":["mypy","src"],"returncode":0,"result":""}}}.
   output_state_type: type-check-state
   dependent_state:
   - type-checked
@@ -343,7 +348,8 @@ task_templates:
     {"action":"file_management","operation":"delete","file_path":"tmp/debug.log","decisions_and_context":"Removed the reported generated artifact."}
     For a code correction, use one edit action. Record the repair in the
     output_state and let the final checks rerun after this task. Finish with
-    next_step.
+    next_step. Return exactly
+    {"action":"next_step","output_state":{"final-scope-repair-state":{"repaired":true}}}.
   output_state_type: final-scope-repair-state
   dependent_state:
   - final-scope-repair-complete

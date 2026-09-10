@@ -16,7 +16,8 @@ steps:
     The deterministic pre-step records repository status for the next step.
     An empty result is valid: `git status --short` returns success
     even when no files are staged. Do not invoke the command again; use the
-    deterministic_context result and choose `next_step`.
+    deterministic_context result and choose `next_step`. Return
+    {"action":"next_step","outputs":{"staged_repository_status":{}}}.
   pre_step:
     action: invoke_tool
     template:
@@ -37,8 +38,8 @@ steps:
     not support diff. Use this exact shape:
     {"action":"invoke_tool","tool":"shell","parameters":{"command":["git","diff","--cached","--stat"]},"decisions_and_context":"Inspected the staged pull-request diff."}
     Confirm from its result that the staged set is the intended pull-request
-    scope, then choose next_step. Do not invoke another Git command in this
-    step.
+    scope, then choose next_step. Return {"action":"next_step"}. Do not
+    invoke another Git command in this step.
   tool_invocations:
   - tool: shell
     command:
@@ -68,7 +69,9 @@ steps:
     {"action":"next_step","outputs":{"validation_tool_obligations":[{"id":"ruff-check","validation_action":["ruff","check","."]}]},"decisions_and_context":"Recorded every discovered validation tool for the mandatory validation gate."}
     If gather_context returns no matching tools, use an empty list:
     {"action":"next_step","outputs":{"validation_tool_obligations":[]},"decisions_and_context":"No applicable validation tools were discovered; the empty obligation list is valid."}
-    Do not return next_step without outputs.validation_tool_obligations.
+    Do not return next_step without outputs.validation_tool_obligations. The
+    gather action is exactly
+    {"action":"gather_context","types":["tools"],"filters":{"labels":["pr-prep"]}}.
   outputs:
   - name: validation_tool_obligations
     type: any
@@ -137,7 +140,8 @@ steps:
     `repository-state` again unless a file or staging state changed after the
     first check. Do not create or update the pull request in this skill. A
     readiness report is invalid when any check is missing, stale, failed, or
-    refers to a different staged file fingerprint.
+    refers to a different staged file fingerprint. Return
+    {"action":"next_step","outputs":{"final_repository_state":{},"readiness_report":{}}}.
   pre_step:
     action: invoke_tool
     template:

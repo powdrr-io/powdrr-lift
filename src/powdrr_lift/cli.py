@@ -4162,6 +4162,8 @@ def _run_probe_workflow_step(args: argparse.Namespace) -> int:
             "llm_type": llm_type,
             "provider": provider,
             "model": model,
+            "requires_llm": probe.requires_llm,
+            "deterministic_result": probe.deterministic_result,
             "prompt_sha256": probe.prompt_sha256,
             "response_schema": probe.response_schema,
             **({"messages": probe.messages} if args.include_prompt else {}),

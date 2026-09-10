@@ -1,0 +1,208 @@
+schema: https://powdrr.io/schemas/pr-workflow-record-v1
+pull_request: 609
+title: Agent-created pull request
+branch: workflow-chat-20260910-024736-463040
+base_branch: main
+workflow:
+  name: specify-a-feature
+  path: /Users/gregory/code/powdrr-lift/.powdrr/agent-feature-run/skills/specify-a-feature/specify-a-feature.yaml
+  skills:
+  - specify-a-feature
+  - design-interview
+  - finish-pr-prep
+  - create-pull-request
+  steps:
+  - description: Capture the feature name.
+    step_type: governed
+    id: capture-feature-name
+    details: 'Choose a stable kebab-case feature name and reuse this exact name as
+      the work-item name for every generated document. If the name is clear from the
+      request, choose it directly. Otherwise ask the user with a prompt_user action,
+      for example: {"action":"prompt_user","text":"What short kebab-case name should
+      identify this feature in its specification files?"} This step declares the required
+      output work_item_name. When the name is clear, advance only with an outputs
+      object containing that exact field, for example: {"action":"next_step","outputs":{"work_item_name":"interaction-file-log"},"decisions_and_context":"Captured
+      the feature name."}'
+    llm_type: high_reasoning
+    actions:
+    - edit
+    - yaml_edit
+    - file_management
+    - read_document
+    outputs:
+    - name: work_item_name
+      type: string
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: string
+  - description: Capture the feature goal and success criteria.
+    step_type: predicated
+    id: capture-feature-context
+    details: 'Parse the request and conversation for the named feature''s outcomes,
+      edge cases, tests, constraints, and any other details needed for a properly
+      detailed plan. Use your best judgment to identify what is still missing. If
+      the request already provides a detail, retain it without asking again. Otherwise
+      ask one focused question with a prompt_user action; repeat this step after each
+      answer until the plan has enough context. Then emit_outputs with feature_description
+      containing the complete feature request and any confirmed answers, for example:
+      {"action":"emit_outputs","outputs":{"feature_description":"..."}}'
+    llm_type: high_reasoning
+    actions: []
+    completion:
+      required_outputs:
+      - feature_description
+    outputs:
+    - name: feature_description
+      type: string
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: string
+        minLength: 1
+  - description: Run the deterministic design interview and generate the validated
+      proposal.
+    step_type: uses_skill
+    id: conduct-design-interview
+    details: Invoke design-interview through this typed uses_skill step. It owns all
+      repository-context gathering, interview outputs, proposal generation, and deterministic
+      validation. Do not invoke specify-system, specify-architecture, or specify-implementation
+      separately.
+    llm_type: high_reasoning
+    uses_skill:
+      skill: design-interview
+      inputs:
+      - name: work_item_name
+        ref: work_item_name
+        schema:
+          type: string
+          minLength: 1
+      - name: feature_description
+        ref: feature_description
+        schema:
+          type: string
+          minLength: 1
+  - description: Stage the validated design-interview proposal for pull request preparation.
+    step_type: invoke_tool
+    id: stage-specification-artifacts
+    details: Stage only the validated proposal and interview input under docs/proposals/<work-item-name>/.
+      Do not stage logs, caches, or unrelated files; do not commit or create the pull
+      request in this step.
+    llm_type: simple_task
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: git
+        operation: add
+        paths:
+        - docs/proposals/<work-item-name>
+  - description: Run finish-pr-prep before creating the pull request.
+    step_type: uses_skill
+    id: prepare-pull-request
+    details: Run finish-pr-prep after the intended specification artifacts are staged
+      by returning an invoke_skill action for the listed finish-pr-prep skill. Do
+      not invoke it through the internal CLI tool. If cleanup changes files, restage
+      only the validated specification artifacts before continuing. Do not begin implementation
+      in this skill. Do not advance until the nested skill returns both final_repository_state
+      and an accepted readiness_report. The readiness report must include the current
+      staged-file scope and the complete results of every validation obligation; do
+      not synthesize it from memory or treat a successful repository-state check as
+      a substitute.
+    llm_type: fast_iteration
+    uses_skill:
+      skill: finish-pr-prep
+  - description: Create or update the pull request for the validated feature proposal.
+    step_type: uses_skill
+    id: create-feature-pull-request
+    details: Invoke create-pull-request with pr-kind `feature`, commit message `Add
+      <work-item-name> feature specification`, and pull-request title `<pull-request-title>`.
+      Pass a `files_to_publish` context list containing every validated specification
+      document, along with the validated specification documents, feature intent,
+      and the accepted readiness_report. The nested skill must stage exactly that
+      list. Do not begin implementation in this skill, and do not invoke it if readiness_report
+      is missing or not accepted.
+    llm_type: simple_task
+    uses_skill:
+      skill: create-pull-request
+tool_calls:
+- tool: shell
+  parameters:
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format .
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format --check .
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff check .
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - uv
+    - run
+    - --extra
+    - dev
+    - pytest
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - uv
+    - run
+    - --extra
+    - dev
+    - mypy
+    - src
+    - tests
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - uv
+    - run
+    - powdrr-lift
+    - validate-pr-files
+    - --repo-root
+    - .
+  returncode: 0
+- tool: git
+  parameters: {}
+  returncode: 0
+- tool: git
+  parameters: {}
+  returncode: 0
+- tool: git
+  parameters: {}
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - commit
+    - -m
+    - Add interaction-file-log feature proposal files
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - push
+    - -u
+    - origin
+    - HEAD
+  returncode: 0
+- tool: gh
+  parameters: {}
+  returncode: 0
+explanation: This record documents the selected skill steps and the tool calls observed
+  before the agent created the pull request.

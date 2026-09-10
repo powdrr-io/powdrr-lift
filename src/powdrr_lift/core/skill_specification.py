@@ -30,6 +30,27 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     )
     | BASEDPYRIGHT_TOOLS
 )
+TOOL_INVOCATION_PACKAGES: dict[str, tuple[dict[str, str], ...]] = {
+    "git_readonly": (
+        {"tool": "git", "operation": "status"},
+        {"tool": "git", "operation": "remote"},
+        {"tool": "git", "operation": "branch_current"},
+        {"tool": "git", "operation": "default_branch"},
+        {"tool": "git", "operation": "show_ref"},
+    ),
+    "git_additive": (
+        {"tool": "git", "operation": "add"},
+        {"tool": "git", "operation": "commit"},
+        {"tool": "git", "operation": "push"},
+        {"tool": "git", "operation": "switch"},
+        {"tool": "git", "operation": "switch_create"},
+        {"tool": "git", "operation": "move"},
+        {"tool": "git", "operation": "rename"},
+    ),
+}
+SUPPORTED_TOOL_INVOCATION_PACKAGES = frozenset(
+    {*TOOL_INVOCATION_PACKAGES, "git_readonly_and_additive"}
+)
 SUPPORTED_PROMPT_CATALOGS = frozenset(
     {
         "context_types",
@@ -312,6 +333,7 @@ class SkillStep:
     llm_type: str | None = None
     interaction_style: str | None = None
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
+    tool_invocation_packages: tuple[str, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[str, ...] = field(default_factory=tuple)
     # An explicit empty list is a closed contract; omission remains legacy.
@@ -353,6 +375,8 @@ class SkillStep:
             data["tool_invocations"] = [
                 tool_invocation.to_data() for tool_invocation in self.tool_invocations
             ]
+        if self.tool_invocation_packages:
+            data["tool_invocation_packages"] = list(self.tool_invocation_packages)
         if self.prompt_catalogs:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
         if self.actions:
@@ -695,6 +719,7 @@ def build_skill_validation_report(
                     "interaction_style",
                     "uses_skill",
                     "tool_invocations",
+                    "tool_invocation_packages",
                     "prompt_catalogs",
                     "actions",
                     "next_step_override",
@@ -1329,7 +1354,71 @@ def build_skill_validation_report(
 
             _validate_step_contracts(step_mapping, step_path, issues)
 
+            packages = step_mapping.get("tool_invocation_packages")
+            if packages is not None:
+                if not isinstance(packages, Sequence) or isinstance(
+                    packages, (str, bytes, bytearray)
+                ):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="invalid_tool_invocation_packages_type",
+                            message=(
+                                "Skill step tool_invocation_packages must be an array."
+                            ),
+                            path=_child_path(step_path, "tool_invocation_packages"),
+                        )
+                    )
+                else:
+                    seen_packages: set[str] = set()
+                    for package_index, package in enumerate(packages):
+                        package_path = _sequence_path(
+                            step_path, "tool_invocation_packages", package_index
+                        )
+                        normalized_package = _optional_string(package)
+                        if normalized_package is None:
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="invalid_tool_invocation_package",
+                                    message=(
+                                        "Tool invocation packages must be non-empty "
+                                        "strings."
+                                    ),
+                                    path=package_path,
+                                )
+                            )
+                        elif (
+                            normalized_package not in SUPPORTED_TOOL_INVOCATION_PACKAGES
+                        ):
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="unsupported_tool_invocation_package",
+                                    message=(
+                                        "Supported tool invocation packages are: "
+                                        + ", ".join(
+                                            sorted(SUPPORTED_TOOL_INVOCATION_PACKAGES)
+                                        )
+                                        + "."
+                                    ),
+                                    path=package_path,
+                                )
+                            )
+                        elif normalized_package in seen_packages:
+                            issues.append(
+                                SkillValidationIssue(
+                                    code="duplicate_tool_invocation_package",
+                                    message=(
+                                        "Tool invocation packages must not contain "
+                                        "duplicates."
+                                    ),
+                                    path=package_path,
+                                )
+                            )
+                        else:
+                            seen_packages.add(normalized_package)
+
             tool_invocations = step_mapping.get("tool_invocations")
+            if tool_invocations is None and not packages:
+                continue
             if tool_invocations is None:
                 continue
             if not isinstance(tool_invocations, Sequence) or isinstance(
@@ -1985,6 +2074,12 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     tool_invocations = _optional_tool_invocations(
         data.get("tool_invocations"),
     )
+    tool_invocation_packages = _optional_tool_invocation_packages(
+        data.get("tool_invocation_packages")
+    )
+    tool_invocations = _merge_tool_invocations(
+        tool_invocations, tool_invocation_packages
+    )
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     actions = _optional_step_actions(data.get("actions"))
     actions_declared = "actions" in data
@@ -2095,6 +2190,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         llm_type=llm_type,
         interaction_style=interaction_style,
         tool_invocations=tool_invocations,
+        tool_invocation_packages=tool_invocation_packages,
         prompt_catalogs=prompt_catalogs,
         actions=actions,
         actions_declared=actions_declared,
@@ -2817,6 +2913,43 @@ def _validate_gather_context_pre_step(
                 path=_child_path(_child_path(pre_step_path, "template"), "types"),
             )
         )
+
+
+def _optional_tool_invocation_packages(value: object) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError("Skill step tool_invocation_packages must be an array.")
+    packages = tuple(_required_string({"package": item}, "package") for item in value)
+    unsupported = sorted(set(packages) - SUPPORTED_TOOL_INVOCATION_PACKAGES)
+    if unsupported:
+        raise ValueError(
+            "Unsupported tool invocation package(s): " + ", ".join(unsupported)
+        )
+    if len(packages) != len(set(packages)):
+        raise ValueError(
+            "Skill step tool_invocation_packages must not contain duplicates."
+        )
+    return packages
+
+
+def _merge_tool_invocations(
+    explicit: tuple[SkillToolInvocation, ...], packages: tuple[str, ...]
+) -> tuple[SkillToolInvocation, ...]:
+    package_names = list(packages)
+    if "git_readonly_and_additive" in package_names:
+        package_names.extend(("git_readonly", "git_additive"))
+    expanded = [
+        _parse_tool_invocation(item)
+        for package in package_names
+        if package != "git_readonly_and_additive"
+        for item in TOOL_INVOCATION_PACKAGES[package]
+    ]
+    merged: list[SkillToolInvocation] = []
+    for invocation in (*explicit, *expanded):
+        if invocation not in merged:
+            merged.append(invocation)
+    return tuple(merged)
 
 
 def _optional_tool_invocations(value: object) -> tuple[SkillToolInvocation, ...]:

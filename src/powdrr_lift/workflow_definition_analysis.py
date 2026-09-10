@@ -508,6 +508,8 @@ def _validate_liveness(ir: WorkflowIR, path: Path) -> list[WorkflowDefinitionIss
         if step.step_type not in {"governed", "coding_loop"}:
             continue
         for invocation in step.tool_invocations:
+            if step.tool_invocation_packages and invocation.tool == "git":
+                continue
             effect = capability_effect(invocation.to_data())
             invocation_data = invocation.to_data()
             if not is_fixed_deterministic(effect) or _has_placeholder(invocation_data):
@@ -553,6 +555,8 @@ def _validate_unknown_effects(
 ) -> list[WorkflowDefinitionIssue]:
     issues: list[WorkflowDefinitionIssue] = []
     for invocation in item.step.tool_invocations:
+        if item.step.tool_invocation_packages and invocation.tool == "git":
+            continue
         effect = capability_effect(invocation.to_data())
         if invocation.tool == "shell" and effect is None:
             issues.append(

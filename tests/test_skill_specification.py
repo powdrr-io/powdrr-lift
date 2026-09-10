@@ -34,6 +34,54 @@ def uses_skill_name(step: SkillStep) -> str:
     return contract.skill
 
 
+def test_git_tool_invocation_package_expands_to_declared_operations() -> None:
+    skill = skill_from_data(
+        {
+            "name": "git-packages",
+            "when_to_use": ["Use Git."],
+            "steps": [
+                {
+                    "description": "Use Git operations.",
+                    "tool_invocation_packages": ["git_readonly_and_additive"],
+                }
+            ],
+        }
+    )
+
+    step = skill.steps[0]
+    assert step.tool_invocation_packages == ("git_readonly_and_additive",)
+    assert {invocation.operation for invocation in step.tool_invocations} == {
+        "status",
+        "remote",
+        "branch_current",
+        "default_branch",
+        "show_ref",
+        "add",
+        "commit",
+        "push",
+        "switch",
+        "switch_create",
+        "move",
+        "rename",
+    }
+
+
+def test_unknown_tool_invocation_package_is_rejected() -> None:
+    with pytest.raises(ValueError, match="Unsupported tool invocation package"):
+        skill_from_data(
+            {
+                "name": "invalid-packages",
+                "when_to_use": ["Use Git."],
+                "steps": [
+                    {
+                        "description": "Use Git operations.",
+                        "tool_invocation_packages": ["git_everything"],
+                    }
+                ],
+            }
+        )
+
+
 def test_uses_skill_step_round_trips_explicit_handoff_bindings() -> None:
     skill = skill_from_data(
         {
@@ -1143,9 +1191,9 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     assert '"file_path":"path/to/unintended-file"' in (skill.steps[3].details or "")
     assert "agent_error.txt" not in (skill.steps[2].details or "")
     assert "agent_error.txt" not in (skill.steps[3].details or "")
-    assert skill.steps[2].tool_invocations[0].command == (
-        "add",
-        "<files-to-publish>",
+    assert skill.steps[2].tool_invocation_packages == ("git_readonly_and_additive",)
+    assert any(
+        invocation.operation == "add" for invocation in skill.steps[2].tool_invocations
     )
     assert skill.steps[3].tool_invocations[-1].command == (
         "git",

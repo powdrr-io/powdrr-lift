@@ -11671,6 +11671,9 @@ def _current_step_contract(
         "declared_tool_invocations": [
             _tool_invocation_to_data(invocation) for invocation in invocations
         ],
+        "tool_invocation_packages": list(
+            getattr(step, "tool_invocation_packages", ()) or ()
+        ),
         "recovery_tool_invocations": [
             _tool_invocation_to_data(invocation) for invocation in recovery_invocations
         ],

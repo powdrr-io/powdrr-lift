@@ -3025,6 +3025,10 @@ def _typed_error_guidance(error: PowdrrExecutionError) -> str:
     guidance = f" Error code: {error.error_code}."
     if error.remediation:
         guidance += f" Remediation: {error.remediation}"
+    if error.details:
+        guidance += (
+            " Diagnostic details: " + json.dumps(error.details, sort_keys=True) + "."
+        )
     return guidance
 
 

@@ -349,6 +349,7 @@ def invoke_basedpyright_capability(
     worktree_root: Path,
     runtime: Any = None,
 ) -> Any:
+    _validate_basedpyright_request(tool, arguments, worktree_root)
     context = ToolContext(
         repo_root=worktree_root,
         worktree_root=worktree_root,
@@ -364,6 +365,118 @@ def invoke_basedpyright_capability(
         f"BasedPyright capability was not executable: {result.reason}",
         error_code="capability_not_executable",
     )
+
+
+def _validate_basedpyright_request(
+    tool: str, arguments: Mapping[str, Any], worktree_root: Path
+) -> None:
+    """Raise an actionable, typed error before the broker sees bad paths.
+
+    The model needs to know whether it supplied a directory, a missing path, or
+    a non-Python file.  The generic broker error loses that distinction, which
+    makes repair prompts prone to repeating the same invocation.
+    """
+    if tool != "basedpyright-structure" or arguments.get("help") is True:
+        return
+    raw_path = arguments.get("path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise PowdrrExecutionError(
+            "BasedPyright structure requires an exact Python file path.",
+            error_code="capability_not_executable",
+            remediation=(
+                "Choose one existing repository-relative .py file; do not pass "
+                "a directory."
+            ),
+            details={"capability": tool, "expected": "existing Python file"},
+        )
+    relative_path = raw_path.strip()
+    if Path(relative_path).is_absolute():
+        raise PowdrrExecutionError(
+            "BasedPyright structure path must be repository-relative.",
+            error_code="capability_not_executable",
+            remediation="Use a repository-relative path ending in .py.",
+            details={
+                "capability": tool,
+                "expected": "repository-relative Python file",
+                "path": relative_path,
+            },
+        )
+    root = worktree_root.resolve()
+    target = (root / relative_path).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise PowdrrExecutionError(
+            "BasedPyright structure path escapes the worktree.",
+            error_code="capability_not_executable",
+            remediation="Use a repository-relative path inside the worktree.",
+            details={
+                "capability": tool,
+                "expected": "path inside worktree",
+                "path": relative_path,
+            },
+            cause_error=exc,
+        ) from exc
+    if target.is_dir():
+        raise PowdrrExecutionError(
+            "BasedPyright structure path must be a file, not a directory.",
+            error_code="capability_not_executable",
+            remediation=(
+                "Choose one exact existing .py file from candidate_python_files; "
+                "do not repeat this directory path."
+            ),
+            details={
+                "capability": tool,
+                "expected": "existing Python file",
+                "received": "directory",
+                "path": relative_path,
+                "candidate_python_files": json.dumps(
+                    _candidate_python_files(root), ensure_ascii=False
+                ),
+            },
+        )
+    if target.suffix.casefold() != ".py":
+        raise PowdrrExecutionError(
+            "BasedPyright structure currently supports Python files only.",
+            error_code="capability_not_executable",
+            remediation="Choose an exact existing path ending in .py.",
+            details={
+                "capability": tool,
+                "expected": "existing Python file",
+                "received": "non-Python path",
+                "path": relative_path,
+            },
+        )
+    if not target.is_file():
+        raise PowdrrExecutionError(
+            "BasedPyright structure path does not exist as a file.",
+            error_code="capability_not_executable",
+            remediation=(
+                "Choose one exact existing .py file from candidate_python_files; "
+                "do not invent or repeat a missing path."
+            ),
+            details={
+                "capability": tool,
+                "expected": "existing Python file",
+                "received": "missing path",
+                "path": relative_path,
+                "candidate_python_files": json.dumps(
+                    _candidate_python_files(root), ensure_ascii=False
+                ),
+            },
+        )
+
+
+def _candidate_python_files(root: Path, *, limit: int = 40) -> list[str]:
+    ignored = {".git", ".venv", "node_modules", ".worktrees"}
+    candidates: list[str] = []
+    for path in sorted(root.rglob("*.py")):
+        if ignored.intersection(path.parts) or not path.is_file():
+            continue
+        candidates.append(path.relative_to(root).as_posix())
+        if len(candidates) >= limit:
+            break
+    return candidates
 
 
 class FuzzyMatchAdapter:

@@ -10,6 +10,7 @@ from powdrr_lift.execution.builtin_tools import (
     BasedPyrightAdapter,
     FuzzyMatchAdapter,
     RepositoryReadAdapter,
+    _validate_basedpyright_request,
     builtin_tool_registry,
     invoke_file_mutation,
     invoke_intrinsic_capability,
@@ -189,6 +190,24 @@ def test_basedpyright_capability_validates_symbol_and_structure_requests(
         .validate(context, {"path": "../outside.py"})
         .valid
     )
+
+
+def test_basedpyright_directory_error_lists_exact_python_candidates(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "example.py").write_text("value = 1\n", encoding="utf-8")
+
+    with pytest.raises(PowdrrExecutionError) as raised:
+        _validate_basedpyright_request(
+            "basedpyright-structure", {"path": "src"}, tmp_path
+        )
+
+    error = raised.value
+    assert error.error_code == "capability_not_executable"
+    assert error.details["received"] == "directory"
+    assert "src/example.py" in error.details["candidate_python_files"]
+    assert "directory" in (error.remediation or "")
 
 
 def test_fuzzy_match_capability_requires_a_structured_command(tmp_path: Path) -> None:

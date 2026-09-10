@@ -270,6 +270,14 @@ steps:
     `basedpyright-symbol` before finalizing its file and dependency plan. Use
     those read-only tools instead of inferring module boundaries from text
     matches alone. Skip them only when the proposed PR has no Python paths. Use
+    BasedPyright only after an exact repository-relative Python file path is
+    present in the selected specification or inspected project context. The
+    `path` parameter must end in `.py` and must name a file, never a directory,
+    proposal folder, glob, or guessed path. If no concrete Python file is known,
+    do not invoke BasedPyright yet; read the relevant context or choose a
+    materially different allowed action. After a capability error, do not
+    reread a document that already succeeded; use the diagnostic candidate file
+    list or another declared discovery action to select a different exact file.
     these exact action shapes:
     {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"operation":"inspect_structure","path":"src/example.py"}}
     and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"operation":"resolve_symbol","query":"Example"}}.

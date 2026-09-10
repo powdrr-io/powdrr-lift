@@ -1600,6 +1600,28 @@ class WorkflowStepRunner:
             )
 
 
+def _is_idempotent_success(action: Any) -> bool:
+    """Treat successful repeated staging as progress, even when state is unchanged."""
+    if getattr(action, "kind", None) == "invoke_tool":
+        tool = getattr(action, "tool", None)
+        parameters = getattr(action, "parameters", None)
+    elif isinstance(action, Mapping):
+        tool = action.get("tool")
+        parameters = action.get("parameters")
+        if (
+            action.get("action") != "invoke_tool"
+            and action.get("kind") != "invoke_tool"
+        ):
+            return False
+    else:
+        return False
+    return (
+        tool == "git"
+        and isinstance(parameters, Mapping)
+        and parameters.get("operation") == "add"
+    )
+
+
 class WorkflowLLMActionEngine:
     """Own JSON parsing and repeated-action accounting for a workflow session."""
 
@@ -1662,6 +1684,7 @@ class WorkflowLLMActionEngine:
         kind = getattr(action, "kind", "")
         made_progress = (
             kind == "complete"
+            or _is_idempotent_success(action)
             or self._controller.previous_action_signature is None
             or action_signature != self._controller.previous_action_signature
             or before_state != after_state

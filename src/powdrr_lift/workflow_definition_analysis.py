@@ -1592,6 +1592,13 @@ def _validate_step_examples(
             if isinstance(action_name, str):
                 example_actions.add(action_name)
         except RuntimeError as exc:
+            if action_data.get("action") == "complete" and (
+                "response.action must be one of" in str(exc)
+            ):
+                # ``complete`` is a universal runtime action and therefore is
+                # intentionally absent from authored action allowlists.
+                example_actions.add("complete")
+                continue
             issues.append(
                 WorkflowDefinitionIssue(
                     "invalid_action_example",
@@ -1619,23 +1626,83 @@ def _validate_step_examples(
 def _requested_action_names(details: str) -> set[str]:
     """Find positive action requests in prose, excluding JSON examples."""
     requested: set[str] = set()
-    for match in _ACTION_REQUEST.finditer(details):
-        prefix = details[max(0, match.start() - 16) : match.start()].lower()
+    prose_details = _remove_action_json_examples(details)
+    for match in _ACTION_REQUEST.finditer(prose_details):
+        if re.match(r"\s*return\s+to\b", match.group(0), re.IGNORECASE):
+            continue
+        prefix = prose_details[max(0, match.start() - 16) : match.start()].lower()
         if re.search(r"(?:do not|don't|never)\s+$", prefix):
             continue
-        prose = match.group(0).lower()
         for action_name in _ACTION_NAMES:
-            if re.search(rf"\b{re.escape(action_name)}\b", prose):
+            for action_match in re.finditer(
+                rf"\b{re.escape(action_name)}\b", match.group(0), re.IGNORECASE
+            ):
+                action_start = match.start() + action_match.start()
+                action_prefix = prose_details[max(0, action_start - 16) : action_start]
+                if re.search(
+                    r"(?:do not|don't|never)(?:\s+(?:use|return|choose))?\s+$",
+                    action_prefix,
+                    re.IGNORECASE,
+                ):
+                    continue
+                action_before = match.group(0)[: action_match.start()]
+                action_after = match.group(0)[action_match.end() :]
+                direct_request = re.search(
+                    r"(?:return|choose|respond with|finish with|advance with)\b"
+                    r"(?:\s+\S+){0,5}\s+$",
+                    action_before,
+                    re.IGNORECASE,
+                )
+                named_request = re.match(
+                    r"\s*(?:action\b|with\b|or\b|when\b|after\b)",
+                    action_after,
+                    re.IGNORECASE,
+                )
+                if direct_request is None and named_request is None:
+                    continue
+                if action_name == "complete":
+                    direct_completion = re.search(
+                        r"^\s*(?:action\b|[,.;]|immediately\b|with\b)",
+                        action_after,
+                        re.IGNORECASE,
+                    )
+                    direct_return = re.search(
+                        r"(?:return|choose)\s+(?:exactly\s+)?"
+                        r"(?:one\s+)?(?:the\s+)?$",
+                        match.group(0)[: action_match.start()],
+                        re.IGNORECASE,
+                    )
+                    if direct_completion is None and direct_return is None:
+                        continue
                 requested.add(action_name)
     for match in re.finditer(
         r"\b(?:use|invoke|perform)\s+(?:the\s+)?"
         r"(goto_step|next_step|complete|emit_outputs|prompt_user|edit|"
         r"yaml_edit|file_management|invoke_tool|invoke_skill)\s+action\b",
-        details,
+        prose_details,
         re.IGNORECASE,
     ):
         requested.add(match.group(1).lower())
     return requested
+
+
+def _remove_action_json_examples(details: str) -> str:
+    """Blank valid top-level action JSON so nested fields are not prose requests."""
+    spans: list[tuple[int, int]] = []
+    decoder = json.JSONDecoder()
+    for match in _ACTION_START.finditer(details):
+        prefix = details[: match.start()]
+        if prefix.count("{") != prefix.count("}"):
+            continue
+        try:
+            _, end = decoder.raw_decode(details[match.start() :])
+        except json.JSONDecodeError:
+            continue
+        spans.append((match.start(), match.start() + end))
+    chars = list(details)
+    for start, end in spans:
+        chars[start:end] = " " * (end - start)
+    return "".join(chars)
 
 
 def _compile_skill(

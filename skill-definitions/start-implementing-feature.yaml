@@ -204,7 +204,8 @@ steps:
     exists, choose next_step and reuse it; do not
     invoke any nested skill. If the gate routed here because the artifact is
     missing, invoke exactly the listed bootstrap-code-structure skill once,
-    then choose next_step after it returns. The nested skill is project-wide
+    then choose next_step after it returns. Return {"action":"next_step"} in
+    either successful branch. The nested skill is project-wide
     and must not ask for a feature or target module. Never invoke bootstrap
     merely because this step is present: the gate result is authoritative.
 - id: confirm-project-structure
@@ -329,6 +330,7 @@ steps:
     section/id/action triples, schema, work-item id, feature ids, paths,
     comments, or persisted-document fields. The runtime validates the complete
     plan before exposing authoritative effects to the later allocation phase.
+    Return exactly {"action":"next_step","outputs":{"proposed_pr_plan":{"proposed_prs":[{"id":"proposed-pr-id","intent":"Implement the change","justification":"Required by the feature","dependent_pr_ids":[]}]}}}.
   outputs:
   - name: proposed_pr_plan
     type: object
@@ -405,6 +407,7 @@ steps:
     schema, feature ids, or other persisted-document fields. Runtime code
     resolves each reference, validates total and exact allocation, compiles the
     read-only compatibility document, validates it, and only then writes it.
+    Return exactly {"action":"next_step","outputs":{"effect_allocation":{"assignments":[{"effect_ref":"effect-ref","proposed_pr_id":"proposed-pr-id"}]}}}.
   inputs:
   - name: proposed_pr_plan
     type: object

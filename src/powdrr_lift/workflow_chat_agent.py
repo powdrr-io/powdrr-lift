@@ -45,6 +45,7 @@ from powdrr_lift.builtin_tool_help import (
 )
 from powdrr_lift.core import (
     Skill,
+    SkillToolInvocation,
     architecture_specification_default_output_path,
     build_skill_directory_validation_report,
     codebase_state_default_output_path,
@@ -1974,6 +1975,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             _validate_workflow_action_for_step(
                 action,
                 self.current_step,
+                execution_events=self.state.execution_events,
+                step_index=self.state.step_index,
                 observer_allowed_action=self.observer_allowed_action,
             )
         _validate_workflow_action_outputs(action, self.current_step)
@@ -7023,10 +7026,14 @@ def _validate_workflow_action_for_step(
     action: SkillChatAction,
     step: Any,
     *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
     observer_allowed_action: ObserverActionRecommendation | None = None,
 ) -> None:
     """Reject tool actions that do not match a current-step invocation."""
-    allowed_actions = _declared_action_names(step)
+    allowed_actions = _declared_action_names(
+        step, execution_events=execution_events, step_index=step_index
+    )
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
@@ -7066,7 +7073,11 @@ def _validate_workflow_action_for_step(
         return
     try:
         _validate_workflow_action_for_step_unwrapped(
-            action, step, observer_allowed_action=observer_allowed_action
+            action,
+            step,
+            execution_events=execution_events,
+            step_index=step_index,
+            observer_allowed_action=observer_allowed_action,
         )
     except RuntimeError as exc:
         if isinstance(exc, _WorkflowToolValidationError):
@@ -8433,10 +8444,14 @@ def _validate_workflow_action_for_step_unwrapped(
     action: SkillChatAction,
     step: Any,
     *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
     observer_allowed_action: ObserverActionRecommendation | None = None,
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
-    allowed_actions = _declared_action_names(step)
+    allowed_actions = _declared_action_names(
+        step, execution_events=execution_events, step_index=step_index
+    )
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
@@ -8479,7 +8494,12 @@ def _validate_workflow_action_for_step_unwrapped(
     ):
         return
     supported_invocations = tuple(
-        invocation for invocation in step.tool_invocations if invocation.tool != "ref"
+        invocation
+        for invocation in (
+            tuple(step.tool_invocations)
+            + _recovery_tool_invocations(step, execution_events, step_index)
+        )
+        if invocation.tool != "ref"
     )
     if action.tool == _INTERNAL_TOOL:
         internal_invocations = tuple(
@@ -11625,6 +11645,9 @@ def _current_step_contract(
     if step is None:
         return {}
     invocations = tuple(getattr(step, "tool_invocations", ()) or ())
+    recovery_invocations = _recovery_tool_invocations(
+        step, execution_events, step_index
+    )
     nested_skill = getattr(step, "uses_skill", None)
     actions = _step_actions(
         step, execution_events=execution_events, step_index=step_index
@@ -11647,6 +11670,9 @@ def _current_step_contract(
         "actions": [name for name, _instructions in actions],
         "declared_tool_invocations": [
             _tool_invocation_to_data(invocation) for invocation in invocations
+        ],
+        "recovery_tool_invocations": [
+            _tool_invocation_to_data(invocation) for invocation in recovery_invocations
         ],
         "declared_nested_skill": (
             nested_skill.to_data() if nested_skill is not None else None
@@ -11818,6 +11844,9 @@ def _step_actions(
     behavior = behavior_for_step(step)
     completion = None
     context_complete = False
+    recovery_invocations = _recovery_tool_invocations(
+        step, execution_events, step_index
+    )
     declared = tuple(getattr(step, "actions", ()) or ())
     if declared or getattr(step, "actions_declared", False):
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
@@ -11858,6 +11887,8 @@ def _step_actions(
         if not behavior.invokes_llm:
             names = []
         actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
+    if recovery_invocations and not any(name == "invoke_tool" for name, _ in actions):
+        actions.insert(0, ("invoke_tool", _DEFAULT_ACTION_INSTRUCTIONS["invoke_tool"]))
     if behavior.is_predicated:
         completion = getattr(step, "completion", None)
         context_complete = (
@@ -11926,14 +11957,73 @@ def _predicated_context_complete(
     return True
 
 
-def _declared_action_names(step: Any) -> tuple[str, ...]:
+def _declared_action_names(
+    step: Any,
+    *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
+) -> tuple[str, ...]:
     # next_step is an implicit runtime action; its output-specific guidance is
     # rendered only when the step declares required handoff outputs.
     behavior = behavior_for_step(step)
-    names = [name for name, _ in _step_actions(step)]
+    names = [
+        name
+        for name, _ in _step_actions(
+            step, execution_events=execution_events, step_index=step_index
+        )
+    ]
     if "next_step" not in names and not behavior.is_predicated:
         names.append("next_step")
     return tuple(names)
+
+
+def _recovery_tool_invocations(
+    step: Any,
+    execution_events: Sequence[Mapping[str, Any]],
+    step_index: int | None,
+) -> tuple[SkillToolInvocation, ...]:
+    """Return bounded diagnostics/corrections after a tool failure in this step."""
+    if step_index is None or not any(
+        event.get("step_index") == step_index
+        and event.get("kind") in {"action_error", "tool_error"}
+        for event in execution_events
+    ):
+        return ()
+    if not any(
+        invocation.tool in {"shell", GIT_TOOL} for invocation in step.tool_invocations
+    ):
+        return ()
+    commands = (
+        ("git", "status", "--short"),
+        ("git", "diff", "--cached", "--stat"),
+        ("git", "diff", "--cached", "--name-only"),
+        ("git", "add", "<files-to-stage>"),
+        ("git", "commit", "-m", "<commit-message>"),
+    )
+    declared = {invocation.command for invocation in step.tool_invocations}
+    return tuple(
+        SkillToolInvocation(tool="shell", command=command, label="recovery")
+        for command in commands
+        if command not in declared
+    )
+
+
+def _is_infrastructure_tool_failure(error: str | None) -> bool:
+    if not error:
+        return False
+    lowered = error.casefold()
+    return any(
+        marker in lowered
+        for marker in (
+            "operation not permitted",
+            "permission denied",
+            "index.lock",
+            "read-only file system",
+            "no such file or directory",
+            "timed out",
+            "connection refused",
+        )
+    )
 
 
 def _action_repair_prompt(
@@ -12069,12 +12159,27 @@ def _action_repair_prompt(
                 + "Wait for the deterministic rerun before claiming progress. "
             )
         invocations = tuple(current_step.tool_invocations)
+        recovery_invocations = _recovery_tool_invocations(
+            current_step, execution_events, step_index
+        )
         if invocations and "invoke_tool" in action_names:
             declared_tools = json.dumps(
                 [_tool_invocation_to_data(item) for item in invocations],
                 ensure_ascii=False,
             )
             prompt += f"Use only these declared tool invocations: {declared_tools}. "
+        if recovery_invocations and "invoke_tool" in action_names:
+            recovery_tools = json.dumps(
+                [_tool_invocation_to_data(item) for item in recovery_invocations],
+                ensure_ascii=False,
+            )
+            prompt += (
+                "A previous tool invocation failed in this step. Recovery commands "
+                "are now available, and only these additional diagnostics or "
+                "corrections "
+                f"may be used: {recovery_tools}. Use them only to diagnose or correct "
+                "the failed tool; do not invent another command. "
+            )
         shapes: list[str] = []
         if "prompt_user" in action_names:
             shapes.append(
@@ -12139,6 +12244,13 @@ def _action_repair_prompt(
                 if {"edit", "yaml_edit"} & action_names
                 else ""
             )
+        )
+    if _is_infrastructure_tool_failure(validation_error):
+        prompt += (
+            " The failure appears to be an environment or permission problem. "
+            "Do not switch to unrelated diagnostic commands. Retry the exact "
+            "required action at most once; if it fails again, return prompt_user "
+            "to request human intervention."
         )
     return prompt
 

@@ -103,6 +103,7 @@ from powdrr_lift.workflow_chat_agent import (
     _read_openai_response,
     _record_durable_fact,
     _record_dynamic_validation_result,
+    _recovery_tool_invocations,
     _repair_response_fingerprint,
     _request_token_budget,
     _require_coding_loop_verification,
@@ -891,6 +892,45 @@ def test_coding_loop_success_is_scoped_to_current_step() -> None:
             action_kind="next_step",
             step_index=0,
         )
+
+
+def test_recovery_commands_are_available_only_after_same_step_tool_failure() -> None:
+    step = SkillStep(
+        description="Commit the staged proposal.",
+        actions=("invoke_tool",),
+        tool_invocations=(
+            SkillToolInvocation(
+                tool="shell", command=("git", "commit", "-m", "<commit-message>")
+            ),
+        ),
+    )
+
+    assert _recovery_tool_invocations(step, (), 0) == ()
+    recovery = _recovery_tool_invocations(
+        step,
+        [{"kind": "action_error", "step_index": 0, "error": "index.lock"}],
+        0,
+    )
+    commands = {invocation.command for invocation in recovery}
+    assert ("git", "status", "--short") in commands
+    assert ("git", "diff", "--cached", "--name-only") in commands
+    assert ("git", "add", "<files-to-stage>") in commands
+
+
+def test_recovery_commands_do_not_cross_step_boundaries() -> None:
+    step = SkillStep(
+        description="Commit the staged proposal.",
+        actions=("invoke_tool",),
+        tool_invocations=(
+            SkillToolInvocation(
+                tool="shell", command=("git", "commit", "-m", "<commit-message>")
+            ),
+        ),
+    )
+    assert (
+        _recovery_tool_invocations(step, [{"kind": "action_error", "step_index": 1}], 0)
+        == ()
+    )
 
 
 def test_explicit_step_contract_rejects_undeclared_complete() -> None:
@@ -5222,6 +5262,32 @@ def test_action_repair_prompt_explains_validation_errors() -> None:
 
     assert "returned a validation_error" in prompt
     assert "matches the current step's declared tool template exactly" in prompt
+
+
+def test_action_repair_prompt_lists_bounded_recovery_commands() -> None:
+    step = SkillStep(
+        description="Commit the staged proposal.",
+        actions=("invoke_tool",),
+        tool_invocations=(
+            SkillToolInvocation(
+                tool="shell", command=("git", "commit", "-m", "<commit-message>")
+            ),
+        ),
+    )
+    prompt = _action_repair_prompt(
+        SkillCatalogEntry(Path("skill.yaml"), _build_skill()),
+        current_step=step,
+        execution_events=[
+            {"kind": "action_error", "step_index": 0, "error": "index.lock"}
+        ],
+        step_index=0,
+        validation_error="Operation not permitted: index.lock",
+    )
+
+    assert '"git", "status", "--short"' in prompt
+    assert '"git", "add", "<files-to-stage>"' in prompt
+    assert "environment or permission problem" in prompt
+    assert "Retry the exact required action at most once" in prompt
 
 
 def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None:

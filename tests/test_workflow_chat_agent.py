@@ -94,6 +94,7 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_action_response,
     _parse_action_response_with_schema,
     _parse_json_object,
+    _parse_workflow_action_file_management,
     _parse_workflow_action_gather_context,
     _predicated_step_complete,
     _prompt_durable_facts,
@@ -4406,6 +4407,41 @@ def test_file_management_action_renames_and_records_result(tmp_path: Path) -> No
     assert not source.exists()
     assert (tmp_path / "new.txt").read_text(encoding="utf-8") == "content"
     assert state.execution_events[-1]["result"]["destination_path"] == "new.txt"
+
+
+@pytest.mark.parametrize("field_name", ["file_path", "destination_path"])
+def test_file_management_delete_accepts_either_path_field(
+    tmp_path: Path, field_name: str
+) -> None:
+    target = tmp_path / "agent_error.txt"
+    target.write_text("diagnostic output", encoding="utf-8")
+
+    action = _parse_workflow_action_file_management(
+        {"operation": "delete", field_name: target.name}, None, None
+    )
+
+    assert action.file_path == target.name
+    assert action.destination_path is None
+    state = _WorkflowExecutionState(
+        selected_skill=SkillCatalogEntry(tmp_path / "skill.yaml", _build_skill()),
+        transcript=[],
+        execution_events=[],
+        execution_context=[],
+        step_index=0,
+        worktree_root=tmp_path,
+    )
+    assert (
+        _handle_workflow_action_file_management(
+            action,
+            state,
+            io.StringIO(),
+            io.StringIO(),
+            lambda: "",
+            SkillChatConfig(skills_dir=Path("skill-definitions")),
+        )
+        is True
+    )
+    assert not target.exists()
 
 
 @pytest.mark.parametrize("path", ["../outside.txt", "nested/../../outside.txt"])

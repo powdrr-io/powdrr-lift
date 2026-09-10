@@ -9414,9 +9414,22 @@ def _parse_workflow_action_file_management(
             "file_management operation must be delete, move, or rename."
         )
     file_path = payload.get("file_path")
+    # Some models use the move/rename field name for the target of a delete.
+    # Treat it as the source path for delete, while keeping the internal action
+    # canonical so execution and event recording remain unchanged.
+    if operation == "delete" and (
+        not isinstance(file_path, str) or not file_path.strip()
+    ):
+        file_path = payload.get("destination_path")
     if not isinstance(file_path, str) or not file_path.strip():
-        raise PowdrrExecutionError("file_management action requires file_path.")
+        raise PowdrrExecutionError(
+            "file_management action requires file_path or destination_path for delete."
+            if operation == "delete"
+            else "file_management action requires file_path."
+        )
     destination_path = payload.get("destination_path")
+    if operation == "delete":
+        destination_path = None
     if operation in {"move", "rename"} and (
         not isinstance(destination_path, str) or not destination_path.strip()
     ):

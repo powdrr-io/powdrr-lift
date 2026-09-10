@@ -1,0 +1,1636 @@
+schema: https://powdrr.io/schemas/pr-workflow-record-v1
+pull_request: 610
+title: Agent-created pull request
+branch: workflow-chat-20260910-030020-785086
+base_branch: main
+workflow:
+  name: start-implementing-feature
+  path: /Users/gregory/code/powdrr-lift/.powdrr/agent-feature-run/skills/start-implementing-feature/start-implementing-feature.yaml
+  skills:
+  - start-implementing-feature
+  - finish-pr-prep
+  - create-pull-request
+  steps:
+  - description: Capture the feature name to search for.
+    step_type: governed
+    id: capture-feature-query
+    details: Extract the feature name or identifier from the user's request without
+      selecting a canonical repository feature. Normalize surrounding prose but preserve
+      the meaningful words in the requested name. If the request does not identify
+      any feature, ask one specific question. Otherwise advance with exactly one output
+      named feature_query. The following deterministic steps use this value only as
+      a search query; they select nothing.
+    llm_type: simple_task
+    actions: []
+    outputs:
+    - name: feature_query
+      type: string
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: string
+  - description: Discover proposed feature specification candidates.
+    step_type: invoke_tool
+    id: discover-proposed-feature
+    details: Invoke only the declared fuzzy-match command once for docs/proposals
+      using the feature name from the user's request. Do not invoke internal, shell,
+      or any other tool in this step. Treat a missing root or empty result as no matches;
+      do not select the feature yet.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: fuzzy-match
+        command:
+        - fuzzy-match
+        - docs/proposals
+        - -name
+        - <feature-query>
+        - -type
+        - d
+        - -maxdepth
+        - '2'
+        - -print
+    outputs:
+    - name: proposed_feature_candidates
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: array
+        items:
+          type: object
+  - description: Discover current feature specification candidates.
+    step_type: invoke_tool
+    id: discover-current-feature
+    details: Invoke only the declared fuzzy-match command once for docs/current using
+      the feature name from the user's request. Do not invoke internal, shell, or
+      any other tool in this step. Treat a missing root or empty result as no matches;
+      do not select the feature yet.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: fuzzy-match
+        command:
+        - fuzzy-match
+        - docs/current
+        - -name
+        - <feature-query>
+        - -type
+        - d
+        - -maxdepth
+        - '2'
+        - -print
+    outputs:
+    - name: current_feature_candidates
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: array
+        items:
+          type: object
+  - description: Discover execution workflow candidates.
+    step_type: invoke_tool
+    id: discover-feature-workflows
+    details: Invoke only the declared fuzzy-match command once for docs/workflows
+      using the feature name from the user's request. Do not invoke internal, shell,
+      or any other tool in this step. Treat a missing root or empty result as no matches;
+      do not select the workflow yet.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: fuzzy-match
+        command:
+        - fuzzy-match
+        - docs/workflows
+        - -name
+        - <feature-query>
+        - -type
+        - d
+        - -maxdepth
+        - '3'
+        - -print
+    outputs:
+    - name: workflow_candidates
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: array
+        items:
+          type: object
+  - description: Select the canonical feature and workflow context.
+    step_type: governed
+    id: select-feature-context
+    details: 'Review all three deterministic search results. Filter them to the best
+      matching feature directory and workflow directories. Normalize case, spaces,
+      underscores, and hyphens when comparing the user''s feature name to candidate
+      directory names. If exactly one proposal or current-feature directory is the
+      best normalized match, select it without asking and use that directory''s basename
+      as the canonical feature_name. A workflow directory is never an independent
+      choice: its only valid path is docs/workflows/<canonical-feature-name>. If that
+      directory is absent, record it as missing and let the later instantiation step
+      create it; do not ask the user which workflow path to use. If no proposal or
+      current-feature candidate is found, do not claim that a canonical feature was
+      selected and do not use next_step or complete: ask one specific question identifying
+      the missing feature. If the user supplies an identifier or path, use goto_step
+      to rerun the relevant deterministic discovery step(s), then select from those
+      results. Ask a question only when multiple normalized feature candidates remain
+      tied and cannot be resolved from the user''s request or the search results.
+      For example: {"action":"prompt_user","text":"Which feature or workflow should
+      I use from these candidates: <candidate-names>?"} Never ask the user to choose
+      between a found proposal and a missing workflow directory. Do not ask whether
+      documents exist before searching. The feature_name output is required for this
+      step; emit it only when this step has actually selected a canonical feature.
+      Pass the selected specification documents, workflow documents, canonical feature
+      name, and missing-document findings to the next step. Emit `specification_documents`
+      as the exact existing file paths for the canonical documents, `workflow_documents`
+      as the exact existing workflow file paths, and `missing_documents` as exact
+      paths that are absent. These are arrays of file paths, never directory paths.
+      The canonical specification filenames are exactly system-specification.yaml,
+      architecture-specification.yaml, implementation-specification.yaml, and proposed-pr-specification.yaml;
+      never invent specification-v1.yaml or another filename from the schema name.'
+    llm_type: standard_reasoning
+    actions:
+    - edit
+    - yaml_edit
+    - file_management
+    - read_document
+    - goto_step
+    outputs:
+    - name: feature_name
+      type: string
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: string
+    - name: specification_documents
+      type: array
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: array
+        items:
+          type: string
+    - name: workflow_documents
+      type: array
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: array
+        items:
+          type: string
+    - name: missing_documents
+      type: array
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: array
+        items:
+          type: string
+  - description: Bootstrap the project-wide module and tool structure.
+    step_type: governed
+    id: bootstrap-project-structure
+    details: 'Check the deterministic pre-step result. If the project-structure artifact
+      exists, choose next_step and reuse it; do not invoke any nested skill. If the
+      gate routed here because the artifact is missing, invoke exactly the listed
+      bootstrap-code-structure skill once, then choose next_step after it returns.
+      The nested skill is project-wide and must not ask for a feature or target module.
+      Never invoke bootstrap merely because this step is present: the gate result
+      is authoritative.'
+    llm_type: standard_reasoning
+    actions:
+    - invoke_skill
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: shell
+        command:
+        - test
+        - -f
+        - docs/project_structure/project-structure.yaml
+  - description: Confirm the project-structure artifact is available.
+    step_type: gate
+    id: confirm-project-structure
+    details: The gate passes only when the project-structure artifact exists in the
+      active worktree.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: shell
+        command:
+        - test
+        - -f
+        - docs/project_structure/project-structure.yaml
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: bootstrap-project-structure
+      retry_context: The project-structure artifact is not available in the active
+        worktree. Rerun bootstrap-project-structure so the nested bootstrap skill
+        can create the artifact in the same worktree, then retry this gate.
+  - description: Plan the proposed PR implementation sequence.
+    step_type: governed
+    id: plan-proposed-prs
+    details: 'This is a planning-only step. Do not create, edit, rename, or delete
+      the proposed PR specification; the following deterministic generation step owns
+      creation of that file. Use only the exact specification document paths handed
+      off by select-feature-context; do not synthesize a filename from a schema, template
+      id, or feature description. If the unified proposed-PR specification already
+      exists in the selected feature context, inspect and reuse its ordered `proposed_prs`
+      entries and pass their stable names and paths onward. Otherwise analyze the
+      feature context and the project structure to define ordered proposed PRs with
+      incremental validation, clear boundaries, low risk, dependencies, and stable
+      names for the later single proposed-pr-specification.yaml file. For each proposed
+      PR, record its goal, scope, files, tests, acceptance criteria, validation commands,
+      dependencies, and risks. Record every action-bearing id from the feature-wide
+      specification-v1 sections after the proposed_prs section, preserving source
+      order and action. Label every change item with the proposed_pr_id that will
+      deliver it. Use the read_document action to inspect templates/execute-proposed-pr.yaml;
+      do not use shell commands to read the template. A proposed PR dependency means
+      the predecessor workflow is complete only after its integration pull request
+      is merged; completion of the predecessor''s final task or creation of its pull
+      request is not sufficient. Preserve these workflow-level dependencies in the
+      instantiation plan. Do not generate one proposed-PR file per PR. Before next_step,
+      return exactly one output named proposed_pr_names containing every stable proposed
+      PR name. Do not rely on decisions_and_context for this handoff. When a proposed
+      PR touches Python source or tests, inspect each implementation area with the
+      bounded `basedpyright-structure` tool and resolve key symbols with `basedpyright-symbol`
+      before finalizing its file and dependency plan. Use those read-only tools instead
+      of inferring module boundaries from text matches alone. Skip them only when
+      the proposed PR has no Python paths. Use these exact action shapes: {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"path":"src/example.py"}}
+      and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"query":"Example"}}.'
+    llm_type: high_reasoning
+    actions:
+    - invoke_tool
+    - read_document
+    outputs:
+    - name: proposed_pr_names
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: array
+        items:
+          type: string
+  - description: Generate the single proposed PR specification template.
+    step_type: invoke_tool
+    id: generate-proposed-pr-specification
+    details: Invoke the declared proposed-pr-specification command exactly once for
+      the selected feature. It must create or reuse exactly one feature-level file
+      at docs/proposals/<feature-name>/proposed-pr-specification.yaml containing all
+      proposed_prs entries in the planned order. Generate only the template; do not
+      fill, validate, instantiate, stage, or commit it. Do not create one file per
+      proposed PR.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - pr-specification
+        - --work-item-name
+        - <feature-name>
+        - --output
+        - docs/proposals/<feature-name>/proposed-pr-specification.yaml
+    outputs:
+    - name: proposed_pr_specification_template
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: true
+  - description: Define the ordered proposed PR plan.
+    step_type: governed
+    id: plan-proposed-pr-specification
+    details: This is a planning-only judgment. Do not edit YAML and do not inspect,
+      copy, assign, or mention authoritative effects. Return exactly one object in
+      `next_step.outputs.proposed_pr_plan`. It contains only one ordered `proposed_prs`
+      array. Every entry contains exactly `id`, `intent`, `justification`, and `dependent_pr_ids`;
+      use an empty dependency array when there are no prerequisites. Do not supply
+      effect references, assignments, section/id/action triples, schema, work-item
+      id, feature ids, paths, comments, or persisted-document fields. The runtime
+      validates the complete plan before exposing authoritative effects to the later
+      allocation phase.
+    llm_type: high_reasoning
+    actions:
+    - read_document
+    outputs:
+    - name: proposed_pr_plan
+      type: object
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: false
+        required:
+        - proposed_prs
+        properties:
+          proposed_prs:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - id
+              - intent
+              - justification
+              - dependent_pr_ids
+              properties:
+                id:
+                  type: string
+                  minLength: 1
+                intent:
+                  type: string
+                  minLength: 1
+                justification:
+                  type: string
+                  minLength: 1
+                dependent_pr_ids:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+  - description: Load authoritative effects for allocation.
+    step_type: invoke_tool
+    id: load-authoritative-pr-effects
+    details: The deterministic pre-step loads the authoritative effects after the
+      plan has validated. It creates collision-checked stable effect references and
+      preserves exact repository section, id, action, and source ordering. Do not
+      invoke a model or edit any file.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - authoritative-pr-effects
+        - --work-item-name
+        - <feature-name>
+    outputs:
+    - name: authoritative_effects
+      type: object
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: false
+        required:
+        - effects
+        properties:
+          effects:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - effect_ref
+              - section
+              - id
+              - action
+              properties:
+                effect_ref:
+                  type: string
+                  minLength: 1
+                section:
+                  type: string
+                  minLength: 1
+                id:
+                  type: string
+                  minLength: 1
+                action:
+                  type: string
+                  minLength: 1
+  - description: Allocate authoritative effects to the planned PRs.
+    step_type: governed
+    id: allocate-proposed-pr-effects
+    details: Use the validated proposed_pr_plan and runtime-owned authoritative_effects
+      handoffs. Return exactly one object in `next_step.outputs.effect_allocation`,
+      containing only `assignments`. Return every supplied effect_ref exactly once
+      with one target proposed_pr_id from the validated plan. Never return, copy,
+      or invent section, id, action, YAML, schema, feature ids, or other persisted-document
+      fields. Runtime code resolves each reference, validates total and exact allocation,
+      compiles the read-only compatibility document, validates it, and only then writes
+      it.
+    llm_type: high_reasoning
+    actions: []
+    inputs:
+    - name: proposed_pr_plan
+      type: object
+      required: true
+      source: previous_step
+    - name: authoritative_effects
+      type: object
+      required: true
+      source: previous_step
+    outputs:
+    - name: effect_allocation
+      type: object
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: false
+        required:
+        - assignments
+        properties:
+          assignments:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - effect_ref
+              - proposed_pr_id
+              properties:
+                effect_ref:
+                  type: string
+                  minLength: 1
+                proposed_pr_id:
+                  type: string
+                  minLength: 1
+  - description: Route proposed PR evaluation deterministically.
+    step_type: gate
+    id: evaluate-proposed-pr-specification
+    details: Runtime code evaluates the compiled proposed PR document exactly once.
+      A successful result advances directly to workflow planning without an LLM confirmation.
+      A failure routes to semantic repair with the complete structured evaluator issues.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<feature-name>
+    gate:
+      outcome:
+        path: returncode
+        equals: 0
+      goto_step: repair-proposed-pr-specification
+      retry_context: Use the structured evaluator issues to identify whether the proposed
+        PR plan or effect allocation must change. Do not edit the generated YAML.
+      success_goto_step: plan-workflow-instantiation
+  - description: Repair every reported proposed PR specification issue.
+    step_type: governed
+    id: repair-proposed-pr-specification
+    details: Do not repair YAML. Review the structured issues selected by the runtime
+      gate. Use goto_step with `plan-proposed-pr-specification` when PR ids, intent,
+      justification, or dependencies must change. Use goto_step with `allocate-proposed-pr-effects`
+      when only effect ownership must change. The selected phase must return a complete
+      replacement decision object and the runtime will compile and evaluate the whole
+      document again. Do not instantiate workflows, stage artifacts, request approval,
+      or create a pull request while the proposed PR file is invalid.
+    llm_type: fast_iteration
+    actions:
+    - read_document
+    - goto_step
+    next_step_override: evaluate-proposed-pr-specification
+  - description: Plan execution workflow instantiation.
+    step_type: governed
+    id: plan-workflow-instantiation
+    details: 'For each validated proposed PR, inspect whether its matching workflow
+      already exists and reuse it when present. For each missing workflow, inspect
+      templates/execute-proposed-pr.yaml with read_document, resolve every task input_state
+      placeholder from the matching validated proposed PR, and prepare the complete
+      instantiation values. Use the fixed template, canonical feature name, distinct
+      workflow instance names, proposed-PR order, and dependency relationships. A
+      persisted Before finalizing the values, use gather_context with type `tools`
+      for the selected feature to discover the repository''s authoritative test command.
+      Include that command as the `verification-command` template value for every
+      execute-proposed-pr workflow. workflow metadata file is named exactly `<proposed_pr_id>-workflow.yaml`
+      inside `docs/workflows/<canonical-feature-name>/`; `<proposed_pr_id>` is the
+      exact id from `proposed_prs`, such as `interaction-log-core`. Do not prepend
+      the template id (`execute-proposed-pr`), the template filename, or a branch
+      name. Use the exact path returned by instantiation or an exact filename listed
+      by the workflow directory; never compose a filename from memory. Do not pass
+      workflow dependencies manually: instantiate-workflow derives them from dependent_prs
+      in the matching proposed PR specification. The resulting workflow state must
+      preserve those derived dependencies so its integration PR must be MERGED before
+      any task in the dependent workflow is selected. Do not model this only as an
+      upstream task dependency. Never ask the user for a template path, leave a required
+      placeholder empty, or overwrite an existing workflow without approval. Pass
+      an invocation plan containing every created or reused workflow and its proposed-PR
+      relationship onward.'
+    llm_type: simple_task
+    actions:
+    - gather_context
+    - edit
+    - yaml_edit
+    - file_management
+    - read_document
+    outputs:
+    - name: verification-command
+      type: string
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: string
+  - description: Instantiate each missing execution workflow.
+    step_type: governed
+    id: instantiate-execution-workflows
+    details: 'Invoke instantiate-workflow once for each missing workflow using the
+      invocation plan. Use templates/execute-proposed-pr.yaml, pass every template-specific
+      value with repeated --template-value NAME=VALUE options, Do not pass workflow
+      dependencies manually: instantiate-workflow derives them from the unified proposed-PR
+      specification. The dependency graph is the source of truth; do not claim dependencies
+      were applied unless they are present in the persisted workflow state. Use the
+      canonical feature name as the shared work-item name. The command must create
+      the powdrr/<proposed-pr-id> integration branch while writing workflow files
+      into this active worktree. Stop if a returned workflow directory is outside
+      the active worktree. Pass every created or reused workflow identity onward.
+      Relationships use semantic identifiers; never add file or directory pointers.'
+    llm_type: simple_task
+    tool_invocations:
+    - tool: internal
+      command:
+      - powdrr-lift
+      - instantiate-workflow
+      - --work-item-name
+      - <feature-name>
+      - --workflow-instance-name
+      - <proposed-pr-name>
+      - --template-value
+      - proposed-pr-id=<proposed-pr-name>
+      - --template-value
+      - verification-command=<verification-command>
+      - --template
+      - templates/execute-proposed-pr.yaml
+    actions:
+    - invoke_tool
+    - edit
+    - yaml_edit
+    - read_document
+  - description: Verify workflow-level dependency metadata.
+    step_type: governed
+    id: verify-workflow-dependencies
+    details: Compare the dependency relationships in the unified proposed-PR file
+      with every generated or reused `<proposed_pr_id>-workflow.yaml` in docs/workflows/<feature-name>/.
+      The filename is derived only from the exact proposed_pr_id; do not use the template
+      id, template filename, branch name, or a guessed name. If a path is not present
+      in the instantiation result, use the exact filenames returned by read_document's
+      missing-file error before reading it. Read each workflow state document and
+      build an exact table of workflow id to depends_on_workflows. Confirm that every
+      proposed_pr dependent_prs predecessor appears in the matching workflow's depends_on_workflows
+      list, that workflows with no planned predecessors have no dependency entries,
+      and that no undeclared dependency was added. Do not infer dependencies from
+      ordering, filenames, task upstream_task_ids, or prose. If any mismatch exists,
+      do not stage or create a pull request; use goto_step with step_id `plan-workflow-instantiation`
+      and include the exact workflow id, expected dependency list, actual dependency
+      list, and file path. Continue only after the persisted metadata exactly matches
+      the plan.
+    llm_type: fast_iteration
+    actions:
+    - edit
+    - yaml_edit
+    - file_management
+    - read_document
+    - goto_step
+  - description: Inspect generated workflow repository state.
+    step_type: invoke_tool
+    id: inspect-workflow-repository-state
+    details: Inspect the active repository state after workflow instantiation.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - repository-state
+    outputs:
+    - name: instantiated_repository_state
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: true
+  - description: Verify workflow artifacts are in the active worktree.
+    step_type: governed
+    id: verify-workflow-artifacts
+    details: Confirm from the repository-state result that every generated workflow
+      task file and <workflow-id>-workflow.yaml is under docs/workflows/ in this active
+      worktree, that each integration branch is powdrr/<proposed-pr-id>, and that
+      no required artifact exists only below .worktrees/. If any file is missing or
+      outside the active worktree, stop and report the inconsistency; do not stage
+      or create a pull request.
+    llm_type: fast_iteration
+    actions:
+    - edit
+    - yaml_edit
+    - file_management
+    - read_document
+  - description: Review the bidirectional workflow and proposed-PR mapping.
+    step_type: governed
+    id: review-workflow-proposed-pr-links
+    details: 'Build an exact mapping table from every validated proposed-PR specification
+      in docs/proposals/<feature-name>/ to its execution workflow in docs/workflows/<feature-name>/.
+      Confirm that every proposed PR has exactly one matching workflow and that every
+      workflow has exactly one matching proposed PR. Match only stable proposed-PR
+      ids and the workflow''s proposed-pr-id metadata; do not infer matches from ordering,
+      directory names, branch names, or fuzzy similarity. Check both directions explicitly:
+      proposed PR -> workflow and workflow -> proposed PR. If any proposed PR is missing
+      a workflow, or any workflow is missing its proposed PR, do not stage artifacts
+      or continue to pull-request preparation; return to the relevant planning or
+      instantiation step with the mismatch and exact paths. For example, return `{"action":"goto_step","step_id":"plan-workflow-instantiation","decisions_and_context":"Proposed
+      PR <id> has no matching workflow at <path>."}` when a proposed PR has no workflow,
+      or `{"action":"goto_step","step_id":"plan-proposed-prs","decisions_and_context":"Workflow
+      <path> has no matching proposed PR."}` when a workflow has no proposed PR. After
+      the mapping is complete, unique, and recorded in workflow context, return `{"action":"next_step","decisions_and_context":"Every
+      proposed PR maps to exactly one workflow, and every workflow maps to exactly
+      one proposed PR."}`.'
+    llm_type: high_reasoning
+    actions:
+    - edit
+    - yaml_edit
+    - file_management
+    - read_document
+    - goto_step
+  - description: Evaluate workflow tasks and relationship invariants deterministically.
+    step_type: invoke_tool
+    id: evaluate-workflow-artifacts
+    details: 'Run the generic evaluator against files changed on the current branch.
+      The evaluator is authoritative: it requires every task to name an existing workflow
+      template and checks every relationship invariant declared by those templates.
+      Do not replace a failure with a prose claim; repair the reported task, template,
+      relationship, or target artifact and rerun the evaluator.'
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - evaluate
+        - docs/proposals/<feature-name>
+    outputs:
+    - name: workflow_artifact_evaluation
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: true
+  - description: Stage the validated implementation and workflow artifacts.
+    step_type: invoke_tool
+    id: stage-validated-artifacts
+    details: Deterministically stage only docs/proposals/<feature-name>/ and docs/workflows/.
+      The runner owns this idempotent staging operation; do not ask the LLM to invoke
+      git add or repeat it. The following deterministic verify-staged-artifacts step
+      reviews the staged paths. Do not commit or create a pull request yet.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: git
+        operation: add
+        paths:
+        - docs/proposals/<feature-name>
+        - docs/workflows
+  - description: Verify the staged artifact set.
+    step_type: invoke_tool
+    id: verify-staged-artifacts
+    details: Confirm that only the validated planning artifacts are staged before
+      pull request preparation.
+    llm_type: simple_task
+    actions: []
+    pre_step:
+      action: invoke_tool
+      template:
+        tool: internal
+        command:
+        - powdrr-lift
+        - repository-state
+    outputs:
+    - name: staged_artifact_repository_state
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: true
+  - description: Run finish-pr-prep on the validated planning artifacts.
+    step_type: uses_skill
+    id: prepare-feature-pull-request-dependency
+    details: Run finish-pr-prep before publishing the required preparation handoffs.
+    llm_type: fast_iteration
+    uses_skill:
+      skill: finish-pr-prep
+  - description: Run finish-pr-prep on the validated planning artifacts.
+    step_type: predicated
+    id: prepare-feature-pull-request
+    details: 'The preceding finish-pr-prep step has already produced the context for
+      this handoff. Apply judgment only to whether its returned repository state and
+      readiness report are acceptable; do not invoke tools or the nested skill again.
+      After the nested skill returns, explicitly publish both handoffs with an `emit_outputs`
+      action, copying the exact values returned by the nested skill: {"action":"emit_outputs","outputs":{"final_repository_state":{"clean":true,"files":[]},"readiness_report":{"ready":true,"reasons":[],"satisfied_requirements":[]}}}
+      Do not return next_step or synthesize either value; the step advances only after
+      both declared outputs are explicitly emitted and the readiness report is accepted.'
+    llm_type: fast_iteration
+    actions: []
+    completion:
+      required_outputs:
+      - final_repository_state
+      - readiness_report
+    outputs:
+    - name: final_repository_state
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        required:
+        - clean
+        - files
+        properties:
+          root:
+            type: string
+          branch:
+            type: string
+          upstream:
+            type: string
+          ahead:
+            type: integer
+          behind:
+            type: integer
+          clean:
+            type: boolean
+          files:
+            type: array
+            items:
+              type: object
+              required:
+              - path
+              - staged
+              - unstaged
+              - untracked
+              - conflicted
+              properties:
+                path:
+                  type: string
+                index_status:
+                  type: string
+                worktree_status:
+                  type: string
+                staged:
+                  type: boolean
+                unstaged:
+                  type: boolean
+                untracked:
+                  type: boolean
+                conflicted:
+                  type: boolean
+    - name: readiness_report
+      type: any
+      required_for_next_step: true
+      scope: skill
+      schema:
+        type: object
+        additionalProperties: false
+        required:
+        - ready
+        - reasons
+        - satisfied_requirements
+        properties:
+          ready:
+            type: boolean
+          reasons:
+            type: array
+            items:
+              type: string
+          satisfied_requirements:
+            type: array
+            items:
+              type: string
+  - description: Commit the validated artifacts and open a draft pull request.
+    step_type: uses_skill
+    id: create-feature-pull-request
+    details: Invoke create-pull-request with pr-kind `feature`, commit message `Add
+      <feature-name> implementation workflow`, and pull-request title `<pull-request-title>`.
+      Pass files_to_publish containing exactly every validated file under docs/proposals/<feature-name>/
+      and docs/workflows/, plus the validated planning artifacts and Feature Plan
+      context. The nested skill must stage exactly that list. Do not advance until
+      it has committed, pushed, and created or updated a pull request successfully.
+      Never claim a PR is ready without a returned PR URL.
+    llm_type: simple_task
+    uses_skill:
+      skill: create-pull-request
+    actions: []
+  - description: Hand the draft pull request to the user for review.
+    step_type: governed
+    id: handoff-feature-pull-request
+    details: Show the pull request URL. Summarize the selected feature, every proposed
+      PR, every execution workflow, and their dependency relationships. State that
+      implementation has not begun and the draft pull request is ready for review.
+    llm_type: standard_reasoning
+    actions:
+    - edit
+    - yaml_edit
+    - file_management
+    - read_document
+tool_calls:
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration-2
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration-2
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration-3
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration-4
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-integration-5
+    - --template-value
+    - proposed-pr-id=interaction-file-log-integration
+    - --template-value
+    - verification-command=pytest tests/interaction_log_integration
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: internal
+  parameters:
+    command:
+    - powdrr-lift
+    - instantiate-workflow
+    - --work-item-name
+    - interaction-file-log
+    - --workflow-instance-name
+    - interaction-file-log-core
+    - --template-value
+    - proposed-pr-id=interaction-file-log-core
+    - --template-value
+    - verification-command=pytest tests/interaction_log_writer
+    - --template
+    - templates/execute-proposed-pr.yaml
+  returncode: 1
+- tool: shell
+  parameters:
+    command:
+    - git
+    - diff
+    - --cached
+    - --stat
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format .
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff format --check .
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev ruff check .
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev pytest
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run --extra dev mypy src tests
+  returncode: 0
+- tool: shell
+  parameters:
+    command: uv run powdrr-lift validate-pr-files --repo-root .
+  returncode: 0
+- tool: git
+  parameters: {}
+  returncode: 0
+- tool: git
+  parameters: {}
+  returncode: 0
+- tool: git
+  parameters: {}
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - commit
+    - -m
+    - Add interaction file log proposal specification
+  returncode: 0
+- tool: shell
+  parameters:
+    command:
+    - git
+    - push
+    - -u
+    - origin
+    - HEAD
+  returncode: 0
+- tool: gh
+  parameters: {}
+  returncode: 0
+explanation: This record documents the selected skill steps and the tool calls observed
+  before the agent created the pull request.

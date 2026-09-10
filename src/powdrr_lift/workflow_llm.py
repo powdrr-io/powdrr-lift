@@ -1615,11 +1615,11 @@ def _is_idempotent_success(action: Any) -> bool:
             return False
     else:
         return False
-    return (
-        tool == "git"
-        and isinstance(parameters, Mapping)
-        and parameters.get("operation") == "add"
-    )
+    if not isinstance(parameters, Mapping):
+        return False
+    if tool == "git":
+        return parameters.get("operation") in {"add", "commit", "switch"}
+    return tool == "gh" and parameters.get("operation") == "pr_create"
 
 
 class WorkflowLLMActionEngine:

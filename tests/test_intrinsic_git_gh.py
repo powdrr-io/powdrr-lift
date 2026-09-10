@@ -166,3 +166,51 @@ def test_git_intrinsic_executes_only_inside_the_worktree(tmp_path: Path) -> None
         text=True,
     )
     assert status.stdout == "A  old.yaml\n"
+
+
+def test_empty_git_commit_is_an_idempotent_success(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "commit", "--allow-empty", "-m", "initial"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = execute_intrinsic_git_gh_tool(
+        "git",
+        {"operation": "commit", "message": "initial"},
+        worktree_root=tmp_path,
+    )
+
+    assert result["returncode"] == 0
+    assert result["no_op"] is True
+    assert "No changes to commit" in result["stdout"]
+
+
+def test_existing_pull_request_makes_create_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_run(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        if args[:3] == ["git", "branch", "--show-current"]:
+            return subprocess.CompletedProcess(args, 0, "workflow/demo\n", "")
+        if args[:3] == ["gh", "pr", "view"]:
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                '{"url":"https://github.com/example/repo/pull/7",'
+                '"state":"OPEN"}',
+                "",
+            )
+        raise AssertionError(args)
+
+    monkeypatch.setattr("powdrr_lift.intrinsic_git_gh.subprocess.run", fake_run)
+    result = execute_intrinsic_git_gh_tool(
+        "gh",
+        {"operation": "pr_create", "title": "Title", "body": "Body"},
+        worktree_root=tmp_path,
+    )
+
+    assert result["returncode"] == 0
+    assert result["no_op"] is True
+    assert result["stdout"] == "https://github.com/example/repo/pull/7\n"

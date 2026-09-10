@@ -23,6 +23,7 @@ from powdrr_lift.workflow_chat_agent import (
     SkillCatalogEntry,
     _build_chat_client,
     _build_step_execution_messages,
+    _default_llm_mappings,
     _parse_action_response_with_schema,
     _resolve_credentials,
     _step_action_response_schema,
@@ -87,6 +88,25 @@ class WorkflowPromptProbeResult:
         if include_prompt:
             data["messages"] = self.probe.messages
         return data
+
+
+def resolve_probe_model(
+    probe: WorkflowPromptProbe,
+    *,
+    provider: str,
+    model_override: str | None = None,
+) -> tuple[str, str, str]:
+    """Resolve the model from the selected step's normal execution contract."""
+    llm_type = getattr(probe.step, "llm_type", None) or "simple_task"
+    mappings = _default_llm_mappings(provider)
+    mapping = mappings.get(llm_type)
+    if mapping is None:
+        raise WorkflowPromptProbeError(
+            f"No LLM mapping {llm_type!r} is configured for provider {provider!r}."
+        )
+    if model_override is not None:
+        return provider, model_override, llm_type
+    return mapping.provider, mapping.model, llm_type
 
 
 def build_workflow_prompt_probe(

@@ -188,6 +188,7 @@ from powdrr_lift.workflow_prompt_probe import (
     build_probe_client,
     build_workflow_prompt_probe,
     probe_workflow_step,
+    resolve_probe_model,
 )
 from powdrr_lift.workflow_replay import (
     WorkflowReplayError,
@@ -4119,14 +4120,17 @@ def _run_probe_workflow_step(args: argparse.Namespace) -> int:
         else repo_root / args.definition
     )
     try:
-        mapping = _default_llm_mappings(args.provider)["simple_task"]
-        model = args.model or mapping.model
         probe = build_workflow_prompt_probe(
             definition,
             repo_root=repo_root,
             root_intent=args.root_intent,
             step_id=args.step_id,
             step_index=args.step_index,
+        )
+        provider, model, llm_type = resolve_probe_model(
+            probe,
+            provider=args.provider,
+            model_override=args.model,
         )
         client = build_probe_client(
             provider=args.provider,
@@ -4155,6 +4159,9 @@ def _run_probe_workflow_step(args: argparse.Namespace) -> int:
             "definition_kind": probe.definition_kind,
             "step_index": probe.step_index,
             "step_id": probe.step_id,
+            "llm_type": llm_type,
+            "provider": provider,
+            "model": model,
             "prompt_sha256": probe.prompt_sha256,
             "response_schema": probe.response_schema,
             **({"messages": probe.messages} if args.include_prompt else {}),

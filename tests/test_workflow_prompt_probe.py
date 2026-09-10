@@ -3,9 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.workflow_chat_agent import _default_llm_mappings
 from powdrr_lift.workflow_prompt_probe import (
     build_workflow_prompt_probe,
     probe_workflow_step,
+    resolve_probe_model,
 )
 
 
@@ -52,6 +54,29 @@ steps:
     assert results[0].action["kind"] == "complete"
     assert client.messages == [probe.messages]
     assert probe.response_schema["properties"]["action"]["enum"]
+
+
+def test_probe_uses_target_step_llm_type_for_model_selection(tmp_path: Path) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect
+    description: Inspect the feature.
+    llm_type: high_reasoning
+""",
+        encoding="utf-8",
+    )
+
+    probe = build_workflow_prompt_probe(definition, repo_root=tmp_path, step_index=0)
+
+    provider, model, llm_type = resolve_probe_model(probe, provider="deepinfra-cheap")
+
+    assert provider == "deepinfra-cheap"
+    assert model == _default_llm_mappings("deepinfra-cheap")["high_reasoning"].model
+    assert llm_type == "high_reasoning"
 
 
 def test_probe_reports_invalid_action_without_executing_it(tmp_path: Path) -> None:

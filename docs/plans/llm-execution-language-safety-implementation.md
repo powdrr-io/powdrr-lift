@@ -73,6 +73,11 @@ Shell effect recognition is currently a static command classifier. Runtime
 shell execution is represented primarily as `PROCESS_EXECUTION`, which is too
 coarse to prove path, network, Git, or evidence properties.
 
+There is no current trust classification that distinguishes a contract that is
+kernel-enforced from one supplied by an adapter or observed only after the
+fact. Nor is there a dedicated adversarial conformance suite that attempts to
+make a tool violate its own effect declaration.
+
 ### Resource scope is too coarse
 
 `ToolContext` carries repository/worktree roots, semantic actions, and allowed
@@ -200,11 +205,39 @@ class OperationContract:
     idempotency: IdempotencyKind
     reversible: bool
     result_variants: tuple[ResultVariant, ...]
+    trust_tier: ToolTrustTier
 ```
 
 `CapabilityEffect` should either be removed or become a projection of
 `OperationContract`. Static analysis and runtime `effects_for` must use the
 same operation contract and resource-selector evaluator.
+
+Adopt the useful distinctions in MCP's tool annotations--read-only,
+destructive, idempotent, and open-world--as derived properties of this richer
+contract, not as authority-granting hints. The contract must retain concrete
+selectors and operation-specific effects; a trusted annotation alone does not
+qualify an operation for a proven guarantee.
+
+### Mediated effect enforcement and trust tiers
+
+Add a kernel-owned effect mediation boundary around every externally visible
+operation channel:
+
+- filesystem access validates normalized paths, symlink resolution, and
+  read/write selectors;
+- process execution validates registered commands, arguments, working
+  directory, environment, and inherited capabilities;
+- network access validates destination, method, and data-flow policy;
+- Git/GitHub operations use typed semantic brokers where possible; and
+- secret and external-mutation interfaces require named operations and record
+  their concrete targets.
+
+The capability check before invocation remains necessary but is insufficient.
+Each broker must emit an observed-effect trace and deny requests outside the
+intersection of the operation declaration and active authority. Define
+`ToolTrustTier` as `enforced`, `tested`, `attested`, or `opaque`; only
+`enforced` operations may contribute a `proven` effect or scope guarantee.
+The other tiers must be visible in the certificate and safety-profile policy.
 
 ### Resource scopes
 
@@ -331,6 +364,17 @@ and compiled contract fingerprint. Change `execution/capabilities.py` to:
 - checkpoint according to the operation contract;
 - compare observed and declared effects; and
 - emit typed result/evidence records.
+
+Add a broker-level conformance assertion after each invocation:
+
+```text
+observed_effects subset_of declared_effects intersection granted_effects
+```
+
+The assertion is defense in depth for mediated channels and is the diagnostic
+mechanism for observed-only channels. A raw, unrestricted process capability
+cannot be classified as enforced merely because its observed trace happened to
+be narrow.
 
 Change `workflow_liveness.py` to project its abstract effects directly from
 these contracts. Remove the separate hard-coded effect registry once all
@@ -562,7 +606,9 @@ corresponding runtime behavior impossible, not merely discouraged.
 - Reject observed effects outside declared contracts.
 
 Acceptance gate: there is one authoritative effect description per operation,
-and mutation tests cannot create an undeclared effect without a runtime denial.
+and mutation tests cannot create an undeclared effect without a runtime denial
+or a contract-conformance failure. Strict profiles accept only enforced
+operations for effect- and scope-proven claims.
 
 ### Phase 4: Interprocedural composition
 
@@ -623,6 +669,29 @@ For every step type and built-in operation, assert that:
 - concrete effects are covered by the compiled envelope;
 - runtime transition selection uses declared outcomes; and
 - completion uses the same condition evaluator as static analysis.
+
+### Adversarial operation-conformance tests
+
+For every built-in operation contract, run it through mediated test fixtures
+that attempt to exceed the declaration:
+
+- reads and writes outside selector roots, including traversal and symlink
+  escapes;
+- undeclared subprocesses, arguments, environments, hooks, and inherited
+  credentials;
+- unapproved network hosts, methods, and external mutation targets;
+- indirect effects through libraries, redirects, or child processes; and
+- repeated calls for operations declared naturally or keyed idempotent.
+
+Record the full observed-effect trace and assert it is contained by both the
+declared contract and the granted authority. Maintain mutation fixtures that
+deliberately add an undeclared write, network request, or subprocess to a
+cooperative tool; the test must prove the mediator and harness detect it.
+
+Run prompt-injection suites such as AgentDojo-style hostile tool-output cases
+as end-to-end regressions. Their assertion is not that the model refuses the
+instruction; it is that no resulting operation can exceed the compiled effect
+and scope contract.
 
 ### Property and model-based tests
 

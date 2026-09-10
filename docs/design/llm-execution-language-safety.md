@@ -35,6 +35,7 @@ guarantees:
   action_safe: proven
   capability_safe: proven
   effect_safe: proven
+  effect_contract_safe: proven
   scope_safe: proven
   control_flow_safe: proven
   completion_safe: proven
@@ -59,6 +60,7 @@ The language should provide the following guarantees.
 | Capability safety | Invoking an undeclared tool or semantic operation |
 | Argument safety | Passing values outside the operation's argument schema |
 | Effect safety | An operation producing effects outside its declared effect summary |
+| Effect-contract safety | An operation declaration granting authority by itself, or a supposedly enforced tool exercising an unmediated effect channel |
 | Scope safety | Reading, editing, staging, deleting, or publishing resources outside the authorized scope |
 | Ownership safety | Making the LLM select or repeat a fixed mechanical operation owned by the runner |
 | Control-flow safety | Entering an unreachable step or jumping to an undeclared target |
@@ -223,6 +225,80 @@ PR but do not merge it.”
 Static and runtime effect descriptions must come from one authoritative
 registry. If the compiler and runtime carry independent summaries, their
 agreement becomes another unproven assumption.
+
+### Effect vocabulary and trustworthy contracts
+
+MCP's `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint`
+are a useful common risk vocabulary, but they are deliberately hints rather
+than a source of authority. In particular, an annotation supplied by an
+untrusted server cannot make an operation safe. Powdrr Lift should preserve
+those distinctions while expressing them as operation contracts that the
+kernel enforces. See the [MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/index)
+and its [ToolAnnotations rationale](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/).
+
+An operation contract must answer more than whether an operation is broadly
+destructive. It identifies the effect family and its concrete target, for
+example: write these paths, stage this path set, comment on this PR, or make a
+request to this host. It also records whether repeating the same request is
+safe and how the kernel can establish that an ambiguous request already
+occurred.
+
+The declaration never grants authority by itself. Before an operation runs,
+the kernel intersects its declared effects and selectors with the active
+workflow authority. During execution, every observable effect channel is
+mediated and checked. The central invariant is:
+
+```text
+observed effects
+  subset of declared operation effects
+  intersection active workflow authority
+```
+
+For enforced operations, this is a prevention property rather than a
+best-effort audit. Filesystem, process, network, Git/GitHub, secret, and
+external-mutation interfaces must be brokered so an undeclared effect fails
+closed. A raw unrestricted process capability necessarily weakens the claim:
+it can use libraries, inherited credentials, hooks, sockets, or subprocesses
+beyond what a post-hoc trace can prove. Prefer typed semantic operations over
+ambient shell authority where a strong certificate is required.
+
+Tools should carry an explicit trust tier:
+
+| Tier | Meaning |
+| --- | --- |
+| Enforced | Every relevant effect channel is mediated; undeclared effects are denied by the execution boundary. |
+| Tested | The operation has adversarial conformance tests, but one or more channels are observed rather than fully mediated. |
+| Attested | A trusted provider supplies the contract; Powdrr Lift has not independently established it. |
+| Opaque | No trustworthy contract exists; use broad authority, quarantine, or explicit approval. |
+
+Only enforced operations may support the strongest effect and scope proofs.
+An external MCP server's annotations normally begin as attested or opaque;
+they do not become enforced merely by being present.
+
+### Adversarial effect-contract conformance
+
+Effect declarations need a verification program of their own. For each
+operation, execute adversarial conformance cases through instrumented brokers
+and compare the recorded trace to its contract. The oracle is structural, not
+model behavior:
+
+```text
+observed_effects subset_of declared_effects intersection granted_effects
+```
+
+The suite should attempt to induce undeclared reads and writes, path escapes
+and symlink escapes, unapproved subprocesses, network destinations, indirect
+mutations through libraries or hooks, repeated allegedly idempotent requests,
+and prompt-injected operation inputs. It should also use mutation testing:
+intentionally introduce an undeclared write, network call, or subprocess in a
+test double and verify that the broker and test harness reject or report it.
+This validates the detector rather than merely exercising cooperative tools.
+
+Prompt-injection benchmarks such as [AgentDojo](https://arxiv.org/abs/2406.13352)
+are valuable outer regressions: they test that hostile tool output cannot steer
+an LLM into an unauthorized operation. They complement, rather than replace,
+deterministic operation conformance tests. The latter must hold even if the
+model follows hostile instructions perfectly.
 
 ## Nested skills and effect envelopes
 

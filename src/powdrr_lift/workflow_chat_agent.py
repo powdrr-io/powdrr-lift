@@ -4513,6 +4513,42 @@ def _execution_events_for_prompt(
     ]
 
 
+def _successful_document_reads_for_prompt(
+    execution_events: Sequence[Mapping[str, Any]],
+    current_step_index: int | None = None,
+) -> list[dict[str, Any]]:
+    """Expose successful reads as durable repair context.
+
+    Compact event metadata intentionally omits results. Repairs still need to
+    know which documents already supplied context so they do not spend a retry
+    rereading the same file instead of correcting the failed capability call.
+    """
+    reads: list[dict[str, Any]] = []
+    for event in execution_events:
+        if event.get("kind") != "read_document":
+            continue
+        if current_step_index is not None and event.get("step_index") not in {
+            None,
+            current_step_index,
+        }:
+            continue
+        result = event.get("result")
+        if not isinstance(result, Mapping):
+            continue
+        path = result.get("path")
+        if not isinstance(path, str) or not path:
+            continue
+        reads.append(
+            {
+                "path": path,
+                "requested_start_line": result.get("requested_start_line"),
+                "requested_end_line": result.get("requested_end_line"),
+                "returned_end_line": result.get("end_line"),
+            }
+        )
+    return reads
+
+
 def _latest_execution_event_for_prompt(
     execution_events: Sequence[dict[str, Any]],
     current_step_index: int | None = None,
@@ -5293,6 +5329,9 @@ def _build_step_execution_messages(
             execution_events,
             current_step_index,
         ),
+        "successful_document_reads": _successful_document_reads_for_prompt(
+            execution_events, current_step_index
+        ),
         "stalled_step_context": [dict(item) for item in stalled_step_context],
         "current_file": current_file_context,
     }
@@ -5326,12 +5365,16 @@ def _build_step_execution_messages(
         )
     ]
     if failed_action is not None:
+        successful_reads = _successful_document_reads_for_prompt(
+            execution_events, current_step_index
+        )
         prompt_data["recovery_required"] = {
             "rejected_action": json.loads(_workflow_action_signature(failed_action)),
             "reason": failure_reason
             or "The previous action was rejected by the workflow contract.",
             "must_choose_different_action": True,
             "allowed_actions": prompt_data["available_actions"],
+            "successful_document_reads": successful_reads,
             "instruction": (
                 "Do not repeat the rejected action, even with different prose. "
                 "Choose one materially different action from allowed_actions, "
@@ -5339,6 +5382,14 @@ def _build_step_execution_messages(
                 "the reported issue."
             ),
         }
+        if successful_reads:
+            prompt_data["recovery_required"]["instruction"] += (
+                " These documents were already read successfully; do not reread "
+                "them unless the failed action specifically requires changed file "
+                "contents: "
+                + ", ".join(str(item["path"]) for item in successful_reads)
+                + "."
+            )
     if "edit" in prompt_data["available_actions"]:
         prompt_data["edit_contract"] = (
             "For edit, return exactly one JSON object with action=edit, a string "
@@ -11326,6 +11377,21 @@ def _workflow_edit_failure_feedback(
         feedback += f" Error code: {error.error_code}."
         if error.remediation:
             feedback += f" Remediation: {error.remediation}"
+        if error.details:
+            feedback += (
+                " Diagnostic details: "
+                + json.dumps(error.details, sort_keys=True)
+                + "."
+            )
+        if (
+            error.error_code == "capability_not_executable"
+            and error.details.get("capability") == "basedpyright-structure"
+        ):
+            feedback += (
+                " This is a capability argument error, not a reason to reread the "
+                "same document. Choose a materially different exact .py path from "
+                "candidate_python_files, or use an available discovery action."
+            )
     if isinstance(error, _WorkflowEditRangeError):
         if current_file_context and current_file_context.get("exists"):
             feedback += (
@@ -12211,6 +12277,15 @@ def _action_repair_prompt(
                 f"may be used: {recovery_tools}. Use them only to diagnose or correct "
                 "the failed tool; do not invent another command. "
             )
+        if failed_action is not None and failed_action.tool == "basedpyright-structure":
+            prompt += (
+                "BasedPyright structure repair rule: parameters.path must be one "
+                "exact existing repository-relative Python file path ending in "
+                ".py. A directory, missing path, or non-Python path is invalid. "
+                "Do not reread the same specification document to repair this "
+                "error; select a concrete implementation file from the diagnostic "
+                "candidate_python_files list or use an available discovery action. "
+            )
         shapes: list[str] = []
         if "prompt_user" in action_names:
             shapes.append(
@@ -12276,6 +12351,16 @@ def _action_repair_prompt(
                 else ""
             )
         )
+        successful_reads = _successful_document_reads_for_prompt(
+            execution_events, step_index
+        )
+        if successful_reads:
+            prompt += (
+                " Documents already read successfully in this step (do not reread "
+                "them as a substitute for correcting the failed action): "
+                + ", ".join(str(item["path"]) for item in successful_reads)
+                + "."
+            )
     if _is_infrastructure_tool_failure(validation_error):
         prompt += (
             " The failure appears to be an environment or permission problem. "

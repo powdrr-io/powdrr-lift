@@ -680,6 +680,7 @@ steps:
 
 - id: prepare-feature-pull-request
   description: Run finish-pr-prep on the validated planning artifacts.
+  actions: []
   step_type: predicated
   llm_type: fast_iteration
   completion:
@@ -687,10 +688,11 @@ steps:
     - final_repository_state
     - readiness_report
   details: >-
-    Invoke the listed finish-pr-prep skill after the validated planning artifacts
-    are staged. If cleanup changes files, restage only those artifacts before
-    continuing. Do not implement any proposed PR in this skill. After the nested
-    skill returns, explicitly publish both handoffs with an `emit_outputs` action,
+    The preceding finish-pr-prep step has already produced the context for this
+    handoff. Apply judgment only to whether its returned repository state and
+    readiness report are acceptable; do not invoke tools or the nested skill
+    again. After the nested skill returns, explicitly publish both handoffs with
+    an `emit_outputs` action,
     copying the exact values returned by the nested skill:
     {"action":"emit_outputs","outputs":{"final_repository_state":{"clean":true,"files":[]},"readiness_report":{"ready":true,"reasons":[],"satisfied_requirements":[]}}}
     Do not return next_step or synthesize either value; the step advances only

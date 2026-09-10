@@ -69,11 +69,7 @@ steps:
     staged and no unintended path is staged. This verification is mandatory
     after every staging or cleanup action; never choose next_step immediately
     after deleting an unintended file.
-  tool_invocations:
-  - tool: git
-    command:
-    - add
-    - <files-to-publish>
+  tool_invocation_packages: [git_readonly_and_additive]
 - description: Commit the validated changes.
   actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
   step_type: governed
@@ -147,9 +143,7 @@ steps:
     existing PR, or run any other tool.
     Do not report completion until the command succeeds and its output includes
     the pull request URL. Never merge the PR or push directly to main.
-  tool_invocations:
-  - tool: gh
-    operation: pr_create
+  tool_invocation_packages: [gh_write]
 - description: Update the existing pull request.
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed
@@ -165,6 +159,4 @@ steps:
     Do not print the body, create a second PR, or run any other tool. Do not
     report completion until the command succeeds and its output
     identifies the pull request. Never merge the PR or push directly to main.
-  tool_invocations:
-  - tool: gh
-    operation: pr_edit
+  tool_invocation_packages: [gh_write]

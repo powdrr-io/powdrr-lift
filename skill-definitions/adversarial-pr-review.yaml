@@ -22,20 +22,8 @@ steps:
     tests, configuration, and documentation. Establish the PR's intended
     behavior and constraints before challenging its design; adversarial means
     rigorous and evidence-driven, not reflexively negative.
+  tool_invocation_packages: [gh_readonly]
   tool_invocations:
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <pr-reference>
-    - --json
-    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: gh
-    command:
-    - pr
-    - diff
-    - <pr-reference>
-    - --patch
   - tool: shell
     command:
     - git

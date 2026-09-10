@@ -1428,8 +1428,25 @@ def _validate_step_examples(
             )
 
             parsed_step = skill_step_from_data(step)
+            example_events: list[dict[str, Any]] = []
+            if action_data.get("action") == "emit_outputs":
+                completion = getattr(parsed_step, "completion", None)
+                if completion is not None:
+                    for requirement in completion.required_actions:
+                        example_events.append(
+                            {
+                                "kind": requirement.action,
+                                "step_index": 0,
+                                **(requirement.parameters or {}),
+                            }
+                        )
             _parse_action_response_with_schema(
-                action_data, schema=_step_action_response_schema(parsed_step)
+                action_data,
+                schema=_step_action_response_schema(
+                    parsed_step,
+                    execution_events=example_events,
+                    step_index=0,
+                ),
             )
         except RuntimeError as exc:
             issues.append(

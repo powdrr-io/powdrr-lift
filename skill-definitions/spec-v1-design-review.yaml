@@ -66,20 +66,7 @@ steps:
     type: any
     required_for_next_step: true
     schema: {type: object, additionalProperties: true}
-  tool_invocations:
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <pr-reference>
-    - --json
-    - number,title,body,url,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: gh
-    command:
-    - pr
-    - diff
-    - <pr-reference>
-    - --patch
+  tool_invocation_packages: [gh_readonly]
 - id: gather-design-context
   description: Gather the repository context needed to review the proposed design.
   actions: [gather_context, edit, yaml_edit, file_management, read_document]
@@ -116,13 +103,8 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<intent-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the intent finding with its evidence and impact."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
+  tool_invocation_packages: [gh_readonly_and_write]
   tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
 - id: review-assumptions
   description: Ask whether the design contains assumptions requiring clarification.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -140,13 +122,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<assumption-finding-and-question>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unresolved assumption and precise clarification question."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-traceability-and-completeness
   description: Ask whether the spec v1 design is complete and internally traceable.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -166,13 +142,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<traceability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the exact missing, duplicated, cyclic, or unassigned path."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-existing-mechanisms
   description: Ask whether existing repository mechanisms can implement the design.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -195,13 +165,8 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<existing-mechanism-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the repository evidence for the existing mechanism and reuse direction."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
+  tool_invocation_packages: [gh_readonly_and_write]
   tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
   - tool: shell
     command:
     - rg
@@ -228,13 +193,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<refactoring-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the prerequisite refactor and concrete correctness benefit."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-unnecessary-scope
   description: Ask whether the design includes unnecessary changes.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -251,13 +210,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<unnecessary-scope-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the unsupported scope and smallest removal."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-security
   description: Ask whether security concerns are addressed by the design.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -275,13 +228,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<security-finding-with-attack-path>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the evidence-backed security risk and mitigation."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-performance
   description: Ask whether performance and scale concerns are addressed.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -299,13 +246,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<performance-finding-with-workload>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the plausible workload and performance mitigation."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-entity-lifecycle
   description: Ask whether entity lifecycle and removals are correct.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -323,13 +264,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<entity-lifecycle-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the stale entity, missing removal, or orphaned relationship."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-dependencies-and-delivery
   description: Ask whether proposed-PR dependencies and delivery sequencing are viable.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -347,13 +282,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<dependency-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the dependency graph evidence and smallest sequencing fix."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-compatibility-and-failure-modes
   description: Ask whether compatibility, migration, and failure behavior are designed.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -370,13 +299,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<compatibility-or-failure-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the rollout or failure-mode risk and correction."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: review-testability-and-operability
   description: Ask whether the design can be validated and operated safely.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -393,13 +316,7 @@ steps:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_review_comment","repository":"<owner>/<repo>","pr_reference":"<number>","body":"<testability-or-operability-finding>","commit_id":"<current-head-sha>","path":"<changed-file>","line":123,"side":"RIGHT"},"decisions_and_context":"Post the missing validation or operational control."}.
     Post every issue found in this question immediately; do not carry an
     unposted finding into a later step.
-  tool_invocations:
-  - tool: gh
-    command: [pr, view, <number>, --comments]
-  - tool: gh
-    command: [api, repos/<owner>/<repo>/pulls/<number>/comments, --method, POST,
-      -f, body=<finding>, -f, commit_id=<current-head-sha>, -f, path=<changed-file>,
-      -F, line=<changed-line>, -f, side=RIGHT]
+  tool_invocation_packages: [gh_readonly_and_write]
 - id: verify-review
   description: Verify the review comments and report the design audit.
   actions: [invoke_tool, edit, yaml_edit, read_document]
@@ -416,10 +333,4 @@ steps:
     failure; never claim it was posted. Never merge the PR or resolve threads.
     Verify with this JSON action:
     {"action":"invoke_tool","tool":"gh","parameters":{"operation":"pr_comments","pr_reference":"<number>"},"decisions_and_context":"Verify every posted issue finding is present on the current head SHA and intended line."}.
-  tool_invocations:
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <number>
-    - --comments
+  tool_invocation_packages: [gh_readonly]

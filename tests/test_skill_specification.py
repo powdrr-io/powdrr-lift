@@ -66,6 +66,33 @@ def test_git_tool_invocation_package_expands_to_declared_operations() -> None:
     }
 
 
+def test_gh_tool_invocation_packages_expand_to_read_and_write_operations() -> None:
+    skill = skill_from_data(
+        {
+            "name": "gh-packages",
+            "when_to_use": ["Use GitHub."],
+            "steps": [
+                {
+                    "description": "Inspect and update a pull request.",
+                    "tool_invocation_packages": ["gh_readonly_and_write"],
+                }
+            ],
+        }
+    )
+
+    step = skill.steps[0]
+    assert step.tool_invocation_packages == ("gh_readonly_and_write",)
+    assert {invocation.operation for invocation in step.tool_invocations} == {
+        "pr_view",
+        "pr_diff",
+        "pr_checks",
+        "pr_comments",
+        "pr_create",
+        "pr_edit",
+        "pr_review_comment",
+    }
+
+
 def test_unknown_tool_invocation_package_is_rejected() -> None:
     with pytest.raises(ValueError, match="Unsupported tool invocation package"):
         skill_from_data(
@@ -1208,8 +1235,14 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "origin",
         "HEAD",
     )
-    assert skill.steps[5].tool_invocations[0].operation == "pr_create"
-    assert skill.steps[6].tool_invocations[0].operation == "pr_edit"
+    assert any(
+        invocation.operation == "pr_create"
+        for invocation in skill.steps[5].tool_invocations
+    )
+    assert any(
+        invocation.operation == "pr_edit"
+        for invocation in skill.steps[6].tool_invocations
+    )
 
 
 def test_checked_in_handle_ad_hoc_skill_matches_flow() -> None:

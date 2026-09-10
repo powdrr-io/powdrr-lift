@@ -16,26 +16,13 @@ steps:
     external-provider checks without attempting to fix them. Identify every
     failing or cancelled check, its workflow run and job, the head SHA, and the
     exact failing command. Preserve the PR's current branch and scope.
+  tool_invocation_packages: [gh_readonly]
   tool_invocations:
   - tool: shell
     command:
     - gh
     - auth
     - status
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <pr-reference>
-    - --json
-    - number,url,title,headRefName,headRefOid,baseRefName,state,files
-  - tool: gh
-    command:
-    - pr
-    - checks
-    - <pr-reference>
-    - --json
-    - name,state,bucket,link,startedAt,completedAt,workflow
   - tool: shell
     command:
     - gh

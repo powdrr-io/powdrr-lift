@@ -22,20 +22,7 @@ steps:
     and proposed-PR metadata as authoritative. If the relationship is ambiguous,
     prepare one inline finding on the nearest relevant changed line and do not
     continue with an assumed feature.
-  tool_invocations:
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <pr-reference>
-    - --json
-    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: gh
-    command:
-    - pr
-    - diff
-    - <pr-reference>
-    - --patch
+  tool_invocation_packages: [gh_readonly]
 - description: Select the feature test scope for the current pull request.
   actions: [edit, yaml_edit, file_management, read_document]
   step_type: governed

@@ -20,20 +20,8 @@ steps:
     including its file and line anchor, requested outcome, and relationship to
     the feature definition and proposed-PR specification. Do not duplicate a
     root cause or act on informational, resolved, or outdated feedback.
+  tool_invocation_packages: [gh_readonly]
   tool_invocations:
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <pr-reference>
-    - --json
-    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: gh
-    command:
-    - pr
-    - diff
-    - <pr-reference>
-    - --patch
   - tool: shell
     command:
     - gh

@@ -30,7 +30,7 @@ SUPPORTED_SKILL_TOOL_TYPES = (
     )
     | BASEDPYRIGHT_TOOLS
 )
-TOOL_INVOCATION_PACKAGES: dict[str, tuple[dict[str, str], ...]] = {
+TOOL_INVOCATION_PACKAGES: dict[str, tuple[dict[str, Any], ...]] = {
     "git_readonly": (
         {"tool": "git", "operation": "status"},
         {"tool": "git", "operation": "remote"},
@@ -47,10 +47,42 @@ TOOL_INVOCATION_PACKAGES: dict[str, tuple[dict[str, str], ...]] = {
         {"tool": "git", "operation": "move"},
         {"tool": "git", "operation": "rename"},
     ),
+    "git_readonly_and_additive": (
+        {"tool": "git", "operation": "status"},
+        {"tool": "git", "operation": "remote"},
+        {"tool": "git", "operation": "branch_current"},
+        {"tool": "git", "operation": "default_branch"},
+        {"tool": "git", "operation": "show_ref"},
+        {"tool": "git", "operation": "add"},
+        {"tool": "git", "operation": "commit"},
+        {"tool": "git", "operation": "push"},
+        {"tool": "git", "operation": "switch"},
+        {"tool": "git", "operation": "switch_create"},
+        {"tool": "git", "operation": "move"},
+        {"tool": "git", "operation": "rename"},
+    ),
+    "gh_readonly": (
+        {"tool": "gh", "operation": "pr_view"},
+        {"tool": "gh", "operation": "pr_diff"},
+        {"tool": "gh", "operation": "pr_checks"},
+        {"tool": "gh", "operation": "pr_comments"},
+    ),
+    "gh_write": (
+        {"tool": "gh", "operation": "pr_create"},
+        {"tool": "gh", "operation": "pr_edit"},
+        {"tool": "gh", "operation": "pr_review_comment"},
+    ),
+    "gh_readonly_and_write": (
+        {"tool": "gh", "operation": "pr_view"},
+        {"tool": "gh", "operation": "pr_diff"},
+        {"tool": "gh", "operation": "pr_checks"},
+        {"tool": "gh", "operation": "pr_comments"},
+        {"tool": "gh", "operation": "pr_create"},
+        {"tool": "gh", "operation": "pr_edit"},
+        {"tool": "gh", "operation": "pr_review_comment"},
+    ),
 }
-SUPPORTED_TOOL_INVOCATION_PACKAGES = frozenset(
-    {*TOOL_INVOCATION_PACKAGES, "git_readonly_and_additive"}
-)
+SUPPORTED_TOOL_INVOCATION_PACKAGES = frozenset(TOOL_INVOCATION_PACKAGES)
 SUPPORTED_PROMPT_CATALOGS = frozenset(
     {
         "context_types",
@@ -2936,13 +2968,9 @@ def _optional_tool_invocation_packages(value: object) -> tuple[str, ...]:
 def _merge_tool_invocations(
     explicit: tuple[SkillToolInvocation, ...], packages: tuple[str, ...]
 ) -> tuple[SkillToolInvocation, ...]:
-    package_names = list(packages)
-    if "git_readonly_and_additive" in package_names:
-        package_names.extend(("git_readonly", "git_additive"))
     expanded = [
         _parse_tool_invocation(item)
-        for package in package_names
-        if package != "git_readonly_and_additive"
+        for package in packages
         for item in TOOL_INVOCATION_PACKAGES[package]
     ]
     merged: list[SkillToolInvocation] = []

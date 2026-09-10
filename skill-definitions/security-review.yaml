@@ -23,20 +23,7 @@ steps:
     features, decisions, risks, and proposed_prs filtered by the feature id
     when one is known. Treat structured repository specifications as
     authoritative and record missing security context as a review gap.
-  tool_invocations:
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <pr-reference>
-    - --json
-    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: gh
-    command:
-    - pr
-    - diff
-    - <pr-reference>
-    - --patch
+  tool_invocation_packages: [gh_readonly]
 - description: Build a threat model for the changed behavior.
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed

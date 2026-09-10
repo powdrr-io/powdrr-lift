@@ -23,20 +23,7 @@ steps:
     authoritative. If the relationship is ambiguous, prepare one inline
     finding on the nearest relevant changed line explaining the missing
     linkage and do not continue with an assumed feature.
-  tool_invocations:
-  - tool: gh
-    command:
-    - pr
-    - view
-    - <pr-reference>
-    - --json
-    - number,title,body,baseRefName,headRefName,headRefOid,state,isDraft,labels,files,commits,reviews
-  - tool: gh
-    command:
-    - pr
-    - diff
-    - <pr-reference>
-    - --patch
+  tool_invocation_packages: [gh_readonly]
 - description: Decide whether the referenced PR is the final proposed PR.
   actions: [edit, yaml_edit, file_management, read_document]
   step_type: governed

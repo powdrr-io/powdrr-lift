@@ -143,9 +143,7 @@ steps:
     existing PR, or run any other tool.
     Do not report completion until the command succeeds and its output includes
     the pull request URL. Never merge the PR or push directly to main.
-  tool_invocations:
-  - tool: gh
-    operation: pr_create
+  tool_invocation_packages: [gh_write]
 - description: Update the existing pull request.
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed
@@ -161,6 +159,4 @@ steps:
     Do not print the body, create a second PR, or run any other tool. Do not
     report completion until the command succeeds and its output
     identifies the pull request. Never merge the PR or push directly to main.
-  tool_invocations:
-  - tool: gh
-    operation: pr_edit
+  tool_invocation_packages: [gh_write]

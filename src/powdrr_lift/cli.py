@@ -1561,6 +1561,14 @@ def build_parser() -> argparse.ArgumentParser:
             "this workflow can start; may be repeated."
         ),
     )
+    instantiate_workflow_parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Reset a stale dedicated integration branch to the generated source "
+            "commit and push it with lease protection."
+        ),
+    )
     instantiate_workflow_parser.set_defaults(func=_run_instantiate_workflow)
 
     process_workflow_task_parser = subparsers.add_parser(
@@ -2125,7 +2133,9 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             output_directory,
             push=False,
         )
-        synchronize_workflow_initialization(integration_worktree, repo_root)
+        synchronize_workflow_initialization(
+            integration_worktree, repo_root, force=args.force
+        )
     except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         print(f"Could not instantiate workflow: {exc}", file=sys.stderr)
         return 1

@@ -33,6 +33,7 @@ status for each guarantee:
 guarantees:
   schema_safe: proven
   action_safe: proven
+  operation_state_safe: proven
   capability_safe: proven
   effect_safe: proven
   effect_contract_safe: proven
@@ -57,6 +58,7 @@ The language should provide the following guarantees.
 | --- | --- |
 | Schema safety | Malformed steps, actions, outcomes, outputs, guards, or transitions |
 | Action safety | The LLM selecting an action outside the active step's closed action set |
+| Operation-state safety | Advancing, retrying, or claiming an operation result without a durable kernel-owned record of its state and result |
 | Capability safety | Invoking an undeclared tool or semantic operation |
 | Argument safety | Passing values outside the operation's argument schema |
 | Effect safety | An operation producing effects outside its declared effect summary |
@@ -147,6 +149,49 @@ The runtime, not the LLM, commits the outcome and transition. The model may
 propose a semantic decision, but it cannot assert that an action succeeded or
 that a completion predicate is satisfied.
 
+### Operations produce durable facts
+
+An action proposal is not an operation result. Every operation invocation must
+have a durable, kernel-owned lifecycle record before it can contribute to
+progress, an output, evidence, completion, or a transition. The record is
+identified by its execution, step activation, operation contract fingerprint,
+normalized arguments, and idempotency key where applicable.
+
+The language has a closed operation-state union such as:
+
+```text
+planned -> authorized -> executing -> succeeded | failed | ambiguous | denied | cancelled
+```
+
+Only the kernel and operation broker may advance this state. In particular,
+`succeeded` means that the operation returned a recognized successful result,
+its observed effects conformed to its authority, and its declared result
+postconditions were recorded. `ambiguous` means that execution may have reached
+an external system but success cannot be established; it is never silently
+coerced into either success or a retry.
+
+Each terminal operation record carries its structured result, observed effects,
+produced and invalidated evidence, output bindings, and any reconciliation
+requirement. Derived workflow state is a reduction of these records, not an
+LLM-maintained checklist.
+
+At every LLM boundary, the kernel supplies a read-only state projection for
+the active step: applicable operation records and statuses, current typed
+outputs, open obligations, valid evidence, and the actions still legal. This
+lets the model make an informed next decision without trusting it to remember
+whether an earlier operation succeeded. The model may request a retry only
+when the recorded state and contract permit it; it may not repeat an operation
+merely because its earlier prose is absent or uncertain.
+
+Workflow generation from a template illustrates the rule. Template
+instantiation is a runner-owned operation, not a conversational milestone. It
+may produce a `workflow_instance` output only after the generated definition
+has been persisted, parsed, validated against its template contract, compiled,
+and fingerprinted. The next step receives the resulting instance reference in
+its kernel-generated state projection. A validation failure instead creates a
+typed failed result with diagnostics; no subsequent step can treat a proposed
+or malformed workflow as generated successfully.
+
 ## Material progress
 
 Progress must be defined structurally. Another model turn, different prose, or
@@ -156,6 +201,8 @@ Material progress is one or more of:
 
 - an irreversible control-flow advance;
 - production of a new required typed output;
+- a successful, state-changing operation record whose declared postconditions
+  are current;
 - satisfaction of an open obligation;
 - consumption of an item from a finite work set;
 - decrease of a retry or iteration budget;

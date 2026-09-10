@@ -61,6 +61,20 @@ Consequences include:
 - failure classes do not form an exhaustive per-step union; and
 - local outcome completeness cannot be checked directly.
 
+### Operation state is durable data but not yet a language contract
+
+`core/execution_state.py` records actions, evidence, obligations, and related
+events, but a definition cannot yet require a closed lifecycle for each
+operation or declare which terminal record permits an output or transition.
+The LLM can therefore receive prose about earlier work without a standard,
+read-only projection of whether the underlying operation succeeded, failed, or
+is ambiguous.
+
+Template instantiation has the same gap. A generated workflow is useful only
+after it has been persisted, parsed, validated, compiled, and fingerprinted,
+but those facts are not yet one typed runner-owned operation result consumed
+by the next workflow step.
+
 ### Static and runtime effects are separate models
 
 `workflow_liveness.CapabilityEffect` contains reads, writes, products,
@@ -161,6 +175,48 @@ class CompiledStepContract:
 `workflow_step_behavior.py` should remain the source for behavior selection,
 but it should produce or participate in this compiled contract rather than
 being reinterpreted independently by each runner.
+
+### Durable operation lifecycle and state projection
+
+Add normalized operation-state types to `core/workflow_contract.py` and persist
+their transitions through `core/execution_state.py`:
+
+```python
+class OperationStatus(StrEnum):
+    PLANNED = "planned"
+    AUTHORIZED = "authorized"
+    EXECUTING = "executing"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    AMBIGUOUS = "ambiguous"
+    DENIED = "denied"
+    CANCELLED = "cancelled"
+
+@dataclass(frozen=True)
+class OperationRecord:
+    operation_id: str
+    step_activation_id: str
+    contract_fingerprint: str
+    arguments_fingerprint: str
+    idempotency_key: str | None
+    status: OperationStatus
+    result: Mapping[str, Any] | None
+    observed_effects: tuple[ObservedEffect, ...]
+    output_bindings: tuple[OutputBinding, ...]
+    evidence_ids: tuple[str, ...]
+```
+
+The kernel writes every state transition. `SUCCEEDED` is allowed only after
+the broker has validated the result variant, effect conformance, and declared
+postconditions. `AMBIGUOUS` is a reconciliation state, never an implicit
+success or an automatic repeat.
+
+Define a pure `StepStateProjection` reduced from durable records. Before each
+LLM decision, pass this projection--rather than prior conversational prose--to
+the provider schema/context. It includes the active activation, applicable
+operation statuses and result handles, current typed outputs, valid evidence,
+open obligations, resource state, and still-legal actions. The provider cannot
+write this projection or manufacture an operation receipt.
 
 ### Closed outcome contract
 
@@ -301,6 +357,11 @@ Move diagnostics into pass-oriented functions with stable input/output types.
 Each diagnostic should identify the guarantee affected and include the shortest
 counterexample path when applicable.
 
+Add diagnostics for a transition or completion condition that consumes an
+operation without a permitted durable terminal status, an output that lacks a
+successful producer record, and any operation whose result cannot be included
+in the active step's state projection.
+
 ### 3. Close action contracts
 
 Change `core/skill_specification.py` and corresponding template/task schemas so
@@ -340,13 +401,26 @@ Replace or extend `workflow_llm.WorkflowActionOutcome` with a semantic result:
 class StepActivationResult:
     outcome: str
     payload: Mapping[str, Any]
-    action_records: tuple[str, ...]
+    operation_record_ids: tuple[str, ...]
     evidence_ids: tuple[str, ...]
 ```
 
 Centralize outcome validation and transition commitment in the shared
 execution engine. Interactive and durable runners should not implement
 different transition rules.
+
+An outcome requirement that refers to an operation or output must name the
+allowed terminal operation statuses and result variants. The compiler rejects a
+transition that relies on an operation with no durable result mapping. Runtime
+transition commitment reads `OperationRecord`s from durable state; it does not
+accept an LLM assertion or a text rendering of the tool result as proof.
+
+Model template instantiation explicitly as a runner-owned operation. Its
+`SUCCEEDED` result variant may bind `workflow_instance_ref` only after the
+generated definition is persisted, schema-validated, checked against the
+template's contract, compiled, and fingerprinted. The following step consumes
+that typed reference from its state projection. `FAILED` returns typed parser,
+validation, or compilation diagnostics; `AMBIGUOUS` requires reconciliation.
 
 ### 5. Unify static and runtime effects
 
@@ -547,15 +621,16 @@ The compiler should use explicit passes in this order:
 2. normalization and compatibility expansion;
 3. reference and handoff resolution;
 4. action and outcome closure;
-5. operation and effect resolution;
-6. resource-scope checking;
-7. nested-skill fixed-point composition;
-8. CFG and abstract-state construction;
-9. completion and evidence observability;
-10. retry relevance;
-11. progress and termination proof;
-12. replay/idempotency proof; and
-13. certificate generation.
+5. operation lifecycle and output-producer resolution;
+6. operation and effect resolution;
+7. resource-scope checking;
+8. nested-skill fixed-point composition;
+9. CFG and abstract-state construction;
+10. completion and evidence observability;
+11. retry relevance;
+12. progress and termination proof;
+13. replay/idempotency proof; and
+14. certificate generation.
 
 Add stable diagnostic families for:
 
@@ -647,6 +722,8 @@ proof.
 ### Unit tests
 
 - canonical serialization and fingerprints;
+- operation lifecycle transition legality and durable record reduction;
+- state-projection contents, immutability, and provider serialization;
 - outcome exhaustiveness and payload schemas;
 - resource selector subset and intersection laws;
 - operation result-to-outcome mapping;
@@ -668,7 +745,9 @@ For every step type and built-in operation, assert that:
 - runtime actions equal the closed compiled set;
 - concrete effects are covered by the compiled envelope;
 - runtime transition selection uses declared outcomes; and
-- completion uses the same condition evaluator as static analysis.
+- completion uses the same condition evaluator as static analysis; and
+- the LLM receives kernel-derived operation statuses rather than prior tool
+  prose as the source of operation truth.
 
 ### Adversarial operation-conformance tests
 
@@ -713,6 +792,10 @@ Exercise:
 - ineffective retry rejection;
 - nested transitive effect denial;
 - crash and reconciliation around a non-idempotent effect;
+- template generation that advances only after a persisted, validated,
+  compiled, and fingerprinted `workflow_instance_ref` record;
+- template generation failure that exposes diagnostics but cannot bind the
+  workflow instance or advance a dependent step;
 - human suspension and resume;
 - approved and denied capability exceptions; and
 - certificate drift after a child or tool manifest changes.

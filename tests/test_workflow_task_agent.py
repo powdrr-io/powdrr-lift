@@ -72,6 +72,33 @@ class _FakeClient:
         return next(self.responses)
 
 
+def test_repeated_stalled_task_action_requires_material_change() -> None:
+    action = WorkflowAction(
+        kind="edit",
+        file_path="example.txt",
+        decisions_and_context="first explanation",
+    )
+    stalled_actions: dict[str, object] = {
+        workflow_task_agent.workflow_action_failure_signature(
+            action, signature=workflow_task_agent.workflow_action_signature
+        ): "unchanged",
+    }
+
+    with pytest.raises(workflow_task_agent.PowdrrExecutionError, match="materially"):
+        workflow_task_agent._reject_repeated_stalled_action(
+            replace(action, decisions_and_context="different explanation"),
+            stalled_actions,
+            "unchanged",
+        )
+
+    workflow_task_agent._reject_repeated_stalled_action(
+        replace(action, decisions_and_context="different explanation"),
+        stalled_actions,
+        "changed",
+    )
+    assert not stalled_actions
+
+
 def _workflow(tmp_path: Path) -> WorkflowInstance:
     return WorkflowInstance.create(
         tmp_path / "workflow",

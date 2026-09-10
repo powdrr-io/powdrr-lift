@@ -42,6 +42,34 @@ steps:
     assert report.validation_successful
 
 
+def test_definition_analysis_rejects_undeclared_invoke_tool_action(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: undeclared-tool
+when_to_use: [Plan work.]
+steps:
+  - id: plan
+    description: Plan the work.
+    actions: [invoke_tool]
+    details: Return the plan as a structured output.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert not report.validation_successful
+    issue = next(
+        issue
+        for issue in report.issues
+        if issue.code == "undeclared_invoke_tool_action"
+    )
+    assert "declares no model-owned tool" in issue.message
+
+
 def test_definition_analysis_covers_instantiated_tasks_and_workflow_metadata() -> None:
     repository_root = Path(__file__).parents[1]
     task = (

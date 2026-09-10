@@ -191,7 +191,7 @@ steps:
     actions: [invoke_tool]
     tool_invocations:
       - tool: basedpyright-structure
-        command: [path=<python-file>]
+        operation: inspect_structure
 """,
         encoding="utf-8",
     )
@@ -202,7 +202,10 @@ steps:
             {
                 "action": "invoke_tool",
                 "tool": "basedpyright-structure",
-                "parameters": {"path": "src/example.py"},
+                "parameters": {
+                    "operation": "inspect_structure",
+                    "path": "src/example.py",
+                },
             }
         ),
         probe,

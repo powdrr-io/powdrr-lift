@@ -5579,8 +5579,9 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "For pr_create and pr_edit, provide only title and body. The runtime "
         "determines the repository, current branch, base branch, and edit target; "
         "never provide pr_reference, head, or base for those operations. "
-        "basedpyright-symbol takes parameters.query and optional parameters.limit "
-        "and basedpyright-structure takes parameters.path; yaml_edit requires "
+        "basedpyright-symbol uses operation=resolve_symbol with parameters.query "
+        "and optional parameters.limit; basedpyright-structure uses "
+        "operation=inspect_structure with parameters.path; yaml_edit requires "
         "a .yaml or .yml file_path and a non-empty operations array; invoke_skill "
         "takes "
         "a skill name from available_skills; "
@@ -8557,9 +8558,31 @@ def _validate_workflow_action_for_step_unwrapped(
         ):
             return
     if action.tool in {"basedpyright-symbol", "basedpyright-structure"}:
-        # BasedPyright is a structured builtin: symbol lookup uses `query` and
-        # structure lookup uses `path`, rather than the generic command shape.
-        # The builtin adapter performs the parameter validation and execution.
+        # BasedPyright is a structured builtin. New declarations use an
+        # operation discriminator so these calls cannot be confused with shell
+        # command templates; legacy command declarations remain compatible.
+        declared_operations = {
+            invocation.operation
+            for invocation in matching_invocations
+            if invocation.operation is not None
+        }
+        if not matching_invocations:
+            supported_tools = sorted(
+                {invocation.tool for invocation in supported_invocations}
+            )
+            supported_tools_text = ", ".join(supported_tools) or "none"
+            raise PowdrrExecutionError(
+                f"Tool {action.tool!r} is not supported by the current workflow "
+                f"step. The step explicitly supports: {supported_tools_text}."
+            )
+        if declared_operations:
+            operation = action.parameters.get("operation")
+            if operation not in declared_operations:
+                expected = ", ".join(sorted(declared_operations))
+                raise PowdrrExecutionError(
+                    f"Tool {action.tool!r} requires one of the declared intrinsic "
+                    f"operations: {expected}."
+                )
         return
     if not matching_invocations:
         supported_tools = sorted(

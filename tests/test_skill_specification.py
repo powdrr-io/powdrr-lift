@@ -1531,11 +1531,32 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     dependency_step = step("verify-workflow-dependencies")
     assert dependency_step.step_type == "governed"
     assert dependency_step.inputs[0].name == "workflow_instantiation_report"
+    assert dependency_step.actions == ("read_document", "goto_step")
+    assert [output.name for output in dependency_step.outputs] == [
+        "workflow_dependency_report"
+    ]
+    dependency_output = dependency_step.outputs[0]
+    assert dependency_output.required_for_next_step
+    assert dependency_output.schema is not None
+    assert dependency_output.schema["additionalProperties"] is False
+    assert dependency_output.schema["required"] == ["workflows", "all_match"]
+    workflow_schema = dependency_output.schema["properties"]["workflows"]
+    assert workflow_schema["type"] == "array"
+    workflow_item_schema = workflow_schema["items"]
+    assert workflow_item_schema["required"] == [
+        "workflow_id",
+        "path",
+        "expected_dependencies",
+        "actual_dependencies",
+        "matches",
+    ]
     dependency_details = dependency_step.details
     assert dependency_details is not None
     assert "depends_on_workflows" in dependency_details
     assert "Do not infer dependencies from ordering" in dependency_details
     assert "step_id `plan-workflow-instantiation`" in dependency_details
+    assert "workflow_dependency_report" in dependency_details
+    assert '"outputs":{"workflow_dependency_report"' in dependency_details
     review_details = step("review-workflow-proposed-pr-links").details
     assert review_details is not None
     assert "every proposed PR has exactly one matching workflow" in review_details

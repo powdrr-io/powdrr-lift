@@ -177,7 +177,8 @@ steps:
     failure is caused by the resolution, then use goto_step with step_id
     `plan-resolutions` to update the conflict plan before returning here. Abort
     or stop for user input rather than guessing if the merge would
-    discard behavior that cannot be reconciled.
+    discard behavior that cannot be reconciled. Return
+    {"action":"goto_step","step_id":"plan-resolutions"} when another plan is required.
   tool_invocations:
   - tool: shell
     command:

@@ -84,13 +84,13 @@ steps:
     Present original text, proposed text, tool count, action-clause count, and
     preserved requirements for every rewrite.
 - id: independent-review
-  actions: [edit, yaml_edit, file_management, read_document]
+  actions: [edit, yaml_edit, file_management, read_document, invoke_skill]
   step_type: governed
   description: Obtain an independent adversarial completeness review.
   llm_type: high_reasoning
   details: >-
     Return this exact action shape to invoke the independent review:
-    {"kind":"invoke_skill","skill":"independent-skill-workflow-review",
+    {"action":"invoke_skill","skill":"independent-skill-workflow-review",
     "provider_role":"adversarial","clean":true,"context":["<target goal>",
     "<original step text>","<proposed replacement text>",
     "<preserved requirements>","<inventory counts>"],
@@ -147,7 +147,9 @@ steps:
     invoke staging, pull-request preparation, or pull-request creation. If the
     target path is listed, preserve that path as `files_to_publish` and choose
     `next_step` to continue. Do not treat an unchanged existing file as a
-    publishable artifact.
+    publishable artifact. Return
+    {"action":"complete","text":"No target definition changed."} when no
+    target path is listed, or {"action":"next_step"} when it is listed.
   tool_invocations:
   - tool: shell
     command:

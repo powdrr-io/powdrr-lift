@@ -26,7 +26,7 @@ steps:
     Compare the gathered entity model against the new needs. If the existing
     specification already covers them, return the complete action, for example
     {"action":"complete","text":"The existing architecture covers the new needs."};
-    otherwise choose next_step.
+    otherwise choose next_step. Return {"action":"next_step"} in that case.
 - id: generate-architecture
   description: Deterministically generate the architecture specification template.
   actions: []
@@ -91,7 +91,7 @@ steps:
     invoke_tool in this governed repair step; the next deterministic step reruns
     the evaluator. If evaluation reports invalid YAML/structure or you are
     stuck, restart generation with {"action":"goto_step","step_id":"generate-architecture"}
-    instead of repeating the same repair.
+    instead of repeating the same repair. Otherwise return {"action":"next_step"}.
 - id: gate-architecture
   description: Confirm that architecture evaluation reports zero issues.
   actions: []

@@ -39,6 +39,28 @@ from powdrr_lift.workflow_liveness import (
 
 _PLACEHOLDER = re.compile(r"<([A-Za-z0-9_-]+)>")
 _ACTION_START = re.compile(r'\{\s*"action"\s*:')
+_ACTION_NAMES = frozenset(
+    {
+        "gather_context",
+        "prompt_user",
+        "edit",
+        "yaml_edit",
+        "file_management",
+        "invoke_skill",
+        "invoke_tool",
+        "read_document",
+        "list_files",
+        "goto_step",
+        "next_step",
+        "complete",
+        "emit_outputs",
+    }
+)
+_ACTION_REQUEST = re.compile(
+    r"\b(?:return|choose|respond with|finish with|advance with)\b"
+    r"[^.!?\n]{0,180}",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1518,6 +1540,7 @@ def _validate_step_examples(
     if not isinstance(details, str):
         return []
     issues: list[WorkflowDefinitionIssue] = []
+    example_actions: set[str] = set()
     decoder = json.JSONDecoder()
     for match in _ACTION_START.finditer(details):
         # A step description may embed an action inside another example. Only
@@ -1565,7 +1588,17 @@ def _validate_step_examples(
                     step_index=0,
                 ),
             )
+            action_name = action_data.get("action")
+            if isinstance(action_name, str):
+                example_actions.add(action_name)
         except RuntimeError as exc:
+            if action_data.get("action") == "complete" and (
+                "response.action must be one of" in str(exc)
+            ):
+                # ``complete`` is a universal runtime action and therefore is
+                # intentionally absent from authored action allowlists.
+                example_actions.add("complete")
+                continue
             issues.append(
                 WorkflowDefinitionIssue(
                     "invalid_action_example",
@@ -1573,7 +1606,103 @@ def _validate_step_examples(
                     f"{step_path}.details",
                 )
             )
+    for action_name in sorted(_requested_action_names(details) - example_actions):
+        issues.append(
+            WorkflowDefinitionIssue(
+                "missing_action_example",
+                f"Step prose requests {action_name!r} but details contain no "
+                "valid JSON example for that action.",
+                f"{step_path}.details",
+                remediation=(
+                    "Add the exact top-level JSON action object the model must "
+                    f"return for {action_name!r}; prose-only action instructions "
+                    "are not sufficient."
+                ),
+            )
+        )
     return issues
+
+
+def _requested_action_names(details: str) -> set[str]:
+    """Find positive action requests in prose, excluding JSON examples."""
+    requested: set[str] = set()
+    prose_details = _remove_action_json_examples(details)
+    for match in _ACTION_REQUEST.finditer(prose_details):
+        if re.match(r"\s*return\s+to\b", match.group(0), re.IGNORECASE):
+            continue
+        prefix = prose_details[max(0, match.start() - 16) : match.start()].lower()
+        if re.search(r"(?:do not|don't|never)\s+$", prefix):
+            continue
+        for action_name in _ACTION_NAMES:
+            for action_match in re.finditer(
+                rf"\b{re.escape(action_name)}\b", match.group(0), re.IGNORECASE
+            ):
+                action_start = match.start() + action_match.start()
+                action_prefix = prose_details[max(0, action_start - 16) : action_start]
+                if re.search(
+                    r"(?:do not|don't|never)(?:\s+(?:use|return|choose))?\s+$",
+                    action_prefix,
+                    re.IGNORECASE,
+                ):
+                    continue
+                action_before = match.group(0)[: action_match.start()]
+                action_after = match.group(0)[action_match.end() :]
+                direct_request = re.search(
+                    r"(?:return|choose|respond with|finish with|advance with)\b"
+                    r"(?:\s+\S+){0,5}\s+$",
+                    action_before,
+                    re.IGNORECASE,
+                )
+                named_request = re.match(
+                    r"\s*(?:action\b|with\b|or\b|when\b|after\b)",
+                    action_after,
+                    re.IGNORECASE,
+                )
+                if direct_request is None and named_request is None:
+                    continue
+                if action_name == "complete":
+                    direct_completion = re.search(
+                        r"^\s*(?:action\b|[,.;]|immediately\b|with\b)",
+                        action_after,
+                        re.IGNORECASE,
+                    )
+                    direct_return = re.search(
+                        r"(?:return|choose)\s+(?:exactly\s+)?"
+                        r"(?:one\s+)?(?:the\s+)?$",
+                        match.group(0)[: action_match.start()],
+                        re.IGNORECASE,
+                    )
+                    if direct_completion is None and direct_return is None:
+                        continue
+                requested.add(action_name)
+    for match in re.finditer(
+        r"\b(?:use|invoke|perform)\s+(?:the\s+)?"
+        r"(goto_step|next_step|complete|emit_outputs|prompt_user|edit|"
+        r"yaml_edit|file_management|invoke_tool|invoke_skill)\s+action\b",
+        prose_details,
+        re.IGNORECASE,
+    ):
+        requested.add(match.group(1).lower())
+    return requested
+
+
+def _remove_action_json_examples(details: str) -> str:
+    """Blank valid top-level action JSON so nested fields are not prose requests."""
+    spans: list[tuple[int, int]] = []
+    decoder = json.JSONDecoder()
+    for match in _ACTION_START.finditer(details):
+        prefix = details[: match.start()]
+        if prefix.count("{") != prefix.count("}"):
+            continue
+        try:
+            _, end = decoder.raw_decode(details[match.start() :])
+        except json.JSONDecodeError:
+            continue
+        spans.append((match.start(), match.start() + end))
+    chars = list(details)
+    for start, end in spans:
+        chars[start:end] = " " * (end - start)
+    return "".join(chars)
 
 
 def _compile_skill(

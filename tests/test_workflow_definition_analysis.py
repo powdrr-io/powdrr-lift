@@ -167,6 +167,62 @@ steps:
     }
 
 
+def test_definition_analysis_requires_examples_for_actions_requested_in_prose(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect
+    description: Inspect the feature.
+    actions: [read_document]
+    outputs:
+      - name: result
+        type: string
+    details: Return the result with exactly one next_step action.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "missing_action_example" in {issue.code for issue in report.issues}
+    issue = next(
+        issue for issue in report.issues if issue.code == "missing_action_example"
+    )
+    assert "next_step" in issue.message
+
+
+def test_definition_analysis_accepts_exact_action_example_for_prose_request(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "skill.yaml"
+    definition.write_text(
+        """\
+name: inspect
+when_to_use: [Inspect files.]
+steps:
+  - id: inspect
+    description: Inspect the feature.
+    actions: [read_document]
+    outputs:
+      - name: result
+        type: string
+    details: >-
+      Return the result with exactly one next_step action:
+      {"action":"next_step","output_state":{"result":"inspected"}}.
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "missing_action_example" not in {issue.code for issue in report.issues}
+
+
 def test_prompt_snapshots_use_production_builder_and_normalize_repository_root(
     tmp_path: Path,
 ) -> None:

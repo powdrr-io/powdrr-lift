@@ -677,6 +677,33 @@ def test_action_engine_treats_repeated_gather_context_as_no_progress() -> None:
     assert repeated.correction is not None
 
 
+def test_action_engine_treats_repeated_git_add_as_idempotent_success() -> None:
+    engine = WorkflowLLMActionEngine(max_stalled_roundtrips=1)
+    action = {
+        "action": "invoke_tool",
+        "tool": "git",
+        "parameters": {"operation": "add", "paths": ["already-staged.txt"]},
+    }
+
+    first = engine.observe_action(
+        action,
+        signature=lambda value: json.dumps(value, sort_keys=True),
+        before_state="staged",
+        after_state="staged",
+    )
+    repeated = engine.observe_action(
+        action,
+        signature=lambda value: json.dumps(value, sort_keys=True),
+        before_state="staged",
+        after_state="staged",
+    )
+
+    assert first.made_progress is True
+    assert repeated.made_progress is True
+    assert repeated.decision is ProgressDecision.PROGRESS
+    assert repeated.correction is None
+
+
 def test_action_engine_accepts_a_material_state_change_for_a_repeat() -> None:
     engine = WorkflowLLMActionEngine(max_stalled_roundtrips=1)
     action = _Action(kind="edit", value="README.md")

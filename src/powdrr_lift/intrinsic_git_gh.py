@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -43,6 +44,17 @@ def execute_intrinsic_git_gh_tool(
             f"Unsupported intrinsic repository tool: {tool!r}.",
             error_code="unsupported_tool",
         )
+    if tool == GH_TOOL and parameters.get("operation") == "pr_create":
+        existing = _existing_pull_request(worktree_root)
+        if existing is not None:
+            return {
+                "tool": tool,
+                "command": [executable, *command],
+                "returncode": 0,
+                "stdout": existing,
+                "stderr": "",
+                "no_op": True,
+            }
     result = subprocess.run(
         [executable, *command],
         cwd=worktree_root,
@@ -50,13 +62,86 @@ def execute_intrinsic_git_gh_tool(
         text=True,
         check=False,
     )
+    normalized_returncode = result.returncode
+    normalized_stdout = result.stdout
+    normalized_stderr = result.stderr
+    no_op = False
+    if tool == GIT_TOOL and parameters.get("operation") == "commit":
+        normalized_returncode, normalized_stdout, normalized_stderr, no_op = (
+            _normalize_empty_commit_result(
+                result,
+                worktree_root=worktree_root,
+            )
+        )
     return {
         "tool": tool,
         "command": [executable, *command],
-        "returncode": result.returncode,
-        "stdout": result.stdout,
-        "stderr": result.stderr,
+        "returncode": normalized_returncode,
+        "stdout": normalized_stdout,
+        "stderr": normalized_stderr,
+        "no_op": no_op,
     }
+
+
+def _normalize_empty_commit_result(
+    result: subprocess.CompletedProcess[str],
+    *,
+    worktree_root: Path,
+) -> tuple[int, str, str, bool]:
+    """Make a clean worktree's empty commit a successful idempotent no-op."""
+    if result.returncode == 0:
+        return result.returncode, result.stdout, result.stderr, False
+    output = f"{result.stdout}\n{result.stderr}".casefold()
+    if not any(
+        marker in output
+        for marker in (
+            "nothing to commit",
+            "nothing added to commit",
+            "no changes added to commit",
+        )
+    ):
+        return result.returncode, result.stdout, result.stderr, False
+    status = subprocess.run(
+        ["git", "status", "--short"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if status.returncode != 0 or status.stdout.strip():
+        return result.returncode, result.stdout, result.stderr, False
+    return (
+        0,
+        f"{result.stdout}No changes to commit; existing HEAD retained.\n",
+        result.stderr,
+        True,
+    )
+
+
+def _existing_pull_request(worktree_root: Path) -> str | None:
+    """Return the current branch's PR URL when one already exists."""
+    try:
+        branch = _current_branch(worktree_root)
+    except PowdrrExecutionError:
+        return None
+    result = subprocess.run(
+        ["gh", "pr", "view", branch, "--json", "url,state"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    url = payload.get("url") if isinstance(payload, Mapping) else None
+    state = payload.get("state") if isinstance(payload, Mapping) else None
+    if isinstance(url, str) and state in {"OPEN", "DRAFT"}:
+        return url.strip() + "\n"
+    return None
 
 
 def _reject_pr_identity_overrides(

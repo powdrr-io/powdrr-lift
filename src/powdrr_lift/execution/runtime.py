@@ -325,7 +325,9 @@ class ExecutionRuntime:
         if effective is None or "invoke_tool" in effective:
             return ()
         action_families = {
-            "edit_files": frozenset({"edit", "yaml_edit", "file_management"}),
+            "edit_files": frozenset(
+                {"edit", "yaml_edit", "file_management", "delete_file"}
+            ),
             "validate_edit": frozenset({"validate_edit"}),
             "apply_edit": frozenset({"apply_edit"}),
             "run_process": frozenset({"shell"}),
@@ -1351,6 +1353,7 @@ class ExecutionRuntime:
                     {"file-mutation", "validate-edit", "apply-edit"}
                 ),
                 "file_management": frozenset({"file-mutation"}),
+                "delete_file": frozenset({"file-mutation"}),
                 "read_document": frozenset({"repository-read_document"}),
                 "gather_context": frozenset({"repository-gather_context"}),
                 "fuzzy_match": frozenset({"fuzzy-match"}),

@@ -49,7 +49,7 @@ steps:
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
 - description: Stage the exact files that belong in the pull request.
-  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
+  actions: [invoke_tool, edit, yaml_edit, delete_file, read_document]
   step_type: governed
   llm_type: simple_task
   details: >-
@@ -61,8 +61,8 @@ steps:
     Do not use `git add .`, `git add --all`, or stage logs, caches, or unrelated
     files. If `git status --short` shows an untracked or modified path that is
     not in `files_to_publish`, delete that path before staging. Delete it with
-    the intrinsic file-management action exactly as
-    {"action":"file_management","operation":"delete","file_path":"path/to/unintended-file"}.
+    the dedicated delete action exactly as
+    {"action":"delete_file","file_path":"path/to/unintended-file"}.
     Do not stage or preserve unintended diagnostic logs, generated artifacts,
     or other files in the pull request. Verify the staged names with `git
     diff --cached --name-only`; do not advance until every intended path is
@@ -71,7 +71,7 @@ steps:
     after deleting an unintended file.
   tool_invocation_packages: [git_readonly_and_additive]
 - description: Commit the validated changes.
-  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
+  actions: [invoke_tool, edit, yaml_edit, delete_file, read_document]
   step_type: governed
   llm_type: simple_task
   details: >-
@@ -84,9 +84,9 @@ steps:
     exact state, so continue without creating an empty commit. If status shows
     unstaged or untracked paths, stop and correct each one: stage an intended
     path with the intrinsic git add action. For every unstaged or untracked path
-    that is not in `files_to_publish`, delete it with the intrinsic
-    file-management action before retrying. Use exactly
-    {"action":"file_management","operation":"delete","file_path":"path/to/unintended-file"}
+    that is not in `files_to_publish`, delete it with the dedicated delete
+    action before retrying. Use exactly
+    {"action":"delete_file","file_path":"path/to/unintended-file"}
     for each unintended path; never add an unintended file to the commit.
     Rerun status, then retry the commit only after the worktree is clean or
     the intended changes are staged. Do not push or invoke any GitHub command

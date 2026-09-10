@@ -94,6 +94,7 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_action_response,
     _parse_action_response_with_schema,
     _parse_json_object,
+    _parse_workflow_action_delete_file,
     _parse_workflow_action_file_management,
     _parse_workflow_action_gather_context,
     _predicated_step_complete,
@@ -4442,6 +4443,17 @@ def test_file_management_delete_accepts_either_path_field(
         is True
     )
     assert not target.exists()
+
+
+def test_delete_file_action_has_only_a_source_path(tmp_path: Path) -> None:
+    target = tmp_path / "agent_error.txt"
+    target.write_text("diagnostic output", encoding="utf-8")
+    action = _parse_workflow_action_delete_file({"file_path": target.name}, None, None)
+
+    assert action.kind == "delete_file"
+    assert action.file_operation == "delete"
+    assert action.file_path == target.name
+    assert action.destination_path is None
 
 
 @pytest.mark.parametrize("path", ["../outside.txt", "nested/../../outside.txt"])

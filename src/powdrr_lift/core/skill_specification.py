@@ -106,6 +106,7 @@ SUPPORTED_STEP_ACTIONS = frozenset(
         "edit",
         "yaml_edit",
         "file_management",
+        "delete_file",
         "invoke_skill",
         "invoke_tool",
         "read_document",

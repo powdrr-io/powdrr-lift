@@ -2026,7 +2026,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 verbose=self.config.verbose,
                 runtime=self.driver.runtime,
             )
-            if action.kind in {"edit", "yaml_edit", "file_management"}
+            if action.kind in {"edit", "yaml_edit", "file_management", "delete_file"}
             else None
         )
         if verification is not None:
@@ -5556,9 +5556,11 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "is genuinely required to continue; ask exactly one clear question.\n"
         "- edit: choose this when the current file context is sufficient and the "
         "next action is a line-based file change.\n"
-        "- file_management: choose this to delete, move, or rename one existing "
+        "- file_management: choose this to move or rename one existing "
         "regular file. Paths must be relative to the current worktree, must not "
         "contain '..', and move/rename requires destination_path.\n"
+        "- delete_file: choose this to delete one existing regular file; provide "
+        "only its relative file_path.\n"
         "- invoke_skill: choose this when a listed skill should run as a nested "
         "workflow before continuing. It inherits the current context and LLM "
         "provider role by default, including the current skill's adversarial "
@@ -5614,7 +5616,7 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "greater than or equal to start_line. Prefer yaml_edit for .yaml or .yml "
         "files, but use edit as "
         "a fallback when a structural operation cannot express the repair. "
-        "file_management requires operation (delete, move, or rename) and "
+        "file_management requires operation (move or rename) and "
         "file_path; move and rename also require destination_path.\n"
         "invoke_tool requires a tool listed in the current step's "
         "tool_invocations. Shell and internal require parameters.command as a "
@@ -5873,9 +5875,14 @@ def _modular_action_system_prompt(
         )
     if "file_management" in action_names:
         prompt += (
-            "file_management uses operation delete, move, or rename plus a relative "
+            "file_management uses operation move or rename plus a relative "
             "file_path; move and rename also require destination_path. Never use '..' "
             "or absolute paths.\n"
+        )
+    if "delete_file" in action_names:
+        prompt += (
+            "delete_file uses only a relative file_path. Never use '..' or "
+            "absolute paths.\n"
         )
     if "goto_step" in action_names:
         prompt += "Use goto_step only with a declared prior step id.\n"
@@ -6107,6 +6114,7 @@ def _workflow_action_handlers() -> dict[
         "edit": _handle_workflow_action_edit,
         "yaml_edit": _handle_workflow_action_yaml_edit,
         "file_management": _handle_workflow_action_file_management,
+        "delete_file": _handle_workflow_action_file_management,
         "read_document": _handle_workflow_action_read_document,
         "list_files": _handle_workflow_action_list_files,
         "next_step": _handle_workflow_action_next_step,
@@ -6181,7 +6189,7 @@ def _workflow_action_material_state(
             )
             for file_path in file_paths
         )
-    if action.kind == "file_management":
+    if action.kind in {"file_management", "delete_file"}:
         return (action.file_operation, action.file_path, action.destination_path)
     if action.kind == "prompt_user":
         return _last_user_message(state)
@@ -6209,7 +6217,7 @@ def _workflow_action_signature(action: SkillChatAction) -> str:
 def _workflow_action_progress_status(action: SkillChatAction) -> str | None:
     if action.kind in {"edit", "yaml_edit"}:
         return "Attempting file edit"
-    if action.kind == "file_management":
+    if action.kind in {"file_management", "delete_file"}:
         return f"Managing file: {action.file_operation} {action.file_path}"
     if action.kind == "read_document":
         return "Reading file"
@@ -8892,6 +8900,7 @@ def _workflow_action_parsers() -> dict[str, WorkflowActionParser]:
         "edit": _parse_workflow_action_edit,
         "yaml_edit": _parse_workflow_action_yaml_edit,
         "file_management": _parse_workflow_action_file_management,
+        "delete_file": _parse_workflow_action_delete_file,
         "gather_context": _parse_workflow_action_gather_context,
         "invoke_tool": _parse_workflow_action_invoke_tool,
         "invoke_skill": _parse_workflow_action_invoke_skill,
@@ -9387,6 +9396,7 @@ def _first_class_action_example(action_name: str) -> str:
             '{"action":"file_management","operation":"rename",'
             '"file_path":"old.txt","destination_path":"new.txt"}'
         ),
+        "delete_file": '{"action":"delete_file","file_path":"old.txt"}',
         "invoke_skill": '{"action":"invoke_skill","skill":"skill-name"}',
         "goto_step": '{"action":"goto_step","step_id":"step-id"}',
         "read_document": (
@@ -9445,6 +9455,23 @@ def _parse_workflow_action_file_management(
         destination_path=(
             destination_path.strip() if isinstance(destination_path, str) else None
         ),
+        decisions_and_context=decisions_and_context,
+        llm_type=llm_type,
+    )
+
+
+def _parse_workflow_action_delete_file(
+    payload: dict[str, Any],
+    decisions_and_context: str | None,
+    llm_type: str | None,
+) -> SkillChatAction:
+    file_path = payload.get("file_path")
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise PowdrrExecutionError("delete_file action requires file_path.")
+    return SkillChatAction(
+        kind="delete_file",
+        file_operation="delete",
+        file_path=file_path.strip(),
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )
@@ -11824,6 +11851,7 @@ def _step_action_response_schema(
             "edit",
             "yaml_edit",
             "file_management",
+            "delete_file",
             "invoke_skill",
             "invoke_tool",
             "read_document",
@@ -11866,6 +11894,7 @@ def _step_action_response_schema(
             "file_path": {"type": "string"},
             "destination_path": {"type": "string"},
         },
+        "delete_file": {"file_path": {"type": "string"}},
         "invoke_skill": {
             "skill": {"type": "string"},
             "provider_role": {
@@ -11932,7 +11961,8 @@ _DEFAULT_ACTION_INSTRUCTIONS = {
     "prompt_user": "Ask one necessary human question.",
     "edit": "Apply a known line-based change to a file.",
     "yaml_edit": "Apply a structural change to a YAML file.",
-    "file_management": "Move, rename, or delete one relative file.",
+    "file_management": "Move or rename one relative file.",
+    "delete_file": "Delete one relative file using file_path.",
     "invoke_skill": "Run one listed nested skill.",
     "invoke_tool": "Run one command declared by this step.",
     "read_document": "Read a bounded range from a known document.",
@@ -11976,6 +12006,7 @@ def _step_actions(
                     "edit",
                     "yaml_edit",
                     "file_management",
+                    "delete_file",
                     "read_document",
                     "prompt_user",
                 ]
@@ -11992,6 +12023,7 @@ def _step_actions(
                 "edit",
                 "yaml_edit",
                 "file_management",
+                "delete_file",
                 "prompt_user",
             ]
         if not behavior.invokes_llm:
@@ -12183,9 +12215,10 @@ def _action_repair_prompt(
     action_requirements = {
         "edit": "Use file_path and edits or file_edits for edit.",
         "file_management": (
-            "Use operation and file_path for file_management; move and rename "
-            "also require destination_path."
+            "Use operation and file_path for file_management; operation must be "
+            "move or rename, and both require destination_path."
         ),
+        "delete_file": "Use only file_path for delete_file.",
         "yaml_edit": (
             "Use file_path and operations for yaml_edit; combine independent "
             "corrections for the same file in one operations array."

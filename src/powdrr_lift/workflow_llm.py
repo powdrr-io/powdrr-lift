@@ -794,6 +794,7 @@ def constrain_action_response_schema(
         "edit": {"file_path", "edits", "file_edits"},
         "yaml_edit": {"file_path", "operations"},
         "file_management": {"operation", "file_path", "destination_path"},
+        "delete_file": {"file_path"},
         "invoke_skill": {"skill", "provider_role", "clean", "context"},
         "invoke_tool": {"tool", "parameters"},
         "read_document": {"file_path", "start_line", "end_line"},

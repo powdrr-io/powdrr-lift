@@ -5614,9 +5614,8 @@ def _action_system_prompt(*, current_step: Any | None = None) -> str:
         "greater than or equal to start_line. Prefer yaml_edit for .yaml or .yml "
         "files, but use edit as "
         "a fallback when a structural operation cannot express the repair. "
-        "file_management requires operation (delete, move, or rename). Delete "
-        "accepts the target in file_path or destination_path; move and rename "
-        "require file_path and destination_path.\n"
+        "file_management requires operation (delete, move, or rename) and "
+        "file_path; move and rename also require destination_path.\n"
         "invoke_tool requires a tool listed in the current step's "
         "tool_invocations. Shell and internal require parameters.command as a "
         "non-empty string or string array. The intrinsic git and gh tools use "
@@ -5874,9 +5873,8 @@ def _modular_action_system_prompt(
         )
     if "file_management" in action_names:
         prompt += (
-            "file_management uses operation delete, move, or rename plus relative "
-            "paths. Delete accepts the target in file_path or destination_path; move "
-            "and rename require both file_path and destination_path. Never use '..' "
+            "file_management uses operation delete, move, or rename plus a relative "
+            "file_path; move and rename also require destination_path. Never use '..' "
             "or absolute paths.\n"
         )
     if "goto_step" in action_names:

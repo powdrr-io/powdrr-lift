@@ -70,15 +70,61 @@ steps:
     assert "declares no model-owned tool" in issue.message
 
 
-def test_definition_analysis_covers_instantiated_tasks_and_workflow_metadata() -> None:
-    repository_root = Path(__file__).parents[1]
-    task = (
-        repository_root
-        / "docs/workflows/interaction-file-log/interaction-file-log-core-task-001.yaml"
+def test_definition_analysis_covers_instantiated_tasks_and_workflow_metadata(
+    tmp_path: Path,
+) -> None:
+    workflow_root = tmp_path / "docs/workflows/interaction-file-log"
+    workflow_root.mkdir(parents=True)
+    task = workflow_root / "interaction-file-log-core-task-001.yaml"
+    task.write_text(
+        """\
+task_id: interaction-file-log-core-task-001
+status: open
+upstream_task_ids: []
+dependent_state: [proposed-pr-context-gathered]
+complexity: high
+input_state:
+  proposed_pr: interaction-file-log-core
+  feature_id: interaction-file-log
+assignee_type: agent
+assignee_role: architect
+output_state_type: proposed-pr-context-state
+description: Gather context about the proposed PR
+workflow_template: execute-proposed-pr
+phase_type: intake
+persona_id: architect
+step_type: invoke_tool
+pre_step:
+  action: gather_context
+  template:
+    feature_id: <feature_id>
+    types: [proposed_prs]
+""",
+        encoding="utf-8",
     )
-    workflow = (
-        repository_root
-        / "docs/workflows/interaction-file-log/interaction-file-log-core-workflow.yaml"
+    workflow = workflow_root / "interaction-file-log-core-workflow.yaml"
+    workflow.write_text(
+        """\
+proposed_pr_id: interaction-file-log-core
+base_branch: main
+integration_branch: powdrr/interaction-file-log-core
+workflow_relative_directory: docs/workflows/interaction-file-log
+invariants:
+  - id: workflow-implements-target
+    relationship: implements
+    source_type: workflow
+    target_type: proposed_pr
+    target_id: interaction-file-log-core
+    cardinality: exactly_one
+relationships:
+  - relationship: implements
+    source_type: workflow
+    target_type: proposed_pr
+    cardinality: exactly_one
+    invariant_id: workflow-implements-target
+    source_id: interaction-file-log-core
+""",
+        encoding="utf-8",
     )
 
     task_report = analyze_workflow_definition(task)

@@ -198,8 +198,7 @@ def test_existing_pull_request_makes_create_idempotent(
             return subprocess.CompletedProcess(
                 args,
                 0,
-                '{"url":"https://github.com/example/repo/pull/7",'
-                '"state":"OPEN"}',
+                '{"url":"https://github.com/example/repo/pull/7","state":"OPEN"}',
                 "",
             )
         raise AssertionError(args)

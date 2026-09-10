@@ -378,10 +378,14 @@ def commit_and_push_workflow_initialization(
     workflow_path = Path(workflow_directory).resolve()
     relative_workflow = workflow_path.relative_to(worktree_path)
     _run_git(worktree_path, ["add", str(relative_workflow)])
-    _run_git(
-        worktree_path,
-        ["commit", "-m", "Initialize durable workflow run"],
+    staged = _git(
+        worktree_path, ["status", "--porcelain", "--", str(relative_workflow)]
     )
+    if staged.stdout.strip():
+        _run_git(
+            worktree_path,
+            ["commit", "-m", "Initialize durable workflow run"],
+        )
     if push:
         branch = _run_git(worktree_path, ["branch", "--show-current"])
         _run_git(worktree_path, ["push", "--set-upstream", "origin", branch])

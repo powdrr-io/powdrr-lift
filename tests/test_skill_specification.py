@@ -1512,8 +1512,25 @@ def test_checked_in_start_implementing_feature_skill_definition_matches_flow() -
     assert instantiate_details is not None
     assert "Do not pass workflow dependencies manually" in instantiate_details
     assert "unified proposed-PR specification" in instantiate_details
+    assert "workflow_instantiation_report" in instantiate_details
+    assert '"outputs":{"workflow_instantiation_report"' in instantiate_details
+    instantiate_output = step("instantiate-execution-workflows").outputs[0]
+    assert instantiate_output.name == "workflow_instantiation_report"
+    assert instantiate_output.required_for_next_step
+    assert instantiate_output.schema is not None
+    assert instantiate_output.schema["required"] == ["workflows"]
+    workflow_output_schema = instantiate_output.schema["properties"]["workflows"]
+    assert workflow_output_schema["items"]["required"] == [
+        "workflow_id",
+        "workflow_directory",
+        "integration_branch",
+        "integration_worktree",
+        "task_count",
+        "reused",
+    ]
     dependency_step = step("verify-workflow-dependencies")
     assert dependency_step.step_type == "governed"
+    assert dependency_step.inputs[0].name == "workflow_instantiation_report"
     dependency_details = dependency_step.details
     assert dependency_details is not None
     assert "depends_on_workflows" in dependency_details

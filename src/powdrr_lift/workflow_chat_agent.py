@@ -8131,8 +8131,26 @@ def _predicated_action_evidence(
         for event in state.execution_events
         if event.get("step_index") == state.step_index
         and event.get("kind") == requirement.action
-        and all(event.get(name) == value for name, value in parameters.items())
+        and all(
+            _predicated_parameter_matches(event.get(name), value, name)
+            for name, value in parameters.items()
+        )
     ]
+
+
+def _predicated_parameter_matches(actual: Any, expected: Any, name: str) -> bool:
+    if (
+        name == "types"
+        and isinstance(actual, Sequence)
+        and isinstance(expected, Sequence)
+    ):
+        try:
+            return [normalize_context_type(str(item)) for item in actual] == [
+                normalize_context_type(str(item)) for item in expected
+            ]
+        except ValueError:
+            return list(actual) == list(expected)
+    return actual == expected
 
 
 def _resolve_predicated_targets(path: str, state: _WorkflowExecutionState) -> list[Any]:
@@ -11897,7 +11915,7 @@ def _predicated_context_complete(
             if event.get("step_index") == step_index
             and event.get("kind") == requirement.action
             and all(
-                event.get(name) == value
+                _predicated_parameter_matches(event.get(name), value, name)
                 for name, value in (requirement.parameters or {}).items()
             )
         ]

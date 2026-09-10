@@ -1974,6 +1974,8 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             _validate_workflow_action_for_step(
                 action,
                 self.current_step,
+                execution_events=self.state.execution_events,
+                step_index=self.state.step_index,
                 observer_allowed_action=self.observer_allowed_action,
             )
         _validate_workflow_action_outputs(action, self.current_step)
@@ -7023,10 +7025,14 @@ def _validate_workflow_action_for_step(
     action: SkillChatAction,
     step: Any,
     *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
     observer_allowed_action: ObserverActionRecommendation | None = None,
 ) -> None:
     """Reject tool actions that do not match a current-step invocation."""
-    allowed_actions = _declared_action_names(step)
+    allowed_actions = _declared_action_names(
+        step, execution_events=execution_events, step_index=step_index
+    )
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
@@ -7066,7 +7072,11 @@ def _validate_workflow_action_for_step(
         return
     try:
         _validate_workflow_action_for_step_unwrapped(
-            action, step, observer_allowed_action=observer_allowed_action
+            action,
+            step,
+            execution_events=execution_events,
+            step_index=step_index,
+            observer_allowed_action=observer_allowed_action,
         )
     except RuntimeError as exc:
         if isinstance(exc, _WorkflowToolValidationError):
@@ -8433,10 +8443,14 @@ def _validate_workflow_action_for_step_unwrapped(
     action: SkillChatAction,
     step: Any,
     *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
     observer_allowed_action: ObserverActionRecommendation | None = None,
 ) -> None:
     """Validate a tool action while preserving the original error wording."""
-    allowed_actions = _declared_action_names(step)
+    allowed_actions = _declared_action_names(
+        step, execution_events=execution_events, step_index=step_index
+    )
     if (
         allowed_actions is not None
         and action.kind not in allowed_actions
@@ -11926,11 +11940,21 @@ def _predicated_context_complete(
     return True
 
 
-def _declared_action_names(step: Any) -> tuple[str, ...]:
+def _declared_action_names(
+    step: Any,
+    *,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    step_index: int | None = None,
+) -> tuple[str, ...]:
     # next_step is an implicit runtime action; its output-specific guidance is
     # rendered only when the step declares required handoff outputs.
     behavior = behavior_for_step(step)
-    names = [name for name, _ in _step_actions(step)]
+    names = [
+        name
+        for name, _ in _step_actions(
+            step, execution_events=execution_events, step_index=step_index
+        )
+    ]
     if "next_step" not in names and not behavior.is_predicated:
         names.append("next_step")
     return tuple(names)

@@ -638,6 +638,33 @@ def test_predicated_step_switches_to_emit_only_after_context_action() -> None:
     )["properties"]["action"]["enum"] == ["emit_outputs"]
 
 
+def test_predicated_validator_switches_to_emit_only_after_context_action() -> None:
+    step = SkillStep(
+        description="Gather context, judge it, and publish the result.",
+        step_type="predicated",
+        actions=("gather_context",),
+        actions_declared=True,
+        completion=SkillStepCompletion(
+            ("result",),
+            (SkillStepRequiredAction("gather_context", exactly=1),),
+        ),
+        outputs=(SkillStepOutput(name="result", type="object"),),
+    )
+    emit = _parse_action_response(
+        {"action": "emit_outputs", "outputs": {"result": {"ok": True}}}
+    )
+
+    with pytest.raises(_WorkflowToolValidationError, match="not allowed"):
+        _validate_workflow_action_for_step(emit, step, step_index=0)
+
+    _validate_workflow_action_for_step(
+        emit,
+        step,
+        execution_events=[{"kind": "gather_context", "step_index": 0}],
+        step_index=0,
+    )
+
+
 def test_predicated_step_advances_after_current_step_outputs(tmp_path: Path) -> None:
     predicated = SkillStep(
         description="Produce the result.",

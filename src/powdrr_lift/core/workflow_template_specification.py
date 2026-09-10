@@ -32,6 +32,7 @@ from powdrr_lift.core.workflow_task_specification import (
     TaskStatus,
     WorkflowTask,
     build_workflow_task_directory_validation_report,
+    load_workflow_task,
     save_workflow_task,
     select_ready_workflow_tasks,
     validate_assignee,
@@ -314,6 +315,28 @@ def instantiate_workflow_template(
         f"{task_prefix}task-{index + 1:03d}"
         for index in range(len(template.task_templates))
     )
+    task_paths = tuple(output_directory / f"{task_id}.yaml" for task_id in task_ids)
+    existing_task_paths = tuple(path for path in task_paths if path.exists())
+    if existing_task_paths:
+        if len(existing_task_paths) != len(task_paths):
+            raise FileExistsError(
+                "Workflow generation left a partial task set in "
+                f"{output_directory}; remove the incomplete workflow before retrying."
+            )
+        existing_tasks = tuple(load_workflow_task(path) for path in task_paths)
+        report = build_workflow_task_directory_validation_report(output_directory)
+        if not report.validation_successful:
+            issues = "; ".join(issue.message for issue in report.issues)
+            raise ValueError(
+                f"Existing workflow failed validation and cannot be reused: {issues}"
+            )
+        ready_tasks = select_ready_workflow_tasks(existing_tasks)
+        if len(ready_tasks) != 1 or ready_tasks[0].task_id != task_ids[0]:
+            raise ValueError(
+                "Existing workflow must have exactly one ready first task; "
+                f"found {[task.task_id for task in ready_tasks]}"
+            )
+        return output_directory, existing_tasks
     substitutions.update(
         {f"upstream-task-{index}": task_id for index, task_id in enumerate(task_ids)}
     )

@@ -4,6 +4,7 @@ import argparse
 import difflib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -2052,6 +2053,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     if not output_root.is_absolute():
         output_root = repo_root / output_root
     template_values = _parse_template_values(args.template_value)
+    reused_existing = False
     try:
         project_root = resolve_git_repository_root(repo_root)
         proposed_pr_id = template_values.get("proposed-pr-id", args.work_item_name)
@@ -2104,6 +2106,22 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             relationships: tuple[Any, ...] = ()
         else:
             assert template_path is not None
+            output_directory = _workflow_output_directory(
+                output_root, args.work_item_name
+            )
+            instance_slug = re.sub(
+                r"[^a-z0-9]+",
+                "-",
+                (args.workflow_instance_name or args.work_item_name).strip().lower(),
+            ).strip("-")
+            task_count = len(load_workflow_template(template_path).task_templates)
+            expected_tasks = tuple(
+                output_directory / f"{instance_slug}-task-{index + 1:03d}.yaml"
+                for index in range(task_count)
+            )
+            reused_existing = bool(expected_tasks) and all(
+                path.is_file() for path in expected_tasks
+            )
             output_directory, tasks = instantiate_workflow_template(
                 template_path=template_path,
                 work_item_name=args.work_item_name,
@@ -2143,6 +2161,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     print(
         json.dumps(
             {
+                "workflow_id": proposed_pr_id,
                 "workflow_directory": str(output_directory),
                 "task_count": len(tasks),
                 "first_task": str(output_directory / f"{tasks[0].task_id}.yaml"),
@@ -2151,6 +2170,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
                 "integration_worktree": (
                     str(integration_worktree) if integration_worktree else None
                 ),
+                "reused": reused_existing,
             },
             indent=2,
         )

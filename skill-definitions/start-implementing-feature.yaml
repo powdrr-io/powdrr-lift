@@ -534,6 +534,16 @@ steps:
     retry the exact invocation once with `--force`; this resets only that
     dedicated integration branch to the current generated source commit and
     uses lease-protected push. Do not use `--force` for any other command.
+    After every invocation succeeds, record its exact returned workflow identity.
+    Before advancing, emit one `workflow_instantiation_report` output containing
+    every requested workflow exactly once. Each entry must copy the command result
+    fields without invention and include `workflow_id`, `workflow_directory`,
+    `integration_branch`, `integration_worktree`, `task_count`, and `reused`.
+    Set `reused` to true when the command reports an existing idempotent workflow
+    and false when it creates one. Use this exact handoff shape:
+    {"action":"next_step","outputs":{"workflow_instantiation_report":{"workflows":[{"workflow_id":"<id>","workflow_directory":"<path>","integration_branch":"powdrr/<id>","integration_worktree":"<path>","task_count":0,"reused":false}]}},"decisions_and_context":"Recorded every successful workflow instantiation result."}
+    Do not advance after a failed invocation, do not invoke a new instance name,
+    and do not put the successful identities only in decisions_and_context.
   tool_invocations:
   - tool: internal
     command:
@@ -564,11 +574,44 @@ steps:
     - --template
     - templates/execute-proposed-pr.yaml
     - --force
+  outputs:
+  - name: workflow_instantiation_report
+    type: any
+    required_for_next_step: true
+    schema:
+      type: object
+      additionalProperties: false
+      properties:
+        workflows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              workflow_id: {type: string}
+              workflow_directory: {type: string}
+              integration_branch: {type: string}
+              integration_worktree: {type: string}
+              task_count: {type: integer}
+              reused: {type: boolean}
+            required:
+            - workflow_id
+            - workflow_directory
+            - integration_branch
+            - integration_worktree
+            - task_count
+            - reused
+      required: [workflows]
 - id: verify-workflow-dependencies
   description: Verify workflow-level dependency metadata.
-  actions: [edit, yaml_edit, file_management, read_document, goto_step]
+  actions: [read_document, goto_step]
   step_type: governed
   llm_type: fast_iteration
+  inputs:
+  - name: workflow_instantiation_report
+    type: any
+    required: true
+    source: previous_step
   details: >-
     Compare the dependency relationships in the unified proposed-PR file with every
     generated or reused `<proposed_pr_id>-workflow.yaml` in
@@ -586,6 +629,45 @@ steps:
     goto_step with step_id `plan-workflow-instantiation` and include the exact
     workflow id, expected dependency list, actual dependency list, and file
     path. Continue only after the persisted metadata exactly matches the plan.
+    When every workflow matches, choose next_step and emit exactly one
+    `workflow_dependency_report` output. The output must contain one `workflows`
+    entry for every workflow and an `all_match` boolean set to true. Each entry
+    must include the exact `workflow_id`, `path`, `expected_dependencies`,
+    `actual_dependencies`, and `matches: true`. Use this exact output shape:
+    {"action":"next_step","outputs":{"workflow_dependency_report":{"workflows":[{"workflow_id":"<id>","path":"<exact path>","expected_dependencies":[],"actual_dependencies":[],"matches":true}],"all_match":true}},"decisions_and_context":"Verified every workflow dependency against the unified proposed-PR plan."}
+    Do not put the report only in decisions_and_context and do not advance
+    without the declared output.
+  outputs:
+  - name: workflow_dependency_report
+    type: any
+    required_for_next_step: true
+    schema:
+      type: object
+      additionalProperties: false
+      properties:
+        workflows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              workflow_id: {type: string}
+              path: {type: string}
+              expected_dependencies:
+                type: array
+                items: {type: string}
+              actual_dependencies:
+                type: array
+                items: {type: string}
+              matches: {type: boolean}
+            required:
+            - workflow_id
+            - path
+            - expected_dependencies
+            - actual_dependencies
+            - matches
+        all_match: {type: boolean}
+      required: [workflows, all_match]
 - id: inspect-workflow-repository-state
   description: Inspect generated workflow repository state.
   actions: []

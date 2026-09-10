@@ -496,6 +496,33 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert tasks[2].coding_loop.verification[0].command == "pytest -q"
 
 
+def test_instantiate_workflow_template_reuses_complete_task_set(
+    tmp_path: Path,
+) -> None:
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
+    )
+    output_root = tmp_path / "workflows"
+
+    first_directory, first_tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="Example Feature",
+        workflow_instance_name="example-pr",
+        output_root=output_root,
+        template_values={"verification-command": "pytest -q"},
+    )
+    second_directory, second_tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name="Example Feature",
+        workflow_instance_name="example-pr",
+        output_root=output_root,
+        template_values={"verification-command": "pytest -q"},
+    )
+
+    assert second_directory == first_directory
+    assert second_tasks == first_tasks
+
+
 def test_checked_in_execute_workflows_do_not_terminate_on_intermediate_tasks() -> None:
     workflow_root = (
         Path(__file__).resolve().parents[1]

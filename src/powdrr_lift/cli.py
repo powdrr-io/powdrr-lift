@@ -183,6 +183,13 @@ from powdrr_lift.workflow_human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
+from powdrr_lift.workflow_prompt_probe import (
+    WorkflowPromptProbeError,
+    build_probe_client,
+    build_workflow_prompt_probe,
+    probe_workflow_step,
+    resolve_probe_model,
+)
 from powdrr_lift.workflow_replay import (
     WorkflowReplayError,
     load_error_record,
@@ -1315,6 +1322,37 @@ def build_parser() -> argparse.ArgumentParser:
     ambiguity_review_parser.add_argument("--base-url")
     ambiguity_review_parser.add_argument("--json", action="store_true")
     ambiguity_review_parser.set_defaults(func=_run_review_workflow_ambiguity)
+
+    prompt_probe_parser = subparsers.add_parser(
+        "probe-workflow-step",
+        aliases=["probe_workflow_step"],
+        help=(
+            "Build the production prompt for one skill or workflow step, call the "
+            "LLM, and validate its action without executing it."
+        ),
+    )
+    prompt_probe_parser.add_argument("--definition", required=True, type=Path)
+    prompt_probe_selector = prompt_probe_parser.add_mutually_exclusive_group(
+        required=True
+    )
+    prompt_probe_selector.add_argument("--step-id")
+    prompt_probe_selector.add_argument("--step-index", type=int)
+    prompt_probe_parser.add_argument(
+        "--root-intent", default="Probe this workflow step."
+    )
+    prompt_probe_parser.add_argument("--repo-root", type=Path)
+    prompt_probe_parser.add_argument(
+        "--provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    prompt_probe_parser.add_argument("--model")
+    prompt_probe_parser.add_argument("--api-key")
+    prompt_probe_parser.add_argument("--base-url")
+    prompt_probe_parser.add_argument("--samples", type=int, default=1)
+    prompt_probe_parser.add_argument("--timeout-retries", type=int, default=0)
+    prompt_probe_parser.add_argument("--timeout-backoff", type=float, default=0)
+    prompt_probe_parser.add_argument("--include-prompt", action="store_true")
+    prompt_probe_parser.add_argument("--json", action="store_true")
+    prompt_probe_parser.set_defaults(func=_run_probe_workflow_step)
 
     comparison_parser = subparsers.add_parser(
         "compare-workflow-definitions",
@@ -4072,6 +4110,83 @@ def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
             if values:
                 print(f"{field}: {', '.join(values)}")
     return 0
+
+
+def _run_probe_workflow_step(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    definition = (
+        args.definition
+        if args.definition.is_absolute()
+        else repo_root / args.definition
+    )
+    try:
+        probe = build_workflow_prompt_probe(
+            definition,
+            repo_root=repo_root,
+            root_intent=args.root_intent,
+            step_id=args.step_id,
+            step_index=args.step_index,
+        )
+        provider, model, llm_type = resolve_probe_model(
+            probe,
+            provider=args.provider,
+            model_override=args.model,
+        )
+        client = build_probe_client(
+            provider=args.provider,
+            model=model,
+            api_key=args.api_key,
+            base_url=args.base_url,
+            repo_root=repo_root,
+            progress_stream=sys.stderr,
+        )
+        results = probe_workflow_step(
+            client,
+            probe,
+            samples=args.samples,
+            model=model,
+            stderr=sys.stderr,
+            max_timeout_retries=args.timeout_retries,
+            timeout_backoff_seconds=args.timeout_backoff,
+            include_prompt=args.include_prompt,
+        )
+    except (KeyError, RuntimeError, WorkflowPromptProbeError) as exc:
+        print(f"Workflow prompt probe failed: {exc}", file=sys.stderr)
+        return 1
+    data = {
+        "probe": {
+            "definition": str(probe.definition),
+            "definition_kind": probe.definition_kind,
+            "step_index": probe.step_index,
+            "step_id": probe.step_id,
+            "llm_type": llm_type,
+            "provider": provider,
+            "model": model,
+            "prompt_sha256": probe.prompt_sha256,
+            "response_schema": probe.response_schema,
+            **({"messages": probe.messages} if args.include_prompt else {}),
+        },
+        "samples": [result.to_data(include_prompt=False) for result in results],
+        "valid": all(result.valid for result in results),
+    }
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        status = "valid" if data["valid"] else "invalid"
+        print(
+            f"Workflow prompt probe {status}: {probe.definition} "
+            f"{probe.definition_kind} step {probe.step_id or probe.step_index}"
+        )
+        for result in results:
+            if result.valid:
+                action = result.action or {}
+                print(f"  sample {result.sample}: valid ({action.get('kind')})")
+            else:
+                print(
+                    f"  sample {result.sample}: invalid "
+                    f"({result.error_code}): {result.error}"
+                )
+    return 0 if data["valid"] else 1
 
 
 def _run_compare_workflow_definitions(args: argparse.Namespace) -> int:

@@ -171,6 +171,14 @@ def test_git_intrinsic_executes_only_inside_the_worktree(tmp_path: Path) -> None
 def test_empty_git_commit_is_an_idempotent_success(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.email", "test@example.com"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.name", "Test User"],
+        check=True,
+    )
+    subprocess.run(
         ["git", "-C", str(tmp_path), "commit", "--allow-empty", "-m", "initial"],
         check=True,
         capture_output=True,

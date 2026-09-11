@@ -38,6 +38,7 @@ from powdrr_lift.agent.providers import (
     resolve_llm_mapping,
     resolve_llm_model,
     resolve_local_model_path,
+    resolve_provider,
     resolve_provider_credentials,
     resolve_provider_roles,
 )
@@ -121,7 +122,6 @@ from powdrr_lift.workflow_chat_agent import (
     _require_coding_loop_verification,
     _resolve_local_model_context,
     _resolve_project_root,
-    _resolve_provider,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
@@ -2266,7 +2266,7 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
     )
     assert simple_mapping is not None
     assert simple_mapping.provider == "local"
-    assert _resolve_provider("auto", simple_mapping.model, mapping=simple_mapping) == (
+    assert resolve_provider("auto", simple_mapping.model, mapping=simple_mapping) == (
         "local"
     )
     deepinfra_mapping = resolve_llm_mapping(
@@ -3239,7 +3239,7 @@ def test_auto_provider_selects_openrouter_when_configured(
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
 
-    assert _resolve_provider("auto", "glm-5.2") == "openrouter"
+    assert resolve_provider("auto", "glm-5.2") == "openrouter"
 
 
 def test_auto_provider_prefers_deepinfra_cheap_over_openrouter(
@@ -3259,7 +3259,7 @@ def test_auto_provider_prefers_deepinfra_cheap_over_openrouter(
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
 
-    assert _resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
+    assert resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
 
 
 def test_available_workflow_providers_requires_api_keys(
@@ -3440,7 +3440,7 @@ def test_auto_provider_prefers_deepinfra_cheap_when_credentials_are_available(
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
 
-    assert _resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
+    assert resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
 
 
 def test_auto_provider_roles_use_the_top_two_configured_providers(
@@ -3490,10 +3490,10 @@ def test_auto_provider_roles_return_no_adversarial_provider_when_only_one_is_con
 
 
 def test_explicit_provider_selection_is_not_overridden() -> None:
-    assert _resolve_provider("local", "glm-5.2") == "local"
+    assert resolve_provider("local", "glm-5.2") == "local"
     assert "deepinfra-cheap" in ALL_PROVIDERS
     with pytest.raises(RuntimeError, match="Unsupported LLM provider 'unknown'"):
-        _resolve_provider("unknown", "test-model")
+        resolve_provider("unknown", "test-model")
 
 
 def test_deepinfra_cheap_maps_every_llm_type_to_flash() -> None:

@@ -204,6 +204,27 @@ def resolve_provider_roles(
     return LLMProviderRoles(normal=normal, adversarial=adversarial)
 
 
+def resolve_provider(
+    provider_override: str,
+    model: str,
+    *,
+    mapping: LLMModelMapping | None = None,
+) -> str:
+    """Resolve a provider for a model, honoring explicit mapping ownership."""
+    if mapping is not None:
+        provider_definition(mapping.provider)
+        return mapping.provider
+    if provider_override != "auto":
+        provider_definition(provider_override)
+        return provider_override
+    candidates = auto_provider_candidates()
+    if candidates:
+        return candidates[0]
+    if model.startswith("claude-"):
+        return "anthropic"
+    return "openai"
+
+
 def initial_model_for_provider(provider: str, configured_model: str) -> str:
     """Resolve the first request model using the selected provider's mapping."""
     definition = provider_definition(provider)

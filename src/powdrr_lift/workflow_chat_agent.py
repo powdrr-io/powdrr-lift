@@ -53,7 +53,6 @@ from powdrr_lift.agent.providers import (
     _estimate_message_tokens,
     _ModelUnavailableError,
     _SemanticRepairExhaustedError,
-    auto_provider_candidates,
     available_provider_names,
     backup_model_for,
     build_provider_client,
@@ -62,6 +61,7 @@ from powdrr_lift.agent.providers import (
     provider_model_limits,
     resolve_llm_mapping,
     resolve_local_model_path,
+    resolve_provider,
     resolve_provider_credentials,
     resolve_provider_roles,
 )
@@ -1058,7 +1058,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     self.current_model, provider=self.provider
                 )
             self.current_model = step_mapping.model
-            self.provider = _resolve_provider(
+            self.provider = resolve_provider(
                 self.config.provider,
                 self.current_model,
                 mapping=step_mapping,
@@ -2438,7 +2438,7 @@ def run_workflow_chat(
         )
         if selection_mapping is not None:
             current_model = selection_mapping.model
-            provider = _resolve_provider(
+            provider = resolve_provider(
                 config.provider,
                 current_model,
                 mapping=selection_mapping,
@@ -11537,26 +11537,6 @@ def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
         model,
         local_context=_resolve_local_model_context(),
     )
-
-
-def _resolve_provider(
-    provider_override: str,
-    model: str,
-    *,
-    mapping: LLMModelMapping | None = None,
-) -> str:
-    if mapping is not None:
-        provider_definition(mapping.provider)
-        return mapping.provider
-    if provider_override != "auto":
-        provider_definition(provider_override)
-        return provider_override
-    candidates = auto_provider_candidates()
-    if candidates:
-        return candidates[0]
-    if model.startswith("claude-"):
-        return "anthropic"
-    return "openai"
 
 
 def resolve_workflow_provider(

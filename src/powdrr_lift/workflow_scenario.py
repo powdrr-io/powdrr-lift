@@ -23,6 +23,7 @@ import yaml
 
 from powdrr_lift.agent.provider_config import DEFAULT_MODEL
 from powdrr_lift.agent.providers import (
+    build_workflow_client,
     initial_model_for_provider,
     resolve_provider_credentials,
 )
@@ -45,7 +46,6 @@ from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
     SkillChatConfig,
     SkillChatSelection,
-    _build_chat_client,
     _ChatWorkflowExecutionStrategy,
     _workflow_action_signature,
     _WorkflowExecutionState,
@@ -396,7 +396,7 @@ def run_workflow_scenario(
             execution_model = initial_model_for_provider(
                 provider_name, configured_model
             )
-            live_client = _build_chat_client(
+            live_client = build_workflow_client(
                 credentials,
                 model=execution_model,
                 model_cache_dir=temporary_root / "models",

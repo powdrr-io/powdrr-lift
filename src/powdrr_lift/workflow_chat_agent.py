@@ -55,12 +55,12 @@ from powdrr_lift.agent.providers import (
     _SemanticRepairExhaustedError,
     available_provider_names,
     backup_model_for,
-    build_provider_client,
+    build_workflow_client,
     initial_model_for_provider,
     long_context_backup_for,
     provider_model_limits,
     resolve_llm_mapping,
-    resolve_local_model_path,
+    resolve_local_model_context,
     resolve_provider,
     resolve_provider_credentials,
     resolve_provider_roles,
@@ -206,8 +206,6 @@ _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
-_DEFAULT_LOCAL_MODEL_CONTEXT = 24576
-_LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
@@ -2290,7 +2288,7 @@ def run_workflow_chat(
         key = (selected_provider, selected_model)
         if key not in clients:
             clients[key] = _maybe_record_llm_exchanges(
-                _build_chat_client(
+                build_workflow_client(
                     selected_credentials,
                     model=selected_model,
                     model_cache_dir=project_root / ".powdrr" / "models",
@@ -2624,7 +2622,7 @@ def run_workflow_chat(
             config.base_url,
         )
         observer_client = _maybe_record_llm_exchanges(
-            _build_chat_client(
+            build_workflow_client(
                 observer_credentials,
                 model=observer_mapping.model,
                 model_cache_dir=project_root / ".powdrr" / "models",
@@ -11401,34 +11399,11 @@ def _read_interactive_line(prompt: str, *, stdout: TextIO) -> str:
         termios.tcsetattr(stdin.fileno(), termios.TCSADRAIN, original_attributes)
 
 
-def _build_chat_client(
-    credentials: ProviderCredentials,
-    *,
-    model: str,
-    model_cache_dir: Path,
-    progress_stream: TextIO | None = None,
-) -> WorkflowLLMClient:
-    provider = provider_definition(credentials.provider)
-    return build_provider_client(
-        provider=credentials.provider,
-        model=model,
-        api_key=credentials.api_key,
-        base_url=credentials.base_url,
-        local_model_path=(
-            resolve_local_model_path(model_cache_dir)
-            if provider.client_kind == "local"
-            else None
-        ),
-        local_context=_resolve_local_model_context(),
-        progress_stream=progress_stream,
-    )
-
-
 def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
     return provider_model_limits(
         provider,
         model,
-        local_context=_resolve_local_model_context(),
+        local_context=resolve_local_model_context(),
     )
 
 
@@ -11525,25 +11500,6 @@ def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
     match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
     expected_shards = int(match.group(1)) if match else 1
     return len(model_paths) >= expected_shards
-
-
-def _resolve_local_model_context() -> int:
-    configured_context = os.environ.get(_LOCAL_MODEL_CONTEXT_ENV)
-    if configured_context is None or not configured_context.strip():
-        return _DEFAULT_LOCAL_MODEL_CONTEXT
-    try:
-        context = int(configured_context)
-    except ValueError as exc:
-        raise PowdrrExecutionError(
-            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
-            f"{configured_context!r}."
-        ) from exc
-    if context <= 0:
-        raise PowdrrExecutionError(
-            f"{_LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
-            f"{configured_context!r}."
-        )
-    return context
 
 
 def _split_system_message(

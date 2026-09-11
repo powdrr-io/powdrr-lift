@@ -37,6 +37,7 @@ from powdrr_lift.agent.providers import (
     long_context_backup_for,
     resolve_llm_mapping,
     resolve_llm_model,
+    resolve_local_model_context,
     resolve_local_model_path,
     resolve_provider,
     resolve_provider_credentials,
@@ -118,7 +119,6 @@ from powdrr_lift.workflow_chat_agent import (
     _recovery_tool_invocations,
     _repair_response_fingerprint,
     _require_coding_loop_verification,
-    _resolve_local_model_context,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
@@ -2157,7 +2157,7 @@ def test_local_llama_client_receives_active_response_schema(
 def test_local_model_context_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "8192")
 
-    assert _resolve_local_model_context() == 8192
+    assert resolve_local_model_context() == 8192
 
 
 def test_local_model_context_rejects_invalid_configuration(
@@ -2166,7 +2166,7 @@ def test_local_model_context_rejects_invalid_configuration(
     monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "not-a-number")
 
     with pytest.raises(RuntimeError, match="POWDRR_LOCAL_MODEL_CONTEXT"):
-        _resolve_local_model_context()
+        resolve_local_model_context()
 
 
 def test_local_llama_client_reports_gpu_initialization_failure(

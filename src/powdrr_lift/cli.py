@@ -15,7 +15,10 @@ from typing import Any
 import yaml
 
 from powdrr_lift.agent.provider_config import ALL_PROVIDERS, default_llm_mappings
-from powdrr_lift.agent.providers import resolve_provider_credentials
+from powdrr_lift.agent.providers import (
+    build_workflow_client,
+    resolve_provider_credentials,
+)
 from powdrr_lift.agent_feature_run import (
     DEFAULT_FEATURE_NAME,
     DEFAULT_FEATURE_REQUEST,
@@ -143,7 +146,6 @@ from powdrr_lift.workflow_ambiguity_review import (
 )
 from powdrr_lift.workflow_chat_agent import (
     WorkflowChatConfig,
-    _build_chat_client,
     choose_workflow_provider,
     download_local_qwen_model,
     resolve_workflow_provider,
@@ -4112,7 +4114,7 @@ def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
         credentials = resolve_provider_credentials(
             provider, args.api_key, args.base_url
         )
-        client = _build_chat_client(
+        client = build_workflow_client(
             credentials,
             model=model,
             model_cache_dir=repo_root / ".powdrr" / "models",

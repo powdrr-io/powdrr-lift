@@ -65,7 +65,6 @@ from powdrr_lift.agent.providers import (
     resolve_provider_credentials,
     resolve_provider_roles,
 )
-from powdrr_lift.agent.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -78,12 +77,10 @@ from powdrr_lift.builtin_tool_help import (
 from powdrr_lift.core import (
     SkillToolInvocation,
     architecture_specification_default_output_path,
-    build_skill_directory_validation_report,
     codebase_state_default_output_path,
     current_state_specification_default_output_path,
     feature_pr_specification_default_output_path,
     implementation_specification_default_output_path,
-    load_skills,
     pr_specification_default_output_path,
     resolve_repo_root,
     system_map_specification_default_output_path,
@@ -136,6 +133,7 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
+from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
@@ -183,6 +181,7 @@ from powdrr_lift.workflow_llm import (
 from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
+from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_observer import (
     ObserverActionRecommendation,
     ObserverDecision,
@@ -190,6 +189,11 @@ from powdrr_lift.workflow_observer import (
     ShadowWorkflowObserver,
     compact_observer_mapping,
     observer_action_matches,
+)
+from powdrr_lift.workflow_paths import (
+    is_dedicated_worktree,
+    resolve_project_root,
+    resolve_worktree_file_path,
 )
 from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
@@ -2253,14 +2257,14 @@ def run_workflow_chat(
     file_added_callback: Callable[[tuple[str, ...]], None] | None = None,
 ) -> int:
     configured_repo_root = resolve_repo_root(config.repo_root)
-    error_log_root = _resolve_project_root(configured_repo_root, configured_repo_root)
+    error_log_root = resolve_project_root(configured_repo_root, configured_repo_root)
     project_root = configured_repo_root
     workflow_context = _load_workflow_context(project_root)
     skills_dir = config.skills_dir
     if not skills_dir.is_absolute():
         skills_dir = configured_repo_root / skills_dir
 
-    catalog = _load_skill_catalog(skills_dir, stderr=stderr)
+    catalog = load_skill_catalog(skills_dir, stderr=stderr)
     if not catalog:
         print(f"No skills found in {skills_dir}.", file=stderr)
         return 1
@@ -2464,7 +2468,7 @@ def run_workflow_chat(
         verbose=config.verbose,
     )
     repo_root = worktree_root
-    project_root = _resolve_project_root(configured_repo_root, worktree_root)
+    project_root = resolve_project_root(configured_repo_root, worktree_root)
     output_dir = config.output_dir
     if output_dir is not None and not output_dir.is_absolute():
         output_dir = repo_root / output_dir
@@ -2701,48 +2705,6 @@ def run_workflow_chat(
         print(f"Wrote skill execution summary to {summary_path}", file=stdout)
 
     return 0
-
-
-def _load_skill_catalog(
-    skills_dir: Path,
-    *,
-    stderr: TextIO,
-) -> tuple[SkillCatalogEntry, ...]:
-    resolved_dir = skills_dir.expanduser().resolve()
-    if not resolved_dir.exists():
-        print(f"Skill directory does not exist: {resolved_dir}", file=stderr)
-        return ()
-    if not resolved_dir.is_dir():
-        print(f"Skill path is not a directory: {resolved_dir}", file=stderr)
-        return ()
-
-    report = build_skill_directory_validation_report(resolved_dir)
-    if not report.validation_successful:
-        for issue in report.issues:
-            print(f"{issue.path}: {issue.code}: {issue.message}", file=stderr)
-        return ()
-
-    skill_paths = tuple(
-        skill_path
-        for pattern in ("*.yaml", "*.yml", "*.json")
-        for skill_path in sorted(resolved_dir.glob(pattern))
-        if skill_path.is_file()
-    )
-    skills = load_skills(resolved_dir)
-    entries = tuple(
-        SkillCatalogEntry(path=skill_path, skill=skill)
-        for skill_path, skill in zip(skill_paths, skills, strict=False)
-    )
-
-    return entries
-
-
-def _load_workflow_template_catalog(
-    templates_dir: Path,
-    *,
-    stderr: TextIO,
-) -> tuple[SkillCatalogEntry, ...]:
-    return _load_skill_catalog(templates_dir, stderr=stderr)
 
 
 def _build_selection_messages(
@@ -3094,7 +3056,7 @@ def _can_reuse_workflow_context(context: WorkflowContext | None) -> bool:
     return bool(
         context
         and context.worktree_root.exists()
-        and _is_dedicated_worktree(context.worktree_root)
+        and is_dedicated_worktree(context.worktree_root)
     )
 
 
@@ -3178,7 +3140,7 @@ def _resolve_worktree_for_request(
     stderr: TextIO,
     verbose: bool,
 ) -> Path:
-    if _is_dedicated_worktree(configured_repo_root):
+    if is_dedicated_worktree(configured_repo_root):
         return configured_repo_root
     if _workflow_context_pr_is_closed(context):
         assert context is not None
@@ -3223,7 +3185,7 @@ def _resolve_worktree_context(
     verbose: bool,
 ) -> Path:
     resolved_repo_root = resolve_repo_root(repo_root)
-    if _is_dedicated_worktree(resolved_repo_root):
+    if is_dedicated_worktree(resolved_repo_root):
         _verbose_print(
             stderr,
             verbose,
@@ -3257,33 +3219,6 @@ def _resolve_worktree_context(
         )
     _verbose_print(stderr, verbose, f"Using dedicated worktree at {worktree_path}")
     return worktree_path
-
-
-def _resolve_project_root(configured_repo_root: Path, worktree_root: Path) -> Path:
-    """Return the primary checkout root used for shared local model storage."""
-    if not _is_dedicated_worktree(configured_repo_root):
-        return configured_repo_root
-    worktree_parts = worktree_root.parts
-    worktree_marker = ".worktrees"
-    if worktree_marker not in worktree_parts:
-        raise PowdrrExecutionError(
-            f"Could not determine project root for worktree {worktree_root}."
-        )
-    marker_index = worktree_parts.index(worktree_marker)
-    if marker_index == 0:
-        raise PowdrrExecutionError(
-            f"Could not determine project root for worktree {worktree_root}."
-        )
-    return Path(*worktree_parts[:marker_index])
-
-
-def _is_dedicated_worktree(repo_root: Path) -> bool:
-    # Git worktrees created outside the repository's conventional .worktrees
-    # directory (for example, the feature-run harness's temporary worktree)
-    # still have a file .git marker. Treat them as dedicated so untracked
-    # harness fixtures remain visible instead of creating a second worktree
-    # from HEAD and silently dropping those fixtures.
-    return ".worktrees" in repo_root.parts or (repo_root / ".git").is_file()
 
 
 def _generate_worktree_branch_name() -> str:
@@ -5205,7 +5140,7 @@ def _workflow_action_material_state(
                 (
                     _material_file_contents(target_path)
                     if (
-                        target_path := _resolve_worktree_file_path(
+                        target_path := resolve_worktree_file_path(
                             file_path,
                             state.worktree_root,
                         )
@@ -5327,7 +5262,7 @@ def _handle_workflow_action_edit(
     pending_writes: list[tuple[Path, str]] = []
     results: list[dict[str, Any]] = []
     for file_edit in file_edits:
-        target_path = _resolve_worktree_file_path(
+        target_path = resolve_worktree_file_path(
             file_edit.file_path,
             state.worktree_root,
         )
@@ -5426,7 +5361,7 @@ def _handle_workflow_action_yaml_edit(
             "yaml_edit requires file_path. Use a repository-relative .yaml or "
             ".yml path."
         )
-    target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
+    target_path = resolve_worktree_file_path(action.file_path, state.worktree_root)
     if not target_path.exists():
         raise _WorkflowYamlEditError(
             f"yaml_edit target {action.file_path!r} does not exist; no file was "
@@ -5599,7 +5534,7 @@ def _handle_workflow_action_read_document(
         raise PowdrrExecutionError(
             "Workflow read_document action end_line must be >= start_line."
         )
-    target_path = _resolve_worktree_file_path(action.file_path, state.worktree_root)
+    target_path = resolve_worktree_file_path(action.file_path, state.worktree_root)
     if not target_path.exists() or not target_path.is_file():
         directory = target_path.parent
         if directory.is_dir():
@@ -5710,7 +5645,7 @@ def _list_worktree_files(
     recursive: bool,
     worktree_root: Path,
 ) -> dict[str, Any]:
-    directory = _resolve_worktree_file_path(directory_value, worktree_root)
+    directory = resolve_worktree_file_path(directory_value, worktree_root)
     if not directory.exists() or not directory.is_dir():
         raise PowdrrExecutionError(
             f"Workflow list_files directory does not exist: {directory_value}."
@@ -10098,7 +10033,7 @@ def _current_file_context(
     if current_file_path is None:
         return None
 
-    resolved_path = _resolve_worktree_file_path(
+    resolved_path = resolve_worktree_file_path(
         str(current_file_path),
         worktree_root,
     )
@@ -10461,21 +10396,6 @@ def _edit_sort_key(edit: SkillChatEdit) -> tuple[int, int]:
     return edit.start_line, end_line
 
 
-def _resolve_worktree_file_path(file_path_value: str, worktree_root: Path) -> Path:
-    resolved_path = Path(file_path_value.strip())
-    if resolved_path.is_absolute():
-        candidate_path = resolved_path.resolve(strict=False)
-    else:
-        candidate_path = (worktree_root / resolved_path).resolve(strict=False)
-
-    resolved_worktree_root = worktree_root.resolve(strict=False)
-    if not candidate_path.is_relative_to(resolved_worktree_root):
-        raise PowdrrExecutionError(
-            f"Workflow edit action file_path must stay within {resolved_worktree_root}."
-        )
-    return candidate_path
-
-
 def _resolve_generated_file_path_from_command(
     command: object,
     *,
@@ -10487,7 +10407,7 @@ def _resolve_generated_file_path_from_command(
 
     output_path_value = _extract_command_option(command_items, "--output")
     if output_path_value is not None:
-        return _resolve_worktree_file_path(output_path_value, worktree_root)
+        return resolve_worktree_file_path(output_path_value, worktree_root)
 
     work_item_name = _extract_command_option(command_items, "--work-item-name")
     if work_item_name is None:

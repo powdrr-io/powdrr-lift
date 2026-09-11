@@ -26,7 +26,6 @@ from powdrr_lift.agent.providers import (
     initial_model_for_provider,
     resolve_provider_credentials,
 )
-from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -54,6 +53,7 @@ from powdrr_lift.workflow_chat_agent import (
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_llm import WorkflowStepRunner
+from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_task_agent import _run_skill_for_agent
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
 

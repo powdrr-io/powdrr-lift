@@ -42,7 +42,6 @@ from powdrr_lift.agent.providers import (
     resolve_provider_credentials,
     resolve_provider_roles,
 )
-from powdrr_lift.agent.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
     CodingLoopSpec,
@@ -120,7 +119,6 @@ from powdrr_lift.workflow_chat_agent import (
     _repair_response_fingerprint,
     _require_coding_loop_verification,
     _resolve_local_model_context,
-    _resolve_project_root,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
@@ -160,6 +158,8 @@ from powdrr_lift.workflow_chat_agent import (
     run_workflow_chat,
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
+from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
+from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
 
 # ruff: noqa: E501
 
@@ -7226,7 +7226,7 @@ def test_resolve_skill_path_accepts_missing_extension(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.agent.workflow_models import SkillCatalogEntry
+    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(
@@ -7245,7 +7245,7 @@ def test_resolve_skill_path_accepts_trailing_dot(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.agent.workflow_models import SkillCatalogEntry
+    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(
@@ -7401,7 +7401,7 @@ def test_local_model_cache_uses_primary_project_root_for_worktree() -> None:
     worktree_root = project_root / ".worktrees" / "skill-chat"
 
     assert (
-        _resolve_project_root(project_root / ".worktrees" / "other", worktree_root)
+        resolve_project_root(project_root / ".worktrees" / "other", worktree_root)
         == project_root
     )
 
@@ -7450,9 +7450,7 @@ def test_worktree_marker_file_is_treated_as_dedicated(tmp_path: Path) -> None:
     worktree.mkdir()
     (worktree / ".git").write_text("gitdir: /tmp/gitdir\n", encoding="utf-8")
 
-    from powdrr_lift.workflow_chat_agent import _is_dedicated_worktree
-
-    assert _is_dedicated_worktree(worktree) is True
+    assert is_dedicated_worktree(worktree) is True
 
 
 def test_anthropic_chat_client_sends_messages_api_request(

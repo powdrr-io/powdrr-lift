@@ -310,7 +310,6 @@ def render_skill_replay(
             f"has {current_step.id!r} at index {step_index}."
         )
 
-    from powdrr_lift.agent.workflow_models import SkillCatalogEntry
     from powdrr_lift.workflow_chat_agent import (
         _build_step_execution_messages,
         _parse_action_response,
@@ -319,6 +318,7 @@ def render_skill_replay(
         _validate_workflow_step_transition,
         _WorkflowExecutionState,
     )
+    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     state = _mapping(bundle.get("prompt_state"), "bundle prompt_state")
     execution_events = [

@@ -17,11 +17,11 @@ from textual.containers import Horizontal, ScrollableContainer
 from textual.events import Key, Resize
 from textual.widgets import Label, ListItem, ListView, TextArea
 
-from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_chat_agent import (
     WorkflowChatConfig,
     run_workflow_chat,
 )
+from powdrr_lift.workflow_models import SkillCatalogEntry
 
 _EMPTY_HUMAN_INPUT_WARNING = "WARNING: received empty response but need human input"
 _USER_RESPONSE_SEPARATOR = "-" * 40

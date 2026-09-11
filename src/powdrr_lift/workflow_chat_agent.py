@@ -36,9 +36,7 @@ from powdrr_lift.agent.exchanges import (
     normalize_cache_usage,
 )
 from powdrr_lift.agent.provider_config import (
-    DEFAULT_MODEL_LIMITS,
     LLM_PROVIDERS,
-    MAX_COMPLETION_TOKENS,
     ZAI_LLM_MAPPINGS,
     LLMModelLimits,
     LLMModelMapping,
@@ -49,14 +47,13 @@ from powdrr_lift.agent.provider_config import (
     provider_supports_llm_mappings,
 )
 from powdrr_lift.agent.providers import (
-    AnthropicChatClient,
-    LocalLlamaChatClient,
     LocalModelRuntimeError,
-    OpenAIChatClient,
     _EmptyProviderResponseError,
     _estimate_message_tokens,
     _ModelUnavailableError,
     _SemanticRepairExhaustedError,
+    build_provider_client,
+    provider_model_limits,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -11589,37 +11586,27 @@ def _build_chat_client(
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
     provider = provider_definition(credentials.provider)
-    if provider.client_kind == "local":
-        resolved_model_path = _resolve_local_model_path(model_cache_dir)
-        return LocalLlamaChatClient(
-            model_path=resolved_model_path,
-            n_ctx=_resolve_local_model_context(),
-        )
-    limits = _model_limits_for(credentials.provider, model)
-    if provider.client_kind == "anthropic":
-        return AnthropicChatClient(
-            model=model,
-            api_key=credentials.api_key,
-            base_url=credentials.base_url,
-            limits=limits,
-        )
-    return OpenAIChatClient(
+    return build_provider_client(
+        provider=credentials.provider,
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
-        limits=limits,
+        local_model_path=(
+            _resolve_local_model_path(model_cache_dir)
+            if provider.client_kind == "local"
+            else None
+        ),
+        local_context=_resolve_local_model_context(),
         progress_stream=progress_stream,
     )
 
 
 def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
-    definition = provider_definition(provider)
-    if definition.client_kind == "local":
-        return LLMModelLimits(
-            context_window=_resolve_local_model_context(),
-            max_output_tokens=MAX_COMPLETION_TOKENS,
-        )
-    return definition.model_limits.get(model.casefold(), DEFAULT_MODEL_LIMITS)
+    return provider_model_limits(
+        provider,
+        model,
+        local_context=_resolve_local_model_context(),
+    )
 
 
 def _resolve_credentials(

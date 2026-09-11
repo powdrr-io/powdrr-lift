@@ -19,10 +19,12 @@ from powdrr_lift.agent.provider_config import (
     DEFAULT_MODEL_LIMITS,
     MAX_COMPLETION_TOKENS,
     LLMModelLimits,
+    provider_definition,
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workflow_llm import (
     ProviderExecutionError,
+    WorkflowLLMClient,
     WorkflowLLMHTTPError,
 )
 
@@ -607,6 +609,60 @@ class _EmptyProviderResponseError(ProviderExecutionError):
 
 class LocalModelRuntimeError(ProviderExecutionError):
     """Raised when the required local GPU model cannot run."""
+
+
+def provider_model_limits(
+    provider: str,
+    model: str,
+    *,
+    local_context: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
+) -> LLMModelLimits:
+    definition = provider_definition(provider)
+    if definition.client_kind == "local":
+        return LLMModelLimits(
+            context_window=local_context,
+            max_output_tokens=MAX_COMPLETION_TOKENS,
+        )
+    return definition.model_limits.get(model.casefold(), DEFAULT_MODEL_LIMITS)
+
+
+def build_provider_client(
+    *,
+    provider: str,
+    model: str,
+    api_key: str,
+    base_url: str,
+    local_model_path: Path | None = None,
+    local_context: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
+    progress_stream: TextIO | None = None,
+) -> WorkflowLLMClient:
+    definition = provider_definition(provider)
+    if definition.client_kind == "local":
+        if local_model_path is None:
+            raise PowdrrExecutionError("A local model path is required.")
+        return LocalLlamaChatClient(
+            model_path=local_model_path,
+            n_ctx=local_context,
+        )
+    limits = provider_model_limits(
+        provider,
+        model,
+        local_context=local_context,
+    )
+    if definition.client_kind == "anthropic":
+        return AnthropicChatClient(
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            limits=limits,
+        )
+    return OpenAIChatClient(
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        limits=limits,
+        progress_stream=progress_stream,
+    )
 
 
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:

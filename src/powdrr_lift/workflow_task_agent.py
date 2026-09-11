@@ -14,8 +14,8 @@ from typing import Any, TextIO
 
 from powdrr_lift.agent.provider_config import default_llm_mappings
 from powdrr_lift.agent.providers import (
-    LocalLlamaChatClient,
     _estimate_message_tokens,
+    build_provider_client,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -4804,24 +4804,21 @@ def _build_workflow_client_for_mapping(
     *,
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
-    from powdrr_lift.agent.providers import OpenAIChatClient
-
     model = mapping.model
-    if mapping.provider == "local":
-        return LocalLlamaChatClient(
-            model_path=_resolve_local_model_path(
-                config.repo_root / ".powdrr" / "models"
-            )
-        )
     credentials = _resolve_credentials(
         mapping.provider,
         config.api_key,
         config.base_url,
     )
-    return OpenAIChatClient(
+    return build_provider_client(
+        provider=mapping.provider,
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
-        limits=_model_limits_for(mapping.provider, model),
+        local_model_path=(
+            _resolve_local_model_path(config.repo_root / ".powdrr" / "models")
+            if mapping.provider == "local"
+            else None
+        ),
         progress_stream=progress_stream,
     )

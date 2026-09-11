@@ -23,6 +23,7 @@ from typing import Any, Literal, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import laga
 import yaml
 
 try:
@@ -11016,12 +11017,15 @@ def _parse_json_object(content: str, context: str) -> dict[str, Any]:
     try:
         parsed_content = json.loads(normalized_content)
     except json.JSONDecodeError as exc:
-        parsed_content = _extract_embedded_json_object(normalized_content)
-        if parsed_content is None:
-            raise PowdrrExecutionError(
-                f"{context} was not valid JSON: {exc.msg} at line "
-                f"{exc.lineno}, column {exc.colno}.\nResponse content:\n{content}"
-            ) from exc
+        try:
+            parsed_content = laga.repair(normalized_content)
+        except laga.LagaError:
+            parsed_content = _extract_embedded_json_object(normalized_content)
+            if parsed_content is None:
+                raise PowdrrExecutionError(
+                    f"{context} was not valid JSON: {exc.msg} at line "
+                    f"{exc.lineno}, column {exc.colno}.\nResponse content:\n{content}"
+                ) from exc
     if not isinstance(parsed_content, dict):
         raise PowdrrExecutionError(f"{context} must be a JSON object.")
     return cast("dict[str, Any]", parsed_content)

@@ -66,8 +66,6 @@ from powdrr_lift.agent.providers import (
     resolve_provider_roles,
 )
 from powdrr_lift.basedpyright_tools import (
-    BASEDPYRIGHT_STRUCTURE_TOOL,
-    BASEDPYRIGHT_SYMBOL_TOOL,
     is_basedpyright_tool,
 )
 from powdrr_lift.builtin_tool_help import (
@@ -199,23 +197,16 @@ from powdrr_lift.workflow_paths import (
 from powdrr_lift.workflow_prompting import (
     _available_work_item_documents,
     _available_work_item_names,
-    _context_type_catalog,
     _current_file_context,
     _effective_interaction_style,
-    _execution_events_for_prompt,
-    _latest_execution_event_for_prompt,
     _match_work_item_names,
-    _prompt_durable_facts,
-    _prompt_step_context,
-    _prompt_transcript,
     _skill_step_to_data,
-    _step_needs_prompt_catalog,
     _successful_document_reads_for_prompt,
     _tool_invocation_to_data,
-    _workflow_context_prompt_data,
-    _workflow_handoff_inputs,
-    build_modular_action_system_prompt,
     interaction_style_prompt,
+)
+from powdrr_lift.workflow_prompting import (
+    _build_step_execution_messages as _build_step_execution_messages_runtime,
 )
 from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
@@ -3825,255 +3816,39 @@ def _build_step_execution_messages(
     failed_action: SkillChatAction | None = None,
     failure_reason: str | None = None,
 ) -> list[dict[str, str]]:
-    current_file_context = _current_file_context(
-        worktree_root,
-        current_file_path,
-        cache=current_file_context_cache,
-    )
-    interaction_style = _effective_interaction_style(
-        selected_skill,
-        current_step,
-        inherited_interaction_style,
-    )
-    available_work_items = _available_work_item_names(worktree_root)
-    available_tools = sorted(
-        {
-            invocation.tool
-            for invocation in current_step.tool_invocations
-            if invocation.tool != "ref"
-        }
-    )
-    tool_descriptions = {
-        "shell": (
-            "Execute a shell command in the current worktree. Commands run with "
-            "the worktree as cwd; any explicit cwd must remain inside it. Set "
-            "parameters.help=true for the tool's conventional --help guidance."
-        ),
-        _INTERNAL_TOOL: (
-            "Execute a powdrr-lift CLI command. This tool is always available, "
-            "but its command must invoke only the powdrr-lift binary and runs "
-            "with the current worktree as cwd. Set parameters.help=true for the "
-            "tool's conventional --help guidance and detailed examples."
-            "detailed usage and examples."
-        ),
-        GIT_TOOL: (
-            "Intrinsic Git tool; supports status, add, and move only. Example: "
-            '{"action":"invoke_tool","tool":"git","parameters":'
-            '{"operation":"status"}}. Set parameters.help=true for the tool\'s '
-            "conventional --help guidance and detailed examples."
-            "usage and examples."
-        ),
-        GH_TOOL: (
-            "Intrinsic GitHub tool for pull-request creation, inspection, and "
-            "inline review comments. "
-            'Example: {"action":"invoke_tool","tool":"gh",'
-            '"parameters":{"operation":"pr_view","pr_reference":"394"}}. '
-            'Inline comment example: {"action":"invoke_tool","tool":"gh",'
-            '"parameters":{"operation":"pr_review_comment",'
-            '"repository":"owner/repo","pr_reference":"394",'
-            '"body":"Finding","commit_id":"sha",'
-            '"path":"docs/design.yaml","line":12,"side":"RIGHT"}}.'
-            " Set parameters.help=true for the tool's conventional --help "
-            "guidance and detailed examples."
-        ),
-        "fuzzy-match": (
-            "Search worktree paths with find-like filters and fuzzy name matching. "
-            "Set parameters.help=true for the tool's conventional --help "
-            "guidance and detailed examples."
-        ),
-        BASEDPYRIGHT_SYMBOL_TOOL: (
-            "Find Python symbols by name across the worktree. Set "
-            "parameters.help=true for the tool's conventional --help guidance "
-            "and detailed examples."
-        ),
-        BASEDPYRIGHT_STRUCTURE_TOOL: (
-            "Discover the classes, functions, methods, and variables in a Python "
-            "file. Set parameters.help=true for the tool's conventional --help "
-            "guidance and detailed examples."
-        ),
-        ENRICH_TOOL: (
-            "Convert a deterministic tool output into structured data. "
-            "Use format pytest and pass the complete tool result as tool_output."
-        ),
-        VALIDATE_EDIT_TOOL: (
-            "Validate a deferred edit without changing files. Pass the complete "
-            "edit action in parameters.edit."
-        ),
-        APPLY_EDIT_TOOL: (
-            "Apply a previously validated deferred edit. Pass the complete edit "
-            "action in parameters.edit."
-        ),
-    }
-    prompt_data: dict[str, Any] = {
-        "execution_mode": "execute_selected_skill",
-        "current_step_index": current_step_index,
-        "current_step_count": len(selected_skill.skill.steps),
-        "current_step": _skill_step_to_data(current_step),
-        "handoff_inputs": _workflow_handoff_inputs(
-            current_step,
-            handoff_records or {},
-        ),
-        # Cross-step values must travel through declared handoff inputs. The
-        # prompt helper retains explicit invocation context while removing
-        # implicit tool and document results.
-        "step_context": _prompt_step_context(
-            execution_context,
-            durable_facts,
-            execution_events,
-            current_step_index,
-        ),
-        "durable_facts": _prompt_durable_facts(durable_facts or {}),
-        "available_tools": [
-            {
-                "name": tool,
-                "description": tool_descriptions.get(tool, tool),
-            }
-            for tool in available_tools
-        ],
-        "worktree_root": ".",
-        "previous_workflow_context": _workflow_context_prompt_data(workflow_context),
-        "work_item_context": {
-            "available": list(available_work_items),
-            "matches": list(
-                _match_work_item_names(
-                    transcript,
-                    available_work_items,
-                )
-            ),
-        },
-        "selected_skill": _selected_skill_prompt_data(selected_skill),
-        "transcript": _prompt_transcript(transcript),
-        "execution_events": _execution_events_for_prompt(
-            execution_events,
-            current_step_index,
-        ),
-        "latest_action": _latest_execution_event_for_prompt(
-            execution_events,
-            current_step_index,
-        ),
-        "successful_document_reads": _successful_document_reads_for_prompt(
-            execution_events, current_step_index
-        ),
-        "stalled_step_context": [dict(item) for item in stalled_step_context],
-        "current_file": current_file_context,
-    }
-    if observer_intervention is not None:
-        prompt_data["observer_intervention"] = observer_intervention
-    if runtime_prompt_context is not None:
-        prompt_data["runtime_state"] = dict(runtime_prompt_context)
-    if _step_needs_prompt_catalog(current_step, "context_types"):
-        prompt_data["available_context_types"] = [
-            {
-                "name": context_type,
-                "when_to_use": description,
-            }
-            for context_type, description in _context_type_catalog()
-        ]
-    if _step_needs_prompt_catalog(current_step, "skills"):
-        prompt_data["available_skills"] = [
-            {
-                "name": entry.skill.name,
-                "path": entry.path.name,
-                "adversarial": entry.skill.adversarial,
-            }
-            for entry in catalog
-        ]
-    prompt_data["available_actions"] = [
-        name
-        for name, _instructions in _step_actions(
+    return _build_step_execution_messages_runtime(
+        selected_skill=selected_skill,
+        current_step=current_step,
+        current_step_index=current_step_index,
+        transcript=transcript,
+        execution_events=execution_events,
+        execution_context=execution_context,
+        handoff_records=handoff_records,
+        durable_facts=durable_facts,
+        current_file_path=current_file_path,
+        worktree_root=worktree_root,
+        catalog=catalog,
+        workflow_context=workflow_context,
+        current_file_context_cache=current_file_context_cache,
+        validation_gate=validation_gate,
+        stalled_step_context=stalled_step_context,
+        inherited_interaction_style=inherited_interaction_style,
+        observer_intervention=observer_intervention,
+        runtime_prompt_context=runtime_prompt_context,
+        step_actions=_step_actions(
             current_step,
             execution_events=execution_events,
             step_index=current_step_index,
-        )
-    ]
-    if failed_action is not None:
-        successful_reads = _successful_document_reads_for_prompt(
-            execution_events, current_step_index
-        )
-        prompt_data["recovery_required"] = {
-            "rejected_action": json.loads(_workflow_action_signature(failed_action)),
-            "reason": failure_reason
-            or "The previous action was rejected by the workflow contract.",
-            "must_choose_different_action": True,
-            "allowed_actions": prompt_data["available_actions"],
-            "successful_document_reads": successful_reads,
-            "instruction": (
-                "Do not repeat the rejected action, even with different prose. "
-                "Choose one materially different action from allowed_actions, "
-                "or return prompt_user if no allowed action can safely resolve "
-                "the reported issue."
-            ),
-        }
-        if successful_reads:
-            prompt_data["recovery_required"]["instruction"] += (
-                " These documents were already read successfully; do not reread "
-                "them unless the failed action specifically requires changed file "
-                "contents: "
-                + ", ".join(str(item["path"]) for item in successful_reads)
-                + "."
-            )
-    if "edit" in prompt_data["available_actions"]:
-        prompt_data["edit_contract"] = (
-            "For edit, return exactly one JSON object with action=edit, a string "
-            "file_path, and a non-empty edits array. Each edit must be an object "
-            "with kind add, remove, or replace; replace requires positive integer "
-            "start_line and end_line plus a string text. Do not use yaml_edit, "
-            "file_edits, operations, or a nested parameters object."
-        )
-    required_output_names = [
-        output.name for output in getattr(current_step, "outputs", ())
-    ]
-    if required_output_names:
-        prompt_data["required_output_names"] = required_output_names
-        prompt_data["output_contract"] = (
-            "When choosing next_step, include outputs with exactly these names: "
-            + ", ".join(required_output_names)
-            + ". Every edit output must be present even when no changes are needed; "
-            'use {"added":[],"deleted":[]} for no changes.'
-        )
-    if validation_gate is not None:
-        prompt_data["validation_gate"] = dict(validation_gate)
-    pre_step_event = _latest_deterministic_pre_step(
-        execution_events,
-        skill_name=selected_skill.skill.name,
-        step_index=current_step_index,
+        ),
+        validation_gate_enabled=_validation_gate_enabled(current_step),
+        pre_step_event=_latest_deterministic_pre_step(
+            execution_events,
+            skill_name=selected_skill.skill.name,
+            step_index=current_step_index,
+        ),
+        failed_action=failed_action,
+        failure_reason=failure_reason,
     )
-    if pre_step_event is not None:
-        bounded_pre_step_event = prune_execution_events(
-            [pre_step_event], include_results=True
-        )[0]
-        prompt_data["deterministic_context"] = {
-            "source": bounded_pre_step_event["action"],
-            "scope": bounded_pre_step_event["template"],
-            "result": bounded_pre_step_event["result"],
-        }
-    return [
-        {
-            "role": "system",
-            "content": build_modular_action_system_prompt(
-                current_step,
-                step_actions=_step_actions(
-                    current_step,
-                    execution_events=execution_events,
-                    step_index=current_step_index,
-                ),
-                include_context=_step_needs_prompt_catalog(
-                    current_step, "context_types"
-                ),
-                include_skills=_step_needs_prompt_catalog(current_step, "skills"),
-                validation_gate_enabled=_validation_gate_enabled(current_step),
-                interaction_style=interaction_style,
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                prompt_data,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ),
-        },
-    ]
 
 
 def _workflow_action_handlers() -> dict[

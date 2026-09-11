@@ -37,6 +37,7 @@ from powdrr_lift.agent.providers import (
     long_context_backup_for,
     resolve_llm_mapping,
     resolve_llm_model,
+    resolve_local_model_context,
     resolve_local_model_path,
     resolve_provider,
     resolve_provider_credentials,
@@ -71,10 +72,8 @@ from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     LLMModelMapping,
     LLMProviderRoles,
-    SkillCatalogEntry,
     SkillChatConfig,
     SkillChatEdit,
-    WorkflowContext,
     _action_repair_prompt,
     _action_system_prompt,
     _advance_predicated_step,
@@ -120,8 +119,6 @@ from powdrr_lift.workflow_chat_agent import (
     _recovery_tool_invocations,
     _repair_response_fingerprint,
     _require_coding_loop_verification,
-    _resolve_local_model_context,
-    _resolve_project_root,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
@@ -161,6 +158,8 @@ from powdrr_lift.workflow_chat_agent import (
     run_workflow_chat,
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
+from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
+from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
 
 # ruff: noqa: E501
 
@@ -2158,7 +2157,7 @@ def test_local_llama_client_receives_active_response_schema(
 def test_local_model_context_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "8192")
 
-    assert _resolve_local_model_context() == 8192
+    assert resolve_local_model_context() == 8192
 
 
 def test_local_model_context_rejects_invalid_configuration(
@@ -2167,7 +2166,7 @@ def test_local_model_context_rejects_invalid_configuration(
     monkeypatch.setenv("POWDRR_LOCAL_MODEL_CONTEXT", "not-a-number")
 
     with pytest.raises(RuntimeError, match="POWDRR_LOCAL_MODEL_CONTEXT"):
-        _resolve_local_model_context()
+        resolve_local_model_context()
 
 
 def test_local_llama_client_reports_gpu_initialization_failure(
@@ -7227,7 +7226,7 @@ def test_resolve_skill_path_accepts_missing_extension(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.workflow_chat_agent import SkillCatalogEntry
+    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(
@@ -7246,7 +7245,7 @@ def test_resolve_skill_path_accepts_trailing_dot(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.workflow_chat_agent import SkillCatalogEntry
+    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(
@@ -7402,7 +7401,7 @@ def test_local_model_cache_uses_primary_project_root_for_worktree() -> None:
     worktree_root = project_root / ".worktrees" / "skill-chat"
 
     assert (
-        _resolve_project_root(project_root / ".worktrees" / "other", worktree_root)
+        resolve_project_root(project_root / ".worktrees" / "other", worktree_root)
         == project_root
     )
 
@@ -7451,9 +7450,7 @@ def test_worktree_marker_file_is_treated_as_dedicated(tmp_path: Path) -> None:
     worktree.mkdir()
     (worktree / ".git").write_text("gitdir: /tmp/gitdir\n", encoding="utf-8")
 
-    from powdrr_lift.workflow_chat_agent import _is_dedicated_worktree
-
-    assert _is_dedicated_worktree(worktree) is True
+    assert is_dedicated_worktree(worktree) is True
 
 
 def test_anthropic_chat_client_sends_messages_api_request(

@@ -764,9 +764,9 @@ def _validate_rendered_prompt_contract(
     """Run prompt-contract checks in memory using the production prompt builder."""
     try:
         from powdrr_lift.workflow_chat_agent import (
-            SkillCatalogEntry,
             _build_step_execution_messages,
         )
+        from powdrr_lift.workflow_models import SkillCatalogEntry
 
         entry = SkillCatalogEntry(definition_path, skill)
         issues: list[WorkflowDefinitionIssue] = []
@@ -1455,9 +1455,9 @@ def render_skill_prompt_snapshots(
 ) -> tuple[Path, ...]:
     """Render normalized prompt contracts for every skill or template step."""
     from powdrr_lift.workflow_chat_agent import (
-        SkillCatalogEntry,
         _build_step_execution_messages,
     )
+    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     root = resolve_repo_root(repo_root)
     raw = yaml.safe_load(definition_path.read_text(encoding="utf-8"))

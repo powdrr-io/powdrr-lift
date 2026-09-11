@@ -63,10 +63,10 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
+from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
     GH_TOOL,
     GIT_TOOL,
-    SkillCatalogEntry,
     _action_system_prompt,
     _apply_file_edits,
     _apply_yaml_operations,
@@ -76,7 +76,6 @@ from powdrr_lift.workflow_chat_agent import (
     _interaction_style_prompt,
     _invalidate_deterministic_pre_step,
     _list_worktree_files,
-    _load_skill_catalog,
     _maybe_record_llm_exchanges,
     _model_limits_for,
     _modular_action_system_prompt,
@@ -85,8 +84,6 @@ from powdrr_lift.workflow_chat_agent import (
     _record_skill_pull_request,
     _require_coding_loop_verification,
     _resolve_pre_step_template,
-    _resolve_project_root,
-    _resolve_worktree_file_path,
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
@@ -146,6 +143,7 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature,
     workflow_action_summary,
 )
+from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_observer import (
     ObserverActionRecommendation,
     ObserverDecision,
@@ -153,6 +151,10 @@ from powdrr_lift.workflow_observer import (
     ShadowWorkflowObserver,
     compact_observer_mapping,
     observer_action_matches,
+)
+from powdrr_lift.workflow_paths import (
+    resolve_project_root,
+    resolve_worktree_file_path,
 )
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 
@@ -1090,7 +1092,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         if action.kind == "yaml_edit":
             if action.file_path is None:
                 raise PowdrrExecutionError("yaml_edit action must include file_path.")
-            path = _resolve_worktree_file_path(action.file_path, self.repo_root)
+            path = resolve_worktree_file_path(action.file_path, self.repo_root)
             if not path.exists():
                 raise PowdrrExecutionError(
                     f"yaml_edit target {action.file_path!r} does not exist. "
@@ -1687,7 +1689,7 @@ def run_workflow_task(
                     file=stdout,
                 )
         if configured_git_state is not None:
-            project_root = _resolve_project_root(
+            project_root = resolve_project_root(
                 configured_repo_root,
                 configured_repo_root,
             )
@@ -1719,7 +1721,7 @@ def run_workflow_task(
         )
         print(str(exc), file=stderr)
         return 2
-    skill_catalog = _load_skill_catalog(
+    skill_catalog = load_skill_catalog(
         repo_root / "skill-definitions",
         stderr=stderr,
     )
@@ -1729,7 +1731,7 @@ def run_workflow_task(
     )
     requested_task_id = config.task_id
     client_was_provided = client is not None
-    dump_root = _resolve_project_root(
+    dump_root = resolve_project_root(
         configured_repo_root,
         repo_root,
     )
@@ -1760,7 +1762,7 @@ def run_workflow_task(
                 )
             )
         if workflow_git_state is not None:
-            project_root = _resolve_project_root(configured_repo_root, repo_root)
+            project_root = resolve_project_root(configured_repo_root, repo_root)
             validate_workflow_git_state(
                 project_root,
                 workflow_git_state,
@@ -2187,7 +2189,7 @@ def _resolve_workflow_task_context(
             )
         )
 
-    project_root = _resolve_project_root(
+    project_root = resolve_project_root(
         configured_repo_root,
         configured_repo_root,
     )
@@ -2701,7 +2703,7 @@ def _handle_exhausted_timeout(
 
 
 def _delete_workflow_task_worktree(repo_root: Path, *, stderr: TextIO) -> None:
-    project_root = _resolve_project_root(repo_root, repo_root)
+    project_root = resolve_project_root(repo_root, repo_root)
     result = subprocess.run(
         ["git", "worktree", "remove", "--force", str(repo_root)],
         cwd=project_root,
@@ -3064,7 +3066,7 @@ def _task_action_material_state(
         return None
     material_state: list[tuple[str, str | None]] = []
     for file_path in file_paths:
-        path = _resolve_worktree_file_path(file_path, repo_root)
+        path = resolve_worktree_file_path(file_path, repo_root)
         if path.is_dir():
             material_state.append((str(path), "<directory>"))
             continue
@@ -3848,10 +3850,10 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
             (
                 file_path,
                 (
-                    _resolve_worktree_file_path(file_path, self.repo_root).read_text(
+                    resolve_worktree_file_path(file_path, self.repo_root).read_text(
                         encoding="utf-8"
                     )
-                    if _resolve_worktree_file_path(file_path, self.repo_root).exists()
+                    if resolve_worktree_file_path(file_path, self.repo_root).exists()
                     else None
                 ),
             )
@@ -4594,7 +4596,7 @@ def _read_task_document(
         raise PowdrrExecutionError(
             "read_document action must include a file and line range."
         )
-    path = _resolve_worktree_file_path(action.file_path, repo_root)
+    path = resolve_worktree_file_path(action.file_path, repo_root)
     if not path.exists() or not path.is_file():
         directory = path.parent
         if directory.is_dir():
@@ -4664,7 +4666,7 @@ def _apply_task_edits(
         edit_groups = [(action.file_path, action.edits)]
     results: list[dict[str, Any]] = []
     for file_path, edits in edit_groups:
-        path = _resolve_worktree_file_path(file_path, repo_root)
+        path = resolve_worktree_file_path(file_path, repo_root)
         current = path.read_text(encoding="utf-8") if path.exists() else ""
         updated = _apply_file_edits(current, edits)
         path.parent.mkdir(parents=True, exist_ok=True)

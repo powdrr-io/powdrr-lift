@@ -15,12 +15,12 @@ from textual.events import Key
 from textual.widgets import Label, ListItem, ListView, Static, TextArea
 
 from powdrr_lift.core import Skill, SkillStep, load_skill
-from powdrr_lift.workflow_chat_agent import SkillCatalogEntry
 from powdrr_lift.workflow_chat_tui import (
     WorkflowChatApp,
     _TextualStdoutOutput,
     _visible_step_indices,
 )
+from powdrr_lift.workflow_models import SkillCatalogEntry
 
 
 def test_textual_response_grows_and_submits_on_return(

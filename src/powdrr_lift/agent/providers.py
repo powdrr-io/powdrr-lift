@@ -39,6 +39,7 @@ from powdrr_lift.workflow_llm import (
 )
 
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
+LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
@@ -310,6 +311,25 @@ def resolve_local_model_path(model_cache_dir: Path) -> Path:
         "`powdrr-lift download-qwen-model` before starting workflow-chat. "
         f"Expected cache={model_cache_dir}."
     )
+
+
+def resolve_local_model_context() -> int:
+    configured_context = os.environ.get(LOCAL_MODEL_CONTEXT_ENV)
+    if configured_context is None or not configured_context.strip():
+        return _DEFAULT_LOCAL_MODEL_CONTEXT
+    try:
+        context = int(configured_context)
+    except ValueError as exc:
+        raise PowdrrExecutionError(
+            f"{LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        ) from exc
+    if context <= 0:
+        raise PowdrrExecutionError(
+            f"{LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
+            f"{configured_context!r}."
+        )
+    return context
 
 
 def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
@@ -946,6 +966,31 @@ def build_provider_client(
         api_key=api_key,
         base_url=base_url,
         limits=limits,
+        progress_stream=progress_stream,
+    )
+
+
+def build_workflow_client(
+    credentials: ProviderCredentials,
+    *,
+    model: str,
+    model_cache_dir: Path,
+    progress_stream: TextIO | None = None,
+) -> WorkflowLLMClient:
+    """Build the workflow-facing client for resolved provider credentials."""
+    provider = provider_definition(credentials.provider)
+    local_context = resolve_local_model_context()
+    return build_provider_client(
+        provider=credentials.provider,
+        model=model,
+        api_key=credentials.api_key,
+        base_url=credentials.base_url,
+        local_model_path=(
+            resolve_local_model_path(model_cache_dir)
+            if provider.client_kind == "local"
+            else None
+        ),
+        local_context=local_context,
         progress_stream=progress_stream,
     )
 

@@ -23,6 +23,7 @@ import yaml
 
 from powdrr_lift.agent.provider_config import DEFAULT_MODEL
 from powdrr_lift.agent.providers import (
+    build_workflow_client,
     initial_model_for_provider,
     resolve_provider_credentials,
 )
@@ -43,10 +44,8 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
-    SkillCatalogEntry,
     SkillChatConfig,
     SkillChatSelection,
-    _build_chat_client,
     _ChatWorkflowExecutionStrategy,
     _workflow_action_signature,
     _WorkflowExecutionState,
@@ -54,6 +53,7 @@ from powdrr_lift.workflow_chat_agent import (
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_llm import WorkflowStepRunner
+from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_task_agent import _run_skill_for_agent
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
 
@@ -396,7 +396,7 @@ def run_workflow_scenario(
             execution_model = initial_model_for_provider(
                 provider_name, configured_model
             )
-            live_client = _build_chat_client(
+            live_client = build_workflow_client(
                 credentials,
                 model=execution_model,
                 model_cache_dir=temporary_root / "models",

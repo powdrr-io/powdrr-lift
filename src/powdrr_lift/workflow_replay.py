@@ -311,7 +311,6 @@ def render_skill_replay(
         )
 
     from powdrr_lift.workflow_chat_agent import (
-        SkillCatalogEntry,
         _build_step_execution_messages,
         _parse_action_response,
         _validate_coding_loop_action,
@@ -319,6 +318,7 @@ def render_skill_replay(
         _validate_workflow_step_transition,
         _WorkflowExecutionState,
     )
+    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     state = _mapping(bundle.get("prompt_state"), "bundle prompt_state")
     execution_events = [

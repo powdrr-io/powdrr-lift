@@ -495,6 +495,7 @@ def _validate_task_semantics(
             isinstance(action, str)
             and isinstance(actions, Sequence)
             and not isinstance(actions, (str, bytes))
+            and actions
             and step.get("step_type") != "invoke_tool"
             and action not in actions
         ):
@@ -508,6 +509,7 @@ def _validate_task_semantics(
                         f"Declare {action!r} in actions, or make the task fully "
                         "engine-owned and remove the model turn."
                     ),
+                    severity="warning",
                 )
             )
     return issues
@@ -935,13 +937,15 @@ def _validate_task_ownership_contract(
     )
     pre_step = task.get("pre_step")
     if step_type == "invoke_tool":
-        if actions:
+        pre_action = pre_step.get("action") if isinstance(pre_step, Mapping) else None
+        if not isinstance(pre_action, str) or list(actions) != [pre_action]:
             issues.append(
                 WorkflowDefinitionIssue(
-                    "deterministic_step_has_model_actions",
-                    "invoke_tool tasks are runner-owned and must not expose model actions.",
+                    "deterministic_step_action_contract",
+                    "Deterministic tasks must declare exactly their runner-owned pre-step action in actions.",
                     f"{task_path}.actions",
-                    remediation="Set actions to [] and let the runner persist the pre-step result automatically.",
+                    remediation="Set actions to [pre_step.action] and let the runner persist the pre-step result automatically.",
+                    severity="warning",
                 )
             )
         if invocations:

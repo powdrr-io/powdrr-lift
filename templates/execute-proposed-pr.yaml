@@ -41,7 +41,7 @@ task_templates:
 - description: Gather context about the proposed PR
   phase_type: intake
   persona_id: architect
-  actions: []
+  actions: [gather_context]
   step_type: invoke_tool
   prompt_catalogs: [context_types]
   complexity: high
@@ -101,6 +101,62 @@ task_templates:
   output_state_type: detailed-execution-plan-state
   dependent_state:
   - execution-plan-created
+- description: Inspect the planned Python structure
+  phase_type: plan_pr
+  persona_id: engineer
+  actions: [invoke_tool]
+  step_type: governed
+  complexity: medium
+  assignee_type: agent
+  assignee_role: architect
+  llm_type: simple_task
+  input_state:
+    execution_plan: <upstream-task-1>.detailed-execution-plan-state
+    planned_python_file: <planned-python-file>
+    structure_inspection: {}
+  tool_invocations:
+  - tool: basedpyright-structure
+    command:
+    - path=<planned-python-file>
+  details: >-
+    Perform exactly one action: invoke basedpyright-structure for the most
+    important Python implementation or test file named in the execution plan.
+    Do not edit files or invoke any other tool. After the result is returned,
+    persist it with one next_step action in structure-inspection-state. If the
+    plan contains no Python file, return next_step with skipped true.
+    Return exactly {"action":"next_step","output_state":{"structure-inspection-state":{"result":{},"skipped":false}}}.
+  output_state_type: structure-inspection-state
+  dependent_state:
+  - structure-inspected
+- description: Resolve the planned Python symbols
+  phase_type: plan_pr
+  persona_id: engineer
+  actions: [invoke_tool]
+  step_type: governed
+  complexity: medium
+  assignee_type: agent
+  assignee_role: architect
+  llm_type: simple_task
+  input_state:
+    execution_plan: <upstream-task-1>.detailed-execution-plan-state
+    structure_inspection: <upstream-task-2>.structure-inspection-state
+    planned_symbol: <planned-symbol>
+    symbol_inspection: {}
+  tool_invocations:
+  - tool: basedpyright-symbol
+    command:
+    - query=<planned-symbol>
+  details: >-
+    Perform exactly one action: invoke basedpyright-symbol for the most
+    important symbol named in the execution plan, using the structure result to
+    choose the query. Do not edit files or invoke any other tool. After the
+    result is returned, persist it with one next_step action in
+    symbol-inspection-state. If the plan contains no Python symbol, return
+    next_step with skipped true.
+    Return exactly {"action":"next_step","output_state":{"symbol-inspection-state":{"result":{},"skipped":false}}}.
+  output_state_type: symbol-inspection-state
+  dependent_state:
+  - symbols-inspected
 - description: Implement, test, and repair the proposed PR
   phase_type: validate
   persona_id: engineer
@@ -122,6 +178,8 @@ task_templates:
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: <upstream-task-1>.detailed-execution-plan-state
+    structure_inspection: <upstream-task-2>.structure-inspection-state
+    symbol_inspection: <upstream-task-3>.symbol-inspection-state
     implementation_and_test_diffs: {}
     test_results: {}
   details: >-
@@ -161,8 +219,8 @@ task_templates:
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: <upstream-task-1>.detailed-execution-plan-state
-    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
-    all_tests_results: <upstream-task-2>.implementation-and-test-state
+    implementation_and_test_diffs: <upstream-task-4>.implementation-and-test-state
+    all_tests_results: <upstream-task-4>.implementation-and-test-state
     completeness_review: {}
   details: >-
     Perform exactly one action: compare the implementation and test evidence to
@@ -185,7 +243,7 @@ task_templates:
   assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    completeness_review: <upstream-task-3>.specification-completeness-state
+    completeness_review: <upstream-task-5>.specification-completeness-state
     repair_result: {}
   details: >-
     Perform exactly one action only when the completeness review identifies a
@@ -203,14 +261,14 @@ task_templates:
 - description: Run formatting checks
   phase_type: validate
   persona_id: engineer
-  actions: []
+  actions: [invoke_tool]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    completeness_repair: <upstream-task-4>.completeness-repair-state
+    completeness_repair: <upstream-task-6>.completeness-repair-state
   pre_step:
     action: invoke_tool
     template:
@@ -226,14 +284,14 @@ task_templates:
 - description: Run lint checks
   phase_type: validate
   persona_id: engineer
-  actions: []
+  actions: [invoke_tool]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    formatting_check: <upstream-task-5>.formatting-check-state
+    formatting_check: <upstream-task-7>.formatting-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -248,14 +306,14 @@ task_templates:
 - description: Run type checks
   phase_type: validate
   persona_id: engineer
-  actions: []
+  actions: [invoke_tool]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    lint_check: <upstream-task-6>.lint-check-state
+    lint_check: <upstream-task-8>.lint-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -269,17 +327,17 @@ task_templates:
 - description: Collect the final diff status
   phase_type: review_pr
   persona_id: code-reviewer
-  actions: []
+  actions: [invoke_tool]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
-    formatting_check: <upstream-task-5>.formatting-check-state
-    lint_check: <upstream-task-6>.lint-check-state
-    type_check: <upstream-task-7>.type-check-state
+    implementation_and_test_diffs: <upstream-task-4>.implementation-and-test-state
+    formatting_check: <upstream-task-7>.formatting-check-state
+    lint_check: <upstream-task-8>.lint-check-state
+    type_check: <upstream-task-9>.type-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -298,8 +356,8 @@ task_templates:
   assignee_role: reviewer
   llm_type: high_reasoning
   input_state:
-    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
-    final_scope_context: <upstream-task-8>.final-scope-context-state
+    implementation_and_test_diffs: <upstream-task-4>.implementation-and-test-state
+    final_scope_context: <upstream-task-10>.final-scope-context-state
   details: >-
     Compare the supplied deterministic Git status and implementation evidence
     to the proposed PR. Identify debug code, generated artifacts, secrets,
@@ -320,7 +378,7 @@ task_templates:
   assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    scope_review: <upstream-task-9>.final-scope-review-state
+    scope_review: <upstream-task-11>.final-scope-review-state
     scope_repair: {}
   details: >-
     Perform exactly one action only when the scope review identifies a finding:
@@ -338,7 +396,7 @@ task_templates:
 - description: Promote the feature documents
   phase_type: confirm_readiness
   persona_id: code-reviewer
-  actions: []
+  actions: [invoke_tool]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -346,8 +404,8 @@ task_templates:
   llm_type: simple_task
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    completeness_review: <upstream-task-3>.specification-completeness-state
-    scope_repair: <upstream-task-10>.final-scope-repair-state
+    completeness_review: <upstream-task-5>.specification-completeness-state
+    scope_repair: <upstream-task-12>.final-scope-repair-state
     feature_id: <work-item-name>
   pre_step:
     action: invoke_tool
@@ -363,16 +421,16 @@ task_templates:
 - description: Verify the pull request file set
   phase_type: confirm_readiness
   persona_id: code-reviewer
-  actions: []
+  actions: [invoke_tool]
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: simple_task
   input_state:
-    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
-    promoted_documents: <upstream-task-11>.promoted-current-state-documents
-    type_check: <upstream-task-7>.type-check-state
+    implementation_and_test_diffs: <upstream-task-4>.implementation-and-test-state
+    promoted_documents: <upstream-task-13>.promoted-current-state-documents
+    type_check: <upstream-task-9>.type-check-state
   pre_step:
     action: invoke_tool
     template:
@@ -396,14 +454,14 @@ task_templates:
   - finish-pr-prep
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
-    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
-    all_tests_results: <upstream-task-2>.implementation-and-test-state
-    completeness_review: <upstream-task-3>.specification-completeness-state
-    formatting_check: <upstream-task-5>.formatting-check-state
-    lint_check: <upstream-task-6>.lint-check-state
-    type_check: <upstream-task-7>.type-check-state
-    promoted_documents: <upstream-task-11>.promoted-current-state-documents
-    staged_changes: <upstream-task-12>.staged-pull-request-state
+    implementation_and_test_diffs: <upstream-task-4>.implementation-and-test-state
+    all_tests_results: <upstream-task-4>.implementation-and-test-state
+    completeness_review: <upstream-task-5>.specification-completeness-state
+    formatting_check: <upstream-task-7>.formatting-check-state
+    lint_check: <upstream-task-8>.lint-check-state
+    type_check: <upstream-task-9>.type-check-state
+    promoted_documents: <upstream-task-13>.promoted-current-state-documents
+    staged_changes: <upstream-task-14>.staged-pull-request-state
   details: >-
     The listed finish-pr-prep skill runs automatically because it is declared
     in uses_skills. Do not return invoke_skill for it; doing so is recursive and

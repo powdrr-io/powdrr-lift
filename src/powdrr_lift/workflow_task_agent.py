@@ -1970,7 +1970,7 @@ def run_workflow_task(
                     runtime=runtime,
                 )
             )
-        if task.step_type == "invoke_tool" and requires_deterministic_output_state:
+        if task.pre_step is not None and requires_deterministic_output_state:
             if task.output_state_type == "staged-pull-request-state":
                 _require_staged_pull_request_files(repo_root)
             completed = workflow.complete_task(

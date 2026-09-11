@@ -36,15 +36,12 @@ from powdrr_lift.agent.exchanges import (
     normalize_cache_usage,
 )
 from powdrr_lift.agent.provider_config import (
-    DEFAULT_LLM_TYPE,
     DEFAULT_MODEL,
-    LLM_PROVIDERS,
     ZAI_LLM_MAPPINGS,
     LLMModelLimits,
     LLMModelMapping,
     LLMProviderRole,
     LLMProviderRoles,
-    default_llm_mappings,
     provider_definition,
     provider_supports_llm_mappings,
 )
@@ -56,10 +53,17 @@ from powdrr_lift.agent.providers import (
     _estimate_message_tokens,
     _ModelUnavailableError,
     _SemanticRepairExhaustedError,
+    available_provider_names,
+    backup_model_for,
     build_provider_client,
+    initial_model_for_provider,
+    long_context_backup_for,
     provider_model_limits,
+    resolve_llm_mapping,
     resolve_local_model_path,
+    resolve_provider,
     resolve_provider_credentials,
+    resolve_provider_roles,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -1039,7 +1043,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     self.state.step_index += 1
                     continue
             step_mapping = (
-                _resolve_llm_mapping(
+                resolve_llm_mapping(
                     self.current_step.llm_type or self.selection.llm_type,
                     mappings=_active_llm_mappings(
                         self.config, self.provider_roles, self.provider_role
@@ -1054,7 +1058,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     self.current_model, provider=self.provider
                 )
             self.current_model = step_mapping.model
-            self.provider = _resolve_provider(
+            self.provider = resolve_provider(
                 self.config.provider,
                 self.current_model,
                 mapping=step_mapping,
@@ -1613,7 +1617,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         if action.llm_type is not None and provider_supports_llm_mappings(
             self.provider
         ):
-            mapping = _resolve_llm_mapping(
+            mapping = resolve_llm_mapping(
                 action.llm_type,
                 mappings=_active_llm_mappings(
                     self.config, self.provider_roles, self.provider_role
@@ -2288,10 +2292,14 @@ def run_workflow_chat(
         print(f"No skills found in {skills_dir}.", file=stderr)
         return 1
 
-    provider_roles = _resolve_provider_roles(config)
+    provider_roles = resolve_provider_roles(
+        config.provider,
+        normal_provider=config.normal_provider,
+        adversarial_provider=config.adversarial_provider,
+    )
     provider_role: LLMProviderRole = "normal"
     provider = provider_roles.provider_for(provider_role)
-    current_model = _initial_model_for_provider(provider, config.model)
+    current_model = initial_model_for_provider(provider, config.model)
     credentials = resolve_provider_credentials(
         provider, config.api_key, config.base_url
     )
@@ -2420,7 +2428,7 @@ def run_workflow_chat(
         )
         selected_skill = _find_catalog_entry(catalog, selection.selected_skill_path)
         selection_mapping = (
-            _resolve_llm_mapping(
+            resolve_llm_mapping(
                 selection.llm_type,
                 mappings=_active_llm_mappings(config, provider_roles, provider_role),
                 provider=provider,
@@ -2430,7 +2438,7 @@ def run_workflow_chat(
         )
         if selection_mapping is not None:
             current_model = selection_mapping.model
-            provider = _resolve_provider(
+            provider = resolve_provider(
                 config.provider,
                 current_model,
                 mapping=selection_mapping,
@@ -2571,7 +2579,7 @@ def run_workflow_chat(
     )
     observer_provider = provider_roles.provider_for(provider_role)
     observer_mapping = (
-        _resolve_llm_mapping(
+        resolve_llm_mapping(
             "high_reasoning",
             mappings=_active_llm_mappings(config, provider_roles, provider_role),
             provider=observer_provider,
@@ -3387,21 +3395,10 @@ def _active_llm_mappings(
 ) -> tuple[tuple[str, LLMModelMapping], ...]:
     """Return mappings for a role without exposing provider details to callers."""
     provider = provider_roles.provider_for(role)
-    mappings = tuple(default_llm_mappings(provider).items())
+    mappings = tuple(provider_definition(provider).llm_mappings.items())
     if role == "normal":
         mappings += config.llm_mappings
     return mappings
-
-
-def _initial_model_for_provider(provider: str, configured_model: str) -> str:
-    """Resolve the first request model using the selected provider's mapping."""
-    definition = provider_definition(provider)
-    if definition.forced_model is not None:
-        return definition.forced_model
-    if configured_model != DEFAULT_MODEL:
-        return configured_model
-    mapping = definition.llm_mappings.get(DEFAULT_LLM_TYPE)
-    return mapping.model if mapping is not None else configured_model
 
 
 def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
@@ -9404,49 +9401,6 @@ def _optional_llm_type(value: object) -> str | None:
     return value.strip().lower().replace("-", "_")
 
 
-def _resolve_llm_model(
-    llm_type: str | None,
-    *,
-    fallback_model: str,
-    mappings: Sequence[tuple[str, LLMModelMapping]],
-    provider: str = "zai",
-) -> str:
-    if llm_type is None or not provider_supports_llm_mappings(provider):
-        return fallback_model
-    resolved_mapping = _resolve_llm_mapping(
-        llm_type,
-        mappings=mappings,
-        provider=provider,
-    )
-    return resolved_mapping.model if resolved_mapping is not None else fallback_model
-
-
-def _resolve_llm_mapping(
-    llm_type: str | None,
-    *,
-    mappings: Sequence[tuple[str, LLMModelMapping]],
-    provider: str,
-) -> LLMModelMapping | None:
-    if llm_type is None:
-        return None
-    if not provider_supports_llm_mappings(provider):
-        raise PowdrrExecutionError(
-            f"LLM mappings are not supported for provider {provider!r}."
-        )
-    normalized_llm_type = llm_type.strip().lower().replace("-", "_")
-    mapping = dict(default_llm_mappings(provider))
-    mapping.update(
-        {key.strip().lower().replace("-", "_"): value for key, value in mappings}
-    )
-    resolved_mapping = mapping.get(normalized_llm_type)
-    if resolved_mapping is None:
-        raise PowdrrExecutionError(
-            f"No LLM mapping is configured for llm_type {llm_type!r} "
-            f"with provider {provider!r}."
-        )
-    return resolved_mapping
-
-
 def _complete_json_with_model_fallback(
     *,
     client_for: Callable[[str, str], WorkflowLLMClient],
@@ -9469,7 +9423,7 @@ def _complete_json_with_model_fallback(
     active_provider = provider
     attempted_models = {model.casefold()}
     while True:
-        long_context_backup = _long_context_backup_for(
+        long_context_backup = long_context_backup_for(
             active_model,
             model_mappings,
         )
@@ -9511,7 +9465,7 @@ def _complete_json_with_model_fallback(
                 stdout=stdout,
                 stderr=stderr,
                 fallback_on_transient_exhaustion=(
-                    _backup_model_for(active_model, model_mappings) is not None
+                    backup_model_for(active_model, model_mappings) is not None
                 ),
                 empty_response_fallback_payload=empty_response_fallback_payload,
                 error_recorder=error_recorder,
@@ -9519,7 +9473,7 @@ def _complete_json_with_model_fallback(
             )
             return result, active_model, active_provider
         except _ModelUnavailableError as exc:
-            backup_model = _backup_model_for(active_model, model_mappings)
+            backup_model = backup_model_for(active_model, model_mappings)
             if (
                 backup_model is None
                 or backup_model.model.casefold() in attempted_models
@@ -9546,28 +9500,6 @@ def _complete_json_with_model_fallback(
             attempted_models.add(backup_model.model.casefold())
             active_model = backup_model.model
             active_provider = backup_model.provider
-
-
-def _backup_model_for(
-    model: str,
-    model_mappings: Sequence[tuple[str, LLMModelMapping]],
-) -> LLMModelMapping | None:
-    normalized_model = model.casefold()
-    for _, mapping in model_mappings:
-        if mapping.model.casefold() == normalized_model:
-            return mapping.backup_model
-    return None
-
-
-def _long_context_backup_for(
-    model: str,
-    model_mappings: Sequence[tuple[str, LLMModelMapping]],
-) -> LLMModelMapping | None:
-    normalized_model = model.casefold()
-    for _, mapping in model_mappings:
-        if mapping.model.casefold() == normalized_model:
-            return mapping.long_context_backup_model
-    return None
 
 
 def _complete_json_with_repair(
@@ -11607,87 +11539,21 @@ def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
     )
 
 
-def _resolve_provider(
-    provider_override: str,
-    model: str,
-    *,
-    mapping: LLMModelMapping | None = None,
-) -> str:
-    if mapping is not None:
-        provider_definition(mapping.provider)
-        return mapping.provider
-    if provider_override != "auto":
-        provider_definition(provider_override)
-        return provider_override
-    candidates = _auto_provider_candidates()
-    if candidates:
-        return candidates[0]
-    if model.startswith("claude-"):
-        return "anthropic"
-    return "openai"
-
-
-def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
-    """Resolve the two opaque provider roles used by workflow execution."""
-    if config.normal_provider is not None:
-        normal = config.normal_provider
-    elif config.provider == "auto":
-        candidates = _auto_provider_candidates()
-        normal = candidates[0] if candidates else "openai"
-    else:
-        normal = config.provider
-    provider_definition(normal)
-
-    adversarial = config.adversarial_provider
-    if adversarial is None and config.provider == "auto":
-        candidates = _auto_provider_candidates()
-        adversarial = next(
-            (candidate for candidate in candidates if candidate != normal),
-            None,
-        )
-    if adversarial is not None:
-        provider_definition(adversarial)
-    return LLMProviderRoles(normal=normal, adversarial=adversarial)
-
-
 def resolve_workflow_provider(
     provider: str = "auto",
     *,
     normal_provider: str | None = None,
 ) -> str:
     """Resolve the normal provider using workflow-chat's provider policy."""
-    return _resolve_provider_roles(
-        SkillChatConfig(
-            skills_dir=Path("."),
-            provider=provider,
-            normal_provider=normal_provider,
-        )
+    return resolve_provider_roles(
+        provider,
+        normal_provider=normal_provider,
     ).normal
-
-
-def _auto_provider_candidates() -> tuple[str, ...]:
-    """Return configured providers in their declared automatic priority order."""
-    candidates: list[tuple[int, str]] = []
-    for name, definition in LLM_PROVIDERS.items():
-        if definition.auto_priority is None or not _provider_has_credentials(name):
-            continue
-        # DeepInfra Cheap is the automatic mode for a DeepInfra credential;
-        # standard DeepInfra remains available through explicit selection.
-        candidates.append((definition.auto_priority, name))
-    return tuple(name for _, name in sorted(candidates))
 
 
 def available_workflow_providers() -> tuple[str, ...]:
     """Return API-backed providers that have usable credentials configured."""
-    candidates: list[tuple[int, str]] = []
-    for name, definition in LLM_PROVIDERS.items():
-        if not definition.api_key_env_names and name != "openai":
-            continue
-        if not _provider_has_credentials(name):
-            continue
-        priority = definition.auto_priority
-        candidates.append((priority if priority is not None else 100, name))
-    return tuple(name for _, name in sorted(candidates))
+    return available_provider_names()
 
 
 def choose_workflow_provider(
@@ -11724,39 +11590,6 @@ def choose_workflow_provider(
             f"Choose a number from 1 to {len(providers)} or enter a provider name: "
         )
         stdout.flush()
-
-
-def _provider_has_credentials(provider: str) -> bool:
-    definition = provider_definition(provider)
-    if provider == "openai" and _resolve_codex_access_token() is not None:
-        return True
-    return any(os.environ.get(env_name) for env_name in definition.api_key_env_names)
-
-
-def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
-    if override:
-        return override, "--api-key"
-    definition = provider_definition(provider)
-    if definition.client_kind == "local":
-        return "local", "local"
-    for env_name in definition.api_key_env_names:
-        value = os.environ.get(env_name)
-        if value:
-            return value, env_name
-    if provider == "openai":
-        codex_token = _resolve_codex_access_token()
-        if codex_token is not None:
-            return codex_token, _codex_auth_path_description()
-    if provider == "openai":
-        raise PowdrrExecutionError(
-            "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
-            "sign in with Codex so ~/.codex/auth.json is available."
-        )
-    credential_names = " or ".join(definition.api_key_env_names)
-    raise PowdrrExecutionError(
-        f"No {definition.display_name} credentials found. Set {credential_names}, "
-        "or pass --api-key."
-    )
 
 
 def download_local_qwen_model(model_cache_dir: Path) -> Path:
@@ -11818,65 +11651,6 @@ def _resolve_local_model_context() -> int:
             f"{configured_context!r}."
         )
     return context
-
-
-def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
-    if override:
-        return override, "--base-url"
-    definition = provider_definition(provider)
-    if definition.client_kind == "local":
-        return "local", "local"
-    for env_name in definition.base_url_env_names:
-        value = os.environ.get(env_name)
-        if value:
-            return value, env_name
-    return definition.default_base_url, "default"
-
-
-def _resolve_codex_access_token() -> str | None:
-    auth_path = _resolve_codex_auth_path()
-    if not auth_path.exists():
-        return None
-
-    try:
-        raw_auth = json.loads(auth_path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        return None
-    if not isinstance(raw_auth, dict):
-        return None
-
-    tokens = raw_auth.get("tokens")
-    if not isinstance(tokens, dict):
-        return None
-
-    access_token = tokens.get("access_token")
-    if not isinstance(access_token, str) or not access_token:
-        return None
-
-    expiry = tokens.get("expiry")
-    if isinstance(expiry, str):
-        try:
-            expiry_dt = datetime.fromisoformat(expiry)
-        except ValueError:
-            return access_token
-        if expiry_dt.tzinfo is None:
-            expiry_dt = expiry_dt.replace(tzinfo=UTC)
-        if expiry_dt <= datetime.now(UTC):
-            return None
-
-    return access_token
-
-
-def _resolve_codex_auth_path() -> Path:
-    codex_home = os.environ.get("CODEX_HOME")
-    if codex_home is not None:
-        return Path(codex_home).expanduser() / "auth.json"
-
-    return Path.home() / ".codex" / "auth.json"
-
-
-def _codex_auth_path_description() -> str:
-    return str(_resolve_codex_auth_path())
 
 
 def _split_system_message(

@@ -32,7 +32,15 @@ from powdrr_lift.agent.providers import (
     _read_openai_response,
     _request_token_budget,
     _serialize_messages,
+    backup_model_for,
+    initial_model_for_provider,
+    long_context_backup_for,
+    resolve_llm_mapping,
+    resolve_llm_model,
     resolve_local_model_path,
+    resolve_provider,
+    resolve_provider_credentials,
+    resolve_provider_roles,
 )
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -74,7 +82,6 @@ from powdrr_lift.workflow_chat_agent import (
     _apply_yaml_operations,
     _available_work_item_documents,
     _available_work_item_names,
-    _backup_model_for,
     _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
@@ -90,12 +97,10 @@ from powdrr_lift.workflow_chat_agent import (
     _handle_workflow_action_edit,
     _handle_workflow_action_file_management,
     _handle_workflow_action_read_document,
-    _initial_model_for_provider,
     _latest_deterministic_pre_step,
     _latest_execution_event_for_prompt,
     _LLMExchangeRecordingClient,
     _load_workflow_context,
-    _long_context_backup_for,
     _match_work_item_names,
     _modular_action_system_prompt,
     _normalize_cache_usage,
@@ -115,14 +120,8 @@ from powdrr_lift.workflow_chat_agent import (
     _recovery_tool_invocations,
     _repair_response_fingerprint,
     _require_coding_loop_verification,
-    _resolve_api_key,
-    _resolve_base_url,
-    _resolve_llm_mapping,
-    _resolve_llm_model,
     _resolve_local_model_context,
     _resolve_project_root,
-    _resolve_provider,
-    _resolve_provider_roles,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
@@ -2222,7 +2221,7 @@ def test_local_llama_client_reports_gpu_inference_failure(
 
 def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
     assert (
-        _resolve_llm_model(
+        resolve_llm_model(
             "high_reasoning",
             fallback_model="test-model",
             mappings=(),
@@ -2230,7 +2229,7 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         == "glm-5.2"
     )
     assert (
-        _resolve_llm_model(
+        resolve_llm_model(
             "simple-task",
             fallback_model="test-model",
             mappings=(
@@ -2244,7 +2243,7 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         == "custom-fast-model"
     )
     assert (
-        _resolve_llm_model(
+        resolve_llm_model(
             None,
             fallback_model="test-model",
             mappings=(),
@@ -2252,7 +2251,7 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         == "test-model"
     )
     assert (
-        _resolve_llm_model(
+        resolve_llm_model(
             "high_reasoning",
             fallback_model="gpt-test-model",
             mappings=(),
@@ -2260,17 +2259,17 @@ def test_llm_type_mapping_selects_zai_model_for_next_roundtrip() -> None:
         )
         == "gpt-test-model"
     )
-    simple_mapping = _resolve_llm_mapping(
+    simple_mapping = resolve_llm_mapping(
         "simple_task",
         mappings=(),
         provider="zai",
     )
     assert simple_mapping is not None
     assert simple_mapping.provider == "local"
-    assert _resolve_provider("auto", simple_mapping.model, mapping=simple_mapping) == (
+    assert resolve_provider("auto", simple_mapping.model, mapping=simple_mapping) == (
         "local"
     )
-    deepinfra_mapping = _resolve_llm_mapping(
+    deepinfra_mapping = resolve_llm_mapping(
         "high_reasoning",
         mappings=(),
         provider="deepinfra",
@@ -2413,7 +2412,7 @@ def test_repeated_document_reads_do_not_count_as_material_progress(
 
 def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
     assert (
-        _resolve_llm_model(
+        resolve_llm_model(
             "simple_task",
             fallback_model="test-model",
             mappings=(),
@@ -2421,13 +2420,13 @@ def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
         )
         == "Qwen/Qwen2.5-Coder-14B-Instruct"
     )
-    backup_mapping = _backup_model_for(
+    backup_mapping = backup_model_for(
         "Qwen/Qwen2.5-Coder-14B-Instruct",
         tuple(ZAI_LLM_MAPPINGS.items()),
     )
     assert backup_mapping is not None
     assert backup_mapping.model == "glm-4.7"
-    long_context_mapping = _long_context_backup_for(
+    long_context_mapping = long_context_backup_for(
         "Qwen/Qwen2.5-Coder-14B-Instruct",
         tuple(ZAI_LLM_MAPPINGS.items()),
     )
@@ -2436,7 +2435,7 @@ def test_default_simple_task_model_uses_qwen_coder_with_glm_backup() -> None:
 
 
 def test_fast_iteration_uses_flash_model_for_long_context_fallback() -> None:
-    mapping = _resolve_llm_mapping(
+    mapping = resolve_llm_mapping(
         "fast_iteration",
         mappings=(),
         provider="zai",
@@ -2553,7 +2552,7 @@ def test_repeated_invalid_response_switches_to_backup_model() -> None:
 
 def test_llm_mapping_rejects_unsupported_provider() -> None:
     with pytest.raises(RuntimeError, match="not supported for provider 'openai'"):
-        _resolve_llm_mapping(
+        resolve_llm_mapping(
             "simple_task",
             mappings=(),
             provider="openai",
@@ -3187,11 +3186,12 @@ def test_deepinfra_credentials_and_base_url_are_supported(
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
     monkeypatch.setenv("DEEPINFRA_BASE_URL", "https://deepinfra.example/v1/openai")
 
-    assert _resolve_api_key("deepinfra", None) == (
+    credentials = resolve_provider_credentials("deepinfra")
+    assert (credentials.api_key, credentials.source) == (
         "deepinfra-token",
         "DEEPINFRA_API_TOKEN",
     )
-    assert _resolve_base_url("deepinfra", None) == (
+    assert (credentials.base_url, credentials.base_url_source) == (
         "https://deepinfra.example/v1/openai",
         "DEEPINFRA_BASE_URL",
     )
@@ -3203,11 +3203,12 @@ def test_openrouter_credentials_and_default_base_url_are_supported(
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
 
-    assert _resolve_api_key("openrouter", None) == (
+    credentials = resolve_provider_credentials("openrouter")
+    assert (credentials.api_key, credentials.source) == (
         "openrouter-key",
         "OPENROUTER_API_KEY",
     )
-    assert _resolve_base_url("openrouter", None) == (
+    assert (credentials.base_url, credentials.base_url_source) == (
         "https://openrouter.ai/api/v1",
         "default",
     )
@@ -3238,7 +3239,7 @@ def test_auto_provider_selects_openrouter_when_configured(
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
 
-    assert _resolve_provider("auto", "glm-5.2") == "openrouter"
+    assert resolve_provider("auto", "glm-5.2") == "openrouter"
 
 
 def test_auto_provider_prefers_deepinfra_cheap_over_openrouter(
@@ -3258,7 +3259,7 @@ def test_auto_provider_prefers_deepinfra_cheap_over_openrouter(
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
 
-    assert _resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
+    assert resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
 
 
 def test_available_workflow_providers_requires_api_keys(
@@ -3277,7 +3278,7 @@ def test_available_workflow_providers_requires_api_keys(
     ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._resolve_codex_access_token",
+        "powdrr_lift.agent.providers._resolve_codex_access_token",
         lambda: None,
     )
     monkeypatch.setenv("OPENROUTER_BASE_URL", "https://example.test")
@@ -3302,7 +3303,7 @@ def test_choose_workflow_provider_presents_configured_provider_pick_list(
     ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._resolve_codex_access_token",
+        "powdrr_lift.agent.providers._resolve_codex_access_token",
         lambda: None,
     )
     monkeypatch.setenv("ZAI_API_KEY", "zai-token")
@@ -3319,9 +3320,9 @@ def test_choose_workflow_provider_presents_configured_provider_pick_list(
 
 
 def test_initial_model_uses_openrouter_mapping_for_default_model() -> None:
-    assert _initial_model_for_provider("openrouter", "glm-5.2") == ("stealth/ox-alpha")
-    assert _initial_model_for_provider("openai", "glm-5.2") == "glm-5.2"
-    assert _initial_model_for_provider("openrouter", "custom-model") == ("custom-model")
+    assert initial_model_for_provider("openrouter", "glm-5.2") == ("stealth/ox-alpha")
+    assert initial_model_for_provider("openai", "glm-5.2") == "glm-5.2"
+    assert initial_model_for_provider("openrouter", "custom-model") == ("custom-model")
 
 
 def test_invalid_gather_context_type_is_repairable() -> None:
@@ -3414,7 +3415,7 @@ def test_parse_json_object_keeps_rejecting_non_json_content() -> None:
 
 def test_llm_type_mapping_selects_deepinfra_model() -> None:
     assert (
-        _resolve_llm_model(
+        resolve_llm_model(
             "high_reasoning",
             fallback_model="fallback-model",
             mappings=tuple(DEEPINFRA_LLM_MAPPINGS.items()),
@@ -3439,7 +3440,7 @@ def test_auto_provider_prefers_deepinfra_cheap_when_credentials_are_available(
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
 
-    assert _resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
+    assert resolve_provider("auto", "glm-5.2") == "deepinfra-cheap"
 
 
 def test_auto_provider_roles_use_the_top_two_configured_providers(
@@ -3461,7 +3462,7 @@ def test_auto_provider_roles_use_the_top_two_configured_providers(
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
     monkeypatch.setenv("ZAI_API_KEY", "zai-token")
 
-    roles = _resolve_provider_roles(SkillChatConfig(skills_dir=Path("skills")))
+    roles = resolve_provider_roles("auto")
 
     assert isinstance(roles, LLMProviderRoles)
     assert roles.normal == "deepinfra-cheap"
@@ -3482,17 +3483,17 @@ def test_auto_provider_roles_return_no_adversarial_provider_when_only_one_is_con
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
 
-    roles = _resolve_provider_roles(SkillChatConfig(skills_dir=Path("skills")))
+    roles = resolve_provider_roles("auto")
 
     assert roles.normal == "deepinfra-cheap"
     assert roles.adversarial is None
 
 
 def test_explicit_provider_selection_is_not_overridden() -> None:
-    assert _resolve_provider("local", "glm-5.2") == "local"
+    assert resolve_provider("local", "glm-5.2") == "local"
     assert "deepinfra-cheap" in ALL_PROVIDERS
     with pytest.raises(RuntimeError, match="Unsupported LLM provider 'unknown'"):
-        _resolve_provider("unknown", "test-model")
+        resolve_provider("unknown", "test-model")
 
 
 def test_deepinfra_cheap_maps_every_llm_type_to_flash() -> None:
@@ -3504,7 +3505,7 @@ def test_deepinfra_cheap_maps_every_llm_type_to_flash() -> None:
         assert mapping.backup_model is not None
         assert mapping.backup_model.model == expected_backup_model
         assert (
-            _resolve_llm_model(
+            resolve_llm_model(
                 llm_type,
                 fallback_model="fallback-model",
                 mappings=tuple(DEEPINFRA_CHEAP_LLM_MAPPINGS.items()),
@@ -7166,7 +7167,8 @@ def test_resolve_api_key_prefers_env_over_codex_auth(
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     monkeypatch.setenv("OPENAI_API_KEY", "env-token")
 
-    assert _resolve_api_key("openai", None) == ("env-token", "OPENAI_API_KEY")
+    credentials = resolve_provider_credentials("openai")
+    assert (credentials.api_key, credentials.source) == ("env-token", "OPENAI_API_KEY")
 
 
 def test_resolve_api_key_uses_codex_auth_when_env_missing(
@@ -7184,7 +7186,8 @@ def test_resolve_api_key_uses_codex_auth_when_env_missing(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key("openai", None) == (
+    credentials = resolve_provider_credentials("openai")
+    assert (credentials.api_key, credentials.source) == (
         "codex-token",
         str(codex_home / "auth.json"),
     )
@@ -7198,7 +7201,11 @@ def test_resolve_api_key_uses_anthropic_env_when_requested(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key("anthropic", None) == ("anth-key", "ANTHROPIC_API_KEY")
+    credentials = resolve_provider_credentials("anthropic")
+    assert (credentials.api_key, credentials.source) == (
+        "anth-key",
+        "ANTHROPIC_API_KEY",
+    )
 
 
 def test_resolve_api_key_uses_zai_env_when_requested(
@@ -7209,7 +7216,8 @@ def test_resolve_api_key_uses_zai_env_when_requested(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key("zai", None) == ("zai-key", "ZAI_API_KEY")
+    credentials = resolve_provider_credentials("zai")
+    assert (credentials.api_key, credentials.source) == ("zai-key", "ZAI_API_KEY")
 
 
 def test_resolve_skill_path_accepts_missing_extension(

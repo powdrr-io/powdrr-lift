@@ -21,6 +21,8 @@ from powdrr_lift.agent.provider_config import (
 from powdrr_lift.agent.providers import (
     _estimate_message_tokens,
     build_provider_client,
+    long_context_backup_for,
+    resolve_llm_mapping,
     resolve_local_model_path,
     resolve_provider_credentials,
 )
@@ -75,7 +77,6 @@ from powdrr_lift.workflow_chat_agent import (
     _invalidate_deterministic_pre_step,
     _list_worktree_files,
     _load_skill_catalog,
-    _long_context_backup_for,
     _maybe_record_llm_exchanges,
     _model_limits_for,
     _modular_action_system_prompt,
@@ -83,7 +84,6 @@ from powdrr_lift.workflow_chat_agent import (
     _print_waiting_for_model,
     _record_skill_pull_request,
     _require_coding_loop_verification,
-    _resolve_llm_mapping,
     _resolve_pre_step_template,
     _resolve_project_root,
     _resolve_worktree_file_path,
@@ -1930,7 +1930,7 @@ def run_workflow_task(
             task_client = _WorkflowTaskDisplayClient(task_client, stderr=stderr)
         task_client = _maybe_record_llm_exchanges(task_client, dump_root)
         compaction_client = task_client
-        long_context_backup = _long_context_backup_for(model, mappings)
+        long_context_backup = long_context_backup_for(model, mappings)
         if not client_was_provided and long_context_backup is not None:
             backup_client = _build_workflow_client_for_mapping(
                 config,
@@ -4792,7 +4792,7 @@ def _resolve_workflow_task_mapping(
         llm_type = DEFAULT_LLM_TYPE
     if not mappings:
         return LLMModelMapping(DEFAULT_MODEL, provider=provider)
-    return _resolve_llm_mapping(
+    return resolve_llm_mapping(
         llm_type,
         mappings=mappings,
         provider=provider,

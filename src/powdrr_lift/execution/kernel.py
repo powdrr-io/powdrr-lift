@@ -245,6 +245,12 @@ class ActionKernel:
         semantic_action = self._semantic_action(action, semantic_action)
         if semantic_action == "emit_outputs":
             return ()
+        # Workflow housekeeping must remain possible while a semantic
+        # follow-up is pending.  In particular, a failed clean-worktree gate
+        # routes back to a cleanup step whose delete action is unrelated to
+        # review/database obligations.
+        if semantic_action in {"delete_file", "file_management"}:
+            return ()
         if not self._obligations:
             return ()
         required = {

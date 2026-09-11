@@ -293,13 +293,29 @@ class ExecutionRuntime:
 
     @contextmanager
     def without_action_contract(self) -> Iterator[None]:
-        """Run engine-owned bookkeeping without widening model permissions."""
-        previous = self._allowed_actions
+        """Run engine-owned bookkeeping outside the model action contract."""
+        previous = (
+            self._allowed_actions,
+            self._phase_actions,
+            self._persona_actions,
+            self._unit_actions,
+            self._adapter_actions,
+        )
         self._allowed_actions = None
+        self._phase_actions = None
+        self._persona_actions = None
+        self._unit_actions = None
+        self._adapter_actions = None
         try:
             yield
         finally:
-            self._allowed_actions = previous
+            (
+                self._allowed_actions,
+                self._phase_actions,
+                self._persona_actions,
+                self._unit_actions,
+                self._adapter_actions,
+            ) = previous
 
     def allowed_actions(self) -> tuple[str, ...] | None:
         """Return the action names the active prompt may propose.

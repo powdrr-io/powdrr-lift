@@ -111,7 +111,6 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_json_object,
     _predicated_step_complete,
     _prompt_user,
-    _record_durable_fact,
     _record_dynamic_validation_result,
     _repair_response_fingerprint,
     _require_coding_loop_verification,
@@ -132,13 +131,10 @@ from powdrr_lift.workflow_chat_agent import (
     _validate_workflow_step_transition,
     _validation_actions_match,
     _validation_issue_fingerprint,
-    _ValidationGateState,
-    _ValidationObligation,
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
     _WorkflowEditRangeError,
-    _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     _WorkflowStructuredDocumentError,
     _WorkflowToolValidationError,
@@ -150,6 +146,12 @@ from powdrr_lift.workflow_chat_agent import (
     download_local_qwen_model,
     missing_executable_output,
     run_workflow_chat,
+)
+from powdrr_lift.workflow_execution_state import (
+    _record_durable_fact,
+    _ValidationGateState,
+    _ValidationObligation,
+    _WorkflowExecutionState,
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext

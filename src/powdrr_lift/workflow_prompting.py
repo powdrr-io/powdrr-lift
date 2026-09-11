@@ -3,10 +3,429 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+import re
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
+from powdrr_lift.workflow_llm import prune_execution_events
+from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
+from powdrr_lift.workflow_paths import resolve_worktree_file_path
 from powdrr_lift.workflow_step_behavior import behavior_for_step
+
+_MAX_PROMPT_TRANSCRIPT_ENTRIES = 12
+_MAX_PROMPT_TRANSCRIPT_CHARS = 12000
+_MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS = 8000
+_MAX_PROMPT_STEP_CONTEXT_ENTRIES = 24
+_MAX_PROMPT_STEP_CONTEXT_CHARS = 16000
+_MAX_PROMPT_FILE_LINES = 200
+_MAX_PROMPT_FILE_CHARS = 16000
+
+
+def _current_file_context(
+    worktree_root: Path,
+    current_file_path: Path | None,
+    *,
+    cache: dict[tuple[str, int, int], dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    if current_file_path is None:
+        return None
+
+    resolved_path = resolve_worktree_file_path(
+        str(current_file_path),
+        worktree_root,
+    )
+    if not resolved_path.exists():
+        return {
+            "path": str(resolved_path.relative_to(worktree_root)),
+            "exists": False,
+        }
+    if not resolved_path.is_file():
+        return {
+            "path": str(resolved_path.relative_to(worktree_root)),
+            "exists": False,
+        }
+
+    stat = resolved_path.stat()
+    cache_key = (str(resolved_path), stat.st_mtime_ns, stat.st_size)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+    lines = resolved_path.read_text(encoding="utf-8").splitlines()
+    serialized_size = sum(len(line) for line in lines)
+    content_omitted = (
+        len(lines) > _MAX_PROMPT_FILE_LINES or serialized_size > _MAX_PROMPT_FILE_CHARS
+    )
+    prompt_lines = [] if content_omitted else lines
+    context = {
+        "path": str(resolved_path.relative_to(worktree_root)),
+        "exists": True,
+        "line_count": len(lines),
+        "lines": [
+            {
+                "line_number": line_number,
+                "text": line,
+            }
+            for line_number, line in enumerate(prompt_lines, start=1)
+        ],
+    }
+    if content_omitted:
+        context.update(
+            {
+                "content_omitted": True,
+                "content_omitted_reason": (
+                    "Use read_document to inspect the required line range."
+                ),
+            }
+        )
+    if cache is not None:
+        cache.clear()
+        cache[cache_key] = context
+    return context
+
+
+def _available_work_item_names(worktree_root: Path) -> tuple[str, ...]:
+    specifications_root = worktree_root / "docs" / "proposals"
+    if not specifications_root.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            path.name
+            for path in specifications_root.iterdir()
+            if path.is_dir() and not path.name.startswith(".")
+        )
+    )
+
+
+def _available_work_item_documents(
+    worktree_root: Path,
+    work_item_name: str,
+) -> tuple[str, ...]:
+    work_item_root = worktree_root / "docs" / "proposals" / work_item_name
+    if not work_item_root.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            str(path.relative_to(worktree_root))
+            for path in work_item_root.rglob("*")
+            if path.is_file()
+        )
+    )
+
+
+def _effective_interaction_style(
+    selected_skill: SkillCatalogEntry,
+    current_step: Any,
+    inherited_style: str | None = None,
+) -> str | None:
+    return (
+        getattr(current_step, "interaction_style", None)
+        or selected_skill.skill.interaction_style
+        or inherited_style
+    )
+
+
+def _match_work_item_names(
+    transcript: Sequence[dict[str, str]],
+    work_item_names: Sequence[str],
+) -> tuple[str, ...]:
+    request_text = " ".join(
+        message.get("content", "")
+        for message in transcript
+        if message.get("role") == "user"
+    )
+    request_tokens = _work_item_name_tokens(request_text)
+    matches: list[str] = []
+    for work_item_name in work_item_names:
+        name_tokens = _work_item_name_tokens(work_item_name)
+        if not name_tokens:
+            continue
+        token_count = len(name_tokens)
+        contiguous_match = any(
+            request_tokens[index : index + token_count] == name_tokens
+            for index in range(len(request_tokens) - token_count + 1)
+        )
+        if contiguous_match or (
+            token_count > 1 and all(token in request_tokens for token in name_tokens)
+        ):
+            matches.append(work_item_name)
+    return tuple(matches)
+
+
+def _work_item_name_tokens(value: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def _workflow_handoff_inputs(
+    step: Any,
+    records: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "declared": [input_spec.to_data() for input_spec in step.inputs],
+        "resolved": {
+            input_spec.name: records[input_spec.name]
+            for input_spec in step.inputs
+            if input_spec.name in records
+        },
+        "missing_required": [
+            input_spec.name
+            for input_spec in step.inputs
+            if input_spec.required and input_spec.name not in records
+        ],
+    }
+
+
+def _skill_step_to_data(step: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "description": step.description,
+        "step_type": getattr(step, "step_type", "governed"),
+        "details": step.details,
+        "uses_skill": (
+            step.uses_skill.to_data()
+            if getattr(step, "uses_skill", None) is not None
+            else None
+        ),
+    }
+    if step.id is not None:
+        data["id"] = step.id
+    if step.tool_invocations:
+        data["tool_invocations"] = [
+            _tool_invocation_to_data(tool_invocation)
+            for tool_invocation in step.tool_invocations
+        ]
+    if getattr(step, "pre_step", None) is not None:
+        data["pre_step"] = step.pre_step.to_data()
+    if getattr(step, "coding_loop", None) is not None:
+        data["coding_loop"] = step.coding_loop.to_data()
+    return data
+
+
+def _tool_invocation_to_data(tool_invocation: Any) -> dict[str, Any]:
+    return tool_invocation.to_data()
+
+
+def _workflow_context_prompt_data(
+    workflow_context: WorkflowContext | None,
+) -> dict[str, object] | None:
+    if workflow_context is None:
+        return None
+    data = {
+        "branch_name": workflow_context.branch_name,
+        "pr_number": workflow_context.pr_number,
+        "pr_url": workflow_context.pr_url,
+        "skill_name": workflow_context.skill_name,
+        "request": workflow_context.request,
+    }
+    return {key: value for key, value in data.items() if value is not None}
+
+
+def _execution_events_for_prompt(
+    execution_events: Sequence[dict[str, Any]],
+    current_step_index: int | None = None,
+) -> list[dict[str, Any]]:
+    """Return the event metadata needed for the next action decision.
+
+    Event results are retained in the full execution summary, but are also
+    copied into the transcript or execution context as they are produced.
+    Sending both copies on every roundtrip needlessly grows prompts and makes
+    large tool results increasingly expensive to serialize. Keep the prompt
+    event stream as metadata while leaving the complete event stream intact
+    for persistence and diagnostics.
+    """
+    events = (
+        [
+            event
+            for event in execution_events
+            if event.get("step_index") == current_step_index
+        ]
+        if current_step_index is not None
+        else execution_events
+    )
+    return [
+        {key: value for key, value in event.items() if key != "decisions_and_context"}
+        for event in prune_execution_events(events, include_results=False)
+    ]
+
+
+def _successful_document_reads_for_prompt(
+    execution_events: Sequence[Mapping[str, Any]],
+    current_step_index: int | None = None,
+) -> list[dict[str, Any]]:
+    """Expose successful reads as durable repair context.
+
+    Compact event metadata intentionally omits results. Repairs still need to
+    know which documents already supplied context so they do not spend a retry
+    rereading the same file instead of correcting the failed capability call.
+    """
+    reads: list[dict[str, Any]] = []
+    for event in execution_events:
+        if event.get("kind") != "read_document":
+            continue
+        if current_step_index is not None and event.get("step_index") not in {
+            None,
+            current_step_index,
+        }:
+            continue
+        result = event.get("result")
+        if not isinstance(result, Mapping):
+            continue
+        path = result.get("path")
+        if not isinstance(path, str) or not path:
+            continue
+        reads.append(
+            {
+                "path": path,
+                "requested_start_line": result.get("requested_start_line"),
+                "requested_end_line": result.get("requested_end_line"),
+                "returned_end_line": result.get("end_line"),
+            }
+        )
+    return reads
+
+
+def _latest_execution_event_for_prompt(
+    execution_events: Sequence[dict[str, Any]],
+    current_step_index: int | None = None,
+) -> dict[str, Any] | None:
+    """Retain the latest result separately from the compact event metadata."""
+    if current_step_index is not None:
+        execution_events = [
+            event
+            for event in execution_events
+            if event.get("step_index") == current_step_index
+        ]
+    if not execution_events:
+        return None
+    latest = prune_execution_events(execution_events[-1:], include_results=True)
+    if not latest:
+        return None
+    return {
+        key: value for key, value in latest[0].items() if key != "decisions_and_context"
+    }
+
+
+_PROMPT_OBSERVATION_RESULT_KEYS = {
+    "tool_result",
+    "edit_result",
+    "yaml_edit_result",
+    "document_context",
+}
+
+
+def _is_prompt_observation_message(message: Mapping[str, str]) -> bool:
+    """Identify action/result transcript entries represented by event state."""
+    content = message.get("content", "")
+    try:
+        decoded = json.loads(content)
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(decoded, Mapping):
+        return False
+    if message.get("role") == "assistant":
+        return isinstance(decoded.get("action", decoded.get("kind")), str)
+    return bool(_PROMPT_OBSERVATION_RESULT_KEYS.intersection(decoded))
+
+
+def _prompt_transcript(
+    transcript: Sequence[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Keep recurring prompts bounded while retaining the complete transcript."""
+    conversational = [
+        message for message in transcript if not _is_prompt_observation_message(message)
+    ]
+    if len(conversational) <= _MAX_PROMPT_TRANSCRIPT_ENTRIES:
+        return conversational
+
+    first = {
+        **conversational[0],
+        "content": _truncate_prompt_content(conversational[0].get("content", "")),
+    }
+    recent = [
+        {
+            **message,
+            "content": _truncate_prompt_content(message.get("content", "")),
+        }
+        for message in conversational[-(_MAX_PROMPT_TRANSCRIPT_ENTRIES - 2) :]
+    ]
+    omitted = {
+        "role": "user",
+        "content": "[Earlier workflow transcript omitted from this prompt; "
+        "full history remains in the execution summary.]",
+    }
+    compacted = [first, omitted, *recent]
+    while (
+        len(compacted) > 3
+        and sum(len(message.get("content", "")) for message in compacted)
+        > _MAX_PROMPT_TRANSCRIPT_CHARS
+    ):
+        compacted.pop(2)
+    return compacted
+
+
+def _prompt_step_context(
+    execution_context: Sequence[str],
+    durable_facts: Mapping[str, Mapping[str, Any]] | None = None,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+    current_step_index: int | None = None,
+) -> list[str]:
+    """Bound recurring step context while retaining the newest handoff facts."""
+    result_prefixes = (
+        "Gathered context:\n",
+        "Deterministic pre-step gather_context result:\n",
+        "Document context: ",
+        "Gate failed: ",
+    )
+    keep_current_gather = any(
+        event.get("kind") == "gather_context"
+        and event.get("step_index") == current_step_index
+        for event in execution_events
+    )
+    execution_context = [
+        value
+        for value in execution_context
+        if keep_current_gather
+        and value.startswith("Gathered context:\n")
+        or not value.startswith(result_prefixes)
+    ]
+    fact_values = {
+        str(record.get("value"))
+        for record in (durable_facts or {}).values()
+        if record.get("value") is not None
+    }
+    execution_context = [
+        value
+        for value in execution_context
+        if " ".join(value.split()) not in fact_values
+    ]
+    if len(execution_context) <= _MAX_PROMPT_STEP_CONTEXT_ENTRIES:
+        recent = list(execution_context)
+    else:
+        recent = list(execution_context[-_MAX_PROMPT_STEP_CONTEXT_ENTRIES:])
+    while (
+        len(recent) > 1
+        and sum(len(value) for value in recent) > _MAX_PROMPT_STEP_CONTEXT_CHARS
+    ):
+        recent.pop(0)
+    return recent
+
+
+def _prompt_durable_facts(
+    durable_facts: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return deduplicated durable facts in a compact, stable prompt shape."""
+    facts = list(durable_facts.values())[-_MAX_PROMPT_STEP_CONTEXT_ENTRIES:]
+    return [dict(fact) for fact in facts]
+
+
+def _truncate_prompt_content(content: str) -> str:
+    if len(content) <= _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS:
+        return content
+    half_limit = _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS // 2
+    return (
+        content[:half_limit]
+        + "\n... [prompt transcript message truncated] ...\n"
+        + content[-half_limit:]
+    )
+
 
 _INTERACTION_STYLE_GUIDANCE: dict[str, str] = {
     "engineering": (

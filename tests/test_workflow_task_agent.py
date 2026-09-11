@@ -1200,7 +1200,7 @@ def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
             max_output_tokens=50,
         )
 
-    monkeypatch.setattr("powdrr_lift.workflow_task_agent._model_limits_for", _limits)
+    monkeypatch.setattr("powdrr_lift.workflow_task_agent.model_limits_for", _limits)
     stderr = io.StringIO()
 
     exit_code = run_workflow_task(
@@ -1251,7 +1251,7 @@ def test_process_workflow_task_compacts_at_proactive_threshold(
         "powdrr_lift.workflow_task_agent._estimate_message_tokens", _estimate
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._model_limits_for",
+        "powdrr_lift.workflow_task_agent.model_limits_for",
         lambda *_args, **_kwargs: LLMModelLimits(
             context_window=5_000,
             max_output_tokens=500,

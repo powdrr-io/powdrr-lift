@@ -58,6 +58,7 @@ from powdrr_lift.execution.builtin_tools import (
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
+from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
 from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
     pull_request_number,
@@ -65,18 +66,22 @@ from powdrr_lift.pr_workflow_record import (
 )
 from powdrr_lift.workflow_action_catalog import step_actions
 from powdrr_lift.workflow_action_protocol import _parse_action_response
-from powdrr_lift.workflow_catalog import load_skill_catalog
+from powdrr_lift.workflow_action_validation import (
+    _invalidate_deterministic_pre_step,
+    _step_index_by_id,
+    _validate_internal_command,
+    _validate_workflow_action_for_step,
+    _validate_workflow_action_outputs,
+    _validate_workflow_handoff,
+    _validation_gate_enabled,
+)
+from powdrr_lift.workflow_catalog import find_skill_by_name, load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
-    GH_TOOL,
-    GIT_TOOL,
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
     _execute_shell_tool,
-    _find_skill_by_name,
-    _invalidate_deterministic_pre_step,
     _list_worktree_files,
-    _model_limits_for,
     _print_waiting_for_model,
     _record_skill_pull_request,
     _require_coding_loop_verification,
@@ -84,14 +89,7 @@ from powdrr_lift.workflow_chat_agent import (
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
-    _step_index_by_id,
     _validate_coding_loop_action,
-    _validate_internal_command,
-    _validate_workflow_action_for_step,
-    _validate_workflow_action_outputs,
-    _validate_workflow_handoff,
-    _validation_gate_enabled,
-    resolve_workflow_provider,
 )
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_git import (
@@ -160,7 +158,11 @@ from powdrr_lift.workflow_prompting import (
     build_modular_action_system_prompt,
     interaction_style_prompt,
 )
-from powdrr_lift.workflow_provider_runtime import maybe_record_llm_exchanges
+from powdrr_lift.workflow_provider_runtime import (
+    maybe_record_llm_exchanges,
+    model_limits_for,
+    resolve_workflow_provider,
+)
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
@@ -542,7 +544,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     reasoning_mode="direct_action",
                     model=self.model,
                 )
-            limits = _model_limits_for(self.mapping_provider, self.model)
+            limits = model_limits_for(self.mapping_provider, self.model)
             estimated_input_tokens = _estimate_message_tokens(messages)
             print(
                 f"Workflow task context: {estimated_input_tokens} estimated input "
@@ -1276,7 +1278,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.observer_rejected_action_signature = workflow_action_signature(action)
         if decision.verdict == "redirect" and decision.target_skill_name:
             try:
-                _find_skill_by_name(self.skill_catalog, decision.target_skill_name)
+                find_skill_by_name(self.skill_catalog, decision.target_skill_name)
             except RuntimeError as error:
                 self.observer_intervention += f"\n- Skill redirect ignored: {error}"
         self.events.append(
@@ -4133,7 +4135,7 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                 raise PowdrrExecutionError(
                     "invoke_skill action must include a skill name."
                 )
-            nested_skill = _find_skill_by_name(self.catalog, action.skill_name)
+            nested_skill = find_skill_by_name(self.catalog, action.skill_name)
             if any(entry.skill.path == nested_skill.path for entry in self.stack):
                 raise PowdrrExecutionError(
                     f"Recursive skill invocation is not allowed: {action.skill_name!r}."
@@ -4473,7 +4475,7 @@ def _run_skill_for_agent_with_shared_runner(
     runtime: ExecutionRuntime | None = None,
     max_roundtrips: int = DEFAULT_MAX_ROUNDTRIPS,
 ) -> dict[str, Any]:
-    selected_skill = _find_skill_by_name(catalog, skill_name)
+    selected_skill = find_skill_by_name(catalog, skill_name)
     transcript = [] if clean else [{"role": "user", "content": task.description}]
     execution_events: list[dict[str, Any]] = []
     execution_context = list(context)

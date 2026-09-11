@@ -311,11 +311,13 @@ def render_skill_replay(
         )
 
     from powdrr_lift.workflow_action_protocol import _parse_action_response
+    from powdrr_lift.workflow_action_validation import (
+        _validate_workflow_action_for_step,
+        _validate_workflow_step_transition,
+    )
     from powdrr_lift.workflow_chat_agent import (
         _build_step_execution_messages,
         _validate_coding_loop_action,
-        _validate_workflow_action_for_step,
-        _validate_workflow_step_transition,
     )
     from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
     from powdrr_lift.workflow_models import SkillCatalogEntry

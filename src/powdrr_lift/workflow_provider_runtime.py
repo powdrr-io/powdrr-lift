@@ -13,14 +13,38 @@ from pathlib import Path
 from typing import TextIO
 
 from powdrr_lift.agent.exchanges import ExchangeRecordingClient
+from powdrr_lift.agent.provider_config import LLMModelLimits
 from powdrr_lift.agent.providers import (
     ProviderCredentials,
     build_workflow_client,
+    provider_model_limits,
+    resolve_local_model_context,
     resolve_provider_credentials,
+    resolve_provider_roles,
 )
 from powdrr_lift.workflow_llm import WorkflowLLMClient, complete_json
 
 ENABLE_LLM_EXCHANGE_LOGGING = False
+
+
+def model_limits_for(provider: str, model: str) -> LLMModelLimits:
+    return provider_model_limits(
+        provider,
+        model,
+        local_context=resolve_local_model_context(),
+    )
+
+
+def resolve_workflow_provider(
+    provider: str = "auto",
+    *,
+    normal_provider: str | None = None,
+) -> str:
+    """Resolve the normal provider using workflow provider policy."""
+    return resolve_provider_roles(
+        provider,
+        normal_provider=normal_provider,
+    ).normal
 
 
 def maybe_record_llm_exchanges(

@@ -1577,8 +1577,10 @@ def _validate_step_examples(
         if not isinstance(action_data, dict):
             continue
         try:
-            from powdrr_lift.workflow_chat_agent import (
+            from powdrr_lift.workflow_action_validation import (
                 _parse_action_response_with_schema,
+            )
+            from powdrr_lift.workflow_chat_agent import (
                 _step_action_response_schema,
             )
 

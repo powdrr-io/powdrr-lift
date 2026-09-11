@@ -25,15 +25,17 @@ from powdrr_lift.core.workflow_task_specification import (
     workflow_task_from_data,
 )
 from powdrr_lift.core.workflow_template_specification import load_workflow_template
+from powdrr_lift.workflow_action_validation import (
+    _parse_action_response_with_schema,
+    _validate_workflow_action_for_step,
+    _workflow_action_data,
+)
 from powdrr_lift.workflow_branching import select_branch_target
 from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
-    _parse_action_response_with_schema,
-    _run_deterministic_pre_step,
-    _run_gate,
     _step_action_response_schema,
-    _workflow_action_data,
 )
+from powdrr_lift.workflow_execution_loop import _run_deterministic_pre_step, _run_gate
 from powdrr_lift.workflow_llm import (
     WorkflowLLMClient,
     complete_json_with_timeout_retry,
@@ -410,8 +412,6 @@ def _task_from_template(
 
 
 def _validate_probe_action(action: Any, step: Any) -> None:
-    from powdrr_lift.workflow_chat_agent import _validate_workflow_action_for_step
-
     _validate_workflow_action_for_step(action, step)
 
 

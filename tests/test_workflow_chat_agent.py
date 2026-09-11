@@ -16,6 +16,10 @@ from urllib.request import Request
 import pytest
 import yaml
 
+from powdrr_lift.agent.exchanges import (
+    ExchangeRecordingClient,
+    normalize_cache_usage,
+)
 from powdrr_lift.agent.provider_config import (
     ALL_LLM_TYPES,
     ALL_PROVIDERS,
@@ -63,6 +67,10 @@ from powdrr_lift.core import (
 from powdrr_lift.core.pr_specification import (
     _load_feature_catalog,
 )
+from powdrr_lift.core.python_tool_commands import (
+    dependency_backed_command_variants,
+    missing_executable_output,
+)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
@@ -74,11 +82,38 @@ from powdrr_lift.workflow_action_catalog import (
 from powdrr_lift.workflow_action_catalog import (
     step_actions as _step_actions,
 )
+from powdrr_lift.workflow_action_operations import (
+    WorkflowEditRangeError as _WorkflowEditRangeError,
+)
+from powdrr_lift.workflow_action_operations import (
+    WorkflowYamlEditError as _WorkflowYamlEditError,
+)
+from powdrr_lift.workflow_action_operations import (
+    _apply_file_edits,
+    _apply_yaml_operations,
+)
 from powdrr_lift.workflow_action_protocol import (
     _parse_action_response,
     _parse_workflow_action_delete_file,
     _parse_workflow_action_file_management,
     _parse_workflow_action_gather_context,
+)
+from powdrr_lift.workflow_action_validation import (
+    _advance_predicated_step,
+    _command_matches_invocation,
+    _discover_validation_obligations,
+    _parse_action_response_with_schema,
+    _predicated_step_complete,
+    _record_dynamic_validation_result,
+    _validate_internal_command,
+    _validate_workflow_action_for_step,
+    _validate_workflow_action_outputs,
+    _validate_workflow_handoff,
+    _validate_workflow_step_transition,
+    _validation_actions_match,
+    _validation_issue_fingerprint,
+    _WorkflowStructuredDocumentError,
+    _WorkflowToolValidationError,
 )
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
@@ -87,69 +122,50 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatConfig,
     SkillChatEdit,
     _action_repair_prompt,
-    _advance_predicated_step,
-    _apply_file_edits,
-    _apply_yaml_operations,
     _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
     _catalog_entry_to_data,
-    _coding_loop_worktree_fingerprint,
-    _command_matches_invocation,
     _complete_json_with_model_fallback,
-    _discover_validation_obligations,
     _empty_pull_request_error,
-    _execute_shell_tool,
     _handle_workflow_action_edit,
     _handle_workflow_action_file_management,
     _handle_workflow_action_read_document,
     _latest_deterministic_pre_step,
-    _LLMExchangeRecordingClient,
     _load_workflow_context,
-    _normalize_cache_usage,
-    _parse_action_response_with_schema,
     _parse_json_object,
-    _predicated_step_complete,
     _prompt_user,
-    _record_durable_fact,
-    _record_dynamic_validation_result,
     _repair_response_fingerprint,
-    _require_coding_loop_verification,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
-    _run_coding_loop_verification,
-    _run_deterministic_pre_step,
-    _run_gate,
     _step_action_response_schema,
-    _validate_coding_loop_action,
     _validate_dynamic_validation_gate_action,
-    _validate_internal_command,
     _validate_user_question,
-    _validate_workflow_action_for_step,
-    _validate_workflow_action_outputs,
-    _validate_workflow_handoff,
-    _validate_workflow_step_transition,
-    _validation_actions_match,
-    _validation_issue_fingerprint,
-    _ValidationGateState,
-    _ValidationObligation,
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
-    _WorkflowEditRangeError,
-    _WorkflowExecutionState,
     _WorkflowProgressDisplay,
-    _WorkflowStructuredDocumentError,
-    _WorkflowToolValidationError,
-    _WorkflowYamlEditError,
     _worktree_reuse_decision,
     available_workflow_providers,
     choose_workflow_provider,
-    dependency_backed_command_variants,
     download_local_qwen_model,
-    missing_executable_output,
     run_workflow_chat,
+)
+from powdrr_lift.workflow_execution_loop import (
+    _coding_loop_worktree_fingerprint,
+    _execute_shell_tool,
+    _require_coding_loop_verification,
+    _run_coding_loop_verification,
+    _run_deterministic_pre_step,
+    _run_gate,
+    _validate_coding_loop_action,
+)
+from powdrr_lift.workflow_execution_state import (
+    _record_durable_fact,
+    _ValidationGateState,
+    _ValidationObligation,
+    _WorkflowExecutionState,
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
@@ -1157,7 +1173,7 @@ def test_failed_evaluator_gate_exposes_structured_issues_for_repair(
         ],
     }
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        "powdrr_lift.workflow_execution_loop._execute_shell_tool",
         lambda *args, **kwargs: result,
     )
     step = SkillStep(
@@ -2678,7 +2694,7 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
             assert response_schema == {"type": "object"}
             return {"action": "complete", "text": "done"}
 
-    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder = ExchangeRecordingClient(_FakeClient(), tmp_path)
 
     assert recorder.complete_json(
         [{"role": "user", "content": "request"}],
@@ -2719,7 +2735,7 @@ def test_llm_exchange_recorder_reuses_client_serialized_messages(
             assert messages == [{"role": "user", "content": "request"}]
             return {"action": "complete"}
 
-    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder = ExchangeRecordingClient(_FakeClient(), tmp_path)
     recorder.complete_json([{"role": "user", "content": "request"}])
 
     exchange = json.loads(next(tmp_path.glob("llm-*.json")).read_text())
@@ -2898,7 +2914,7 @@ def test_active_response_schema_rejects_unknown_envelope_fields() -> None:
 
 
 def test_normalize_cache_usage_supports_provider_formats() -> None:
-    assert _normalize_cache_usage(
+    assert normalize_cache_usage(
         {
             "prompt_tokens": 2000,
             "prompt_tokens_details": {
@@ -2912,7 +2928,7 @@ def test_normalize_cache_usage_supports_provider_formats() -> None:
         "cache_miss_tokens": 500,
         "cache_write_tokens": 0,
     }
-    assert _normalize_cache_usage(
+    assert normalize_cache_usage(
         {
             "prompt_tokens": 2000,
             "prompt_cache_hit_tokens": 1800,
@@ -2938,7 +2954,7 @@ def test_llm_exchange_recorder_includes_normalized_cache_usage(
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
             return {"action": "complete"}
 
-    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder = ExchangeRecordingClient(_FakeClient(), tmp_path)
     recorder.complete_json([{"role": "user", "content": "request"}])
 
     exchange = json.loads(next(tmp_path.glob("llm-*.json")).read_text())

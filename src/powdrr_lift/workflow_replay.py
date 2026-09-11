@@ -311,13 +311,15 @@ def render_skill_replay(
         )
 
     from powdrr_lift.workflow_action_protocol import _parse_action_response
-    from powdrr_lift.workflow_chat_agent import (
-        _build_step_execution_messages,
-        _validate_coding_loop_action,
+    from powdrr_lift.workflow_action_validation import (
         _validate_workflow_action_for_step,
         _validate_workflow_step_transition,
-        _WorkflowExecutionState,
     )
+    from powdrr_lift.workflow_chat_agent import (
+        _build_step_execution_messages,
+    )
+    from powdrr_lift.workflow_execution_loop import _validate_coding_loop_action
+    from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
     from powdrr_lift.workflow_models import SkillCatalogEntry
 
     state = _mapping(bundle.get("prompt_state"), "bundle prompt_state")

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TextIO
 
 from powdrr_lift.core import build_skill_directory_validation_report, load_skills
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workflow_models import SkillCatalogEntry
 
 
@@ -48,3 +49,14 @@ def load_workflow_template_catalog(
     stderr: TextIO,
 ) -> tuple[SkillCatalogEntry, ...]:
     return load_skill_catalog(templates_dir, stderr=stderr)
+
+
+def find_skill_by_name(
+    catalog: tuple[SkillCatalogEntry, ...] | list[SkillCatalogEntry],
+    skill_name: str,
+) -> SkillCatalogEntry:
+    normalized_name = skill_name.strip().casefold()
+    for entry in catalog:
+        if entry.skill.name.casefold() == normalized_name:
+            return entry
+    raise PowdrrExecutionError(f"Could not find referenced skill {skill_name!r}.")

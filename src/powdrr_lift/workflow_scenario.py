@@ -48,10 +48,10 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatSelection,
     _ChatWorkflowExecutionStrategy,
     _workflow_action_signature,
-    _WorkflowExecutionState,
     _WorkflowProgressDisplay,
     resolve_workflow_provider,
 )
+from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
 from powdrr_lift.workflow_llm import WorkflowStepRunner
 from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_task_agent import _run_skill_for_agent

@@ -12,10 +12,8 @@ from powdrr_lift.basedpyright_tools import (
 )
 from powdrr_lift.builtin_tool_help import BUILTIN_TOOL_NAMES, builtin_tool_help
 from powdrr_lift.intrinsic_git_gh import execute_intrinsic_git_gh_tool
-from powdrr_lift.workflow_chat_agent import (
-    _execute_fuzzy_match_tool,
-    _execute_shell_tool,
-)
+from powdrr_lift.workflow_chat_agent import _execute_fuzzy_match_tool
+from powdrr_lift.workflow_execution_loop import _execute_shell_tool
 
 
 def test_help_catalog_covers_each_builtin_tool() -> None:

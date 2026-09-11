@@ -6,6 +6,11 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
+from powdrr_lift.agent.progress import (
+    ProgressDecision,
+    WorkflowExecutionController,
+    no_progress_feedback,
+)
 from powdrr_lift.agent.protocol import AgentClient, AgentProposalError
 from powdrr_lift.agent.repair import (
     RepairContext,
@@ -27,6 +32,7 @@ __all__ = [
     "WorkflowFileEdits",
     "WorkflowYamlOperation",
     "ProposalKernel",
+    "ProgressDecision",
     "RepairContext",
     "RepairDirective",
     "RepairExhaustionReport",
@@ -35,5 +41,7 @@ __all__ = [
     "RepairPolicy",
     "RepairStage",
     "classify_repair_failure",
+    "no_progress_feedback",
     "run_proposal_round",
+    "WorkflowExecutionController",
 ]

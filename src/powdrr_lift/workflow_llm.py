@@ -23,6 +23,11 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,  # noqa: F401 - compatibility export
     WorkflowYamlOperation,  # noqa: F401 - compatibility export
 )
+from powdrr_lift.agent.progress import (
+    ProgressDecision,
+    WorkflowExecutionController,
+    no_progress_feedback,
+)
 from powdrr_lift.agent.repair import (
     RepairContext,
     RepairDirective,
@@ -42,11 +47,6 @@ from powdrr_lift.errors import (
 )
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.workflow_execution import (
-    ProgressDecision,
-    WorkflowExecutionController,
-    no_progress_feedback,
-)
 
 
 class WorkflowLLMClient(Protocol):

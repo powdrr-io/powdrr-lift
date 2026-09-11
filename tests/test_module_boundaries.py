@@ -72,6 +72,25 @@ def test_agent_protocol_depends_only_on_contracts() -> None:
     )
 
 
+def test_agent_package_does_not_import_definition_or_execution_implementations() -> (
+    None
+):
+    forbidden_prefixes = (
+        "powdrr_lift.core",
+        "powdrr_lift.definitions",
+        "powdrr_lift.execution",
+        "powdrr_lift.workflow_chat_agent",
+        "powdrr_lift.workflow_task_agent",
+    )
+    for path in _python_files("agent"):
+        imports = _imported_modules(path)
+        assert not any(
+            module.startswith(forbidden)
+            for module in imports
+            for forbidden in forbidden_prefixes
+        ), path
+
+
 def test_proposal_round_keeps_kernel_as_transition_owner() -> None:
     from powdrr_lift.agent import run_proposal_round
     from powdrr_lift.contracts import (

@@ -70,3 +70,47 @@ def test_agent_protocol_depends_only_on_contracts() -> None:
         for module in imports
         for forbidden in forbidden_prefixes
     )
+
+
+def test_proposal_round_keeps_kernel_as_transition_owner() -> None:
+    from powdrr_lift.agent import run_proposal_round
+    from powdrr_lift.contracts import (
+        AgentInput,
+        AgentProposal,
+        KernelResult,
+        Observation,
+        ProcedureView,
+        StateProjection,
+    )
+
+    class FakeClient:
+        def propose(self, agent_input: AgentInput) -> AgentProposal:
+            assert agent_input.procedure.step_id == "step"
+            return AgentProposal(action={"action": "inspect"})
+
+    class FakeKernel:
+        def process_proposal(self, proposal: AgentProposal) -> KernelResult:
+            assert proposal.action == {"action": "inspect"}
+            return KernelResult(
+                operation_id="operation-1",
+                operation_status="succeeded",
+                observation=Observation("tool_result", {"ok": True}, "kernel"),
+                transition="next",
+            )
+
+    result = run_proposal_round(
+        FakeClient(),
+        FakeKernel(),
+        AgentInput(
+            procedure=ProcedureView(
+                "definition",
+                "fingerprint",
+                "step",
+                "Inspect",
+                ("inspect",),
+                ("done",),
+            ),
+            state=StateProjection("execution", "activation", "step", {}, {}),
+        ),
+    )
+    assert result.transition == "next"

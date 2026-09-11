@@ -68,12 +68,6 @@ task_templates:
       - intent
       - risks
       - decisions
-  details: >-
-    The deterministic pre-step already gathered the context. Assign that exact
-    result to proposed-pr-context-state. Do not search for, rediscover, or
-    reinterpret the proposed PR. Complete this task with a next_step action,
-    for example:
-    {"action":"next_step","output_state":{"proposed-pr-context-state":"the exact gathered result"},"decisions_and_context":"Assigned the deterministic proposed PR context for planning."}
   output_state_type: proposed-pr-context-state
   # Approval is supplied by start-implementing-feature. The deterministic
   # pre-step below gathers the context this task needs; it is not a separate
@@ -238,11 +232,6 @@ task_templates:
       - format
       - --check
       - .
-  details: >-
-    Assign the deterministic formatter result to formatting-check-state. Do not
-    fix files in this step. Finish with next_step and output_state exactly
-    containing that typed state, including the command, return code, and result.
-    Return exactly {"action":"next_step","output_state":{"formatting-check-state":{"command":["ruff","format","--check","."],"returncode":0,"result":""}}}.
   output_state_type: formatting-check-state
   dependent_state:
   - formatting-checked
@@ -265,11 +254,6 @@ task_templates:
       - ruff
       - check
       - .
-  details: >-
-    Assign the deterministic lint result to lint-check-state. Do not fix files in
-    this step. Finish with next_step and output_state exactly containing that
-    typed state, including the command, return code, and result. Return exactly
-    {"action":"next_step","output_state":{"lint-check-state":{"command":["ruff","check","."],"returncode":0,"result":""}}}.
   output_state_type: lint-check-state
   dependent_state:
   - lint-checked
@@ -291,11 +275,6 @@ task_templates:
       command:
       - mypy
       - src
-  details: >-
-    Assign the deterministic type-check result to type-check-state. Do not fix
-    files in this step. Finish with next_step and output_state exactly containing
-    that typed state, including the command, return code, and result. Return
-    exactly {"action":"next_step","output_state":{"type-check-state":{"command":["mypy","src"],"returncode":0,"result":""}}}.
   output_state_type: type-check-state
   dependent_state:
   - type-checked
@@ -377,11 +356,6 @@ task_templates:
       - mv
       - docs/proposals/<work-item-name>
       - docs/current/<work-item-name>
-  details: >-
-    The deterministic git mv already ran. Assign its complete result and moved
-    paths to promoted-current-state-documents. Do not edit, stage, or resolve a
-    different feature in this step. If the command reports an inconsistent
-    proposal/current directory, stop and report that exact inconsistency.
   output_state_type: promoted-current-state-documents
   dependent_state:
   - current-state-documents-promoted
@@ -405,17 +379,6 @@ task_templates:
       command:
       - status
       - --short
-  details: >-
-    The deterministic repository status is authoritative. Verify that every
-    changed path is within the approved implementation, test, and
-    promoted-document scope. Stage exactly those approved paths with the
-    intrinsic Git add action; do not use a shell command and do not stage logs,
-    caches, or unrelated files. For example:
-    {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["src/feature.py","tests/test_feature.py","docs/current/feature"]},"decisions_and_context":"Staged the verified pull-request files."}
-    After the add succeeds, use next_step with the exact staged path list in
-    the declared output_state. Report an inconsistency rather than silently
-    accepting an unexpected file. This next_step finishes the task and advances
-    the workflow.
   output_state_type: staged-pull-request-state
   dependent_state:
   - pull-request-files-verified

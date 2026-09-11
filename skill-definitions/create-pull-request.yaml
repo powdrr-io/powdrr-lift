@@ -13,11 +13,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Invoke `powdrr-lift pull-request-description --kind feature` exactly once.
-    Keep the returned template in workflow context for the next step. Do not
-    print the template, its sections, or a draft body to the chat or status
-    window. Preserve the current branch and existing pull request context.
   pre_step:
     action: invoke_tool
     template:
@@ -52,9 +47,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Capture the current short repository status before any cleanup or staging.
-    Preserve the result in workflow context for the next step.
   pre_step:
     action: invoke_tool
     template:
@@ -122,9 +114,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Capture the staged file names after staging and preserve the result in
-    workflow context. The next step will verify it against `files_to_publish`.
   pre_step:
     action: invoke_tool
     template:

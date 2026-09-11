@@ -12,12 +12,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    The deterministic pre-step records repository status for the next step.
-    An empty result is valid: `git status --short` returns success
-    even when no files are staged. Do not invoke the command again; use the
-    deterministic_context result and choose `next_step`. Return
-    {"action":"next_step","outputs":{"staged_repository_status":{}}}.
   pre_step:
     action: invoke_tool
     template:
@@ -128,20 +122,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Invoke the listed `powdrr-lift repository-state` tool exactly once. Use its
-    result to confirm that the intended files remain staged, the worktree has
-    no unintended leftovers, and the final commands and results are recorded
-    for the upcoming pull request summary. After receiving that result, choose
-    `next_step` with both declared outputs: copy the repository-state result to
-    `final_repository_state` and emit `readiness_report` containing the exact
-    staged file set, every validation obligation and its current successful
-    result, and an explicit accepted/ready outcome. Do not invoke
-    `repository-state` again unless a file or staging state changed after the
-    first check. Do not create or update the pull request in this skill. A
-    readiness report is invalid when any check is missing, stale, failed, or
-    refers to a different staged file fingerprint. Return
-    {"action":"next_step","outputs":{"final_repository_state":{},"readiness_report":{}}}.
   pre_step:
     action: invoke_tool
     template:

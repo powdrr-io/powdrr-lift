@@ -21,12 +21,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Invoke the declared system-specification tool exactly once. The generator is
-    restart-safe: it overwrites an unreadable/invalid existing file and merges
-    readable existing values into the fresh template while restoring all
-    instructions and missing default fields. Pass its generated file to the next
-    step for completion; do not edit the file in this step.
   pre_step:
     action: invoke_tool
     template:
@@ -55,9 +49,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Invoke the declared evaluator exactly once for the current file and pass its
-    complete result to the next step. Do not edit the file in this step.
   pre_step:
     action: invoke_tool
     template:

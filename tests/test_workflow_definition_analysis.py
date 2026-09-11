@@ -95,6 +95,34 @@ task_templates:
     assert "pre_step_action_not_declared" in {issue.code for issue in report.issues}
 
 
+def test_definition_analysis_rejects_details_on_deterministic_task(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "workflow.yaml"
+    definition.write_text(
+        """\
+id: workflow
+when_to_use: [Execute work.]
+how_to_fill_this_out: [Use the task contract.]
+task_templates:
+  - description: Run the command.
+    step_type: invoke_tool
+    actions: []
+    details: This prose is not consumed by the deterministic runner.
+    pre_step:
+      action: invoke_tool
+      template: {tool: shell, command: [true]}
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "deterministic_task_details_unused" in {
+        issue.code for issue in report.issues
+    }
+
+
 def test_definition_analysis_covers_instantiated_tasks_and_workflow_metadata(
     tmp_path: Path,
 ) -> None:

@@ -40,11 +40,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    The input `feature_query` is the exact output from capture-feature-query.
-    Invoke only the declared fuzzy-match command once for docs/proposals using
-    that value. If the command returns no lines or a missing-root error, record
-    an empty proposed_feature_candidates array; do not select the feature yet.
   inputs:
   - name: feature_query
     type: string
@@ -74,11 +69,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    The input `feature_query` is the exact output from capture-feature-query.
-    Invoke only the declared fuzzy-match command once for docs/current using
-    that value. If the command returns no lines or a missing-root error, record
-    an empty current_feature_candidates array; do not select the feature yet.
   inputs:
   - name: feature_query
     type: string
@@ -108,11 +98,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    The input `feature_query` is the exact output from capture-feature-query.
-    Invoke only the declared fuzzy-match command once for docs/workflows using
-    that value. If the command returns no lines or a missing-root error, record
-    an empty workflow_candidates array; do not select the workflow yet.
   inputs:
   - name: feature_query
     type: string
@@ -335,14 +320,6 @@ steps:
     type: string
     required: true
     source: previous_step
-  details: >-
-    The `feature_name` input is the canonical feature selected by the prior
-    step. Invoke the declared proposed-pr-specification command exactly once for
-    that value. It must create or reuse exactly one feature-level file at
-    docs/proposals/<feature_name>/proposed-pr-specification.yaml containing all
-    proposed_prs entries in the planned order. Generate only the template; do
-    not fill, validate, instantiate, stage, or commit it. Do not create one
-    file per proposed PR.
   pre_step:
     action: invoke_tool
     template:
@@ -403,11 +380,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    The deterministic pre-step loads the authoritative effects after the plan
-    has validated. It creates collision-checked stable effect references and
-    preserves exact repository section, id, action, and source ordering. Do not
-    invoke a model or edit any file.
   pre_step:
     action: invoke_tool
     template:
@@ -752,7 +724,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: Inspect the active repository state after workflow instantiation.
   pre_step:
     action: invoke_tool
     template:
@@ -806,13 +777,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Run the generic evaluator against files changed on the current branch. The
-    evaluator is authoritative: it
-    requires every task to name an existing workflow template and checks every
-    relationship invariant declared by those templates. Do not replace a
-    failure with a prose claim; repair the reported task, template, relationship,
-    or target artifact and rerun the evaluator.
   pre_step:
     action: invoke_tool
     template:
@@ -831,12 +795,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Deterministically stage only docs/proposals/<feature-name>/ and
-    docs/workflows/. The runner owns this idempotent staging operation; do not
-    ask the LLM to invoke git add or repeat it. The following deterministic
-    verify-staged-artifacts step reviews the staged paths. Do not commit or
-    create a pull request yet.
   pre_step:
     action: invoke_tool
     template:
@@ -850,7 +808,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: Confirm that only the validated planning artifacts are staged before pull request preparation.
   pre_step:
     action: invoke_tool
     template:

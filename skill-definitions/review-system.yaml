@@ -29,11 +29,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Invoke the declared generator exactly once; do not edit the generated file.
-    The generator overwrites an unreadable/invalid existing file and merges
-    readable values into the fresh template while restoring instructions and
-    missing default fields.
   pre_step:
     action: invoke_tool
     template:
@@ -62,7 +57,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the evaluator exactly once; do not edit the file in this step.
   pre_step:
     action: invoke_tool
     template:

@@ -476,6 +476,16 @@ def _validate_task_semantics(
 ) -> list[WorkflowDefinitionIssue]:
     """Check deterministic/model boundaries before any provider is called."""
     issues: list[WorkflowDefinitionIssue] = []
+    if step.get("step_type") == "invoke_tool" and "details" in step:
+        issues.append(
+            WorkflowDefinitionIssue(
+                "deterministic_task_details_unused",
+                "Deterministic invoke_tool tasks do not consume details; remove "
+                "the field and keep the command contract in pre_step.",
+                f"{step_path}.details",
+                remediation="Remove details from this deterministic task.",
+            )
+        )
     pre_step = step.get("pre_step")
     if isinstance(pre_step, Mapping):
         action = pre_step.get("action")

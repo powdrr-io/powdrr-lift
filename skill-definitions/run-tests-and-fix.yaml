@@ -8,8 +8,6 @@ steps:
   description: Run the complete test suite and preserve its raw tool result.
   step_type: invoke_tool
   llm_type: simple_task
-  details: The deterministic pre-step has already run pytest. Return
-    {"action":"next_step","outputs":{"test_tool_result":{}}}; do not run it again.
   outputs:
   - name: test_tool_result
     type: any
@@ -28,8 +26,6 @@ steps:
     type: any
     required: true
   llm_type: simple_task
-  details: The deterministic pre-step has already called enrich with the exact test_tool_result and stored enriched_test_result. Return
-    {"action":"next_step","outputs":{"enriched_test_result":{}}}; do not call enrich again.
   pre_step:
     action: invoke_tool
     template:
@@ -134,7 +130,6 @@ steps:
     type: any
     required: true
   llm_type: simple_task
-  details: The deterministic validator checks the complete repair_edit output. Do not edit or apply files here.
   pre_step:
     action: invoke_tool
     template:
@@ -210,8 +205,6 @@ steps:
     type: any
     required: true
   llm_type: simple_task
-  details: The deterministic pre-step applies the already validated repair_edit. Return
-    {"action":"next_step"}; do not edit manually or run tests here.
   pre_step:
     action: invoke_tool
     template:

@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from powdrr_lift.core.intent import IntentClause, IntentSource, IntentStore
+from powdrr_lift.product.intent import IntentClause, IntentSource, IntentStore
 
 
 @dataclass(frozen=True, slots=True)

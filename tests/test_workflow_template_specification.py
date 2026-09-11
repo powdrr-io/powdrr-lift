@@ -342,6 +342,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert proposed_pr_input == "<proposed-pr-id>"
     assert template.task_templates[0].input_state["feature_id"] == "<work-item-name>"
     assert template.task_templates[0].dependent_state == ()
+    assert template.task_templates[0].actions == ("gather_context",)
     assert [
         cast(PhaseType, task.phase_type).value for task in template.task_templates
     ] == [
@@ -484,7 +485,7 @@ def test_instantiate_workflow_template_creates_first_ready_task(tmp_path: Path) 
     assert tasks[1].upstream_task_ids == ("task-001",)
     assert all(task.status.value == "open" for task in tasks)
     assert all(task.workflow_template == template_path.stem for task in tasks)
-    assert tasks[0].actions == ()
+    assert tasks[0].actions == ("gather_context",)
     assert tasks[0].actions_declared is True
     assert tasks[1].actions == (
         "invoke_tool",

@@ -275,7 +275,7 @@ class WorkflowTaskAgentConfig:
     context_compaction_threshold: float = 0.75
     verbose: bool = False
     allow_unmanaged_git: bool = False
-    run_deterministic_invoke_tool_pre_steps: bool = False
+    run_deterministic_invoke_tool_pre_steps: bool = True
 
 
 def _context_compaction_threshold(context_window: int, fraction: float) -> int:
@@ -1742,6 +1742,7 @@ def run_workflow_task(
         configured_workflow_id,
     )
     requested_task_id = config.task_id
+    single_task_requested = requested_task_id is not None
     client_was_provided = client is not None
     dump_root = resolve_project_root(
         configured_repo_root,
@@ -1969,6 +1970,41 @@ def run_workflow_task(
                     runtime=runtime,
                 )
             )
+        if task.step_type == "invoke_tool" and requires_deterministic_output_state:
+            if task.output_state_type == "staged-pull-request-state":
+                _require_staged_pull_request_files(repo_root)
+            completed = workflow.complete_task(
+                task.task_id,
+                deterministic_output_state,
+            )
+            driver_events.append(
+                {
+                    "kind": "next_step",
+                    "output_state": deterministic_output_state,
+                    "deterministic": True,
+                }
+            )
+            _publish_workflow_progress(
+                repo_root,
+                workflow,
+                workflow_id=workflow_id_from_task_id(task.task_id),
+                reason=f"deterministic next_step {completed.task_id}",
+                stdout=stdout,
+                open_pull_request=False,
+                events=driver_events,
+                runtime=runtime,
+            )
+            print(
+                f"Completed deterministic workflow task: {completed.task_id}",
+                file=stdout,
+            )
+            if single_task_requested:
+                return 0
+            workflow = _select_workflow_instance(
+                WorkflowInstance.from_directory(workflow_dir),
+                configured_workflow_id,
+            )
+            continue
         runtime.set_action_contract(
             frozenset(task.actions),
             enforce_empty=task.actions_declared,

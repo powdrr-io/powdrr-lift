@@ -386,7 +386,7 @@ def test_execute_proposed_pr_task_fixture_completes_deterministic_handoff() -> N
     )
 
     assert result.status == "passed"
-    assert result.roundtrips == 1
+    assert result.roundtrips == 0
 
 
 def test_execute_proposed_pr_task_plan_fixture_resolves_upstream_context() -> None:
@@ -450,4 +450,4 @@ def test_execute_proposed_pr_failure_fixtures_recover_or_handoff() -> None:
     ]
 
     assert all(result.status == "passed" for result in results)
-    assert [result.roundtrips for result in results] == [2, 2, 2, 2, 1]
+    assert [result.roundtrips for result in results] == [0, 0, 2, 2, 1]

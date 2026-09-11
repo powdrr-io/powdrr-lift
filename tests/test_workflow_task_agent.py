@@ -287,15 +287,7 @@ def test_deterministic_gather_context_must_be_persisted_exactly(
             )
         )
     )
-    client = _FakeClient(
-        [
-            {"action": "complete", "output_state": {"context-state": "summary"}},
-            {
-                "action": "complete",
-                "output_state": {"context-state": expected_context},
-            },
-        ]
-    )
+    client = _FakeClient([])
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(workflow_dir=workflow.directory, repo_root=tmp_path),
@@ -305,8 +297,10 @@ def test_deterministic_gather_context_must_be_persisted_exactly(
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 2
-    assert "exact deterministic pre-step result" in client.messages[1][1]["content"]
+    assert client.messages == []
+    completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
+    assert completed.status == TaskStatus.COMPLETED
+    assert completed.output_state == {"context-state": expected_context}
 
 
 def test_process_workflow_task_resolves_input_placeholders_before_llm(

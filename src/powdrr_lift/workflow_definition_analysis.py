@@ -468,6 +468,7 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                 )
             )
         issues.extend(_validate_repairability(data, str(path)))
+        issues.extend(_validate_task_ownership_contract(data, f"{path}.step"))
     return WorkflowDefinitionReport(path, kind, tuple(issues))
 
 
@@ -494,7 +495,7 @@ def _validate_task_semantics(
             isinstance(action, str)
             and isinstance(actions, Sequence)
             and not isinstance(actions, (str, bytes))
-            and action != "invoke_tool"
+            and step.get("step_type") != "invoke_tool"
             and action not in actions
         ):
             issues.append(
@@ -884,6 +885,7 @@ def _validate_template_liveness(
             else set()
         )
         pre_step = task.get("pre_step")
+        issues.extend(_validate_task_ownership_contract(task, task_path))
         pre_template = (
             pre_step.get("template") if isinstance(pre_step, Mapping) else None
         )
@@ -909,6 +911,78 @@ def _validate_template_liveness(
                     severity="warning",
                 )
             )
+    return issues
+
+
+def _validate_task_ownership_contract(
+    task: Mapping[str, Any], task_path: str
+) -> list[WorkflowDefinitionIssue]:
+    """Reject ambiguous ownership and multi-operation model tasks."""
+    issues: list[WorkflowDefinitionIssue] = []
+    step_type = task.get("step_type", "governed")
+    actions = task.get("actions", [])
+    actions = (
+        actions
+        if isinstance(actions, Sequence) and not isinstance(actions, (str, bytes))
+        else []
+    )
+    invocations = task.get("tool_invocations", [])
+    invocations = (
+        invocations
+        if isinstance(invocations, Sequence)
+        and not isinstance(invocations, (str, bytes))
+        else []
+    )
+    pre_step = task.get("pre_step")
+    if step_type == "invoke_tool":
+        if actions:
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "deterministic_step_has_model_actions",
+                    "invoke_tool tasks are runner-owned and must not expose model actions.",
+                    f"{task_path}.actions",
+                    remediation="Set actions to [] and let the runner persist the pre-step result automatically.",
+                )
+            )
+        if invocations:
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "deterministic_step_has_model_invocations",
+                    "invoke_tool tasks must use exactly one runner-owned pre_step, not model tool_invocations.",
+                    f"{task_path}.tool_invocations",
+                )
+            )
+        if not isinstance(pre_step, Mapping):
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "deterministic_step_missing_pre_step",
+                    "invoke_tool tasks must declare one runner-owned pre_step.",
+                    f"{task_path}.pre_step",
+                )
+            )
+    elif len(invocations) > 1:
+        issues.append(
+            WorkflowDefinitionIssue(
+                "multiple_model_tool_invocations",
+                "A model-owned task may declare at most one tool invocation. Split inspections into separate deterministic tasks.",
+                f"{task_path}.tool_invocations",
+                remediation="Use one inspect/collect task per invocation, then a separate judgment task.",
+            )
+        )
+    if (
+        "invoke_tool" in actions
+        and not invocations
+        and not isinstance(pre_step, Mapping)
+        and step_type != "coding_loop"
+    ):
+        issues.append(
+            WorkflowDefinitionIssue(
+                "undeclared_invoke_tool_action",
+                "The task exposes invoke_tool without a declared invocation or deterministic pre_step.",
+                f"{task_path}.actions",
+                remediation="Declare one pre_step or remove invoke_tool from actions.",
+            )
+        )
     return issues
 
 

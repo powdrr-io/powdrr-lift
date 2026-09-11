@@ -41,7 +41,7 @@ task_templates:
 - description: Gather context about the proposed PR
   phase_type: intake
   persona_id: architect
-  actions: [gather_context]
+  actions: []
   step_type: invoke_tool
   prompt_catalogs: [context_types]
   complexity: high
@@ -76,17 +76,12 @@ task_templates:
 - description: Create the execution plan
   phase_type: plan_pr
   persona_id: engineer
-  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
+  actions: []
   step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: architect
   llm_type: high_reasoning
-  tool_invocations:
-  - tool: basedpyright-structure
-    operation: inspect_structure
-  - tool: basedpyright-symbol
-    operation: resolve_symbol
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     execution_plan: []
@@ -94,17 +89,11 @@ task_templates:
     Perform exactly one action: create the ordered execution plan. Read the
     supplied proposed PR context, map every acceptance criterion to tests and
     implementation work, and record exact paths and validation commands in the
-    plan. Do not edit files or call gather_context in this step. For every
-    Python implementation or test area in the plan, first use
-    `basedpyright-structure` on the exact file and `basedpyright-symbol` for
-    the key symbols that the change will modify or consume. Use those results
-    to make file ownership, callers, and test placement explicit; do not infer
-    Python boundaries from text search alone. These are read-only inspections,
-    not substitutes for the declared verification command. Skip them only when
-    the proposed PR has no Python paths. Use invoke_tool with these exact shapes:
-    {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"operation":"inspect_structure","path":"src/example.py"}}
-    and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"operation":"resolve_symbol","query":"Example"}}.
-    After the inspections, return the plan in the required next_step action.
+    plan. Do not edit files, invoke tools, or call gather_context in this step.
+    Identify the exact implementation and test paths, symbols requiring
+    inspection, focused tests, and validation commands. Read-only inspections
+    are separate deterministic tasks after this plan; do not perform them here.
+    After the plan is complete, return the required next_step action.
     If a required decision is missing, use one prompt_user action instead of
     inventing it. When the plan is complete, return exactly this next_step shape,
     replacing the example execution_plan with the ordered plan:
@@ -136,22 +125,21 @@ task_templates:
     implementation_and_test_diffs: {}
     test_results: {}
   details: >-
-    Work as a bounded inspect, implement, test, and repair loop. Use the
-    proposed PR context and execution plan to decide what product behavior and
-    focused tests are needed. Make the smallest safe edits in the approved
-    scope; do not weaken tests or claim success from prose. After every edit,
-    the harness automatically runs the declared full-test-suite verification
-    command and records its exact result. Use failures as evidence, repair the
-    implementation or tests when justified, and repeat until the suite passes.
-    Before editing any Python file, use `basedpyright-structure` on that file
-    and `basedpyright-symbol` for the symbol being changed or its nearest stable
-    caller. After a Python edit, rerun structure inspection for every edited
-    Python file and use the returned symbol boundaries to confirm that the edit
-    still targets the intended definition and callers. If the repository's
-    discovered validation tools include a BasedPyright command, run that exact
-    command as part of validation; never invent a command or replace the
-    declared verification with a prose claim. Skip the bounded inspections only
-    when the change contains no Python files.
+    Work as a bounded inspect, implement, test, and repair loop. The harness
+    owns the loop; perform exactly one action per model round-trip and then
+    yields control. Use the proposed PR context and execution plan to choose
+    the next smallest safe action. An inspection round-trip may perform one
+    `basedpyright-structure` or `basedpyright-symbol` action; an edit
+    round-trip may perform one edit; a repair round-trip may perform one
+    targeted edit. Never combine inspection, editing, testing, or repair in a
+    single response. After every edit, the harness automatically runs the
+    declared full-test-suite verification command and records its exact result.
+    Use failures as evidence and choose the next single repair action only
+    after that result is returned. If the repository's discovered validation
+    tools include a BasedPyright command, the harness runs that exact command
+    during validation; never invent a command or replace declared verification
+    with a prose claim. Skip Python inspections only when the change contains
+    no Python files.
     Finish with next_step and implementation-and-test-state containing the
     changed paths, test coverage, and final verification evidence; next_step is
     rejected until the latest automatic verification passes. Return exactly
@@ -278,34 +266,47 @@ task_templates:
   output_state_type: type-check-state
   dependent_state:
   - type-checked
+- description: Collect the final diff status
+  phase_type: review_pr
+  persona_id: code-reviewer
+  actions: []
+  step_type: invoke_tool
+  complexity: medium
+  assignee_type: agent
+  assignee_role: reviewer
+  llm_type: simple_task
+  input_state:
+    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
+    formatting_check: <upstream-task-5>.formatting-check-state
+    lint_check: <upstream-task-6>.lint-check-state
+    type_check: <upstream-task-7>.type-check-state
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: git
+      command: [status, --short]
+  output_state_type: final-scope-context-state
+  dependent_state:
+  - final-scope-status-collected
 - description: Review the final diff for scope
   phase_type: review_pr
   persona_id: code-reviewer
-  actions: [invoke_tool, edit, yaml_edit, file_management, read_document]
+  actions: []
   step_type: governed
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: high_reasoning
   input_state:
-    formatting_check: <upstream-task-5>.formatting-check-state
-    lint_check: <upstream-task-6>.lint-check-state
-    type_check: <upstream-task-7>.type-check-state
-    scope_review: {}
+    implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
+    final_scope_context: <upstream-task-8>.final-scope-context-state
   details: >-
-    Perform exactly one action: inspect the complete diff and identify debug
-    code, generated artifacts, secrets, unrelated edits, or missing intended
-    files. Do not edit or stage files. Use the structured Git intrinsic for
-    status, never a raw git command: 
-    {"action":"invoke_tool","tool":"git","parameters":{"operation":"status"},"decisions_and_context":"Inspected the repository status for the complete scope review."}
-    After the status result, return one next_step action with an explicit clean
-    boolean and every finding, for example:
-    {"action":"next_step","output_state":{"final-scope-review-state":{"clean":true,"findings":[]}},"decisions_and_context":"Reviewed the complete diff and found no out-of-scope changes."}
-    A clean review requires an empty findings list, not merely passing checks.
-    Ignore workflow-llm-errors.jsonl during this review: it is runtime
-    observability state written outside the deliverable and must not be treated
-    as a scope finding or repaired by repeatedly deleting it. Treat other
-    diagnostic artifacts such as agent_error.txt as out of scope when present.
+    Compare the supplied deterministic Git status and implementation evidence
+    to the proposed PR. Identify debug code, generated artifacts, secrets,
+    unrelated edits, or missing intended files. Do not run tools or edit files.
+    Return one next_step with clean and every finding. A clean review requires
+    an empty findings list, not merely passing checks. Return exactly:
+    {"action":"next_step","output_state":{"final-scope-review-state":{"clean":true,"findings":[]}},"decisions_and_context":"Reviewed the deterministic status and implementation evidence."}
   output_state_type: final-scope-review-state
   dependent_state:
   - final-scope-reviewed
@@ -319,7 +320,7 @@ task_templates:
   assignee_role: coder
   llm_type: standard_reasoning
   input_state:
-    scope_review: <upstream-task-8>.final-scope-review-state
+    scope_review: <upstream-task-9>.final-scope-review-state
     scope_repair: {}
   details: >-
     Perform exactly one action only when the scope review identifies a finding:
@@ -346,7 +347,7 @@ task_templates:
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
     completeness_review: <upstream-task-3>.specification-completeness-state
-    scope_repair: <upstream-task-9>.final-scope-repair-state
+    scope_repair: <upstream-task-10>.final-scope-repair-state
     feature_id: <work-item-name>
   pre_step:
     action: invoke_tool
@@ -362,7 +363,7 @@ task_templates:
 - description: Verify the pull request file set
   phase_type: confirm_readiness
   persona_id: code-reviewer
-  actions: [invoke_tool]
+  actions: []
   step_type: invoke_tool
   complexity: medium
   assignee_type: agent
@@ -370,7 +371,7 @@ task_templates:
   llm_type: simple_task
   input_state:
     implementation_and_test_diffs: <upstream-task-2>.implementation-and-test-state
-    promoted_documents: <upstream-task-10>.promoted-current-state-documents
+    promoted_documents: <upstream-task-11>.promoted-current-state-documents
     type_check: <upstream-task-7>.type-check-state
   pre_step:
     action: invoke_tool
@@ -401,8 +402,8 @@ task_templates:
     formatting_check: <upstream-task-5>.formatting-check-state
     lint_check: <upstream-task-6>.lint-check-state
     type_check: <upstream-task-7>.type-check-state
-    promoted_documents: <upstream-task-10>.promoted-current-state-documents
-    staged_changes: <upstream-task-11>.staged-pull-request-state
+    promoted_documents: <upstream-task-11>.promoted-current-state-documents
+    staged_changes: <upstream-task-12>.staged-pull-request-state
   details: >-
     The listed finish-pr-prep skill runs automatically because it is declared
     in uses_skills. Do not return invoke_skill for it; doing so is recursive and

@@ -70,7 +70,7 @@ steps:
     assert "declares no model-owned tool" in issue.message
 
 
-def test_definition_analysis_rejects_undeclared_deterministic_pre_step(
+def test_definition_analysis_allows_runner_owned_gather_context(
     tmp_path: Path,
 ) -> None:
     definition = tmp_path / "workflow.yaml"
@@ -92,7 +92,32 @@ task_templates:
 
     report = analyze_workflow_definition(definition)
 
-    assert "pre_step_action_not_declared" in {issue.code for issue in report.issues}
+    assert "pre_step_action_not_declared" not in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_rejects_multiple_model_tool_invocations(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "workflow.yaml"
+    definition.write_text(
+        """\
+id: workflow
+when_to_use: [Execute work.]
+how_to_fill_this_out: [Use the task contract.]
+task_templates:
+  - description: Plan work.
+    step_type: governed
+    actions: [invoke_tool]
+    tool_invocations:
+      - {tool: basedpyright-structure, operation: inspect_structure}
+      - {tool: basedpyright-symbol, operation: resolve_symbol}
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "multiple_model_tool_invocations" in {issue.code for issue in report.issues}
 
 
 def test_definition_analysis_rejects_details_on_deterministic_task(

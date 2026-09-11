@@ -39,6 +39,7 @@ status for each guarantee:
 guarantees:
   schema_safe: proven
   action_safe: proven
+  decision_safe: proven
   operation_state_safe: proven
   capability_safe: proven
   effect_safe: proven
@@ -67,6 +68,7 @@ The language should provide the following guarantees.
 | --- | --- |
 | Schema safety | Malformed steps, actions, outcomes, outputs, guards, or transitions |
 | Action safety | The LLM selecting an action outside the active step's closed action set |
+| Decision safety | One LLM activation choosing a tool, transition, retry, and semantic result together, or answering more than one declared judgment question |
 | Operation-state safety | Advancing, retrying, or claiming an operation result without a durable kernel-owned record of its state and result |
 | Capability safety | Invoking an undeclared tool or semantic operation |
 | Argument safety | Passing values outside the operation's argument schema |
@@ -238,6 +240,78 @@ unbounded `goto`. An author can express a cycle only through a form whose
 termination rule the compiler understands. Lower-level graph syntax may remain
 as an intermediate representation, but validation must recover one of these
 proofs for every back edge.
+
+### Single-decision normal form
+
+“One choice per step” cannot mean that an LLM output has only one possible
+value; a model with no possible choice contributes nothing. It means that one
+activation answers exactly one declared semantic question. The kernel has
+already selected the step, so the model does not also choose an action, tool,
+transition, retry policy, or completion status.
+
+An LLM step in single-decision normal form has:
+
+- one semantic verb, stated as one question;
+- one immutable typed input projection;
+- one output value conforming to one declared schema rather than an
+  action/outcome union;
+- no model-visible action catalog or tools;
+- no model-selected `next`, `retry`, `complete`, or `fail`; and
+- one kernel-owned validation path from the output to a recorded result.
+
+```yaml
+- id: classify-security-risk
+  judge:
+    kind: classify_one
+    question: Which declared risk class best describes this change surface?
+    input: "${change_surface}"
+    output:
+      name: risk_class
+      type: enum[none, boundary, authentication, authorization, secrets]
+  limits: {attempts: 1, response_repairs: 1, wall_time: 60s}
+```
+
+The only successful model response is a `risk_class`. The model cannot read
+another file, run a test, edit code, advance, or request another attempt in the
+same activation. Schema failure is a kernel-observed `invalid_response`; the
+kernel may spend the declared response-repair budget by invoking a distinct
+`repair-risk-class-response` activation whose sole output is again a
+`risk_class`.
+
+A structured value may contain several inseparable fields or a bounded list.
+That is still one choice only when the fields jointly answer one question and
+share one acceptance predicate. If fields have different evidence, consumers,
+or failure policies, the author must split them. For example, “understand the
+feature” is too broad: desired outcome, non-goals, acceptance criteria,
+preserved invariants, and risk classification are separate judgments.
+
+Nested calls do not weaken this rule. A call is acceptable only when its
+compiled body expands into single-decision LLM nodes and runner-owned operation
+nodes. A label such as `implement_change` or `repair_finding` is not a sufficient
+contract because it can hide an unconstrained inner agent loop.
+
+The provider protocol may retain an action discriminator for transport
+compatibility, but it must be a constant, not an enum. For the example above,
+the only valid shape is conceptually:
+
+```json
+{"action": "return_risk_class", "risk_class": "authentication"}
+```
+
+The compiler proves decision safety structurally. An LLM-owned node is rejected
+if it has zero or multiple judgment contracts, exposes any operation capability,
+has multiple independently optional outputs, or has an outgoing edge selected
+directly by the model. It also requires a bounded input projection, output
+schema, output validator, activation limits, one registered decision kind, and
+one bounded subject. A semantic lint flags broad verbs such as `research`,
+`implement`, `review_everything`, or `do_next_work` unless they are expanded
+into a recognized single-subject decision form.
+
+The compiler cannot prove from arbitrary English that a question is
+conceptually narrow. The hard guarantee is structural: one bounded subject, one
+registered decision form, one result schema, and no other authority. Semantic
+cohesion remains an authored contract checked by review and evaluation, and the
+certificate must say so rather than claiming to understand prompt meaning.
 
 ### Deterministic, exhaustive branches
 
@@ -432,113 +506,253 @@ security review; an authentication change may produce several implementation
 units, test targets, invariants, and security findings. The workflow should
 adapt to those facts without giving the LLM an open-ended agent loop.
 
-The following example is illustrative source syntax. It shows the semantic
-constructs the compiler must preserve; exact YAML spelling may evolve.
+The inlined example below explains the core execution pattern. The companion
+[single-decision feature-development design](single-decision-feature-development.md)
+expands the complete lifecycle represented by `specify-a-feature`,
+`design-interview`, `start-implementing-feature`, and PR #660's
+`execute-proposed-pr` template through final feature-wide acceptance.
+
+The following example is illustrative source syntax after nested skills have
+been inlined. Exact YAML spelling may evolve. Every `judge` node is one LLM
+activation in single-decision normal form; every other node is kernel-owned.
 
 ```yaml
-workflow: develop-feature
-inputs:
-  request: feature_request
-  repository: repository_ref
-
-authority:
-  read: ["repo://**"]
-  write: ["repo://src/**", "repo://tests/**", "repo://docs/**"]
-  git: [status, diff, add, commit, push_feature_branch]
-  github: [create_pull_request]
-
+workflow: develop-feature-expanded
+inputs: {request: feature_request, repository: repository_ref}
 limits:
   wall_time: 12h
-  llm_activations: 512
-  llm_tokens: 4000000
-  tool_calls: 5000
-  external_cost_usd: 200
+  llm_activations: 1024
+  llm_tokens: 8000000
+  tool_calls: 10000
   response_repairs_per_activation: 1
   repair_epochs: 3
 
 body:
-  - id: observe-repository
+  # Observe before asking the model to reason. These operations advance on
+  # their own recognized results; the model never selects or confirms them.
+  - id: capture-repository
     operation: capture_repository_snapshot
-    with: {repository: "${repository}"}
     bind: repository_snapshot
 
-  - id: gather-context
-    llm: identify_relevant_context
-    with:
-      request: "${request}"
-      repository_index: "${repository_snapshot.index}"
-    decision:
-      schema: context_query
-      max_items: 80
-    then:
-      operation: read_context_snapshot
-      bind: context_snapshot
+  - id: state-desired-outcome
+    judge:
+      kind: construct_one
+      question: What single externally observable outcome does the request require?
+      input: "${request}"
+      output: {name: desired_outcome, type: desired_outcome}
 
-  - id: understand-change
-    llm: derive_change_contract
-    with:
-      request: "${request}"
-      context: "${context_snapshot}"
-    decision:
-      schema: change_contract
-      requires:
-        - in_scope
-        - out_of_scope
-        - acceptance_criteria
-        - preserved_invariants
-        - risk_class
-    bind: change_contract
+  - id: formulate-context-query
+    judge:
+      kind: construct_one
+      question: Which bounded search vocabulary best locates code governing this outcome?
+      input: ["${request}", "${desired_outcome}", "${repository_snapshot.index}"]
+      output: {name: context_query, type: context_query}
 
-  - id: plan
-    llm: plan_change_units
+  - id: search-context
+    operation: search_repository_index
+    with: {query: "${context_query}", max_results: 80}
+    bind: context_candidates
+
+  # Relevance is decided independently for each candidate. The model cannot
+  # search, read, or decide when enough context has been gathered.
+  - id: classify-context-candidates
+    for_each:
+      snapshot: "${context_candidates}"
+      item: candidate
+      max_parallel: 8
+      body:
+        judge:
+          kind: classify_one
+          question: Is this candidate evidence for the requested outcome?
+          input: ["${desired_outcome}", "${candidate.search_excerpt}"]
+          output:
+            name: relevance
+            type: enum[relevant, irrelevant]
+      collect: relevance_decisions
+
+  - id: seal-context-selection
+    operation: select_relevant_candidates
     with:
-      contract: "${change_contract}"
+      candidates: "${context_candidates}"
+      decisions: "${relevance_decisions}"
+      max_selected: 40
+    bind: selected_context
+
+  - id: read-context
+    operation: read_repository_snapshot
+    with: {selection: "${selected_context}"}
+    bind: context_snapshot
+
+  - id: derive-entity-candidates
+    operation: derive_entity_candidates
+    with: {context: "${context_snapshot}", max_items: 64}
+    bind: entity_candidates
+
+  - id: classify-entity-impact
+    for_each:
+      snapshot: "${entity_candidates}"
+      item: entity
+      body:
+        judge:
+          kind: classify_one
+          question: What is this entity's single relationship to the requested outcome?
+          input: ["${desired_outcome}", "${entity.definition}", "${entity.references}"]
+          output:
+            name: impact
+            type: enum[must_change, depends_on_change, must_not_change, unrelated]
+      collect: entity_impacts
+
+  - id: seal-system-map
+    operation: build_system_map
+    with:
       context: "${context_snapshot}"
-    decision:
-      schema: snapshot<change_unit>
-      key: $.id
+      impacts: "${entity_impacts}"
+    bind: system_map
+
+  # “Understand the change” is split into four independent questions because
+  # their evidence and downstream consumers differ.
+  - id: state-non-goals
+    judge:
+      kind: extract_bounded_set
+      question: What behavior is explicitly outside this requested outcome?
+      input: ["${request}", "${desired_outcome}", "${system_map}"]
+      output:
+        name: non_goals
+        type: snapshot<non_goal>
+        max_items: 24
+
+  - id: derive-acceptance-criteria
+    judge:
+      kind: extract_bounded_set
+      question: What observable criteria are jointly necessary and sufficient for the desired outcome?
+      input: ["${request}", "${desired_outcome}", "${non_goals}", "${system_map}"]
+      output:
+        name: acceptance_criteria
+        type: snapshot<acceptance_criterion>
+        key: $.id
+        max_items: 32
+
+  - id: identify-preserved-invariants
+    judge:
+      kind: extract_bounded_set
+      question: Which existing invariants intersect the mapped change surface?
+      input: ["${system_map}", "${acceptance_criteria}"]
+      output:
+        name: preserved_invariants
+        type: snapshot<invariant>
+        key: $.id
+        max_items: 32
+
+  - id: classify-risk
+    judge:
+      kind: classify_one
+      question: Which single declared risk class best describes the mapped change?
+      input: ["${system_map}", "${acceptance_criteria}", "${preserved_invariants}"]
+      output:
+        name: risk_class
+        type: enum[docs_only, local_code, boundary, authentication, authorization, secrets]
+
+  - id: validate-change-contract
+    operation: validate_change_contract
+    with:
+      outcome: "${desired_outcome}"
+      non_goals: "${non_goals}"
+      criteria: "${acceptance_criteria}"
+      invariants: "${preserved_invariants}"
+      risk: "${risk_class}"
+    outcomes:
+      valid: {continue: true}
+      inconsistent: {terminal: blocked}
+
+  # The kernel creates one planning subject for each criterion/entity pair that
+  # needs a change. One activation proposes exactly one unit for one subject.
+  - id: derive-planning-subjects
+    operation: derive_planning_subjects
+    with:
+      criteria: "${acceptance_criteria}"
+      system_map: "${system_map}"
       max_items: 64
-    validate:
-      operation: validate_plan_coverage
-      requires:
-        covers: "${change_contract.acceptance_criteria}"
-        preserves: "${change_contract.preserved_invariants}"
-    bind: change_units
+    bind: planning_subjects
 
-  - id: implement
+  - id: plan-change-units
+    for_each:
+      snapshot: "${planning_subjects}"
+      item: subject
+      body:
+        retry:
+          budget: 2
+          body:
+            - judge:
+                kind: construct_one
+                question: What one bounded change unit satisfies this planning subject?
+                input: ["${subject}", "${system_map}", "${last_validation_diagnostic?}"]
+                output: {name: proposed_unit, type: change_unit}
+            - operation: validate_change_unit
+              with: {unit: "${proposed_unit}", subject: "${subject}"}
+          retry_on: [invalid_unit]
+      collect: change_units
+      on_item_exhausted: failed.invalid_change_plan
+
+  - id: validate-plan-coverage
+    operation: validate_plan_coverage
+    with:
+      units: "${change_units}"
+      criteria: "${acceptance_criteria}"
+      invariants: "${preserved_invariants}"
+    outcomes:
+      complete: {continue: true}
+      incomplete: {terminal: blocked}
+
+  # Editing is proposal, validation, and application—not a tool-using agent.
+  - id: implement-change-units
     for_each:
       snapshot: "${change_units}"
       item: unit
-      max_parallel: 4
       body:
-        call: implement_change_unit
-        with:
-          unit: "${unit}"
-          contract: "${change_contract}"
-          writable_paths: "${unit.paths}"
-        retry:
-          budget: 2
-          on: [patch_rejected, local_check_failed]
+        - operation: assemble_unit_context
+          with: {unit: "${unit}", context: "${context_snapshot}"}
+          bind: unit_context
+        - retry:
+            budget: 2
+            body:
+              - judge:
+                  kind: construct_one
+                  question: What patch implements exactly this change unit within its writable paths?
+                  input: ["${unit}", "${unit_context}", "${last_patch_diagnostic?}"]
+                  output: {name: patch, type: bounded_patch}
+              - operation: validate_patch
+                with:
+                  patch: "${patch}"
+                  writable_paths: "${unit.writable_paths}"
+                  forbidden_effects: "${unit.forbidden_effects}"
+            retry_on: [patch_rejected]
+        - operation: apply_validated_patch
+          with: {patch: "${patch}"}
+        - operation: run_unit_checks
+          with: {unit: "${unit}"}
+          bind: unit_evidence
       collect: implementation_results
       on_item_exhausted: failed.implementation_incomplete
 
-  - id: discover-verification
+  # Verification work is derived mechanically from the actual diff, project
+  # configuration, criteria, and invariants. The model cannot omit a check.
+  - id: derive-verification-obligations
     operation: derive_verification_obligations
     with:
       baseline: "${repository_snapshot.commit}"
       current_tree: workspace
-      acceptance: "${change_contract.acceptance_criteria}"
-      invariants: "${change_contract.preserved_invariants}"
-    bind:
-      obligations:
-        type: snapshot<verification_obligation>
-        key: $.id
-        max_items: 128
+      criteria: "${acceptance_criteria}"
+      invariants: "${preserved_invariants}"
+      max_items: 128
+    bind: obligations
 
-  - id: validate-and-repair
+  - id: validation-epochs
     repeat:
-      budget: "${limits.repair_epochs}"
+      budget: 3
       body:
+        - operation: capture_current_diff
+          bind: current_diff
+
         - for_each:
             snapshot: "${obligations}"
             item: obligation
@@ -547,29 +761,44 @@ body:
               with: {obligation: "${obligation}"}
             collect: verification_evidence
 
+        # Each review activation has one perspective and one finding-set output.
         - parallel:
             max_parallel: 4
             branches:
-              - call: review_code
-              - call: review_feature_completeness
-              - call: review_preserved_invariants
+              - judge:
+                  kind: extract_bounded_set
+                  question: Which concrete correctness defects exist in this diff?
+                  input: ["${change_units}", "${current_diff}", "${verification_evidence}"]
+                  output: {name: code_findings, type: snapshot<finding>, max_items: 20}
+              - judge:
+                  kind: extract_bounded_set
+                  question: Which accepted criteria lack implementation or fresh evidence?
+                  input: ["${acceptance_criteria}", "${current_diff}", "${verification_evidence}"]
+                  output: {name: completeness_findings, type: snapshot<finding>, max_items: 20}
+              - judge:
+                  kind: extract_bounded_set
+                  question: Which declared invariant is violated by the current diff?
+                  input: ["${preserved_invariants}", "${current_diff}", "${verification_evidence}"]
+                  output: {name: invariant_findings, type: snapshot<finding>, max_items: 20}
               - match:
-                  value: "${change_contract.risk_class}"
+                  value: "${risk_class}"
                   cases:
                     - when_in: [boundary, authentication, authorization, secrets]
-                      do: {call: review_security}
-                  otherwise: {emit: no_security_review_required}
-          collect: review_reports
+                      do:
+                        judge:
+                          kind: extract_bounded_set
+                          question: Which concrete security defects exist in this diff?
+                          input: ["${risk_class}", "${system_map}", "${current_diff}"]
+                          output: {name: security_findings, type: snapshot<finding>, max_items: 20}
+                  otherwise:
+                    emit: {security_findings: []}
 
-        - operation: normalize_findings
+        - operation: normalize_and_seal_findings
           with:
+            sources: [code_findings, completeness_findings, invariant_findings, security_findings]
             verification: "${verification_evidence}"
-            reviews: "${review_reports}"
-          bind:
-            findings:
-              type: snapshot<finding>
-              key: $.fingerprint
-              max_items: 40
+            max_items: 40
+          bind: findings
 
         - match:
             value: "${findings.count}"
@@ -581,13 +810,46 @@ body:
                 snapshot: "${findings}"
                 item: finding
                 body:
-                  call: repair_finding
-                  retry: {budget: 1, on: [patch_rejected]}
+                  - operation: resolve_finding_citations
+                    with: {finding: "${finding}", diff: "${current_diff}"}
+                    bind: current_source_at_citations
+                  - judge:
+                      kind: classify_one
+                      question: Is this one finding supported by the cited current evidence?
+                      input: ["${finding}", "${current_source_at_citations}"]
+                      output:
+                        name: disposition
+                        type: enum[confirmed, unsupported, needs_human]
+                  - match:
+                      value: "${disposition}"
+                      cases:
+                        - when: unsupported
+                          do:
+                            operation: record_finding_disposition
+                        - when: needs_human
+                          do:
+                            suspend: finding_disposition_required
+                        - when: confirmed
+                          do:
+                            retry:
+                              budget: 1
+                              body:
+                                - judge:
+                                    kind: construct_one
+                                    question: What patch repairs only this confirmed finding?
+                                    input: ["${finding}", "${current_source_at_citations}", "${last_patch_diagnostic?}"]
+                                    output: {name: repair_patch, type: bounded_patch}
+                                - operation: validate_repair_patch
+                              retry_on: [patch_rejected]
+                            then:
+                              operation: apply_validated_patch
+                              with: {patch: "${repair_patch}"}
               then:
-                operation: refresh_changed_evidence
+                operation: start_new_evidence_epoch
+                effects: [invalidate_intersecting_evidence, refresh_diff, refresh_obligations]
       on_exhausted: failed.validation_not_converged
 
-  - id: final-proof
+  - id: prove-feature-complete
     operation: evaluate_feature_completion
     requires:
       implementation_results: all_succeeded
@@ -598,7 +860,7 @@ body:
       security: passing_or_structurally_not_required
       scope: observed_effects_within_authority
     outcomes:
-      completed: {goto: publish}
+      complete: {continue: true}
       incomplete: {terminal: failed}
 
   - id: publish
@@ -616,15 +878,55 @@ The apparent flexibility comes from typed values:
 
 - `context_query` determines which files are read, subject to path and item
   limits;
-- `change_contract.risk_class` selects the validation and security branches;
+- `risk_class` selects the validation and security branches;
 - `change_units` determines the number of implementation activations;
 - the actual diff, project manifests, acceptance criteria, and invariants
   determine `obligations`; and
 - verification and four independent review perspectives determine `findings`.
 
 The model makes semantic judgments inside those boundaries. It never controls
-the program counter, loop budget, evidence freshness, finding count, or success
-predicate.
+the program counter, loop budget, evidence freshness, authoritative normalized
+finding count, or success predicate.
+
+The LLM activation inventory makes the decomposition explicit:
+
+| Activation | One question | Sole successful output | Kernel-owned next work |
+| --- | --- | --- | --- |
+| State desired outcome | What observable result is requested? | `desired_outcome` | Provide it to context discovery |
+| Formulate context query | What vocabulary locates that result? | `context_query` | Search with an 80-result cap |
+| Classify one context candidate | Is this candidate relevant? | `relevant` or `irrelevant` | Select and read approved candidates |
+| Classify one entity | How does this entity relate to the outcome? | One `impact` enum | Construct the system map |
+| State non-goals | What is outside the outcome? | One bounded non-goal snapshot | Validate scope consistency |
+| Derive acceptance criteria | What observations define the outcome? | One bounded criterion snapshot | Derive planning and proof obligations |
+| Identify invariants | What existing guarantees intersect the change? | One bounded invariant snapshot | Add preservation obligations |
+| Classify risk | What one risk class applies? | One `risk_class` enum | Select security policy deterministically |
+| Plan one subject | What one unit covers this criterion/entity pair? | One `change_unit` | Validate coverage and scope |
+| Propose one patch | What patch implements this one unit? | One `bounded_patch` | Validate, apply, and run unit checks |
+| Review one perspective | What findings exist for this one review concern? | One bounded finding snapshot | Normalize and deduplicate findings |
+| Assess one finding | Is this finding supported by its cited evidence? | One `disposition` enum | Record, suspend, or enter repair branch |
+| Repair one finding | What patch fixes only this finding? | One `bounded_patch` | Validate, apply, and invalidate evidence |
+
+An activation is repeated only because an enclosing finite collection has
+another item or a kernel-owned retry has consumed an attempt. The response
+never contains an action discriminator. Even `confirmed` versus `unsupported`
+is one answer to the single finding-support question; the subsequent branch is
+evaluated by the kernel.
+
+For example, one concrete repair trace is:
+
+```text
+kernel: activate assess-finding[sha256:abc] with one finding and cited lines
+LLM:    {action: return_disposition, disposition: confirmed}
+kernel: validate enum; commit decision; select confirmed branch
+kernel: activate repair-finding[sha256:abc] with that finding and current lines
+LLM:    {action: return_patch, patch: <bounded patch>}
+kernel: validate paths and patch; apply it; invalidate intersecting evidence
+kernel: decrement repair epoch; derive and run the next obligation snapshot
+```
+
+At no point can either LLM activation choose to inspect more files, run a test,
+skip evidence refresh, process a different finding, repeat itself, or declare
+the workflow complete.
 
 ### Why the example terminates
 
@@ -632,12 +934,13 @@ Compilation produces a proof obligation for every adaptive construct:
 
 | Construct | Proof |
 | --- | --- |
-| Context gathering | One bounded LLM decision, then a snapshot of at most 80 paths |
-| Planning | One bounded decision and at most 64 stable change-unit keys |
-| Implementation | At most 64 items, each with two retries and bounded child operations |
+| Context gathering | Two setup judgments, at most 80 relevance judgments, and at most 64 entity-impact judgments |
+| Change contract | Four bounded judgments whose outputs are validated together |
+| Planning | At most 64 subjects and three one-unit proposal attempts per subject |
+| Implementation | At most 64 units and three one-patch proposal attempts per unit |
 | Verification | At most 128 obligations in an epoch, one bounded operation per item |
-| Review | Four finite branches; the security branch is an exhaustive match |
-| Repair | At most 40 findings per epoch, one repair retry per finding, and three epochs |
+| Review | At most four single-perspective judgments per epoch; the security branch is an exhaustive match |
+| Repair | At most 40 disposition judgments and two patch attempts per confirmed finding in each of three epochs |
 | Publication | Three finite operations; ambiguous remote state suspends instead of retrying |
 
 The compiler can derive a conservative upper bound on activations and operation
@@ -650,21 +953,22 @@ state within the bound.
 ### Freshness, fixed points, and feature completeness
 
 A successful repair mutates the workspace and invalidates evidence whose
-resource fingerprint intersects the mutation. `refresh_changed_evidence`
+resource fingerprint intersects the mutation. `start_new_evidence_epoch`
 creates a new validation epoch and reruns affected obligations; it does not
 pretend earlier test results remain current. The next review may discover new
 findings, but doing so consumes the next finite repair epoch.
 
 The final proof is a deterministic reduction over durable records. Relative to
-the accepted `change_contract`, “feature complete” means every acceptance
-criterion has a typed coverage edge to an implemented change and fresh passing
-evidence. “Invariants preserved” and “secure” mean the declared review and
-verification obligations have current passing evidence, not that an LLM said
-the code looked good. No execution language can prove that a semantic contract
-perfectly captured unstated user intent or that a review found every possible
-vulnerability; those judgments remain explicit assumptions in the certificate.
-The workflow may fail to achieve its declared facts, but it cannot report
-success without them and cannot chase them forever.
+the accepted desired outcome, non-goals, and acceptance criteria, “feature
+complete” means every acceptance criterion has a typed coverage edge to an
+implemented change and fresh passing evidence. “Invariants preserved” and
+“secure” mean the declared review and verification obligations have current
+passing evidence, not that an LLM said the code looked good. No execution
+language can prove that a semantic contract perfectly captured unstated user
+intent or that a review found every possible vulnerability; those judgments
+remain explicit assumptions in the certificate. The workflow may fail to
+achieve its declared facts, but it cannot report success without them and
+cannot chase them forever.
 
 ## Effects and resource scopes
 
@@ -918,6 +1222,8 @@ whether a certificate is acceptable for a particular environment.
 ## Authoring principles
 
 - Put authority, effects, outcomes, guards, and completion in structured data.
+- Normalize each LLM activation to one subject, one question, one output, and
+  no model-selected action or transition.
 - Use prose only for semantic judgment and explanation.
 - Prefer runner-owned execution when no model judgment is required.
 - Express alternatives as exhaustive matches over typed snapshots.
@@ -949,6 +1255,8 @@ This direction is successful when a reviewer can inspect a compiled workflow
 certificate and answer, without trusting prompt prose:
 
 - What can the LLM choose at each boundary?
+- Does each LLM boundary answer one semantic question, or does it hide a
+  multi-action agent loop?
 - What can the complete workflow read and mutate?
 - Which resources are in scope?
 - What outcomes can each step produce?

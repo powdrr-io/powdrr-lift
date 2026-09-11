@@ -14,9 +14,10 @@ collections so one workflow can adapt to the actual size, risk, and structure
 of a feature while remaining total and operationally contained.
 
 The target design is defined in
-`docs/design/llm-execution-language-safety.md`. This document maps that design
-onto the current repository and identifies the required code changes,
-migration order, and acceptance tests.
+`docs/design/llm-execution-language-safety.md`, with the full coding-flow
+lowering in `docs/design/single-decision-feature-development.md`. This document
+maps that design onto the current repository and identifies the required code
+changes, migration order, and acceptance tests.
 
 ## Current foundation
 
@@ -35,6 +36,9 @@ The repository already contains substantial pieces of the target system.
 | Capability exceptions | `core/capability_exception.py` | Exact argument binding, manifest fingerprint, signed approval, expiration, and use count |
 | Durable truth | `core/execution_state.py` | Action, obligation, evidence, finding, checkpoint, and capability decision events |
 | Workflow compilation | `execution/compile.py` | Closed phase action contracts and durable task generation |
+| Feature specification | `skill-definitions/specify-a-feature.yaml` and `design-interview.yaml` | Category-specific context gathering, typed proposal edits, deterministic generation, and evaluation |
+| Feature planning | `skill-definitions/start-implementing-feature.yaml` | Deterministic discovery, separated PR planning/effect allocation, workflow instantiation, and relationship checks |
+| Proposed-PR execution | `templates/execute-proposed-pr.yaml` and [PR #660](https://github.com/powdrr-io/powdrr-lift/pull/660) | Separate plan judgment, inspections, mechanical checks, scope capture, and one-action coding-loop round trips |
 
 This is not a greenfield design. The main work is to make these components use
 one semantic contract and to close compatibility paths that weaken guarantees.
@@ -65,6 +69,20 @@ Consequences include:
 - result-to-transition mapping is spread across runner code;
 - failure classes do not form an exhaustive per-step union; and
 - local outcome completeness cannot be checked directly.
+
+### LLM steps still hide multiple decisions
+
+Even a step with a closed action set can remain an underspecified mini-agent.
+Names such as `gather_context`, `implement_change_unit`, `review_code`, and
+`repair_finding` may combine tool choice, semantic judgment, mutation,
+verification, retry, and advancement in one model activation. A finite outer
+graph does not provide decision safety when an inner prompt recreates an agent
+loop.
+
+The canonical contract needs a single-decision normal form in which an LLM node
+has one question, one subject, one output schema, no tools, and no model-owned
+transition. Complex stages must lower into multiple judgment nodes separated by
+runner-owned observations, validation, effects, and branches.
 
 ### Operation state is durable data but not yet a language contract
 
@@ -204,10 +222,34 @@ class CompiledStepContract:
     owner: Literal["kernel", "llm", "human"]
     inputs: tuple[ValueSpec, ...]
     actions: tuple[ActionContract, ...]
+    decision: DecisionContract | None
     outcomes: tuple[OutcomeContract, ...]
     completion: CompletionContract
     progress_measure: ProgressMeasure | None
 ```
+
+For an LLM-owned step, `actions` is empty and `decision` is required. For a
+kernel-owned step, `decision` is absent. Define the decision boundary directly:
+
+```python
+@dataclass(frozen=True)
+class DecisionContract:
+    kind: Literal["classify_one", "construct_one", "extract_bounded_set"]
+    question: str
+    subject: ValueBinding
+    context: tuple[ValueBinding, ...]
+    output: ValueSpec
+    validator: ValidatorRef
+    limits: ActivationLimits
+    transport_action_const: str
+```
+
+`transport_action_const` may support existing provider envelopes, but it is a
+JSON-schema `const`, never a model-selectable enum. `classify_one` emits one
+enum value for one subject. `construct_one` emits one typed object such as one
+change unit or one bounded patch. `extract_bounded_set` is reserved for one
+cohesive discovery question and must declare stable keys and maximum
+cardinality. Independent questions or outputs require separate nodes.
 
 `ControlNode` should be a closed union of `SequenceNode`, `MatchNode`,
 `ForEachNode`, `WorklistNode`, `RepeatNode`, `RetryNode`, `ParallelNode`,
@@ -452,7 +494,7 @@ operation without a permitted durable terminal status, an output that lacks a
 successful producer record, and any operation whose result cannot be included
 in the active step's state projection.
 
-### 3. Close action contracts
+### 3. Close action contracts and normalize LLM decisions
 
 Change `core/skill_specification.py` and corresponding template/task schemas so
 new definitions must declare `actions`, including an explicit empty list.
@@ -471,6 +513,28 @@ actions. Human suspension and step transitions should be explicit outcomes or
 kernel behavior. `emit_outputs` may remain a provider protocol detail, but it
 must compile to an outcome rather than expand semantic authority silently.
 
+Add `judge` as the only strict-profile LLM node. It compiles to one
+`DecisionContract`; its semantic action set is empty. Validate that it has
+exactly one subject, one question, one required output, one validator, and one
+activation-limit contract. It may consume read-only context bindings but may not
+expose operations or select a transition.
+
+Update provider schemas so the transport action is a `const` derived from the
+decision contract. For example, a risk-classification node accepts only
+`return_risk_class`; it does not enumerate `read_document`, `invoke_tool`,
+`next_step`, or `complete`. Provider failure and response repair are
+kernel-owned result paths that consume budgets before another activation.
+
+Add a normalization pass that structurally rejects multiple subjects, outputs,
+actions, effects, or model-selected edges. Add a semantic lint for broad prompts
+that may hide multiple responsibilities; because arbitrary English cannot be
+proved narrow, an unrecognized decision form receives `decision_safe: unknown`
+rather than a false proof. Checked-in compatibility steps such as
+`gather_context`, `coding_loop`, `implement_change`, or `repair_finding` must
+either expand into registered single-decision and runner-owned nodes or remain
+unknown. Nested skills are checked after inlining their compiled summaries so a
+single-looking call cannot conceal a multi-action agent loop.
+
 ### 4. Introduce step outcomes
 
 Add outcome parsing and validation to:
@@ -480,9 +544,9 @@ Add outcome parsing and validation to:
 - `core/workflow_task_specification.py`; and
 - template instantiation and execution-plan compilation.
 
-Update `_step_action_response_schema` so provider schemas expose only the
+Update `_step_action_response_schema` so provider schemas expose only the one
 decision payload appropriate to the active step. Do not ask the LLM to return a
-success outcome for a runner-owned effect.
+success outcome for a runner-owned effect or to select an outgoing edge.
 
 Replace or extend `workflow_llm.WorkflowActionOutcome` with a semantic result:
 
@@ -753,23 +817,28 @@ The compiler should use explicit passes in this order:
 2. normalization and compatibility expansion;
 3. reference and handoff resolution;
 4. action and outcome closure;
-5. operation lifecycle and output-producer resolution;
-6. operation and effect resolution;
-7. resource-scope checking;
-8. nested-skill fixed-point composition;
-9. structured control typing and exhaustiveness;
-10. snapshot/worklist key and cardinality validation;
-11. CFG and abstract-state construction;
-12. completion and evidence observability;
-13. retry relevance;
-14. variant and control-termination proof;
-15. activation-limit and whole-workflow resource-bound proof;
-16. replay/idempotency proof; and
-17. certificate generation.
+5. single-decision normalization and hidden-agent rejection;
+6. operation lifecycle and output-producer resolution;
+7. operation and effect resolution;
+8. resource-scope checking;
+9. nested-skill fixed-point composition;
+10. structured control typing and exhaustiveness;
+11. snapshot/worklist key and cardinality validation;
+12. CFG and abstract-state construction;
+13. completion and evidence observability;
+14. retry relevance;
+15. variant and control-termination proof;
+16. activation-limit and whole-workflow resource-bound proof;
+17. replay/idempotency proof; and
+18. certificate generation.
 
 Add stable diagnostic families for:
 
 - omitted or implicitly expanded authority;
+- multiple decisions, outputs, or model-selectable transport actions in one LLM
+  activation;
+- LLM nodes that expose tools, effects, transition actions, or self-retry;
+- broad compatibility nodes that conceal an uncompiled inner agent loop;
 - incomplete outcome unions;
 - unmapped operation result variants;
 - scope widening at nested calls;
@@ -806,6 +875,8 @@ fingerprints are stable across processes and platforms.
 ### Phase 2: Closed actions and explicit outcomes
 
 - Migrate all checked-in steps to explicit actions.
+- Add `DecisionContract` and strict `judge` nodes with one constant transport
+  action, one subject, one question, one output, and no tool authority.
 - Add outcomes while compiling legacy transitions for compatibility.
 - Remove implicit `prompt_user`, `next_step`, and `complete` authority from the
   current schema version.
@@ -813,6 +884,8 @@ fingerprints are stable across processes and platforms.
 
 Acceptance gate: deleting an action or outcome from a contract makes the
 corresponding runtime behavior impossible, not merely discouraged.
+Every strict LLM activation has exactly one legal decision payload; broad
+compatibility nodes receive `decision_safe: unknown`.
 
 ### Phase 3: Unified effects and scopes
 
@@ -863,6 +936,44 @@ Acceptance gate: an exception can authorize only its exact bound operation and
 cannot transitively broaden a child, forge evidence, or change an unrelated
 proof.
 
+### Reference feature-flow migration order
+
+Use the flow in `docs/design/single-decision-feature-development.md` as the
+first full conformance target:
+
+1. In `design-interview`, split each category's `gather_context` from its one
+   category-edit judgment. Replace the model-authored aggregate JSON edit with
+   deterministic serialization. Convert evaluator repair into a bounded issue
+   worklist.
+2. In `specify-a-feature`, replace model-owned name/context stopping decisions
+   with typed intake judgments and explicit human suspension. Compile
+   `finish-pr-prep` and `create-pull-request` transitively into runner-owned
+   readiness and publication operations.
+3. In `start-implementing-feature`, preserve the three deterministic discovery
+   operations and deterministic evaluator gates. Convert PR planning to one
+   entry per planning subject, effect allocation to one PR classification per
+   effect, workflow creation to a snapshot loop, and relationship review to
+   deterministic evaluators.
+4. Take PR #660's `execute-proposed-pr` separation as the migration baseline.
+   Convert planned file/symbol inspections from model-invoked tasks to runner
+   `for_each` operations. Replace the one-action coding loop with one patch
+   judgment per derived change unit. Replace global completeness and scope
+   reports with one verdict per criterion, changed symbol, invariant, security
+   obligation, and changed path.
+5. Add the outer dependency-aware workflow worklist. A proposed-PR workflow is
+   ready only when every predecessor PR has a durable merged receipt; otherwise
+   execution suspends without polling.
+6. Add feature-wide acceptance after all proposed PRs merge. Re-derive
+   obligations from the integrated tree and require fresh evidence for
+   acceptance criteria, expected tests, required test cases, invariants,
+   security obligations, and non-goals.
+
+Acceptance gate: record every provider request in a complete feature run and
+assert that its schema has one constant transport action, one subject, one
+required output, no tools, and no model-selected transition. Also assert that
+the run cannot publish a PR or feature-success result from stale or incomplete
+evidence.
+
 ## Verification strategy
 
 ### Unit tests
@@ -871,6 +982,8 @@ proof.
 - operation lifecycle transition legality and durable record reduction;
 - state-projection contents, immutability, and provider serialization;
 - outcome exhaustiveness and payload schemas;
+- decision-contract exclusivity, constant transport actions, and rejection of
+  tool-bearing or multi-output LLM nodes;
 - resource selector subset and intersection laws;
 - operation result-to-outcome mapping;
 - completion evaluation and evidence invalidation;
@@ -894,6 +1007,7 @@ For every step type and built-in operation, assert that:
 
 - runtime ownership matches compiled ownership;
 - runtime actions equal the closed compiled set;
+- an LLM request exposes exactly one decision schema and no operation catalog;
 - concrete effects are covered by the compiled envelope;
 - runtime transition selection uses declared outcomes; and
 - completion uses the same condition evaluator as static analysis; and
@@ -944,6 +1058,10 @@ Generate small workflow graphs and verify:
 Exercise:
 
 - deterministic success;
+- a complete `specify-a-feature` -> `design-interview` ->
+  `start-implementing-feature` -> dependency-ordered `execute-proposed-pr` ->
+  feature-acceptance run in which every recorded LLM request has one constant
+  transport action and no tool catalog;
 - a documentation-only feature that skips irrelevant integration and security
   branches through an exhaustive match;
 - a cross-boundary feature whose repository-derived plan contains multiple
@@ -987,7 +1105,13 @@ The first change set should remain intentionally narrow:
 This slice creates the architectural seam needed for later effect unification
 without attempting a repository-wide language migration in one PR.
 
-The first control-flow slice after that seam should add `MatchSpec`,
+The next slice should add `DecisionContract` and compile one planning judgment,
+one classification, and one bounded patch proposal into strict `judge` nodes.
+Assert that adding a second output, tool, action discriminator, self-retry, or
+model-selected transition makes `decision_safe` fail. Lower the corresponding
+PR #660 compatibility tasks into these nodes without changing their outputs.
+
+The first control-flow slice after decision normalization should add `MatchSpec`,
 `CollectionSnapshot`, and `ForEachSpec` only. Migrate one read-only discovery
 sequence and one validation-obligation loop, lower both forms into the existing
 CFG, and prove their case coverage and cardinality bounds. Add worklists,
@@ -998,6 +1122,9 @@ records are stable.
 
 - Do not build a second runtime inside the static analyzer.
 - Do not infer authoritative effects or completion from prompt prose.
+- Do not mistake “one action per model round trip” for one legal decision when
+  the model still selects the action kind.
+- Do not hide a coding agent inside a broadly named judgment or nested skill.
 - Do not call a workflow safe because one successful path exists.
 - Do not claim general Turing completeness for the orchestration language while
   also promising decidable termination for every accepted definition.
@@ -1016,7 +1143,8 @@ records are stable.
 The implementation is complete when:
 
 - definitions compile into one runtime-consumed contract;
-- every LLM boundary has a closed action and outcome union;
+- every LLM boundary has exactly one decision contract, one constant transport
+  action, one required output, and no model-owned operation or transition;
 - every executable operation has one static/runtime effect contract;
 - nested effects and resource scopes compose transitively;
 - completion depends on fresh structured evidence and obligations;

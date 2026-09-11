@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.workflow_llm import prune_execution_events
-from powdrr_lift.workflow_models import WorkflowContext
+from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import resolve_worktree_file_path
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 
@@ -109,6 +109,18 @@ def _available_work_item_documents(
             for path in work_item_root.rglob("*")
             if path.is_file()
         )
+    )
+
+
+def _effective_interaction_style(
+    selected_skill: SkillCatalogEntry,
+    current_step: Any,
+    inherited_style: str | None = None,
+) -> str | None:
+    return (
+        getattr(current_step, "interaction_style", None)
+        or selected_skill.skill.interaction_style
+        or inherited_style
     )
 
 

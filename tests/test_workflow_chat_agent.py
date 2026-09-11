@@ -84,7 +84,6 @@ from powdrr_lift.workflow_chat_agent import (
     _advance_predicated_step,
     _apply_file_edits,
     _apply_yaml_operations,
-    _available_work_item_documents,
     _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
@@ -153,6 +152,7 @@ from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
 from powdrr_lift.workflow_prompting import (
     _action_system_prompt,
+    _available_work_item_documents,
     _available_work_item_names,
     _current_file_context,
     _execution_events_for_prompt,

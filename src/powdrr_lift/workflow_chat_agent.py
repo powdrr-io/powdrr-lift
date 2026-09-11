@@ -197,9 +197,11 @@ from powdrr_lift.workflow_paths import (
     resolve_worktree_file_path,
 )
 from powdrr_lift.workflow_prompting import (
+    _available_work_item_documents,
     _available_work_item_names,
     _context_type_catalog,
     _current_file_context,
+    _effective_interaction_style,
     _execution_events_for_prompt,
     _latest_execution_event_for_prompt,
     _match_work_item_names,
@@ -2847,22 +2849,6 @@ def _resolve_template_path(
     return _resolve_skill_path(template_path_value, catalog)
 
 
-def _available_work_item_documents(
-    worktree_root: Path,
-    work_item_name: str,
-) -> tuple[str, ...]:
-    work_item_root = worktree_root / "docs" / "proposals" / work_item_name
-    if not work_item_root.is_dir():
-        return ()
-    return tuple(
-        sorted(
-            str(path.relative_to(worktree_root))
-            for path in work_item_root.rglob("*")
-            if path.is_file()
-        )
-    )
-
-
 def _normalize_skill_path_value(value: str) -> str:
     return value.strip().rstrip(".").rstrip()
 
@@ -3275,18 +3261,6 @@ def _selected_skill_prompt_data(entry: SkillCatalogEntry) -> dict[str, Any]:
         "adversarial": entry.skill.adversarial,
         "interaction_style": entry.skill.interaction_style,
     }
-
-
-def _effective_interaction_style(
-    selected_skill: SkillCatalogEntry,
-    current_step: Any,
-    inherited_style: str | None = None,
-) -> str | None:
-    return (
-        getattr(current_step, "interaction_style", None)
-        or selected_skill.skill.interaction_style
-        or inherited_style
-    )
 
 
 def _selection_system_prompt() -> str:

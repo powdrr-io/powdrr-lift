@@ -9,12 +9,13 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from test_workflow_chat_agent import SkillChatConfig, _build_skill
+from test_workflow_chat_agent import _build_skill
 from textual.containers import ScrollableContainer
 from textual.events import Key
 from textual.widgets import Label, ListItem, ListView, Static, TextArea
 
 from powdrr_lift.core import Skill, SkillStep, load_skill
+from powdrr_lift.workflow_chat_selection import SkillChatConfig
 from powdrr_lift.workflow_chat_tui import (
     WorkflowChatApp,
     _TextualStdoutOutput,

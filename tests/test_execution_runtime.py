@@ -428,9 +428,7 @@ def test_runtime_keeps_cleanup_action_available_with_open_obligation(
         workflow_directory=tmp_path / "workflow",
         repo_root=tmp_path,
     )
-    runtime.kernel.propose(
-        {"kind": "change"}, semantic_action="change_mutable_row"
-    )
+    runtime.kernel.propose({"kind": "change"}, semantic_action="change_mutable_row")
     runtime.install_step_scope(frozenset({"delete_file"}), enforce_empty=True)
 
     assert runtime.allowed_actions() == ("delete_file", "next_step", "prompt_user")

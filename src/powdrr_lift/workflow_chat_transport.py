@@ -24,6 +24,11 @@ from powdrr_lift.agent.providers import (
     long_context_backup_for,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workflow_chat_io import (
+    _prompt_user,
+    _verbose_json,
+    _verbose_print,
+)
 from powdrr_lift.workflow_chat_selection import (
     SkillChatConfig,
     WorkflowChatConfig,
@@ -37,6 +42,7 @@ from powdrr_lift.workflow_llm import (
 from powdrr_lift.workflow_llm import (
     complete_json as _request_json,
 )
+from powdrr_lift.workflow_provider_runtime import model_limits_for
 
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _MAX_REPEATED_REPAIR_ATTEMPTS = 5
@@ -51,22 +57,6 @@ def _chat_support(name: str) -> Any:
 
 def _support_call(name: str, *args: Any, **kwargs: Any) -> Any:
     return _chat_support(name)(*args, **kwargs)
-
-
-def _verbose_json(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_verbose_json", *args, **kwargs)
-
-
-def _prompt_user(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_prompt_user", *args, **kwargs)
-
-
-def _verbose_print(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_verbose_print", *args, **kwargs)
-
-
-def _model_limits_for(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_model_limits_for", *args, **kwargs)
 
 
 def _complete_json_with_model_fallback(
@@ -102,7 +92,7 @@ def _complete_json_with_model_fallback(
             "Prompt size breakdown",
             prompt_size_breakdown(messages),
         )
-        active_limits = _model_limits_for(active_provider, active_model)
+        active_limits = model_limits_for(active_provider, active_model)
         if (
             long_context_backup is not None
             and estimated_input_tokens + _CONTEXT_SAFETY_MARGIN_TOKENS

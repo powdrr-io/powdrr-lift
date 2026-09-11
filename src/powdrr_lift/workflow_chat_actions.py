@@ -53,6 +53,7 @@ from powdrr_lift.workflow_chat_contract import (
     _resolve_generated_file_path_from_command,
     _yaml_operation_to_data,
 )
+from powdrr_lift.workflow_chat_io import _prompt_user, _verbose_print
 from powdrr_lift.workflow_chat_selection import WorkflowChatConfig
 from powdrr_lift.workflow_execution_loop import _execute_shell_tool
 from powdrr_lift.workflow_execution_state import (
@@ -80,14 +81,6 @@ def _chat_support(name: str) -> Any:
 
 def _support_call(name: str, *args: Any, **kwargs: Any) -> Any:
     return _chat_support(name)(*args, **kwargs)
-
-
-def _verbose_print(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_verbose_print", *args, **kwargs)
-
-
-def _prompt_user(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_prompt_user", *args, **kwargs)
 
 
 def _workflow_action_handlers() -> dict[

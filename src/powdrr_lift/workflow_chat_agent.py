@@ -39,11 +39,17 @@ from powdrr_lift.agent.exchanges import (
     normalize_cache_usage,
 )
 from powdrr_lift.agent.provider_config import (
+    DEFAULT_MODEL_LIMITS,
+    LLM_PROVIDERS,
+    MAX_COMPLETION_TOKENS,
+    ZAI_LLM_MAPPINGS,
     LLMModelLimits,
     LLMModelMapping,
-    LLMProviderDefinition,
     LLMProviderRole,
     LLMProviderRoles,
+    default_llm_mappings,
+    provider_definition,
+    provider_supports_llm_mappings,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -184,22 +190,9 @@ _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
 _DEFAULT_MODEL = "glm-5.2"
 _DEFAULT_LLM_TYPE = "high_reasoning"
-_MAX_COMPLETION_TOKENS = 32768
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
-_QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
-_DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
-_DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
-_OPENROUTER_MODEL = "stealth/ox-alpha"
-ALL_LLM_TYPES = (
-    "high_reasoning",
-    "standard_reasoning",
-    "simple_task",
-    "fast_iteration",
-    "long_context",
-    "vision",
-)
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
 _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
@@ -219,208 +212,6 @@ _MAX_REPEATED_REPAIR_ATTEMPTS = 5
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"
-
-
-_DEFAULT_MODEL_LIMITS = LLMModelLimits(
-    context_window=128_000,
-    max_output_tokens=_MAX_COMPLETION_TOKENS,
-)
-
-ZAI_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
-    "glm-5.2": LLMModelLimits(context_window=200_000, max_output_tokens=131_072),
-    "glm-4.7": LLMModelLimits(context_window=200_000, max_output_tokens=131_072),
-    "glm-4.7-flashx": LLMModelLimits(
-        context_window=200_000,
-        max_output_tokens=131_072,
-    ),
-    "glm-4.7-flash": LLMModelLimits(
-        context_window=200_000,
-        max_output_tokens=131_072,
-    ),
-    "glm-4.6v": LLMModelLimits(context_window=200_000, max_output_tokens=32_768),
-}
-
-# DeepInfra exposes model-specific limits through its model metadata API. Keep
-# conservative limits for the configured models so requests never claim more
-# output than the documented 16K cap for most hosted models.
-DEEPINFRA_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
-    "deepseek-ai/deepseek-v4-pro": LLMModelLimits(
-        context_window=1_000_000,
-        max_output_tokens=16_384,
-    ),
-    "deepseek-ai/deepseek-v4-flash": LLMModelLimits(
-        context_window=1_000_000,
-        max_output_tokens=16_384,
-    ),
-    "deepseek-ai/deepseek-v4-flash-0731": LLMModelLimits(
-        context_window=1_000_000,
-        max_output_tokens=16_384,
-    ),
-    "qwen/qwen3-next-80b-a3b-instruct": LLMModelLimits(
-        context_window=128_000,
-        max_output_tokens=16_384,
-    ),
-    "qwen/qwen2.5-vl-32b-instruct": LLMModelLimits(
-        context_window=128_000,
-        max_output_tokens=16_384,
-    ),
-}
-
-
-# These are semantic task classes, rather than model names. Each capability
-# maps to its primary model and, when needed, its per-model backup.
-ZAI_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    "high_reasoning": LLMModelMapping("glm-5.2", provider="zai"),
-    "standard_reasoning": LLMModelMapping("glm-4.7", provider="zai"),
-    "simple_task": LLMModelMapping(
-        _QWEN_2_5_CODER_MODEL,
-        provider="local",
-        backup_model=LLMModelMapping("glm-4.7", provider="zai"),
-        long_context_backup_model=LLMModelMapping("glm-5.2", provider="zai"),
-    ),
-    "fast_iteration": LLMModelMapping(
-        _QWEN_2_5_CODER_MODEL,
-        provider="local",
-        long_context_backup_model=LLMModelMapping("glm-4.7-flash", provider="zai"),
-    ),
-    "long_context": LLMModelMapping("glm-5.2", provider="zai"),
-    "vision": LLMModelMapping("glm-4.6v", provider="zai"),
-}
-
-DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    "high_reasoning": LLMModelMapping(
-        "deepseek-ai/DeepSeek-V4-Pro", provider="deepinfra"
-    ),
-    "standard_reasoning": LLMModelMapping(
-        "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
-    ),
-    "simple_task": LLMModelMapping(
-        "Qwen/Qwen3-Next-80B-A3B-Instruct",
-        provider="deepinfra",
-        long_context_backup_model=LLMModelMapping(
-            "deepseek-ai/DeepSeek-V4-Flash",
-            provider="deepinfra",
-        ),
-    ),
-    "fast_iteration": LLMModelMapping(
-        "Qwen/Qwen3-Next-80B-A3B-Instruct",
-        provider="deepinfra",
-        long_context_backup_model=LLMModelMapping(
-            "deepseek-ai/DeepSeek-V4-Flash",
-            provider="deepinfra",
-        ),
-    ),
-    "long_context": LLMModelMapping(
-        "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
-    ),
-    "vision": LLMModelMapping("Qwen/Qwen2.5-VL-32B-Instruct", provider="deepinfra"),
-}
-
-DEEPINFRA_CHEAP_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    llm_type: LLMModelMapping(
-        _DEEPINFRA_CHEAP_MODEL,
-        provider="deepinfra-cheap",
-        backup_model=LLMModelMapping(
-            _DEEPINFRA_CHEAP_BACKUP_MODEL,
-            provider="deepinfra-cheap",
-        ),
-    )
-    for llm_type in ALL_LLM_TYPES
-}
-
-OPENROUTER_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
-    llm_type: LLMModelMapping(_OPENROUTER_MODEL, provider="openrouter")
-    for llm_type in ALL_LLM_TYPES
-}
-
-
-LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
-    "openai": LLMProviderDefinition(
-        name="openai",
-        display_name="OpenAI",
-        llm_mappings={},
-        model_limits={},
-        api_key_env_names=("OPENAI_API_KEY", "CODEX_API_KEY"),
-        base_url_env_names=("OPENAI_BASE_URL", "CODEX_BASE_URL"),
-        auto_priority=40,
-    ),
-    "anthropic": LLMProviderDefinition(
-        name="anthropic",
-        display_name="Anthropic",
-        llm_mappings={},
-        model_limits={},
-        api_key_env_names=("ANTHROPIC_API_KEY", "CLAUDE_API_KEY"),
-        base_url_env_names=("ANTHROPIC_BASE_URL",),
-        default_base_url="https://api.anthropic.com",
-        client_kind="anthropic",
-        auto_priority=20,
-    ),
-    "zai": LLMProviderDefinition(
-        name="zai",
-        display_name="z.ai",
-        llm_mappings=ZAI_LLM_MAPPINGS,
-        model_limits=ZAI_MODEL_LIMITS,
-        api_key_env_names=("ZAI_API_KEY", "GLM_API_KEY"),
-        base_url_env_names=("ZAI_BASE_URL",),
-        default_base_url="https://api.z.ai/api/paas/v4/",
-        auto_priority=30,
-    ),
-    "openrouter": LLMProviderDefinition(
-        name="openrouter",
-        display_name="OpenRouter",
-        llm_mappings=OPENROUTER_LLM_MAPPINGS,
-        model_limits={},
-        api_key_env_names=("OPENROUTER_API_KEY",),
-        base_url_env_names=("OPENROUTER_BASE_URL",),
-        default_base_url="https://openrouter.ai/api/v1",
-        auto_priority=10,
-    ),
-    "deepinfra": LLMProviderDefinition(
-        name="deepinfra",
-        display_name="DeepInfra",
-        llm_mappings=DEEPINFRA_LLM_MAPPINGS,
-        model_limits=DEEPINFRA_MODEL_LIMITS,
-        api_key_env_names=("DEEPINFRA_API_TOKEN", "DEEPINFRA_API_KEY"),
-        base_url_env_names=("DEEPINFRA_BASE_URL",),
-        default_base_url="https://api.deepinfra.com/v1/openai",
-        auto_priority=None,
-    ),
-    "deepinfra-cheap": LLMProviderDefinition(
-        name="deepinfra-cheap",
-        display_name="DeepInfra",
-        llm_mappings=DEEPINFRA_CHEAP_LLM_MAPPINGS,
-        model_limits=DEEPINFRA_MODEL_LIMITS,
-        api_key_env_names=("DEEPINFRA_API_TOKEN", "DEEPINFRA_API_KEY"),
-        base_url_env_names=("DEEPINFRA_BASE_URL",),
-        default_base_url="https://api.deepinfra.com/v1/openai",
-        forced_model=_DEEPINFRA_CHEAP_MODEL,
-        auto_priority=0,
-    ),
-    "local": LLMProviderDefinition(
-        name="local",
-        display_name="local",
-        llm_mappings=ZAI_LLM_MAPPINGS,
-        model_limits={},
-        default_base_url="local",
-        client_kind="local",
-    ),
-}
-ALL_PROVIDERS = tuple(LLM_PROVIDERS)
-
-
-def _provider_definition(provider: str) -> LLMProviderDefinition:
-    try:
-        return LLM_PROVIDERS[provider]
-    except KeyError as exc:
-        raise PowdrrExecutionError(f"Unsupported LLM provider {provider!r}.") from exc
-
-
-def _default_llm_mappings(provider: str) -> Mapping[str, LLMModelMapping]:
-    return _provider_definition(provider).llm_mappings
-
-
-def _provider_supports_llm_mappings(provider: str) -> bool:
-    return bool(_provider_definition(provider).llm_mappings)
 
 
 WorkflowActionParser = Callable[
@@ -1013,7 +804,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 continue
             self.provider = self.provider_roles.provider_for(self.provider_role)
             self.current_model = (
-                _provider_definition(self.provider).forced_model or self.current_model
+                provider_definition(self.provider).forced_model or self.current_model
             )
             self.current_step_index = self.state.step_index
             self.current_step = self.selected_skill.skill.steps[self.current_step_index]
@@ -1250,7 +1041,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     ),
                     provider=self.provider,
                 )
-                if _provider_supports_llm_mappings(self.provider)
+                if provider_supports_llm_mappings(self.provider)
                 else None
             )
             if step_mapping is None:
@@ -1814,7 +1605,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "step. Choose a materially different action; changing only "
                 "decisions_and_context is not sufficient."
             )
-        if action.llm_type is not None and _provider_supports_llm_mappings(
+        if action.llm_type is not None and provider_supports_llm_mappings(
             self.provider
         ):
             mapping = _resolve_llm_mapping(
@@ -2406,7 +2197,7 @@ class OpenAIChatClient:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
-        self._limits = limits or _DEFAULT_MODEL_LIMITS
+        self._limits = limits or DEFAULT_MODEL_LIMITS
         self._progress_stream = progress_stream
         self.last_usage: dict[str, Any] = {}
         self.last_serialized_messages: str | None = None
@@ -2671,7 +2462,7 @@ class LocalLlamaChatClient:
             response = self._llama.create_chat_completion(
                 messages=messages,
                 temperature=0,
-                max_tokens=_MAX_COMPLETION_TOKENS,
+                max_tokens=MAX_COMPLETION_TOKENS,
                 response_format=(
                     {
                         "type": "json_object",
@@ -2720,7 +2511,7 @@ class AnthropicChatClient:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._api_version = api_version
-        self._limits = limits or _DEFAULT_MODEL_LIMITS
+        self._limits = limits or DEFAULT_MODEL_LIMITS
         self.last_serialized_messages: str | None = None
 
     def complete_json(
@@ -2927,7 +2718,7 @@ def _request_token_budget(
             f"context window is {limits.context_window} tokens."
         )
     return (
-        min(_MAX_COMPLETION_TOKENS, limits.max_output_tokens, available_output_tokens),
+        min(MAX_COMPLETION_TOKENS, limits.max_output_tokens, available_output_tokens),
         estimated_input_tokens,
     )
 
@@ -3212,7 +3003,7 @@ def run_workflow_chat(
                 mappings=_active_llm_mappings(config, provider_roles, provider_role),
                 provider=provider,
             )
-            if _provider_supports_llm_mappings(provider)
+            if provider_supports_llm_mappings(provider)
             else None
         )
         if selection_mapping is not None:
@@ -3361,7 +3152,7 @@ def run_workflow_chat(
             mappings=_active_llm_mappings(config, provider_roles, provider_role),
             provider=observer_provider,
         )
-        if _provider_supports_llm_mappings(observer_provider)
+        if provider_supports_llm_mappings(observer_provider)
         else None
     )
     if observer_mapping is not None:
@@ -4172,7 +3963,7 @@ def _active_llm_mappings(
 ) -> tuple[tuple[str, LLMModelMapping], ...]:
     """Return mappings for a role without exposing provider details to callers."""
     provider = provider_roles.provider_for(role)
-    mappings = tuple(_default_llm_mappings(provider).items())
+    mappings = tuple(default_llm_mappings(provider).items())
     if role == "normal":
         mappings += config.llm_mappings
     return mappings
@@ -4180,7 +3971,7 @@ def _active_llm_mappings(
 
 def _initial_model_for_provider(provider: str, configured_model: str) -> str:
     """Resolve the first request model using the selected provider's mapping."""
-    definition = _provider_definition(provider)
+    definition = provider_definition(provider)
     if definition.forced_model is not None:
         return definition.forced_model
     if configured_model != _DEFAULT_MODEL:
@@ -10196,7 +9987,7 @@ def _resolve_llm_model(
     mappings: Sequence[tuple[str, LLMModelMapping]],
     provider: str = "zai",
 ) -> str:
-    if llm_type is None or not _provider_supports_llm_mappings(provider):
+    if llm_type is None or not provider_supports_llm_mappings(provider):
         return fallback_model
     resolved_mapping = _resolve_llm_mapping(
         llm_type,
@@ -10214,12 +10005,12 @@ def _resolve_llm_mapping(
 ) -> LLMModelMapping | None:
     if llm_type is None:
         return None
-    if not _provider_supports_llm_mappings(provider):
+    if not provider_supports_llm_mappings(provider):
         raise PowdrrExecutionError(
             f"LLM mappings are not supported for provider {provider!r}."
         )
     normalized_llm_type = llm_type.strip().lower().replace("-", "_")
-    mapping = dict(_default_llm_mappings(provider))
+    mapping = dict(default_llm_mappings(provider))
     mapping.update(
         {key.strip().lower().replace("-", "_"): value for key, value in mappings}
     )
@@ -12365,7 +12156,7 @@ def _build_chat_client(
     model_cache_dir: Path,
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
-    provider = _provider_definition(credentials.provider)
+    provider = provider_definition(credentials.provider)
     if provider.client_kind == "local":
         resolved_model_path = _resolve_local_model_path(model_cache_dir)
         return LocalLlamaChatClient(
@@ -12390,13 +12181,13 @@ def _build_chat_client(
 
 
 def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
-    definition = _provider_definition(provider)
+    definition = provider_definition(provider)
     if definition.client_kind == "local":
         return LLMModelLimits(
             context_window=_resolve_local_model_context(),
-            max_output_tokens=_MAX_COMPLETION_TOKENS,
+            max_output_tokens=MAX_COMPLETION_TOKENS,
         )
-    return definition.model_limits.get(model.casefold(), _DEFAULT_MODEL_LIMITS)
+    return definition.model_limits.get(model.casefold(), DEFAULT_MODEL_LIMITS)
 
 
 def _resolve_credentials(
@@ -12422,10 +12213,10 @@ def _resolve_provider(
     mapping: LLMModelMapping | None = None,
 ) -> str:
     if mapping is not None:
-        _provider_definition(mapping.provider)
+        provider_definition(mapping.provider)
         return mapping.provider
     if provider_override != "auto":
-        _provider_definition(provider_override)
+        provider_definition(provider_override)
         return provider_override
     candidates = _auto_provider_candidates()
     if candidates:
@@ -12444,7 +12235,7 @@ def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
         normal = candidates[0] if candidates else "openai"
     else:
         normal = config.provider
-    _provider_definition(normal)
+    provider_definition(normal)
 
     adversarial = config.adversarial_provider
     if adversarial is None and config.provider == "auto":
@@ -12454,7 +12245,7 @@ def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
             None,
         )
     if adversarial is not None:
-        _provider_definition(adversarial)
+        provider_definition(adversarial)
     return LLMProviderRoles(normal=normal, adversarial=adversarial)
 
 
@@ -12512,7 +12303,7 @@ def choose_workflow_provider(
         )
     stdout.write("Available workflow-chat providers:\n")
     for index, provider in enumerate(providers, start=1):
-        definition = _provider_definition(provider)
+        definition = provider_definition(provider)
         stdout.write(f"  {index}. {definition.display_name} ({provider})\n")
     stdout.write("Choose a provider by number or name: ")
     stdout.flush()
@@ -12535,7 +12326,7 @@ def choose_workflow_provider(
 
 
 def _provider_has_credentials(provider: str) -> bool:
-    definition = _provider_definition(provider)
+    definition = provider_definition(provider)
     if provider == "openai" and _resolve_codex_access_token() is not None:
         return True
     return any(os.environ.get(env_name) for env_name in definition.api_key_env_names)
@@ -12544,7 +12335,7 @@ def _provider_has_credentials(provider: str) -> bool:
 def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--api-key"
-    definition = _provider_definition(provider)
+    definition = provider_definition(provider)
     if definition.client_kind == "local":
         return "local", "local"
     for env_name in definition.api_key_env_names:
@@ -12642,7 +12433,7 @@ def _resolve_local_model_context() -> int:
 def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
     if override:
         return override, "--base-url"
-    definition = _provider_definition(provider)
+    definition = provider_definition(provider)
     if definition.client_kind == "local":
         return "local", "local"
     for env_name in definition.base_url_env_names:

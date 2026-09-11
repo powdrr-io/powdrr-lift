@@ -93,7 +93,7 @@ def summarize_skill(skill: Any) -> SkillEffectSummary:
         for action in step.actions:
             if action in {"read_document", "list_files", "gather_context"}:
                 reads.add("files" if action != "gather_context" else "context")
-            if action in {"edit", "yaml_edit", "file_management"}:
+            if action in {"edit", "yaml_edit", "file_management", "delete_file"}:
                 writes.add("files")
         for invocation in step.tool_invocations:
             effect = capability_effect(invocation.to_data())

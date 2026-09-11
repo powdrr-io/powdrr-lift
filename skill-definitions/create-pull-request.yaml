@@ -65,7 +65,8 @@ steps:
     type: any
     required_for_next_step: true
     schema: {type: string}
-- description: Remove unintended files before staging.
+- id: remove-unintended-files
+  description: Remove unintended files before staging.
   actions: [delete_file]
   step_type: governed
   llm_type: simple_task
@@ -74,8 +75,31 @@ steps:
     untracked or modified path is not in `files_to_publish`, delete exactly one
     such path with {"action":"delete_file","file_path":"path/to/file"} and
     verify the repository status before advancing. If no unintended path is
-    present, choose next_step. Do not stage files in this step.
+    present, choose {"action":"next_step"}. Do not stage files in this step.
+  outputs:
+  - name: cleanup_result
+    type: string
+    required_for_next_step: false
+    schema: {type: string}
+- id: verify-clean-worktree
+  description: Confirm the worktree is clean after cleanup.
+  actions: []
+  step_type: gate
+  llm_type: simple_task
+  details: The gate passes only when the worktree has no unstaged or untracked files.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command: [sh, -c, 'test -z "$(git status --porcelain)"']
+  gate:
+    outcome: {path: returncode, equals: 0}
+    goto_step: remove-unintended-files
+    retry_context: >-
+      The worktree is not clean. Return to remove-unintended-files and delete
+      one unintended path with delete_file before retrying this gate.
 - description: Stage the exact files that belong in the pull request.
+  id: stage-exact-files
   actions: [invoke_tool]
   step_type: governed
   llm_type: simple_task

@@ -46,6 +46,7 @@ _ACTION_NAMES = frozenset(
         "edit",
         "yaml_edit",
         "file_management",
+        "delete_file",
         "invoke_skill",
         "invoke_tool",
         "read_document",
@@ -713,7 +714,13 @@ def compare_prompt_snapshot_contract(
         for invocation in step.tool_invocations
     )
     issues: list[WorkflowDefinitionIssue] = []
-    for action in ("edit", "yaml_edit", "file_management", "read_document"):
+    for action in (
+        "edit",
+        "yaml_edit",
+        "file_management",
+        "delete_file",
+        "read_document",
+    ):
         if (
             _has_positive_prompt_directive(text, action)
             and action not in declared
@@ -865,6 +872,7 @@ def _validate_template_liveness(
 _DISCRETE_OUTCOME_ACTIONS = frozenset(
     {
         "file_management",
+        "delete_file",
         "edit",
         "yaml_edit",
         "goto_step",
@@ -1341,7 +1349,14 @@ def _step_can_produce_progress(step: SkillStep) -> bool:
         return True
     if any(
         action
-        in {"edit", "yaml_edit", "file_management", "prompt_user", "invoke_skill"}
+        in {
+            "edit",
+            "yaml_edit",
+            "file_management",
+            "delete_file",
+            "prompt_user",
+            "invoke_skill",
+        }
         for action in step.actions
     ):
         return True
@@ -1678,7 +1693,7 @@ def _requested_action_names(details: str) -> set[str]:
     for match in re.finditer(
         r"\b(?:use|invoke|perform)\s+(?:the\s+)?"
         r"(goto_step|next_step|complete|emit_outputs|prompt_user|edit|"
-        r"yaml_edit|file_management|invoke_tool|invoke_skill)\s+action\b",
+        r"yaml_edit|file_management|delete_file|invoke_tool|invoke_skill)\s+action\b",
         prose_details,
         re.IGNORECASE,
     ):

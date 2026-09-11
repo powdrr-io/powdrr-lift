@@ -395,6 +395,8 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("finish-pr-prep.yaml", 0),
                 ("finish-pr-prep.yaml", 4),
                 ("create-pull-request.yaml", 0),
+                ("create-pull-request.yaml", 2),
+                ("create-pull-request.yaml", 6),
                 ("specify-system.yaml", 1),
                 ("specify-system.yaml", 3),
                 ("specify-system.yaml", 3),
@@ -435,6 +437,7 @@ def test_checked_in_skill_and_workflow_steps_declare_prompt_catalogs() -> None:
                 ("review-skill-workflow.yaml", 8),
             }
             expected_gate_steps = {
+                ("create-pull-request.yaml", 4),
                 ("specify-system.yaml", 5),
                 ("specify-architecture.yaml", 5),
                 ("specify-implementation.yaml", 6),
@@ -1195,7 +1198,11 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     assert [step.description for step in skill.steps] == [
         "Generate the pull request description template.",
         "Fill in the pull request description template.",
+        "Inspect repository state before staging the pull request.",
+        "Remove unintended files before staging.",
+        "Confirm the worktree is clean after cleanup.",
         "Stage the exact files that belong in the pull request.",
+        "Verify the staged pull request file set.",
         "Commit the validated changes.",
         "Push the committed changes.",
         "Create a draft pull request when none exists.",
@@ -1211,25 +1218,27 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     ]
     assert "do not print" in (skill.steps[0].details or "").lower()
     assert "do not print" in (skill.steps[1].details or "").lower()
-    assert "files_to_publish" in (skill.steps[2].details or "")
-    assert "git diff --cached --name-only" in (skill.steps[2].details or "")
-    assert '"file_path":"path/to/unintended-file"' in (skill.steps[2].details or "")
-    assert '"action":"delete_file"' in (skill.steps[2].details or "")
+    assert skill.steps[2].pre_step is not None
+    assert skill.steps[2].pre_step.template["command"] == ["git", "status", "--short"]
     assert '"action":"delete_file"' in (skill.steps[3].details or "")
-    assert '"file_path":"path/to/unintended-file"' in (skill.steps[3].details or "")
-    assert "agent_error.txt" not in (skill.steps[2].details or "")
-    assert "agent_error.txt" not in (skill.steps[3].details or "")
-    assert skill.steps[2].tool_invocation_packages == ("git_readonly_and_additive",)
+    assert skill.steps[5].tool_invocation_packages == ("git_readonly_and_additive",)
     assert any(
-        invocation.operation == "add" for invocation in skill.steps[2].tool_invocations
+        invocation.operation == "add" for invocation in skill.steps[5].tool_invocations
     )
-    assert skill.steps[3].tool_invocations[-1].command == (
+    assert skill.steps[6].pre_step is not None
+    assert skill.steps[6].pre_step.template["command"] == [
+        "git",
+        "diff",
+        "--cached",
+        "--name-only",
+    ]
+    assert skill.steps[7].tool_invocations[-1].command == (
         "git",
         "commit",
         "-m",
         "<commit-message>",
     )
-    assert skill.steps[4].tool_invocations[0].command == (
+    assert skill.steps[8].tool_invocations[0].command == (
         "git",
         "push",
         "-u",
@@ -1238,11 +1247,11 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
     )
     assert any(
         invocation.operation == "pr_create"
-        for invocation in skill.steps[5].tool_invocations
+        for invocation in skill.steps[9].tool_invocations
     )
     assert any(
         invocation.operation == "pr_edit"
-        for invocation in skill.steps[6].tool_invocations
+        for invocation in skill.steps[10].tool_invocations
     )
 
 

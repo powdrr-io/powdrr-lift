@@ -14,9 +14,15 @@ import inspect
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, TypeVar, cast
+from dataclasses import dataclass
+from typing import Any, Protocol, TypeVar, cast
 
+from powdrr_lift.agent.actions import (
+    WorkflowAction,  # noqa: F401 - compatibility export
+    WorkflowEdit,  # noqa: F401 - compatibility export
+    WorkflowFileEdits,  # noqa: F401 - compatibility export
+    WorkflowYamlOperation,  # noqa: F401 - compatibility export
+)
 from powdrr_lift.agent.repair import (
     RepairContext,
     RepairDirective,
@@ -647,36 +653,6 @@ def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowEdit:
-    """One line-based mutation in the shared workflow action contract."""
-
-    kind: str
-    start_line: int
-    end_line: int | None = None
-    text: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowFileEdits:
-    """Line-based mutations for one file in a shared edit action."""
-
-    file_path: str
-    edits: tuple[WorkflowEdit, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowYamlOperation:
-    """One structural mutation in a YAML workflow action."""
-
-    operation: str
-    section: str | None = None
-    item_id: str | None = None
-    item_index: int | None = None
-    path: tuple[str, ...] = field(default_factory=tuple)
-    value: Any = None
-
-
 def prompt_size_breakdown(messages: Sequence[Mapping[str, str]]) -> dict[str, Any]:
     """Estimate prompt size by top-level field without changing the prompt.
 
@@ -722,42 +698,6 @@ def _prompt_size_tokens(value: str) -> int:
         1,
         (len(value) + _PROMPT_SIZE_CHARS_PER_TOKEN - 1) // _PROMPT_SIZE_CHARS_PER_TOKEN,
     )
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowAction:
-    """The action schema parsed for both chat and durable workflow tasks."""
-
-    kind: str
-    tool: str | None = None
-    skill_name: str | None = None
-    step_id: str | None = None
-    file_path: str | None = None
-    destination_path: str | None = None
-    file_operation: str | None = None
-    start_line: int | None = None
-    end_line: int | None = None
-    directory: str | None = None
-    pattern: str | None = None
-    recursive: bool = False
-    text: str | None = None
-    output_state: Any = None
-    outputs: dict[str, Any] = field(default_factory=dict)
-    parameters: dict[str, Any] = field(default_factory=dict)
-    edits: tuple[WorkflowEdit, ...] = field(default_factory=tuple)
-    file_edits: tuple[WorkflowFileEdits, ...] = field(default_factory=tuple)
-    yaml_operations: tuple[WorkflowYamlOperation, ...] = field(default_factory=tuple)
-    types: tuple[str, ...] = field(default_factory=tuple)
-    feature_id: str | None = None
-    keywords: tuple[str, ...] = field(default_factory=tuple)
-    filters: dict[str, object] = field(default_factory=dict)
-    decisions_and_context: str | None = None
-    llm_type: str | None = None
-    provider_role: Literal["normal", "adversarial"] | None = None
-    clean: bool = False
-    context: tuple[str, ...] = field(default_factory=tuple)
-    # Durable task execution uses this only when persisting a human handoff.
-    human_input: dict[str, Any] | None = None
 
 
 def complete_json(

@@ -6,6 +6,7 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
+from powdrr_lift.agent.loop import WorkflowActionObservation, WorkflowActionOutcome
 from powdrr_lift.agent.progress import (
     ProgressDecision,
     WorkflowExecutionController,
@@ -28,6 +29,8 @@ __all__ = [
     "AgentClient",
     "AgentProposalError",
     "WorkflowAction",
+    "WorkflowActionObservation",
+    "WorkflowActionOutcome",
     "WorkflowEdit",
     "WorkflowFileEdits",
     "WorkflowYamlOperation",

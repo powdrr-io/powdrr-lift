@@ -23,6 +23,10 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,  # noqa: F401 - compatibility export
     WorkflowYamlOperation,  # noqa: F401 - compatibility export
 )
+from powdrr_lift.agent.loop import (
+    WorkflowActionObservation,
+    WorkflowActionOutcome,
+)
 from powdrr_lift.agent.progress import (
     ProgressDecision,
     WorkflowExecutionController,
@@ -798,16 +802,6 @@ def complete_json_with_timeout_retry(
             time.sleep(delay_seconds)
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowActionObservation:
-    """The common result of evaluating one proposed workflow action."""
-
-    signature: str
-    made_progress: bool
-    decision: ProgressDecision
-    correction: str | None = None
-
-
 class WorkflowActionProgressStrategy(Protocol[StrategyActionT]):
     """Adapter hooks for state snapshots and runner-specific reporting."""
 
@@ -838,14 +832,6 @@ class WorkflowActionRequest:
     timeout_backoff_seconds: float
     response_schema: Mapping[str, Any] | None = None
     request_action: Callable[[], Any] | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowActionOutcome:
-    """The adapter's result after the shared runner executes an action."""
-
-    continue_running: bool = True
-    exit_code: int | None = None
 
 
 class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):

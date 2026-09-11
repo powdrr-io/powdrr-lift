@@ -31,10 +31,6 @@ except ImportError:  # pragma: no cover - only used on non-POSIX platforms
     termios = None  # type: ignore[assignment]
     tty = None  # type: ignore[assignment]
 
-from powdrr_lift.agent.exchanges import (
-    ExchangeRecordingClient,
-    normalize_cache_usage,
-)
 from powdrr_lift.agent.provider_config import (
     DEFAULT_MODEL,
     ZAI_LLM_MAPPINGS,
@@ -48,21 +44,18 @@ from powdrr_lift.agent.provider_config import (
 from powdrr_lift.agent.providers import (
     LOCAL_MODEL_PATTERN,
     LocalModelRuntimeError,
-    ProviderCredentials,
     _EmptyProviderResponseError,
     _estimate_message_tokens,
     _ModelUnavailableError,
     _SemanticRepairExhaustedError,
     available_provider_names,
     backup_model_for,
-    build_workflow_client,
     initial_model_for_provider,
     long_context_backup_for,
     provider_model_limits,
     resolve_llm_mapping,
     resolve_local_model_context,
     resolve_provider,
-    resolve_provider_credentials,
     resolve_provider_roles,
 )
 from powdrr_lift.basedpyright_tools import (
@@ -218,6 +211,9 @@ from powdrr_lift.workflow_prompting import (
 )
 from powdrr_lift.workflow_prompting import (
     _build_step_execution_messages as _build_step_execution_messages_runtime,
+)
+from powdrr_lift.workflow_provider_runtime import (
+    WorkflowClientRegistry,
 )
 from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
@@ -2135,25 +2131,6 @@ class _SkillExecutionFrame:
     child_skill_name: str = ""
 
 
-def _maybe_record_llm_exchanges(
-    client: WorkflowLLMClient,
-    repo_root: Path,
-) -> WorkflowLLMClient:
-    """Apply exchange recording only while the hardcoded diagnostic flag is enabled."""
-    if not _ENABLE_LLM_EXCHANGE_LOGGING:
-        return client
-    return ExchangeRecordingClient(
-        client,
-        repo_root,
-        request_json=_request_json,
-    )
-
-
-# Compatibility names for existing scenario and unit-test seams.
-_LLMExchangeRecordingClient = ExchangeRecordingClient
-_normalize_cache_usage = normalize_cache_usage
-
-
 class _WorkflowEditRangeError(PowdrrExecutionError):
     """Raised when a line-based edit falls outside the current file."""
 
@@ -2272,38 +2249,13 @@ def run_workflow_chat(
     provider_role: LLMProviderRole = "normal"
     provider = provider_roles.provider_for(provider_role)
     current_model = initial_model_for_provider(provider, config.model)
-    credentials = resolve_provider_credentials(
-        provider, config.api_key, config.base_url
+    client_registry = WorkflowClientRegistry(
+        api_key=config.api_key,
+        base_url=config.base_url,
+        project_root=project_root,
+        progress_stream=stderr,
     )
-    clients: dict[tuple[str, str], WorkflowLLMClient] = {}
-
-    def client_for(
-        selected_provider: str,
-        selected_credentials: ProviderCredentials,
-        selected_model: str,
-    ) -> WorkflowLLMClient:
-        key = (selected_provider, selected_model)
-        if key not in clients:
-            clients[key] = _maybe_record_llm_exchanges(
-                build_workflow_client(
-                    selected_credentials,
-                    model=selected_model,
-                    model_cache_dir=project_root / ".powdrr" / "models",
-                    progress_stream=stderr,
-                ),
-                project_root,
-            )
-        return clients[key]
-
-    def client_for_model(
-        selected_model: str, selected_provider: str
-    ) -> WorkflowLLMClient:
-        selected_credentials = resolve_provider_credentials(
-            selected_provider,
-            config.api_key,
-            config.base_url,
-        )
-        return client_for(selected_provider, selected_credentials, selected_model)
+    credentials = client_registry.credentials_for(provider)
 
     print(
         f"Using {credentials.provider} credentials from {credentials.source} "
@@ -2368,7 +2320,7 @@ def run_workflow_chat(
     for _turn in range(config.max_turns):
         _verbose_print(stderr, config.verbose, f"Starting selection turn {_turn + 1}")
         selection, current_model, provider = _complete_json_with_model_fallback(
-            client_for=client_for_model,
+            client_for=client_registry.client_for,
             messages=_build_selection_messages(
                 catalog,
                 transcript,
@@ -2415,9 +2367,7 @@ def run_workflow_chat(
                 current_model,
                 mapping=selection_mapping,
             )
-        credentials = resolve_provider_credentials(
-            provider, config.api_key, config.base_url
-        )
+        credentials = client_registry.credentials_for(provider)
         if not skill_announced:
             print(f"Matched skill: {selected_skill.skill.name}", file=stdout)
             skill_announced = True
@@ -2542,7 +2492,7 @@ def run_workflow_chat(
         input_func=input_func,
         stdout=stdout,
         stderr=stderr,
-        client_for_model=client_for_model,
+        client_for_model=client_registry.client_for,
         provider_roles=provider_roles,
         provider_role=provider_role,
         current_model=current_model,
@@ -2613,19 +2563,9 @@ def run_workflow_chat(
                 handoff_state=compact_observer_mapping(execution_state.handoff_records),
             )
 
-        observer_credentials = resolve_provider_credentials(
+        observer_client = client_registry.client_for(
+            observer_mapping.model,
             observer_mapping.provider,
-            config.api_key,
-            config.base_url,
-        )
-        observer_client = _maybe_record_llm_exchanges(
-            build_workflow_client(
-                observer_credentials,
-                model=observer_mapping.model,
-                model_cache_dir=project_root / ".powdrr" / "models",
-                progress_stream=stderr,
-            ),
-            project_root,
         )
         driver.observer = ShadowWorkflowObserver(
             client=observer_client,

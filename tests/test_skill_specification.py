@@ -1208,6 +1208,14 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "Create a draft pull request when none exists.",
         "Update the existing pull request.",
     ]
+    gate = skill.steps[4]
+    assert gate.pre_step is not None
+    assert gate.pre_step.template["command"] == [
+        "sh",
+        "-c",
+        'test -z "$(git diff --name-only)$(git ls-files --others --exclude-standard)"',
+    ]
+    assert "staged changes are allowed" in (gate.details or "").lower()
     assert skill.steps[0].pre_step is not None
     assert skill.steps[0].pre_step.action == "invoke_tool"
     assert skill.steps[0].pre_step.template["command"] == [

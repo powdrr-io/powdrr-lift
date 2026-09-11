@@ -86,18 +86,26 @@ steps:
   actions: []
   step_type: gate
   llm_type: simple_task
-  details: The gate passes only when the worktree has no unstaged or untracked files.
+  details: >-
+    The gate passes only when the worktree has no unstaged or untracked files.
+    Staged changes are allowed here because the next deterministic step verifies
+    the staged set against files_to_publish.
   pre_step:
     action: invoke_tool
     template:
       tool: shell
-      command: [sh, -c, 'test -z "$(git status --porcelain)"']
+      command:
+      - sh
+      - -c
+      - 'test -z "$(git diff --name-only)$(git ls-files --others --exclude-standard)"'
   gate:
     outcome: {path: returncode, equals: 0}
     goto_step: remove-unintended-files
     retry_context: >-
-      The worktree is not clean. Return to remove-unintended-files and delete
-      one unintended path with delete_file before retrying this gate.
+      The worktree has an unstaged or untracked path. Return to
+      remove-unintended-files and delete one unintended path with delete_file
+      before retrying this gate. Staged paths are checked against
+      files_to_publish by the next step.
 - description: Stage the exact files that belong in the pull request.
   id: stage-exact-files
   actions: [invoke_tool]

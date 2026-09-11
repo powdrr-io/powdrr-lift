@@ -71,6 +71,15 @@ def test_action_kernel_blocks_unrelated_actions_until_obligations_close() -> Non
     assert kernel.validate_proposal({"kind": "test"})
 
 
+def test_action_kernel_allows_cleanup_while_obligation_is_open() -> None:
+    kernel = ActionKernel()
+    kernel.propose({"kind": "change"}, semantic_action="change_mutable_row")
+
+    assert not kernel.validate_proposal(
+        {"kind": "delete_file"}, semantic_action="delete_file"
+    )
+
+
 def test_action_kernel_records_obligation_open_and_satisfied_events() -> None:
     kernel = ActionKernel()
     proposed = kernel.propose(

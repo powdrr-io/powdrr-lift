@@ -969,18 +969,28 @@ class WorkflowStepRunner:
                         guidance,
                         source_ref=f"{self.runtime.execution_id}:roundtrip-{roundtrips}",
                     )
-            proposal_errors = self.kernel.validate_proposal(action)
+            relationship_errors = self.kernel.validate_proposal(action)
+            contract_errors: tuple[str, ...] = ()
             if self.runtime is not None:
-                proposal_errors = (
-                    *proposal_errors,
-                    *self.runtime.validate_action(str(getattr(action, "kind", ""))),
+                contract_errors = self.runtime.validate_action(
+                    str(getattr(action, "kind", ""))
                 )
+            proposal_errors = (*relationship_errors, *contract_errors)
             if proposal_errors:
+                contract_violation = bool(contract_errors) and not relationship_errors
                 error = PowdrrExecutionError(
                     " ".join(proposal_errors),
-                    error_code="relationship_obligation_open",
+                    error_code=(
+                        "step_contract_action_not_allowed"
+                        if contract_violation
+                        else "relationship_obligation_open"
+                    ),
                     action_kind=str(getattr(action, "kind", "action")),
-                    remediation="perform the required follow-up action first",
+                    remediation=(
+                        "Choose an action declared by the active step contract."
+                        if contract_violation
+                        else "perform the required follow-up action first"
+                    ),
                 )
                 strategy.record_action_error(action, error)
                 directive = self._record_semantic_failure(
@@ -1198,12 +1208,13 @@ class WorkflowStepRunner:
         action = deterministic(failure, directive)
         if action is None:
             return None
-        proposal_errors = self.kernel.validate_proposal(action)
+        relationship_errors = self.kernel.validate_proposal(action)
+        contract_errors: tuple[str, ...] = ()
         if self.runtime is not None:
-            proposal_errors = (
-                *proposal_errors,
-                *self.runtime.validate_action(str(getattr(action, "kind", ""))),
+            contract_errors = self.runtime.validate_action(
+                str(getattr(action, "kind", ""))
             )
+        proposal_errors = (*relationship_errors, *contract_errors)
         if proposal_errors:
             error = PowdrrExecutionError(
                 " ".join(proposal_errors),

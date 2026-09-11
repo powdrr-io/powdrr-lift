@@ -241,7 +241,11 @@ class ExecutionRuntime:
             for item in (*self.state.obligations, *self.kernel.open_obligations)
             if item.status.value == "open" and item.required_action
         }
-        if required:
+        # Keep cleanup actions visible in a step-specific contract.  A pending
+        # semantic obligation must not erase the action needed to repair a
+        # failed gate; kernel validation still enforces the obligation for
+        # semantic actions that could close or bypass it.
+        if required and result.intersection(required):
             result.intersection_update(required)
         return frozenset(result) if scopes or result else None
 

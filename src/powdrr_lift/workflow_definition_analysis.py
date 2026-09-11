@@ -1796,6 +1796,13 @@ def _compile_skill(
             add_target(index, step.gate.goto_step, "gate.goto_step")
             if step.gate.success_goto_step is not None:
                 add_target(index, step.gate.success_goto_step, "gate.success_goto_step")
+        if step.branch is not None:
+            successors[index].clear()
+            for case_index, case in enumerate(step.branch.cases):
+                add_target(
+                    index, case.goto_step, f"branch.cases[{case_index}].goto_step"
+                )
+            add_target(index, step.branch.default_goto_step, "branch.default_goto_step")
 
     predecessors: list[set[int]] = [set() for _ in steps]
     for source, targets in enumerate(successors):

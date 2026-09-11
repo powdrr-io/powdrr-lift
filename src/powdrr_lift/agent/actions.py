@@ -53,6 +53,7 @@ class WorkflowAction:
     pattern: str | None = None
     recursive: bool = False
     text: str | None = None
+    capture_as: str | None = None
     output_state: Any = None
     outputs: dict[str, Any] = field(default_factory=dict)
     parameters: dict[str, Any] = field(default_factory=dict)

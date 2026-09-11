@@ -143,6 +143,7 @@ from powdrr_lift.workflow_action_catalog import (
     step_actions as _step_actions,
 )
 from powdrr_lift.workflow_action_protocol import _parse_action_response
+from powdrr_lift.workflow_branching import select_branch_target
 from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
@@ -896,6 +897,22 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     skill=self.selected_skill,
                     step_index=self.current_step_index,
                 )
+            if step_behavior.runs_branch:
+                target_step_id = select_branch_target(
+                    self.current_step.branch, self.state.handoff_records
+                )
+                target_index = _step_index_by_id(self.selected_skill, target_step_id)
+                self.state.execution_events.append(
+                    {
+                        "kind": "goto_step",
+                        "step_id": target_step_id,
+                        "target_step_index": target_index,
+                        "source": "branch",
+                        "step_index": self.current_step_index,
+                    }
+                )
+                self.state.step_index = target_index
+                continue
             if step_behavior.runs_gate:
                 if self.state.runtime is not None:
                     self.state.runtime.install_step_scope(frozenset())
@@ -4597,6 +4614,28 @@ def _handle_workflow_action_prompt_user(
         }
     )
     state.transcript.append({"role": "user", "content": answer})
+    if action.capture_as:
+        current_step = state.selected_skill.skill.steps[state.step_index]
+        declaration = next(
+            (
+                output
+                for output in current_step.outputs
+                if output.name == action.capture_as
+            ),
+            None,
+        )
+        if declaration is None:
+            raise PowdrrExecutionError(
+                "prompt_user capture_as must name a declared output: "
+                f"{action.capture_as}"
+            )
+        state.handoff_records[action.capture_as] = {
+            "name": action.capture_as,
+            "type": declaration.type,
+            "value": answer,
+            "produced_by": {"step_index": state.step_index, "action": action.kind},
+            "scope": declaration.scope,
+        }
     if action.decisions_and_context:
         _record_durable_fact(
             state,
@@ -8725,7 +8764,10 @@ def _step_action_response_schema(
             "keywords": {"type": "array", "items": {"type": "string"}},
             "filters": {"type": "object"},
         },
-        "prompt_user": {"text": {"type": "string"}},
+        "prompt_user": {
+            "text": {"type": "string"},
+            "capture_as": {"type": "string"},
+        },
         "edit": {
             "file_path": {"type": "string"},
             "edits": {"type": "array", "items": {"type": "object"}},
@@ -8883,7 +8925,9 @@ def _action_repair_prompt(
         "gather_context": "Use non-empty types for gather_context.",
         "prompt_user": (
             'Use text containing a clear English question ending in "?" for '
-            "prompt_user."
+            "prompt_user. If the answer must be reused by a later step, include "
+            "capture_as with the exact declared output name; the runtime records "
+            "the answer as that output."
         ),
     }
     requirements = [
@@ -8988,6 +9032,7 @@ def _action_repair_prompt(
         if "prompt_user" in action_names:
             shapes.append(
                 '{"action":"prompt_user","text":"One clear English question?",'
+                '"capture_as":"declared_output_name",'
                 '"decisions_and_context":"More information is required."}'
             )
         if "next_step" in action_names:

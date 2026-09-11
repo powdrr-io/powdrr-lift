@@ -1774,3 +1774,35 @@ def test_checked_in_review_architecture_skill_definition_matches_review_flow() -
         "evaluate",
         "docs/proposals/<work-item-name>/architecture-specification.yaml",
     )
+
+
+def test_branch_step_is_typed_and_round_trips() -> None:
+    skill = skill_from_data(
+        {
+            "name": "routing",
+            "when_to_use": ["route a decision"],
+            "steps": [
+                {
+                    "id": "route",
+                    "description": "Route the typed decision.",
+                    "step_type": "branch",
+                    "branch": {
+                        "cases": [
+                            {
+                                "path": "decision.kind",
+                                "equals": "resolved",
+                                "goto_step": "done",
+                            }
+                        ],
+                        "default_goto_step": "ask",
+                    },
+                },
+                {"id": "done", "description": "Done."},
+                {"id": "ask", "description": "Ask."},
+            ],
+        }
+    )
+    branch = skill.steps[0].branch
+    assert branch is not None
+    assert branch.cases[0].goto_step == "done"
+    assert skill_from_data(skill.to_data()).steps[0].branch == branch

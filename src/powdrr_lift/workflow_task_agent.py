@@ -65,6 +65,7 @@ from powdrr_lift.pr_workflow_record import (
 )
 from powdrr_lift.workflow_action_catalog import step_actions
 from powdrr_lift.workflow_action_protocol import _parse_action_response
+from powdrr_lift.workflow_branching import select_branch_target
 from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
     GH_TOOL,
@@ -3614,6 +3615,20 @@ class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
                     step_behavior.runtime_actions(getattr(step, "actions", ())),
                     enforce_empty=getattr(step, "actions_declared", False),
                 )
+            if step_behavior.runs_branch:
+                target_step_id = select_branch_target(step.branch, self.handoff_records)
+                target_index = _step_index_by_id(frame.skill, target_step_id)
+                self.execution_events.append(
+                    {
+                        "kind": "goto_step",
+                        "skill": frame.skill.skill.name,
+                        "step_id": target_step_id,
+                        "target_step_index": target_index,
+                        "source": "branch",
+                    }
+                )
+                frame.step_index = target_index
+                continue
             if step_behavior.runs_gate:
                 if step.gate is None:
                     raise PowdrrExecutionError("gate steps require gate settings.")

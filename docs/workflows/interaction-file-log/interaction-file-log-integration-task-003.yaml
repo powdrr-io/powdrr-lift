@@ -1,14 +1,14 @@
-task_id: interaction-file-log-core-task-003
+task_id: interaction-file-log-integration-task-003
 status: open
 upstream_task_ids:
-- interaction-file-log-core-task-001
-- interaction-file-log-core-task-002
+- interaction-file-log-integration-task-001
+- interaction-file-log-integration-task-002
 dependent_state:
 - implementation-and-tests-passed
 complexity: high
 input_state:
-  proposed_pr_context: interaction-file-log-core-task-001.proposed-pr-context-state
-  execution_plan: interaction-file-log-core-task-002.detailed-execution-plan-state
+  proposed_pr_context: interaction-file-log-integration-task-001.proposed-pr-context-state
+  execution_plan: interaction-file-log-integration-task-002.detailed-execution-plan-state
   implementation_and_test_diffs: {}
   test_results: {}
 assignee_type: agent
@@ -43,8 +43,8 @@ details: 'Work as a bounded inspect, implement, test, and repair loop. Use the p
 
 
   Instantiation context: work item name is ''interaction-file-log''; workflow instance
-  name is ''interaction-file-log-core''. Use these values as search context and verify
-  repository documents before deciding what they identify.'
+  name is ''interaction-file-log-integration''. Use these values as search context
+  and verify repository documents before deciding what they identify.'
 llm_type: standard_reasoning
 actions:
 - invoke_tool

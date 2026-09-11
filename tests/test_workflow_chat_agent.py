@@ -124,8 +124,6 @@ from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     LLMModelMapping,
     LLMProviderRoles,
-    SkillChatEdit,
-    _action_repair_prompt,
     _build_step_execution_messages,
     _empty_pull_request_error,
     _latest_deterministic_pre_step,
@@ -133,17 +131,20 @@ from powdrr_lift.workflow_chat_agent import (
     _prompt_user,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
-    _step_action_response_schema,
     _validate_dynamic_validation_gate_action,
     _workflow_action_material_state,
     _workflow_action_progress_status,
-    _workflow_edit_failure_feedback,
     _WorkflowProgressDisplay,
     _worktree_reuse_decision,
     available_workflow_providers,
     choose_workflow_provider,
     download_local_qwen_model,
     run_workflow_chat,
+)
+from powdrr_lift.workflow_chat_contract import (
+    _action_repair_prompt,
+    _step_action_response_schema,
+    _workflow_edit_failure_feedback,
 )
 from powdrr_lift.workflow_chat_selection import (
     SkillChatConfig,
@@ -174,6 +175,7 @@ from powdrr_lift.workflow_execution_state import (
     _WorkflowExecutionState,
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
+from powdrr_lift.workflow_llm import WorkflowEdit as SkillChatEdit
 from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
 from powdrr_lift.workflow_prompting import (

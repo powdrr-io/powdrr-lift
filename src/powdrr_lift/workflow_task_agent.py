@@ -63,6 +63,7 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
+from powdrr_lift.workflow_action_protocol import _parse_action_response
 from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
     GH_TOOL,
@@ -79,7 +80,6 @@ from powdrr_lift.workflow_chat_agent import (
     _maybe_record_llm_exchanges,
     _model_limits_for,
     _modular_action_system_prompt,
-    _parse_action_response,
     _print_waiting_for_model,
     _record_skill_pull_request,
     _require_coding_loop_verification,

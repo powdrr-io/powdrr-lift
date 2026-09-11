@@ -68,6 +68,12 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.test_failure_packet import build_test_failure_packet
+from powdrr_lift.workflow_action_protocol import (
+    _parse_action_response,
+    _parse_workflow_action_delete_file,
+    _parse_workflow_action_file_management,
+    _parse_workflow_action_gather_context,
+)
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     LLMModelMapping,
@@ -103,12 +109,8 @@ from powdrr_lift.workflow_chat_agent import (
     _match_work_item_names,
     _modular_action_system_prompt,
     _normalize_cache_usage,
-    _parse_action_response,
     _parse_action_response_with_schema,
     _parse_json_object,
-    _parse_workflow_action_delete_file,
-    _parse_workflow_action_file_management,
-    _parse_workflow_action_gather_context,
     _predicated_step_complete,
     _prompt_durable_facts,
     _prompt_step_context,

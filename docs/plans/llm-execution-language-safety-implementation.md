@@ -8,6 +8,11 @@ guarantees. Preserve the useful flexibility of nested skills while preventing
 undeclared effects, hidden authority amplification, unsupported completion
 claims, ineffective retries, and unbounded execution.
 
+The target is not a merely finite static checklist. Definitions must support
+exhaustive branches and bounded, data-driven work over repository-derived
+collections so one workflow can adapt to the actual size, risk, and structure
+of a feature while remaining total and operationally contained.
+
 The target design is defined in
 `docs/design/llm-execution-language-safety.md`. This document maps that design
 onto the current repository and identifies the required code changes,
@@ -128,6 +133,37 @@ unbounded coding loops. The language does not yet let an author declare a
 cycle's variant, finite work set, or resource consumption directly. This limits
 the strength and explainability of termination proofs.
 
+### Adaptive control flow is not a first-class total language
+
+The current schema has branch and coding-loop step types, and the runtime has
+iteration limits, but it does not yet define a small set of structured control
+forms with compositional semantics. In particular, there is no canonical
+contract for:
+
+- an exhaustive match over a closed typed value;
+- iteration over an immutable, cardinality-bounded repository snapshot;
+- a dynamically populated worklist with stable keys and monotone item state;
+- bounded rediscovery after mutations create a new evidence epoch;
+- parallel finite branches with deterministic joins; or
+- deriving a whole-workflow resource bound from nested control forms.
+
+As a result, useful data-driven work tends to be encoded either as generated
+static steps or as a broad model-controlled coding loop. The former is rigid;
+the latter makes termination depend on model behavior.
+
+### Control termination and operation containment are conflated
+
+A finite transition graph does not stop one provider call or subprocess from
+hanging. Conversely, a global wall-clock timeout contains damage without
+proving the program terminates semantically. The certificate and runtime need
+separate guarantees for control termination and operation termination, with
+`termination_safe` as their conjunction.
+
+Every LLM activation, response-repair attempt, tool call, subprocess, nested
+call, and external request needs an enforced local budget and a typed exhaustion
+result. Existing roundtrip limits are valuable containment, but they are not a
+compositional language-level proof and should not be reported as one.
+
 ### Exceptions grant effects but do not describe weakened proofs
 
 Capability exceptions are already tightly bound at runtime. They do not yet
@@ -143,9 +179,10 @@ both static analysis and runtime execution:
 @dataclass(frozen=True)
 class CompiledWorkflowContract:
     definition_fingerprint: str
-    steps: tuple[CompiledStepContract, ...]
+    body: ControlNode
     transitive_effects: EffectEnvelope
     resource_scope: ResourceScope
+    resource_limits: ResourceLimits
     obligations: tuple[ObligationSpec, ...]
     guarantees: SafetyCertificate
     dependency_fingerprints: tuple[str, ...]
@@ -171,6 +208,58 @@ class CompiledStepContract:
     completion: CompletionContract
     progress_measure: ProgressMeasure | None
 ```
+
+`ControlNode` should be a closed union of `SequenceNode`, `MatchNode`,
+`ForEachNode`, `WorklistNode`, `RepeatNode`, `RetryNode`, `ParallelNode`,
+`CallNode`, and `StepNode`. Compilation may lower these nodes to a graph for
+analysis and execution, but the structured source form retains the termination
+argument an author intended.
+
+Add immutable data/control types alongside the step contract:
+
+```python
+@dataclass(frozen=True)
+class CollectionSnapshot:
+    item_schema: SchemaRef
+    key_path: str
+    source_fingerprint: str
+    items: tuple[Mapping[str, Any], ...]
+    max_items: int
+
+
+@dataclass(frozen=True)
+class ForEachContract:
+    snapshot_binding: str
+    body: ControlNode
+    max_parallel: int
+    item_retry_budget: int
+    collect_binding: str
+
+
+@dataclass(frozen=True)
+class WorklistContract:
+    item_schema: SchemaRef
+    key_path: str
+    max_admissions: int
+    max_epochs: int
+    body: ControlNode
+
+
+@dataclass(frozen=True)
+class ActivationLimits:
+    wall_time_seconds: int
+    llm_turns: int
+    input_tokens: int
+    output_tokens: int
+    tool_calls: int
+    output_bytes: int
+    external_cost_microunits: int
+```
+
+Snapshots are values, not live views. Creating a new snapshot after a mutation
+creates a new evidence epoch and must consume an explicit epoch budget.
+Collection bounds, retry counts, parallelism, and activation limits participate
+in the compiled fingerprint and cannot be raised by an LLM decision.
 
 `workflow_step_behavior.py` should remain the source for behavior selection,
 but it should produce or participate in this compiled contract rather than
@@ -540,7 +629,49 @@ The analyzer must distinguish:
 - an unknown cycle requiring an author declaration; and
 - an external wait represented as suspension rather than a cycle.
 
-### 9. Make suspension and partial completion first-class
+### 9. Add total, data-driven control forms
+
+Extend definition schemas with structured `match`, `for_each`, `worklist`,
+`repeat`, `retry`, `parallel`, and `sequence` nodes. Keep `branch` and
+`coding_loop` as compatibility syntax that normalizes into these forms where
+possible.
+
+Implement the following rules in the canonical compiler and shared runtime:
+
+- `match` reads one immutable typed value, requires disjoint cases, and is
+  exhaustive through closed-union coverage or an explicit `otherwise`;
+- `for_each` consumes a persisted `CollectionSnapshot` with stable unique keys
+  and a statically declared maximum cardinality;
+- `worklist` admits stable keys monotonically, never reinserts a disposed key in
+  the same epoch, and enforces admission and epoch bounds;
+- `repeat` consumes an epoch budget before entering another execution of its
+  body and exposes only structured `break` outcomes;
+- `retry` consumes its budget on every back edge, including provider-response
+  repair and child-call retry;
+- `parallel` has a finite child set, bounded concurrency, deterministic result
+  collection, and an explicit fail/join policy; and
+- snapshot refresh after mutation creates a new epoch, invalidates intersecting
+  evidence, and consumes an epoch budget.
+
+Add a lowering pass from structured control nodes to the existing CFG and an
+inverse validation pass for legacy graphs. Reject any reachable back edge that
+cannot be associated with a well-founded variant or finite resource. Do not add
+a general model-guarded `while` construct.
+
+Have the compiler derive a conservative symbolic cost for every subtree. For
+example, a loop cost is its maximum cardinality multiplied by its bounded body
+and retry cost; parallelism changes elapsed-time estimates, not the total call
+bound. Reject a definition whose derived local maxima exceed global workflow
+limits.
+
+Instrument every LLM and operation activation with `ActivationLimits`. Provider
+timeouts, invalid structured output, token exhaustion, subprocess timeout,
+output overflow, and tool-call exhaustion must produce typed outcomes. The
+kernel decrements budgets before dispatch so a crash cannot refund an attempt.
+Expose separate `control_termination_safe` and `operation_termination_safe`
+proofs and define `termination_safe` as their conjunction.
+
+### 10. Make suspension and partial completion first-class
 
 Add terminal status types for `blocked`, `suspended`, `partial`, `failed`, and
 `cancelled`. Define which may resume and what event is required.
@@ -557,7 +688,7 @@ Persist a suspension record with:
 Partial completion must enumerate valid outputs and must not satisfy global
 success gates.
 
-### 10. Integrate exceptions with certificates
+### 11. Integrate exceptions with certificates
 
 Extend `CapabilityExceptionRequest` with:
 
@@ -577,7 +708,7 @@ Secret access should remain non-exceptionable unless a separate policy and
 data-flow model is introduced. Exceptions must never authorize forged evidence,
 suppressed failures, or unrecorded effects.
 
-### 11. Add safety profiles and enforcement modes
+### 12. Add safety profiles and enforcement modes
 
 Define profile requirements independently from proof generation:
 
@@ -599,7 +730,7 @@ Map existing `ExecutionMode` values carefully:
 Do not make profile names change proof results. A permissive profile may accept
 an unknown property, but the certificate must continue to say `unknown`.
 
-### 12. Bind runtime execution to compiled certificates
+### 13. Bind runtime execution to compiled certificates
 
 At execution creation, persist:
 
@@ -626,12 +757,15 @@ The compiler should use explicit passes in this order:
 6. operation and effect resolution;
 7. resource-scope checking;
 8. nested-skill fixed-point composition;
-9. CFG and abstract-state construction;
-10. completion and evidence observability;
-11. retry relevance;
-12. progress and termination proof;
-13. replay/idempotency proof; and
-14. certificate generation.
+9. structured control typing and exhaustiveness;
+10. snapshot/worklist key and cardinality validation;
+11. CFG and abstract-state construction;
+12. completion and evidence observability;
+13. retry relevance;
+14. variant and control-termination proof;
+15. activation-limit and whole-workflow resource-bound proof;
+16. replay/idempotency proof; and
+17. certificate generation.
 
 Add stable diagnostic families for:
 
@@ -641,8 +775,14 @@ Add stable diagnostic families for:
 - scope widening at nested calls;
 - undeclared transitive effects;
 - stale or unproducible evidence requirements;
+- non-exhaustive or overlapping match cases;
+- live or unbounded collection iteration;
+- duplicate or unstable work-item keys;
+- worklist reinsertion and unbounded rediscovery;
 - cycles without a variant;
 - non-decreasing variants;
+- activations without enforceable local limits;
+- derived resource bounds that exceed workflow limits;
 - non-idempotent effects without reconciliation;
 - certificate/runtime fingerprint drift; and
 - exception attempts that weaken forbidden guarantees.
@@ -700,12 +840,17 @@ profile.
 
 - Expand completion over durable evidence and obligations.
 - Add evidence invalidation.
-- Add variants and finite resource declarations.
+- Add structured matches, snapshots, bounded worklists, finite parallel joins,
+  variants, and finite resource declarations.
+- Enforce per-activation time, turn, token, call, output, and cost limits.
+- Derive conservative resource bounds compositionally across nested controls.
 - Prove all reachable cycles or classify them as bounded, disproven, or
   unknown.
 
 Acceptance gate: all checked-in strict workflows have no unobservable
-completion, ineffective retry, non-progress cycle, or unknown unbounded cycle.
+completion, ineffective retry, non-progress cycle, unknown unbounded cycle, or
+unbounded reachable activation. Their certificates separately prove control
+termination and operation termination.
 
 ### Phase 6: Exceptions and strict enforcement
 
@@ -729,7 +874,12 @@ proof.
 - resource selector subset and intersection laws;
 - operation result-to-outcome mapping;
 - completion evaluation and evidence invalidation;
-- variant decrease and finite-budget consumption; and
+- match disjointness and exhaustiveness;
+- snapshot sealing, stable key uniqueness, and cardinality limits;
+- worklist monotonicity, admission limits, and epoch changes;
+- deterministic parallel joins and bounded child cancellation;
+- variant decrease, finite-budget consumption, and symbolic cost composition;
+- activation-limit exhaustion result mapping; and
 - exception binding and expiration.
 
 ### Compiler golden tests
@@ -779,6 +929,11 @@ Generate small workflow graphs and verify:
 
 - no proven-safe graph contains a reachable stuck state;
 - every termination-safe graph has no infinite abstract trace;
+- a proven `for_each` executes each sealed key at most its declared attempt
+  count regardless of scheduling;
+- a proven worklist never increases its remaining-admission measure or
+  resurrects a disposed key within an epoch;
+- the symbolic resource bound is never lower than a concrete generated trace;
 - scope intersection never widens authority;
 - adding a nested effect never reduces the parent envelope;
 - evidence-invalidating mutations prevent stale completion; and
@@ -789,7 +944,19 @@ Generate small workflow graphs and verify:
 Exercise:
 
 - deterministic success;
+- a documentation-only feature that skips irrelevant integration and security
+  branches through an exhaustive match;
+- a cross-boundary feature whose repository-derived plan contains multiple
+  change units and whose diff derives multiple verification obligations;
 - semantic repair followed by fresh validation;
+- a repair mutation that invalidates evidence and causes only affected
+  obligations to run in the next bounded epoch;
+- repeated model response failures, tool timeout, token exhaustion, and output
+  overflow, each reaching its declared exhaustion outcome without another
+  implicit activation;
+- an oversized or duplicate-key collection rejected before loop entry;
+- a review that keeps discovering findings and deterministically exhausts its
+  admission or epoch budget;
 - ineffective retry rejection;
 - nested transitive effect denial;
 - crash and reconciliation around a non-idempotent effect;
@@ -820,11 +987,23 @@ The first change set should remain intentionally narrow:
 This slice creates the architectural seam needed for later effect unification
 without attempting a repository-wide language migration in one PR.
 
+The first control-flow slice after that seam should add `MatchSpec`,
+`CollectionSnapshot`, and `ForEachSpec` only. Migrate one read-only discovery
+sequence and one validation-obligation loop, lower both forms into the existing
+CFG, and prove their case coverage and cardinality bounds. Add worklists,
+parallel joins, and epoch refresh only after snapshot semantics and durable item
+records are stable.
+
 ## What not to do
 
 - Do not build a second runtime inside the static analyzer.
 - Do not infer authoritative effects or completion from prompt prose.
 - Do not call a workflow safe because one successful path exists.
+- Do not claim general Turing completeness for the orchestration language while
+  also promising decidable termination for every accepted definition.
+- Do not encode live repository queries or model-selected `while` loops as
+  iterable collections.
+- Do not use a global timeout as a substitute for a control-termination proof.
 - Do not treat a warning baseline as a proof.
 - Do not require parents to restate every nested child action manually.
 - Do not use one global safety level to hide which properties are unknown.
@@ -841,7 +1020,13 @@ The implementation is complete when:
 - every executable operation has one static/runtime effect contract;
 - nested effects and resource scopes compose transitively;
 - completion depends on fresh structured evidence and obligations;
+- exhaustive branches and bounded repository-derived collections are
+  first-class compiled control forms;
 - every reachable cycle is proven terminating, explicitly bounded, or rejected;
+- every reachable LLM and operation activation has enforced local resource
+  limits and a typed exhaustion outcome;
+- certificates separately prove control termination and operation termination,
+  and report overall termination as their conjunction;
 - exceptions weaken only named guarantees within exact scope;
 - execution is bound to definition, dependency, manifest, and profile
   fingerprints; and

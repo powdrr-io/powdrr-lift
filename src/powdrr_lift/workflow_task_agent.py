@@ -13,6 +13,10 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from powdrr_lift.agent.provider_config import default_llm_mappings
+from powdrr_lift.agent.providers import (
+    LocalLlamaChatClient,
+    _estimate_message_tokens,
+)
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -56,13 +60,11 @@ from powdrr_lift.workflow_chat_agent import (
     GH_TOOL,
     GIT_TOOL,
     LLMModelMapping,
-    LocalLlamaChatClient,
     SkillCatalogEntry,
     _action_system_prompt,
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
-    _estimate_message_tokens,
     _execute_shell_tool,
     _find_skill_by_name,
     _interaction_style_prompt,
@@ -4802,7 +4804,7 @@ def _build_workflow_client_for_mapping(
     *,
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
-    from powdrr_lift.workflow_chat_agent import OpenAIChatClient
+    from powdrr_lift.agent.providers import OpenAIChatClient
 
     model = mapping.model
     if mapping.provider == "local":

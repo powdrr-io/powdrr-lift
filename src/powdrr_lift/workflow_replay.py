@@ -310,9 +310,9 @@ def render_skill_replay(
             f"has {current_step.id!r} at index {step_index}."
         )
 
+    from powdrr_lift.workflow_action_protocol import _parse_action_response
     from powdrr_lift.workflow_chat_agent import (
         _build_step_execution_messages,
-        _parse_action_response,
         _validate_coding_loop_action,
         _validate_workflow_action_for_step,
         _validate_workflow_step_transition,

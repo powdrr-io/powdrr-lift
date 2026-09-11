@@ -115,6 +115,11 @@ from powdrr_lift.workflow_action_validation import (
     _WorkflowStructuredDocumentError,
     _WorkflowToolValidationError,
 )
+from powdrr_lift.workflow_chat_actions import (
+    _handle_workflow_action_edit,
+    _handle_workflow_action_file_management,
+    _handle_workflow_action_read_document,
+)
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     LLMModelMapping,
@@ -125,9 +130,6 @@ from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
     _complete_json_with_model_fallback,
     _empty_pull_request_error,
-    _handle_workflow_action_edit,
-    _handle_workflow_action_file_management,
-    _handle_workflow_action_read_document,
     _latest_deterministic_pre_step,
     _load_workflow_context,
     _parse_json_object,

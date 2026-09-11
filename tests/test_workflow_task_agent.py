@@ -32,7 +32,6 @@ from powdrr_lift.core.spec_context import (
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
-    _action_system_prompt,
 )
 from powdrr_lift.workflow_git import (
     WorkflowGitInconsistency,
@@ -44,6 +43,7 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMHTTPError,
     complete_json_with_timeout_retry,
 )
+from powdrr_lift.workflow_prompting import _action_system_prompt
 from powdrr_lift.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_task_messages,

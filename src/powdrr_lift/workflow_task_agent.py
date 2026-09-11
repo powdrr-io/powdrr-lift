@@ -68,18 +68,15 @@ from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
     GH_TOOL,
     GIT_TOOL,
-    _action_system_prompt,
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
     _execute_shell_tool,
     _find_skill_by_name,
-    _interaction_style_prompt,
     _invalidate_deterministic_pre_step,
     _list_worktree_files,
     _maybe_record_llm_exchanges,
     _model_limits_for,
-    _modular_action_system_prompt,
     _print_waiting_for_model,
     _record_skill_pull_request,
     _require_coding_loop_verification,
@@ -87,12 +84,14 @@ from powdrr_lift.workflow_chat_agent import (
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
+    _step_actions,
     _step_index_by_id,
     _validate_coding_loop_action,
     _validate_internal_command,
     _validate_workflow_action_for_step,
     _validate_workflow_action_outputs,
     _validate_workflow_handoff,
+    _validation_gate_enabled,
     resolve_workflow_provider,
 )
 from powdrr_lift.workflow_error_logging import record_workflow_llm_error
@@ -155,6 +154,12 @@ from powdrr_lift.workflow_observer import (
 from powdrr_lift.workflow_paths import (
     resolve_project_root,
     resolve_worktree_file_path,
+)
+from powdrr_lift.workflow_prompting import (
+    _action_system_prompt,
+    _step_needs_prompt_catalog,
+    build_modular_action_system_prompt,
+    interaction_style_prompt,
 )
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 
@@ -3173,7 +3178,14 @@ def _task_system_prompt(
     *, task: WorkflowTask, interaction_style: str | None = None
 ) -> str:
     action_prompt = (
-        _modular_action_system_prompt(task, interaction_style=interaction_style)
+        build_modular_action_system_prompt(
+            task,
+            step_actions=_step_actions(task),
+            include_context=_step_needs_prompt_catalog(task, "context_types"),
+            include_skills=_step_needs_prompt_catalog(task, "skills"),
+            validation_gate_enabled=_validation_gate_enabled(task),
+            interaction_style=interaction_style,
+        )
         if task.actions_declared
         else _action_system_prompt()
     )
@@ -3198,7 +3210,7 @@ def _task_system_prompt(
         "tool's conventional --help option. Invoke that form when you need "
         "detailed parameters, examples, or usage "
         "guidance. A help response does not count as a successful task tool "
-        "invocation.\n" + _interaction_style_prompt(interaction_style)
+        "invocation.\n" + interaction_style_prompt(interaction_style)
     )
 
 

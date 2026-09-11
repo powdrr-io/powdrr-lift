@@ -81,7 +81,6 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatConfig,
     SkillChatEdit,
     _action_repair_prompt,
-    _action_system_prompt,
     _advance_predicated_step,
     _apply_file_edits,
     _apply_yaml_operations,
@@ -107,7 +106,6 @@ from powdrr_lift.workflow_chat_agent import (
     _LLMExchangeRecordingClient,
     _load_workflow_context,
     _match_work_item_names,
-    _modular_action_system_prompt,
     _normalize_cache_usage,
     _parse_action_response_with_schema,
     _parse_json_object,
@@ -162,8 +160,23 @@ from powdrr_lift.workflow_chat_agent import (
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
+from powdrr_lift.workflow_prompting import (
+    _action_system_prompt,
+    _step_needs_prompt_catalog,
+    build_modular_action_system_prompt,
+)
 
 # ruff: noqa: E501
+
+
+def _build_modular_prompt(step: SkillStep) -> str:
+    return build_modular_action_system_prompt(
+        step,
+        step_actions=_step_actions(step),
+        include_context=_step_needs_prompt_catalog(step, "context_types"),
+        include_skills=_step_needs_prompt_catalog(step, "skills"),
+        validation_gate_enabled=bool(getattr(step, "validation_gate", None)),
+    )
 
 
 def test_goto_step_action_requires_a_step_id() -> None:
@@ -481,7 +494,7 @@ def test_step_execution_prompt_includes_capability_catalogs_only_when_needed(
             ),
         ),
     )
-    output_prompt = _modular_action_system_prompt(output_step)
+    output_prompt = _build_modular_prompt(output_step)
     assert '"outputs"' in output_prompt
     assert '"work_item_name":"interaction-file-log"' in output_prompt
 
@@ -560,7 +573,7 @@ def test_execution_event_prompt_uses_only_current_step_events() -> None:
 
 
 def test_modular_action_prompt_requires_invoke_skill_for_nested_steps() -> None:
-    prompt = _modular_action_system_prompt(
+    prompt = _build_modular_prompt(
         SkillStep(
             description="Run the preparation skill.",
             uses_skill=SkillUsesSkill("finish-pr-prep"),
@@ -5410,7 +5423,7 @@ def test_prompt_user_repair_guidance_uses_text_and_current_step_shapes() -> None
 
 
 def test_modular_action_prompt_has_canonical_prompt_user_shape() -> None:
-    prompt = _modular_action_system_prompt(
+    prompt = _build_modular_prompt(
         SkillStep(
             description="Ask a question.",
             actions=("prompt_user",),
@@ -5432,7 +5445,7 @@ def test_validation_gate_prompt_requires_a_different_repair_strategy() -> None:
         validation_gate={"id": "yaml-checks"},
     )
 
-    prompt = _modular_action_system_prompt(step)
+    prompt = _build_modular_prompt(step)
 
     assert (
         "failed result is a diagnosis, not permission to repeat the same edit" in prompt

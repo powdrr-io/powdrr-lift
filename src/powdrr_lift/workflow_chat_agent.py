@@ -65,6 +65,7 @@ from powdrr_lift.agent.providers import (
     resolve_provider_credentials,
     resolve_provider_roles,
 )
+from powdrr_lift.agent.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -75,7 +76,6 @@ from powdrr_lift.builtin_tool_help import (
     builtin_tool_help,
 )
 from powdrr_lift.core import (
-    Skill,
     SkillToolInvocation,
     architecture_specification_default_output_path,
     build_skill_directory_validation_report,
@@ -249,12 +249,6 @@ _INTERACTION_STYLE_GUIDANCE: dict[str, str] = {
 
 
 @dataclass(frozen=True, slots=True)
-class SkillCatalogEntry:
-    path: Path
-    skill: Skill
-
-
-@dataclass(frozen=True, slots=True)
 class SkillChatConfig:
     skills_dir: Path
     repo_root: Path | None = None
@@ -305,27 +299,6 @@ class SkillChatSelection:
         return self.ready_to_execute
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowContext:
-    worktree_root: Path
-    branch_name: str | None = None
-    pr_number: int | None = None
-    pr_url: str | None = None
-    skill_name: str | None = None
-    request: str | None = None
-
-    def to_data(self) -> dict[str, object]:
-        return {
-            "worktree_root": str(self.worktree_root),
-            "branch_name": self.branch_name,
-            "pr_number": self.pr_number,
-            "pr_url": self.pr_url,
-            "skill_name": self.skill_name,
-            "request": self.request,
-        }
-
-
-WorkflowTemplateCatalogEntry = SkillCatalogEntry
 WorkflowChatConfig = SkillChatConfig
 WorkflowChatResult = SkillChatResult
 WorkflowChatSelection = SkillChatSelection

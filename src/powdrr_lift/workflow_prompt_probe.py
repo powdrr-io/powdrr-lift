@@ -14,6 +14,7 @@ import yaml
 
 from powdrr_lift.agent.provider_config import default_llm_mappings
 from powdrr_lift.agent.providers import resolve_provider_credentials
+from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.skill_specification import load_skill
 from powdrr_lift.core.workflow_task_specification import (
@@ -23,7 +24,6 @@ from powdrr_lift.core.workflow_task_specification import (
 )
 from powdrr_lift.core.workflow_template_specification import load_workflow_template
 from powdrr_lift.workflow_chat_agent import (
-    SkillCatalogEntry,
     _build_chat_client,
     _build_step_execution_messages,
     _parse_action_response_with_schema,

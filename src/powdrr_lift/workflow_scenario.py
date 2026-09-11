@@ -26,6 +26,7 @@ from powdrr_lift.agent.providers import (
     initial_model_for_provider,
     resolve_provider_credentials,
 )
+from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -43,7 +44,6 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
-    SkillCatalogEntry,
     SkillChatConfig,
     SkillChatSelection,
     _build_chat_client,

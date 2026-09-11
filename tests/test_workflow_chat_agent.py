@@ -42,6 +42,7 @@ from powdrr_lift.agent.providers import (
     resolve_provider_credentials,
     resolve_provider_roles,
 )
+from powdrr_lift.agent.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
     CodingLoopSpec,
@@ -71,10 +72,8 @@ from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
     LLMModelMapping,
     LLMProviderRoles,
-    SkillCatalogEntry,
     SkillChatConfig,
     SkillChatEdit,
-    WorkflowContext,
     _action_repair_prompt,
     _action_system_prompt,
     _advance_predicated_step,
@@ -7227,7 +7226,7 @@ def test_resolve_skill_path_accepts_missing_extension(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.workflow_chat_agent import SkillCatalogEntry
+    from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(
@@ -7246,7 +7245,7 @@ def test_resolve_skill_path_accepts_trailing_dot(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.workflow_chat_agent import SkillCatalogEntry
+    from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(

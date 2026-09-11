@@ -26,6 +26,7 @@ from powdrr_lift.agent.providers import (
     resolve_local_model_path,
     resolve_provider_credentials,
 )
+from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -66,7 +67,6 @@ from powdrr_lift.pr_workflow_record import (
 from powdrr_lift.workflow_chat_agent import (
     GH_TOOL,
     GIT_TOOL,
-    SkillCatalogEntry,
     _action_system_prompt,
     _apply_file_edits,
     _apply_yaml_operations,

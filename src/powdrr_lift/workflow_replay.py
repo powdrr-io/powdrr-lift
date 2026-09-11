@@ -310,8 +310,8 @@ def render_skill_replay(
             f"has {current_step.id!r} at index {step_index}."
         )
 
+    from powdrr_lift.agent.workflow_models import SkillCatalogEntry
     from powdrr_lift.workflow_chat_agent import (
-        SkillCatalogEntry,
         _build_step_execution_messages,
         _parse_action_response,
         _validate_coding_loop_action,

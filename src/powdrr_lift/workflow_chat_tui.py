@@ -17,8 +17,8 @@ from textual.containers import Horizontal, ScrollableContainer
 from textual.events import Key, Resize
 from textual.widgets import Label, ListItem, ListView, TextArea
 
+from powdrr_lift.agent.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_chat_agent import (
-    SkillCatalogEntry,
     WorkflowChatConfig,
     run_workflow_chat,
 )

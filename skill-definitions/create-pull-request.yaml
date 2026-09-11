@@ -48,28 +48,61 @@ steps:
     If a section does not apply, write Not applicable and why. Never leave a
     placeholder or claim an unrun check passed. Keep the completed body in
     workflow context and do not print it to the chat or status window.
-- description: Stage the exact files that belong in the pull request.
-  actions: [invoke_tool, edit, yaml_edit, delete_file, read_document]
+- description: Inspect repository state before staging the pull request.
+  actions: []
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Capture the current short repository status before any cleanup or staging.
+    Preserve the result in workflow context for the next step.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command: [git, status, --short]
+  outputs:
+  - name: repository_status_before_staging
+    type: any
+    required_for_next_step: true
+    schema: {type: string}
+- description: Remove unintended files before staging.
+  actions: [delete_file]
   step_type: governed
   llm_type: simple_task
   details: >-
-    Read the `files_to_publish` list from workflow context. It is authoritative
-    for this pull request. Verify every listed path exists or is an intended
-    new file, then invoke the intrinsic git tool with exactly those paths. The
-    exact action shape is
+    Compare the captured repository status with `files_to_publish`. If an
+    untracked or modified path is not in `files_to_publish`, delete exactly one
+    such path with {"action":"delete_file","file_path":"path/to/file"} and
+    verify the repository status before advancing. If no unintended path is
+    present, choose next_step. Do not stage files in this step.
+- description: Stage the exact files that belong in the pull request.
+  actions: [invoke_tool]
+  step_type: governed
+  llm_type: simple_task
+  details: >-
+    Invoke the intrinsic git tool exactly once with the authoritative
+    `files_to_publish` list. Use exactly
     {"action":"invoke_tool","tool":"git","parameters":{"operation":"add","paths":["path/to/file"]}}.
     Do not use `git add .`, `git add --all`, or stage logs, caches, or unrelated
-    files. If `git status --short` shows an untracked or modified path that is
-    not in `files_to_publish`, delete that path before staging. Delete it with
-    the dedicated delete action exactly as
-    {"action":"delete_file","file_path":"path/to/unintended-file"}.
-    Do not stage or preserve unintended diagnostic logs, generated artifacts,
-    or other files in the pull request. Verify the staged names with `git
-    diff --cached --name-only`; do not advance until every intended path is
-    staged and no unintended path is staged. This verification is mandatory
-    after every staging or cleanup action; never choose next_step immediately
-    after deleting an unintended file.
+    files.
   tool_invocation_packages: [git_readonly_and_additive]
+- description: Verify the staged pull request file set.
+  actions: []
+  step_type: invoke_tool
+  llm_type: simple_task
+  details: >-
+    Capture the staged file names after staging and preserve the result in
+    workflow context. The next step will verify it against `files_to_publish`.
+  pre_step:
+    action: invoke_tool
+    template:
+      tool: shell
+      command: [git, diff, --cached, --name-only]
+  outputs:
+  - name: staged_file_names
+    type: any
+    required_for_next_step: true
+    schema: {type: string}
 - description: Commit the validated changes.
   actions: [invoke_tool, edit, yaml_edit, delete_file, read_document]
   step_type: governed

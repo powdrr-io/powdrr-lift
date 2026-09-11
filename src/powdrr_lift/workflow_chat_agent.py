@@ -34,6 +34,10 @@ except ImportError:  # pragma: no cover - only used on non-POSIX platforms
     termios = None  # type: ignore[assignment]
     tty = None  # type: ignore[assignment]
 
+from powdrr_lift.agent.exchanges import (
+    ExchangeRecordingClient,
+    normalize_cache_usage,
+)
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -2403,112 +2407,6 @@ class WorkflowChatCredentials:
     base_url_source: str
 
 
-def _normalize_cache_usage(usage: Mapping[str, Any]) -> dict[str, int] | None:
-    """Normalize cache counters returned by OpenAI-compatible providers."""
-    prompt_tokens = usage.get("prompt_tokens")
-    prompt_details = usage.get("prompt_tokens_details")
-    if not isinstance(prompt_details, Mapping):
-        prompt_details = {}
-
-    cached_tokens = prompt_details.get("cached_tokens")
-    if not isinstance(cached_tokens, int):
-        cached_tokens = usage.get("prompt_cache_hit_tokens")
-    if not isinstance(cached_tokens, int):
-        cached_tokens = 0
-
-    cache_miss_tokens = usage.get("prompt_cache_miss_tokens")
-    if not isinstance(cache_miss_tokens, int):
-        cache_miss_tokens = (
-            prompt_tokens - cached_tokens if isinstance(prompt_tokens, int) else 0
-        )
-
-    cache_write_tokens = prompt_details.get("cache_write_tokens")
-    if not isinstance(cache_write_tokens, int):
-        cache_write_tokens = usage.get("cache_write_tokens")
-    if not isinstance(cache_write_tokens, int):
-        cache_write_tokens = 0
-
-    if not any((cached_tokens, cache_miss_tokens, cache_write_tokens)):
-        return None
-    return {
-        "prompt_tokens": prompt_tokens if isinstance(prompt_tokens, int) else 0,
-        "cached_tokens": cached_tokens,
-        "cache_miss_tokens": cache_miss_tokens,
-        "cache_write_tokens": cache_write_tokens,
-    }
-
-
-class _LLMExchangeRecordingClient:
-    """Record every LLM request and response in the active repository root."""
-
-    def __init__(self, client: WorkflowLLMClient, repo_root: Path) -> None:
-        self._client = client
-        self._repo_root = repo_root.expanduser().resolve()
-
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        try:
-            response = _request_json(
-                self._client, messages, response_schema=response_schema
-            )
-        except Exception as exc:
-            serialized_messages = _client_serialized_messages(
-                self._client,
-                messages,
-            )
-            self._write_exchange(
-                messages,
-                {
-                    "error": str(exc),
-                    "error_type": type(exc).__name__,
-                },
-                serialized_messages=serialized_messages,
-            )
-            raise
-        self._write_exchange(
-            messages,
-            response,
-            serialized_messages=_client_serialized_messages(self._client, messages),
-        )
-        return response
-
-    def _write_exchange(
-        self,
-        messages: list[dict[str, str]],
-        output: object,
-        *,
-        serialized_messages: str | None = None,
-    ) -> None:
-        timestamp = datetime.now(UTC)
-        timestamp_text = timestamp.strftime("%Y%m%d-%H%M%S-%f")
-        output_path = self._repo_root / f"llm-{timestamp_text}.json"
-        suffix = 1
-        while output_path.exists():
-            output_path = self._repo_root / f"llm-{timestamp_text}-{suffix}.json"
-            suffix += 1
-        serialized_messages = serialized_messages or _serialize_messages(messages)
-        exchange: dict[str, Any] = {
-            "timestamp": timestamp.isoformat(),
-            "output": output,
-        }
-        usage = getattr(self._client, "last_usage", None)
-        if isinstance(usage, Mapping):
-            cache_usage = _normalize_cache_usage(usage)
-            if cache_usage is not None:
-                exchange["usage"] = cache_usage
-        output_path.write_text(
-            _serialize_exchange(
-                exchange,
-                serialized_messages=serialized_messages,
-            ),
-            encoding="utf-8",
-        )
-
-
 def _maybe_record_llm_exchanges(
     client: WorkflowLLMClient,
     repo_root: Path,
@@ -2516,38 +2414,16 @@ def _maybe_record_llm_exchanges(
     """Apply exchange recording only while the hardcoded diagnostic flag is enabled."""
     if not _ENABLE_LLM_EXCHANGE_LOGGING:
         return client
-    return _LLMExchangeRecordingClient(client, repo_root)
+    return ExchangeRecordingClient(
+        client,
+        repo_root,
+        request_json=_request_json,
+    )
 
 
-def _serialize_exchange(
-    exchange: Mapping[str, Any],
-    *,
-    serialized_messages: str,
-) -> str:
-    """Serialize an exchange without encoding the large input twice."""
-    lines = [
-        "{",
-        f'  "timestamp": {json.dumps(exchange["timestamp"], ensure_ascii=False)},',
-        f'  "input": {serialized_messages},',
-        '  "output": ' + json.dumps(exchange["output"], indent=2, ensure_ascii=False),
-    ]
-    if "usage" in exchange:
-        lines[-1] += ","
-        lines.append(
-            '  "usage": ' + json.dumps(exchange["usage"], indent=2, ensure_ascii=False)
-        )
-    lines.append("}")
-    return "\n".join(lines) + "\n"
-
-
-def _client_serialized_messages(
-    client: object,
-    messages: list[dict[str, str]],
-) -> str:
-    serialized_messages = getattr(client, "last_serialized_messages", None)
-    if isinstance(serialized_messages, str):
-        return serialized_messages
-    return _serialize_messages(messages)
+# Compatibility names for existing scenario and unit-test seams.
+_LLMExchangeRecordingClient = ExchangeRecordingClient
+_normalize_cache_usage = normalize_cache_usage
 
 
 class OpenAIChatClient:

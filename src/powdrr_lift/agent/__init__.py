@@ -6,6 +6,7 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
+from powdrr_lift.agent.exchanges import ExchangeRecordingClient
 from powdrr_lift.agent.loop import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -40,6 +41,7 @@ from powdrr_lift.agent.runner import ProposalKernel, run_proposal_round
 __all__ = [
     "AgentClient",
     "AgentProposalError",
+    "ExchangeRecordingClient",
     "SchemaAwareWorkflowLLMClient",
     "WorkflowAction",
     "WorkflowActionObservation",

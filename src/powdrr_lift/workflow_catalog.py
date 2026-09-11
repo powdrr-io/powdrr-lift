@@ -7,7 +7,7 @@ from typing import TextIO
 
 from powdrr_lift.core import build_skill_directory_validation_report, load_skills
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workflow_models import SkillCatalogEntry
+from powdrr_lift.process.catalog import SkillCatalogEntry
 
 
 def load_skill_catalog(

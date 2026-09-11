@@ -18,6 +18,7 @@ from typing import Any, TextIO
 
 import yaml
 
+from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.agent.provider_config import (
     ZAI_LLM_MAPPINGS,
     LLMModelLimits,
@@ -48,6 +49,7 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import (
     execute_intrinsic_git_gh_tool,  # noqa: F401 - compatibility monkeypatch seam
 )
+from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workflow_action_catalog import (
     declared_action_names as _declared_action_names,
 )
@@ -162,7 +164,6 @@ from powdrr_lift.workflow_llm import (
 from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
-from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_observer import (
     ObserverActionRecommendation,
     ObserverDecision,

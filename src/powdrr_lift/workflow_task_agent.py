@@ -64,6 +64,7 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
+from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workflow_action_catalog import step_actions
 from powdrr_lift.workflow_action_operations import (
     _apply_file_edits,
@@ -144,7 +145,6 @@ from powdrr_lift.workflow_llm import (
     workflow_action_signature,
     workflow_action_summary,
 )
-from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_observer import (
     ObserverActionRecommendation,
     ObserverDecision,

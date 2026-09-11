@@ -19,6 +19,7 @@ from powdrr_lift.core import (
     system_map_specification_default_output_path,
     system_specification_default_output_path,
 )
+from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workflow_action_catalog import (
     DEFAULT_ACTION_INSTRUCTIONS as _DEFAULT_ACTION_INSTRUCTIONS,
 )
@@ -56,7 +57,6 @@ from powdrr_lift.workflow_llm import (
 from powdrr_lift.workflow_llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
-from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_paths import resolve_worktree_file_path
 from powdrr_lift.workflow_prompting import (
     _successful_document_reads_for_prompt,

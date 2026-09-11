@@ -25,6 +25,7 @@ from powdrr_lift.core.workflow_task_specification import (
     workflow_task_from_data,
 )
 from powdrr_lift.core.workflow_template_specification import load_workflow_template
+from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workflow_action_validation import (
     _parse_action_response_with_schema,
     _validate_workflow_action_for_step,
@@ -38,7 +39,6 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMClient,
     complete_json_with_timeout_retry,
 )
-from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 from powdrr_lift.workflow_task_agent import _build_task_messages
 

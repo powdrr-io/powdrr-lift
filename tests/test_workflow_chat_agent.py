@@ -16,6 +16,7 @@ from urllib.request import Request
 import pytest
 import yaml
 
+from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.agent.exchanges import (
     ExchangeRecordingClient,
     normalize_cache_usage,
@@ -75,6 +76,7 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
+from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.test_failure_packet import build_test_failure_packet
 from powdrr_lift.workflow_action_catalog import (
     recovery_tool_invocations as _recovery_tool_invocations,
@@ -178,7 +180,6 @@ from powdrr_lift.workflow_execution_state import (
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 from powdrr_lift.workflow_llm import WorkflowEdit as SkillChatEdit
-from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
 from powdrr_lift.workflow_prompting import (
     _action_system_prompt,
@@ -7271,7 +7272,7 @@ def test_resolve_skill_path_accepts_missing_extension(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.workflow_models import SkillCatalogEntry
+    from powdrr_lift.process.catalog import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(
@@ -7290,7 +7291,7 @@ def test_resolve_skill_path_accepts_trailing_dot(
     skills_dir.mkdir()
     skill_path = skills_dir / "specify-a-feature.json"
     save_skill(_build_skill(), skill_path)
-    from powdrr_lift.workflow_models import SkillCatalogEntry
+    from powdrr_lift.process.catalog import SkillCatalogEntry
 
     catalog = (
         SkillCatalogEntry(

@@ -9,3 +9,7 @@ The current workflow-definition modules are being migrated here incrementally.
 New process-language APIs belong in this package; this marker is intentionally
 small until each implementation has a clean ownership boundary.
 """
+
+from powdrr_lift.process.catalog import SkillCatalogEntry, WorkflowTemplateCatalogEntry
+
+__all__ = ["SkillCatalogEntry", "WorkflowTemplateCatalogEntry"]

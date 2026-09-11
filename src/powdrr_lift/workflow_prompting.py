@@ -82,6 +82,54 @@ def _current_file_context(
     return context
 
 
+def _workflow_handoff_inputs(
+    step: Any,
+    records: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "declared": [input_spec.to_data() for input_spec in step.inputs],
+        "resolved": {
+            input_spec.name: records[input_spec.name]
+            for input_spec in step.inputs
+            if input_spec.name in records
+        },
+        "missing_required": [
+            input_spec.name
+            for input_spec in step.inputs
+            if input_spec.required and input_spec.name not in records
+        ],
+    }
+
+
+def _skill_step_to_data(step: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "description": step.description,
+        "step_type": getattr(step, "step_type", "governed"),
+        "details": step.details,
+        "uses_skill": (
+            step.uses_skill.to_data()
+            if getattr(step, "uses_skill", None) is not None
+            else None
+        ),
+    }
+    if step.id is not None:
+        data["id"] = step.id
+    if step.tool_invocations:
+        data["tool_invocations"] = [
+            _tool_invocation_to_data(tool_invocation)
+            for tool_invocation in step.tool_invocations
+        ]
+    if getattr(step, "pre_step", None) is not None:
+        data["pre_step"] = step.pre_step.to_data()
+    if getattr(step, "coding_loop", None) is not None:
+        data["coding_loop"] = step.coding_loop.to_data()
+    return data
+
+
+def _tool_invocation_to_data(tool_invocation: Any) -> dict[str, Any]:
+    return tool_invocation.to_data()
+
+
 def _workflow_context_prompt_data(
     workflow_context: WorkflowContext | None,
 ) -> dict[str, object] | None:

@@ -204,9 +204,12 @@ from powdrr_lift.workflow_prompting import (
     _prompt_durable_facts,
     _prompt_step_context,
     _prompt_transcript,
+    _skill_step_to_data,
     _step_needs_prompt_catalog,
     _successful_document_reads_for_prompt,
+    _tool_invocation_to_data,
     _workflow_context_prompt_data,
+    _workflow_handoff_inputs,
     build_modular_action_system_prompt,
     interaction_style_prompt,
 )
@@ -6083,25 +6086,6 @@ def _record_runtime_readiness_from_pre_step(
     )
 
 
-def _workflow_handoff_inputs(
-    step: Any,
-    records: Mapping[str, Mapping[str, Any]],
-) -> dict[str, Any]:
-    return {
-        "declared": [input_spec.to_data() for input_spec in step.inputs],
-        "resolved": {
-            input_spec.name: records[input_spec.name]
-            for input_spec in step.inputs
-            if input_spec.name in records
-        },
-        "missing_required": [
-            input_spec.name
-            for input_spec in step.inputs
-            if input_spec.required and input_spec.name not in records
-        ],
-    }
-
-
 def _workflow_context_handoff_records(
     workflow_context: WorkflowContext | None,
 ) -> dict[str, dict[str, Any]]:
@@ -7346,35 +7330,6 @@ def _validate_internal_command(command: object) -> None:
         raise PowdrrExecutionError(
             "The internal tool may invoke only the powdrr-lift binary."
         )
-
-
-def _skill_step_to_data(step: Any) -> dict[str, Any]:
-    data: dict[str, Any] = {
-        "description": step.description,
-        "step_type": getattr(step, "step_type", "governed"),
-        "details": step.details,
-        "uses_skill": (
-            step.uses_skill.to_data()
-            if getattr(step, "uses_skill", None) is not None
-            else None
-        ),
-    }
-    if step.id is not None:
-        data["id"] = step.id
-    if step.tool_invocations:
-        data["tool_invocations"] = [
-            _tool_invocation_to_data(tool_invocation)
-            for tool_invocation in step.tool_invocations
-        ]
-    if getattr(step, "pre_step", None) is not None:
-        data["pre_step"] = step.pre_step.to_data()
-    if getattr(step, "coding_loop", None) is not None:
-        data["coding_loop"] = step.coding_loop.to_data()
-    return data
-
-
-def _tool_invocation_to_data(tool_invocation: Any) -> dict[str, Any]:
-    return tool_invocation.to_data()
 
 
 def _required_shell_command_item(value: object) -> str:

@@ -136,7 +136,6 @@ from powdrr_lift.workflow_chat_agent import (
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
-    _workflow_handoff_inputs,
     _WorkflowEditRangeError,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
@@ -163,6 +162,7 @@ from powdrr_lift.workflow_prompting import (
     _prompt_step_context,
     _prompt_transcript,
     _step_needs_prompt_catalog,
+    _workflow_handoff_inputs,
     build_modular_action_system_prompt,
 )
 

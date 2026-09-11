@@ -16,6 +16,10 @@ from urllib.request import Request
 import pytest
 import yaml
 
+from powdrr_lift.agent.exchanges import (
+    ExchangeRecordingClient,
+    normalize_cache_usage,
+)
 from powdrr_lift.agent.provider_config import (
     ALL_LLM_TYPES,
     ALL_PROVIDERS,
@@ -104,9 +108,7 @@ from powdrr_lift.workflow_chat_agent import (
     _handle_workflow_action_file_management,
     _handle_workflow_action_read_document,
     _latest_deterministic_pre_step,
-    _LLMExchangeRecordingClient,
     _load_workflow_context,
-    _normalize_cache_usage,
     _parse_action_response_with_schema,
     _parse_json_object,
     _predicated_step_complete,
@@ -2678,7 +2680,7 @@ def test_llm_exchange_recorder_writes_input_and_output_json(
             assert response_schema == {"type": "object"}
             return {"action": "complete", "text": "done"}
 
-    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder = ExchangeRecordingClient(_FakeClient(), tmp_path)
 
     assert recorder.complete_json(
         [{"role": "user", "content": "request"}],
@@ -2719,7 +2721,7 @@ def test_llm_exchange_recorder_reuses_client_serialized_messages(
             assert messages == [{"role": "user", "content": "request"}]
             return {"action": "complete"}
 
-    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder = ExchangeRecordingClient(_FakeClient(), tmp_path)
     recorder.complete_json([{"role": "user", "content": "request"}])
 
     exchange = json.loads(next(tmp_path.glob("llm-*.json")).read_text())
@@ -2898,7 +2900,7 @@ def test_active_response_schema_rejects_unknown_envelope_fields() -> None:
 
 
 def test_normalize_cache_usage_supports_provider_formats() -> None:
-    assert _normalize_cache_usage(
+    assert normalize_cache_usage(
         {
             "prompt_tokens": 2000,
             "prompt_tokens_details": {
@@ -2912,7 +2914,7 @@ def test_normalize_cache_usage_supports_provider_formats() -> None:
         "cache_miss_tokens": 500,
         "cache_write_tokens": 0,
     }
-    assert _normalize_cache_usage(
+    assert normalize_cache_usage(
         {
             "prompt_tokens": 2000,
             "prompt_cache_hit_tokens": 1800,
@@ -2938,7 +2940,7 @@ def test_llm_exchange_recorder_includes_normalized_cache_usage(
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
             return {"action": "complete"}
 
-    recorder = _LLMExchangeRecordingClient(_FakeClient(), tmp_path)
+    recorder = ExchangeRecordingClient(_FakeClient(), tmp_path)
     recorder.complete_json([{"role": "user", "content": "request"}])
 
     exchange = json.loads(next(tmp_path.glob("llm-*.json")).read_text())

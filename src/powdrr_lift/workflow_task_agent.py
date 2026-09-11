@@ -76,7 +76,6 @@ from powdrr_lift.workflow_chat_agent import (
     _find_skill_by_name,
     _invalidate_deterministic_pre_step,
     _list_worktree_files,
-    _maybe_record_llm_exchanges,
     _model_limits_for,
     _print_waiting_for_model,
     _record_skill_pull_request,
@@ -161,6 +160,7 @@ from powdrr_lift.workflow_prompting import (
     build_modular_action_system_prompt,
     interaction_style_prompt,
 )
+from powdrr_lift.workflow_provider_runtime import maybe_record_llm_exchanges
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
@@ -1935,7 +1935,7 @@ def run_workflow_task(
                 )
         if config.verbose:
             task_client = _WorkflowTaskDisplayClient(task_client, stderr=stderr)
-        task_client = _maybe_record_llm_exchanges(task_client, dump_root)
+        task_client = maybe_record_llm_exchanges(task_client, dump_root)
         compaction_client = task_client
         long_context_backup = long_context_backup_for(model, mappings)
         if not client_was_provided and long_context_backup is not None:
@@ -1949,7 +1949,7 @@ def run_workflow_task(
                     backup_client,
                     stderr=stderr,
                 )
-            compaction_client = _maybe_record_llm_exchanges(backup_client, dump_root)
+            compaction_client = maybe_record_llm_exchanges(backup_client, dump_root)
 
         driver_events: list[dict[str, Any]] = []
         with runtime.without_action_contract():
@@ -2004,7 +2004,7 @@ def run_workflow_task(
         # task agent receives them.  Production runs construct both clients
         # and continue to enable the observer normally.
         if observer_mapping is not None and not client_was_provided:
-            observer_client = _maybe_record_llm_exchanges(
+            observer_client = maybe_record_llm_exchanges(
                 _build_workflow_client_for_mapping(
                     config,
                     task,

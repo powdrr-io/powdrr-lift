@@ -26,7 +26,10 @@ from powdrr_lift.agent.actions import (
 from powdrr_lift.agent.loop import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
-    WorkflowActionRequest,
+    WorkflowActionProgressStrategy,
+    WorkflowActionRequest,  # noqa: F401 - compatibility export
+    WorkflowExecutionObserver,
+    WorkflowExecutionStrategy,
 )
 from powdrr_lift.agent.progress import (
     ProgressDecision,
@@ -79,7 +82,6 @@ class WorkflowLLMExecutionAborted(ExecutionCancelled):
 
 
 ActionT = TypeVar("ActionT")
-StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
 _MAX_PROMPT_EVENT_CHARS = 8_000
 _PROMPT_SIZE_CHARS_PER_TOKEN = 3
@@ -788,72 +790,6 @@ def complete_json_with_timeout_retry(
                 flush=True,
             )
             time.sleep(delay_seconds)
-
-
-class WorkflowActionProgressStrategy(Protocol[StrategyActionT]):
-    """Adapter hooks for state snapshots and runner-specific reporting."""
-
-    def material_state(self, action: StrategyActionT) -> object: ...
-
-    def record_no_progress(
-        self,
-        action: StrategyActionT,
-        observation: WorkflowActionObservation,
-    ) -> None: ...
-
-
-class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):
-    """Boundary between the shared execution loop and its presentation mode.
-
-    A strategy owns only its input/output boundary: building the current
-    context, presenting status, and translating terminal or human-input
-    actions into its native outcome.  The shared driver owns roundtrips,
-    parsing, timeout handling, action-failure accounting, and no-progress
-    correction.
-    """
-
-    def next_request(self) -> WorkflowActionRequest | None: ...
-
-    def report_roundtrip(self, roundtrip: int, action: Any) -> None:
-        """Present one parsed LLM action; adapters may leave this as a no-op."""
-        _ = roundtrip, action
-
-    def execute_action(self, action: Any) -> WorkflowActionOutcome: ...
-
-    def record_response_error(
-        self,
-        error: RuntimeError,
-        payload: dict[str, Any] | None,
-    ) -> None: ...
-
-    def record_action_error(self, action: Any, error: Exception) -> None: ...
-
-    def action_failure_exit_code(self, action: Any) -> int | None: ...
-
-    def observe_outcome(
-        self,
-        action: Any,
-        observation: WorkflowActionObservation,
-        outcome: WorkflowActionOutcome,
-    ) -> WorkflowActionOutcome: ...
-
-    def exhausted_roundtrips_exit_code(self) -> int: ...
-
-
-class WorkflowExecutionObserver(Protocol):
-    """Optional, failure-isolated observer of shared execution boundaries."""
-
-    def response_failed(self, error: Exception) -> Any: ...
-
-    def action_failed(self, action: Any, error: Exception) -> Any: ...
-
-    def action_proposed(self, action: Any) -> Any: ...
-
-    def action_completed(
-        self,
-        action: Any,
-        observation: WorkflowActionObservation,
-    ) -> Any: ...
 
 
 def _coding_loop_spec(strategy: Any) -> Any | None:

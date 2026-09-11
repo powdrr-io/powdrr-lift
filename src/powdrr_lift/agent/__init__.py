@@ -9,7 +9,10 @@ from powdrr_lift.agent.actions import (
 from powdrr_lift.agent.loop import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
+    WorkflowActionProgressStrategy,
     WorkflowActionRequest,
+    WorkflowExecutionObserver,
+    WorkflowExecutionStrategy,
 )
 from powdrr_lift.agent.progress import (
     ProgressDecision,
@@ -41,6 +44,7 @@ __all__ = [
     "WorkflowAction",
     "WorkflowActionObservation",
     "WorkflowActionOutcome",
+    "WorkflowActionProgressStrategy",
     "WorkflowActionRequest",
     "WorkflowEdit",
     "WorkflowFileEdits",
@@ -59,4 +63,6 @@ __all__ = [
     "no_progress_feedback",
     "run_proposal_round",
     "WorkflowExecutionController",
+    "WorkflowExecutionObserver",
+    "WorkflowExecutionStrategy",
 ]

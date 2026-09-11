@@ -26,11 +26,16 @@ from powdrr_lift.agent.actions import (
 from powdrr_lift.agent.loop import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
+    WorkflowActionRequest,
 )
 from powdrr_lift.agent.progress import (
     ProgressDecision,
     WorkflowExecutionController,
     no_progress_feedback,
+)
+from powdrr_lift.agent.protocol import (
+    SchemaAwareWorkflowLLMClient,  # noqa: F401 - compatibility export
+    WorkflowLLMClient,  # noqa: F401 - compatibility export
 )
 from powdrr_lift.agent.repair import (
     RepairContext,
@@ -51,23 +56,6 @@ from powdrr_lift.errors import (
 )
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.runtime import ExecutionRuntime
-
-
-class WorkflowLLMClient(Protocol):
-    """Minimal provider surface used by every workflow runner."""
-
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
-
-
-class SchemaAwareWorkflowLLMClient(Protocol):
-    """Optional provider surface for strict workflow action schemas."""
-
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]: ...
 
 
 class WorkflowLLMTimeoutExhausted(ProviderExecutionError):
@@ -812,26 +800,6 @@ class WorkflowActionProgressStrategy(Protocol[StrategyActionT]):
         action: StrategyActionT,
         observation: WorkflowActionObservation,
     ) -> None: ...
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowActionRequest:
-    """One fully specified request for the next workflow action.
-
-    The runner owns the LLM exchange.  Adapters only provide the current
-    context and the parser appropriate for their durable or interactive
-    boundary.
-    """
-
-    client: WorkflowLLMClient
-    messages: list[dict[str, str]]
-    parser: Callable[[dict[str, Any]], Any]
-    model: str
-    stderr: Any
-    max_timeout_retries: int
-    timeout_backoff_seconds: float
-    response_schema: Mapping[str, Any] | None = None
-    request_action: Callable[[], Any] | None = None
 
 
 class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):

@@ -6,13 +6,22 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
-from powdrr_lift.agent.loop import WorkflowActionObservation, WorkflowActionOutcome
+from powdrr_lift.agent.loop import (
+    WorkflowActionObservation,
+    WorkflowActionOutcome,
+    WorkflowActionRequest,
+)
 from powdrr_lift.agent.progress import (
     ProgressDecision,
     WorkflowExecutionController,
     no_progress_feedback,
 )
-from powdrr_lift.agent.protocol import AgentClient, AgentProposalError
+from powdrr_lift.agent.protocol import (
+    AgentClient,
+    AgentProposalError,
+    SchemaAwareWorkflowLLMClient,
+    WorkflowLLMClient,
+)
 from powdrr_lift.agent.repair import (
     RepairContext,
     RepairDirective,
@@ -28,11 +37,14 @@ from powdrr_lift.agent.runner import ProposalKernel, run_proposal_round
 __all__ = [
     "AgentClient",
     "AgentProposalError",
+    "SchemaAwareWorkflowLLMClient",
     "WorkflowAction",
     "WorkflowActionObservation",
     "WorkflowActionOutcome",
+    "WorkflowActionRequest",
     "WorkflowEdit",
     "WorkflowFileEdits",
+    "WorkflowLLMClient",
     "WorkflowYamlOperation",
     "ProposalKernel",
     "ProgressDecision",

@@ -73,7 +73,6 @@ from powdrr_lift.builtin_tool_help import (
     builtin_tool_help,
 )
 from powdrr_lift.core import (
-    SkillToolInvocation,
     architecture_specification_default_output_path,
     codebase_state_default_output_path,
     current_state_specification_default_output_path,
@@ -130,6 +129,18 @@ from powdrr_lift.pr_workflow_record import (
     is_pull_request_create_command,
     pull_request_number,
     record_pull_request_workflow,
+)
+from powdrr_lift.workflow_action_catalog import (
+    DEFAULT_ACTION_INSTRUCTIONS as _DEFAULT_ACTION_INSTRUCTIONS,
+)
+from powdrr_lift.workflow_action_catalog import (
+    declared_action_names as _declared_action_names,
+)
+from powdrr_lift.workflow_action_catalog import (
+    recovery_tool_invocations as _recovery_tool_invocations,
+)
+from powdrr_lift.workflow_action_catalog import (
+    step_actions as _step_actions,
 )
 from powdrr_lift.workflow_action_protocol import _parse_action_response
 from powdrr_lift.workflow_catalog import load_skill_catalog
@@ -8789,200 +8800,6 @@ def _json_schema_for_declared_type(type_name: str) -> dict[str, Any]:
     if normalized in {"string", "array", "object", "integer", "number", "boolean"}:
         return {"type": normalized}
     return {}
-
-
-_DEFAULT_ACTION_INSTRUCTIONS = {
-    "gather_context": "Discover checked-in specifications relevant to this step.",
-    "prompt_user": "Ask one necessary human question.",
-    "edit": "Apply a known line-based change to a file.",
-    "yaml_edit": "Apply a structural change to a YAML file.",
-    "file_management": "Move or rename one relative file.",
-    "delete_file": "Delete one relative file using file_path.",
-    "invoke_skill": "Run one listed nested skill.",
-    "invoke_tool": "Run one command declared by this step.",
-    "read_document": "Read a bounded range from a known document.",
-    "list_files": "Discover exact file paths.",
-    "goto_step": "Repeat one declared prior step when another pass is needed.",
-    "next_step": "Advance after this step is complete.",
-    "emit_outputs": "Publish the completed outputs for a predicated step.",
-    "complete": "End the skill after all work is finished.",
-}
-
-
-def _step_actions(
-    step: Any,
-    *,
-    execution_events: Sequence[Mapping[str, Any]] = (),
-    step_index: int | None = None,
-) -> tuple[tuple[str, str], ...]:
-    """Return declared actions plus the universal prompt and advance actions."""
-    behavior = behavior_for_step(step)
-    completion = None
-    context_complete = False
-    recovery_invocations = _recovery_tool_invocations(
-        step, execution_events, step_index
-    )
-    declared = tuple(getattr(step, "actions", ()) or ())
-    if declared or getattr(step, "actions_declared", False):
-        actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in declared]
-    else:
-        # Older skill definitions may omit an explicit action catalog. Infer the
-        # available actions from their declared capabilities until those definitions
-        # are migrated to the explicit per-step contract.
-        names: list[str] = []
-        if (
-            getattr(step, "details", None)
-            or getattr(step, "tool_invocations", ())
-            or getattr(step, "uses_skill", None)
-        ):
-            names.extend(
-                [
-                    "gather_context",
-                    "edit",
-                    "yaml_edit",
-                    "file_management",
-                    "delete_file",
-                    "read_document",
-                    "prompt_user",
-                ]
-            )
-        else:
-            names.append("invoke_skill")
-        if getattr(step, "tool_invocations", ()):
-            names.insert(0, "invoke_tool")
-        if getattr(step, "uses_skill", None):
-            names.insert(0, "invoke_skill")
-        if _validation_gate_enabled(step):
-            names = [
-                "invoke_tool",
-                "edit",
-                "yaml_edit",
-                "file_management",
-                "delete_file",
-                "prompt_user",
-            ]
-        if not behavior.invokes_llm:
-            names = []
-        actions = [(name, _DEFAULT_ACTION_INSTRUCTIONS[name]) for name in names]
-    if recovery_invocations and not any(name == "invoke_tool" for name, _ in actions):
-        actions.insert(0, ("invoke_tool", _DEFAULT_ACTION_INSTRUCTIONS["invoke_tool"]))
-    if behavior.is_predicated:
-        completion = getattr(step, "completion", None)
-        context_complete = (
-            completion is not None
-            and step_index is not None
-            and _predicated_context_complete(step, execution_events, step_index)
-        )
-        if completion is not None and completion.required_actions:
-            if context_complete:
-                actions = [
-                    ("emit_outputs", _DEFAULT_ACTION_INSTRUCTIONS["emit_outputs"])
-                ]
-        else:
-            actions.append(
-                ("emit_outputs", _DEFAULT_ACTION_INSTRUCTIONS["emit_outputs"])
-            )
-        action_names = {name for name, _ in actions}
-    else:
-        action_names = {name for name, _ in actions}
-    if "prompt_user" not in action_names and not (
-        behavior.is_predicated
-        and completion is not None
-        and completion.required_actions
-        and context_complete
-    ):
-        actions.append(("prompt_user", "Ask one necessary human question."))
-    if "next_step" not in action_names and not behavior.is_predicated:
-        actions.append(("next_step", "Advance only after this step is complete."))
-    outputs = tuple(
-        output
-        for output in (getattr(step, "outputs", ()) or ())
-        if getattr(output, "required_for_next_step", False)
-    )
-    if outputs:
-        suffix = (
-            " Include outputs: " + ", ".join(output.name for output in outputs) + "."
-        )
-        actions = [
-            (name, instructions + suffix if name == "next_step" else instructions)
-            for name, instructions in actions
-        ]
-    return tuple(actions)
-
-
-def _predicated_context_complete(
-    step: Any, execution_events: Sequence[Mapping[str, Any]], step_index: int
-) -> bool:
-    completion = getattr(step, "completion", None)
-    if completion is None or not completion.required_actions:
-        return False
-    for requirement in completion.required_actions:
-        matching = [
-            event
-            for event in execution_events
-            if event.get("step_index") == step_index
-            and event.get("kind") == requirement.action
-            and all(
-                _predicated_parameter_matches(event.get(name), value, name)
-                for name, value in (requirement.parameters or {}).items()
-            )
-        ]
-        if requirement.exactly is not None and len(matching) != requirement.exactly:
-            return False
-        if not matching:
-            return False
-    return True
-
-
-def _declared_action_names(
-    step: Any,
-    *,
-    execution_events: Sequence[Mapping[str, Any]] = (),
-    step_index: int | None = None,
-) -> tuple[str, ...]:
-    # next_step is an implicit runtime action; its output-specific guidance is
-    # rendered only when the step declares required handoff outputs.
-    behavior = behavior_for_step(step)
-    names = [
-        name
-        for name, _ in _step_actions(
-            step, execution_events=execution_events, step_index=step_index
-        )
-    ]
-    if "next_step" not in names and not behavior.is_predicated:
-        names.append("next_step")
-    return tuple(names)
-
-
-def _recovery_tool_invocations(
-    step: Any,
-    execution_events: Sequence[Mapping[str, Any]],
-    step_index: int | None,
-) -> tuple[SkillToolInvocation, ...]:
-    """Return bounded diagnostics/corrections after a tool failure in this step."""
-    if step_index is None or not any(
-        event.get("step_index") == step_index
-        and event.get("kind") in {"action_error", "tool_error"}
-        for event in execution_events
-    ):
-        return ()
-    if not any(
-        invocation.tool in {"shell", GIT_TOOL} for invocation in step.tool_invocations
-    ):
-        return ()
-    commands = (
-        ("git", "status", "--short"),
-        ("git", "diff", "--cached", "--stat"),
-        ("git", "diff", "--cached", "--name-only"),
-        ("git", "add", "<files-to-stage>"),
-        ("git", "commit", "-m", "<commit-message>"),
-    )
-    declared = {invocation.command for invocation in step.tool_invocations}
-    return tuple(
-        SkillToolInvocation(tool="shell", command=command, label="recovery")
-        for command in commands
-        if command not in declared
-    )
 
 
 def _is_infrastructure_tool_failure(error: str | None) -> bool:

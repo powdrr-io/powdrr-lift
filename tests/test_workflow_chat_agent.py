@@ -68,6 +68,12 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.test_failure_packet import build_test_failure_packet
+from powdrr_lift.workflow_action_catalog import (
+    recovery_tool_invocations as _recovery_tool_invocations,
+)
+from powdrr_lift.workflow_action_catalog import (
+    step_actions as _step_actions,
+)
 from powdrr_lift.workflow_action_protocol import (
     _parse_action_response,
     _parse_workflow_action_delete_file,
@@ -107,7 +113,6 @@ from powdrr_lift.workflow_chat_agent import (
     _prompt_user,
     _record_durable_fact,
     _record_dynamic_validation_result,
-    _recovery_tool_invocations,
     _repair_response_fingerprint,
     _require_coding_loop_verification,
     _resolve_skill_path,
@@ -117,7 +122,6 @@ from powdrr_lift.workflow_chat_agent import (
     _run_deterministic_pre_step,
     _run_gate,
     _step_action_response_schema,
-    _step_actions,
     _validate_coding_loop_action,
     _validate_dynamic_validation_gate_action,
     _validate_internal_command,

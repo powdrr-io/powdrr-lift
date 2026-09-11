@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -80,6 +81,66 @@ def _current_file_context(
         cache.clear()
         cache[cache_key] = context
     return context
+
+
+def _available_work_item_names(worktree_root: Path) -> tuple[str, ...]:
+    specifications_root = worktree_root / "docs" / "proposals"
+    if not specifications_root.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            path.name
+            for path in specifications_root.iterdir()
+            if path.is_dir() and not path.name.startswith(".")
+        )
+    )
+
+
+def _available_work_item_documents(
+    worktree_root: Path,
+    work_item_name: str,
+) -> tuple[str, ...]:
+    work_item_root = worktree_root / "docs" / "proposals" / work_item_name
+    if not work_item_root.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            str(path.relative_to(worktree_root))
+            for path in work_item_root.rglob("*")
+            if path.is_file()
+        )
+    )
+
+
+def _match_work_item_names(
+    transcript: Sequence[dict[str, str]],
+    work_item_names: Sequence[str],
+) -> tuple[str, ...]:
+    request_text = " ".join(
+        message.get("content", "")
+        for message in transcript
+        if message.get("role") == "user"
+    )
+    request_tokens = _work_item_name_tokens(request_text)
+    matches: list[str] = []
+    for work_item_name in work_item_names:
+        name_tokens = _work_item_name_tokens(work_item_name)
+        if not name_tokens:
+            continue
+        token_count = len(name_tokens)
+        contiguous_match = any(
+            request_tokens[index : index + token_count] == name_tokens
+            for index in range(len(request_tokens) - token_count + 1)
+        )
+        if contiguous_match or (
+            token_count > 1 and all(token in request_tokens for token in name_tokens)
+        ):
+            matches.append(work_item_name)
+    return tuple(matches)
+
+
+def _work_item_name_tokens(value: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9]+", value.casefold()))
 
 
 def _workflow_handoff_inputs(

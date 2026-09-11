@@ -197,10 +197,12 @@ from powdrr_lift.workflow_paths import (
     resolve_worktree_file_path,
 )
 from powdrr_lift.workflow_prompting import (
+    _available_work_item_names,
     _context_type_catalog,
     _current_file_context,
     _execution_events_for_prompt,
     _latest_execution_event_for_prompt,
+    _match_work_item_names,
     _prompt_durable_facts,
     _prompt_step_context,
     _prompt_transcript,
@@ -2845,19 +2847,6 @@ def _resolve_template_path(
     return _resolve_skill_path(template_path_value, catalog)
 
 
-def _available_work_item_names(worktree_root: Path) -> tuple[str, ...]:
-    specifications_root = worktree_root / "docs" / "proposals"
-    if not specifications_root.is_dir():
-        return ()
-    return tuple(
-        sorted(
-            path.name
-            for path in specifications_root.iterdir()
-            if path.is_dir() and not path.name.startswith(".")
-        )
-    )
-
-
 def _available_work_item_documents(
     worktree_root: Path,
     work_item_name: str,
@@ -2872,37 +2861,6 @@ def _available_work_item_documents(
             if path.is_file()
         )
     )
-
-
-def _match_work_item_names(
-    transcript: Sequence[dict[str, str]],
-    work_item_names: Sequence[str],
-) -> tuple[str, ...]:
-    request_text = " ".join(
-        message.get("content", "")
-        for message in transcript
-        if message.get("role") == "user"
-    )
-    request_tokens = _work_item_name_tokens(request_text)
-    matches: list[str] = []
-    for work_item_name in work_item_names:
-        name_tokens = _work_item_name_tokens(work_item_name)
-        if not name_tokens:
-            continue
-        token_count = len(name_tokens)
-        contiguous_match = any(
-            request_tokens[index : index + token_count] == name_tokens
-            for index in range(len(request_tokens) - token_count + 1)
-        )
-        if contiguous_match or (
-            token_count > 1 and all(token in request_tokens for token in name_tokens)
-        ):
-            matches.append(work_item_name)
-    return tuple(matches)
-
-
-def _work_item_name_tokens(value: str) -> tuple[str, ...]:
-    return tuple(re.findall(r"[a-z0-9]+", value.casefold()))
 
 
 def _normalize_skill_path_value(value: str) -> str:

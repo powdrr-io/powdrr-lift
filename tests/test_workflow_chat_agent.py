@@ -85,7 +85,6 @@ from powdrr_lift.workflow_chat_agent import (
     _apply_file_edits,
     _apply_yaml_operations,
     _available_work_item_documents,
-    _available_work_item_names,
     _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
@@ -102,7 +101,6 @@ from powdrr_lift.workflow_chat_agent import (
     _latest_deterministic_pre_step,
     _LLMExchangeRecordingClient,
     _load_workflow_context,
-    _match_work_item_names,
     _normalize_cache_usage,
     _parse_action_response_with_schema,
     _parse_json_object,
@@ -155,9 +153,11 @@ from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
 from powdrr_lift.workflow_prompting import (
     _action_system_prompt,
+    _available_work_item_names,
     _current_file_context,
     _execution_events_for_prompt,
     _latest_execution_event_for_prompt,
+    _match_work_item_names,
     _prompt_durable_facts,
     _prompt_step_context,
     _prompt_transcript,

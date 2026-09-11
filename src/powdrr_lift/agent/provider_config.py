@@ -52,6 +52,8 @@ class LLMProviderDefinition:
 
 
 MAX_COMPLETION_TOKENS = 32768
+DEFAULT_MODEL = "glm-5.2"
+DEFAULT_LLM_TYPE = "high_reasoning"
 QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
 DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"

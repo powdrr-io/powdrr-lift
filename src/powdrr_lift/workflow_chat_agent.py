@@ -36,6 +36,8 @@ from powdrr_lift.agent.exchanges import (
     normalize_cache_usage,
 )
 from powdrr_lift.agent.provider_config import (
+    DEFAULT_LLM_TYPE,
+    DEFAULT_MODEL,
     LLM_PROVIDERS,
     ZAI_LLM_MAPPINGS,
     LLMModelLimits,
@@ -47,6 +49,7 @@ from powdrr_lift.agent.provider_config import (
     provider_supports_llm_mappings,
 )
 from powdrr_lift.agent.providers import (
+    LOCAL_MODEL_PATTERN,
     LocalModelRuntimeError,
     ProviderCredentials,
     _EmptyProviderResponseError,
@@ -55,6 +58,7 @@ from powdrr_lift.agent.providers import (
     _SemanticRepairExhaustedError,
     build_provider_client,
     provider_model_limits,
+    resolve_local_model_path,
     resolve_provider_credentials,
 )
 from powdrr_lift.basedpyright_tools import (
@@ -192,11 +196,8 @@ from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
-_DEFAULT_MODEL = "glm-5.2"
-_DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
-_LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
 _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
@@ -257,7 +258,7 @@ class SkillChatConfig:
     provider: str = "auto"
     normal_provider: str | None = None
     adversarial_provider: str | None = None
-    model: str = _DEFAULT_MODEL
+    model: str = DEFAULT_MODEL
     llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
@@ -3397,9 +3398,9 @@ def _initial_model_for_provider(provider: str, configured_model: str) -> str:
     definition = provider_definition(provider)
     if definition.forced_model is not None:
         return definition.forced_model
-    if configured_model != _DEFAULT_MODEL:
+    if configured_model != DEFAULT_MODEL:
         return configured_model
-    mapping = definition.llm_mappings.get(_DEFAULT_LLM_TYPE)
+    mapping = definition.llm_mappings.get(DEFAULT_LLM_TYPE)
     return mapping.model if mapping is not None else configured_model
 
 
@@ -11589,7 +11590,7 @@ def _build_chat_client(
         api_key=credentials.api_key,
         base_url=credentials.base_url,
         local_model_path=(
-            _resolve_local_model_path(model_cache_dir)
+            resolve_local_model_path(model_cache_dir)
             if provider.client_kind == "local"
             else None
         ),
@@ -11758,21 +11759,10 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     )
 
 
-def _resolve_local_model_path(model_cache_dir: Path) -> Path:
-    cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
-    if _has_all_local_model_shards(cached_model_paths):
-        return cached_model_paths[0]
-    raise PowdrrExecutionError(
-        "The local Qwen model is not fully cached. Run "
-        "`powdrr-lift download-qwen-model` before starting workflow-chat. "
-        f"Expected cache={model_cache_dir}."
-    )
-
-
 def download_local_qwen_model(model_cache_dir: Path) -> Path:
     """Download the local Qwen GGUF shards into the configured cache."""
     model_cache_dir.mkdir(parents=True, exist_ok=True)
-    cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
+    cached_model_paths = sorted(model_cache_dir.glob(LOCAL_MODEL_PATTERN))
     if _has_all_local_model_shards(cached_model_paths):
         return cached_model_paths[0]
     try:
@@ -11785,7 +11775,7 @@ def download_local_qwen_model(model_cache_dir: Path) -> Path:
         snapshot_directory = Path(
             snapshot_download(
                 repo_id=_LOCAL_MODEL_REPOSITORY,
-                allow_patterns=[_LOCAL_MODEL_PATTERN],
+                allow_patterns=[LOCAL_MODEL_PATTERN],
                 local_dir=str(model_cache_dir),
             )
         )
@@ -11795,7 +11785,7 @@ def download_local_qwen_model(model_cache_dir: Path) -> Path:
             f"Repository={_LOCAL_MODEL_REPOSITORY}, cache={model_cache_dir}. "
             f"Underlying error: {type(exc).__name__}: {exc}"
         ) from exc
-    model_paths = sorted(snapshot_directory.glob(_LOCAL_MODEL_PATTERN))
+    model_paths = sorted(snapshot_directory.glob(LOCAL_MODEL_PATTERN))
     if not _has_all_local_model_shards(model_paths):
         raise PowdrrExecutionError(
             "The Hugging Face Qwen repository did not provide all Q5_K_M GGUF shards."

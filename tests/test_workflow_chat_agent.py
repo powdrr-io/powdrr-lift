@@ -32,6 +32,7 @@ from powdrr_lift.agent.providers import (
     _read_openai_response,
     _request_token_budget,
     _serialize_messages,
+    resolve_local_model_path,
 )
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -119,7 +120,6 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_llm_mapping,
     _resolve_llm_model,
     _resolve_local_model_context,
-    _resolve_local_model_path,
     _resolve_project_root,
     _resolve_provider,
     _resolve_provider_roles,
@@ -2579,7 +2579,7 @@ def test_local_model_path_requires_pre_downloaded_q5_k_m_shards(
     tmp_path: Path,
 ) -> None:
     with pytest.raises(RuntimeError, match="download-qwen-model"):
-        _resolve_local_model_path(tmp_path)
+        resolve_local_model_path(tmp_path)
 
 
 def test_download_local_model_caches_q5_k_m_shards(

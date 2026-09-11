@@ -32,6 +32,7 @@ from powdrr_lift.workflow_llm import (
 )
 
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
+LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_STREAM_CHUNKS = 4096
@@ -139,6 +140,25 @@ def _resolve_codex_auth_path() -> Path:
 
 def _codex_auth_path_description() -> str:
     return str(_resolve_codex_auth_path())
+
+
+def resolve_local_model_path(model_cache_dir: Path) -> Path:
+    cached_model_paths = sorted(model_cache_dir.glob(LOCAL_MODEL_PATTERN))
+    if _has_all_local_model_shards(cached_model_paths):
+        return cached_model_paths[0]
+    raise PowdrrExecutionError(
+        "The local Qwen model is not fully cached. Run "
+        "`powdrr-lift download-qwen-model` before starting workflow-chat. "
+        f"Expected cache={model_cache_dir}."
+    )
+
+
+def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
+    if not model_paths:
+        return False
+    match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
+    expected_shards = int(match.group(1)) if match else 1
+    return len(model_paths) >= expected_shards
 
 
 class OpenAIChatClient:

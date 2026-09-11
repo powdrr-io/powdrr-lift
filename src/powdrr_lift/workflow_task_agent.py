@@ -63,6 +63,7 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
+from powdrr_lift.workflow_action_catalog import step_actions
 from powdrr_lift.workflow_action_protocol import _parse_action_response
 from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
@@ -84,7 +85,6 @@ from powdrr_lift.workflow_chat_agent import (
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
-    _step_actions,
     _step_index_by_id,
     _validate_coding_loop_action,
     _validate_internal_command,
@@ -3180,7 +3180,7 @@ def _task_system_prompt(
     action_prompt = (
         build_modular_action_system_prompt(
             task,
-            step_actions=_step_actions(task),
+            step_actions=step_actions(task),
             include_context=_step_needs_prompt_catalog(task, "context_types"),
             include_skills=_step_needs_prompt_catalog(task, "skills"),
             validation_gate_enabled=_validation_gate_enabled(task),

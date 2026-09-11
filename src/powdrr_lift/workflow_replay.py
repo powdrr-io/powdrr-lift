@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import yaml
 
-from powdrr_lift.core import load_skill
+from powdrr_lift.process.model import load_skill
 from powdrr_lift.workflow_error_logging import WORKFLOW_LLM_ERROR_LOG
 
 WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION = 1

@@ -221,7 +221,7 @@ from powdrr_lift.core.pr_specification import (
     show_proposed_pr_specification,
     validate_pr_specification_yaml,
 )
-from powdrr_lift.core.skill_specification import (
+from powdrr_lift.process.model import (
     Skill,
     SkillDocument,
     CodingLoopSpec,
@@ -362,7 +362,7 @@ _SCHEMAS = "powdrr_lift.core.schemas"
 _SYSTEM = "powdrr_lift.core.system_specification"
 _TEMPLATE = "powdrr_lift.core.template"
 _VALIDATE = "powdrr_lift.core.validate"
-_SKILL = "powdrr_lift.core.skill_specification"
+_SKILL = "powdrr_lift.process.model"
 _WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.core.workflow_task_specification"
 _WORKFLOW_TEMPLATE_SPECIFICATION = "powdrr_lift.core.workflow_template_specification"
 

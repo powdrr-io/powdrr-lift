@@ -6,7 +6,6 @@ from typing import cast
 
 from powdrr_lift.core import WorkflowInstance
 from powdrr_lift.core.delivery_profile import PhaseType
-from powdrr_lift.core.skill_specification import SkillToolInvocation
 from powdrr_lift.core.workflow_task_specification import TaskComplexity
 from powdrr_lift.core.workflow_template_specification import (
     WorkflowTaskTemplate,
@@ -20,6 +19,7 @@ from powdrr_lift.core.workflow_template_specification import (
     workflow_template_from_json,
     workflow_template_to_json,
 )
+from powdrr_lift.process.model import SkillToolInvocation
 
 
 def test_workflow_template_round_trips_through_json() -> None:

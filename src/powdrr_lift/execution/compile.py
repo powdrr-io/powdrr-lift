@@ -6,7 +6,6 @@ from collections.abc import Mapping
 
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PersonaType, PhaseType
 from powdrr_lift.core.execution_plan import ExecutionPlan
-from powdrr_lift.core.skill_specification import SUPPORTED_STEP_ACTIONS
 from powdrr_lift.core.workflow_task_specification import (
     AgentRole,
     AssigneeType,
@@ -15,6 +14,7 @@ from powdrr_lift.core.workflow_task_specification import (
     WorkflowTask,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.process.model import SUPPORTED_STEP_ACTIONS
 
 
 def compile_execution_plan(

@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from powdrr_lift.core.skill_specification import SkillToolInvocation
 from powdrr_lift.core.workflow_task_specification import (
     AgentRole,
     AssigneeType,
@@ -27,6 +26,7 @@ from powdrr_lift.core.workflow_task_specification import (
     workflow_task_to_json,
     workflow_task_to_yaml,
 )
+from powdrr_lift.process.model import SkillToolInvocation
 
 
 def test_workflow_task_round_trips_through_json() -> None:

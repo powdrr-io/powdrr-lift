@@ -18,7 +18,6 @@ from powdrr_lift.agent.providers import (
     resolve_provider_credentials,
 )
 from powdrr_lift.core import resolve_repo_root
-from powdrr_lift.core.skill_specification import load_skill
 from powdrr_lift.core.workflow_task_specification import (
     WorkflowInstance,
     WorkflowTask,
@@ -26,6 +25,7 @@ from powdrr_lift.core.workflow_task_specification import (
 )
 from powdrr_lift.core.workflow_template_specification import load_workflow_template
 from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.model import load_skill
 from powdrr_lift.workflow_action_validation import (
     _parse_action_response_with_schema,
     _validate_workflow_action_for_step,

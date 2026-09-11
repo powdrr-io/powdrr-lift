@@ -17,18 +17,18 @@ from typing import Any
 import yaml
 
 from powdrr_lift.core import resolve_repo_root
-from powdrr_lift.core.workflow_task_specification import (
-    build_workflow_task_validation_report,
-)
-from powdrr_lift.core.workflow_template_specification import (
-    build_workflow_template_validation_report,
-)
 from powdrr_lift.process.model import (
     Skill,
     SkillStep,
     build_skill_validation_report,
     load_skill,
     skill_step_from_data,
+)
+from powdrr_lift.process.tasks import (
+    build_workflow_task_validation_report,
+)
+from powdrr_lift.process.templates import (
+    build_workflow_template_validation_report,
 )
 from powdrr_lift.workflow_liveness import (
     build_abstract_execution_graph,

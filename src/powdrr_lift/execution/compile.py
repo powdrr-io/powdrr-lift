@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PersonaType, PhaseType
 from powdrr_lift.core.execution_plan import ExecutionPlan
-from powdrr_lift.core.workflow_task_specification import (
+from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.process.model import SUPPORTED_STEP_ACTIONS
+from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeType,
     TaskComplexity,
     TaskStatus,
+    WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.process.model import SUPPORTED_STEP_ACTIONS
 
 
 def compile_execution_plan(
@@ -133,3 +135,25 @@ def _agent_role(persona_type: PersonaType) -> AgentRole:
     if persona_type in {PersonaType.SPECIFICATION_REVIEWER, PersonaType.CODE_REVIEWER}:
         return AgentRole.REVIEWER
     return AgentRole.CODER
+
+
+def workflow_instance_from_execution_plan(
+    directory: str | Path,
+    *,
+    profile: DeliveryProfile,
+    plan: ExecutionPlan,
+    actions_by_phase: Mapping[PhaseType, tuple[str, ...]],
+    intent_ids_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
+    clause_ids_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
+) -> WorkflowInstance:
+    """Compile and persist a process task graph from an execution plan."""
+    return WorkflowInstance.create(
+        directory,
+        compile_execution_plan(
+            profile,
+            plan,
+            actions_by_phase=actions_by_phase,
+            intent_ids_by_phase=intent_ids_by_phase,
+            clause_ids_by_phase=clause_ids_by_phase,
+        ),
+    )

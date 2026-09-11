@@ -2,6 +2,7 @@
 
 # ruff: noqa: F401, I001
 
+from importlib import import_module
 from typing import Any
 
 from powdrr_lift.core.execution_state import (
@@ -221,41 +222,6 @@ from powdrr_lift.core.pr_specification import (
     show_proposed_pr_specification,
     validate_pr_specification_yaml,
 )
-from powdrr_lift.process.model import (
-    Skill,
-    SkillDocument,
-    CodingLoopSpec,
-    CodingLoopVerification,
-    SkillStep,
-    SkillStepCompletion,
-    SkillUsesSkill,
-    SkillUsesSkillBinding,
-    SkillStepRequiredAction,
-    SkillStepGate,
-    SkillStepBranch,
-    SkillStepBranchCase,
-    SkillStepInput,
-    SkillStepOutput,
-    SkillStepPreStep,
-    SkillToolInvocation,
-    SkillValidationIssue,
-    SkillValidationReport,
-    build_skill_directory_validation_report,
-    build_skill_validation_report,
-    load_skill,
-    load_skills,
-    save_skill,
-    skill_from_data,
-    skill_from_json,
-    skill_from_yaml,
-    skill_step_from_data,
-    skill_to_json,
-    skill_to_yaml,
-    validate_skill_directory,
-    validate_skill_directory_json,
-    validate_skill_json,
-    validate_skill_json_file,
-)
 from powdrr_lift.core.schemas import (
     ChangeEntity,
     ChangeEntityRelationship,
@@ -285,65 +251,6 @@ from powdrr_lift.core.template import (
     create_change_log_template_from_plan_diff,
     render_change_log_template,
 )
-from powdrr_lift.core.workflow_task_specification import (
-    AgentRole,
-    AssigneeRole,
-    AssigneeType,
-    HumanRole,
-    ReadyWorkflowTask,
-    WorkflowInstance,
-    TaskComplexity,
-    TaskStatus,
-    WorkflowTask,
-    WorkflowTaskDocument,
-    WorkflowTaskValidationIssue,
-    WorkflowTaskValidationReport,
-    build_workflow_task_directory_validation_report,
-    build_workflow_task_validation_report,
-    load_workflow_task,
-    load_workflow_task_document,
-    load_workflow_task_documents,
-    load_workflow_tasks,
-    load_ready_workflow_tasks,
-    save_workflow_task,
-    save_workflow_task_document,
-    select_ready_workflow_tasks,
-    validate_assignee,
-    validate_workflow_task_directory,
-    validate_workflow_task_directory_json,
-    validate_workflow_task_json,
-    validate_workflow_task_json_file,
-    validate_workflow_task_yaml,
-    validate_workflow_task_yaml_file,
-    workflow_task_document_from_data,
-    workflow_task_document_from_json,
-    workflow_task_document_from_yaml,
-    workflow_task_document_to_json,
-    workflow_task_document_to_yaml,
-    workflow_task_from_data,
-    workflow_task_from_json,
-    workflow_task_from_yaml,
-    workflow_task_to_json,
-    workflow_task_to_yaml,
-)
-from powdrr_lift.core.workflow_template_specification import (
-    WorkflowTaskTemplate,
-    WorkflowTaskTemplateGeneration,
-    WorkflowTemplate,
-    WorkflowTemplateDocument,
-    WorkflowTemplateValidationIssue,
-    WorkflowTemplateValidationReport,
-    build_workflow_template_validation_report,
-    load_workflow_template,
-    save_workflow_template,
-    validate_workflow_template_json,
-    validate_workflow_template_json_file,
-    workflow_template_from_data,
-    workflow_template_from_json,
-    workflow_template_from_yaml,
-    workflow_template_to_json,
-    workflow_template_to_yaml,
-)
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
 _EXECUTION_STATE = "powdrr_lift.core.execution_state"
@@ -363,8 +270,8 @@ _SYSTEM = "powdrr_lift.core.system_specification"
 _TEMPLATE = "powdrr_lift.core.template"
 _VALIDATE = "powdrr_lift.core.validate"
 _SKILL = "powdrr_lift.process.model"
-_WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.core.workflow_task_specification"
-_WORKFLOW_TEMPLATE_SPECIFICATION = "powdrr_lift.core.workflow_template_specification"
+_WORKFLOW_TASK_SPECIFICATION = "powdrr_lift.process.tasks"
+_WORKFLOW_TEMPLATE_SPECIFICATION = "powdrr_lift.process.templates"
 
 _EXPORTS: dict[str, str] = {
     "EXECUTION_STATE_SCHEMA_VERSION": _EXECUTION_STATE,
@@ -411,6 +318,7 @@ _EXPORTS: dict[str, str] = {
     "CodingLoopVerification": _SKILL,
     "SkillStep": _SKILL,
     "SkillStepCompletion": _SKILL,
+    "SkillStepGate": _SKILL,
     "SkillStepBranch": _SKILL,
     "SkillStepBranchCase": _SKILL,
     "SkillUsesSkill": _SKILL,
@@ -422,6 +330,11 @@ _EXPORTS: dict[str, str] = {
     "SkillToolInvocation": _SKILL,
     "SkillValidationIssue": _SKILL,
     "SkillValidationReport": _SKILL,
+    "AgentRole": _WORKFLOW_TASK_SPECIFICATION,
+    "AssigneeRole": _WORKFLOW_TASK_SPECIFICATION,
+    "AssigneeType": _WORKFLOW_TASK_SPECIFICATION,
+    "HumanRole": _WORKFLOW_TASK_SPECIFICATION,
+    "ReadyWorkflowTask": _WORKFLOW_TASK_SPECIFICATION,
     "TaskComplexity": _WORKFLOW_TASK_SPECIFICATION,
     "TaskStatus": _WORKFLOW_TASK_SPECIFICATION,
     "PRSpecificationValidationIssue": _PR_SPECIFICATION,
@@ -494,6 +407,7 @@ _EXPORTS: dict[str, str] = {
     "build_system_specification_validation_report": _SYSTEM,
     "build_workflow_task_directory_validation_report": _WORKFLOW_TASK_SPECIFICATION,
     "build_workflow_task_validation_report": _WORKFLOW_TASK_SPECIFICATION,
+    "load_ready_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
     "build_changelog_index": _INDEX,
     "build_changelog_index_at_ref": _INDEX,
     "build_repo_tree": _BLAME_VIEW,
@@ -551,11 +465,13 @@ _EXPORTS: dict[str, str] = {
     "resolve_repo_root": _PR_ANALYSIS,
     "search_proposed_pr_specifications": _PR_SPECIFICATION,
     "show_proposed_pr_specification": _PR_SPECIFICATION,
-    "save_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
     "save_skill": _SKILL,
     "save_workflow_task": _WORKFLOW_TASK_SPECIFICATION,
+    "save_workflow_task_document": _WORKFLOW_TASK_SPECIFICATION,
     "select_ready_workflow_tasks": _WORKFLOW_TASK_SPECIFICATION,
     "build_workflow_template_validation_report": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "load_workflow_template": _WORKFLOW_TEMPLATE_SPECIFICATION,
+    "save_workflow_template": _WORKFLOW_TEMPLATE_SPECIFICATION,
     "system_specification_default_output_path": _SYSTEM,
     "system_map_specification_default_output_path": _FEATURE_PLANNING,
     "validate_architecture_specification_yaml": _ARCHITECTURE,
@@ -622,5 +538,9 @@ def __getattr__(name: str) -> Any:
             "parse_validation_report": parse_validation_report,
             "validate_change_log_yaml": validate_change_log_yaml,
         }[name]
+
+    module_name = _EXPORTS.get(name)
+    if module_name is not None:
+        return getattr(import_module(module_name), name)
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

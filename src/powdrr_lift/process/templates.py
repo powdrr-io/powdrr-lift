@@ -14,7 +14,17 @@ from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
 )
-from powdrr_lift.core.workflow_task_specification import (
+from powdrr_lift.process.model import (
+    SUPPORTED_INTERACTION_STYLES,
+    SUPPORTED_STEP_TYPES,
+    CodingLoopSpec,
+    CodingLoopVerification,
+    SkillStepGate,
+    SkillStepPreStep,
+    SkillToolInvocation,
+    skill_step_from_data,
+)
+from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeRole,
     AssigneeType,
@@ -26,16 +36,6 @@ from powdrr_lift.core.workflow_task_specification import (
     save_workflow_task,
     select_ready_workflow_tasks,
     validate_assignee,
-)
-from powdrr_lift.process.model import (
-    SUPPORTED_INTERACTION_STYLES,
-    SUPPORTED_STEP_TYPES,
-    CodingLoopSpec,
-    CodingLoopVerification,
-    SkillStepGate,
-    SkillStepPreStep,
-    SkillToolInvocation,
-    skill_step_from_data,
 )
 
 

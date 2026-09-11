@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from powdrr_lift.core.workflow_task_specification import (
+from powdrr_lift.process.tasks import (
     AssigneeType,
     HumanRole,
     TaskComplexity,

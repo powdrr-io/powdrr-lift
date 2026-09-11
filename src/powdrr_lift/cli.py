@@ -102,12 +102,6 @@ from powdrr_lift.core.workflow_relationships import (
     WorkflowRelationshipValidationReport,
     validate_workflow_relationships,
 )
-from powdrr_lift.core.workflow_task_specification import HumanRole
-from powdrr_lift.core.workflow_template_specification import (
-    instantiate_workflow_template,
-    instantiated_workflow_relationships,
-    load_workflow_template,
-)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.acceptance import (
     audit_capability_surface,
@@ -126,6 +120,12 @@ from powdrr_lift.openai_proxy import (
 )
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
+)
+from powdrr_lift.process.tasks import HumanRole
+from powdrr_lift.process.templates import (
+    instantiate_workflow_template,
+    instantiated_workflow_relationships,
+    load_workflow_template,
 )
 from powdrr_lift.product.intent import (
     IntentClause,

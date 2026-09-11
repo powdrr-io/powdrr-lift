@@ -12,6 +12,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
 
+from powdrr_lift.agent.provider_config import default_llm_mappings
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -61,7 +62,6 @@ from powdrr_lift.workflow_chat_agent import (
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
-    _default_llm_mappings,
     _estimate_message_tokens,
     _execute_shell_tool,
     _find_skill_by_name,
@@ -1817,7 +1817,7 @@ def run_workflow_task(
             return 1
 
         provider = resolve_workflow_provider(config.provider)
-        mappings = tuple(_default_llm_mappings(provider).items())
+        mappings = tuple(default_llm_mappings(provider).items())
         mapping = _resolve_workflow_task_mapping(
             task.llm_type,
             mappings=mappings,
@@ -4762,7 +4762,7 @@ def _build_workflow_client(
     provider = resolve_workflow_provider(config.provider)
     mapping = _resolve_workflow_task_mapping(
         task.llm_type,
-        mappings=tuple(_default_llm_mappings(provider).items()),
+        mappings=tuple(default_llm_mappings(provider).items()),
         provider=provider,
     )
     if mapping is None:

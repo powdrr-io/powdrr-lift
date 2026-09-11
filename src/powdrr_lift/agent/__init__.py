@@ -6,6 +6,7 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
+from powdrr_lift.agent.exchanges import ExchangeRecordingClient
 from powdrr_lift.agent.loop import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -25,6 +26,13 @@ from powdrr_lift.agent.protocol import (
     SchemaAwareWorkflowLLMClient,
     WorkflowLLMClient,
 )
+from powdrr_lift.agent.provider_config import (
+    LLMModelLimits,
+    LLMModelMapping,
+    LLMProviderDefinition,
+    LLMProviderRole,
+    LLMProviderRoles,
+)
 from powdrr_lift.agent.repair import (
     RepairContext,
     RepairDirective,
@@ -40,6 +48,12 @@ from powdrr_lift.agent.runner import ProposalKernel, run_proposal_round
 __all__ = [
     "AgentClient",
     "AgentProposalError",
+    "ExchangeRecordingClient",
+    "LLMModelLimits",
+    "LLMModelMapping",
+    "LLMProviderDefinition",
+    "LLMProviderRole",
+    "LLMProviderRoles",
     "SchemaAwareWorkflowLLMClient",
     "WorkflowAction",
     "WorkflowActionObservation",

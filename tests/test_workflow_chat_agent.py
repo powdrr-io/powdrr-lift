@@ -16,6 +16,14 @@ from urllib.request import Request
 import pytest
 import yaml
 
+from powdrr_lift.agent.provider_config import (
+    ALL_LLM_TYPES,
+    ALL_PROVIDERS,
+    DEEPINFRA_CHEAP_LLM_MAPPINGS,
+    DEEPINFRA_LLM_MAPPINGS,
+    OPENROUTER_LLM_MAPPINGS,
+    ZAI_LLM_MAPPINGS,
+)
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
     CodingLoopSpec,
@@ -42,12 +50,6 @@ from powdrr_lift.file_management import FileManagementError, manage_worktree_fil
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.test_failure_packet import build_test_failure_packet
 from powdrr_lift.workflow_chat_agent import (
-    ALL_LLM_TYPES,
-    ALL_PROVIDERS,
-    DEEPINFRA_CHEAP_LLM_MAPPINGS,
-    DEEPINFRA_LLM_MAPPINGS,
-    OPENROUTER_LLM_MAPPINGS,
-    ZAI_LLM_MAPPINGS,
     AnthropicChatClient,
     LLMModelLimits,
     LLMModelMapping,

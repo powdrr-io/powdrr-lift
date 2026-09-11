@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 from powdrr_lift.workflow_llm import prune_execution_events
 from powdrr_lift.workflow_models import WorkflowContext
+from powdrr_lift.workflow_paths import resolve_worktree_file_path
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _MAX_PROMPT_TRANSCRIPT_ENTRIES = 12
@@ -15,6 +17,69 @@ _MAX_PROMPT_TRANSCRIPT_CHARS = 12000
 _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS = 8000
 _MAX_PROMPT_STEP_CONTEXT_ENTRIES = 24
 _MAX_PROMPT_STEP_CONTEXT_CHARS = 16000
+_MAX_PROMPT_FILE_LINES = 200
+_MAX_PROMPT_FILE_CHARS = 16000
+
+
+def _current_file_context(
+    worktree_root: Path,
+    current_file_path: Path | None,
+    *,
+    cache: dict[tuple[str, int, int], dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    if current_file_path is None:
+        return None
+
+    resolved_path = resolve_worktree_file_path(
+        str(current_file_path),
+        worktree_root,
+    )
+    if not resolved_path.exists():
+        return {
+            "path": str(resolved_path.relative_to(worktree_root)),
+            "exists": False,
+        }
+    if not resolved_path.is_file():
+        return {
+            "path": str(resolved_path.relative_to(worktree_root)),
+            "exists": False,
+        }
+
+    stat = resolved_path.stat()
+    cache_key = (str(resolved_path), stat.st_mtime_ns, stat.st_size)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+    lines = resolved_path.read_text(encoding="utf-8").splitlines()
+    serialized_size = sum(len(line) for line in lines)
+    content_omitted = (
+        len(lines) > _MAX_PROMPT_FILE_LINES or serialized_size > _MAX_PROMPT_FILE_CHARS
+    )
+    prompt_lines = [] if content_omitted else lines
+    context = {
+        "path": str(resolved_path.relative_to(worktree_root)),
+        "exists": True,
+        "line_count": len(lines),
+        "lines": [
+            {
+                "line_number": line_number,
+                "text": line,
+            }
+            for line_number, line in enumerate(prompt_lines, start=1)
+        ],
+    }
+    if content_omitted:
+        context.update(
+            {
+                "content_omitted": True,
+                "content_omitted_reason": (
+                    "Use read_document to inspect the required line range."
+                ),
+            }
+        )
+    if cache is not None:
+        cache.clear()
+        cache[cache_key] = context
+    return context
 
 
 def _workflow_context_prompt_data(

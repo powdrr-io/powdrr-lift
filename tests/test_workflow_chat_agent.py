@@ -93,7 +93,6 @@ from powdrr_lift.workflow_chat_agent import (
     _coding_loop_worktree_fingerprint,
     _command_matches_invocation,
     _complete_json_with_model_fallback,
-    _current_file_context,
     _discover_validation_obligations,
     _empty_pull_request_error,
     _execute_shell_tool,
@@ -157,6 +156,7 @@ from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
 from powdrr_lift.workflow_prompting import (
     _action_system_prompt,
+    _current_file_context,
     _execution_events_for_prompt,
     _latest_execution_event_for_prompt,
     _prompt_durable_facts,

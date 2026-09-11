@@ -67,6 +67,10 @@ from powdrr_lift.core import (
 from powdrr_lift.core.pr_specification import (
     _load_feature_catalog,
 )
+from powdrr_lift.core.python_tool_commands import (
+    dependency_backed_command_variants,
+    missing_executable_output,
+)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
@@ -122,10 +126,8 @@ from powdrr_lift.workflow_chat_agent import (
     _build_selection_messages,
     _build_step_execution_messages,
     _catalog_entry_to_data,
-    _coding_loop_worktree_fingerprint,
     _complete_json_with_model_fallback,
     _empty_pull_request_error,
-    _execute_shell_tool,
     _handle_workflow_action_edit,
     _handle_workflow_action_file_management,
     _handle_workflow_action_read_document,
@@ -134,15 +136,10 @@ from powdrr_lift.workflow_chat_agent import (
     _parse_json_object,
     _prompt_user,
     _repair_response_fingerprint,
-    _require_coding_loop_verification,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
-    _run_coding_loop_verification,
-    _run_deterministic_pre_step,
-    _run_gate,
     _step_action_response_schema,
-    _validate_coding_loop_action,
     _validate_dynamic_validation_gate_action,
     _validate_user_question,
     _workflow_action_material_state,
@@ -152,10 +149,17 @@ from powdrr_lift.workflow_chat_agent import (
     _worktree_reuse_decision,
     available_workflow_providers,
     choose_workflow_provider,
-    dependency_backed_command_variants,
     download_local_qwen_model,
-    missing_executable_output,
     run_workflow_chat,
+)
+from powdrr_lift.workflow_execution_loop import (
+    _coding_loop_worktree_fingerprint,
+    _execute_shell_tool,
+    _require_coding_loop_verification,
+    _run_coding_loop_verification,
+    _run_deterministic_pre_step,
+    _run_gate,
+    _validate_coding_loop_action,
 )
 from powdrr_lift.workflow_execution_state import (
     _record_durable_fact,
@@ -1169,7 +1173,7 @@ def test_failed_evaluator_gate_exposes_structured_issues_for_repair(
         ],
     }
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._execute_shell_tool",
+        "powdrr_lift.workflow_execution_loop._execute_shell_tool",
         lambda *args, **kwargs: result,
     )
     step = SkillStep(

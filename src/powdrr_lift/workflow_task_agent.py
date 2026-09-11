@@ -85,6 +85,9 @@ from powdrr_lift.workflow_action_validation import (
 from powdrr_lift.workflow_catalog import find_skill_by_name, load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
+)
+from powdrr_lift.workflow_error_logging import record_workflow_llm_error
+from powdrr_lift.workflow_execution_loop import (
     _execute_shell_tool,
     _print_waiting_for_model,
     _require_coding_loop_verification,
@@ -93,7 +96,6 @@ from powdrr_lift.workflow_chat_agent import (
     _run_gate,
     _validate_coding_loop_action,
 )
-from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_git import (
     WorkflowGitInconsistency,
     WorkflowGitState,

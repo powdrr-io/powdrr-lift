@@ -317,8 +317,8 @@ def render_skill_replay(
     )
     from powdrr_lift.workflow_chat_agent import (
         _build_step_execution_messages,
-        _validate_coding_loop_action,
     )
+    from powdrr_lift.workflow_execution_loop import _validate_coding_loop_action
     from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
     from powdrr_lift.workflow_models import SkillCatalogEntry
 

@@ -8,6 +8,7 @@ import pytest
 from powdrr_lift.workflow_ambiguity_review import (
     WorkflowAmbiguityReviewError,
     build_ambiguity_review_messages,
+    review_workflow_definition,
     review_workflow_definition_step,
 )
 
@@ -80,3 +81,38 @@ def test_build_ambiguity_messages_requires_exactly_one_step_selector(
         WorkflowAmbiguityReviewError, match="either step_id or step_index"
     ):
         build_ambiguity_review_messages(path, step_id="inspect-files", step_index=0)
+
+
+def test_ambiguity_review_can_audit_every_step_with_isolated_prompts(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workflow.yaml"
+    path.write_text(
+        """\
+id: inspect
+when_to_use: [Inspect files.]
+task_templates:
+  - description: Inspect the files.
+    details: Read the files and report the result.
+  - description: Emit the result.
+    details: Emit the validated result.
+""",
+        encoding="utf-8",
+    )
+    response = {
+        "first_action": {"action": "read_document", "parameters": {}},
+        "completion_condition": "The result is recorded.",
+        "allowed_actions": ["read_document", "next_step"],
+        "missing_information": [],
+        "conflicts": [],
+        "ambiguous_phrases": [],
+        "source_sentences": [],
+        "suggested_wording": [],
+        "confidence": 0.9,
+    }
+    client = _FakeClient(response)
+
+    reviews = review_workflow_definition(client, path)
+
+    assert len(reviews) == 2
+    assert len(client.messages) == 2

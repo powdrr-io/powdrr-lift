@@ -142,6 +142,7 @@ from powdrr_lift.pull_request_description import (
 from powdrr_lift.repository_state import render_repository_state
 from powdrr_lift.workflow_ambiguity_review import (
     WorkflowAmbiguityReviewError,
+    review_workflow_definition,
     review_workflow_definition_step,
 )
 from powdrr_lift.workflow_chat_agent import (
@@ -1307,14 +1308,19 @@ def build_parser() -> argparse.ArgumentParser:
         "review-workflow-ambiguity",
         aliases=["review_workflow_ambiguity"],
         help=(
-            "Request an advisory high-reasoning ambiguity review of one "
-            "definition step."
+            "Request an advisory high-reasoning ambiguity review of one or all "
+            "definition steps."
         ),
     )
     ambiguity_review_parser.add_argument("--definition", required=True, type=Path)
-    step_selector = ambiguity_review_parser.add_mutually_exclusive_group(required=True)
+    step_selector = ambiguity_review_parser.add_mutually_exclusive_group(required=False)
     step_selector.add_argument("--step-id")
     step_selector.add_argument("--step-index", type=int)
+    step_selector.add_argument(
+        "--all-steps",
+        action="store_true",
+        help="Review every step with one isolated judgment prompt per step.",
+    )
     ambiguity_review_parser.add_argument("--repo-root", type=Path)
     ambiguity_review_parser.add_argument(
         "--provider", default="auto", choices=ALL_PROVIDERS + ("auto",)
@@ -1323,6 +1329,11 @@ def build_parser() -> argparse.ArgumentParser:
     ambiguity_review_parser.add_argument("--api-key")
     ambiguity_review_parser.add_argument("--base-url")
     ambiguity_review_parser.add_argument("--json", action="store_true")
+    ambiguity_review_parser.add_argument(
+        "--fail-on-findings",
+        action="store_true",
+        help="Exit non-zero when any review reports ambiguity or missing information.",
+    )
     ambiguity_review_parser.set_defaults(func=_run_review_workflow_ambiguity)
 
     prompt_probe_parser = subparsers.add_parser(
@@ -4120,28 +4131,44 @@ def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
             model_cache_dir=repo_root / ".powdrr" / "models",
             progress_stream=sys.stderr,
         )
-        review = review_workflow_definition_step(
-            client,
-            definition_path,
-            step_id=args.step_id,
-            step_index=args.step_index,
+        reviews = (
+            review_workflow_definition(client, definition_path)
+            if args.all_steps
+            else (
+                review_workflow_definition_step(
+                    client,
+                    definition_path,
+                    step_id=args.step_id,
+                    step_index=args.step_index,
+                ),
+            )
         )
     except (KeyError, RuntimeError, WorkflowAmbiguityReviewError) as exc:
         print(f"Workflow ambiguity review failed: {exc}", file=sys.stderr)
         return 1
-    data = review.to_data()
+    data = (
+        {"reviews": [review.to_data() for review in reviews]}
+        if args.all_steps
+        else reviews[0].to_data()
+    )
     if args.json:
         print(json.dumps(data, indent=2, ensure_ascii=False))
     else:
-        print(
-            f"Ambiguity review: {review.definition} step "
-            f"{review.step_id or review.step_index} "
-            f"(confidence {review.confidence:.2f})"
-        )
-        for field in ("missing_information", "conflicts", "ambiguous_phrases"):
-            values = data[field]
-            if values:
-                print(f"{field}: {', '.join(values)}")
+        for review in reviews:
+            print(
+                f"Ambiguity review: {review.definition} step "
+                f"{review.step_id or review.step_index} "
+                f"(confidence {review.confidence:.2f})"
+            )
+            for field in ("missing_information", "conflicts", "ambiguous_phrases"):
+                values = getattr(review, field)
+                if values:
+                    print(f"{field}: {', '.join(values)}")
+    if args.fail_on_findings and any(
+        review.missing_information or review.conflicts or review.ambiguous_phrases
+        for review in reviews
+    ):
+        return 1
     return 0
 
 

@@ -8,6 +8,44 @@ from pathlib import Path
 SOURCE_ROOT = Path(__file__).parents[1] / "src" / "powdrr_lift"
 
 
+def test_language_and_agent_package_surfaces_exist() -> None:
+    for package in ("product", "process", "agent"):
+        assert (SOURCE_ROOT / package / "__init__.py").is_file()
+
+
+def test_product_language_does_not_import_runtime_or_agent_modules() -> None:
+    forbidden_prefixes = (
+        "powdrr_lift.agent",
+        "powdrr_lift.process",
+        "powdrr_lift.execution",
+        "powdrr_lift.workflow_chat_agent",
+        "powdrr_lift.workflow_task_agent",
+    )
+    for path in _python_files("product"):
+        imports = _imported_modules(path)
+        assert not any(
+            module.startswith(forbidden)
+            for module in imports
+            for forbidden in forbidden_prefixes
+        ), path
+
+
+def test_process_language_does_not_import_agent_or_runtime_modules() -> None:
+    forbidden_prefixes = (
+        "powdrr_lift.agent",
+        "powdrr_lift.execution",
+        "powdrr_lift.workflow_chat_agent",
+        "powdrr_lift.workflow_task_agent",
+    )
+    for path in _python_files("process"):
+        imports = _imported_modules(path)
+        assert not any(
+            module.startswith(forbidden)
+            for module in imports
+            for forbidden in forbidden_prefixes
+        ), path
+
+
 def _imported_modules(path: Path) -> set[str]:
     tree = ast.parse(path.read_text())
     modules: set[str] = set()

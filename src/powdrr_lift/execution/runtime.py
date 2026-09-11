@@ -34,14 +34,6 @@ from powdrr_lift.core.execution_state import (
     ExecutionObligation,
     ExecutionState,
 )
-from powdrr_lift.core.intent import (
-    IntentClause,
-    IntentContract,
-    IntentKind,
-    IntentStore,
-    IntentTrigger,
-    make_intent_source,
-)
 from powdrr_lift.core.workflow_task_specification import WorkflowInstance
 from powdrr_lift.errors import PersistenceCorruptionError, PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
@@ -81,6 +73,14 @@ from powdrr_lift.execution.tools import (
     ToolContext,
     ToolRegistry,
     ToolResult,
+)
+from powdrr_lift.product.intent import (
+    IntentClause,
+    IntentContract,
+    IntentKind,
+    IntentStore,
+    IntentTrigger,
+    make_intent_source,
 )
 
 

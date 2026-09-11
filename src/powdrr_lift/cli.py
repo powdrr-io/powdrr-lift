@@ -87,14 +87,6 @@ from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.effective_contract import resolve_effective_contract
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.execution_plan import ExecutionPlan
-from powdrr_lift.core.intent import (
-    IntentClause,
-    IntentContract,
-    IntentKind,
-    IntentStore,
-    IntentTrigger,
-    make_intent_source,
-)
 from powdrr_lift.core.pr_specification import load_proposed_pr_dependency_graph
 from powdrr_lift.core.project_structure import (
     create_project_structure_template,
@@ -134,6 +126,14 @@ from powdrr_lift.openai_proxy import (
 )
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
+)
+from powdrr_lift.product.intent import (
+    IntentClause,
+    IntentContract,
+    IntentKind,
+    IntentStore,
+    IntentTrigger,
+    make_intent_source,
 )
 from powdrr_lift.pull_request_description import (
     find_existing_pull_request,

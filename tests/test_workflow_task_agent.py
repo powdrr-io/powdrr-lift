@@ -1884,11 +1884,11 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
             )
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._resolve_credentials",
+        "powdrr_lift.workflow_task_agent.resolve_provider_credentials",
         lambda provider, api_key, base_url: type(
             "Credentials",
             (),

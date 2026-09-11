@@ -21,6 +21,8 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.agent.provider_config import DEFAULT_MODEL
+from powdrr_lift.agent.providers import resolve_provider_credentials
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -37,7 +39,6 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
-    _DEFAULT_MODEL,
     LLMProviderRoles,
     SkillCatalogEntry,
     SkillChatConfig,
@@ -45,7 +46,6 @@ from powdrr_lift.workflow_chat_agent import (
     _build_chat_client,
     _ChatWorkflowExecutionStrategy,
     _initial_model_for_provider,
-    _resolve_credentials,
     _workflow_action_signature,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
@@ -382,11 +382,11 @@ def run_workflow_scenario(
         provider_name = _optional_text(provider.get("provider")) or "auto"
         if provider_name == "auto":
             provider_name = resolve_workflow_provider()
-        configured_model = _optional_text(provider.get("model")) or _DEFAULT_MODEL
+        configured_model = _optional_text(provider.get("model")) or DEFAULT_MODEL
         live_client = None
         execution_model = "scripted"
         if provider_mode == "live":
-            credentials = _resolve_credentials(
+            credentials = resolve_provider_credentials(
                 provider_name,
                 _optional_text(provider.get("api_key")),
                 _optional_text(provider.get("base_url")),

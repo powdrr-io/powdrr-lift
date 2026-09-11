@@ -12,7 +12,18 @@ from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
 
-from powdrr_lift.agent.provider_config import default_llm_mappings
+from powdrr_lift.agent.provider_config import (
+    DEFAULT_LLM_TYPE,
+    DEFAULT_MODEL,
+    LLMModelMapping,
+    default_llm_mappings,
+)
+from powdrr_lift.agent.providers import (
+    _estimate_message_tokens,
+    build_provider_client,
+    resolve_local_model_path,
+    resolve_provider_credentials,
+)
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -51,18 +62,13 @@ from powdrr_lift.pr_workflow_record import (
     record_pull_request_workflow,
 )
 from powdrr_lift.workflow_chat_agent import (
-    _DEFAULT_LLM_TYPE,
-    _DEFAULT_MODEL,
     GH_TOOL,
     GIT_TOOL,
-    LLMModelMapping,
-    LocalLlamaChatClient,
     SkillCatalogEntry,
     _action_system_prompt,
     _apply_file_edits,
     _apply_yaml_operations,
     _build_step_execution_messages,
-    _estimate_message_tokens,
     _execute_shell_tool,
     _find_skill_by_name,
     _interaction_style_prompt,
@@ -77,9 +83,7 @@ from powdrr_lift.workflow_chat_agent import (
     _print_waiting_for_model,
     _record_skill_pull_request,
     _require_coding_loop_verification,
-    _resolve_credentials,
     _resolve_llm_mapping,
-    _resolve_local_model_path,
     _resolve_pre_step_template,
     _resolve_project_root,
     _resolve_worktree_file_path,
@@ -4785,9 +4789,9 @@ def _resolve_workflow_task_mapping(
 ) -> LLMModelMapping | None:
     """Resolve task mappings, using workflow-chat's model for generic providers."""
     if llm_type is None:
-        llm_type = _DEFAULT_LLM_TYPE
+        llm_type = DEFAULT_LLM_TYPE
     if not mappings:
-        return LLMModelMapping(_DEFAULT_MODEL, provider=provider)
+        return LLMModelMapping(DEFAULT_MODEL, provider=provider)
     return _resolve_llm_mapping(
         llm_type,
         mappings=mappings,
@@ -4802,24 +4806,21 @@ def _build_workflow_client_for_mapping(
     *,
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
-    from powdrr_lift.workflow_chat_agent import OpenAIChatClient
-
     model = mapping.model
-    if mapping.provider == "local":
-        return LocalLlamaChatClient(
-            model_path=_resolve_local_model_path(
-                config.repo_root / ".powdrr" / "models"
-            )
-        )
-    credentials = _resolve_credentials(
+    credentials = resolve_provider_credentials(
         mapping.provider,
         config.api_key,
         config.base_url,
     )
-    return OpenAIChatClient(
+    return build_provider_client(
+        provider=mapping.provider,
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
-        limits=_model_limits_for(mapping.provider, model),
+        local_model_path=(
+            resolve_local_model_path(config.repo_root / ".powdrr" / "models")
+            if mapping.provider == "local"
+            else None
+        ),
         progress_stream=progress_stream,
     )

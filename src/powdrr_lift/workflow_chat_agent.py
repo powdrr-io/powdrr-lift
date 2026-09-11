@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
 import inspect
 import json
-import math
 import os
 import re
 import select
@@ -20,8 +18,6 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, TextIO, cast
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 import laga
 import yaml
@@ -40,9 +36,9 @@ from powdrr_lift.agent.exchanges import (
     normalize_cache_usage,
 )
 from powdrr_lift.agent.provider_config import (
-    DEFAULT_MODEL_LIMITS,
+    DEFAULT_LLM_TYPE,
+    DEFAULT_MODEL,
     LLM_PROVIDERS,
-    MAX_COMPLETION_TOKENS,
     ZAI_LLM_MAPPINGS,
     LLMModelLimits,
     LLMModelMapping,
@@ -51,6 +47,19 @@ from powdrr_lift.agent.provider_config import (
     default_llm_mappings,
     provider_definition,
     provider_supports_llm_mappings,
+)
+from powdrr_lift.agent.providers import (
+    LOCAL_MODEL_PATTERN,
+    LocalModelRuntimeError,
+    ProviderCredentials,
+    _EmptyProviderResponseError,
+    _estimate_message_tokens,
+    _ModelUnavailableError,
+    _SemanticRepairExhaustedError,
+    build_provider_client,
+    provider_model_limits,
+    resolve_local_model_path,
+    resolve_provider_credentials,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -127,7 +136,6 @@ from powdrr_lift.workflow_error_logging import record_workflow_llm_error
 from powdrr_lift.workflow_llm import (
     PowdrrExecutionError,
     ProgressDecision,
-    ProviderExecutionError,
     RepairContext,
     RepairDirective,
     RepairExhaustionReport,
@@ -140,7 +148,6 @@ from powdrr_lift.workflow_llm import (
     WorkflowExecutionStrategy,
     WorkflowLLMClient,
     WorkflowLLMExecutionAborted,
-    WorkflowLLMHTTPError,
     WorkflowStepRunner,
     assert_material_repair_prompt,
     build_clean_room_action_parameters_prompt,
@@ -189,11 +196,8 @@ from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
-_DEFAULT_MODEL = "glm-5.2"
-_DEFAULT_LLM_TYPE = "high_reasoning"
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
-_LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
 _LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
@@ -254,7 +258,7 @@ class SkillChatConfig:
     provider: str = "auto"
     normal_provider: str | None = None
     adversarial_provider: str | None = None
-    model: str = _DEFAULT_MODEL
+    model: str = DEFAULT_MODEL
     llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
     api_key: str | None = None
     base_url: str | None = None
@@ -2155,15 +2159,6 @@ class _SkillExecutionFrame:
     child_skill_name: str = ""
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowChatCredentials:
-    provider: str
-    api_key: str
-    source: str
-    base_url: str
-    base_url_source: str
-
-
 def _maybe_record_llm_exchanges(
     client: WorkflowLLMClient,
     repo_root: Path,
@@ -2181,582 +2176,6 @@ def _maybe_record_llm_exchanges(
 # Compatibility names for existing scenario and unit-test seams.
 _LLMExchangeRecordingClient = ExchangeRecordingClient
 _normalize_cache_usage = normalize_cache_usage
-
-
-class OpenAIChatClient:
-    def __init__(
-        self,
-        *,
-        model: str,
-        api_key: str,
-        base_url: str,
-        timeout: float = 120.0,
-        limits: LLMModelLimits | None = None,
-        progress_stream: TextIO | None = None,
-    ) -> None:
-        self._model = model
-        self._api_key = api_key
-        self._base_url = base_url.rstrip("/")
-        self._timeout = timeout
-        self._limits = limits or DEFAULT_MODEL_LIMITS
-        self._progress_stream = progress_stream
-        self.last_usage: dict[str, Any] = {}
-        self.last_serialized_messages: str | None = None
-
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        serialized_messages = _serialize_messages(messages)
-        self.last_serialized_messages = serialized_messages
-        max_tokens, estimated_input_tokens = _request_token_budget(
-            messages,
-            self._limits,
-            serialized_messages=serialized_messages,
-        )
-        payload = {
-            "model": self._model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": max_tokens,
-            "response_format": (
-                {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "workflow_action",
-                        "strict": True,
-                        "schema": dict(response_schema),
-                    },
-                }
-                if response_schema is not None
-                else {"type": "json_object"}
-            ),
-            "stream": True,
-        }
-        request = Request(
-            f"{self._base_url}/chat/completions",
-            data=_serialize_openai_payload(
-                payload,
-                serialized_messages=serialized_messages,
-            ).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        request_started = time.monotonic()
-        try:
-            with urlopen(request, timeout=self._timeout) as response:
-                raw_response = _read_openai_response(
-                    response,
-                    progress_stream=self._progress_stream,
-                )
-        except HTTPError as exc:
-            raise WorkflowLLMHTTPError(
-                "OpenAI",
-                exc.code,
-                exc.read().decode("utf-8", errors="replace"),
-            ) from exc
-        except URLError as exc:
-            raise ProviderExecutionError(
-                f"OpenAI request failed: {exc.reason}"
-            ) from exc
-        except ConnectionError as exc:
-            raise ProviderExecutionError(
-                f"OpenAI request connection dropped: {exc}"
-            ) from exc
-        except TimeoutError as exc:
-            raise ProviderExecutionError(
-                _provider_timeout_message(
-                    provider="OpenAI-compatible",
-                    model=self._model,
-                    endpoint=request.full_url,
-                    timeout=self._timeout,
-                    elapsed=time.monotonic() - request_started,
-                    message=str(exc),
-                    message_count=len(messages),
-                    max_tokens=max_tokens,
-                    estimated_input_tokens=estimated_input_tokens,
-                )
-            ) from exc
-
-        loaded_response = _parse_json_object(
-            raw_response,
-            "OpenAI response",
-        )
-        usage = loaded_response.get("usage")
-        self.last_usage = dict(usage) if isinstance(usage, dict) else {}
-        choices = loaded_response.get("choices")
-        if not isinstance(choices, list) or not choices:
-            raise PowdrrExecutionError("OpenAI response did not include any choices.")
-        first_choice = choices[0]
-        if not isinstance(first_choice, dict):
-            raise PowdrrExecutionError("OpenAI response choice was not an object.")
-        message = first_choice.get("message")
-        if not isinstance(message, dict):
-            raise PowdrrExecutionError(
-                "OpenAI response choice message was not an object."
-            )
-        content = message.get("content")
-        if not isinstance(content, str) or not content.strip():
-            raise PowdrrExecutionError("OpenAI response message content was empty.")
-
-        return _parse_json_object(content, "OpenAI response content")
-
-
-def _read_openai_response(
-    response: Any,
-    *,
-    progress_stream: TextIO | None,
-) -> str:
-    """Read a streamed OpenAI response and return its normal response shape.
-
-    Providers sometimes ignore ``stream=true`` (and test doubles commonly do
-    too), so a regular JSON response is still accepted. ``readline`` is used
-    for SSE responses so each completed event is consumed as soon as it is
-    available; the socket timeout therefore applies to inactivity between
-    events rather than waiting for the entire generation to finish.
-    """
-    content_type = ""
-    headers = getattr(response, "headers", None)
-    if headers is not None:
-        content_type = str(headers.get("Content-Type", "")).casefold()
-    if "text/event-stream" not in content_type or not hasattr(response, "readline"):
-        return response.read().decode("utf-8")
-
-    content_parts: list[str] = []
-    response_metadata: dict[str, Any] | None = None
-    event_data: list[str] = []
-    chunk_count = 0
-    stream_complete = False
-    while True:
-        line = response.readline()
-        if not line:
-            break
-        decoded_line = line.decode("utf-8", errors="replace").rstrip("\r\n")
-        if decoded_line:
-            if decoded_line.startswith("data:"):
-                event_data.append(decoded_line[5:].lstrip())
-            continue
-        if not event_data:
-            continue
-        event_payload = "\n".join(event_data)
-        event_data.clear()
-        if event_payload == "[DONE]":
-            stream_complete = True
-            break
-        try:
-            event = json.loads(event_payload)
-        except json.JSONDecodeError as exc:
-            raise PowdrrExecutionError(
-                f"OpenAI streaming response contained invalid JSON: {exc.msg}"
-            ) from exc
-        if not isinstance(event, dict):
-            continue
-        if response_metadata is None:
-            response_metadata = event
-        choices = event.get("choices")
-        if not isinstance(choices, list) or not choices:
-            continue
-        first_choice = choices[0]
-        if not isinstance(first_choice, dict):
-            continue
-        if first_choice.get("finish_reason") is not None:
-            stream_complete = True
-        delta = first_choice.get("delta")
-        if not isinstance(delta, dict):
-            continue
-        content = delta.get("content")
-        if isinstance(content, str):
-            content_parts.append(content)
-            chunk_count += 1
-            content_length = sum(len(part) for part in content_parts)
-            if (
-                chunk_count > _MAX_STREAM_CHUNKS
-                or content_length > _MAX_STREAM_CONTENT_CHARS
-            ):
-                excerpt = "".join(content_parts)[:256]
-                raise _ModelUnavailableError(
-                    "OpenAI streaming response exceeded the bounded output limit "
-                    f"({chunk_count} chunks, {content_length} characters); "
-                    f"partial content prefix: {excerpt!r}"
-                )
-            if progress_stream is not None:
-                print(
-                    f"received streamed LLM data ({chunk_count} chunks)...",
-                    file=progress_stream,
-                    flush=True,
-                )
-
-    if response_metadata is None:
-        raise PowdrrExecutionError(
-            "OpenAI streaming response did not include any events."
-        )
-    if not content_parts:
-        raise PowdrrExecutionError("OpenAI streaming response content was empty.")
-    if not stream_complete:
-        raise _ModelUnavailableError(
-            "OpenAI streaming response ended before a completion marker; "
-            f"received {chunk_count} content chunks"
-        )
-    response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
-    return json.dumps(response_metadata)
-
-
-class LocalLlamaChatClient:
-    def __init__(
-        self,
-        *,
-        model_path: Path,
-        n_ctx: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
-    ) -> None:
-        try:
-            llama_module = importlib.import_module("llama_cpp")
-            Llama = llama_module.Llama
-            llama_supports_gpu_offload = llama_module.llama_supports_gpu_offload
-        except ImportError as exc:
-            raise PowdrrExecutionError(
-                "Local provider requires llama-cpp-python. Install the local "
-                "extra (with Metal support on macOS): "
-                "CMAKE_ARGS='-DGGML_METAL=on' uv sync --extra local."
-            ) from exc
-        if not model_path.is_file():
-            raise PowdrrExecutionError(
-                f"Local GGUF model file does not exist: {model_path}"
-            )
-        if "q5_k_m" not in model_path.name.casefold():
-            raise PowdrrExecutionError(
-                "Local Qwen model must be the Q5_K_M GGUF variant; expected a "
-                "model filename containing 'q5_k_m'."
-            )
-        if not llama_supports_gpu_offload():
-            raise PowdrrExecutionError(
-                "Local model execution requires GPU offload support, but the "
-                "installed llama-cpp-python build cannot use a GPU. Reinstall "
-                "the local extra with Metal or CUDA support."
-            )
-        try:
-            self._llama: Any = Llama(
-                model_path=str(model_path),
-                n_ctx=n_ctx,
-                n_gpu_layers=-1,
-                verbose=False,
-            )
-        except Exception as exc:
-            raise LocalModelRuntimeError(
-                "Local Qwen GPU model failed to initialize. The model was "
-                "required to offload all layers to the GPU; no CPU fallback "
-                f"is allowed. Model={model_path}, context={n_ctx}. "
-                f"Underlying error: {exc}"
-            ) from exc
-
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        try:
-            response = self._llama.create_chat_completion(
-                messages=messages,
-                temperature=0,
-                max_tokens=MAX_COMPLETION_TOKENS,
-                response_format=(
-                    {
-                        "type": "json_object",
-                        "schema": dict(response_schema),
-                    }
-                    if response_schema is not None
-                    else {"type": "json_object"}
-                ),
-            )
-        except Exception as exc:
-            raise LocalModelRuntimeError(
-                "Local Qwen GPU inference failed. The workflow cannot continue "
-                "with a CPU fallback. Check Metal/CUDA availability, GPU memory, "
-                f"and POWDRR_LOCAL_MODEL_CONTEXT. Underlying error: {exc}"
-            ) from exc
-        choices = response.get("choices")
-        if not isinstance(choices, list) or not choices:
-            raise PowdrrExecutionError(
-                "Local LLM response did not include any choices."
-            )
-        first_choice = choices[0]
-        if not isinstance(first_choice, dict):
-            raise PowdrrExecutionError("Local LLM response choice was not an object.")
-        message = first_choice.get("message")
-        if not isinstance(message, dict):
-            raise PowdrrExecutionError("Local LLM response message was not an object.")
-        content = message.get("content")
-        if not isinstance(content, str) or not content.strip():
-            raise PowdrrExecutionError("Local LLM response content was empty.")
-        return _parse_json_object(content, "Local LLM response content")
-
-
-class AnthropicChatClient:
-    def __init__(
-        self,
-        *,
-        model: str,
-        api_key: str,
-        base_url: str,
-        timeout: float = 120.0,
-        api_version: str = "2023-06-01",
-        limits: LLMModelLimits | None = None,
-    ) -> None:
-        self._model = model
-        self._api_key = api_key
-        self._base_url = base_url.rstrip("/")
-        self._timeout = timeout
-        self._api_version = api_version
-        self._limits = limits or DEFAULT_MODEL_LIMITS
-        self.last_serialized_messages: str | None = None
-
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        _ = response_schema
-        serialized_messages = _serialize_messages(messages)
-        self.last_serialized_messages = serialized_messages
-        system_prompt, conversation_messages = _split_system_message(messages)
-        conversation_messages = [
-            _anthropic_message(message) for message in conversation_messages
-        ]
-        serialized_conversation_messages = _serialize_messages(conversation_messages)
-        max_tokens, estimated_input_tokens = _request_token_budget(
-            messages,
-            self._limits,
-            serialized_messages=serialized_messages,
-        )
-        request = Request(
-            f"{self._base_url}/v1/messages",
-            data=_serialize_anthropic_payload(
-                model=self._model,
-                max_tokens=max_tokens,
-                serialized_messages=serialized_conversation_messages,
-                system_prompt=system_prompt,
-                response_schema=response_schema,
-            ).encode("utf-8"),
-            headers={
-                "x-api-key": self._api_key,
-                "anthropic-version": self._api_version,
-                "content-type": "application/json",
-            },
-            method="POST",
-        )
-        request_started = time.monotonic()
-        try:
-            with urlopen(request, timeout=self._timeout) as response:
-                raw_response = response.read().decode("utf-8")
-        except HTTPError as exc:
-            raise WorkflowLLMHTTPError(
-                "Anthropic",
-                exc.code,
-                exc.read().decode("utf-8", errors="replace"),
-            ) from exc
-        except URLError as exc:
-            raise PowdrrExecutionError(
-                f"Anthropic request failed: {exc.reason}"
-            ) from exc
-        except ConnectionError as exc:
-            raise PowdrrExecutionError(
-                f"Anthropic request connection dropped: {exc}"
-            ) from exc
-        except TimeoutError as exc:
-            raise PowdrrExecutionError(
-                _provider_timeout_message(
-                    provider="Anthropic",
-                    model=self._model,
-                    endpoint=request.full_url,
-                    timeout=self._timeout,
-                    elapsed=time.monotonic() - request_started,
-                    message=str(exc),
-                    message_count=len(conversation_messages),
-                    max_tokens=max_tokens,
-                    estimated_input_tokens=estimated_input_tokens,
-                )
-            ) from exc
-
-        loaded_response = _parse_json_object(
-            raw_response,
-            "Anthropic response",
-        )
-        content = loaded_response.get("content")
-        if not isinstance(content, list) or not content:
-            raise PowdrrExecutionError(
-                "Anthropic response did not include any content."
-            )
-
-        text_parts: list[str] = []
-        for block in content:
-            if not isinstance(block, dict):
-                continue
-            if (
-                block.get("type") == "tool_use"
-                and block.get("name") == "workflow_action"
-                and isinstance(block.get("input"), dict)
-            ):
-                return cast(dict[str, Any], block["input"])
-            if block.get("type") != "text":
-                continue
-            text = block.get("text")
-            if isinstance(text, str) and text.strip():
-                text_parts.append(text)
-
-        response_text = "".join(text_parts).strip()
-        if not response_text:
-            raise PowdrrExecutionError("Anthropic response content was empty.")
-
-        return _parse_json_object(response_text, "Anthropic response content")
-
-
-def _provider_timeout_message(
-    *,
-    provider: str,
-    model: str,
-    endpoint: str,
-    timeout: float,
-    elapsed: float,
-    message: str,
-    message_count: int,
-    max_tokens: int,
-    estimated_input_tokens: int,
-) -> str:
-    return (
-        f"{provider} request timed out for model {model!r}: {message}. "
-        f"Elapsed {elapsed:.1f}s of configured {timeout:g}s timeout; "
-        f"endpoint={endpoint!r}, messages={message_count}, "
-        f"estimated_input_tokens={estimated_input_tokens}, "
-        f"max_tokens={max_tokens}."
-    )
-
-
-def _serialize_messages(messages: Sequence[Mapping[str, str]]) -> str:
-    return json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
-
-
-def _serialize_prompt_json(value: object) -> str:
-    """Serialize structured prompt context without formatting-only whitespace."""
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-
-
-def _serialize_openai_payload(
-    payload: Mapping[str, Any],
-    *,
-    serialized_messages: str,
-) -> str:
-    return (
-        "{"
-        + '"model":'
-        + json.dumps(payload["model"], ensure_ascii=False)
-        + ',"messages":'
-        + serialized_messages
-        + ',"temperature":'
-        + json.dumps(payload["temperature"])
-        + ',"max_tokens":'
-        + json.dumps(payload["max_tokens"])
-        + ',"response_format":'
-        + json.dumps(payload["response_format"], separators=(",", ":"))
-        + ',"stream":'
-        + json.dumps(payload["stream"])
-        + "}"
-    )
-
-
-def _serialize_anthropic_payload(
-    *,
-    model: str,
-    max_tokens: int,
-    serialized_messages: str,
-    system_prompt: str | None,
-    response_schema: Mapping[str, Any] | None = None,
-) -> str:
-    serialized = (
-        "{"
-        + '"model":'
-        + json.dumps(model, ensure_ascii=False)
-        + ',"max_tokens":'
-        + json.dumps(max_tokens)
-        + ',"messages":'
-        + serialized_messages
-    )
-    if system_prompt is not None:
-        serialized += ',"system":' + json.dumps(system_prompt, ensure_ascii=False)
-    if response_schema is not None:
-        serialized += (
-            ',"tools":['
-            '{"name":"workflow_action","description":"Return the next workflow '
-            'action.","input_schema":'
-            + json.dumps(response_schema, ensure_ascii=False, separators=(",", ":"))
-            + '}],"tool_choice":{"type":"tool","name":"workflow_action"}'
-        )
-    return serialized + "}"
-
-
-def _request_token_budget(
-    messages: list[dict[str, str]],
-    limits: LLMModelLimits,
-    *,
-    serialized_messages: str | None = None,
-) -> tuple[int, int]:
-    estimated_input_tokens = _estimate_message_tokens(
-        messages,
-        serialized_messages=serialized_messages,
-    )
-    available_output_tokens = (
-        limits.context_window - estimated_input_tokens - _CONTEXT_SAFETY_MARGIN_TOKENS
-    )
-    if available_output_tokens < 1:
-        raise PowdrrExecutionError(
-            "Model context window is exhausted: "
-            f"estimated input is {estimated_input_tokens} tokens, "
-            f"context window is {limits.context_window} tokens."
-        )
-    return (
-        min(MAX_COMPLETION_TOKENS, limits.max_output_tokens, available_output_tokens),
-        estimated_input_tokens,
-    )
-
-
-def _estimate_message_tokens(
-    messages: list[dict[str, str]],
-    *,
-    serialized_messages: str | None = None,
-) -> int:
-    serialized = serialized_messages or _serialize_messages(messages)
-    return max(
-        1,
-        math.ceil(len(serialized) / _TOKEN_ESTIMATE_CHARS_PER_TOKEN),
-    )
-
-
-class _ModelUnavailableError(ProviderExecutionError):
-    pass
-
-
-class _SemanticRepairExhaustedError(_ModelUnavailableError):
-    """Raised when a model repeats an invalid structured response."""
-
-
-class _EmptyProviderResponseError(ProviderExecutionError):
-    def __init__(
-        self,
-        message: str,
-        *,
-        messages: Sequence[dict[str, str]] | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.messages = messages
-
-
-class LocalModelRuntimeError(ProviderExecutionError):
-    """Raised when the required local GPU model cannot run."""
 
 
 class _WorkflowEditRangeError(PowdrrExecutionError):
@@ -2873,12 +2292,14 @@ def run_workflow_chat(
     provider_role: LLMProviderRole = "normal"
     provider = provider_roles.provider_for(provider_role)
     current_model = _initial_model_for_provider(provider, config.model)
-    credentials = _resolve_credentials(provider, config.api_key, config.base_url)
+    credentials = resolve_provider_credentials(
+        provider, config.api_key, config.base_url
+    )
     clients: dict[tuple[str, str], WorkflowLLMClient] = {}
 
     def client_for(
         selected_provider: str,
-        selected_credentials: WorkflowChatCredentials,
+        selected_credentials: ProviderCredentials,
         selected_model: str,
     ) -> WorkflowLLMClient:
         key = (selected_provider, selected_model)
@@ -2897,7 +2318,7 @@ def run_workflow_chat(
     def client_for_model(
         selected_model: str, selected_provider: str
     ) -> WorkflowLLMClient:
-        selected_credentials = _resolve_credentials(
+        selected_credentials = resolve_provider_credentials(
             selected_provider,
             config.api_key,
             config.base_url,
@@ -3014,7 +2435,9 @@ def run_workflow_chat(
                 current_model,
                 mapping=selection_mapping,
             )
-        credentials = _resolve_credentials(provider, config.api_key, config.base_url)
+        credentials = resolve_provider_credentials(
+            provider, config.api_key, config.base_url
+        )
         if not skill_announced:
             print(f"Matched skill: {selected_skill.skill.name}", file=stdout)
             skill_announced = True
@@ -3210,7 +2633,7 @@ def run_workflow_chat(
                 handoff_state=compact_observer_mapping(execution_state.handoff_records),
             )
 
-        observer_credentials = _resolve_credentials(
+        observer_credentials = resolve_provider_credentials(
             observer_mapping.provider,
             config.api_key,
             config.base_url,
@@ -3975,9 +3398,9 @@ def _initial_model_for_provider(provider: str, configured_model: str) -> str:
     definition = provider_definition(provider)
     if definition.forced_model is not None:
         return definition.forced_model
-    if configured_model != _DEFAULT_MODEL:
+    if configured_model != DEFAULT_MODEL:
         return configured_model
-    mapping = definition.llm_mappings.get(_DEFAULT_LLM_TYPE)
+    mapping = definition.llm_mappings.get(DEFAULT_LLM_TYPE)
     return mapping.model if mapping is not None else configured_model
 
 
@@ -12154,59 +11577,33 @@ def _read_interactive_line(prompt: str, *, stdout: TextIO) -> str:
 
 
 def _build_chat_client(
-    credentials: WorkflowChatCredentials,
+    credentials: ProviderCredentials,
     *,
     model: str,
     model_cache_dir: Path,
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
     provider = provider_definition(credentials.provider)
-    if provider.client_kind == "local":
-        resolved_model_path = _resolve_local_model_path(model_cache_dir)
-        return LocalLlamaChatClient(
-            model_path=resolved_model_path,
-            n_ctx=_resolve_local_model_context(),
-        )
-    limits = _model_limits_for(credentials.provider, model)
-    if provider.client_kind == "anthropic":
-        return AnthropicChatClient(
-            model=model,
-            api_key=credentials.api_key,
-            base_url=credentials.base_url,
-            limits=limits,
-        )
-    return OpenAIChatClient(
+    return build_provider_client(
+        provider=credentials.provider,
         model=model,
         api_key=credentials.api_key,
         base_url=credentials.base_url,
-        limits=limits,
+        local_model_path=(
+            resolve_local_model_path(model_cache_dir)
+            if provider.client_kind == "local"
+            else None
+        ),
+        local_context=_resolve_local_model_context(),
         progress_stream=progress_stream,
     )
 
 
 def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
-    definition = provider_definition(provider)
-    if definition.client_kind == "local":
-        return LLMModelLimits(
-            context_window=_resolve_local_model_context(),
-            max_output_tokens=MAX_COMPLETION_TOKENS,
-        )
-    return definition.model_limits.get(model.casefold(), DEFAULT_MODEL_LIMITS)
-
-
-def _resolve_credentials(
-    provider: str,
-    api_key_override: str | None,
-    base_url_override: str | None,
-) -> WorkflowChatCredentials:
-    api_key, source = _resolve_api_key(provider, api_key_override)
-    base_url, base_url_source = _resolve_base_url(provider, base_url_override)
-    return WorkflowChatCredentials(
-        provider=provider,
-        api_key=api_key,
-        source=source,
-        base_url=base_url,
-        base_url_source=base_url_source,
+    return provider_model_limits(
+        provider,
+        model,
+        local_context=_resolve_local_model_context(),
     )
 
 
@@ -12362,21 +11759,10 @@ def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
     )
 
 
-def _resolve_local_model_path(model_cache_dir: Path) -> Path:
-    cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
-    if _has_all_local_model_shards(cached_model_paths):
-        return cached_model_paths[0]
-    raise PowdrrExecutionError(
-        "The local Qwen model is not fully cached. Run "
-        "`powdrr-lift download-qwen-model` before starting workflow-chat. "
-        f"Expected cache={model_cache_dir}."
-    )
-
-
 def download_local_qwen_model(model_cache_dir: Path) -> Path:
     """Download the local Qwen GGUF shards into the configured cache."""
     model_cache_dir.mkdir(parents=True, exist_ok=True)
-    cached_model_paths = sorted(model_cache_dir.glob(_LOCAL_MODEL_PATTERN))
+    cached_model_paths = sorted(model_cache_dir.glob(LOCAL_MODEL_PATTERN))
     if _has_all_local_model_shards(cached_model_paths):
         return cached_model_paths[0]
     try:
@@ -12389,7 +11775,7 @@ def download_local_qwen_model(model_cache_dir: Path) -> Path:
         snapshot_directory = Path(
             snapshot_download(
                 repo_id=_LOCAL_MODEL_REPOSITORY,
-                allow_patterns=[_LOCAL_MODEL_PATTERN],
+                allow_patterns=[LOCAL_MODEL_PATTERN],
                 local_dir=str(model_cache_dir),
             )
         )
@@ -12399,7 +11785,7 @@ def download_local_qwen_model(model_cache_dir: Path) -> Path:
             f"Repository={_LOCAL_MODEL_REPOSITORY}, cache={model_cache_dir}. "
             f"Underlying error: {type(exc).__name__}: {exc}"
         ) from exc
-    model_paths = sorted(snapshot_directory.glob(_LOCAL_MODEL_PATTERN))
+    model_paths = sorted(snapshot_directory.glob(LOCAL_MODEL_PATTERN))
     if not _has_all_local_model_shards(model_paths):
         raise PowdrrExecutionError(
             "The Hugging Face Qwen repository did not provide all Q5_K_M GGUF shards."

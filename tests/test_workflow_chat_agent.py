@@ -24,6 +24,16 @@ from powdrr_lift.agent.provider_config import (
     OPENROUTER_LLM_MAPPINGS,
     ZAI_LLM_MAPPINGS,
 )
+from powdrr_lift.agent.providers import (
+    AnthropicChatClient,
+    LocalLlamaChatClient,
+    LocalModelRuntimeError,
+    OpenAIChatClient,
+    _read_openai_response,
+    _request_token_budget,
+    _serialize_messages,
+    resolve_local_model_path,
+)
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
     CodingLoopSpec,
@@ -50,13 +60,9 @@ from powdrr_lift.file_management import FileManagementError, manage_worktree_fil
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
 from powdrr_lift.test_failure_packet import build_test_failure_packet
 from powdrr_lift.workflow_chat_agent import (
-    AnthropicChatClient,
     LLMModelLimits,
     LLMModelMapping,
     LLMProviderRoles,
-    LocalLlamaChatClient,
-    LocalModelRuntimeError,
-    OpenAIChatClient,
     SkillCatalogEntry,
     SkillChatConfig,
     SkillChatEdit,
@@ -104,19 +110,16 @@ from powdrr_lift.workflow_chat_agent import (
     _prompt_step_context,
     _prompt_transcript,
     _prompt_user,
-    _read_openai_response,
     _record_durable_fact,
     _record_dynamic_validation_result,
     _recovery_tool_invocations,
     _repair_response_fingerprint,
-    _request_token_budget,
     _require_coding_loop_verification,
     _resolve_api_key,
     _resolve_base_url,
     _resolve_llm_mapping,
     _resolve_llm_model,
     _resolve_local_model_context,
-    _resolve_local_model_path,
     _resolve_project_root,
     _resolve_provider,
     _resolve_provider_roles,
@@ -126,7 +129,6 @@ from powdrr_lift.workflow_chat_agent import (
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
-    _serialize_messages,
     _step_action_response_schema,
     _step_actions,
     _validate_coding_loop_action,
@@ -2577,7 +2579,7 @@ def test_local_model_path_requires_pre_downloaded_q5_k_m_shards(
     tmp_path: Path,
 ) -> None:
     with pytest.raises(RuntimeError, match="download-qwen-model"):
-        _resolve_local_model_path(tmp_path)
+        resolve_local_model_path(tmp_path)
 
 
 def test_download_local_model_caches_q5_k_m_shards(
@@ -2689,7 +2691,7 @@ def test_llm_exchange_recorder_reuses_client_serialized_messages(
         return _serialize_messages(cast(list[dict[str, str]], messages))
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._serialize_messages",
+        "powdrr_lift.agent.providers._serialize_messages",
         _track_serialization,
     )
 
@@ -2746,10 +2748,10 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
         return _FakeResponse()
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._serialize_messages",
+        "powdrr_lift.agent.providers._serialize_messages",
         _track_serialization,
     )
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _fake_urlopen)
+    monkeypatch.setattr("powdrr_lift.agent.providers.urlopen", _fake_urlopen)
 
     client = OpenAIChatClient(
         model="test-model",
@@ -3142,7 +3144,7 @@ def test_openai_read_timeout_is_reported_as_provider_runtime_error(
     def _timed_out(request: Request, timeout: float) -> object:
         raise TimeoutError("The read operation timed out")
 
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _timed_out)
+    monkeypatch.setattr("powdrr_lift.agent.providers.urlopen", _timed_out)
     client = OpenAIChatClient(
         model="test-model",
         api_key="test-key",
@@ -3165,7 +3167,7 @@ def test_openai_remote_disconnect_is_reported_as_retryable_provider_error(
     def _disconnected(request: Request, timeout: float) -> object:
         raise ConnectionResetError("Remote end closed connection without response")
 
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _disconnected)
+    monkeypatch.setattr("powdrr_lift.agent.providers.urlopen", _disconnected)
     client = OpenAIChatClient(
         model="test-model",
         api_key="test-key",
@@ -3639,7 +3641,7 @@ def test_workflow_execution_terminalizes_unrepairable_actions(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -3742,7 +3744,7 @@ def test_workflow_execution_retries_stalled_step_with_clean_context(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -3918,7 +3920,7 @@ def test_run_workflow_chat_generates_skill_summary(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -4007,7 +4009,7 @@ def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
             return next(responses)
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -4638,7 +4640,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -4852,7 +4854,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -5609,7 +5611,7 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -5730,7 +5732,7 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -5814,7 +5816,7 @@ def test_run_workflow_chat_verbose_prints_progress(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -5903,7 +5905,7 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -5988,7 +5990,7 @@ def test_run_workflow_chat_uses_anthropic_provider(
             return next(responses)
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.AnthropicChatClient",
+        "powdrr_lift.agent.providers.AnthropicChatClient",
         _FakeAnthropicClient,
     )
     monkeypatch.setattr(
@@ -6069,7 +6071,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
             return next(responses)
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setenv("ZAI_API_KEY", "zai-key")
@@ -6157,7 +6159,7 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -6259,7 +6261,7 @@ def test_run_workflow_chat_repairs_missing_action_fields(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -6341,7 +6343,7 @@ def test_empty_prompt_user_action_is_reprompted_until_question_is_present(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -6414,7 +6416,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -6687,7 +6689,7 @@ def test_run_workflow_chat_executes_shell_tool_actions(
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.OpenAIChatClient",
+        "powdrr_lift.agent.providers.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
@@ -7483,7 +7485,7 @@ def test_anthropic_chat_client_sends_messages_api_request(
         captured["timeout"] = timeout
         return _FakeResponse()
 
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _fake_urlopen)
+    monkeypatch.setattr("powdrr_lift.agent.providers.urlopen", _fake_urlopen)
 
     client = AnthropicChatClient(
         model="claude-sonnet-4.5",
@@ -7558,7 +7560,7 @@ def test_openai_chat_client_reports_malformed_json_content(
     def _fake_urlopen(request: Request, timeout: float) -> _FakeResponse:
         return _FakeResponse()
 
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _fake_urlopen)
+    monkeypatch.setattr("powdrr_lift.agent.providers.urlopen", _fake_urlopen)
 
     client = OpenAIChatClient(
         model="test-model",
@@ -7610,7 +7612,7 @@ def test_openai_chat_client_consumes_sse_content_and_reports_progress(
         assert body["stream"] is True
         return _FakeResponse()
 
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.urlopen", _fake_urlopen)
+    monkeypatch.setattr("powdrr_lift.agent.providers.urlopen", _fake_urlopen)
     progress = io.StringIO()
     client = OpenAIChatClient(
         model="test-model",
@@ -7641,10 +7643,10 @@ def test_openai_streaming_response_is_bounded_before_json_parse(
             ]
         )
 
-    monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._MAX_STREAM_CHUNKS",
-        1,
-    )
+        monkeypatch.setattr(
+            "powdrr_lift.agent.providers._MAX_STREAM_CHUNKS",
+            1,
+        )
 
     with pytest.raises(RuntimeError, match="exceeded the bounded output limit"):
         _read_openai_response(_FakeResponse(), progress_stream=None)

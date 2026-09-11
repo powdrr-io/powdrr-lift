@@ -41,7 +41,7 @@ task_templates:
 - description: Gather context about the proposed PR
   phase_type: intake
   persona_id: architect
-  actions: []
+  actions: [gather_context]
   step_type: invoke_tool
   prompt_catalogs: [context_types]
   complexity: high

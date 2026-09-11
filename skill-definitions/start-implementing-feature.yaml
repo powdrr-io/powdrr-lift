@@ -41,10 +41,15 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
+    The input `feature_query` is the exact output from capture-feature-query.
     Invoke only the declared fuzzy-match command once for docs/proposals using
-    the feature name from the user's request. Do not invoke internal, shell, or
-    any other tool in this step. Treat a missing root or empty result as no
-    matches; do not select the feature yet.
+    that value. If the command returns no lines or a missing-root error, record
+    an empty proposed_feature_candidates array; do not select the feature yet.
+  inputs:
+  - name: feature_query
+    type: string
+    required: true
+    source: previous_step
   pre_step:
     action: invoke_tool
     template:
@@ -70,10 +75,15 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
+    The input `feature_query` is the exact output from capture-feature-query.
     Invoke only the declared fuzzy-match command once for docs/current using
-    the feature name from the user's request. Do not invoke internal, shell, or
-    any other tool in this step. Treat a missing root or empty result as no
-    matches; do not select the feature yet.
+    that value. If the command returns no lines or a missing-root error, record
+    an empty current_feature_candidates array; do not select the feature yet.
+  inputs:
+  - name: feature_query
+    type: string
+    required: true
+    source: previous_step
   pre_step:
     action: invoke_tool
     template:
@@ -99,10 +109,15 @@ steps:
   step_type: invoke_tool
   llm_type: simple_task
   details: >-
+    The input `feature_query` is the exact output from capture-feature-query.
     Invoke only the declared fuzzy-match command once for docs/workflows using
-    the feature name from the user's request. Do not invoke internal, shell, or
-    any other tool in this step. Treat a missing root or empty result as no
-    matches; do not select the workflow yet.
+    that value. If the command returns no lines or a missing-root error, record
+    an empty workflow_candidates array; do not select the workflow yet.
+  inputs:
+  - name: feature_query
+    type: string
+    required: true
+    source: previous_step
   pre_step:
     action: invoke_tool
     template:
@@ -124,33 +139,27 @@ steps:
     schema: {type: array, items: {type: object}}
 - id: select-feature-context
   description: Select the canonical feature and workflow context.
-  actions: [edit, yaml_edit, file_management, read_document, goto_step]
+  actions: [goto_step]
   step_type: governed
   llm_type: standard_reasoning
   details: >-
-    Review all three deterministic search results. Filter them to the best
-    matching feature directory and workflow directories. Normalize case,
-    spaces, underscores, and hyphens when comparing the user's feature name to
-    candidate directory names. If exactly one proposal or current-feature
-    directory is the best normalized match, select it without asking and use
-    that directory's basename as the canonical feature_name. A workflow
-    directory is never an independent choice: its only valid path is
-    docs/workflows/<canonical-feature-name>. If that directory is absent, record
-    it as missing and let the later instantiation step create it; do not ask
-    the user which workflow path to use. If no proposal or current-feature
-    candidate is found, do not claim that a canonical feature was selected and
-    do not use next_step or complete: ask one specific question identifying the
-    missing feature. If the user supplies an identifier or path, use goto_step
-    to rerun the relevant deterministic discovery step(s), then select from
-    those results. Ask a question only when multiple normalized feature
-    candidates remain tied and cannot be resolved from the user's request or
-    the search results. For example:
+    Inputs are the exact proposed_feature_candidates,
+    current_feature_candidates, workflow_candidates, and feature_query outputs
+    from the preceding discovery steps. Normalize case, spaces, underscores,
+    and hyphens. If exactly one proposal or current-feature directory matches
+    feature_query, select it, use the matching directory's basename as the
+    canonical feature_name, and emit the exact
+    document paths. A workflow directory is never an independent choice: its
+    only valid path is docs/workflows/<canonical-feature-name>. If no candidate
+    matches, emit one prompt_user action. If multiple candidates remain tied,
+    emit one prompt_user action naming the candidate paths. If the user supplies
+    a new identifier, emit one goto_step action for the relevant discovery step;
+    do not combine it with another action. For example:
     {"action":"prompt_user","text":"Which feature or workflow should I use from these candidates: <candidate-names>?"}
-    Never ask the user to choose between a found proposal and a missing
-    workflow directory.
-    Do not ask whether documents exist before searching. The feature_name
-    output is required for this step; emit it only when this step has actually
-    selected a canonical feature. Pass the selected specification documents,
+    Never ask the user to choose a missing workflow directory; do not ask the
+    user which workflow path to use. Do not ask whether
+    documents exist before searching. Emit feature_name only after selecting a
+    canonical feature. Pass the selected specification documents,
     workflow documents, canonical feature name, and missing-document findings
     to the next step. Emit `specification_documents` as the exact existing
     file paths for the canonical documents, `workflow_documents` as the exact
@@ -186,6 +195,23 @@ steps:
       type: array
       items:
         type: string
+  inputs:
+  - name: feature_query
+    type: string
+    required: true
+    source: previous_step
+  - name: proposed_feature_candidates
+    type: array
+    required: true
+    source: previous_step
+  - name: current_feature_candidates
+    type: array
+    required: true
+    source: previous_step
+  - name: workflow_candidates
+    type: array
+    required: true
+    source: previous_step
 - id: bootstrap-project-structure
   description: Bootstrap the project-wide module and tool structure.
   actions: [invoke_skill]
@@ -200,12 +226,11 @@ steps:
       - -f
       - docs/project_structure/project-structure.yaml
   details: >-
-    Check the deterministic pre-step result. If the project-structure artifact
-    exists, choose next_step and reuse it; do not
-    invoke any nested skill. If the gate routed here because the artifact is
-    missing, invoke exactly the listed bootstrap-code-structure skill once,
-    then choose next_step after it returns. Return {"action":"next_step"} in
-    either successful branch. The nested skill is project-wide
+    The engine-owned pre-step result is authoritative; do not reread it. If the
+    artifact exists, emit one next_step action and reuse it. If it is missing,
+    emit one invoke_skill action for the exact skill id
+    `bootstrap-code-structure`; after that action returns, emit next_step in the
+    following turn. The nested skill is project-wide
     and must not ask for a feature or target module. Never invoke bootstrap
     merely because this step is present: the gate result is authoritative.
 - id: confirm-project-structure
@@ -241,6 +266,19 @@ steps:
     operation: inspect_structure
   - tool: basedpyright-symbol
     operation: resolve_symbol
+  inputs:
+  - name: feature_name
+    type: string
+    required: true
+    source: previous_step
+  - name: specification_documents
+    type: array
+    required: true
+    source: previous_step
+  - name: workflow_documents
+    type: array
+    required: true
+    source: previous_step
   details: >-
     This is a planning-only step. Do not create, edit, rename, or delete the
     proposed PR specification; the following deterministic generation step owns
@@ -292,10 +330,16 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
+  inputs:
+  - name: feature_name
+    type: string
+    required: true
+    source: previous_step
   details: >-
-    Invoke the declared proposed-pr-specification command exactly once for the
-    selected feature. It must create or reuse exactly one feature-level file at
-    docs/proposals/<feature-name>/proposed-pr-specification.yaml containing all
+    The `feature_name` input is the canonical feature selected by the prior
+    step. Invoke the declared proposed-pr-specification command exactly once for
+    that value. It must create or reuse exactly one feature-level file at
+    docs/proposals/<feature_name>/proposed-pr-specification.yaml containing all
     proposed_prs entries in the planned order. Generate only the template; do
     not fill, validate, instantiate, stage, or commit it. Do not create one
     file per proposed PR.
@@ -481,19 +525,34 @@ steps:
   actions: [gather_context, edit, yaml_edit, file_management, read_document]
   step_type: governed
   llm_type: simple_task
+  inputs:
+  - name: proposed_pr_names
+    type: array
+    required: true
+    source: previous_step
+  - name: feature_name
+    type: string
+    required: true
+    source: previous_step
+  - name: proposed_pr_specification_template
+    type: object
+    required: true
+    source: previous_step
   details: >-
-    For each validated proposed PR, inspect whether its matching workflow
+    Use the `proposed_pr_names`, `feature_name`, and
+    `proposed_pr_specification_template` inputs from the preceding steps. For each
+    validated proposed PR, inspect whether its matching workflow
     already exists and reuse it when present. For each missing workflow,
     inspect templates/execute-proposed-pr.yaml with read_document, resolve
     every task input_state placeholder from the matching validated proposed PR,
     and prepare the complete instantiation
     values. Use the fixed template, canonical feature name, distinct workflow
-    instance names, proposed-PR order, and dependency relationships. A persisted
-    Before finalizing the values, use gather_context with type `tools` for the
+    instance names, proposed-PR order, and dependency relationships. Before
+    finalizing the values, use gather_context with type `tools` for the
     selected feature to discover the repository's authoritative test command.
     Include that command as the `verification-command` template value for every
     execute-proposed-pr workflow.
-    workflow metadata file is named exactly
+    The workflow metadata file is named exactly
     `<proposed_pr_id>-workflow.yaml` inside
     `docs/workflows/<canonical-feature-name>/`; `<proposed_pr_id>` is the exact
     id from `proposed_prs`, such as `interaction-log-core`. Do not prepend the
@@ -513,21 +572,38 @@ steps:
     type: string
     required_for_next_step: true
     schema: {type: string}
+  - name: invocation-plan
+    type: object
+    required_for_next_step: true
+    schema: {type: object, additionalProperties: true}
 - id: instantiate-execution-workflows
   description: Instantiate each missing execution workflow.
   actions: [invoke_tool, edit, yaml_edit, read_document]
   step_type: governed
   llm_type: simple_task
   tool_invocation_packages: [git_readonly_and_additive]
+  inputs:
+  - name: invocation-plan
+    type: object
+    required: true
+    source: previous_step
+  - name: verification-command
+    type: string
+    required: true
+    source: previous_step
+  - name: feature_name
+    type: string
+    required: true
+    source: previous_step
   details: >-
-    Invoke instantiate-workflow once for each missing workflow using the
-    invocation plan. Use templates/execute-proposed-pr.yaml, pass every
+    Invoke instantiate-workflow once for each missing workflow listed in the
+    `invocation-plan` input. Use templates/execute-proposed-pr.yaml, pass every
     template-specific value with repeated --template-value NAME=VALUE options,
     Do not pass workflow dependencies manually: instantiate-workflow derives
     them from the unified proposed-PR specification. The dependency graph is
     the source of truth; do not claim dependencies were applied unless they
     are present in the persisted workflow state.
-    Use the canonical feature name as the shared work-item name. The
+    Use the `feature_name` input as the shared work-item name. The
     command must create the powdrr/<proposed-pr-id> integration branch while
     writing workflow files into this active worktree. Stop if a returned
     workflow directory is outside the active worktree. Pass every created or

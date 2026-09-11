@@ -10,7 +10,39 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.workflow_llm import WorkflowLLMClient
+from powdrr_lift.workflow_llm import WorkflowLLMClient, complete_json
+
+_REVIEW_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "first_action",
+        "completion_condition",
+        "allowed_actions",
+        "missing_information",
+        "conflicts",
+        "ambiguous_phrases",
+        "source_sentences",
+        "suggested_wording",
+        "confidence",
+    ],
+    "properties": {
+        "first_action": {
+            "type": "object",
+            "required": ["action"],
+            "additionalProperties": True,
+            "properties": {"action": {"type": "string", "minLength": 1}},
+        },
+        "completion_condition": {"type": "string", "minLength": 1},
+        "allowed_actions": {"type": "array", "items": {"type": "string"}},
+        "missing_information": {"type": "array", "items": {"type": "string"}},
+        "conflicts": {"type": "array", "items": {"type": "string"}},
+        "ambiguous_phrases": {"type": "array", "items": {"type": "string"}},
+        "source_sentences": {"type": "array", "items": {"type": "string"}},
+        "suggested_wording": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    },
+}
 
 
 class WorkflowAmbiguityReviewError(ValueError):
@@ -91,6 +123,12 @@ def build_ambiguity_review_messages(
                 "model to inspect, decide, mutate, and report in one step. Every "
                 "finding must quote its exact source sentence in source_sentences and "
                 "offer a concrete replacement in suggested_wording. "
+                "The actions field is an allowlist, not a request to perform all "
+                "of those actions: the runtime permits exactly one top-level action "
+                "per model response. Treat a value as resolved when it is supplied "
+                "by an input_state/output_state field, a deterministic pre_step, "
+                "or an explicit literal in the step. Do not report generic style "
+                "preferences or the existence of multiple allowed action names. "
                 "Return exactly one JSON object matching this complete example:\n"
                 + json.dumps(example, ensure_ascii=False)
             ),
@@ -105,6 +143,7 @@ def build_ambiguity_review_messages(
                     "guidance": definition.get("how_to_fill_this_out", []),
                     "step_index": selected_index,
                     "step": dict(step),
+                    "execution_contract": _execution_contract(step),
                 },
                 ensure_ascii=False,
             ),
@@ -130,12 +169,56 @@ def review_workflow_definition_step(
         definition_path, step_id=step_id, step_index=step_index
     )
     try:
-        payload = client.complete_json(messages)
+        payload = complete_json(
+            client, messages, response_schema=_REVIEW_RESPONSE_SCHEMA
+        )
     except RuntimeError as exc:
         raise WorkflowAmbiguityReviewError(
             f"Ambiguity reviewer request failed: {exc}"
         ) from exc
-    return _parse_review(payload, identity)
+    try:
+        return _parse_review(payload, identity)
+    except WorkflowAmbiguityReviewError as first_error:
+        repair_messages = [
+            *messages,
+            {
+                "role": "user",
+                "content": (
+                    "Your previous review response was invalid: "
+                    f"{first_error}. Return the same review again as one complete "
+                    "JSON object. `first_action` must be an object with a non-empty "
+                    "string `action`; include every required field, using empty "
+                    "arrays when there are no findings."
+                ),
+            },
+        ]
+        try:
+            repaired = complete_json(
+                client, repair_messages, response_schema=_REVIEW_RESPONSE_SCHEMA
+            )
+            return _parse_review(repaired, identity)
+        except (RuntimeError, WorkflowAmbiguityReviewError) as second_error:
+            raise WorkflowAmbiguityReviewError(
+                f"Ambiguity reviewer returned invalid JSON twice: {second_error}"
+            ) from second_error
+
+
+def _execution_contract(step: Mapping[str, Any]) -> dict[str, Any]:
+    """Expose the engine-owned contract so the reviewer need not infer it."""
+    inputs = step.get("input_state")
+    outputs = step.get("outputs")
+    output_state_type = step.get("output_state_type")
+    pre_step = step.get("pre_step")
+    return {
+        "one_action_per_response": True,
+        "allowed_actions_are_alternatives": True,
+        "input_names": sorted(inputs) if isinstance(inputs, Mapping) else [],
+        "output_names": sorted(outputs) if isinstance(outputs, Mapping) else [],
+        "output_state_type": output_state_type
+        if isinstance(output_state_type, str)
+        else None,
+        "deterministic_pre_step": pre_step if isinstance(pre_step, Mapping) else None,
+    }
 
 
 def review_workflow_definition(

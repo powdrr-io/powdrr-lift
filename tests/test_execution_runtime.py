@@ -1199,6 +1199,20 @@ def test_runtime_action_contract_allows_only_declared_actions(tmp_path: Path) ->
     }
 
 
+def test_delete_file_is_exposed_by_file_mutation_adapter(tmp_path: Path) -> None:
+    runtime = ExecutionRuntime(
+        "run-delete-file-capability",
+        profile_id="default",
+        workflow_directory=tmp_path / "workflow",
+        repo_root=tmp_path,
+    )
+    runtime.set_action_contract(frozenset({"delete_file"}))
+
+    assert {item["tool_name"] for item in runtime.capability_catalog()} == {
+        "file-mutation"
+    }
+
+
 def test_observer_action_allowance_is_one_shot_and_step_scoped(tmp_path: Path) -> None:
     runtime = ExecutionRuntime(
         "run-observer-action",

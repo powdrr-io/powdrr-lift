@@ -1405,7 +1405,12 @@ class ExecutionRuntime:
             "gh",
         }
         mapping = {
-            "file-mutation": {"edit", "yaml_edit", "file_management"},
+            "file-mutation": {
+                "edit",
+                "yaml_edit",
+                "file_management",
+                "delete_file",
+            },
             "validate-edit": {"validate_edit"},
             "apply-edit": {"apply_edit"},
             "process": {"shell"},

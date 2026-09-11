@@ -6,6 +6,7 @@ from powdrr_lift.agent.actions import (
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
+from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.agent.exchanges import ExchangeRecordingClient
 from powdrr_lift.agent.loop import (
     WorkflowActionObservation,
@@ -79,4 +80,5 @@ __all__ = [
     "WorkflowExecutionController",
     "WorkflowExecutionObserver",
     "WorkflowExecutionStrategy",
+    "WorkflowContext",
 ]

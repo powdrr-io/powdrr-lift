@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.workflow_models import SkillCatalogEntry
+from powdrr_lift.process.catalog import SkillCatalogEntry
 
 
 @dataclass(slots=True)

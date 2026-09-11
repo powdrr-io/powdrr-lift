@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -15,8 +16,8 @@ from powdrr_lift.basedpyright_tools import (
 from powdrr_lift.intrinsic_edit import APPLY_EDIT_TOOL, VALIDATE_EDIT_TOOL
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
+from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workflow_llm import prune_execution_events, workflow_action_signature
-from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_paths import resolve_worktree_file_path
 from powdrr_lift.workflow_step_behavior import behavior_for_step
 

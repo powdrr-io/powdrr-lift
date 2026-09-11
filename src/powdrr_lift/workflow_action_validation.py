@@ -10,6 +10,7 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.builtin_tool_help import BUILTIN_TOOL_NAMES
 from powdrr_lift.core.execution_state import ExecutionArtifact
 from powdrr_lift.core.pr_specification import compile_split_pr_specification
@@ -18,6 +19,7 @@ from powdrr_lift.core.validation_messages import ValidationError
 from powdrr_lift.execution.builtin_tools import invoke_file_mutation
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL, intrinsic_command
+from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workflow_action_catalog import (
     declared_action_names as _declared_action_names,
 )
@@ -37,7 +39,6 @@ from powdrr_lift.workflow_llm import (
 from powdrr_lift.workflow_llm import (
     WorkflowAction as SkillChatAction,
 )
-from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext
 from powdrr_lift.workflow_observer import (
     ObserverActionRecommendation,
     observer_action_matches,

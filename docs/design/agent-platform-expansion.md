@@ -17,6 +17,25 @@ can:
   requirements, and entities
 - keep the CLI and MCP surfaces aligned across macOS, Windows, and Linux
 
+## Three distinct systems
+
+Powdrr combines three systems that must remain separate in the codebase:
+
+1. The product/lifecycle language describes the product itself and its durable
+   history: specification-v1 documents, current state, requirements,
+   architecture, implementation intent, proposed PRs, decisions, and related
+   artifacts.
+2. The process language describes LLM-led work: skills, workflows, workflow
+   templates, tasks, steps, actions, effects, outcomes, handoffs, and
+   liveness constraints.
+3. The agent authors and manipulates artifacts in both languages and executes
+   process contracts. It is a consumer of validated models and a provider /
+   human adapter, not a third language owner.
+
+Product and process definitions should exchange typed artifact references and
+compiled views. The agent may propose edits to either language, but validators
+and the execution kernel decide whether those edits are valid or executable.
+
 ## Core Document Types
 
 The platform should support these specification families:

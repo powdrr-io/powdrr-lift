@@ -16,6 +16,7 @@ from powdrr_lift.agent.provider_config import default_llm_mappings
 from powdrr_lift.agent.providers import (
     _estimate_message_tokens,
     build_provider_client,
+    resolve_provider_credentials,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -79,7 +80,6 @@ from powdrr_lift.workflow_chat_agent import (
     _print_waiting_for_model,
     _record_skill_pull_request,
     _require_coding_loop_verification,
-    _resolve_credentials,
     _resolve_llm_mapping,
     _resolve_local_model_path,
     _resolve_pre_step_template,
@@ -4805,7 +4805,7 @@ def _build_workflow_client_for_mapping(
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
     model = mapping.model
-    credentials = _resolve_credentials(
+    credentials = resolve_provider_credentials(
         mapping.provider,
         config.api_key,
         config.base_url,

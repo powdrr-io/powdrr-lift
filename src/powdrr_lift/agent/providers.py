@@ -5,9 +5,12 @@ from __future__ import annotations
 import importlib
 import json
 import math
+import os
 import re
 import time
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TextIO, cast
 from urllib.error import HTTPError, URLError
@@ -33,6 +36,109 @@ _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_STREAM_CHUNKS = 4096
 _MAX_STREAM_CONTENT_CHARS = 131072
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCredentials:
+    provider: str
+    api_key: str
+    source: str
+    base_url: str
+    base_url_source: str
+
+
+def resolve_provider_credentials(
+    provider: str,
+    api_key_override: str | None = None,
+    base_url_override: str | None = None,
+) -> ProviderCredentials:
+    definition = provider_definition(provider)
+    if api_key_override:
+        api_key, source = api_key_override, "--api-key"
+    elif definition.client_kind == "local":
+        api_key, source = "local", "local"
+    else:
+        api_key = ""
+        source = ""
+        for env_name in definition.api_key_env_names:
+            value = os.environ.get(env_name)
+            if value:
+                api_key, source = value, env_name
+                break
+        if not api_key and provider == "openai":
+            access_token = _resolve_codex_access_token()
+            if access_token is not None:
+                api_key, source = access_token, _codex_auth_path_description()
+        if not api_key:
+            if provider == "openai":
+                raise PowdrrExecutionError(
+                    "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, "
+                    "or sign in with Codex so ~/.codex/auth.json is available."
+                )
+            credential_names = " or ".join(definition.api_key_env_names)
+            raise PowdrrExecutionError(
+                f"No {definition.display_name} credentials found. "
+                f"Set {credential_names}, or pass --api-key."
+            )
+
+    if base_url_override:
+        base_url, base_url_source = base_url_override, "--base-url"
+    elif definition.client_kind == "local":
+        base_url, base_url_source = "local", "local"
+    else:
+        base_url, base_url_source = definition.default_base_url, "default"
+        for env_name in definition.base_url_env_names:
+            value = os.environ.get(env_name)
+            if value:
+                base_url, base_url_source = value, env_name
+                break
+    return ProviderCredentials(
+        provider=provider,
+        api_key=api_key,
+        source=source,
+        base_url=base_url,
+        base_url_source=base_url_source,
+    )
+
+
+def _resolve_codex_access_token() -> str | None:
+    auth_path = _resolve_codex_auth_path()
+    if not auth_path.exists():
+        return None
+    try:
+        raw_auth = json.loads(auth_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(raw_auth, dict):
+        return None
+    tokens = raw_auth.get("tokens")
+    if not isinstance(tokens, dict):
+        return None
+    access_token = tokens.get("access_token")
+    if not isinstance(access_token, str) or not access_token:
+        return None
+    expiry = tokens.get("expiry")
+    if isinstance(expiry, str):
+        try:
+            expiry_dt = datetime.fromisoformat(expiry)
+        except ValueError:
+            return access_token
+        if expiry_dt.tzinfo is None:
+            expiry_dt = expiry_dt.replace(tzinfo=UTC)
+        if expiry_dt <= datetime.now(UTC):
+            return None
+    return access_token
+
+
+def _resolve_codex_auth_path() -> Path:
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home is not None:
+        return Path(codex_home).expanduser() / "auth.json"
+    return Path.home() / ".codex" / "auth.json"
+
+
+def _codex_auth_path_description() -> str:
+    return str(_resolve_codex_auth_path())
 
 
 class OpenAIChatClient:

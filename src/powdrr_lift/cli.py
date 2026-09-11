@@ -15,6 +15,7 @@ from typing import Any
 import yaml
 
 from powdrr_lift.agent.provider_config import ALL_PROVIDERS, default_llm_mappings
+from powdrr_lift.agent.providers import resolve_provider_credentials
 from powdrr_lift.agent_feature_run import (
     DEFAULT_FEATURE_NAME,
     DEFAULT_FEATURE_REQUEST,
@@ -143,7 +144,6 @@ from powdrr_lift.workflow_ambiguity_review import (
 from powdrr_lift.workflow_chat_agent import (
     WorkflowChatConfig,
     _build_chat_client,
-    _resolve_credentials,
     choose_workflow_provider,
     download_local_qwen_model,
     resolve_workflow_provider,
@@ -4109,7 +4109,9 @@ def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
         mapping = default_llm_mappings(requested_provider)["high_reasoning"]
         provider = mapping.provider
         model = args.model or mapping.model
-        credentials = _resolve_credentials(provider, args.api_key, args.base_url)
+        credentials = resolve_provider_credentials(
+            provider, args.api_key, args.base_url
+        )
         client = _build_chat_client(
             credentials,
             model=model,

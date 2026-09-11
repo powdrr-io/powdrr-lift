@@ -13,6 +13,7 @@ from typing import Any, TextIO
 import yaml
 
 from powdrr_lift.agent.provider_config import default_llm_mappings
+from powdrr_lift.agent.providers import resolve_provider_credentials
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.skill_specification import load_skill
 from powdrr_lift.core.workflow_task_specification import (
@@ -26,7 +27,6 @@ from powdrr_lift.workflow_chat_agent import (
     _build_chat_client,
     _build_step_execution_messages,
     _parse_action_response_with_schema,
-    _resolve_credentials,
     _run_deterministic_pre_step,
     _run_gate,
     _step_action_response_schema,
@@ -345,7 +345,7 @@ def build_probe_client(
     progress_stream: TextIO | None = None,
 ) -> WorkflowLLMClient:
     """Construct the same provider client used by workflow-chat."""
-    credentials = _resolve_credentials(provider, api_key, base_url)
+    credentials = resolve_provider_credentials(provider, api_key, base_url)
     return _build_chat_client(
         credentials,
         model=model,

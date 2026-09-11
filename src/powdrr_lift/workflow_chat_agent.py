@@ -48,12 +48,14 @@ from powdrr_lift.agent.provider_config import (
 )
 from powdrr_lift.agent.providers import (
     LocalModelRuntimeError,
+    ProviderCredentials,
     _EmptyProviderResponseError,
     _estimate_message_tokens,
     _ModelUnavailableError,
     _SemanticRepairExhaustedError,
     build_provider_client,
     provider_model_limits,
+    resolve_provider_credentials,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -2156,15 +2158,6 @@ class _SkillExecutionFrame:
     child_skill_name: str = ""
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowChatCredentials:
-    provider: str
-    api_key: str
-    source: str
-    base_url: str
-    base_url_source: str
-
-
 def _maybe_record_llm_exchanges(
     client: WorkflowLLMClient,
     repo_root: Path,
@@ -2298,12 +2291,14 @@ def run_workflow_chat(
     provider_role: LLMProviderRole = "normal"
     provider = provider_roles.provider_for(provider_role)
     current_model = _initial_model_for_provider(provider, config.model)
-    credentials = _resolve_credentials(provider, config.api_key, config.base_url)
+    credentials = resolve_provider_credentials(
+        provider, config.api_key, config.base_url
+    )
     clients: dict[tuple[str, str], WorkflowLLMClient] = {}
 
     def client_for(
         selected_provider: str,
-        selected_credentials: WorkflowChatCredentials,
+        selected_credentials: ProviderCredentials,
         selected_model: str,
     ) -> WorkflowLLMClient:
         key = (selected_provider, selected_model)
@@ -2322,7 +2317,7 @@ def run_workflow_chat(
     def client_for_model(
         selected_model: str, selected_provider: str
     ) -> WorkflowLLMClient:
-        selected_credentials = _resolve_credentials(
+        selected_credentials = resolve_provider_credentials(
             selected_provider,
             config.api_key,
             config.base_url,
@@ -2439,7 +2434,9 @@ def run_workflow_chat(
                 current_model,
                 mapping=selection_mapping,
             )
-        credentials = _resolve_credentials(provider, config.api_key, config.base_url)
+        credentials = resolve_provider_credentials(
+            provider, config.api_key, config.base_url
+        )
         if not skill_announced:
             print(f"Matched skill: {selected_skill.skill.name}", file=stdout)
             skill_announced = True
@@ -2635,7 +2632,7 @@ def run_workflow_chat(
                 handoff_state=compact_observer_mapping(execution_state.handoff_records),
             )
 
-        observer_credentials = _resolve_credentials(
+        observer_credentials = resolve_provider_credentials(
             observer_mapping.provider,
             config.api_key,
             config.base_url,
@@ -11579,7 +11576,7 @@ def _read_interactive_line(prompt: str, *, stdout: TextIO) -> str:
 
 
 def _build_chat_client(
-    credentials: WorkflowChatCredentials,
+    credentials: ProviderCredentials,
     *,
     model: str,
     model_cache_dir: Path,
@@ -11606,22 +11603,6 @@ def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
         provider,
         model,
         local_context=_resolve_local_model_context(),
-    )
-
-
-def _resolve_credentials(
-    provider: str,
-    api_key_override: str | None,
-    base_url_override: str | None,
-) -> WorkflowChatCredentials:
-    api_key, source = _resolve_api_key(provider, api_key_override)
-    base_url, base_url_source = _resolve_base_url(provider, base_url_override)
-    return WorkflowChatCredentials(
-        provider=provider,
-        api_key=api_key,
-        source=source,
-        base_url=base_url,
-        base_url_source=base_url_source,
     )
 
 

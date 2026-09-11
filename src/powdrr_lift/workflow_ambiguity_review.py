@@ -83,7 +83,12 @@ def build_ambiguity_review_messages(
                 "Inspect one step and its compact parent contract. Do not propose "
                 "code changes, invoke tools, or claim execution results. Identify "
                 "only ambiguity that could cause an LLM to choose the wrong first "
-                "action, completion condition, parameters, or human handoff. Every "
+                "action, completion condition, parameters, or human handoff. Treat "
+                "a deterministic pre-step as engine-owned: it must not require an "
+                "LLM turn to copy its result into output state. For model-owned "
+                "tasks, require exactly one meaningful action per turn, explicit "
+                "typed outputs, and an exact JSON example; flag prose that asks the "
+                "model to inspect, decide, mutate, and report in one step. Every "
                 "finding must quote its exact source sentence in source_sentences and "
                 "offer a concrete replacement in suggested_wording. "
                 "Return exactly one JSON object matching this complete example:\n"
@@ -131,6 +136,20 @@ def review_workflow_definition_step(
             f"Ambiguity reviewer request failed: {exc}"
         ) from exc
     return _parse_review(payload, identity)
+
+
+def review_workflow_definition(
+    client: WorkflowLLMClient,
+    definition_path: Path,
+) -> tuple[WorkflowAmbiguityReview, ...]:
+    """Review every step in a definition with compact, isolated prompts."""
+    definition, kind = _load_definition(definition_path)
+    steps = definition["steps" if kind == "skill" else "task_templates"]
+    assert isinstance(steps, Sequence)
+    return tuple(
+        review_workflow_definition_step(client, definition_path, step_index=index)
+        for index in range(len(steps))
+    )
 
 
 def _parse_review(

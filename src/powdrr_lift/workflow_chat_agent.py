@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, TextIO, cast
+from typing import Any, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -37,6 +37,13 @@ except ImportError:  # pragma: no cover - only used on non-POSIX platforms
 from powdrr_lift.agent.exchanges import (
     ExchangeRecordingClient,
     normalize_cache_usage,
+)
+from powdrr_lift.agent.provider_config import (
+    LLMModelLimits,
+    LLMModelMapping,
+    LLMProviderDefinition,
+    LLMProviderRole,
+    LLMProviderRoles,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -214,34 +221,6 @@ _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"
 
 
-@dataclass(frozen=True, slots=True)
-class LLMModelLimits:
-    context_window: int
-    max_output_tokens: int
-
-
-@dataclass(frozen=True, slots=True)
-class LLMModelMapping:
-    model: str
-    provider: str
-    backup_model: LLMModelMapping | None = None
-    long_context_backup_model: LLMModelMapping | None = None
-
-
-LLMProviderRole = Literal["normal", "adversarial"]
-
-
-@dataclass(frozen=True, slots=True)
-class LLMProviderRoles:
-    normal: str
-    adversarial: str | None = None
-
-    def provider_for(self, role: LLMProviderRole) -> str:
-        if role == "adversarial" and self.adversarial is not None:
-            return self.adversarial
-        return self.normal
-
-
 _DEFAULT_MODEL_LIMITS = LLMModelLimits(
     context_window=128_000,
     max_output_tokens=_MAX_COMPLETION_TOKENS,
@@ -353,20 +332,6 @@ OPENROUTER_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     llm_type: LLMModelMapping(_OPENROUTER_MODEL, provider="openrouter")
     for llm_type in ALL_LLM_TYPES
 }
-
-
-@dataclass(frozen=True, slots=True)
-class LLMProviderDefinition:
-    name: str
-    display_name: str
-    llm_mappings: Mapping[str, LLMModelMapping]
-    model_limits: Mapping[str, LLMModelLimits]
-    api_key_env_names: tuple[str, ...] = ()
-    base_url_env_names: tuple[str, ...] = ()
-    default_base_url: str = "https://api.openai.com/v1"
-    client_kind: str = "openai"
-    forced_model: str | None = None
-    auto_priority: int | None = None
 
 
 LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {

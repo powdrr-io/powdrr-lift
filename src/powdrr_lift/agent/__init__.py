@@ -26,6 +26,13 @@ from powdrr_lift.agent.protocol import (
     SchemaAwareWorkflowLLMClient,
     WorkflowLLMClient,
 )
+from powdrr_lift.agent.provider_config import (
+    LLMModelLimits,
+    LLMModelMapping,
+    LLMProviderDefinition,
+    LLMProviderRole,
+    LLMProviderRoles,
+)
 from powdrr_lift.agent.repair import (
     RepairContext,
     RepairDirective,
@@ -42,6 +49,11 @@ __all__ = [
     "AgentClient",
     "AgentProposalError",
     "ExchangeRecordingClient",
+    "LLMModelLimits",
+    "LLMModelMapping",
+    "LLMProviderDefinition",
+    "LLMProviderRole",
+    "LLMProviderRoles",
     "SchemaAwareWorkflowLLMClient",
     "WorkflowAction",
     "WorkflowActionObservation",

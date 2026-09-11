@@ -78,11 +78,38 @@ from powdrr_lift.workflow_action_catalog import (
 from powdrr_lift.workflow_action_catalog import (
     step_actions as _step_actions,
 )
+from powdrr_lift.workflow_action_operations import (
+    WorkflowEditRangeError as _WorkflowEditRangeError,
+)
+from powdrr_lift.workflow_action_operations import (
+    WorkflowYamlEditError as _WorkflowYamlEditError,
+)
+from powdrr_lift.workflow_action_operations import (
+    _apply_file_edits,
+    _apply_yaml_operations,
+)
 from powdrr_lift.workflow_action_protocol import (
     _parse_action_response,
     _parse_workflow_action_delete_file,
     _parse_workflow_action_file_management,
     _parse_workflow_action_gather_context,
+)
+from powdrr_lift.workflow_action_validation import (
+    _advance_predicated_step,
+    _command_matches_invocation,
+    _discover_validation_obligations,
+    _parse_action_response_with_schema,
+    _predicated_step_complete,
+    _record_dynamic_validation_result,
+    _validate_internal_command,
+    _validate_workflow_action_for_step,
+    _validate_workflow_action_outputs,
+    _validate_workflow_handoff,
+    _validate_workflow_step_transition,
+    _validation_actions_match,
+    _validation_issue_fingerprint,
+    _WorkflowStructuredDocumentError,
+    _WorkflowToolValidationError,
 )
 from powdrr_lift.workflow_chat_agent import (
     LLMModelLimits,
@@ -91,17 +118,12 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatConfig,
     SkillChatEdit,
     _action_repair_prompt,
-    _advance_predicated_step,
-    _apply_file_edits,
-    _apply_yaml_operations,
     _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
     _catalog_entry_to_data,
     _coding_loop_worktree_fingerprint,
-    _command_matches_invocation,
     _complete_json_with_model_fallback,
-    _discover_validation_obligations,
     _empty_pull_request_error,
     _execute_shell_tool,
     _handle_workflow_action_edit,
@@ -109,12 +131,8 @@ from powdrr_lift.workflow_chat_agent import (
     _handle_workflow_action_read_document,
     _latest_deterministic_pre_step,
     _load_workflow_context,
-    _parse_action_response_with_schema,
     _parse_json_object,
-    _predicated_step_complete,
     _prompt_user,
-    _record_durable_fact,
-    _record_dynamic_validation_result,
     _repair_response_fingerprint,
     _require_coding_loop_verification,
     _resolve_skill_path,
@@ -126,25 +144,11 @@ from powdrr_lift.workflow_chat_agent import (
     _step_action_response_schema,
     _validate_coding_loop_action,
     _validate_dynamic_validation_gate_action,
-    _validate_internal_command,
     _validate_user_question,
-    _validate_workflow_action_for_step,
-    _validate_workflow_action_outputs,
-    _validate_workflow_handoff,
-    _validate_workflow_step_transition,
-    _validation_actions_match,
-    _validation_issue_fingerprint,
-    _ValidationGateState,
-    _ValidationObligation,
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
-    _WorkflowEditRangeError,
-    _WorkflowExecutionState,
     _WorkflowProgressDisplay,
-    _WorkflowStructuredDocumentError,
-    _WorkflowToolValidationError,
-    _WorkflowYamlEditError,
     _worktree_reuse_decision,
     available_workflow_providers,
     choose_workflow_provider,
@@ -152,6 +156,12 @@ from powdrr_lift.workflow_chat_agent import (
     download_local_qwen_model,
     missing_executable_output,
     run_workflow_chat,
+)
+from powdrr_lift.workflow_execution_state import (
+    _record_durable_fact,
+    _ValidationGateState,
+    _ValidationObligation,
+    _WorkflowExecutionState,
 )
 from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
 from powdrr_lift.workflow_models import SkillCatalogEntry, WorkflowContext

@@ -20,6 +20,7 @@ import laga
 
 from powdrr_lift.agent.provider_config import (
     DEFAULT_MODEL_LIMITS,
+    LLM_PROVIDERS,
     MAX_COMPLETION_TOKENS,
     LLMModelLimits,
     provider_definition,
@@ -140,6 +141,34 @@ def _resolve_codex_auth_path() -> Path:
 
 def _codex_auth_path_description() -> str:
     return str(_resolve_codex_auth_path())
+
+
+def provider_has_credentials(provider: str) -> bool:
+    definition = provider_definition(provider)
+    if provider == "openai" and _resolve_codex_access_token() is not None:
+        return True
+    return any(os.environ.get(env_name) for env_name in definition.api_key_env_names)
+
+
+def auto_provider_candidates() -> tuple[str, ...]:
+    candidates: list[tuple[int, str]] = []
+    for name, definition in LLM_PROVIDERS.items():
+        if definition.auto_priority is None or not provider_has_credentials(name):
+            continue
+        candidates.append((definition.auto_priority, name))
+    return tuple(name for _, name in sorted(candidates))
+
+
+def available_provider_names() -> tuple[str, ...]:
+    candidates: list[tuple[int, str]] = []
+    for name, definition in LLM_PROVIDERS.items():
+        if not definition.api_key_env_names and name != "openai":
+            continue
+        if not provider_has_credentials(name):
+            continue
+        priority = definition.auto_priority
+        candidates.append((priority if priority is not None else 100, name))
+    return tuple(name for _, name in sorted(candidates))
 
 
 def resolve_local_model_path(model_cache_dir: Path) -> Path:

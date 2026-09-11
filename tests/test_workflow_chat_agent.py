@@ -33,6 +33,7 @@ from powdrr_lift.agent.providers import (
     _request_token_budget,
     _serialize_messages,
     resolve_local_model_path,
+    resolve_provider_credentials,
 )
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -115,8 +116,6 @@ from powdrr_lift.workflow_chat_agent import (
     _recovery_tool_invocations,
     _repair_response_fingerprint,
     _require_coding_loop_verification,
-    _resolve_api_key,
-    _resolve_base_url,
     _resolve_llm_mapping,
     _resolve_llm_model,
     _resolve_local_model_context,
@@ -3187,11 +3186,12 @@ def test_deepinfra_credentials_and_base_url_are_supported(
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
     monkeypatch.setenv("DEEPINFRA_BASE_URL", "https://deepinfra.example/v1/openai")
 
-    assert _resolve_api_key("deepinfra", None) == (
+    credentials = resolve_provider_credentials("deepinfra")
+    assert (credentials.api_key, credentials.source) == (
         "deepinfra-token",
         "DEEPINFRA_API_TOKEN",
     )
-    assert _resolve_base_url("deepinfra", None) == (
+    assert (credentials.base_url, credentials.base_url_source) == (
         "https://deepinfra.example/v1/openai",
         "DEEPINFRA_BASE_URL",
     )
@@ -3203,11 +3203,12 @@ def test_openrouter_credentials_and_default_base_url_are_supported(
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
 
-    assert _resolve_api_key("openrouter", None) == (
+    credentials = resolve_provider_credentials("openrouter")
+    assert (credentials.api_key, credentials.source) == (
         "openrouter-key",
         "OPENROUTER_API_KEY",
     )
-    assert _resolve_base_url("openrouter", None) == (
+    assert (credentials.base_url, credentials.base_url_source) == (
         "https://openrouter.ai/api/v1",
         "default",
     )
@@ -3277,7 +3278,7 @@ def test_available_workflow_providers_requires_api_keys(
     ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._resolve_codex_access_token",
+        "powdrr_lift.agent.providers._resolve_codex_access_token",
         lambda: None,
     )
     monkeypatch.setenv("OPENROUTER_BASE_URL", "https://example.test")
@@ -3302,7 +3303,7 @@ def test_choose_workflow_provider_presents_configured_provider_pick_list(
     ):
         monkeypatch.delenv(env_name, raising=False)
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent._resolve_codex_access_token",
+        "powdrr_lift.agent.providers._resolve_codex_access_token",
         lambda: None,
     )
     monkeypatch.setenv("ZAI_API_KEY", "zai-token")
@@ -7166,7 +7167,8 @@ def test_resolve_api_key_prefers_env_over_codex_auth(
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     monkeypatch.setenv("OPENAI_API_KEY", "env-token")
 
-    assert _resolve_api_key("openai", None) == ("env-token", "OPENAI_API_KEY")
+    credentials = resolve_provider_credentials("openai")
+    assert (credentials.api_key, credentials.source) == ("env-token", "OPENAI_API_KEY")
 
 
 def test_resolve_api_key_uses_codex_auth_when_env_missing(
@@ -7184,7 +7186,8 @@ def test_resolve_api_key_uses_codex_auth_when_env_missing(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key("openai", None) == (
+    credentials = resolve_provider_credentials("openai")
+    assert (credentials.api_key, credentials.source) == (
         "codex-token",
         str(codex_home / "auth.json"),
     )
@@ -7198,7 +7201,11 @@ def test_resolve_api_key_uses_anthropic_env_when_requested(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key("anthropic", None) == ("anth-key", "ANTHROPIC_API_KEY")
+    credentials = resolve_provider_credentials("anthropic")
+    assert (credentials.api_key, credentials.source) == (
+        "anth-key",
+        "ANTHROPIC_API_KEY",
+    )
 
 
 def test_resolve_api_key_uses_zai_env_when_requested(
@@ -7209,7 +7216,8 @@ def test_resolve_api_key_uses_zai_env_when_requested(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CODEX_API_KEY", raising=False)
 
-    assert _resolve_api_key("zai", None) == ("zai-key", "ZAI_API_KEY")
+    credentials = resolve_provider_credentials("zai")
+    assert (credentials.api_key, credentials.source) == ("zai-key", "ZAI_API_KEY")
 
 
 def test_resolve_skill_path_accepts_missing_extension(

@@ -38,7 +38,6 @@ from powdrr_lift.agent.exchanges import (
 from powdrr_lift.agent.provider_config import (
     DEFAULT_LLM_TYPE,
     DEFAULT_MODEL,
-    LLM_PROVIDERS,
     ZAI_LLM_MAPPINGS,
     LLMModelLimits,
     LLMModelMapping,
@@ -56,6 +55,8 @@ from powdrr_lift.agent.providers import (
     _estimate_message_tokens,
     _ModelUnavailableError,
     _SemanticRepairExhaustedError,
+    auto_provider_candidates,
+    available_provider_names,
     build_provider_client,
     provider_model_limits,
     resolve_local_model_path,
@@ -11619,7 +11620,7 @@ def _resolve_provider(
     if provider_override != "auto":
         provider_definition(provider_override)
         return provider_override
-    candidates = _auto_provider_candidates()
+    candidates = auto_provider_candidates()
     if candidates:
         return candidates[0]
     if model.startswith("claude-"):
@@ -11632,7 +11633,7 @@ def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
     if config.normal_provider is not None:
         normal = config.normal_provider
     elif config.provider == "auto":
-        candidates = _auto_provider_candidates()
+        candidates = auto_provider_candidates()
         normal = candidates[0] if candidates else "openai"
     else:
         normal = config.provider
@@ -11640,7 +11641,7 @@ def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
 
     adversarial = config.adversarial_provider
     if adversarial is None and config.provider == "auto":
-        candidates = _auto_provider_candidates()
+        candidates = auto_provider_candidates()
         adversarial = next(
             (candidate for candidate in candidates if candidate != normal),
             None,
@@ -11665,29 +11666,9 @@ def resolve_workflow_provider(
     ).normal
 
 
-def _auto_provider_candidates() -> tuple[str, ...]:
-    """Return configured providers in their declared automatic priority order."""
-    candidates: list[tuple[int, str]] = []
-    for name, definition in LLM_PROVIDERS.items():
-        if definition.auto_priority is None or not _provider_has_credentials(name):
-            continue
-        # DeepInfra Cheap is the automatic mode for a DeepInfra credential;
-        # standard DeepInfra remains available through explicit selection.
-        candidates.append((definition.auto_priority, name))
-    return tuple(name for _, name in sorted(candidates))
-
-
 def available_workflow_providers() -> tuple[str, ...]:
     """Return API-backed providers that have usable credentials configured."""
-    candidates: list[tuple[int, str]] = []
-    for name, definition in LLM_PROVIDERS.items():
-        if not definition.api_key_env_names and name != "openai":
-            continue
-        if not _provider_has_credentials(name):
-            continue
-        priority = definition.auto_priority
-        candidates.append((priority if priority is not None else 100, name))
-    return tuple(name for _, name in sorted(candidates))
+    return available_provider_names()
 
 
 def choose_workflow_provider(
@@ -11724,39 +11705,6 @@ def choose_workflow_provider(
             f"Choose a number from 1 to {len(providers)} or enter a provider name: "
         )
         stdout.flush()
-
-
-def _provider_has_credentials(provider: str) -> bool:
-    definition = provider_definition(provider)
-    if provider == "openai" and _resolve_codex_access_token() is not None:
-        return True
-    return any(os.environ.get(env_name) for env_name in definition.api_key_env_names)
-
-
-def _resolve_api_key(provider: str, override: str | None) -> tuple[str, str]:
-    if override:
-        return override, "--api-key"
-    definition = provider_definition(provider)
-    if definition.client_kind == "local":
-        return "local", "local"
-    for env_name in definition.api_key_env_names:
-        value = os.environ.get(env_name)
-        if value:
-            return value, env_name
-    if provider == "openai":
-        codex_token = _resolve_codex_access_token()
-        if codex_token is not None:
-            return codex_token, _codex_auth_path_description()
-    if provider == "openai":
-        raise PowdrrExecutionError(
-            "No OpenAI credentials found. Set OPENAI_API_KEY, CODEX_API_KEY, or "
-            "sign in with Codex so ~/.codex/auth.json is available."
-        )
-    credential_names = " or ".join(definition.api_key_env_names)
-    raise PowdrrExecutionError(
-        f"No {definition.display_name} credentials found. Set {credential_names}, "
-        "or pass --api-key."
-    )
 
 
 def download_local_qwen_model(model_cache_dir: Path) -> Path:
@@ -11818,65 +11766,6 @@ def _resolve_local_model_context() -> int:
             f"{configured_context!r}."
         )
     return context
-
-
-def _resolve_base_url(provider: str, override: str | None) -> tuple[str, str]:
-    if override:
-        return override, "--base-url"
-    definition = provider_definition(provider)
-    if definition.client_kind == "local":
-        return "local", "local"
-    for env_name in definition.base_url_env_names:
-        value = os.environ.get(env_name)
-        if value:
-            return value, env_name
-    return definition.default_base_url, "default"
-
-
-def _resolve_codex_access_token() -> str | None:
-    auth_path = _resolve_codex_auth_path()
-    if not auth_path.exists():
-        return None
-
-    try:
-        raw_auth = json.loads(auth_path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        return None
-    if not isinstance(raw_auth, dict):
-        return None
-
-    tokens = raw_auth.get("tokens")
-    if not isinstance(tokens, dict):
-        return None
-
-    access_token = tokens.get("access_token")
-    if not isinstance(access_token, str) or not access_token:
-        return None
-
-    expiry = tokens.get("expiry")
-    if isinstance(expiry, str):
-        try:
-            expiry_dt = datetime.fromisoformat(expiry)
-        except ValueError:
-            return access_token
-        if expiry_dt.tzinfo is None:
-            expiry_dt = expiry_dt.replace(tzinfo=UTC)
-        if expiry_dt <= datetime.now(UTC):
-            return None
-
-    return access_token
-
-
-def _resolve_codex_auth_path() -> Path:
-    codex_home = os.environ.get("CODEX_HOME")
-    if codex_home is not None:
-        return Path(codex_home).expanduser() / "auth.json"
-
-    return Path.home() / ".codex" / "auth.json"
-
-
-def _codex_auth_path_description() -> str:
-    return str(_resolve_codex_auth_path())
 
 
 def _split_system_message(

@@ -379,9 +379,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[0].step_type == "invoke_tool"
     assert template.task_templates[0].pre_step is not None
     assert template.task_templates[0].pre_step.action == "gather_context"
-    assert "Assign that exact result to proposed-pr-context-state" in (
-        template.task_templates[0].details or ""
-    )
+    assert template.task_templates[0].details is None
     assert "<work-item-name>" not in (template.task_templates[0].details or "")
     assert "<proposed-pr-id>" not in (template.task_templates[0].details or "")
     report = build_workflow_template_validation_report(template.to_json())

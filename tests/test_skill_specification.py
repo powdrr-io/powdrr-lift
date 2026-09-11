@@ -1106,9 +1106,8 @@ def test_run_tests_and_fix_uses_deterministic_test_enrichment() -> None:
     }
     assert steps["rerun-all-tests"].gate is not None
     assert steps["rerun-all-tests"].gate.goto_step == "enrich-test-results"
-    assert "do not run it again" in (steps["run-all-tests"].details or "")
-    assert "test_tool_result" in (steps["enrich-test-results"].details or "")
-    assert "enriched_test_result" in (steps["enrich-test-results"].details or "")
+    assert steps["run-all-tests"].details is None
+    assert steps["enrich-test-results"].details is None
     repair_details = steps["produce-repair-edit"].details or ""
     assert "read_document for every file" in repair_details
     assert "Do not guess line 1" in repair_details
@@ -1224,7 +1223,7 @@ def test_create_pull_request_skill_has_prescribed_flow() -> None:
         "--kind",
         "feature",
     ]
-    assert "do not print" in (skill.steps[0].details or "").lower()
+    assert skill.steps[0].details is None
     assert "do not print" in (skill.steps[1].details or "").lower()
     assert skill.steps[2].pre_step is not None
     assert skill.steps[2].pre_step.template["command"] == ["git", "status", "--short"]

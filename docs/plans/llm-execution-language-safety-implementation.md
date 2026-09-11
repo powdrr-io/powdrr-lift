@@ -8,10 +8,16 @@ guarantees. Preserve the useful flexibility of nested skills while preventing
 undeclared effects, hidden authority amplification, unsupported completion
 claims, ineffective retries, and unbounded execution.
 
+The target is not a merely finite static checklist. Definitions must support
+exhaustive branches and bounded, data-driven work over repository-derived
+collections so one workflow can adapt to the actual size, risk, and structure
+of a feature while remaining total and operationally contained.
+
 The target design is defined in
-`docs/design/llm-execution-language-safety.md`. This document maps that design
-onto the current repository and identifies the required code changes,
-migration order, and acceptance tests.
+`docs/design/llm-execution-language-safety.md`, with the full coding-flow
+lowering in `docs/design/single-decision-feature-development.md`. This document
+maps that design onto the current repository and identifies the required code
+changes, migration order, and acceptance tests.
 
 ## Current foundation
 
@@ -30,6 +36,9 @@ The repository already contains substantial pieces of the target system.
 | Capability exceptions | `core/capability_exception.py` | Exact argument binding, manifest fingerprint, signed approval, expiration, and use count |
 | Durable truth | `core/execution_state.py` | Action, obligation, evidence, finding, checkpoint, and capability decision events |
 | Workflow compilation | `execution/compile.py` | Closed phase action contracts and durable task generation |
+| Feature specification | `skill-definitions/specify-a-feature.yaml` and `design-interview.yaml` | Category-specific context gathering, typed proposal edits, deterministic generation, and evaluation |
+| Feature planning | `skill-definitions/start-implementing-feature.yaml` | Deterministic discovery, separated PR planning/effect allocation, workflow instantiation, and relationship checks |
+| Proposed-PR execution | `templates/execute-proposed-pr.yaml` and [PR #660](https://github.com/powdrr-io/powdrr-lift/pull/660) | Separate plan judgment, inspections, mechanical checks, scope capture, and one-action coding-loop round trips |
 
 This is not a greenfield design. The main work is to make these components use
 one semantic contract and to close compatibility paths that weaken guarantees.
@@ -60,6 +69,20 @@ Consequences include:
 - result-to-transition mapping is spread across runner code;
 - failure classes do not form an exhaustive per-step union; and
 - local outcome completeness cannot be checked directly.
+
+### LLM steps still hide multiple decisions
+
+Even a step with a closed action set can remain an underspecified mini-agent.
+Names such as `gather_context`, `implement_change_unit`, `review_code`, and
+`repair_finding` may combine tool choice, semantic judgment, mutation,
+verification, retry, and advancement in one model activation. A finite outer
+graph does not provide decision safety when an inner prompt recreates an agent
+loop.
+
+The canonical contract needs a single-decision normal form in which an LLM node
+has one question, one subject, one output schema, no tools, and no model-owned
+transition. Complex stages must lower into multiple judgment nodes separated by
+runner-owned observations, validation, effects, and branches.
 
 ### Operation state is durable data but not yet a language contract
 
@@ -128,6 +151,37 @@ unbounded coding loops. The language does not yet let an author declare a
 cycle's variant, finite work set, or resource consumption directly. This limits
 the strength and explainability of termination proofs.
 
+### Adaptive control flow is not a first-class total language
+
+The current schema has branch and coding-loop step types, and the runtime has
+iteration limits, but it does not yet define a small set of structured control
+forms with compositional semantics. In particular, there is no canonical
+contract for:
+
+- an exhaustive match over a closed typed value;
+- iteration over an immutable, cardinality-bounded repository snapshot;
+- a dynamically populated worklist with stable keys and monotone item state;
+- bounded rediscovery after mutations create a new evidence epoch;
+- parallel finite branches with deterministic joins; or
+- deriving a whole-workflow resource bound from nested control forms.
+
+As a result, useful data-driven work tends to be encoded either as generated
+static steps or as a broad model-controlled coding loop. The former is rigid;
+the latter makes termination depend on model behavior.
+
+### Control termination and operation containment are conflated
+
+A finite transition graph does not stop one provider call or subprocess from
+hanging. Conversely, a global wall-clock timeout contains damage without
+proving the program terminates semantically. The certificate and runtime need
+separate guarantees for control termination and operation termination, with
+`termination_safe` as their conjunction.
+
+Every LLM activation, response-repair attempt, tool call, subprocess, nested
+call, and external request needs an enforced local budget and a typed exhaustion
+result. Existing roundtrip limits are valuable containment, but they are not a
+compositional language-level proof and should not be reported as one.
+
 ### Exceptions grant effects but do not describe weakened proofs
 
 Capability exceptions are already tightly bound at runtime. They do not yet
@@ -143,9 +197,10 @@ both static analysis and runtime execution:
 @dataclass(frozen=True)
 class CompiledWorkflowContract:
     definition_fingerprint: str
-    steps: tuple[CompiledStepContract, ...]
+    body: ControlNode
     transitive_effects: EffectEnvelope
     resource_scope: ResourceScope
+    resource_limits: ResourceLimits
     obligations: tuple[ObligationSpec, ...]
     guarantees: SafetyCertificate
     dependency_fingerprints: tuple[str, ...]
@@ -167,10 +222,86 @@ class CompiledStepContract:
     owner: Literal["kernel", "llm", "human"]
     inputs: tuple[ValueSpec, ...]
     actions: tuple[ActionContract, ...]
+    decision: DecisionContract | None
     outcomes: tuple[OutcomeContract, ...]
     completion: CompletionContract
     progress_measure: ProgressMeasure | None
 ```
+
+For an LLM-owned step, `actions` is empty and `decision` is required. For a
+kernel-owned step, `decision` is absent. Define the decision boundary directly:
+
+```python
+@dataclass(frozen=True)
+class DecisionContract:
+    kind: Literal["classify_one", "construct_one", "extract_bounded_set"]
+    question: str
+    subject: ValueBinding
+    context: tuple[ValueBinding, ...]
+    output: ValueSpec
+    validator: ValidatorRef
+    limits: ActivationLimits
+    transport_action_const: str
+```
+
+`transport_action_const` may support existing provider envelopes, but it is a
+JSON-schema `const`, never a model-selectable enum. `classify_one` emits one
+enum value for one subject. `construct_one` emits one typed object such as one
+change unit or one bounded patch. `extract_bounded_set` is reserved for one
+cohesive discovery question and must declare stable keys and maximum
+cardinality. Independent questions or outputs require separate nodes.
+
+`ControlNode` should be a closed union of `SequenceNode`, `MatchNode`,
+`ForEachNode`, `WorklistNode`, `RepeatNode`, `RetryNode`, `ParallelNode`,
+`CallNode`, and `StepNode`. Compilation may lower these nodes to a graph for
+analysis and execution, but the structured source form retains the termination
+argument an author intended.
+
+Add immutable data/control types alongside the step contract:
+
+```python
+@dataclass(frozen=True)
+class CollectionSnapshot:
+    item_schema: SchemaRef
+    key_path: str
+    source_fingerprint: str
+    items: tuple[Mapping[str, Any], ...]
+    max_items: int
+
+
+@dataclass(frozen=True)
+class ForEachContract:
+    snapshot_binding: str
+    body: ControlNode
+    max_parallel: int
+    item_retry_budget: int
+    collect_binding: str
+
+
+@dataclass(frozen=True)
+class WorklistContract:
+    item_schema: SchemaRef
+    key_path: str
+    max_admissions: int
+    max_epochs: int
+    body: ControlNode
+
+
+@dataclass(frozen=True)
+class ActivationLimits:
+    wall_time_seconds: int
+    llm_turns: int
+    input_tokens: int
+    output_tokens: int
+    tool_calls: int
+    output_bytes: int
+    external_cost_microunits: int
+```
+
+Snapshots are values, not live views. Creating a new snapshot after a mutation
+creates a new evidence epoch and must consume an explicit epoch budget.
+Collection bounds, retry counts, parallelism, and activation limits participate
+in the compiled fingerprint and cannot be raised by an LLM decision.
 
 `workflow_step_behavior.py` should remain the source for behavior selection,
 but it should produce or participate in this compiled contract rather than
@@ -363,7 +494,7 @@ operation without a permitted durable terminal status, an output that lacks a
 successful producer record, and any operation whose result cannot be included
 in the active step's state projection.
 
-### 3. Close action contracts
+### 3. Close action contracts and normalize LLM decisions
 
 Change `core/skill_specification.py` and corresponding template/task schemas so
 new definitions must declare `actions`, including an explicit empty list.
@@ -382,6 +513,28 @@ actions. Human suspension and step transitions should be explicit outcomes or
 kernel behavior. `emit_outputs` may remain a provider protocol detail, but it
 must compile to an outcome rather than expand semantic authority silently.
 
+Add `judge` as the only strict-profile LLM node. It compiles to one
+`DecisionContract`; its semantic action set is empty. Validate that it has
+exactly one subject, one question, one required output, one validator, and one
+activation-limit contract. It may consume read-only context bindings but may not
+expose operations or select a transition.
+
+Update provider schemas so the transport action is a `const` derived from the
+decision contract. For example, a risk-classification node accepts only
+`return_risk_class`; it does not enumerate `read_document`, `invoke_tool`,
+`next_step`, or `complete`. Provider failure and response repair are
+kernel-owned result paths that consume budgets before another activation.
+
+Add a normalization pass that structurally rejects multiple subjects, outputs,
+actions, effects, or model-selected edges. Add a semantic lint for broad prompts
+that may hide multiple responsibilities; because arbitrary English cannot be
+proved narrow, an unrecognized decision form receives `decision_safe: unknown`
+rather than a false proof. Checked-in compatibility steps such as
+`gather_context`, `coding_loop`, `implement_change`, or `repair_finding` must
+either expand into registered single-decision and runner-owned nodes or remain
+unknown. Nested skills are checked after inlining their compiled summaries so a
+single-looking call cannot conceal a multi-action agent loop.
+
 ### 4. Introduce step outcomes
 
 Add outcome parsing and validation to:
@@ -391,9 +544,9 @@ Add outcome parsing and validation to:
 - `core/workflow_task_specification.py`; and
 - template instantiation and execution-plan compilation.
 
-Update `_step_action_response_schema` so provider schemas expose only the
+Update `_step_action_response_schema` so provider schemas expose only the one
 decision payload appropriate to the active step. Do not ask the LLM to return a
-success outcome for a runner-owned effect.
+success outcome for a runner-owned effect or to select an outgoing edge.
 
 Replace or extend `workflow_llm.WorkflowActionOutcome` with a semantic result:
 
@@ -540,7 +693,49 @@ The analyzer must distinguish:
 - an unknown cycle requiring an author declaration; and
 - an external wait represented as suspension rather than a cycle.
 
-### 9. Make suspension and partial completion first-class
+### 9. Add total, data-driven control forms
+
+Extend definition schemas with structured `match`, `for_each`, `worklist`,
+`repeat`, `retry`, `parallel`, and `sequence` nodes. Keep `branch` and
+`coding_loop` as compatibility syntax that normalizes into these forms where
+possible.
+
+Implement the following rules in the canonical compiler and shared runtime:
+
+- `match` reads one immutable typed value, requires disjoint cases, and is
+  exhaustive through closed-union coverage or an explicit `otherwise`;
+- `for_each` consumes a persisted `CollectionSnapshot` with stable unique keys
+  and a statically declared maximum cardinality;
+- `worklist` admits stable keys monotonically, never reinserts a disposed key in
+  the same epoch, and enforces admission and epoch bounds;
+- `repeat` consumes an epoch budget before entering another execution of its
+  body and exposes only structured `break` outcomes;
+- `retry` consumes its budget on every back edge, including provider-response
+  repair and child-call retry;
+- `parallel` has a finite child set, bounded concurrency, deterministic result
+  collection, and an explicit fail/join policy; and
+- snapshot refresh after mutation creates a new epoch, invalidates intersecting
+  evidence, and consumes an epoch budget.
+
+Add a lowering pass from structured control nodes to the existing CFG and an
+inverse validation pass for legacy graphs. Reject any reachable back edge that
+cannot be associated with a well-founded variant or finite resource. Do not add
+a general model-guarded `while` construct.
+
+Have the compiler derive a conservative symbolic cost for every subtree. For
+example, a loop cost is its maximum cardinality multiplied by its bounded body
+and retry cost; parallelism changes elapsed-time estimates, not the total call
+bound. Reject a definition whose derived local maxima exceed global workflow
+limits.
+
+Instrument every LLM and operation activation with `ActivationLimits`. Provider
+timeouts, invalid structured output, token exhaustion, subprocess timeout,
+output overflow, and tool-call exhaustion must produce typed outcomes. The
+kernel decrements budgets before dispatch so a crash cannot refund an attempt.
+Expose separate `control_termination_safe` and `operation_termination_safe`
+proofs and define `termination_safe` as their conjunction.
+
+### 10. Make suspension and partial completion first-class
 
 Add terminal status types for `blocked`, `suspended`, `partial`, `failed`, and
 `cancelled`. Define which may resume and what event is required.
@@ -557,7 +752,7 @@ Persist a suspension record with:
 Partial completion must enumerate valid outputs and must not satisfy global
 success gates.
 
-### 10. Integrate exceptions with certificates
+### 11. Integrate exceptions with certificates
 
 Extend `CapabilityExceptionRequest` with:
 
@@ -577,7 +772,7 @@ Secret access should remain non-exceptionable unless a separate policy and
 data-flow model is introduced. Exceptions must never authorize forged evidence,
 suppressed failures, or unrecorded effects.
 
-### 11. Add safety profiles and enforcement modes
+### 12. Add safety profiles and enforcement modes
 
 Define profile requirements independently from proof generation:
 
@@ -599,7 +794,7 @@ Map existing `ExecutionMode` values carefully:
 Do not make profile names change proof results. A permissive profile may accept
 an unknown property, but the certificate must continue to say `unknown`.
 
-### 12. Bind runtime execution to compiled certificates
+### 13. Bind runtime execution to compiled certificates
 
 At execution creation, persist:
 
@@ -622,27 +817,41 @@ The compiler should use explicit passes in this order:
 2. normalization and compatibility expansion;
 3. reference and handoff resolution;
 4. action and outcome closure;
-5. operation lifecycle and output-producer resolution;
-6. operation and effect resolution;
-7. resource-scope checking;
-8. nested-skill fixed-point composition;
-9. CFG and abstract-state construction;
-10. completion and evidence observability;
-11. retry relevance;
-12. progress and termination proof;
-13. replay/idempotency proof; and
-14. certificate generation.
+5. single-decision normalization and hidden-agent rejection;
+6. operation lifecycle and output-producer resolution;
+7. operation and effect resolution;
+8. resource-scope checking;
+9. nested-skill fixed-point composition;
+10. structured control typing and exhaustiveness;
+11. snapshot/worklist key and cardinality validation;
+12. CFG and abstract-state construction;
+13. completion and evidence observability;
+14. retry relevance;
+15. variant and control-termination proof;
+16. activation-limit and whole-workflow resource-bound proof;
+17. replay/idempotency proof; and
+18. certificate generation.
 
 Add stable diagnostic families for:
 
 - omitted or implicitly expanded authority;
+- multiple decisions, outputs, or model-selectable transport actions in one LLM
+  activation;
+- LLM nodes that expose tools, effects, transition actions, or self-retry;
+- broad compatibility nodes that conceal an uncompiled inner agent loop;
 - incomplete outcome unions;
 - unmapped operation result variants;
 - scope widening at nested calls;
 - undeclared transitive effects;
 - stale or unproducible evidence requirements;
+- non-exhaustive or overlapping match cases;
+- live or unbounded collection iteration;
+- duplicate or unstable work-item keys;
+- worklist reinsertion and unbounded rediscovery;
 - cycles without a variant;
 - non-decreasing variants;
+- activations without enforceable local limits;
+- derived resource bounds that exceed workflow limits;
 - non-idempotent effects without reconciliation;
 - certificate/runtime fingerprint drift; and
 - exception attempts that weaken forbidden guarantees.
@@ -666,6 +875,8 @@ fingerprints are stable across processes and platforms.
 ### Phase 2: Closed actions and explicit outcomes
 
 - Migrate all checked-in steps to explicit actions.
+- Add `DecisionContract` and strict `judge` nodes with one constant transport
+  action, one subject, one question, one output, and no tool authority.
 - Add outcomes while compiling legacy transitions for compatibility.
 - Remove implicit `prompt_user`, `next_step`, and `complete` authority from the
   current schema version.
@@ -673,6 +884,8 @@ fingerprints are stable across processes and platforms.
 
 Acceptance gate: deleting an action or outcome from a contract makes the
 corresponding runtime behavior impossible, not merely discouraged.
+Every strict LLM activation has exactly one legal decision payload; broad
+compatibility nodes receive `decision_safe: unknown`.
 
 ### Phase 3: Unified effects and scopes
 
@@ -700,12 +913,17 @@ profile.
 
 - Expand completion over durable evidence and obligations.
 - Add evidence invalidation.
-- Add variants and finite resource declarations.
+- Add structured matches, snapshots, bounded worklists, finite parallel joins,
+  variants, and finite resource declarations.
+- Enforce per-activation time, turn, token, call, output, and cost limits.
+- Derive conservative resource bounds compositionally across nested controls.
 - Prove all reachable cycles or classify them as bounded, disproven, or
   unknown.
 
 Acceptance gate: all checked-in strict workflows have no unobservable
-completion, ineffective retry, non-progress cycle, or unknown unbounded cycle.
+completion, ineffective retry, non-progress cycle, unknown unbounded cycle, or
+unbounded reachable activation. Their certificates separately prove control
+termination and operation termination.
 
 ### Phase 6: Exceptions and strict enforcement
 
@@ -718,6 +936,44 @@ Acceptance gate: an exception can authorize only its exact bound operation and
 cannot transitively broaden a child, forge evidence, or change an unrelated
 proof.
 
+### Reference feature-flow migration order
+
+Use the flow in `docs/design/single-decision-feature-development.md` as the
+first full conformance target:
+
+1. In `design-interview`, split each category's `gather_context` from its one
+   category-edit judgment. Replace the model-authored aggregate JSON edit with
+   deterministic serialization. Convert evaluator repair into a bounded issue
+   worklist.
+2. In `specify-a-feature`, replace model-owned name/context stopping decisions
+   with typed intake judgments and explicit human suspension. Compile
+   `finish-pr-prep` and `create-pull-request` transitively into runner-owned
+   readiness and publication operations.
+3. In `start-implementing-feature`, preserve the three deterministic discovery
+   operations and deterministic evaluator gates. Convert PR planning to one
+   entry per planning subject, effect allocation to one PR classification per
+   effect, workflow creation to a snapshot loop, and relationship review to
+   deterministic evaluators.
+4. Take PR #660's `execute-proposed-pr` separation as the migration baseline.
+   Convert planned file/symbol inspections from model-invoked tasks to runner
+   `for_each` operations. Replace the one-action coding loop with one patch
+   judgment per derived change unit. Replace global completeness and scope
+   reports with one verdict per criterion, changed symbol, invariant, security
+   obligation, and changed path.
+5. Add the outer dependency-aware workflow worklist. A proposed-PR workflow is
+   ready only when every predecessor PR has a durable merged receipt; otherwise
+   execution suspends without polling.
+6. Add feature-wide acceptance after all proposed PRs merge. Re-derive
+   obligations from the integrated tree and require fresh evidence for
+   acceptance criteria, expected tests, required test cases, invariants,
+   security obligations, and non-goals.
+
+Acceptance gate: record every provider request in a complete feature run and
+assert that its schema has one constant transport action, one subject, one
+required output, no tools, and no model-selected transition. Also assert that
+the run cannot publish a PR or feature-success result from stale or incomplete
+evidence.
+
 ## Verification strategy
 
 ### Unit tests
@@ -726,10 +982,17 @@ proof.
 - operation lifecycle transition legality and durable record reduction;
 - state-projection contents, immutability, and provider serialization;
 - outcome exhaustiveness and payload schemas;
+- decision-contract exclusivity, constant transport actions, and rejection of
+  tool-bearing or multi-output LLM nodes;
 - resource selector subset and intersection laws;
 - operation result-to-outcome mapping;
 - completion evaluation and evidence invalidation;
-- variant decrease and finite-budget consumption; and
+- match disjointness and exhaustiveness;
+- snapshot sealing, stable key uniqueness, and cardinality limits;
+- worklist monotonicity, admission limits, and epoch changes;
+- deterministic parallel joins and bounded child cancellation;
+- variant decrease, finite-budget consumption, and symbolic cost composition;
+- activation-limit exhaustion result mapping; and
 - exception binding and expiration.
 
 ### Compiler golden tests
@@ -744,6 +1007,7 @@ For every step type and built-in operation, assert that:
 
 - runtime ownership matches compiled ownership;
 - runtime actions equal the closed compiled set;
+- an LLM request exposes exactly one decision schema and no operation catalog;
 - concrete effects are covered by the compiled envelope;
 - runtime transition selection uses declared outcomes; and
 - completion uses the same condition evaluator as static analysis; and
@@ -779,6 +1043,11 @@ Generate small workflow graphs and verify:
 
 - no proven-safe graph contains a reachable stuck state;
 - every termination-safe graph has no infinite abstract trace;
+- a proven `for_each` executes each sealed key at most its declared attempt
+  count regardless of scheduling;
+- a proven worklist never increases its remaining-admission measure or
+  resurrects a disposed key within an epoch;
+- the symbolic resource bound is never lower than a concrete generated trace;
 - scope intersection never widens authority;
 - adding a nested effect never reduces the parent envelope;
 - evidence-invalidating mutations prevent stale completion; and
@@ -789,7 +1058,23 @@ Generate small workflow graphs and verify:
 Exercise:
 
 - deterministic success;
+- a complete `specify-a-feature` -> `design-interview` ->
+  `start-implementing-feature` -> dependency-ordered `execute-proposed-pr` ->
+  feature-acceptance run in which every recorded LLM request has one constant
+  transport action and no tool catalog;
+- a documentation-only feature that skips irrelevant integration and security
+  branches through an exhaustive match;
+- a cross-boundary feature whose repository-derived plan contains multiple
+  change units and whose diff derives multiple verification obligations;
 - semantic repair followed by fresh validation;
+- a repair mutation that invalidates evidence and causes only affected
+  obligations to run in the next bounded epoch;
+- repeated model response failures, tool timeout, token exhaustion, and output
+  overflow, each reaching its declared exhaustion outcome without another
+  implicit activation;
+- an oversized or duplicate-key collection rejected before loop entry;
+- a review that keeps discovering findings and deterministically exhausts its
+  admission or epoch budget;
 - ineffective retry rejection;
 - nested transitive effect denial;
 - crash and reconciliation around a non-idempotent effect;
@@ -820,11 +1105,32 @@ The first change set should remain intentionally narrow:
 This slice creates the architectural seam needed for later effect unification
 without attempting a repository-wide language migration in one PR.
 
+The next slice should add `DecisionContract` and compile one planning judgment,
+one classification, and one bounded patch proposal into strict `judge` nodes.
+Assert that adding a second output, tool, action discriminator, self-retry, or
+model-selected transition makes `decision_safe` fail. Lower the corresponding
+PR #660 compatibility tasks into these nodes without changing their outputs.
+
+The first control-flow slice after decision normalization should add `MatchSpec`,
+`CollectionSnapshot`, and `ForEachSpec` only. Migrate one read-only discovery
+sequence and one validation-obligation loop, lower both forms into the existing
+CFG, and prove their case coverage and cardinality bounds. Add worklists,
+parallel joins, and epoch refresh only after snapshot semantics and durable item
+records are stable.
+
 ## What not to do
 
 - Do not build a second runtime inside the static analyzer.
 - Do not infer authoritative effects or completion from prompt prose.
+- Do not mistake “one action per model round trip” for one legal decision when
+  the model still selects the action kind.
+- Do not hide a coding agent inside a broadly named judgment or nested skill.
 - Do not call a workflow safe because one successful path exists.
+- Do not claim general Turing completeness for the orchestration language while
+  also promising decidable termination for every accepted definition.
+- Do not encode live repository queries or model-selected `while` loops as
+  iterable collections.
+- Do not use a global timeout as a substitute for a control-termination proof.
 - Do not treat a warning baseline as a proof.
 - Do not require parents to restate every nested child action manually.
 - Do not use one global safety level to hide which properties are unknown.
@@ -837,11 +1143,18 @@ without attempting a repository-wide language migration in one PR.
 The implementation is complete when:
 
 - definitions compile into one runtime-consumed contract;
-- every LLM boundary has a closed action and outcome union;
+- every LLM boundary has exactly one decision contract, one constant transport
+  action, one required output, and no model-owned operation or transition;
 - every executable operation has one static/runtime effect contract;
 - nested effects and resource scopes compose transitively;
 - completion depends on fresh structured evidence and obligations;
+- exhaustive branches and bounded repository-derived collections are
+  first-class compiled control forms;
 - every reachable cycle is proven terminating, explicitly bounded, or rejected;
+- every reachable LLM and operation activation has enforced local resource
+  limits and a typed exhaustion outcome;
+- certificates separately prove control termination and operation termination,
+  and report overall termination as their conjunction;
 - exceptions weaken only named guarantees within exact scope;
 - execution is bound to definition, dependency, manifest, and profile
   fingerprints; and

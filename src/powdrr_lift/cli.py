@@ -145,12 +145,12 @@ from powdrr_lift.workflow_ambiguity_review import (
     review_workflow_definition_step,
 )
 from powdrr_lift.workflow_chat_agent import (
-    WorkflowChatConfig,
     choose_workflow_provider,
     download_local_qwen_model,
     resolve_workflow_provider,
     run_workflow_chat,
 )
+from powdrr_lift.workflow_chat_selection import WorkflowChatConfig
 from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
 from powdrr_lift.workflow_definition_analysis import (
     analyze_workflow_definition,

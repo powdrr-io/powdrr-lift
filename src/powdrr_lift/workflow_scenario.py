@@ -44,13 +44,12 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
 from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
-    SkillChatConfig,
-    SkillChatSelection,
     _ChatWorkflowExecutionStrategy,
     _workflow_action_signature,
     _WorkflowProgressDisplay,
     resolve_workflow_provider,
 )
+from powdrr_lift.workflow_chat_selection import SkillChatConfig, SkillChatSelection
 from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
 from powdrr_lift.workflow_llm import WorkflowStepRunner
 from powdrr_lift.workflow_models import SkillCatalogEntry

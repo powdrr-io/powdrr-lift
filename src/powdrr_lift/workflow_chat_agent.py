@@ -61,6 +61,7 @@ from powdrr_lift.agent.providers import (
     provider_model_limits,
     resolve_local_model_path,
     resolve_provider_credentials,
+    resolve_provider_roles,
 )
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -2289,7 +2290,11 @@ def run_workflow_chat(
         print(f"No skills found in {skills_dir}.", file=stderr)
         return 1
 
-    provider_roles = _resolve_provider_roles(config)
+    provider_roles = resolve_provider_roles(
+        config.provider,
+        normal_provider=config.normal_provider,
+        adversarial_provider=config.adversarial_provider,
+    )
     provider_role: LLMProviderRole = "normal"
     provider = provider_roles.provider_for(provider_role)
     current_model = _initial_model_for_provider(provider, config.model)
@@ -11628,41 +11633,15 @@ def _resolve_provider(
     return "openai"
 
 
-def _resolve_provider_roles(config: SkillChatConfig) -> LLMProviderRoles:
-    """Resolve the two opaque provider roles used by workflow execution."""
-    if config.normal_provider is not None:
-        normal = config.normal_provider
-    elif config.provider == "auto":
-        candidates = auto_provider_candidates()
-        normal = candidates[0] if candidates else "openai"
-    else:
-        normal = config.provider
-    provider_definition(normal)
-
-    adversarial = config.adversarial_provider
-    if adversarial is None and config.provider == "auto":
-        candidates = auto_provider_candidates()
-        adversarial = next(
-            (candidate for candidate in candidates if candidate != normal),
-            None,
-        )
-    if adversarial is not None:
-        provider_definition(adversarial)
-    return LLMProviderRoles(normal=normal, adversarial=adversarial)
-
-
 def resolve_workflow_provider(
     provider: str = "auto",
     *,
     normal_provider: str | None = None,
 ) -> str:
     """Resolve the normal provider using workflow-chat's provider policy."""
-    return _resolve_provider_roles(
-        SkillChatConfig(
-            skills_dir=Path("."),
-            provider=provider,
-            normal_provider=normal_provider,
-        )
+    return resolve_provider_roles(
+        provider,
+        normal_provider=normal_provider,
     ).normal
 
 

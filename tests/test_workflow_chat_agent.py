@@ -34,6 +34,7 @@ from powdrr_lift.agent.providers import (
     _serialize_messages,
     resolve_local_model_path,
     resolve_provider_credentials,
+    resolve_provider_roles,
 )
 from powdrr_lift.cli import main
 from powdrr_lift.core import (
@@ -121,7 +122,6 @@ from powdrr_lift.workflow_chat_agent import (
     _resolve_local_model_context,
     _resolve_project_root,
     _resolve_provider,
-    _resolve_provider_roles,
     _resolve_skill_path,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
@@ -3462,7 +3462,7 @@ def test_auto_provider_roles_use_the_top_two_configured_providers(
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
     monkeypatch.setenv("ZAI_API_KEY", "zai-token")
 
-    roles = _resolve_provider_roles(SkillChatConfig(skills_dir=Path("skills")))
+    roles = resolve_provider_roles("auto")
 
     assert isinstance(roles, LLMProviderRoles)
     assert roles.normal == "deepinfra-cheap"
@@ -3483,7 +3483,7 @@ def test_auto_provider_roles_return_no_adversarial_provider_when_only_one_is_con
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
     monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
 
-    roles = _resolve_provider_roles(SkillChatConfig(skills_dir=Path("skills")))
+    roles = resolve_provider_roles("auto")
 
     assert roles.normal == "deepinfra-cheap"
     assert roles.adversarial is None

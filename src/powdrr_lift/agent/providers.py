@@ -23,6 +23,7 @@ from powdrr_lift.agent.provider_config import (
     LLM_PROVIDERS,
     MAX_COMPLETION_TOKENS,
     LLMModelLimits,
+    LLMProviderRoles,
     provider_definition,
 )
 from powdrr_lift.errors import PowdrrExecutionError
@@ -169,6 +170,33 @@ def available_provider_names() -> tuple[str, ...]:
         priority = definition.auto_priority
         candidates.append((priority if priority is not None else 100, name))
     return tuple(name for _, name in sorted(candidates))
+
+
+def resolve_provider_roles(
+    provider: str,
+    *,
+    normal_provider: str | None = None,
+    adversarial_provider: str | None = None,
+) -> LLMProviderRoles:
+    if normal_provider is not None:
+        normal = normal_provider
+    elif provider == "auto":
+        candidates = auto_provider_candidates()
+        normal = candidates[0] if candidates else "openai"
+    else:
+        normal = provider
+    provider_definition(normal)
+
+    adversarial = adversarial_provider
+    if adversarial is None and provider == "auto":
+        candidates = auto_provider_candidates()
+        adversarial = next(
+            (candidate for candidate in candidates if candidate != normal),
+            None,
+        )
+    if adversarial is not None:
+        provider_definition(adversarial)
+    return LLMProviderRoles(normal=normal, adversarial=adversarial)
 
 
 def resolve_local_model_path(model_cache_dir: Path) -> Path:

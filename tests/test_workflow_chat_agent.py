@@ -126,15 +126,11 @@ from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
     SkillChatEdit,
     _action_repair_prompt,
-    _build_json_repair_messages,
     _build_step_execution_messages,
-    _complete_json_with_model_fallback,
     _empty_pull_request_error,
     _latest_deterministic_pre_step,
     _load_workflow_context,
-    _parse_json_object,
     _prompt_user,
-    _repair_response_fingerprint,
     _resolve_worktree_context,
     _resolve_worktree_for_request,
     _step_action_response_schema,
@@ -155,6 +151,12 @@ from powdrr_lift.workflow_chat_selection import (
     _catalog_entry_to_data,
     _resolve_skill_path,
     _validate_user_question,
+)
+from powdrr_lift.workflow_chat_transport import (
+    _build_json_repair_messages,
+    _complete_json_with_model_fallback,
+    _parse_json_object,
+    _repair_response_fingerprint,
 )
 from powdrr_lift.workflow_execution_loop import (
     _coding_loop_worktree_fingerprint,

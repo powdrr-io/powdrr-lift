@@ -341,6 +341,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     proposed_pr_input = template.task_templates[0].input_state["proposed_pr"]
     assert proposed_pr_input == "<proposed-pr-id>"
     assert template.task_templates[0].input_state["feature_id"] == "<work-item-name>"
+    assert template.task_templates[0].dependent_state == ()
     assert [
         cast(PhaseType, task.phase_type).value for task in template.task_templates
     ] == [

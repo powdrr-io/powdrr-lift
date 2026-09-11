@@ -1,7 +1,7 @@
 ---
 id: execute-proposed-pr
 when_to_use:
-- When an approved proposed PR is ready to execute.
+- When `start-implementing-feature` has approved a proposed PR for execution.
 - When implementation must be validated against the proposed PR specification
   before creating the PR.
 how_to_fill_this_out:
@@ -75,8 +75,10 @@ task_templates:
     for example:
     {"action":"next_step","output_state":{"proposed-pr-context-state":"the exact gathered result"},"decisions_and_context":"Assigned the deterministic proposed PR context for planning."}
   output_state_type: proposed-pr-context-state
-  dependent_state:
-  - proposed-pr-context-gathered
+  # Approval is supplied by start-implementing-feature. The deterministic
+  # pre-step below gathers the context this task needs; it is not a separate
+  # plan-review gate.
+  dependent_state: []
 - description: Create the execution plan
   phase_type: plan_pr
   persona_id: engineer

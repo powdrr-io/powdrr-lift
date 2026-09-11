@@ -65,6 +65,13 @@ from powdrr_lift.pr_workflow_record import (
     record_pull_request_workflow,
 )
 from powdrr_lift.workflow_action_catalog import step_actions
+from powdrr_lift.workflow_action_operations import (
+    _apply_file_edits,
+    _apply_yaml_operations,
+    _list_worktree_files,
+    _record_skill_pull_request,
+    _resolve_pre_step_template,
+)
 from powdrr_lift.workflow_action_protocol import _parse_action_response
 from powdrr_lift.workflow_action_validation import (
     _invalidate_deterministic_pre_step,
@@ -77,15 +84,10 @@ from powdrr_lift.workflow_action_validation import (
 )
 from powdrr_lift.workflow_catalog import find_skill_by_name, load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
-    _apply_file_edits,
-    _apply_yaml_operations,
     _build_step_execution_messages,
     _execute_shell_tool,
-    _list_worktree_files,
     _print_waiting_for_model,
-    _record_skill_pull_request,
     _require_coding_loop_verification,
-    _resolve_pre_step_template,
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,

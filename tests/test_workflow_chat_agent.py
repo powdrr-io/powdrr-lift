@@ -78,6 +78,16 @@ from powdrr_lift.workflow_action_catalog import (
 from powdrr_lift.workflow_action_catalog import (
     step_actions as _step_actions,
 )
+from powdrr_lift.workflow_action_operations import (
+    WorkflowEditRangeError as _WorkflowEditRangeError,
+)
+from powdrr_lift.workflow_action_operations import (
+    WorkflowYamlEditError as _WorkflowYamlEditError,
+)
+from powdrr_lift.workflow_action_operations import (
+    _apply_file_edits,
+    _apply_yaml_operations,
+)
 from powdrr_lift.workflow_action_protocol import (
     _parse_action_response,
     _parse_workflow_action_delete_file,
@@ -108,8 +118,6 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatConfig,
     SkillChatEdit,
     _action_repair_prompt,
-    _apply_file_edits,
-    _apply_yaml_operations,
     _build_json_repair_messages,
     _build_selection_messages,
     _build_step_execution_messages,
@@ -140,9 +148,7 @@ from powdrr_lift.workflow_chat_agent import (
     _workflow_action_material_state,
     _workflow_action_progress_status,
     _workflow_edit_failure_feedback,
-    _WorkflowEditRangeError,
     _WorkflowProgressDisplay,
-    _WorkflowYamlEditError,
     _worktree_reuse_decision,
     available_workflow_providers,
     choose_workflow_provider,

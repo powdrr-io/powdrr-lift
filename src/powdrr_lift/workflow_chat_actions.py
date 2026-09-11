@@ -47,6 +47,12 @@ from powdrr_lift.workflow_action_validation import (
     _validate_structured_document_text,
     _worktree_relative_path,
 )
+from powdrr_lift.workflow_chat_contract import (
+    _file_edits_to_data,
+    _normalize_structured_document_text,
+    _resolve_generated_file_path_from_command,
+    _yaml_operation_to_data,
+)
 from powdrr_lift.workflow_chat_selection import WorkflowChatConfig
 from powdrr_lift.workflow_execution_loop import _execute_shell_tool
 from powdrr_lift.workflow_execution_state import (
@@ -76,28 +82,12 @@ def _support_call(name: str, *args: Any, **kwargs: Any) -> Any:
     return _chat_support(name)(*args, **kwargs)
 
 
-def _file_edits_to_data(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_file_edits_to_data", *args, **kwargs)
-
-
-def _normalize_structured_document_text(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_normalize_structured_document_text", *args, **kwargs)
-
-
 def _verbose_print(*args: Any, **kwargs: Any) -> Any:
     return _support_call("_verbose_print", *args, **kwargs)
 
 
-def _yaml_operation_to_data(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_yaml_operation_to_data", *args, **kwargs)
-
-
 def _prompt_user(*args: Any, **kwargs: Any) -> Any:
     return _support_call("_prompt_user", *args, **kwargs)
-
-
-def _resolve_generated_file_path_from_command(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_resolve_generated_file_path_from_command", *args, **kwargs)
 
 
 def _workflow_action_handlers() -> dict[

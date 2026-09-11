@@ -19,6 +19,24 @@ This is a multi-PR migration. Every PR below must be independently mergeable,
 keep the existing workflow path working, and add observable evidence before it
 enforces new behavior.
 
+## Three-layer product boundary
+
+The implementation must keep three concerns distinct:
+
+- The **product/lifecycle language** describes specification-v1 documents,
+  current state, requirements, architecture, implementation intent, proposed
+  PRs, decisions, and other durable product artifacts.
+- The **process language** describes skills, workflows, templates, tasks, steps,
+  actions, effects, outcomes, handoffs, and liveness constraints for LLM-led
+  work.
+- The **agent** authors and manipulates artifacts in either language and
+  proposes process actions, but consumes compiled contracts and cannot become
+  an alternate parser, validator, or transition owner.
+
+Product and process compilers may exchange typed artifact references and
+compiled views. They must not depend on the agent runtime or provider modules;
+the agent runtime is the consumer and adapter layer over both languages.
+
 ## Required outcomes
 
 The implementation is complete when all of the following are true:
@@ -179,6 +197,19 @@ src/powdrr_lift/
     tool_manifest.py
     behavior_rule.py
     action_relationship.py
+  product/
+    model.py
+    parser.py
+    validation.py
+    compiler.py
+    catalog.py
+  process/
+    model.py
+    parser.py
+    validation.py
+    compiler.py
+    analysis.py
+    catalog.py
   execution/
     __init__.py
     store.py
@@ -201,6 +232,13 @@ The module boundaries are:
 
 - `core/*`: frozen dataclasses, enums, `to_data`/`from_data`, schema-version
   constants, and pure validation reports. These modules do no I/O.
+- `product/*`: product/lifecycle language parsing, coherence validation,
+  compilation, and artifact views. It does not know how an LLM is prompted or
+  how a process action executes.
+- `process/*`: skill/workflow language parsing, action/effect/outcome
+  validation, liveness analysis, compilation, and process views. It may refer
+  to product artifacts through typed contracts, but does not parse product
+  implementation modules.
 - `execution/store.py`: atomic files, event append, materialized snapshots,
   optimistic versions, and file locking where required.
 - `execution/events.py`: event envelope and pure event reduction.
@@ -218,6 +256,11 @@ The module boundaries are:
 - `execution/checkpoints.py`: content-addressed workspace snapshots and revert.
 - `execution/kernel.py`: coordinates the above through protocols; contains no
   CLI, MCP, provider, GitHub, or terminal presentation logic.
+
+The dependency rule is directional: `product` and `process` compile into
+contracts; `execution` enforces process contracts and records lifecycle state;
+`agent` proposes and renders; adapters expose the agent to users. No compiler
+may import the agent to validate its own output.
 
 Avoid importing `workflow_chat_agent` or `workflow_task_agent` from the new
 package. Dependency direction must point from those adapters into `execution`.

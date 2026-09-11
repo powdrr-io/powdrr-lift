@@ -6,15 +6,32 @@ Refactor Powdrr Lift so agent code is a consumer of validated definitions and
 execution contracts, not an alternate owner of their schema, validation, or
 semantics.
 
+Powdrr is intentionally becoming three related but distinct systems:
+
+1. **The product/lifecycle language** describes the product and its durable
+   knowledge: specification-v1 documents, current state, proposed PRs,
+   requirements, architecture, implementation intent, and decisions.
+2. **The process language** describes LLM-led work: skills, workflows, workflow
+   templates, tasks, steps, actions, effects, outcomes, handoffs, and
+   liveness/safety guarantees.
+3. **The agent** authors and manipulates artifacts in both languages and
+   executes processes under their compiled contracts. It is an interpreter and
+   adapter, not the owner of either language's meaning.
+
+The refactor must preserve this distinction in the package layout and import
+graph. Product artifacts and process definitions may refer to one another
+through typed identifiers and compiled contracts, but neither language may
+depend on provider-specific agent code.
+
 The target dependency direction is:
 
 ```text
-definition source
-    -> definition parser and validator
-    -> compiled execution contract
-    -> execution kernel and state projection
-    -> agent proposal loop
-    -> provider / human adapter
+product and lifecycle language       process language
+    -> product compiler                   -> process compiler
+    -> product contracts                  -> process contracts
+                   \                     /
+                    -> agent/execution kernel
+                    -> provider / human adapter
 ```
 
 The agent may propose an action or a semantic decision. It must not parse
@@ -56,13 +73,19 @@ the ownership and dependency rules should remain stable.
 
 ```text
 powdrr_lift/
-  definitions/
-    model.py                 # source definition types and versioned schema
-    parser.py                # YAML/JSON loading and normalization
-    validation.py            # structural and reference validation
-    compiler.py              # Definition -> CompiledDefinition
+  product/
+    model.py                 # product/lifecycle artifacts and versioned schemas
+    parser.py                # specification-v1 and lifecycle artifact loading
+    validation.py            # product coherence and reference validation
+    compiler.py              # product source -> product contracts/views
+    catalog.py               # product artifact discovery and context metadata
+  process/
+    model.py                 # skills, workflows, tasks, and step schemas
+    parser.py                # process YAML/JSON loading and normalization
+    validation.py            # action, effect, outcome, and reference checks
+    compiler.py              # process source -> compiled process contract
     analysis.py              # CFG, liveness, effects, handoffs, diagnostics
-    catalog.py               # discovery and human-facing definition metadata
+    catalog.py               # process discovery and human-facing metadata
   contracts/
     action.py                # closed action and argument contracts
     outcome.py               # result and transition contracts
@@ -93,21 +116,42 @@ imports should become thin re-exports rather than additional implementations.
 
 ## Ownership rules
 
-### Definitions own meaning
+### Product language owns product meaning
 
-The definitions layer owns:
+The product layer owns:
 
-- source schemas and version migration;
+- specification-v1 schemas and lifecycle artifact schemas;
+- requirements, architecture, implementation intent, proposed PRs, and
+  current-state documents;
+- product references, relationships, versioning, and coherence rules; and
+- compilation into immutable product contracts and agent-facing views.
+
+It must not import skills, workflows, provider clients, prompt transports,
+tool adapters, or execution state. Product documents can be authored or
+modified by an agent, but the agent cannot redefine their schema or declare a
+document valid.
+
+### Process language owns execution meaning
+
+The process layer owns:
+
+- skill, workflow, template, task, and step schemas and version migration;
 - parsing and normalization;
 - references, placeholders, and dependency resolution;
-- the canonical definition model;
+- the canonical process model;
 - compiler diagnostics;
 - CFG, liveness, effect, handoff, and completion analysis; and
-- compilation into an immutable execution contract.
+- compilation into an immutable process execution contract.
 
-It may depend on pure contract types. It must not import provider clients,
-prompt transports, interactive UI, tool adapters, worktree mutation, or durable
-execution state.
+It may depend on pure contract types and typed product references. It must not
+import provider clients, prompt transports, interactive UI, tool adapters,
+worktree mutation, or durable execution state.
+
+Product and process compilers are separate even when a process consumes
+product artifacts. A workflow may request product context or produce a
+proposed-PR artifact, but that relationship is represented as a typed input or
+output contract rather than an import from process code into product parsing
+implementation.
 
 ### Contracts own shared vocabulary
 
@@ -145,9 +189,11 @@ The agent layer owns:
 - provider retry policy; and
 - generic proposal-loop coordination.
 
-It may inspect the closed action and outcome schemas supplied by the compiler,
-but it cannot add actions, widen scopes, validate completion, or commit a
-transition. A proposal is data passed to the kernel, not an execution fact.
+It may inspect product views and the closed action/outcome schemas supplied by
+the compilers, and it may propose edits to either language. It cannot add
+product or process schema fields, add actions, widen scopes, validate
+completion, or commit a transition. A proposal is data passed to the relevant
+validator or kernel, not an execution fact.
 
 ### Adapters own product-specific policy
 
@@ -319,6 +365,9 @@ Maintain tests at four levels:
 Add architecture tests that assert:
 
 - definitions do not import agent or provider modules;
+- product modules do not import process compilers or agent/provider modules;
+- process modules do not import product implementation modules or agent/provider
+  modules;
 - contracts do not import definitions, providers, or execution adapters;
 - agents do not call raw definition validators or tool adapters directly;
 - adapters depend on interfaces rather than private helpers; and
@@ -346,6 +395,10 @@ ownership moves underneath them.
 The refactor is complete when:
 
 - definition parsing and validation can run without importing agent code;
+- product-language parsing and validation can run without importing process or
+  agent code;
+- process-language parsing, validation, and liveness analysis can run without
+  importing product implementation, agent, or provider code;
 - agent proposal tests can run without loading definition files or real tools;
 - execution truth and transitions are owned by the kernel;
 - chat and durable task execution share the same compiled-contract and state

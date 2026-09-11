@@ -19,12 +19,17 @@ from urllib.request import Request, urlopen
 import laga
 
 from powdrr_lift.agent.provider_config import (
+    DEFAULT_LLM_TYPE,
+    DEFAULT_MODEL,
     DEFAULT_MODEL_LIMITS,
     LLM_PROVIDERS,
     MAX_COMPLETION_TOKENS,
     LLMModelLimits,
+    LLMModelMapping,
     LLMProviderRoles,
+    default_llm_mappings,
     provider_definition,
+    provider_supports_llm_mappings,
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workflow_llm import (
@@ -197,6 +202,82 @@ def resolve_provider_roles(
     if adversarial is not None:
         provider_definition(adversarial)
     return LLMProviderRoles(normal=normal, adversarial=adversarial)
+
+
+def initial_model_for_provider(provider: str, configured_model: str) -> str:
+    """Resolve the first request model using the selected provider's mapping."""
+    definition = provider_definition(provider)
+    if definition.forced_model is not None:
+        return definition.forced_model
+    if configured_model != DEFAULT_MODEL:
+        return configured_model
+    mapping = definition.llm_mappings.get(DEFAULT_LLM_TYPE)
+    return mapping.model if mapping is not None else configured_model
+
+
+def resolve_llm_model(
+    llm_type: str | None,
+    *,
+    fallback_model: str,
+    mappings: Sequence[tuple[str, LLMModelMapping]],
+    provider: str = "zai",
+) -> str:
+    if llm_type is None or not provider_supports_llm_mappings(provider):
+        return fallback_model
+    resolved_mapping = resolve_llm_mapping(
+        llm_type,
+        mappings=mappings,
+        provider=provider,
+    )
+    return resolved_mapping.model if resolved_mapping is not None else fallback_model
+
+
+def resolve_llm_mapping(
+    llm_type: str | None,
+    *,
+    mappings: Sequence[tuple[str, LLMModelMapping]],
+    provider: str,
+) -> LLMModelMapping | None:
+    if llm_type is None:
+        return None
+    if not provider_supports_llm_mappings(provider):
+        raise PowdrrExecutionError(
+            f"LLM mappings are not supported for provider {provider!r}."
+        )
+    normalized_llm_type = llm_type.strip().lower().replace("-", "_")
+    mapping = dict(default_llm_mappings(provider))
+    mapping.update(
+        {key.strip().lower().replace("-", "_"): value for key, value in mappings}
+    )
+    resolved_mapping = mapping.get(normalized_llm_type)
+    if resolved_mapping is None:
+        raise PowdrrExecutionError(
+            f"No LLM mapping is configured for llm_type {llm_type!r} "
+            f"with provider {provider!r}."
+        )
+    return resolved_mapping
+
+
+def backup_model_for(
+    model: str,
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
+) -> LLMModelMapping | None:
+    normalized_model = model.casefold()
+    for _, mapping in model_mappings:
+        if mapping.model.casefold() == normalized_model:
+            return mapping.backup_model
+    return None
+
+
+def long_context_backup_for(
+    model: str,
+    model_mappings: Sequence[tuple[str, LLMModelMapping]],
+) -> LLMModelMapping | None:
+    normalized_model = model.casefold()
+    for _, mapping in model_mappings:
+        if mapping.model.casefold() == normalized_model:
+            return mapping.long_context_backup_model
+    return None
 
 
 def resolve_local_model_path(model_cache_dir: Path) -> Path:

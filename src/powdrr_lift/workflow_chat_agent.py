@@ -36,14 +36,12 @@ from powdrr_lift.agent.exchanges import (
     normalize_cache_usage,
 )
 from powdrr_lift.agent.provider_config import (
-    DEFAULT_LLM_TYPE,
     DEFAULT_MODEL,
     ZAI_LLM_MAPPINGS,
     LLMModelLimits,
     LLMModelMapping,
     LLMProviderRole,
     LLMProviderRoles,
-    default_llm_mappings,
     provider_definition,
     provider_supports_llm_mappings,
 )
@@ -57,8 +55,12 @@ from powdrr_lift.agent.providers import (
     _SemanticRepairExhaustedError,
     auto_provider_candidates,
     available_provider_names,
+    backup_model_for,
     build_provider_client,
+    initial_model_for_provider,
+    long_context_backup_for,
     provider_model_limits,
+    resolve_llm_mapping,
     resolve_local_model_path,
     resolve_provider_credentials,
     resolve_provider_roles,
@@ -1041,7 +1043,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     self.state.step_index += 1
                     continue
             step_mapping = (
-                _resolve_llm_mapping(
+                resolve_llm_mapping(
                     self.current_step.llm_type or self.selection.llm_type,
                     mappings=_active_llm_mappings(
                         self.config, self.provider_roles, self.provider_role
@@ -1615,7 +1617,7 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         if action.llm_type is not None and provider_supports_llm_mappings(
             self.provider
         ):
-            mapping = _resolve_llm_mapping(
+            mapping = resolve_llm_mapping(
                 action.llm_type,
                 mappings=_active_llm_mappings(
                     self.config, self.provider_roles, self.provider_role
@@ -2297,7 +2299,7 @@ def run_workflow_chat(
     )
     provider_role: LLMProviderRole = "normal"
     provider = provider_roles.provider_for(provider_role)
-    current_model = _initial_model_for_provider(provider, config.model)
+    current_model = initial_model_for_provider(provider, config.model)
     credentials = resolve_provider_credentials(
         provider, config.api_key, config.base_url
     )
@@ -2426,7 +2428,7 @@ def run_workflow_chat(
         )
         selected_skill = _find_catalog_entry(catalog, selection.selected_skill_path)
         selection_mapping = (
-            _resolve_llm_mapping(
+            resolve_llm_mapping(
                 selection.llm_type,
                 mappings=_active_llm_mappings(config, provider_roles, provider_role),
                 provider=provider,
@@ -2577,7 +2579,7 @@ def run_workflow_chat(
     )
     observer_provider = provider_roles.provider_for(provider_role)
     observer_mapping = (
-        _resolve_llm_mapping(
+        resolve_llm_mapping(
             "high_reasoning",
             mappings=_active_llm_mappings(config, provider_roles, provider_role),
             provider=observer_provider,
@@ -3393,21 +3395,10 @@ def _active_llm_mappings(
 ) -> tuple[tuple[str, LLMModelMapping], ...]:
     """Return mappings for a role without exposing provider details to callers."""
     provider = provider_roles.provider_for(role)
-    mappings = tuple(default_llm_mappings(provider).items())
+    mappings = tuple(provider_definition(provider).llm_mappings.items())
     if role == "normal":
         mappings += config.llm_mappings
     return mappings
-
-
-def _initial_model_for_provider(provider: str, configured_model: str) -> str:
-    """Resolve the first request model using the selected provider's mapping."""
-    definition = provider_definition(provider)
-    if definition.forced_model is not None:
-        return definition.forced_model
-    if configured_model != DEFAULT_MODEL:
-        return configured_model
-    mapping = definition.llm_mappings.get(DEFAULT_LLM_TYPE)
-    return mapping.model if mapping is not None else configured_model
 
 
 def _catalog_entry_to_data(entry: SkillCatalogEntry) -> dict[str, Any]:
@@ -9410,49 +9401,6 @@ def _optional_llm_type(value: object) -> str | None:
     return value.strip().lower().replace("-", "_")
 
 
-def _resolve_llm_model(
-    llm_type: str | None,
-    *,
-    fallback_model: str,
-    mappings: Sequence[tuple[str, LLMModelMapping]],
-    provider: str = "zai",
-) -> str:
-    if llm_type is None or not provider_supports_llm_mappings(provider):
-        return fallback_model
-    resolved_mapping = _resolve_llm_mapping(
-        llm_type,
-        mappings=mappings,
-        provider=provider,
-    )
-    return resolved_mapping.model if resolved_mapping is not None else fallback_model
-
-
-def _resolve_llm_mapping(
-    llm_type: str | None,
-    *,
-    mappings: Sequence[tuple[str, LLMModelMapping]],
-    provider: str,
-) -> LLMModelMapping | None:
-    if llm_type is None:
-        return None
-    if not provider_supports_llm_mappings(provider):
-        raise PowdrrExecutionError(
-            f"LLM mappings are not supported for provider {provider!r}."
-        )
-    normalized_llm_type = llm_type.strip().lower().replace("-", "_")
-    mapping = dict(default_llm_mappings(provider))
-    mapping.update(
-        {key.strip().lower().replace("-", "_"): value for key, value in mappings}
-    )
-    resolved_mapping = mapping.get(normalized_llm_type)
-    if resolved_mapping is None:
-        raise PowdrrExecutionError(
-            f"No LLM mapping is configured for llm_type {llm_type!r} "
-            f"with provider {provider!r}."
-        )
-    return resolved_mapping
-
-
 def _complete_json_with_model_fallback(
     *,
     client_for: Callable[[str, str], WorkflowLLMClient],
@@ -9475,7 +9423,7 @@ def _complete_json_with_model_fallback(
     active_provider = provider
     attempted_models = {model.casefold()}
     while True:
-        long_context_backup = _long_context_backup_for(
+        long_context_backup = long_context_backup_for(
             active_model,
             model_mappings,
         )
@@ -9517,7 +9465,7 @@ def _complete_json_with_model_fallback(
                 stdout=stdout,
                 stderr=stderr,
                 fallback_on_transient_exhaustion=(
-                    _backup_model_for(active_model, model_mappings) is not None
+                    backup_model_for(active_model, model_mappings) is not None
                 ),
                 empty_response_fallback_payload=empty_response_fallback_payload,
                 error_recorder=error_recorder,
@@ -9525,7 +9473,7 @@ def _complete_json_with_model_fallback(
             )
             return result, active_model, active_provider
         except _ModelUnavailableError as exc:
-            backup_model = _backup_model_for(active_model, model_mappings)
+            backup_model = backup_model_for(active_model, model_mappings)
             if (
                 backup_model is None
                 or backup_model.model.casefold() in attempted_models
@@ -9552,28 +9500,6 @@ def _complete_json_with_model_fallback(
             attempted_models.add(backup_model.model.casefold())
             active_model = backup_model.model
             active_provider = backup_model.provider
-
-
-def _backup_model_for(
-    model: str,
-    model_mappings: Sequence[tuple[str, LLMModelMapping]],
-) -> LLMModelMapping | None:
-    normalized_model = model.casefold()
-    for _, mapping in model_mappings:
-        if mapping.model.casefold() == normalized_model:
-            return mapping.backup_model
-    return None
-
-
-def _long_context_backup_for(
-    model: str,
-    model_mappings: Sequence[tuple[str, LLMModelMapping]],
-) -> LLMModelMapping | None:
-    normalized_model = model.casefold()
-    for _, mapping in model_mappings:
-        if mapping.model.casefold() == normalized_model:
-            return mapping.long_context_backup_model
-    return None
 
 
 def _complete_json_with_repair(

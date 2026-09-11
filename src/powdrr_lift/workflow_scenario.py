@@ -22,7 +22,10 @@ from typing import Any
 import yaml
 
 from powdrr_lift.agent.provider_config import DEFAULT_MODEL
-from powdrr_lift.agent.providers import resolve_provider_credentials
+from powdrr_lift.agent.providers import (
+    initial_model_for_provider,
+    resolve_provider_credentials,
+)
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -45,7 +48,6 @@ from powdrr_lift.workflow_chat_agent import (
     SkillChatSelection,
     _build_chat_client,
     _ChatWorkflowExecutionStrategy,
-    _initial_model_for_provider,
     _workflow_action_signature,
     _WorkflowExecutionState,
     _WorkflowProgressDisplay,
@@ -391,7 +393,7 @@ def run_workflow_scenario(
                 _optional_text(provider.get("api_key")),
                 _optional_text(provider.get("base_url")),
             )
-            execution_model = _initial_model_for_provider(
+            execution_model = initial_model_for_provider(
                 provider_name, configured_model
             )
             live_client = _build_chat_client(

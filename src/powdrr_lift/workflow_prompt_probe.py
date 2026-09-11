@@ -32,10 +32,9 @@ from powdrr_lift.workflow_action_validation import (
 )
 from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
-    _run_deterministic_pre_step,
-    _run_gate,
     _step_action_response_schema,
 )
+from powdrr_lift.workflow_execution_loop import _run_deterministic_pre_step, _run_gate
 from powdrr_lift.workflow_llm import (
     WorkflowLLMClient,
     complete_json_with_timeout_retry,

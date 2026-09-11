@@ -14,10 +14,42 @@ import inspect
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import Any, Literal, Protocol, TypeVar, cast
+from dataclasses import dataclass
+from typing import Any, Protocol, TypeVar, cast
 
+from powdrr_lift.agent.actions import (
+    WorkflowAction,  # noqa: F401 - compatibility export
+    WorkflowEdit,  # noqa: F401 - compatibility export
+    WorkflowFileEdits,  # noqa: F401 - compatibility export
+    WorkflowYamlOperation,  # noqa: F401 - compatibility export
+)
+from powdrr_lift.agent.loop import (
+    WorkflowActionObservation,
+    WorkflowActionOutcome,
+    WorkflowActionProgressStrategy,
+    WorkflowActionRequest,  # noqa: F401 - compatibility export
+    WorkflowExecutionObserver,
+    WorkflowExecutionStrategy,
+)
+from powdrr_lift.agent.progress import (
+    ProgressDecision,
+    WorkflowExecutionController,
+    no_progress_feedback,
+)
+from powdrr_lift.agent.protocol import (
+    SchemaAwareWorkflowLLMClient,  # noqa: F401 - compatibility export
+    WorkflowLLMClient,  # noqa: F401 - compatibility export
+)
+from powdrr_lift.agent.repair import (
+    RepairContext,
+    RepairDirective,
+    RepairExhaustionReport,  # noqa: F401 - compatibility export
+    RepairFailure,
+    RepairFailureClass,
+    RepairPolicy,
+    RepairStage,
+    classify_repair_failure,
+)
 from powdrr_lift.errors import (
     ExecutionCancelled,
     PersistenceCorruptionError,
@@ -27,28 +59,6 @@ from powdrr_lift.errors import (
 )
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.workflow_execution import (
-    ProgressDecision,
-    WorkflowExecutionController,
-    no_progress_feedback,
-)
-
-
-class WorkflowLLMClient(Protocol):
-    """Minimal provider surface used by every workflow runner."""
-
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
-
-
-class SchemaAwareWorkflowLLMClient(Protocol):
-    """Optional provider surface for strict workflow action schemas."""
-
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]: ...
 
 
 class WorkflowLLMTimeoutExhausted(ProviderExecutionError):
@@ -72,195 +82,12 @@ class WorkflowLLMExecutionAborted(ExecutionCancelled):
 
 
 ActionT = TypeVar("ActionT")
-StrategyActionT = TypeVar("StrategyActionT", contravariant=True)
 _MAX_PROMPT_EVENTS = 32
 _MAX_PROMPT_EVENT_CHARS = 8_000
 _PROMPT_SIZE_CHARS_PER_TOKEN = 3
 # A caller may opt into an unlimited loop for deterministic harnesses, but
 # production entry points must always provide a finite budget.
 DEFAULT_MAX_ROUNDTRIPS = 128
-
-
-class RepairStage(StrEnum):
-    """Semantic recovery stages shared by workflow adapters."""
-
-    TARGETED = "targeted"
-    CLEAN_ROOM = "clean_room"
-    SELECT_ACTION = "select_action"
-    FILL_ACTION = "fill_action"
-    DETERMINISTIC = "deterministic"
-    MODEL_FALLBACK = "model_fallback"
-    HUMAN_HANDOFF = "human_handoff"
-    EXHAUSTED = "exhausted"
-
-
-class RepairFailureClass(StrEnum):
-    """Stable categories used to select the first recovery strategy.
-
-    The broad values remain supported for callers that have not migrated their
-    error codes yet.  New adapters should use the specific categories so the
-    coordinator can make a deterministic first-stage decision.
-    """
-
-    RESPONSE = "response"
-    PROPOSAL = "proposal"
-    EXECUTION = "execution"
-    NO_PROGRESS = "no_progress"
-    TRANSPORT_TRANSIENT = "transport_transient"
-    TRANSPORT_TERMINAL = "transport_terminal"
-    RESPONSE_EMPTY = "response_empty"
-    RESPONSE_SYNTAX = "response_syntax"
-    RESPONSE_SCHEMA = "response_schema"
-    ACTION_CONTRACT = "action_contract"
-    ACTION_PRECONDITION = "action_precondition"
-    ACTION_EXECUTION = "action_execution"
-    NO_MATERIAL_PROGRESS = "no_material_progress"
-    VALIDATION_REGRESSION = "validation_regression"
-    COMPLETION_BLOCKED = "completion_blocked"
-
-
-def classify_repair_failure(
-    error_code: str,
-    *,
-    default: RepairFailureClass,
-) -> RepairFailureClass:
-    """Map stable error codes to repair classes without parsing messages."""
-    code = error_code.casefold()
-    if code in {"timeout", "rate_limit", "provider_overloaded"}:
-        return RepairFailureClass.TRANSPORT_TRANSIENT
-    if code in {"authentication", "unsupported_model", "provider_unavailable"}:
-        return RepairFailureClass.TRANSPORT_TERMINAL
-    if code in {"empty_response", "incomplete_response"}:
-        return RepairFailureClass.RESPONSE_EMPTY
-    if code in {"invalid_json", "invalid_response_json", "non_object_response"}:
-        return RepairFailureClass.RESPONSE_SYNTAX
-    if code in {"response_schema", "invalid_action_shape", "missing_action"}:
-        return RepairFailureClass.RESPONSE_SCHEMA
-    if code in {"workflow_action_not_allowed", "action_not_allowed"}:
-        return RepairFailureClass.ACTION_CONTRACT
-    if code in {
-        "precondition_failed",
-        "file_not_found",
-        "relationship_obligation_open",
-    }:
-        return RepairFailureClass.ACTION_PRECONDITION
-    if code in {"no_progress", "stalled_action"}:
-        return RepairFailureClass.NO_MATERIAL_PROGRESS
-    if code in {"validation_regression", "issue_unchanged"}:
-        return RepairFailureClass.VALIDATION_REGRESSION
-    if code in {"completion_blocked", "output_state_missing"}:
-        return RepairFailureClass.COMPLETION_BLOCKED
-    return default
-
-
-@dataclass(frozen=True, slots=True)
-class RepairPolicy:
-    """Bound semantic recovery independently from transport retries."""
-
-    targeted_attempts: int = 1
-    clean_room_attempts: int = 1
-    action_selection_attempts: int = 1
-    parameter_attempts: int = 1
-    deterministic_recovery: bool = True
-    model_fallback_attempts: int = 1
-    allow_human_handoff: bool = True
-
-
-@dataclass(frozen=True, slots=True)
-class RepairFailure:
-    """Failure facts supplied to the shared recovery coordinator."""
-
-    classification: RepairFailureClass
-    error_code: str
-    message: str
-    action_signature: str | None = None
-    target_signature: str | None = None
-    action_payload: Mapping[str, Any] | None = None
-    remediation: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class RepairContext:
-    """Typed, adapter-neutral state supplied to semantic repair decisions."""
-
-    execution_id: str = ""
-    boundary_id: str = ""
-    objective: str = ""
-    deterministic_state: Mapping[str, Any] = field(default_factory=dict)
-    allowed_actions: tuple[str, ...] = ()
-    action_schemas: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
-    required_outputs: tuple[str, ...] = ()
-    open_obligations: tuple[Mapping[str, Any], ...] = ()
-    rejected_strategies: tuple[str, ...] = ()
-    last_material_progress: Mapping[str, Any] | None = None
-    material_state_fingerprint: str = ""
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "execution_id": self.execution_id,
-            "boundary_id": self.boundary_id,
-            "objective": self.objective,
-            "deterministic_state": _repair_json_safe(self.deterministic_state),
-            "allowed_actions": list(self.allowed_actions),
-            "action_schemas": _repair_json_safe(self.action_schemas),
-            "required_outputs": list(self.required_outputs),
-            "open_obligations": _repair_json_safe(self.open_obligations),
-            "rejected_strategies": list(self.rejected_strategies),
-            "last_material_progress": (
-                _repair_json_safe(self.last_material_progress)
-                if self.last_material_progress is not None
-                else None
-            ),
-            "material_state_fingerprint": self.material_state_fingerprint,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class RepairDirective:
-    """The adapter-independent result of recording one semantic failure."""
-
-    stage: RepairStage
-    attempt: int
-    reason: str
-    allowed_actions: tuple[str, ...] = ()
-    prompt_profile: str = "normal_full_context"
-    model_policy: str = "current_model"
-    failure_class: RepairFailureClass = RepairFailureClass.EXECUTION
-    error_code: str = "unknown"
-    target_signature: str | None = None
-    material_state_fingerprint: str = ""
-    rejected_strategy_signatures: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class RepairExhaustionReport:
-    """Structured terminal record for a boundary with no safe recovery left."""
-
-    boundary_id: str
-    objective: str
-    final_state: Mapping[str, Any]
-    failures: tuple[Mapping[str, Any], ...] = ()
-    prompt_manifests: tuple[Mapping[str, Any], ...] = ()
-    rejected_strategies: tuple[Mapping[str, Any], ...] = ()
-    allowed_actions: tuple[str, ...] = ()
-    reason: str = ""
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "boundary_id": self.boundary_id,
-            "objective": self.objective,
-            "final_state": dict(self.final_state),
-            "failures": [dict(item) for item in self.failures],
-            "prompt_manifests": [dict(item) for item in self.prompt_manifests],
-            "rejected_strategies": [dict(item) for item in self.rejected_strategies],
-            "allowed_actions": list(self.allowed_actions),
-            "reason": self.reason,
-        }
-
-
-def _repair_json_safe(value: Any) -> Any:
-    """Normalize context values for durable JSON events and prompt payloads."""
-    return json.loads(json.dumps(value, ensure_ascii=False, default=str))
 
 
 def _prompt_profile_for_stage(stage: RepairStage) -> str:
@@ -820,36 +647,6 @@ def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowEdit:
-    """One line-based mutation in the shared workflow action contract."""
-
-    kind: str
-    start_line: int
-    end_line: int | None = None
-    text: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowFileEdits:
-    """Line-based mutations for one file in a shared edit action."""
-
-    file_path: str
-    edits: tuple[WorkflowEdit, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowYamlOperation:
-    """One structural mutation in a YAML workflow action."""
-
-    operation: str
-    section: str | None = None
-    item_id: str | None = None
-    item_index: int | None = None
-    path: tuple[str, ...] = field(default_factory=tuple)
-    value: Any = None
-
-
 def prompt_size_breakdown(messages: Sequence[Mapping[str, str]]) -> dict[str, Any]:
     """Estimate prompt size by top-level field without changing the prompt.
 
@@ -895,42 +692,6 @@ def _prompt_size_tokens(value: str) -> int:
         1,
         (len(value) + _PROMPT_SIZE_CHARS_PER_TOKEN - 1) // _PROMPT_SIZE_CHARS_PER_TOKEN,
     )
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowAction:
-    """The action schema parsed for both chat and durable workflow tasks."""
-
-    kind: str
-    tool: str | None = None
-    skill_name: str | None = None
-    step_id: str | None = None
-    file_path: str | None = None
-    destination_path: str | None = None
-    file_operation: str | None = None
-    start_line: int | None = None
-    end_line: int | None = None
-    directory: str | None = None
-    pattern: str | None = None
-    recursive: bool = False
-    text: str | None = None
-    output_state: Any = None
-    outputs: dict[str, Any] = field(default_factory=dict)
-    parameters: dict[str, Any] = field(default_factory=dict)
-    edits: tuple[WorkflowEdit, ...] = field(default_factory=tuple)
-    file_edits: tuple[WorkflowFileEdits, ...] = field(default_factory=tuple)
-    yaml_operations: tuple[WorkflowYamlOperation, ...] = field(default_factory=tuple)
-    types: tuple[str, ...] = field(default_factory=tuple)
-    feature_id: str | None = None
-    keywords: tuple[str, ...] = field(default_factory=tuple)
-    filters: dict[str, object] = field(default_factory=dict)
-    decisions_and_context: str | None = None
-    llm_type: str | None = None
-    provider_role: Literal["normal", "adversarial"] | None = None
-    clean: bool = False
-    context: tuple[str, ...] = field(default_factory=tuple)
-    # Durable task execution uses this only when persisting a human handoff.
-    human_input: dict[str, Any] | None = None
 
 
 def complete_json(
@@ -1029,110 +790,6 @@ def complete_json_with_timeout_retry(
                 flush=True,
             )
             time.sleep(delay_seconds)
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowActionObservation:
-    """The common result of evaluating one proposed workflow action."""
-
-    signature: str
-    made_progress: bool
-    decision: ProgressDecision
-    correction: str | None = None
-
-
-class WorkflowActionProgressStrategy(Protocol[StrategyActionT]):
-    """Adapter hooks for state snapshots and runner-specific reporting."""
-
-    def material_state(self, action: StrategyActionT) -> object: ...
-
-    def record_no_progress(
-        self,
-        action: StrategyActionT,
-        observation: WorkflowActionObservation,
-    ) -> None: ...
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowActionRequest:
-    """One fully specified request for the next workflow action.
-
-    The runner owns the LLM exchange.  Adapters only provide the current
-    context and the parser appropriate for their durable or interactive
-    boundary.
-    """
-
-    client: WorkflowLLMClient
-    messages: list[dict[str, str]]
-    parser: Callable[[dict[str, Any]], Any]
-    model: str
-    stderr: Any
-    max_timeout_retries: int
-    timeout_backoff_seconds: float
-    response_schema: Mapping[str, Any] | None = None
-    request_action: Callable[[], Any] | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowActionOutcome:
-    """The adapter's result after the shared runner executes an action."""
-
-    continue_running: bool = True
-    exit_code: int | None = None
-
-
-class WorkflowExecutionStrategy(WorkflowActionProgressStrategy[Any], Protocol):
-    """Boundary between the shared execution loop and its presentation mode.
-
-    A strategy owns only its input/output boundary: building the current
-    context, presenting status, and translating terminal or human-input
-    actions into its native outcome.  The shared driver owns roundtrips,
-    parsing, timeout handling, action-failure accounting, and no-progress
-    correction.
-    """
-
-    def next_request(self) -> WorkflowActionRequest | None: ...
-
-    def report_roundtrip(self, roundtrip: int, action: Any) -> None:
-        """Present one parsed LLM action; adapters may leave this as a no-op."""
-        _ = roundtrip, action
-
-    def execute_action(self, action: Any) -> WorkflowActionOutcome: ...
-
-    def record_response_error(
-        self,
-        error: RuntimeError,
-        payload: dict[str, Any] | None,
-    ) -> None: ...
-
-    def record_action_error(self, action: Any, error: Exception) -> None: ...
-
-    def action_failure_exit_code(self, action: Any) -> int | None: ...
-
-    def observe_outcome(
-        self,
-        action: Any,
-        observation: WorkflowActionObservation,
-        outcome: WorkflowActionOutcome,
-    ) -> WorkflowActionOutcome: ...
-
-    def exhausted_roundtrips_exit_code(self) -> int: ...
-
-
-class WorkflowExecutionObserver(Protocol):
-    """Optional, failure-isolated observer of shared execution boundaries."""
-
-    def response_failed(self, error: Exception) -> Any: ...
-
-    def action_failed(self, action: Any, error: Exception) -> Any: ...
-
-    def action_proposed(self, action: Any) -> Any: ...
-
-    def action_completed(
-        self,
-        action: Any,
-        observation: WorkflowActionObservation,
-    ) -> Any: ...
 
 
 def _coding_loop_spec(strategy: Any) -> Any | None:

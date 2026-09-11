@@ -198,7 +198,14 @@ from powdrr_lift.workflow_paths import (
 )
 from powdrr_lift.workflow_prompting import (
     _context_type_catalog,
+    _execution_events_for_prompt,
+    _latest_execution_event_for_prompt,
+    _prompt_durable_facts,
+    _prompt_step_context,
+    _prompt_transcript,
     _step_needs_prompt_catalog,
+    _successful_document_reads_for_prompt,
+    _workflow_context_prompt_data,
     build_modular_action_system_prompt,
     interaction_style_prompt,
 )
@@ -3322,21 +3329,6 @@ def _effective_interaction_style(
     )
 
 
-def _workflow_context_prompt_data(
-    workflow_context: WorkflowContext | None,
-) -> dict[str, object] | None:
-    if workflow_context is None:
-        return None
-    data = {
-        "branch_name": workflow_context.branch_name,
-        "pr_number": workflow_context.pr_number,
-        "pr_url": workflow_context.pr_url,
-        "skill_name": workflow_context.skill_name,
-        "request": workflow_context.request,
-    }
-    return {key: value for key, value in data.items() if value is not None}
-
-
 def _selection_system_prompt() -> str:
     return (
         "Task: route the user's request to the best available skill. Read the "
@@ -3402,229 +3394,6 @@ def _build_skill_execution_summary(
         "execution_events": list(execution_events),
         "skill": selected_skill.skill.to_data(),
     }
-
-
-def _execution_events_for_prompt(
-    execution_events: Sequence[dict[str, Any]],
-    current_step_index: int | None = None,
-) -> list[dict[str, Any]]:
-    """Return the event metadata needed for the next action decision.
-
-    Event results are retained in the full execution summary, but are also
-    copied into the transcript or execution context as they are produced.
-    Sending both copies on every roundtrip needlessly grows prompts and makes
-    large tool results increasingly expensive to serialize. Keep the prompt
-    event stream as metadata while leaving the complete event stream intact
-    for persistence and diagnostics.
-    """
-    events = (
-        [
-            event
-            for event in execution_events
-            if event.get("step_index") == current_step_index
-        ]
-        if current_step_index is not None
-        else execution_events
-    )
-    return [
-        {key: value for key, value in event.items() if key != "decisions_and_context"}
-        for event in prune_execution_events(events, include_results=False)
-    ]
-
-
-def _successful_document_reads_for_prompt(
-    execution_events: Sequence[Mapping[str, Any]],
-    current_step_index: int | None = None,
-) -> list[dict[str, Any]]:
-    """Expose successful reads as durable repair context.
-
-    Compact event metadata intentionally omits results. Repairs still need to
-    know which documents already supplied context so they do not spend a retry
-    rereading the same file instead of correcting the failed capability call.
-    """
-    reads: list[dict[str, Any]] = []
-    for event in execution_events:
-        if event.get("kind") != "read_document":
-            continue
-        if current_step_index is not None and event.get("step_index") not in {
-            None,
-            current_step_index,
-        }:
-            continue
-        result = event.get("result")
-        if not isinstance(result, Mapping):
-            continue
-        path = result.get("path")
-        if not isinstance(path, str) or not path:
-            continue
-        reads.append(
-            {
-                "path": path,
-                "requested_start_line": result.get("requested_start_line"),
-                "requested_end_line": result.get("requested_end_line"),
-                "returned_end_line": result.get("end_line"),
-            }
-        )
-    return reads
-
-
-def _latest_execution_event_for_prompt(
-    execution_events: Sequence[dict[str, Any]],
-    current_step_index: int | None = None,
-) -> dict[str, Any] | None:
-    """Retain the latest result separately from the compact event metadata."""
-    if current_step_index is not None:
-        execution_events = [
-            event
-            for event in execution_events
-            if event.get("step_index") == current_step_index
-        ]
-    if not execution_events:
-        return None
-    latest = prune_execution_events(execution_events[-1:], include_results=True)
-    if not latest:
-        return None
-    return {
-        key: value for key, value in latest[0].items() if key != "decisions_and_context"
-    }
-
-
-def _sanitize_prior_step_event(event: Mapping[str, Any]) -> dict[str, Any]:
-    """Keep prior-step progress while hiding reusable command payloads."""
-    hidden_keys = {
-        "command",
-        "parameters",
-        "file_edits",
-        "edits",
-        "operations",
-        "result",
-        "template",
-    }
-    return {key: value for key, value in event.items() if key not in hidden_keys}
-
-
-_PROMPT_OBSERVATION_RESULT_KEYS = {
-    "tool_result",
-    "edit_result",
-    "yaml_edit_result",
-    "document_context",
-}
-
-
-def _is_prompt_observation_message(message: Mapping[str, str]) -> bool:
-    """Identify action/result transcript entries represented by event state."""
-    content = message.get("content", "")
-    try:
-        decoded = json.loads(content)
-    except (TypeError, ValueError):
-        return False
-    if not isinstance(decoded, Mapping):
-        return False
-    if message.get("role") == "assistant":
-        return isinstance(decoded.get("action", decoded.get("kind")), str)
-    return bool(_PROMPT_OBSERVATION_RESULT_KEYS.intersection(decoded))
-
-
-def _prompt_transcript(
-    transcript: Sequence[dict[str, str]],
-) -> list[dict[str, str]]:
-    """Keep recurring prompts bounded while retaining the complete transcript."""
-    conversational = [
-        message for message in transcript if not _is_prompt_observation_message(message)
-    ]
-    if len(conversational) <= _MAX_PROMPT_TRANSCRIPT_ENTRIES:
-        return conversational
-
-    first = {
-        **conversational[0],
-        "content": _truncate_prompt_content(conversational[0].get("content", "")),
-    }
-    recent = [
-        {
-            **message,
-            "content": _truncate_prompt_content(message.get("content", "")),
-        }
-        for message in conversational[-(_MAX_PROMPT_TRANSCRIPT_ENTRIES - 2) :]
-    ]
-    omitted = {
-        "role": "user",
-        "content": "[Earlier workflow transcript omitted from this prompt; "
-        "full history remains in the execution summary.]",
-    }
-    compacted = [first, omitted, *recent]
-    while (
-        len(compacted) > 3
-        and sum(len(message.get("content", "")) for message in compacted)
-        > _MAX_PROMPT_TRANSCRIPT_CHARS
-    ):
-        compacted.pop(2)
-    return compacted
-
-
-def _prompt_step_context(
-    execution_context: Sequence[str],
-    durable_facts: Mapping[str, Mapping[str, Any]] | None = None,
-    execution_events: Sequence[Mapping[str, Any]] = (),
-    current_step_index: int | None = None,
-) -> list[str]:
-    """Bound recurring step context while retaining the newest handoff facts."""
-    result_prefixes = (
-        "Gathered context:\n",
-        "Deterministic pre-step gather_context result:\n",
-        "Document context: ",
-        "Gate failed: ",
-    )
-    keep_current_gather = any(
-        event.get("kind") == "gather_context"
-        and event.get("step_index") == current_step_index
-        for event in execution_events
-    )
-    execution_context = [
-        value
-        for value in execution_context
-        if keep_current_gather
-        and value.startswith("Gathered context:\n")
-        or not value.startswith(result_prefixes)
-    ]
-    fact_values = {
-        str(record.get("value"))
-        for record in (durable_facts or {}).values()
-        if record.get("value") is not None
-    }
-    execution_context = [
-        value
-        for value in execution_context
-        if " ".join(value.split()) not in fact_values
-    ]
-    if len(execution_context) <= _MAX_PROMPT_STEP_CONTEXT_ENTRIES:
-        recent = list(execution_context)
-    else:
-        recent = list(execution_context[-_MAX_PROMPT_STEP_CONTEXT_ENTRIES:])
-    while (
-        len(recent) > 1
-        and sum(len(value) for value in recent) > _MAX_PROMPT_STEP_CONTEXT_CHARS
-    ):
-        recent.pop(0)
-    return recent
-
-
-def _prompt_durable_facts(
-    durable_facts: Mapping[str, Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    """Return deduplicated durable facts in a compact, stable prompt shape."""
-    facts = list(durable_facts.values())[-_MAX_PROMPT_STEP_CONTEXT_ENTRIES:]
-    return [dict(fact) for fact in facts]
-
-
-def _truncate_prompt_content(content: str) -> str:
-    if len(content) <= _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS:
-        return content
-    half_limit = _MAX_PROMPT_TRANSCRIPT_MESSAGE_CHARS // 2
-    return (
-        content[:half_limit]
-        + "\n... [prompt transcript message truncated] ...\n"
-        + content[-half_limit:]
-    )
 
 
 _PRE_STEP_PLACEHOLDER = re.compile(r"<([^<>]+)>")

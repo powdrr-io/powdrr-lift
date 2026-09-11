@@ -57,7 +57,7 @@ coding_loop:
     pass.
   verification:
   - id: full-test-suite
-    command: uv run --extra dev pytest
+    command: uv run pytest -q
   stopping_conditions:
   - The complete test suite passes.
   - No approved implementation or test issue remains unresolved.

@@ -436,6 +436,7 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
             step_path = f"{path}.{step_key}[{index}]"
             issues.extend(_validate_step_examples(step, step_path))
             issues.extend(_validate_repairability(step, step_path))
+            issues.extend(_validate_task_semantics(step, step_path))
             if declared:
                 issues.extend(_validate_step_placeholders(step, step_path, declared))
         if kind == "skill":
@@ -453,6 +454,7 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
             else:
                 issues.extend(_validate_raw_liveness(data, path))
     if kind == "workflow_task":
+        issues.extend(_validate_task_semantics(data, str(path)))
         try:
             task_step = skill_step_from_data(data)
         except (TypeError, ValueError):
@@ -467,6 +469,47 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
             )
         issues.extend(_validate_repairability(data, str(path)))
     return WorkflowDefinitionReport(path, kind, tuple(issues))
+
+
+def _validate_task_semantics(
+    step: Mapping[str, Any], step_path: str
+) -> list[WorkflowDefinitionIssue]:
+    """Check deterministic/model boundaries before any provider is called."""
+    issues: list[WorkflowDefinitionIssue] = []
+    if step.get("step_type") == "invoke_tool" and "details" in step:
+        issues.append(
+            WorkflowDefinitionIssue(
+                "deterministic_task_details_unused",
+                "Deterministic invoke_tool tasks do not consume details; remove "
+                "the field and keep the command contract in pre_step.",
+                f"{step_path}.details",
+                remediation="Remove details from this deterministic task.",
+            )
+        )
+    pre_step = step.get("pre_step")
+    if isinstance(pre_step, Mapping):
+        action = pre_step.get("action")
+        actions = step.get("actions")
+        if (
+            isinstance(action, str)
+            and isinstance(actions, Sequence)
+            and not isinstance(actions, (str, bytes))
+            and action != "invoke_tool"
+            and action not in actions
+        ):
+            issues.append(
+                WorkflowDefinitionIssue(
+                    "pre_step_action_not_declared",
+                    f"Deterministic pre-step action {action!r} is not declared "
+                    "in the task action contract; the runtime will reject it.",
+                    f"{step_path}.pre_step.action",
+                    remediation=(
+                        f"Declare {action!r} in actions, or make the task fully "
+                        "engine-owned and remove the model turn."
+                    ),
+                )
+            )
+    return issues
 
 
 def _validate_raw_liveness(
@@ -1755,6 +1798,13 @@ def _compile_skill(
             add_target(index, step.gate.goto_step, "gate.goto_step")
             if step.gate.success_goto_step is not None:
                 add_target(index, step.gate.success_goto_step, "gate.success_goto_step")
+        if step.branch is not None:
+            successors[index].clear()
+            for case_index, case in enumerate(step.branch.cases):
+                add_target(
+                    index, case.goto_step, f"branch.cases[{case_index}].goto_step"
+                )
+            add_target(index, step.branch.default_goto_step, "branch.default_goto_step")
 
     predecessors: list[set[int]] = [set() for _ in steps]
     for source, targets in enumerate(successors):

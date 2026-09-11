@@ -30,6 +30,7 @@ from powdrr_lift.workflow_action_validation import (
     _validate_workflow_action_for_step,
     _workflow_action_data,
 )
+from powdrr_lift.workflow_branching import select_branch_target
 from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
     _step_action_response_schema,
@@ -450,6 +451,8 @@ def _run_non_llm_skill_step(
 ) -> Any:
     behavior = behavior_for_step(step)
     runtime = _probe_runtime(root)
+    if behavior.runs_branch:
+        return {"goto_step": select_branch_target(step.branch, handoff_records)}
     if behavior.runs_gate:
         passed = _run_gate(
             step,

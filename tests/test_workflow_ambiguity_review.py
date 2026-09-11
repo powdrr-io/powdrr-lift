@@ -8,6 +8,7 @@ import pytest
 from powdrr_lift.workflow_ambiguity_review import (
     WorkflowAmbiguityReviewError,
     build_ambiguity_review_messages,
+    review_workflow_definition,
     review_workflow_definition_step,
 )
 
@@ -20,6 +21,16 @@ class _FakeClient:
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         self.messages.append(messages)
         return self.response
+
+
+class _SequenceClient(_FakeClient):
+    def __init__(self, responses: list[dict[str, Any]]) -> None:
+        super().__init__(responses[0])
+        self.responses = responses
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        self.messages.append(messages)
+        return self.responses.pop(0)
 
 
 def _definition(tmp_path: Path) -> Path:
@@ -61,6 +72,7 @@ def test_ambiguity_review_uses_compact_single_step_prompt(tmp_path: Path) -> Non
     assert len(client.messages) == 1
     assert "Inspect the files." in client.messages[0][1]["content"]
     assert "read-only" in client.messages[0][0]["content"]
+    assert '"one_action_per_response": true' in client.messages[0][1]["content"]
 
 
 def test_ambiguity_review_rejects_incomplete_reviewer_response(tmp_path: Path) -> None:
@@ -69,6 +81,28 @@ def test_ambiguity_review_rejects_incomplete_reviewer_response(tmp_path: Path) -
 
     with pytest.raises(WorkflowAmbiguityReviewError, match="completion_condition"):
         review_workflow_definition_step(client, path, step_index=0)
+
+
+def test_ambiguity_review_repairs_invalid_first_response(tmp_path: Path) -> None:
+    path = _definition(tmp_path)
+    valid = {
+        "first_action": {"action": "read_document"},
+        "completion_condition": "The files are inspected.",
+        "allowed_actions": ["read_document"],
+        "missing_information": [],
+        "conflicts": [],
+        "ambiguous_phrases": [],
+        "source_sentences": [],
+        "suggested_wording": [],
+        "confidence": 0.9,
+    }
+    client = _SequenceClient([{"first_action": "read_document"}, valid])
+
+    review = review_workflow_definition_step(client, path, step_index=0)
+
+    assert review.first_action["action"] == "read_document"
+    assert len(client.messages) == 2
+    assert "previous review response was invalid" in client.messages[1][-1]["content"]
 
 
 def test_build_ambiguity_messages_requires_exactly_one_step_selector(
@@ -80,3 +114,38 @@ def test_build_ambiguity_messages_requires_exactly_one_step_selector(
         WorkflowAmbiguityReviewError, match="either step_id or step_index"
     ):
         build_ambiguity_review_messages(path, step_id="inspect-files", step_index=0)
+
+
+def test_ambiguity_review_can_audit_every_step_with_isolated_prompts(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workflow.yaml"
+    path.write_text(
+        """\
+id: inspect
+when_to_use: [Inspect files.]
+task_templates:
+  - description: Inspect the files.
+    details: Read the files and report the result.
+  - description: Emit the result.
+    details: Emit the validated result.
+""",
+        encoding="utf-8",
+    )
+    response = {
+        "first_action": {"action": "read_document", "parameters": {}},
+        "completion_condition": "The result is recorded.",
+        "allowed_actions": ["read_document", "next_step"],
+        "missing_information": [],
+        "conflicts": [],
+        "ambiguous_phrases": [],
+        "source_sentences": [],
+        "suggested_wording": [],
+        "confidence": 0.9,
+    }
+    client = _FakeClient(response)
+
+    reviews = review_workflow_definition(client, path)
+
+    assert len(reviews) == 2
+    assert len(client.messages) == 2

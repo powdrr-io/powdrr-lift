@@ -164,11 +164,6 @@ steps:
 - description: Stage the validated project-structure artifact.
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Confirm that the validated project-structure artifact is the only intended
-    bootstrap output, inspect its diff, and stage the exact path under
-    docs/project_structure. Do not stage unrelated files, feature-specific
-    specifications, or generated caches. Do not commit here.
   pre_step:
     action: invoke_tool
     template:

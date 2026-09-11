@@ -70,6 +70,59 @@ steps:
     assert "declares no model-owned tool" in issue.message
 
 
+def test_definition_analysis_rejects_undeclared_deterministic_pre_step(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "workflow.yaml"
+    definition.write_text(
+        """\
+id: workflow
+when_to_use: [Execute work.]
+how_to_fill_this_out: [Use the task contract.]
+task_templates:
+  - description: Gather context.
+    step_type: invoke_tool
+    actions: []
+    pre_step:
+      action: gather_context
+      template: {feature_id: example, types: [requirements]}
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "pre_step_action_not_declared" in {issue.code for issue in report.issues}
+
+
+def test_definition_analysis_rejects_details_on_deterministic_task(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "workflow.yaml"
+    definition.write_text(
+        """\
+id: workflow
+when_to_use: [Execute work.]
+how_to_fill_this_out: [Use the task contract.]
+task_templates:
+  - description: Run the command.
+    step_type: invoke_tool
+    actions: []
+    details: This prose is not consumed by the deterministic runner.
+    pre_step:
+      action: invoke_tool
+      template: {tool: shell, command: [true]}
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "deterministic_task_details_unused" in {
+        issue.code for issue in report.issues
+    }
+
+
 def test_definition_analysis_covers_instantiated_tasks_and_workflow_metadata(
     tmp_path: Path,
 ) -> None:

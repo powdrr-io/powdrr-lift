@@ -19,6 +19,7 @@ class StepBehavior:
     _kind: str
     invokes_llm: bool
     runs_gate: bool
+    runs_branch: bool
     publishes_predicated_outputs: bool
 
     @property
@@ -46,33 +47,49 @@ _BEHAVIORS: dict[str, StepBehavior] = {
         "governed",
         invokes_llm=True,
         runs_gate=False,
+        runs_branch=False,
         publishes_predicated_outputs=False,
     ),
     "predicated": StepBehavior(
         "predicated",
         invokes_llm=True,
         runs_gate=False,
+        runs_branch=False,
         publishes_predicated_outputs=True,
     ),
     "invoke_tool": StepBehavior(
         "invoke_tool",
         invokes_llm=False,
         runs_gate=False,
+        runs_branch=False,
         publishes_predicated_outputs=False,
     ),
     "uses_skill": StepBehavior(
         "uses_skill",
         invokes_llm=False,
         runs_gate=False,
+        runs_branch=False,
         publishes_predicated_outputs=False,
     ),
     "gate": StepBehavior(
-        "gate", invokes_llm=False, runs_gate=True, publishes_predicated_outputs=False
+        "gate",
+        invokes_llm=False,
+        runs_gate=True,
+        runs_branch=False,
+        publishes_predicated_outputs=False,
+    ),
+    "branch": StepBehavior(
+        "branch",
+        invokes_llm=False,
+        runs_gate=False,
+        runs_branch=True,
+        publishes_predicated_outputs=False,
     ),
     "coding_loop": StepBehavior(
         "coding_loop",
         invokes_llm=True,
         runs_gate=False,
+        runs_branch=False,
         publishes_predicated_outputs=False,
     ),
 }

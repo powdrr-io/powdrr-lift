@@ -70,10 +70,6 @@ steps:
   description: Stage the validated design-interview proposal for pull request preparation.
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    Stage only the validated proposal and interview input under
-    docs/proposals/<work-item-name>/. Do not stage logs, caches, or unrelated
-    files; do not commit or create the pull request in this step.
   pre_step:
     action: invoke_tool
     template:

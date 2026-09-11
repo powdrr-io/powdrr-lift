@@ -125,6 +125,7 @@ SUPPORTED_STEP_TYPES = frozenset(
         "uses_skill",
         "invoke_tool",
         "gate",
+        "branch",
         "coding_loop",
     }
 )
@@ -245,6 +246,32 @@ class SkillStepGate:
         if self.success_goto_step is not None:
             data["success_goto_step"] = self.success_goto_step
         return data
+
+
+@dataclass(frozen=True, slots=True)
+class SkillStepBranchCase:
+    """One deterministic branch selected from a handoff value."""
+
+    path: str
+    equals: Any
+    goto_step: str
+
+    def to_data(self) -> dict[str, Any]:
+        return {"path": self.path, "equals": self.equals, "goto_step": self.goto_step}
+
+
+@dataclass(frozen=True, slots=True)
+class SkillStepBranch:
+    """Deterministic multi-way control flow; the model never chooses the target."""
+
+    cases: tuple[SkillStepBranchCase, ...]
+    default_goto_step: str
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "cases": [case.to_data() for case in self.cases],
+            "default_goto_step": self.default_goto_step,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -378,6 +405,7 @@ class SkillStep:
     step_type: str = "governed"
     pre_step: SkillStepPreStep | None = None
     gate: SkillStepGate | None = None
+    branch: SkillStepBranch | None = None
     validation_gate: Mapping[str, Any] | None = None
     coding_loop: CodingLoopSpec | None = None
     completion: SkillStepCompletion | None = None
@@ -422,6 +450,8 @@ class SkillStep:
             data["pre_step"] = self.pre_step.to_data()
         if self.gate is not None:
             data["gate"] = self.gate.to_data()
+        if self.branch is not None:
+            data["branch"] = self.branch.to_data()
         if self.coding_loop is not None:
             data["coding_loop"] = self.coding_loop.to_data()
         if self.completion is not None:
@@ -862,7 +892,7 @@ def build_skill_validation_report(
                         code="invalid_step_type_value",
                         message=(
                             "Skill step step_type must be governed, predicated, "
-                            "uses_skill, invoke_tool, gate, or coding_loop."
+                            "uses_skill, invoke_tool, gate, branch, or coding_loop."
                         ),
                         path=_child_path(step_path, "step_type"),
                     )
@@ -1002,6 +1032,69 @@ def build_skill_validation_report(
                         code="unexpected_gate",
                         message="Only gate steps may declare gate.",
                         path=_child_path(step_path, "gate"),
+                    )
+                )
+            raw_branch = step_mapping.get("branch")
+            if normalized_step_type == "branch":
+                if not isinstance(raw_branch, Mapping):
+                    issues.append(
+                        SkillValidationIssue(
+                            code="missing_branch",
+                            message="branch steps must declare a branch object.",
+                            path=_child_path(step_path, "branch"),
+                        )
+                    )
+                else:
+                    cases = raw_branch.get("cases")
+                    if (
+                        not isinstance(cases, Sequence)
+                        or isinstance(cases, (str, bytes, bytearray))
+                        or not cases
+                    ):
+                        issues.append(
+                            SkillValidationIssue(
+                                code="invalid_branch_cases",
+                                message="branch.cases must be a non-empty array.",
+                                path=_child_path(step_path, "branch.cases"),
+                            )
+                        )
+                    else:
+                        for case_index, case in enumerate(cases):
+                            case_path = _child_path(
+                                step_path, f"branch.cases[{case_index}]"
+                            )
+                            if (
+                                not isinstance(case, Mapping)
+                                or _optional_string(case.get("path")) is None
+                                or "equals" not in case
+                                or _optional_string(case.get("goto_step")) is None
+                            ):
+                                issues.append(
+                                    SkillValidationIssue(
+                                        code="invalid_branch_case",
+                                        message=(
+                                            "Each branch case must declare path, "
+                                            "equals, and goto_step."
+                                        ),
+                                        path=case_path,
+                                    )
+                                )
+                    if _optional_string(raw_branch.get("default_goto_step")) is None:
+                        issues.append(
+                            SkillValidationIssue(
+                                code="missing_branch_default",
+                                message=(
+                                    "branch must declare a non-empty default_goto_step."
+                                ),
+                                path=_child_path(step_path, "branch.default_goto_step"),
+                            )
+                        )
+            elif raw_branch is not None:
+                issues.append(
+                    SkillValidationIssue(
+                        code="unexpected_branch",
+                        message="Only branch steps may declare branch.",
+                        path=_child_path(step_path, "branch"),
                     )
                 )
             raw_coding_loop = step_mapping.get("coding_loop")
@@ -2116,11 +2209,14 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
     prompt_catalogs = _optional_prompt_catalogs(data.get("prompt_catalogs"))
     actions = _optional_step_actions(data.get("actions"))
     actions_declared = "actions" in data
+    inputs = _parse_step_inputs(data.get("inputs"))
+    outputs = _parse_step_outputs(data.get("outputs"))
     next_step_override = _optional_string(data.get("next_step_override"))
     if data.get("next_step_override") is not None and next_step_override is None:
         raise ValueError("Skill step next_step_override must be a non-empty string.")
     pre_step = _parse_pre_step(data.get("pre_step"))
     gate = _parse_gate(data.get("gate"))
+    branch = _parse_branch(data.get("branch"))
     raw_coding_loop = data.get("coding_loop")
     coding_loop = (
         _parse_coding_loop(raw_coding_loop) if raw_coding_loop is not None else None
@@ -2184,6 +2280,14 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         raise ValueError("gate steps must declare a gate object.")
     if step_type != "gate" and gate is not None:
         raise ValueError("Only gate steps may declare gate.")
+    if step_type == "branch" and branch is None:
+        raise ValueError("branch steps must declare a branch object.")
+    if step_type != "branch" and branch is not None:
+        raise ValueError("Only branch steps may declare branch.")
+    if step_type == "branch" and (
+        pre_step is not None or actions_declared or inputs or outputs
+    ):
+        raise ValueError("branch steps may only declare branch control flow.")
     if step_type == "coding_loop" and coding_loop is None:
         raise ValueError("coding_loop steps must declare a coding_loop object.")
     if step_type != "coding_loop" and coding_loop is not None:
@@ -2203,8 +2307,6 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
             raise ValueError("uses_skill steps cannot declare model actions.")
         if prompt_catalogs:
             raise ValueError("uses_skill steps cannot declare prompt_catalogs.")
-    inputs = _parse_step_inputs(data.get("inputs"))
-    outputs = _parse_step_outputs(data.get("outputs"))
     if completion is not None:
         declared_outputs = {output.name for output in outputs}
         missing_outputs = sorted(
@@ -2230,6 +2332,7 @@ def skill_step_from_data(data: Mapping[str, Any]) -> SkillStep:
         next_step_override=next_step_override,
         pre_step=pre_step,
         gate=gate,
+        branch=branch,
         validation_gate=validation_gate,
         coding_loop=coding_loop,
         completion=completion,
@@ -2507,6 +2610,35 @@ def _parse_gate(value: object) -> SkillStepGate | None:
         goto_step=_required_string(value, "goto_step"),
         retry_context=_required_string(value, "retry_context"),
         success_goto_step=_optional_string(value.get("success_goto_step")),
+    )
+
+
+def _parse_branch(value: object) -> SkillStepBranch | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("Skill step branch must be an object.")
+    cases_value = value.get("cases")
+    if (
+        not isinstance(cases_value, Sequence)
+        or isinstance(cases_value, (str, bytes, bytearray))
+        or not cases_value
+    ):
+        raise ValueError("Branch cases must be a non-empty array.")
+    cases: list[SkillStepBranchCase] = []
+    for item in cases_value:
+        if not isinstance(item, Mapping):
+            raise ValueError("Branch cases must contain objects.")
+        path = _required_string(item, "path")
+        if "equals" not in item:
+            raise ValueError("Branch cases must declare equals.")
+        goto_step = _required_string(item, "goto_step")
+        cases.append(
+            SkillStepBranchCase(path=path, equals=item["equals"], goto_step=goto_step)
+        )
+    return SkillStepBranch(
+        cases=tuple(cases),
+        default_goto_step=_required_string(value, "default_goto_step"),
     )
 
 

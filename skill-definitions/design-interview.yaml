@@ -394,7 +394,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the design-interview-input generator exactly once; do not edit its output.
   pre_step:
     action: invoke_tool
     template:
@@ -568,12 +567,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: >-
-    The 20 preceding *_edits inputs are stored in the JSON interview input.
-    Invoke the feature-pr specification generator exactly once for
-    <work-item-name>, passing it that JSON file. The generator creates the
-    complete docs/proposals/<work-item-name>/feature-pr-specification.yaml from
-    the interview edits. Do not edit the YAML in this step.
   pre_step:
     action: invoke_tool
     template:
@@ -589,7 +582,6 @@ steps:
   actions: []
   step_type: invoke_tool
   llm_type: simple_task
-  details: Invoke the declared evaluator exactly once and pass its complete result onward.
   pre_step:
     action: invoke_tool
     template:

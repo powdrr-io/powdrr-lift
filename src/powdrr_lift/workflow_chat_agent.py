@@ -118,6 +118,7 @@ from powdrr_lift.workflow_action_validation import (
     _WorkflowStructuredDocumentError,
     _WorkflowToolValidationError,
 )
+from powdrr_lift.workflow_branching import select_branch_target
 from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_actions import (
     _workflow_action_handlers,
@@ -540,6 +541,22 @@ class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     skill=self.selected_skill,
                     step_index=self.current_step_index,
                 )
+            if step_behavior.runs_branch:
+                target_step_id = select_branch_target(
+                    self.current_step.branch, self.state.handoff_records
+                )
+                target_index = _step_index_by_id(self.selected_skill, target_step_id)
+                self.state.execution_events.append(
+                    {
+                        "kind": "goto_step",
+                        "step_id": target_step_id,
+                        "target_step_index": target_index,
+                        "source": "branch",
+                        "step_index": self.current_step_index,
+                    }
+                )
+                self.state.step_index = target_index
+                continue
             if step_behavior.runs_gate:
                 if self.state.runtime is not None:
                     self.state.runtime.install_step_scope(frozenset())

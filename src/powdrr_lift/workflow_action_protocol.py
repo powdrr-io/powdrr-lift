@@ -769,9 +769,17 @@ def _parse_workflow_action_prompt_user(
         text,
         field_name="Workflow prompt_user action text",
     )
+    capture_as = payload.get("capture_as")
+    if capture_as is not None and (
+        not isinstance(capture_as, str) or not capture_as.strip()
+    ):
+        raise PowdrrExecutionError(
+            "Workflow prompt_user capture_as must be a non-empty string."
+        )
     return SkillChatAction(
         kind="prompt_user",
         text=(text.strip() if text else None),
+        capture_as=(capture_as.strip() if isinstance(capture_as, str) else None),
         decisions_and_context=decisions_and_context,
         llm_type=llm_type,
     )

@@ -505,7 +505,7 @@ def step_control_contracts(ir: Any) -> tuple[StepControlContract, ...]:
         step = item.step
         owner: Literal["runner", "llm"] = (
             "runner"
-            if step.step_type in {"invoke_tool", "gate", "uses_skill"}
+            if step.step_type in {"invoke_tool", "gate", "branch", "uses_skill"}
             else "llm"
         )
         actions = tuple(step.actions)
@@ -555,6 +555,8 @@ def runtime_static_conformance(ir: Any) -> tuple[str, ...]:
             )
         if behavior.runs_gate != (item.step.step_type == "gate"):
             mismatches.append(f"{contract.step_id}: gate policy mismatch")
+        if behavior.runs_branch != (item.step.step_type == "branch"):
+            mismatches.append(f"{contract.step_id}: branch policy mismatch")
     return tuple(mismatches)
 
 

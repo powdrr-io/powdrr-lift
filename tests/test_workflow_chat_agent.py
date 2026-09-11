@@ -3396,6 +3396,18 @@ def test_json_repair_uses_clean_room_prompt_without_original_history() -> None:
     }
 
 
+def test_parse_json_object_repairs_common_llm_json_syntax() -> None:
+    assert _parse_json_object("{action: 'next_step', output_state: {},}", "test") == {
+        "action": "next_step",
+        "output_state": {},
+    }
+
+
+def test_parse_json_object_keeps_rejecting_non_json_content() -> None:
+    with pytest.raises(PowdrrExecutionError, match="was not valid JSON"):
+        _parse_json_object("this is not a JSON response", "test")
+
+
 def test_llm_type_mapping_selects_deepinfra_model() -> None:
     assert (
         _resolve_llm_model(

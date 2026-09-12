@@ -1,6 +1,12 @@
 """A small, total control plane for bounded LLM-assisted procedures."""
 
 from procedrr.compiler import CompilationError, CompilationReport, compile_workflow
+from procedrr.feature_delivery import (
+    execute_proposed_pr,
+    feature_delivery_process,
+    specify_a_feature,
+    start_implementing_feature,
+)
 from procedrr.model import (
     ActivationLimits,
     CallNode,
@@ -64,4 +70,8 @@ __all__ = [
     "ExecutionResult",
     "ReferenceRuntime",
     "RetryableFailure",
+    "execute_proposed_pr",
+    "feature_delivery_process",
+    "specify_a_feature",
+    "start_implementing_feature",
 ]

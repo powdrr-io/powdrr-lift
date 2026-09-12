@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 from procedrr import (
@@ -19,6 +21,7 @@ from procedrr import (
     TerminalStatus,
     WorkflowDefinition,
     compile_workflow,
+    feature_delivery_process,
 )
 
 
@@ -115,3 +118,14 @@ def test_runtime_rejects_snapshot_above_declared_bound() -> None:
     ).execute(workflow, {"items": ["a", "b"]})
     assert result.status == TerminalStatus.FAILED
     assert "exceeds" in (result.error or "")
+
+
+def test_feature_delivery_process_covers_three_named_lifecycle_calls() -> None:
+    compiled = compile_workflow(feature_delivery_process(max_proposed_prs=2))
+    calls = cast(SequenceNode, compiled.definition.body).nodes
+    assert [cast(CallNode, call).name for call in calls[:2]] == [
+        "specify-a-feature",
+        "start-implementing-feature",
+    ]
+    assert compiled.max_llm_activations > 0
+    assert compiled.max_llm_activations < compiled.definition.limits.llm_activations

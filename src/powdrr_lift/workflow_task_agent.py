@@ -67,6 +67,7 @@ from powdrr_lift.pr_workflow_record import (
 from powdrr_lift.process.action_catalog import step_actions
 from powdrr_lift.process.branching import select_branch_target
 from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.discovery import find_skill_by_name, load_skill_catalog
 from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.workflow_action_operations import (
     _apply_file_edits,
@@ -85,7 +86,6 @@ from powdrr_lift.workflow_action_validation import (
     _validate_workflow_handoff,
     _validation_gate_enabled,
 )
-from powdrr_lift.workflow_catalog import find_skill_by_name, load_skill_catalog
 from powdrr_lift.workflow_chat_agent import (
     _build_step_execution_messages,
 )

@@ -9,14 +9,14 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.workflow_definition_analysis import (
+from powdrr_lift.process.compiler import (
     analyze_workflow_definition,
-    render_skill_prompt_snapshots,
 )
 from powdrr_lift.workflow_definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
 )
+from powdrr_lift.workflow_definition_prompts import render_skill_prompt_snapshots
 
 WORKFLOW_TUNING_REPORT_SCHEMA_VERSION = 1
 

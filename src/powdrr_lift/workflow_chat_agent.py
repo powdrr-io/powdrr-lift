@@ -57,6 +57,7 @@ from powdrr_lift.process.action_catalog import (
 )
 from powdrr_lift.process.branching import select_branch_target
 from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.discovery import load_skill_catalog
 from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.workflow_action_protocol import _parse_action_response
 from powdrr_lift.workflow_action_validation import (
@@ -85,7 +86,6 @@ from powdrr_lift.workflow_action_validation import (
     _workflow_context_handoff_records,
     _WorkflowToolValidationError,
 )
-from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_actions import (
     _workflow_action_handlers,
 )

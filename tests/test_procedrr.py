@@ -6,6 +6,7 @@ from procedrr import (
     DecisionContract,
     DecisionKind,
     ForEachNode,
+    Guarantee,
     JudgeNode,
     MatchCase,
     MatchNode,
@@ -54,7 +55,7 @@ def test_compiler_proves_bounded_sequence_and_counts_repairs() -> None:
     compiled = compile_workflow(workflow)
     assert compiled.max_llm_activations == 1
     assert compiled.max_tool_calls == 1
-    assert compiled.certificate.status("decision_safe") == "proven"
+    assert compiled.certificate.status(Guarantee.DECISION_SAFE) == "proven"
 
 
 def test_compiler_counts_data_driven_fanout_and_retries() -> None:

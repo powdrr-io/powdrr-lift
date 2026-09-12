@@ -18,8 +18,10 @@ from powdrr_lift.agent.providers import (
     resolve_provider_credentials,
 )
 from powdrr_lift.core import resolve_repo_root
+from powdrr_lift.process.branching import select_branch_target
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.process.model import load_skill
+from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
@@ -31,7 +33,6 @@ from powdrr_lift.workflow_action_validation import (
     _validate_workflow_action_for_step,
     _workflow_action_data,
 )
-from powdrr_lift.workflow_branching import select_branch_target
 from powdrr_lift.workflow_chat_agent import _build_step_execution_messages
 from powdrr_lift.workflow_chat_contract import _step_action_response_schema
 from powdrr_lift.workflow_execution_loop import _run_deterministic_pre_step, _run_gate
@@ -39,7 +40,6 @@ from powdrr_lift.workflow_llm import (
     WorkflowLLMClient,
     complete_json_with_timeout_retry,
 )
-from powdrr_lift.workflow_step_behavior import behavior_for_step
 from powdrr_lift.workflow_task_agent import _build_task_messages
 
 

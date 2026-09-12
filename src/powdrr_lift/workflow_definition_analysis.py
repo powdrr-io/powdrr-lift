@@ -17,6 +17,14 @@ from typing import Any
 import yaml
 
 from powdrr_lift.core import resolve_repo_root
+from powdrr_lift.process.liveness import (
+    build_abstract_execution_graph,
+    capability_effect,
+    effect_for_pre_step,
+    is_fixed_deterministic,
+    is_idempotent,
+    runtime_static_conformance,
+)
 from powdrr_lift.process.model import (
     Skill,
     SkillStep,
@@ -29,14 +37,6 @@ from powdrr_lift.process.tasks import (
 )
 from powdrr_lift.process.templates import (
     build_workflow_template_validation_report,
-)
-from powdrr_lift.workflow_liveness import (
-    build_abstract_execution_graph,
-    capability_effect,
-    effect_for_pre_step,
-    is_fixed_deterministic,
-    is_idempotent,
-    runtime_static_conformance,
 )
 
 _PLACEHOLDER = re.compile(r"<([A-Za-z0-9_-]+)>")

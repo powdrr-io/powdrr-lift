@@ -543,7 +543,7 @@ def step_control_contracts(ir: Any) -> tuple[StepControlContract, ...]:
 
 def runtime_static_conformance(ir: Any) -> tuple[str, ...]:
     """Compare static ownership with the production step behavior policy."""
-    from powdrr_lift.workflow_step_behavior import behavior_for_step
+    from powdrr_lift.process.step_behavior import behavior_for_step
 
     mismatches: list[str] = []
     for contract, item in zip(step_control_contracts(ir), ir.steps, strict=True):

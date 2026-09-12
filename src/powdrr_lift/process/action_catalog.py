@@ -7,7 +7,7 @@ from typing import Any
 
 from powdrr_lift.core.spec_context import normalize_context_type
 from powdrr_lift.process.model import SkillToolInvocation
-from powdrr_lift.workflow_step_behavior import behavior_for_step
+from powdrr_lift.process.step_behavior import behavior_for_step
 
 DEFAULT_ACTION_INSTRUCTIONS: dict[str, str] = {
     "gather_context": "Discover checked-in specifications relevant to this step.",

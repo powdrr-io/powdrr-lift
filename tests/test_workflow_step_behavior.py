@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from powdrr_lift.workflow_step_behavior import behavior_for_step
+from powdrr_lift.process.step_behavior import behavior_for_step
 
 
 @dataclass

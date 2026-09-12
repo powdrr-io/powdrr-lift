@@ -76,14 +76,14 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.file_management import FileManagementError, manage_worktree_file
 from powdrr_lift.fuzzy_match import execute_fuzzy_match
-from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.test_failure_packet import build_test_failure_packet
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     recovery_tool_invocations as _recovery_tool_invocations,
 )
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     step_actions as _step_actions,
 )
+from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.test_failure_packet import build_test_failure_packet
 from powdrr_lift.workflow_action_operations import (
     WorkflowEditRangeError as _WorkflowEditRangeError,
 )

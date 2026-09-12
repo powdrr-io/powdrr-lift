@@ -14,7 +14,7 @@ from typing import Any, TextIO, cast
 import pytest
 
 from powdrr_lift.core import WorkflowInstance, save_workflow_task
-from powdrr_lift.core.workflow_template_specification import (
+from powdrr_lift.process.templates import (
     instantiate_workflow_template,
 )
 from powdrr_lift.workflow_task_agent import (

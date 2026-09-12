@@ -781,7 +781,7 @@ def __getattr__(name: str) -> Any:
         "workflow_task_to_json",
         "workflow_task_to_yaml",
     }:
-        from powdrr_lift.core.workflow_task_specification import (
+        from powdrr_lift.process.tasks import (
             AgentRole,
             AssigneeRole,
             AssigneeType,
@@ -889,7 +889,7 @@ def __getattr__(name: str) -> Any:
         "workflow_template_to_json",
         "workflow_template_to_yaml",
     }:
-        from powdrr_lift.core.workflow_template_specification import (
+        from powdrr_lift.process.templates import (
             WorkflowTaskTemplate,
             WorkflowTaskTemplateGeneration,
             WorkflowTemplate,

@@ -6,9 +6,9 @@ from typing import cast
 
 from powdrr_lift.core import WorkflowInstance
 from powdrr_lift.core.delivery_profile import PhaseType
-from powdrr_lift.core.skill_specification import SkillToolInvocation
-from powdrr_lift.core.workflow_task_specification import TaskComplexity
-from powdrr_lift.core.workflow_template_specification import (
+from powdrr_lift.process.model import SkillToolInvocation
+from powdrr_lift.process.tasks import TaskComplexity
+from powdrr_lift.process.templates import (
     WorkflowTaskTemplate,
     WorkflowTaskTemplateGeneration,
     WorkflowTemplate,

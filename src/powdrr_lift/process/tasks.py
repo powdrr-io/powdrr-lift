@@ -10,7 +10,11 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.core.delivery_profile import PhaseType
-from powdrr_lift.core.skill_specification import (
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
+from powdrr_lift.process.model import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
     CodingLoopSpec,
@@ -18,10 +22,6 @@ from powdrr_lift.core.skill_specification import (
     SkillStepPreStep,
     SkillToolInvocation,
     skill_step_from_data,
-)
-from powdrr_lift.core.validation_messages import (
-    ValidationError,
-    validation_error_to_data,
 )
 
 
@@ -212,31 +212,6 @@ class WorkflowInstance:
         for task in initial_tasks:
             workflow.add_task(task)
         return workflow
-
-    @classmethod
-    def from_execution_plan(
-        cls,
-        directory: str | Path,
-        *,
-        profile: Any,
-        plan: Any,
-        actions_by_phase: Mapping[Any, tuple[str, ...]],
-        intent_ids_by_phase: Mapping[Any, tuple[str, ...]] | None = None,
-        clause_ids_by_phase: Mapping[Any, tuple[str, ...]] | None = None,
-    ) -> WorkflowInstance:
-        """Create the durable task graph from the canonical typed plan."""
-        from powdrr_lift.execution.compile import compile_execution_plan
-
-        return cls.create(
-            directory,
-            compile_execution_plan(
-                profile,
-                plan,
-                actions_by_phase=actions_by_phase,
-                intent_ids_by_phase=intent_ids_by_phase,
-                clause_ids_by_phase=clause_ids_by_phase,
-            ),
-        )
 
     @classmethod
     def from_directory(cls, directory: str | Path) -> WorkflowInstance:

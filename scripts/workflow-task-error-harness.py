@@ -24,7 +24,7 @@ from powdrr_lift.core import (
     WorkflowTask,
     load_workflow_template,
 )
-from powdrr_lift.core.workflow_task_specification import save_workflow_task
+from powdrr_lift.process.tasks import save_workflow_task
 from powdrr_lift.workflow_git import (
     load_workflow_git_state,
     resolve_git_repository_root,

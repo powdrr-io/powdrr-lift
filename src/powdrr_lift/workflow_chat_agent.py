@@ -49,13 +49,15 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import (
     execute_intrinsic_git_gh_tool,  # noqa: F401 - compatibility monkeypatch seam
 )
-from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     declared_action_names as _declared_action_names,
 )
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     step_actions as _step_actions,
 )
+from powdrr_lift.process.branching import select_branch_target
+from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.workflow_action_protocol import _parse_action_response
 from powdrr_lift.workflow_action_validation import (
     _advance_predicated_step,
@@ -83,7 +85,6 @@ from powdrr_lift.workflow_action_validation import (
     _workflow_context_handoff_records,
     _WorkflowToolValidationError,
 )
-from powdrr_lift.workflow_branching import select_branch_target
 from powdrr_lift.workflow_catalog import load_skill_catalog
 from powdrr_lift.workflow_chat_actions import (
     _workflow_action_handlers,
@@ -191,7 +192,6 @@ from powdrr_lift.workflow_replay import (
     build_workflow_replay_state,
     definition_content_sha256,
 )
-from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 

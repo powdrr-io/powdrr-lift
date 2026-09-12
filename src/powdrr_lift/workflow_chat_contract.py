@@ -19,16 +19,17 @@ from powdrr_lift.core import (
     system_map_specification_default_output_path,
     system_specification_default_output_path,
 )
-from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     DEFAULT_ACTION_INSTRUCTIONS as _DEFAULT_ACTION_INSTRUCTIONS,
 )
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     recovery_tool_invocations as _recovery_tool_invocations,
 )
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     step_actions as _step_actions,
 )
+from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.workflow_action_operations import (
     WorkflowEditRangeError as _WorkflowEditRangeError,
 )
@@ -63,7 +64,6 @@ from powdrr_lift.workflow_prompting import (
     _tool_invocation_to_data,
     interaction_style_prompt,
 )
-from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 
 def _workflow_action_signature(action: SkillChatAction) -> str:

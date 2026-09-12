@@ -19,13 +19,14 @@ from powdrr_lift.core.validation_messages import ValidationError
 from powdrr_lift.execution.builtin_tools import invoke_file_mutation
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL, intrinsic_command
-from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     declared_action_names as _declared_action_names,
 )
-from powdrr_lift.workflow_action_catalog import (
+from powdrr_lift.process.action_catalog import (
     recovery_tool_invocations as _recovery_tool_invocations,
 )
+from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.workflow_action_protocol import _parse_action_response
 from powdrr_lift.workflow_execution_state import (
     _ensure_execution_runtime,
@@ -43,7 +44,6 @@ from powdrr_lift.workflow_observer import (
     ObserverActionRecommendation,
     observer_action_matches,
 )
-from powdrr_lift.workflow_step_behavior import behavior_for_step
 
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"

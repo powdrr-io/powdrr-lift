@@ -134,6 +134,52 @@ _EXPORT_MODULES.update(
         "WorkflowTemplateCatalogEntry": "powdrr_lift.process.catalog",
     }
 )
+_EXPORT_MODULES.update(
+    {
+        name: "powdrr_lift.process.branching"
+        for name in ("resolve_handoff_path", "select_branch_target")
+    }
+)
+_EXPORT_MODULES.update(
+    {
+        name: "powdrr_lift.process.step_behavior"
+        for name in ("StepBehavior", "behavior_for_step")
+    }
+)
+_EXPORT_MODULES.update(
+    {
+        name: "powdrr_lift.process.action_catalog"
+        for name in (
+            "DEFAULT_ACTION_INSTRUCTIONS",
+            "declared_action_names",
+            "predicated_context_complete",
+            "recovery_tool_invocations",
+            "step_actions",
+        )
+    }
+)
+_EXPORT_MODULES.update(
+    {
+        name: "powdrr_lift.process.liveness"
+        for name in (
+            "AbstractTransition",
+            "AbstractWorkflowState",
+            "CapabilityEffect",
+            "SkillEffectSummary",
+            "StepControlContract",
+            "build_abstract_execution_graph",
+            "capability_effect",
+            "effect_for_pre_step",
+            "effect_registry",
+            "expand_abstract_transitions",
+            "is_fixed_deterministic",
+            "is_idempotent",
+            "runtime_static_conformance",
+            "step_control_contracts",
+            "summarize_skill",
+        )
+    }
+)
 
 
 def __getattr__(name: str) -> Any:
@@ -242,4 +288,28 @@ __all__ = [
     "workflow_template_from_yaml",
     "workflow_template_to_json",
     "workflow_template_to_yaml",
+    "resolve_handoff_path",
+    "select_branch_target",
+    "StepBehavior",
+    "behavior_for_step",
+    "DEFAULT_ACTION_INSTRUCTIONS",
+    "declared_action_names",
+    "predicated_context_complete",
+    "recovery_tool_invocations",
+    "step_actions",
+    "AbstractTransition",
+    "AbstractWorkflowState",
+    "CapabilityEffect",
+    "SkillEffectSummary",
+    "StepControlContract",
+    "build_abstract_execution_graph",
+    "capability_effect",
+    "effect_for_pre_step",
+    "effect_registry",
+    "expand_abstract_transitions",
+    "is_fixed_deterministic",
+    "is_idempotent",
+    "runtime_static_conformance",
+    "step_control_contracts",
+    "summarize_skill",
 ]

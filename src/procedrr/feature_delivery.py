@@ -220,7 +220,9 @@ def feature_delivery_process(*, max_proposed_prs: int = 16) -> WorkflowDefinitio
     return WorkflowDefinition(
         "feature-delivery",
         body,
-        ResourceLimits(llm_activations=1024, tool_calls=4096, max_epochs=3),
+        # The admission bound is part of the process contract; the aggregate
+        # budget leaves room for the worst-case per-PR decision sequence.
+        ResourceLimits(llm_activations=2048, tool_calls=4096, max_epochs=3),
     )
 
 

@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from powdrr_lift.workrr.workflow_tuning import (
+from powdrr_lift.workrr.tuning import (
     save_workflow_tuning_report,
     tune_workflow,
 )

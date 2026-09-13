@@ -194,7 +194,7 @@ Powdrr already has most of the necessary primitives:
 
 | Capability | Existing seam | Relevance to the target |
 | --- | --- | --- |
-| Shared model/action loop | `workflow_llm.py::WorkflowStepRunner` | Natural owner of the state transition protocol for chat and durable tasks |
+| Shared model/action loop | `workrr/llm.py::WorkflowStepRunner` | Natural owner of the state transition protocol for chat and durable tasks |
 | Action lifecycle | `execution/kernel.py::ActionKernel` | Deterministic proposal, start, completion, and failure boundary |
 | Typed materialized state | `core/execution_state.py::ExecutionState` | Starting point for the canonical current-state projection |
 | Event reduction | `core/execution_state.py::reduce_execution_event` | Deterministic state reconstruction |
@@ -213,7 +213,7 @@ of shadowing a transcript-oriented runtime.
 
 ### The live state is still transcript-oriented
 
-`workflow_chat_agent.py::_WorkflowExecutionState` maintains separate mutable
+`workrr/chat_agent.py::_WorkflowExecutionState` maintains separate mutable
 collections for:
 
 - `transcript`;
@@ -238,7 +238,7 @@ not make current state sufficient.
 
 ### Compaction can affect correctness
 
-`workflow_task_agent.py::_compact_workflow_task_context()` asks an LLM to
+`workrr/task_agent.py::_compact_workflow_task_context()` asks an LLM to
 preserve requirements, decisions, errors, outputs, and other actionable facts
 from task history. That summary is useful as a diagnostic artifact, but it
 cannot safely be an authority for future execution. Omitting or paraphrasing a

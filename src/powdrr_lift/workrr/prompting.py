@@ -18,11 +18,11 @@ from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.workrr.context import WorkflowContext
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     prune_execution_events,
     workflow_action_signature,
 )
-from powdrr_lift.workrr.workflow_paths import resolve_worktree_file_path
+from powdrr_lift.workrr.paths import resolve_worktree_file_path
 
 _INTERNAL_TOOL = "internal"
 

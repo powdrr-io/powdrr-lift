@@ -16,20 +16,20 @@ from powdrr_lift.pr_workflow_record import (
     record_pull_request_workflow,
 )
 from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.workrr.workflow_action_validation import _command_items_for_validation
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.action_validation import _command_items_for_validation
+from powdrr_lift.workrr.llm import (
     PowdrrExecutionError,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowAction as SkillChatAction,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowEdit as SkillChatEdit,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowYamlOperation as SkillChatYamlOperation,
 )
-from powdrr_lift.workrr.workflow_paths import resolve_worktree_file_path
+from powdrr_lift.workrr.paths import resolve_worktree_file_path
 
 _PRE_STEP_PLACEHOLDER = re.compile(r"<([^<>]+)>")
 

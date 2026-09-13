@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-import powdrr_lift.workrr.workflow_git as workflow_git
+import powdrr_lift.workrr.git as workflow_git
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.workflow_git import (
+from powdrr_lift.workrr.git import (
     WorkflowGitState,
     claim_workflow_task,
     cleanup_workflow_run,

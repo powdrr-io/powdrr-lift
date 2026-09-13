@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from powdrr_lift.workrr.workflow_error_logging import (
+from powdrr_lift.workrr.error_logging import (
     WORKFLOW_LLM_ERROR_LOG,
     record_workflow_llm_error,
 )

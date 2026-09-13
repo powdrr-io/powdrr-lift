@@ -22,11 +22,11 @@ It can guarantee that:
 
 Repair responsibility is currently distributed across several layers:
 
-- `workflow_chat_agent.py` owns JSON-response repair, prompt construction,
+- `workrr/chat_agent.py` owns JSON-response repair, prompt construction,
   model fallback, and chat-specific action correction.
-- `workflow_llm.py` owns the shared action request/execution loop, action failure
+- `workrr/llm.py` owns the shared action request/execution loop, action failure
   counting, semantic action signatures, and no-progress detection.
-- `workflow_task_agent.py` turns durable-task failures into a
+- `workrr/task_agent.py` turns durable-task failures into a
   `response_correction` string that is added to the next task prompt.
 - Chat execution restores a step checkpoint after repeated stalls and includes
   `stalled_step_context` in the next full step prompt.
@@ -98,7 +98,7 @@ compatibility fallback while existing errors are migrated to typed codes.
 
 ## Shared repair coordinator
 
-Add a `WorkflowRepairCoordinator` in `workflow_llm.py`. It belongs beside
+Add a `WorkflowRepairCoordinator` in `workrr/llm.py`. It belongs beside
 `WorkflowStepRunner` because the shared runner is the only layer that sees all
 response, proposal, execution, and progress outcomes.
 
@@ -747,7 +747,7 @@ correction. It remains opt-in and is not authoritative CI.
 ### PR 1: typed failure and repair state
 
 - Add failure classes, repair policy, repair context, directives, attempt
-  identities, and ledger types in `workflow_llm.py`.
+  identities, and ledger types in `workrr/llm.py`.
 - Migrate existing response/action/no-progress observations into typed failures.
 - Preserve current behavior behind a compatibility coordinator.
 - Add pure state-machine and signature tests.

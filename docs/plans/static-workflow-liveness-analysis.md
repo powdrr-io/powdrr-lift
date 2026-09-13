@@ -101,7 +101,7 @@ or treat natural-language interpretation as authoritative.
 
 ## Existing foundation
 
-`workflow_definition_analysis.py` is the integration point. It already:
+`process/compiler.py` is the integration point. It already:
 
 - Parses and schema-validates definitions.
 - Compiles skills into `WorkflowIR` control-flow graphs.
@@ -111,7 +111,7 @@ or treat natural-language interpretation as authoritative.
 - Renders production prompt snapshots.
 
 The liveness analyzer should extend `WorkflowIR` and reuse production behavior
-from `workflow_step_behavior.py`. It must not duplicate rules for whether a step
+from `process/step_behavior.py`. It must not duplicate rules for whether a step
 invokes an LLM, auto-advances, runs a gate, or publishes predicated outputs.
 
 ## Declarative execution model

@@ -12,7 +12,7 @@ from powdrr_lift.errors import (
     ProviderExecutionError,
 )
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowActionRequest,
     WorkflowExecutionStrategy,
     WorkflowStepRunner,

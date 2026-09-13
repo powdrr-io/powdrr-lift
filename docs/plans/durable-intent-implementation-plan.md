@@ -108,7 +108,7 @@ Latest `main` already contains important execution primitives:
 - `execution/kernel.py` provides deterministic action lifecycle events.
 - `execution/relationships.py` expands action consequences into obligations.
 - `execution/evidence.py` evaluates evidence freshness and readiness.
-- `workflow_llm.py::WorkflowStepRunner` is the shared action loop for chat and
+- `workrr/llm.py::WorkflowStepRunner` is the shared action loop for chat and
   automated workflows.
 
 The remaining architectural problems are concentrated at the boundary:

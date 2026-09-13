@@ -39,28 +39,8 @@ from powdrr_lift.process.branching import select_branch_target
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.process.discovery import load_skill_catalog
 from powdrr_lift.process.step_behavior import behavior_for_step
-from powdrr_lift.workrr.context import WorkflowContext
-from powdrr_lift.workrr.provider_config import (
-    ZAI_LLM_MAPPINGS,
-    LLMModelLimits,
-    LLMModelMapping,
-    LLMProviderRole,
-    LLMProviderRoles,
-    provider_definition,
-    provider_supports_llm_mappings,
-)
-from powdrr_lift.workrr.providers import (
-    LOCAL_MODEL_PATTERN,
-    available_provider_names,
-    initial_model_for_provider,
-    provider_model_limits,
-    resolve_llm_mapping,
-    resolve_local_model_context,
-    resolve_provider,
-    resolve_provider_roles,
-)
-from powdrr_lift.workrr.workflow_action_protocol import _parse_action_response
-from powdrr_lift.workrr.workflow_action_validation import (
+from powdrr_lift.workrr.action_protocol import _parse_action_response
+from powdrr_lift.workrr.action_validation import (
     _advance_predicated_step,
     _invalidate_deterministic_pre_step,
     _json_schema_error,
@@ -86,15 +66,15 @@ from powdrr_lift.workrr.workflow_action_validation import (
     _workflow_context_handoff_records,
     _WorkflowToolValidationError,
 )
-from powdrr_lift.workrr.workflow_chat_actions import (
+from powdrr_lift.workrr.chat_actions import (
     _workflow_action_handlers,
 )
-from powdrr_lift.workrr.workflow_chat_context import (
+from powdrr_lift.workrr.chat_context import (
     _load_workflow_context,
     _persist_workflow_context,
     _resolve_worktree_for_request,
 )
-from powdrr_lift.workrr.workflow_chat_contract import (
+from powdrr_lift.workrr.chat_contract import (
     _action_repair_prompt,
     _command_items,
     _current_step_contract,
@@ -104,12 +84,12 @@ from powdrr_lift.workrr.workflow_chat_contract import (
     _underlying_execution_error,
     _workflow_edit_failure_feedback,
 )
-from powdrr_lift.workrr.workflow_chat_io import (
+from powdrr_lift.workrr.chat_io import (
     _prompt_user,
     _verbose_print,
     _write_agent_error,
 )
-from powdrr_lift.workrr.workflow_chat_selection import (
+from powdrr_lift.workrr.chat_selection import (
     SkillChatSelection,
     WorkflowChatConfig,
     _active_llm_mappings,
@@ -117,23 +97,24 @@ from powdrr_lift.workrr.workflow_chat_selection import (
     _parse_selection_response,
     _selection_repair_prompt,
 )
-from powdrr_lift.workrr.workflow_chat_transport import (
+from powdrr_lift.workrr.chat_transport import (
     _complete_json_with_model_fallback,
 )
-from powdrr_lift.workrr.workflow_error_logging import record_workflow_llm_error
-from powdrr_lift.workrr.workflow_execution_loop import (
+from powdrr_lift.workrr.context import WorkflowContext
+from powdrr_lift.workrr.error_logging import record_workflow_llm_error
+from powdrr_lift.workrr.execution_loop import (
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
     _run_gate,
     _validate_coding_loop_action,
 )
-from powdrr_lift.workrr.workflow_execution_state import (
+from powdrr_lift.workrr.execution_state import (
     _begin_step_checkpoint,
     _record_durable_fact,
     _restore_step_checkpoint,
     _WorkflowExecutionState,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     PowdrrExecutionError,
     ProgressDecision,
     RepairContext,
@@ -159,13 +140,13 @@ from powdrr_lift.workrr.workflow_llm import (
     workflow_action_failure_signature,
     workflow_action_summary,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowAction as SkillChatAction,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
-from powdrr_lift.workrr.workflow_observer import (
+from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,
     ObserverDecision,
     ObserverExecutionContext,
@@ -173,21 +154,40 @@ from powdrr_lift.workrr.workflow_observer import (
     compact_observer_mapping,
     observer_action_matches,
 )
-from powdrr_lift.workrr.workflow_paths import (
+from powdrr_lift.workrr.paths import (
     resolve_project_root,
     resolve_worktree_file_path,
 )
-from powdrr_lift.workrr.workflow_prompting import (
+from powdrr_lift.workrr.prompting import (
     _build_step_execution_messages as _build_step_execution_messages_runtime,
 )
-from powdrr_lift.workrr.workflow_prompting import (
+from powdrr_lift.workrr.prompting import (
     _current_file_context,
     _effective_interaction_style,
 )
-from powdrr_lift.workrr.workflow_provider_runtime import (
+from powdrr_lift.workrr.provider_config import (
+    ZAI_LLM_MAPPINGS,
+    LLMModelLimits,
+    LLMModelMapping,
+    LLMProviderRole,
+    LLMProviderRoles,
+    provider_definition,
+    provider_supports_llm_mappings,
+)
+from powdrr_lift.workrr.provider_runtime import (
     WorkflowClientRegistry,
 )
-from powdrr_lift.workrr.workflow_replay import (
+from powdrr_lift.workrr.providers import (
+    LOCAL_MODEL_PATTERN,
+    available_provider_names,
+    initial_model_for_provider,
+    provider_model_limits,
+    resolve_llm_mapping,
+    resolve_local_model_context,
+    resolve_provider,
+    resolve_provider_roles,
+)
+from powdrr_lift.workrr.replay import (
     WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
     build_workflow_replay_state,
     definition_content_sha256,

@@ -30,36 +30,36 @@ from powdrr_lift.process.action_catalog import (
 )
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.process.step_behavior import behavior_for_step
-from powdrr_lift.workrr.workflow_action_operations import (
+from powdrr_lift.workrr.action_operations import (
     WorkflowEditRangeError as _WorkflowEditRangeError,
 )
-from powdrr_lift.workrr.workflow_action_operations import (
+from powdrr_lift.workrr.action_operations import (
     WorkflowYamlEditError as _WorkflowYamlEditError,
 )
-from powdrr_lift.workrr.workflow_action_validation import (
+from powdrr_lift.workrr.action_validation import (
     _validation_gate_enabled,
     _WorkflowStructuredDocumentError,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     PowdrrExecutionError,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowAction as SkillChatAction,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowEdit as SkillChatEdit,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowFileEdits as SkillChatFileEdits,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     WorkflowYamlOperation as SkillChatYamlOperation,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     workflow_action_signature as _shared_workflow_action_signature,
 )
-from powdrr_lift.workrr.workflow_paths import resolve_worktree_file_path
-from powdrr_lift.workrr.workflow_prompting import (
+from powdrr_lift.workrr.paths import resolve_worktree_file_path
+from powdrr_lift.workrr.prompting import (
     _successful_document_reads_for_prompt,
     _tool_invocation_to_data,
     interaction_style_prompt,

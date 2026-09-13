@@ -41,23 +41,23 @@ from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_edit import APPLY_EDIT_TOOL, VALIDATE_EDIT_TOOL
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
-from powdrr_lift.workrr.context import WorkflowContext
-from powdrr_lift.workrr.workflow_action_operations import _resolve_pre_step_template
-from powdrr_lift.workrr.workflow_action_validation import (
+from powdrr_lift.workrr.action_operations import _resolve_pre_step_template
+from powdrr_lift.workrr.action_validation import (
     _command_items_for_validation,
     _record_runtime_readiness_from_pre_step,
     _runtime_readiness_report,
     _validate_internal_command,
 )
-from powdrr_lift.workrr.workflow_chat_io import _verbose_print
+from powdrr_lift.workrr.chat_io import _verbose_print
+from powdrr_lift.workrr.context import WorkflowContext
 
 _INTERNAL_TOOL = "internal"
 
 
 def _chat_support(name: str) -> Any:
-    from powdrr_lift.workrr import workflow_chat_agent
+    from powdrr_lift.workrr import chat_agent
 
-    return getattr(workflow_chat_agent, name)
+    return getattr(chat_agent, name)
 
 
 def _support_call(name: str, *args: Any, **kwargs: Any) -> Any:

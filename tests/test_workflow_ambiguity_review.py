@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from powdrr_lift.workrr.workflow_ambiguity_review import (
+from powdrr_lift.workrr.ambiguity_review import (
     WorkflowAmbiguityReviewError,
     build_ambiguity_review_messages,
     review_workflow_definition,

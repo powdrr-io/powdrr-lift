@@ -20,16 +20,16 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.workrr.workflow_scenario import (
+from powdrr_lift.workrr.scenario import (
     load_workflow_scenario,
     run_workflow_scenario,
 )
-from powdrr_lift.workrr.workflow_task_agent import (
+from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _build_workflow_client,
     run_workflow_task,
 )
-from powdrr_lift.workrr.workflow_task_scenario import (
+from powdrr_lift.workrr.task_scenario import (
     LiveWorkflowTaskExchangeRecorder,
     run_workflow_task_scenario,
 )
@@ -341,7 +341,7 @@ def test_live_workflow_scenario_records_real_client_exchanges(
             return {"action": "complete", "output_state": {"plan-state": {"ok": True}}}
 
     monkeypatch.setattr(
-        "powdrr_lift.workrr.workflow_task_scenario._build_workflow_client",
+        "powdrr_lift.workrr.task_scenario._build_workflow_client",
         lambda *_args, **_kwargs: FakeLiveClient(),
     )
     scenario = {

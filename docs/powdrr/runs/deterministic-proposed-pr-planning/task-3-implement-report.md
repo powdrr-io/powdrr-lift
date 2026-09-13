@@ -31,7 +31,7 @@ DONE
 
 ## Verification
 
-- `rtk .venv/bin/pytest -q tests/test_skill_specification.py tests/test_pr_specification.py tests/test_workflow_llm.py tests/test_workflow_chat_agent.py`
+- `rtk .venv/bin/pytest -q tests/test_skill_specification.py tests/test_pr_specification.py tests/test_workrr/llm.py tests/test_workrr/chat_agent.py`
   - 275 passed in 12.07s.
 - `rtk .venv/bin/ruff format --check .`
   - 220 files already formatted.

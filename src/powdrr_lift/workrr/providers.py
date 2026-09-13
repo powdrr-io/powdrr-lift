@@ -19,6 +19,11 @@ from urllib.request import Request, urlopen
 import laga
 
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.llm import (
+    ProviderExecutionError,
+    WorkflowLLMClient,
+    WorkflowLLMHTTPError,
+)
 from powdrr_lift.workrr.provider_config import (
     DEFAULT_LLM_TYPE,
     DEFAULT_MODEL,
@@ -31,11 +36,6 @@ from powdrr_lift.workrr.provider_config import (
     default_llm_mappings,
     provider_definition,
     provider_supports_llm_mappings,
-)
-from powdrr_lift.workrr.workflow_llm import (
-    ProviderExecutionError,
-    WorkflowLLMClient,
-    WorkflowLLMHTTPError,
 )
 
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576

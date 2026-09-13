@@ -17,12 +17,12 @@ from powdrr_lift.process.tasks import WorkflowInstance, save_workflow_task
 from powdrr_lift.process.templates import (
     instantiate_workflow_template,
 )
-from powdrr_lift.workrr.workflow_task_agent import (
+from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _build_workflow_client,
     run_workflow_task,
 )
-from powdrr_lift.workrr.workflow_task_scenario import LiveWorkflowTaskExchangeRecorder
+from powdrr_lift.workrr.task_scenario import LiveWorkflowTaskExchangeRecorder
 
 
 class _TeeTextIO(io.TextIOBase):

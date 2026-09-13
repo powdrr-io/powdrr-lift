@@ -13,12 +13,12 @@ from pathlib import Path
 from typing import Any, Literal, Protocol, cast
 
 from powdrr_lift.repository_state import repository_state
-from powdrr_lift.workrr.workflow_error_logging import (
+from powdrr_lift.workrr.error_logging import (
     WORKFLOW_LLM_ERROR_LOG,
     WORKFLOW_OBSERVER_LOG,
     record_workflow_observer_event,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     ProgressDecision,
     WorkflowActionObservation,
     WorkflowLLMClient,

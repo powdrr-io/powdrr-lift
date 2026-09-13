@@ -10,9 +10,9 @@ import pytest
 
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import _stage_generated_file, main
-from powdrr_lift.workrr.workflow_error_logging import record_workflow_llm_error
-from powdrr_lift.workrr.workflow_human_task import HumanTaskRunnerConfig
-from powdrr_lift.workrr.workflow_task_agent import WorkflowTaskAgentConfig
+from powdrr_lift.workrr.error_logging import record_workflow_llm_error
+from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
+from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
 
 
 def test_cli_init_writes_template(

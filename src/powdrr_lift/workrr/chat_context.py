@@ -15,9 +15,9 @@ from powdrr_lift.execution.builtin_tools import invoke_intrinsic_capability
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
 from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.workrr.chat_io import _prompt_user, _verbose_print
 from powdrr_lift.workrr.context import WorkflowContext
-from powdrr_lift.workrr.workflow_chat_io import _prompt_user, _verbose_print
-from powdrr_lift.workrr.workflow_paths import is_dedicated_worktree
+from powdrr_lift.workrr.paths import is_dedicated_worktree
 
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 

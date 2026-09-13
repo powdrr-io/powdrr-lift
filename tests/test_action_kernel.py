@@ -7,7 +7,7 @@ from powdrr_lift.core.execution_state import (
 )
 from powdrr_lift.execution.kernel import ActionKernel, ActionLifecyclePhase
 from powdrr_lift.intrinsic_enrich import execute_enrich_tool
-from powdrr_lift.workrr.workflow_llm import PowdrrExecutionError
+from powdrr_lift.workrr.llm import PowdrrExecutionError
 
 
 def test_action_kernel_records_one_ordered_lifecycle() -> None:

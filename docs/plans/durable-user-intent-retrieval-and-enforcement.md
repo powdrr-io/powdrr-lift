@@ -142,7 +142,7 @@ Powdrr already contains the necessary foundation:
 | Specification decisions and invariants | `core/codebase_state.py`, `core/entity_context.py`, `core/spec_context.py` | Retrieval is exposed through CLI/MCP and explicit context actions, not automatically resolved by the execution loop. |
 | Action relationships | `core/action_relationship.py`, `execution/relationships.py` | Relationships are built-in standalone primitives and are not compiled from matched user intent or persisted by the live runner. |
 | Durable obligations and evidence | `core/execution_state.py`, `execution/evidence.py` | Normal actions do not consistently open, satisfy, invalidate, or gate on them. |
-| Shared action lifecycle | `workflow_llm.py`, `execution/kernel.py` | The shared runner records lifecycle events but does not own policy resolution and enforcement. |
+| Shared action lifecycle | `workrr/llm.py`, `execution/kernel.py` | The shared runner records lifecycle events but does not own policy resolution and enforcement. |
 | Typed context compaction | `execution/compaction.py` | Rule and obligation IDs are preservable, but the compactor is not yet the authoritative prompt/resume path. |
 | Plan/task compilation | `core/execution_plan.py`, `execution/compile.py` | Compiled tasks do not yet carry an automatically resolved intent contract. |
 

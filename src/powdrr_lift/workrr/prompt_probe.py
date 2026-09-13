@@ -23,27 +23,27 @@ from powdrr_lift.process.tasks import (
     workflow_task_from_data,
 )
 from powdrr_lift.process.templates import load_workflow_template
+from powdrr_lift.workrr.action_validation import (
+    _parse_action_response_with_schema,
+    _validate_workflow_action_for_step,
+    _workflow_action_data,
+)
+from powdrr_lift.workrr.chat_agent import _build_step_execution_messages
+from powdrr_lift.workrr.chat_contract import _step_action_response_schema
+from powdrr_lift.workrr.execution_loop import (
+    _run_deterministic_pre_step,
+    _run_gate,
+)
+from powdrr_lift.workrr.llm import (
+    WorkflowLLMClient,
+    complete_json_with_timeout_retry,
+)
 from powdrr_lift.workrr.provider_config import default_llm_mappings
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,
 )
-from powdrr_lift.workrr.workflow_action_validation import (
-    _parse_action_response_with_schema,
-    _validate_workflow_action_for_step,
-    _workflow_action_data,
-)
-from powdrr_lift.workrr.workflow_chat_agent import _build_step_execution_messages
-from powdrr_lift.workrr.workflow_chat_contract import _step_action_response_schema
-from powdrr_lift.workrr.workflow_execution_loop import (
-    _run_deterministic_pre_step,
-    _run_gate,
-)
-from powdrr_lift.workrr.workflow_llm import (
-    WorkflowLLMClient,
-    complete_json_with_timeout_retry,
-)
-from powdrr_lift.workrr.workflow_task_agent import _build_task_messages
+from powdrr_lift.workrr.task_agent import _build_task_messages
 
 
 class WorkflowPromptProbeError(ValueError):
@@ -202,7 +202,7 @@ def build_workflow_prompt_probe(
         task = _task_from_template(template_step, index=index, definition=definition)
         workflow = WorkflowInstance(directory=root, _tasks={task.task_id: task})
         if behavior_for_step(task).is_predicated and task.pre_step is not None:
-            from powdrr_lift.workrr.workflow_task_agent import (
+            from powdrr_lift.workrr.task_agent import (
                 _run_task_deterministic_pre_step,
             )
 
@@ -236,7 +236,7 @@ def build_workflow_prompt_probe(
             raise WorkflowPromptProbeError("A durable task file contains only step 0.")
         workflow = WorkflowInstance(directory=root, _tasks={task.task_id: task})
         if behavior_for_step(task).is_predicated and task.pre_step is not None:
-            from powdrr_lift.workrr.workflow_task_agent import (
+            from powdrr_lift.workrr.task_agent import (
                 _run_task_deterministic_pre_step,
             )
 

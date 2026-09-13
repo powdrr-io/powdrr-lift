@@ -13,15 +13,16 @@ from procedrr import (
     MatchCase,
     MatchNode,
     OperationNode,
-    ReferenceRuntime,
-    ResourceLimits,
     SequenceNode,
     SnapshotSpec,
     TerminalNode,
     TerminalStatus,
     WorkflowDefinition,
+    append_step,
     compile_workflow,
     feature_delivery_process,
+    parse_and_validate,
+    set_value,
 )
 
 
@@ -81,45 +82,6 @@ def test_non_exhaustive_match_is_rejected() -> None:
         compile_workflow(workflow)
 
 
-def test_reference_runtime_owns_transition_and_binds_one_decision() -> None:
-    workflow = compile_workflow(
-        WorkflowDefinition(
-            "run",
-            SequenceNode(
-                (JudgeNode(decision()), TerminalNode(TerminalStatus.SUCCEEDED))
-            ),
-            ResourceLimits(llm_activations=1),
-        )
-    )
-    runtime = ReferenceRuntime(
-        decision_handler=lambda _node, _state: "a",
-        operation_handler=lambda _node, _state: None,
-    )
-    result = runtime.execute(workflow)
-    assert result.status == TerminalStatus.SUCCEEDED
-    assert result.values["choice"] == "a"
-    assert [event.kind for event in result.events] == ["decision", "terminal"]
-
-
-def test_runtime_rejects_snapshot_above_declared_bound() -> None:
-    workflow = compile_workflow(
-        WorkflowDefinition(
-            "bounded",
-            ForEachNode(
-                SnapshotSpec("items", {"type": "string"}, "items", 1),
-                "item",
-                TerminalNode(TerminalStatus.SUCCEEDED),
-            ),
-        )
-    )
-    result = ReferenceRuntime(
-        decision_handler=lambda _node, _state: None,
-        operation_handler=lambda _node, _state: None,
-    ).execute(workflow, {"items": ["a", "b"]})
-    assert result.status == TerminalStatus.FAILED
-    assert "exceeds" in (result.error or "")
-
-
 def test_feature_delivery_process_covers_three_named_lifecycle_calls() -> None:
     compiled = compile_workflow(feature_delivery_process(max_proposed_prs=2))
     calls = cast(SequenceNode, compiled.definition.body).nodes
@@ -129,3 +91,14 @@ def test_feature_delivery_process_covers_three_named_lifecycle_calls() -> None:
     ]
     assert compiled.max_llm_activations > 0
     assert compiled.max_llm_activations < compiled.definition.limits.llm_activations
+
+
+def test_parser_validates_declarative_steps_and_editor_is_persistent() -> None:
+    document = parse_and_validate(
+        "name: demo\nsteps:\n  - operation: {name: inspect}\n"
+    )
+    changed = set_value(document, ("name",), "edited")
+    extended = append_step(changed, ("steps",), {"terminal": "succeeded"})
+    assert document["name"] == "demo"
+    assert extended["name"] == "edited"
+    assert len(extended["steps"]) == 2

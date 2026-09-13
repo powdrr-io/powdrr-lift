@@ -1,6 +1,7 @@
 """A small, total control plane for bounded LLM-assisted procedures."""
 
 from procedrr.compiler import CompilationError, CompilationReport, compile_workflow
+from procedrr.editor import append_step, set_value
 from procedrr.feature_delivery import (
     execute_proposed_pr,
     feature_delivery_process,
@@ -31,12 +32,12 @@ from procedrr.model import (
     WorkflowDefinition,
     WorklistNode,
 )
-from procedrr.runtime import (
-    ExecutionError,
-    ExecutionEvent,
-    ExecutionResult,
-    ReferenceRuntime,
-    RetryableFailure,
+from procedrr.parser import (
+    DocumentDiagnostic,
+    ParseError,
+    parse_and_validate,
+    parse_document,
+    validate_document,
 )
 
 __all__ = [
@@ -65,13 +66,15 @@ __all__ = [
     "WorkflowDefinition",
     "WorklistNode",
     "compile_workflow",
-    "ExecutionError",
-    "ExecutionEvent",
-    "ExecutionResult",
-    "ReferenceRuntime",
-    "RetryableFailure",
     "execute_proposed_pr",
     "feature_delivery_process",
     "specify_a_feature",
     "start_implementing_feature",
+    "DocumentDiagnostic",
+    "ParseError",
+    "append_step",
+    "parse_and_validate",
+    "parse_document",
+    "set_value",
+    "validate_document",
 ]

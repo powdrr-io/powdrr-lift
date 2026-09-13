@@ -43,10 +43,24 @@ _FEATURE_COVERAGE_SECTIONS = (
     "expected_tests",
 )
 _CONTENT_SECTIONS = (
-    "requirements", "approach", "entities", "entity_relationships",
-    "invariants", "guidance", "features", "human-decisions", "feature_ids",
-    "intent", "acceptance_criteria", "expected_tests", "required_test_cases",
-    "expected_outcomes", "non_goals", "risks", "modules", "tools",
+    "requirements",
+    "approach",
+    "entities",
+    "entity_relationships",
+    "invariants",
+    "guidance",
+    "features",
+    "human-decisions",
+    "feature_ids",
+    "intent",
+    "acceptance_criteria",
+    "expected_tests",
+    "required_test_cases",
+    "expected_outcomes",
+    "non_goals",
+    "risks",
+    "modules",
+    "tools",
 )
 _PROPOSED_PR_SCHEMA = "https://powdrr.io/schemas/proposed-pr-specification-v1"
 

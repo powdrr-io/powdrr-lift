@@ -36,6 +36,7 @@ steps:
            expected_outcomes, non_goals, risks, decisions, proposed_prs,
            modules, tools]
       item_binding: category
+      collect: category_edits_by_category
       body:
         - operation:
             tool: gather_context

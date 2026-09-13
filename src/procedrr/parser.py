@@ -110,6 +110,16 @@ def _validate_steps(
                 for key in ("item_binding", "item"):
                     if isinstance(value.get(key), str):
                         local.add(value[key])
+                if control == "for_each" and "collect" not in value:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.for_each.collect",
+                            "data-driven body outputs require an explicit collect "
+                            "binding",
+                        )
+                    )
+                if isinstance(value.get("collect"), str):
+                    bindings.add(value["collect"])
                 _validate_steps(
                     nested, f"{step_path}.{control}.body", diagnostics, local
                 )
@@ -138,6 +148,32 @@ def _validate_steps(
                         f"unknown tool: {operation.get('tool')}",
                     )
                 )
+            elif operation.get("tool") == "gather_context":
+                parameters = operation.get("parameters")
+                if (
+                    not isinstance(parameters, Mapping)
+                    or not isinstance(parameters.get("types"), list)
+                    or not parameters["types"]
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.operation.parameters",
+                            "gather_context requires a non-empty types list",
+                        )
+                    )
+            elif operation.get("tool") == "internal":
+                command = operation.get("command")
+                if (
+                    not isinstance(command, list)
+                    or not command
+                    or not all(isinstance(part, str) for part in command)
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.operation.command",
+                            "internal requires a non-empty string command list",
+                        )
+                    )
             if isinstance(operation, Mapping) and isinstance(
                 operation.get("bind"), str
             ):

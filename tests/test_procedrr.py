@@ -70,6 +70,17 @@ def test_parser_rejects_unknown_tool_and_validator_references() -> None:
         parse_and_validate(
             "name: bad\nsteps:\n  - operation: {tool: imaginary, bind: x}\n"
         )
+
+
+def test_parser_requires_explicit_collection_for_loop_outputs() -> None:
+    with pytest.raises(Exception, match="collect binding"):
+        parse_and_validate(
+            "name: bad\nsteps:\n"
+            "  - for_each:\n"
+            "      item_binding: item\n"
+            "      body:\n"
+            "        - operation: {tool: internal, command: [echo], bind: output}\n"
+        )
     with pytest.raises(Exception, match="unknown validator"):
         parse_and_validate(
             "name: bad\nsteps:\n  - judge:\n"
@@ -113,7 +124,8 @@ def test_non_exhaustive_match_is_rejected() -> None:
 
 def test_parser_validates_declarative_steps_and_editor_is_persistent() -> None:
     document = parse_and_validate(
-        "name: demo\nsteps:\n  - operation: {tool: internal, bind: inspected}\n"
+        "name: demo\nsteps:\n"
+        "  - operation: {tool: internal, command: [echo], bind: inspected}\n"
     )
     changed = set_value(document, ("name",), "edited")
     extended = append_step(changed, ("steps",), {"terminal": "succeeded"})

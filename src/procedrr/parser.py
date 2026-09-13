@@ -171,10 +171,14 @@ def _validate_steps(
                     )
             elif operation.get("tool") == "internal":
                 command = operation.get("command")
+                if command is None and isinstance(operation.get("parameters"), Mapping):
+                    command = operation["parameters"].get("command")
                 if (
                     not isinstance(command, list)
                     or not command
                     or not all(isinstance(part, str) for part in command)
+                ) and not (
+                    isinstance(command, str) and _BINDING.fullmatch(command) is not None
                 ):
                     diagnostics.append(
                         DocumentDiagnostic(

@@ -42,6 +42,12 @@ _FEATURE_COVERAGE_SECTIONS = (
     "acceptance_criteria",
     "expected_tests",
 )
+_CONTENT_SECTIONS = (
+    "requirements", "approach", "entities", "entity_relationships",
+    "invariants", "guidance", "features", "human-decisions", "feature_ids",
+    "intent", "acceptance_criteria", "expected_tests", "required_test_cases",
+    "expected_outcomes", "non_goals", "risks", "modules", "tools",
+)
 _PROPOSED_PR_SCHEMA = "https://powdrr.io/schemas/proposed-pr-specification-v1"
 
 
@@ -756,6 +762,16 @@ def build_pr_specification_validation_report(
         proposed_pr_specification_yaml,
         issues=issues,
     )
+    if not any(raw_spec.get(section) for section in _CONTENT_SECTIONS):
+        issues.append(
+            PRSpecificationValidationIssue(
+                code="empty_specification",
+                message=(
+                    "A specification must contain substantive design content; "
+                    "id and title alone are not sufficient."
+                ),
+            )
+        )
 
     if "proposed_prs" in raw_spec:
         return _build_multi_proposed_pr_validation_report(

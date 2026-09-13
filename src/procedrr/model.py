@@ -126,6 +126,9 @@ class DecisionContract:
     validator: str
     transport_action_const: str
     limits: ActivationLimits = field(default_factory=ActivationLimits)
+    prompt_system: str = ""
+    instructions: tuple[str, ...] = ()
+    context_bindings: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.kind, DecisionKind):
@@ -143,6 +146,14 @@ class DecisionContract:
             raise ValueError("output_schema must be a non-empty mapping")
         if self.transport_action_const in {"", "next_step", "complete", "retry"}:
             raise ValueError("transport action must be a dedicated constant")
+        if not self.prompt_system.strip():
+            raise ValueError("prompt_system cannot be empty")
+        if not self.instructions or any(not item.strip() for item in self.instructions):
+            raise ValueError("instructions must contain non-empty rules")
+        if not self.context_bindings or any(
+            not item.strip() for item in self.context_bindings
+        ):
+            raise ValueError("context_bindings must contain at least one binding")
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -154,6 +165,9 @@ class DecisionContract:
             "validator": self.validator,
             "transport_action_const": self.transport_action_const,
             "limits": self.limits.to_data(),
+            "prompt_system": self.prompt_system,
+            "instructions": list(self.instructions),
+            "context_bindings": list(self.context_bindings),
         }
 
 

@@ -1,6 +1,7 @@
 """A small, total control plane for bounded LLM-assisted procedures."""
 
 from procedrr.compiler import CompilationError, CompilationReport, compile_workflow
+from procedrr.design_interview import design_interview
 from procedrr.editor import append_step, set_value
 from procedrr.model import (
     ActivationLimits,
@@ -67,4 +68,5 @@ __all__ = [
     "parse_document",
     "set_value",
     "validate_document",
+    "design_interview",
 ]

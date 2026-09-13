@@ -32,49 +32,49 @@ from powdrr_lift.fuzzy_match import fuzzy_match_json
 from powdrr_lift.intrinsic_edit import APPLY_EDIT_TOOL, VALIDATE_EDIT_TOOL
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
-from powdrr_lift.workflow_action_operations import (
+from powdrr_lift.workrr.workflow_action_operations import (
     WorkflowYamlEditError as _WorkflowYamlEditError,
 )
-from powdrr_lift.workflow_action_operations import (
+from powdrr_lift.workrr.workflow_action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,
     _list_worktree_files,
     _record_skill_pull_request,
 )
-from powdrr_lift.workflow_action_validation import (
+from powdrr_lift.workrr.workflow_action_validation import (
     _command_items_for_validation,
     _validate_internal_command,
     _validate_structured_document_text,
     _worktree_relative_path,
 )
-from powdrr_lift.workflow_chat_contract import (
+from powdrr_lift.workrr.workflow_chat_contract import (
     _file_edits_to_data,
     _normalize_structured_document_text,
     _resolve_generated_file_path_from_command,
     _yaml_operation_to_data,
 )
-from powdrr_lift.workflow_chat_io import _prompt_user, _verbose_print
-from powdrr_lift.workflow_chat_selection import WorkflowChatConfig
-from powdrr_lift.workflow_execution_loop import _execute_shell_tool
-from powdrr_lift.workflow_execution_state import (
+from powdrr_lift.workrr.workflow_chat_io import _prompt_user, _verbose_print
+from powdrr_lift.workrr.workflow_chat_selection import WorkflowChatConfig
+from powdrr_lift.workrr.workflow_execution_loop import _execute_shell_tool
+from powdrr_lift.workrr.workflow_execution_state import (
     _ensure_execution_runtime,
     _record_durable_fact,
     _WorkflowExecutionState,
 )
-from powdrr_lift.workflow_llm import (
+from powdrr_lift.workrr.workflow_llm import (
     WorkflowAction as SkillChatAction,
 )
-from powdrr_lift.workflow_llm import (
+from powdrr_lift.workrr.workflow_llm import (
     WorkflowFileEdits as SkillChatFileEdits,
 )
-from powdrr_lift.workflow_paths import resolve_worktree_file_path
+from powdrr_lift.workrr.workflow_paths import resolve_worktree_file_path
 
 _INTERNAL_TOOL = "internal"
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
 
 
 def _chat_support(name: str) -> Any:
-    from powdrr_lift import workflow_chat_agent
+    from powdrr_lift.workrr import workflow_chat_agent
 
     return getattr(workflow_chat_agent, name)
 

@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from powdrr_lift.workflow_execution import ProgressDecision
-from powdrr_lift.workflow_llm import (
+from powdrr_lift.workrr.workflow_execution import ProgressDecision
+from powdrr_lift.workrr.workflow_llm import (
     ProgrammerInvariantError,
     RepairContext,
     RepairExhaustionReport,
@@ -522,7 +522,7 @@ def test_timeout_retry_preserves_optional_response_schema(
                 raise RuntimeError("request timed out")
             return {"action": "next_step"}
 
-    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", lambda _: None)
+    monkeypatch.setattr("powdrr_lift.workrr.workflow_llm.time.sleep", lambda _: None)
     client = _SchemaClient()
 
     assert complete_json_with_timeout_retry(

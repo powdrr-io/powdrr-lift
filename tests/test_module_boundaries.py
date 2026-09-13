@@ -18,8 +18,8 @@ def test_structrr_language_does_not_import_runtime_or_workrr_modules() -> None:
         "powdrr_lift.workrr",
         "powdrr_lift.process",
         "powdrr_lift.execution",
-        "powdrr_lift.workflow_chat_agent",
-        "powdrr_lift.workflow_task_agent",
+        "powdrr_lift.workrr.workflow_chat_agent",
+        "powdrr_lift.workrr.workflow_task_agent",
     )
     for path in _python_files("structrr"):
         imports = _imported_modules(path)
@@ -34,8 +34,8 @@ def test_process_language_does_not_import_workrr_or_runtime_modules() -> None:
     forbidden_prefixes = (
         "powdrr_lift.workrr",
         "powdrr_lift.execution",
-        "powdrr_lift.workflow_chat_agent",
-        "powdrr_lift.workflow_task_agent",
+        "powdrr_lift.workrr.workflow_chat_agent",
+        "powdrr_lift.workrr.workflow_task_agent",
     )
     for path in _python_files("process"):
         imports = _imported_modules(path)
@@ -66,8 +66,8 @@ def test_contracts_do_not_import_runtime_definition_or_provider_modules() -> Non
         "powdrr_lift.workrr",
         "powdrr_lift.definitions",
         "powdrr_lift.execution",
-        "powdrr_lift.workflow_chat_agent",
-        "powdrr_lift.workflow_task_agent",
+        "powdrr_lift.workrr.workflow_chat_agent",
+        "powdrr_lift.workrr.workflow_task_agent",
     )
     for path in _python_files("contracts"):
         imports = _imported_modules(path)
@@ -81,8 +81,8 @@ def test_contracts_do_not_import_runtime_definition_or_provider_modules() -> Non
 def test_definitions_do_not_import_workrr_or_provider_modules() -> None:
     forbidden_prefixes = (
         "powdrr_lift.workrr",
-        "powdrr_lift.workflow_chat_agent",
-        "powdrr_lift.workflow_task_agent",
+        "powdrr_lift.workrr.workflow_chat_agent",
+        "powdrr_lift.workrr.workflow_task_agent",
         "powdrr_lift.openai_proxy",
     )
     for path in _python_files("definitions"):
@@ -100,8 +100,8 @@ def test_workrr_protocol_depends_only_on_contracts() -> None:
         "powdrr_lift.core",
         "powdrr_lift.definitions",
         "powdrr_lift.execution",
-        "powdrr_lift.workflow_chat_agent",
-        "powdrr_lift.workflow_task_agent",
+        "powdrr_lift.workrr.workflow_chat_agent",
+        "powdrr_lift.workrr.workflow_task_agent",
     )
     assert not any(
         module.startswith(forbidden)
@@ -110,23 +110,44 @@ def test_workrr_protocol_depends_only_on_contracts() -> None:
     )
 
 
-def test_workrr_package_does_not_import_definition_or_execution_implementations() -> (
-    None
-):
+def test_workrr_protocol_package_has_no_definition_or_execution_imports() -> None:
     forbidden_prefixes = (
         "powdrr_lift.core",
         "powdrr_lift.definitions",
         "powdrr_lift.execution",
-        "powdrr_lift.workflow_chat_agent",
-        "powdrr_lift.workflow_task_agent",
+        "powdrr_lift.workrr.workflow_chat_agent",
+        "powdrr_lift.workrr.workflow_task_agent",
     )
     for path in _python_files("workrr"):
+        if path.name.startswith("workflow_") or path.name == "feature_run.py":
+            continue
         imports = _imported_modules(path)
         assert not any(
             module.startswith(forbidden)
             for module in imports
             for forbidden in forbidden_prefixes
         ), path
+
+
+def test_workflow_implementations_are_not_stranded_at_package_root() -> None:
+    assert not tuple(SOURCE_ROOT.glob("workflow_*.py"))
+    assert not (SOURCE_ROOT / "agent_feature_run.py").exists()
+
+
+def test_core_does_not_reexport_process_language() -> None:
+    from powdrr_lift import core
+
+    process_names = {
+        "Skill",
+        "SkillDocument",
+        "WorkflowTask",
+        "WorkflowInstance",
+        "WorkflowTemplate",
+        "load_skill",
+        "load_workflow_task_document",
+        "load_workflow_template",
+    }
+    assert process_names.isdisjoint(core.__all__)
 
 
 def test_proposal_round_keeps_kernel_as_transition_owner() -> None:

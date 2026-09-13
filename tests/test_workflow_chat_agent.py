@@ -17,22 +17,6 @@ import pytest
 import yaml
 
 from powdrr_lift.cli import main
-from powdrr_lift.core import (
-    CodingLoopSpec,
-    CodingLoopVerification,
-    Skill,
-    SkillStep,
-    SkillStepCompletion,
-    SkillStepGate,
-    SkillStepInput,
-    SkillStepOutput,
-    SkillStepPreStep,
-    SkillStepRequiredAction,
-    SkillToolInvocation,
-    SkillUsesSkill,
-    load_skill,
-    save_skill,
-)
 from powdrr_lift.core.pr_specification import (
     _load_feature_catalog,
 )
@@ -51,119 +35,23 @@ from powdrr_lift.process.action_catalog import (
     step_actions as _step_actions,
 )
 from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.model import (
+    CodingLoopSpec,
+    CodingLoopVerification,
+    Skill,
+    SkillStep,
+    SkillStepCompletion,
+    SkillStepGate,
+    SkillStepInput,
+    SkillStepOutput,
+    SkillStepPreStep,
+    SkillStepRequiredAction,
+    SkillToolInvocation,
+    SkillUsesSkill,
+    load_skill,
+    save_skill,
+)
 from powdrr_lift.test_failure_packet import build_test_failure_packet
-from powdrr_lift.workflow_action_operations import (
-    WorkflowEditRangeError as _WorkflowEditRangeError,
-)
-from powdrr_lift.workflow_action_operations import (
-    WorkflowYamlEditError as _WorkflowYamlEditError,
-)
-from powdrr_lift.workflow_action_operations import (
-    _apply_file_edits,
-    _apply_yaml_operations,
-)
-from powdrr_lift.workflow_action_protocol import (
-    _parse_action_response,
-    _parse_workflow_action_delete_file,
-    _parse_workflow_action_file_management,
-    _parse_workflow_action_gather_context,
-)
-from powdrr_lift.workflow_action_validation import (
-    _advance_predicated_step,
-    _command_matches_invocation,
-    _discover_validation_obligations,
-    _parse_action_response_with_schema,
-    _predicated_step_complete,
-    _record_dynamic_validation_result,
-    _validate_internal_command,
-    _validate_workflow_action_for_step,
-    _validate_workflow_action_outputs,
-    _validate_workflow_handoff,
-    _validate_workflow_step_transition,
-    _validation_actions_match,
-    _validation_issue_fingerprint,
-    _WorkflowStructuredDocumentError,
-    _WorkflowToolValidationError,
-)
-from powdrr_lift.workflow_chat_actions import (
-    _handle_workflow_action_edit,
-    _handle_workflow_action_file_management,
-    _handle_workflow_action_read_document,
-)
-from powdrr_lift.workflow_chat_agent import (
-    LLMModelLimits,
-    LLMModelMapping,
-    LLMProviderRoles,
-    _build_step_execution_messages,
-    _empty_pull_request_error,
-    _latest_deterministic_pre_step,
-    _validate_dynamic_validation_gate_action,
-    _workflow_action_material_state,
-    _workflow_action_progress_status,
-    _WorkflowProgressDisplay,
-    available_workflow_providers,
-    choose_workflow_provider,
-    download_local_qwen_model,
-    run_workflow_chat,
-)
-from powdrr_lift.workflow_chat_context import (
-    _load_workflow_context,
-    _resolve_worktree_context,
-    _resolve_worktree_for_request,
-    _worktree_reuse_decision,
-)
-from powdrr_lift.workflow_chat_contract import (
-    _action_repair_prompt,
-    _step_action_response_schema,
-    _workflow_edit_failure_feedback,
-)
-from powdrr_lift.workflow_chat_io import _prompt_user
-from powdrr_lift.workflow_chat_selection import (
-    SkillChatConfig,
-    _build_selection_messages,
-    _catalog_entry_to_data,
-    _resolve_skill_path,
-    _validate_user_question,
-)
-from powdrr_lift.workflow_chat_transport import (
-    _build_json_repair_messages,
-    _complete_json_with_model_fallback,
-    _parse_json_object,
-    _repair_response_fingerprint,
-)
-from powdrr_lift.workflow_execution_loop import (
-    _coding_loop_worktree_fingerprint,
-    _execute_shell_tool,
-    _require_coding_loop_verification,
-    _run_coding_loop_verification,
-    _run_deterministic_pre_step,
-    _run_gate,
-    _validate_coding_loop_action,
-)
-from powdrr_lift.workflow_execution_state import (
-    _record_durable_fact,
-    _ValidationGateState,
-    _ValidationObligation,
-    _WorkflowExecutionState,
-)
-from powdrr_lift.workflow_llm import WorkflowAction, workflow_action_summary
-from powdrr_lift.workflow_llm import WorkflowEdit as SkillChatEdit
-from powdrr_lift.workflow_paths import is_dedicated_worktree, resolve_project_root
-from powdrr_lift.workflow_prompting import (
-    _action_system_prompt,
-    _available_work_item_documents,
-    _available_work_item_names,
-    _current_file_context,
-    _execution_events_for_prompt,
-    _latest_execution_event_for_prompt,
-    _match_work_item_names,
-    _prompt_durable_facts,
-    _prompt_step_context,
-    _prompt_transcript,
-    _step_needs_prompt_catalog,
-    _workflow_handoff_inputs,
-    build_modular_action_system_prompt,
-)
 from powdrr_lift.workrr.context import WorkflowContext
 from powdrr_lift.workrr.exchanges import (
     ExchangeRecordingClient,
@@ -195,6 +83,121 @@ from powdrr_lift.workrr.providers import (
     resolve_provider,
     resolve_provider_credentials,
     resolve_provider_roles,
+)
+from powdrr_lift.workrr.workflow_action_operations import (
+    WorkflowEditRangeError as _WorkflowEditRangeError,
+)
+from powdrr_lift.workrr.workflow_action_operations import (
+    WorkflowYamlEditError as _WorkflowYamlEditError,
+)
+from powdrr_lift.workrr.workflow_action_operations import (
+    _apply_file_edits,
+    _apply_yaml_operations,
+)
+from powdrr_lift.workrr.workflow_action_protocol import (
+    _parse_action_response,
+    _parse_workflow_action_delete_file,
+    _parse_workflow_action_file_management,
+    _parse_workflow_action_gather_context,
+)
+from powdrr_lift.workrr.workflow_action_validation import (
+    _advance_predicated_step,
+    _command_matches_invocation,
+    _discover_validation_obligations,
+    _parse_action_response_with_schema,
+    _predicated_step_complete,
+    _record_dynamic_validation_result,
+    _validate_internal_command,
+    _validate_workflow_action_for_step,
+    _validate_workflow_action_outputs,
+    _validate_workflow_handoff,
+    _validate_workflow_step_transition,
+    _validation_actions_match,
+    _validation_issue_fingerprint,
+    _WorkflowStructuredDocumentError,
+    _WorkflowToolValidationError,
+)
+from powdrr_lift.workrr.workflow_chat_actions import (
+    _handle_workflow_action_edit,
+    _handle_workflow_action_file_management,
+    _handle_workflow_action_read_document,
+)
+from powdrr_lift.workrr.workflow_chat_agent import (
+    LLMModelLimits,
+    LLMModelMapping,
+    LLMProviderRoles,
+    _build_step_execution_messages,
+    _empty_pull_request_error,
+    _latest_deterministic_pre_step,
+    _validate_dynamic_validation_gate_action,
+    _workflow_action_material_state,
+    _workflow_action_progress_status,
+    _WorkflowProgressDisplay,
+    available_workflow_providers,
+    choose_workflow_provider,
+    download_local_qwen_model,
+    run_workflow_chat,
+)
+from powdrr_lift.workrr.workflow_chat_context import (
+    _load_workflow_context,
+    _resolve_worktree_context,
+    _resolve_worktree_for_request,
+    _worktree_reuse_decision,
+)
+from powdrr_lift.workrr.workflow_chat_contract import (
+    _action_repair_prompt,
+    _step_action_response_schema,
+    _workflow_edit_failure_feedback,
+)
+from powdrr_lift.workrr.workflow_chat_io import _prompt_user
+from powdrr_lift.workrr.workflow_chat_selection import (
+    SkillChatConfig,
+    _build_selection_messages,
+    _catalog_entry_to_data,
+    _resolve_skill_path,
+    _validate_user_question,
+)
+from powdrr_lift.workrr.workflow_chat_transport import (
+    _build_json_repair_messages,
+    _complete_json_with_model_fallback,
+    _parse_json_object,
+    _repair_response_fingerprint,
+)
+from powdrr_lift.workrr.workflow_execution_loop import (
+    _coding_loop_worktree_fingerprint,
+    _execute_shell_tool,
+    _require_coding_loop_verification,
+    _run_coding_loop_verification,
+    _run_deterministic_pre_step,
+    _run_gate,
+    _validate_coding_loop_action,
+)
+from powdrr_lift.workrr.workflow_execution_state import (
+    _record_durable_fact,
+    _ValidationGateState,
+    _ValidationObligation,
+    _WorkflowExecutionState,
+)
+from powdrr_lift.workrr.workflow_llm import WorkflowAction, workflow_action_summary
+from powdrr_lift.workrr.workflow_llm import WorkflowEdit as SkillChatEdit
+from powdrr_lift.workrr.workflow_paths import (
+    is_dedicated_worktree,
+    resolve_project_root,
+)
+from powdrr_lift.workrr.workflow_prompting import (
+    _action_system_prompt,
+    _available_work_item_documents,
+    _available_work_item_names,
+    _current_file_context,
+    _execution_events_for_prompt,
+    _latest_execution_event_for_prompt,
+    _match_work_item_names,
+    _prompt_durable_facts,
+    _prompt_step_context,
+    _prompt_transcript,
+    _step_needs_prompt_catalog,
+    _workflow_handoff_inputs,
+    build_modular_action_system_prompt,
 )
 
 # ruff: noqa: E501
@@ -1184,7 +1187,7 @@ def test_failed_evaluator_gate_exposes_structured_issues_for_repair(
         ],
     }
     monkeypatch.setattr(
-        "powdrr_lift.workflow_execution_loop._execute_shell_tool",
+        "powdrr_lift.workrr.workflow_execution_loop._execute_shell_tool",
         lambda *args, **kwargs: result,
     )
     step = SkillStep(
@@ -2507,7 +2510,7 @@ def test_oversized_context_uses_long_context_backup_model(
         return _FakeClient()
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_transport.model_limits_for",
+        "powdrr_lift.workrr.workflow_chat_transport.model_limits_for",
         lambda provider, model: LLMModelLimits(
             context_window=100,
             max_output_tokens=50,
@@ -3691,11 +3694,11 @@ def test_workflow_execution_terminalizes_unrepairable_actions(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
 
@@ -3794,7 +3797,7 @@ def test_workflow_execution_retries_stalled_step_with_clean_context(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
 
@@ -3970,7 +3973,7 @@ def test_run_workflow_chat_generates_skill_summary(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -4059,7 +4062,7 @@ def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: repo_root,
     )
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -4690,7 +4693,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -4904,11 +4907,11 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        "powdrr_lift.workrr.workflow_chat_agent.subprocess.run",
         _fake_run,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -5661,7 +5664,7 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -5782,7 +5785,7 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -5866,7 +5869,7 @@ def test_run_workflow_chat_verbose_prints_progress(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -5955,7 +5958,7 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -6040,7 +6043,7 @@ def test_run_workflow_chat_uses_anthropic_provider(
         _FakeAnthropicClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -6122,7 +6125,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
     )
     monkeypatch.setenv("ZAI_API_KEY", "zai-key")
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -6209,12 +6212,12 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
     sleep_calls: list[float] = []
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_agent.time.sleep",
+        "powdrr_lift.workrr.workflow_chat_agent.time.sleep",
         sleep_calls.append,
     )
 
@@ -6311,7 +6314,7 @@ def test_run_workflow_chat_repairs_missing_action_fields(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -6393,7 +6396,7 @@ def test_empty_prompt_user_action_is_reprompted_until_question_is_present(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -6466,7 +6469,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
 
@@ -6739,10 +6742,12 @@ def test_run_workflow_chat_executes_shell_tool_actions(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: worktree_root,
     )
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.workflow_chat_agent.subprocess.run", _fake_run
+    )
 
     output_dir = Path("generated")
     stdout = io.StringIO()
@@ -6787,7 +6792,7 @@ def test_execute_shell_tool_does_not_double_wrap_rtk(
     stdout = io.StringIO()
     stderr = io.StringIO()
 
-    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+    with patch("powdrr_lift.workrr.workflow_chat_agent.subprocess.run") as run:
         run.return_value.returncode = 0
         run.return_value.stdout = ""
         run.return_value.stderr = ""
@@ -6811,8 +6816,10 @@ def test_execute_shell_tool_falls_back_when_rtk_is_unavailable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.shutil.which", lambda _: None)
-    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.workflow_chat_agent.shutil.which", lambda _: None
+    )
+    with patch("powdrr_lift.workrr.workflow_chat_agent.subprocess.run") as run:
         run.return_value.returncode = 0
         run.return_value.stdout = ""
         run.return_value.stderr = ""
@@ -6890,7 +6897,7 @@ dev = ["ruff>=0.8"]
     )
 
     with patch(
-        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        "powdrr_lift.workrr.workflow_chat_agent.subprocess.run",
         side_effect=[missing, success],
     ) as run:
         result = _execute_shell_tool(
@@ -6935,7 +6942,7 @@ def test_execute_shell_tool_accepts_empty_commit_on_clean_worktree(
         ["git", "status", "--short"], 0, stdout="", stderr=""
     )
     with patch(
-        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        "powdrr_lift.workrr.workflow_chat_agent.subprocess.run",
         side_effect=[no_commit, clean_status],
     ):
         result = _execute_shell_tool(
@@ -6965,7 +6972,7 @@ def test_execute_shell_tool_reports_corrective_action_for_dirty_empty_commit(
         ["git", "status", "--short"], 0, stdout="?? agent_error.txt\n", stderr=""
     )
     with patch(
-        "powdrr_lift.workflow_chat_agent.subprocess.run",
+        "powdrr_lift.workrr.workflow_chat_agent.subprocess.run",
         side_effect=[no_commit, dirty_status],
     ):
         result = _execute_shell_tool(
@@ -7090,7 +7097,7 @@ def test_execute_shell_tool_verbose_prints_stdout(
     stdout = io.StringIO()
     stderr = io.StringIO()
 
-    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+    with patch("powdrr_lift.workrr.workflow_chat_agent.subprocess.run") as run:
         run.return_value.returncode = 0
         run.return_value.stdout = "tool stdout\n"
         run.return_value.stderr = ""
@@ -7147,7 +7154,7 @@ def test_passing_pytest_result_includes_empty_failure_packet() -> None:
 def test_shell_tool_returns_raw_result_without_format_specific_enrichment(
     tmp_path: Path,
 ) -> None:
-    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+    with patch("powdrr_lift.workrr.workflow_chat_agent.subprocess.run") as run:
         run.return_value.returncode = 0
         run.return_value.stdout = "10 passed\n"
         run.return_value.stderr = ""
@@ -7171,7 +7178,7 @@ def test_execute_shell_tool_can_suppress_stdout_without_losing_result(
     stdout = io.StringIO()
     stderr = io.StringIO()
 
-    with patch("powdrr_lift.workflow_chat_agent.subprocess.run") as run:
+    with patch("powdrr_lift.workrr.workflow_chat_agent.subprocess.run") as run:
         run.return_value.returncode = 0
         run.return_value.stdout = "generated PR template\n"
         run.return_value.stderr = ""
@@ -7393,9 +7400,11 @@ def test_closed_workflow_pr_creates_a_new_worktree_without_prompting(
             stderr="",
         )
 
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_context._resolve_worktree_context",
+        "powdrr_lift.workrr.workflow_chat_agent.subprocess.run", _fake_run
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.workflow_chat_context._resolve_worktree_context",
         lambda repo_root, stderr, verbose: new_worktree,
     )
 
@@ -7478,7 +7487,9 @@ def test_resolve_worktree_context_creates_dedicated_worktree_from_primary_checko
         captured["cwd"] = cwd
         return type("Result", (), {"stdout": f"{worktree_root}\n"})()
 
-    monkeypatch.setattr("powdrr_lift.workflow_chat_agent.subprocess.run", _fake_run)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.workflow_chat_agent.subprocess.run", _fake_run
+    )
 
     stderr = io.StringIO()
     resolved = _resolve_worktree_context(repo_root, stderr=stderr, verbose=True)

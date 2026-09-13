@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from powdrr_lift.test_failure_packet import build_test_failure_packet
-from powdrr_lift.workflow_llm import PowdrrExecutionError
+from powdrr_lift.workrr.workflow_llm import PowdrrExecutionError
 
 ENRICH_TOOL = "enrich"
 

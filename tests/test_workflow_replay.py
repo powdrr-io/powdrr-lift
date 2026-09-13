@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from powdrr_lift.workflow_replay import (
+from powdrr_lift.workrr.workflow_replay import (
     WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION,
     WorkflowReplayError,
     build_workflow_replay_state,

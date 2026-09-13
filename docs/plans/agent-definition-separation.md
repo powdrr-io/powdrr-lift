@@ -40,11 +40,12 @@ definition formats, decide whether a workflow is valid, infer authority from
 prose, or commit an execution transition. The kernel and definition compiler
 own those decisions.
 
-The required final package surfaces are `powdrr_lift.structrr` for the product
-and lifecycle language, `powdrr_lift.process` for the LLM-led process language,
-and `powdrr_lift.workrr` for proposal, provider, and runner APIs. The existing
-`core/` and top-level workflow modules are migration locations, not the target
-public architecture.
+The required package surfaces are `powdrr_lift.structrr` for the product and
+lifecycle language, `powdrr_lift.process` for the LLM-led process language,
+and `powdrr_lift.workrr` for proposal, provider, and runner APIs. The former
+top-level workflow modules have now been relocated under `workrr`; `core/`
+does not re-export process-language definitions. These are enforced package
+boundaries, not just migration locations.
 
 This plan complements the state-centric execution architecture and the LLM
 execution-language safety plan. It is deliberately focused on module
@@ -117,9 +118,10 @@ powdrr_lift/
     cli.py                   # command-line composition
 ```
 
-Existing `core/` and top-level modules may remain as compatibility locations
-during migration. New code should use the package boundaries above, and old
-imports should become thin re-exports rather than additional implementations.
+The package split is complete for the current implementation. New code must
+use the package boundaries above. Compatibility re-exports from `core/` are
+intentionally not allowed: product code belongs in `structrr`, process
+definitions belong in `process`, and agent orchestration belongs in `workrr`.
 
 ## Ownership rules
 

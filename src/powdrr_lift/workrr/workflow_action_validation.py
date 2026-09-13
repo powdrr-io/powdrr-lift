@@ -26,24 +26,24 @@ from powdrr_lift.process.action_catalog import (
 )
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.process.step_behavior import behavior_for_step
-from powdrr_lift.workflow_action_protocol import _parse_action_response
-from powdrr_lift.workflow_execution_state import (
+from powdrr_lift.workrr.context import WorkflowContext
+from powdrr_lift.workrr.workflow_action_protocol import _parse_action_response
+from powdrr_lift.workrr.workflow_execution_state import (
     _ensure_execution_runtime,
     _ValidationGateState,
     _ValidationObligation,
     _WorkflowExecutionState,
 )
-from powdrr_lift.workflow_llm import (
+from powdrr_lift.workrr.workflow_llm import (
     PowdrrExecutionError,
 )
-from powdrr_lift.workflow_llm import (
+from powdrr_lift.workrr.workflow_llm import (
     WorkflowAction as SkillChatAction,
 )
-from powdrr_lift.workflow_observer import (
+from powdrr_lift.workrr.workflow_observer import (
     ObserverActionRecommendation,
     observer_action_matches,
 )
-from powdrr_lift.workrr.context import WorkflowContext
 
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"

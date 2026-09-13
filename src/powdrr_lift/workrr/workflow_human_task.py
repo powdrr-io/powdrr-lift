@@ -15,7 +15,7 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.workflow_git import (
+from powdrr_lift.workrr.workflow_git import (
     WorkflowGitInconsistency,
     claim_workflow_task,
     create_workflow_worktree,
@@ -24,7 +24,7 @@ from powdrr_lift.workflow_git import (
     validate_workflow_git_state,
     workflow_id_from_task_id,
 )
-from powdrr_lift.workflow_task_agent import (
+from powdrr_lift.workrr.workflow_task_agent import (
     _open_final_workflow_pull_request,
     publish_workflow_progress,
 )

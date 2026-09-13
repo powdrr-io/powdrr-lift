@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
 
-from powdrr_lift.workflow_llm import WorkflowLLMClient, complete_json
 from powdrr_lift.workrr.exchanges import ExchangeRecordingClient
 from powdrr_lift.workrr.provider_config import LLMModelLimits
 from powdrr_lift.workrr.providers import (
@@ -23,6 +22,7 @@ from powdrr_lift.workrr.providers import (
     resolve_provider_credentials,
     resolve_provider_roles,
 )
+from powdrr_lift.workrr.workflow_llm import WorkflowLLMClient, complete_json
 
 ENABLE_LLM_EXCHANGE_LOGGING = False
 

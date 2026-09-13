@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
-from powdrr_lift.core import (
+from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeType,
     HumanRole,
@@ -14,6 +14,8 @@ from powdrr_lift.core import (
     TaskStatus,
     WorkflowInstance,
     WorkflowTask,
+)
+from powdrr_lift.process.templates import (
     WorkflowTaskTemplate,
     WorkflowTemplate,
     save_workflow_template,

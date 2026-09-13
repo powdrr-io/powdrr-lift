@@ -14,25 +14,6 @@ from typing import Any, TextIO, cast
 import laga
 
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workflow_chat_io import (
-    _prompt_user,
-    _verbose_json,
-    _verbose_print,
-)
-from powdrr_lift.workflow_chat_selection import (
-    SkillChatConfig,
-    WorkflowChatConfig,
-)
-from powdrr_lift.workflow_execution_loop import _print_waiting_for_model
-from powdrr_lift.workflow_llm import (
-    WorkflowLLMClient,
-    build_clean_room_repair_prompt,
-    prompt_size_breakdown,
-)
-from powdrr_lift.workflow_llm import (
-    complete_json as _request_json,
-)
-from powdrr_lift.workflow_provider_runtime import model_limits_for
 from powdrr_lift.workrr.provider_config import LLMModelMapping
 from powdrr_lift.workrr.providers import (
     LocalModelRuntimeError,
@@ -43,6 +24,25 @@ from powdrr_lift.workrr.providers import (
     backup_model_for,
     long_context_backup_for,
 )
+from powdrr_lift.workrr.workflow_chat_io import (
+    _prompt_user,
+    _verbose_json,
+    _verbose_print,
+)
+from powdrr_lift.workrr.workflow_chat_selection import (
+    SkillChatConfig,
+    WorkflowChatConfig,
+)
+from powdrr_lift.workrr.workflow_execution_loop import _print_waiting_for_model
+from powdrr_lift.workrr.workflow_llm import (
+    WorkflowLLMClient,
+    build_clean_room_repair_prompt,
+    prompt_size_breakdown,
+)
+from powdrr_lift.workrr.workflow_llm import (
+    complete_json as _request_json,
+)
+from powdrr_lift.workrr.workflow_provider_runtime import model_limits_for
 
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _MAX_REPEATED_REPAIR_ATTEMPTS = 5
@@ -50,7 +50,7 @@ _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 
 
 def _chat_support(name: str) -> Any:
-    from powdrr_lift import workflow_chat_agent
+    from powdrr_lift.workrr import workflow_chat_agent
 
     return getattr(workflow_chat_agent, name)
 

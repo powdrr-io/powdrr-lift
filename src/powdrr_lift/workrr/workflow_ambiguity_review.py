@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.workflow_llm import WorkflowLLMClient, complete_json
+from powdrr_lift.workrr.workflow_llm import WorkflowLLMClient, complete_json
 
 _REVIEW_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",

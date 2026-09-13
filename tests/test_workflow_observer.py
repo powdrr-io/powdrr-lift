@@ -6,9 +6,9 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.workflow_error_logging import WORKFLOW_OBSERVER_LOG
-from powdrr_lift.workflow_llm import ProgressDecision, WorkflowActionObservation
-from powdrr_lift.workflow_observer import (
+from powdrr_lift.workrr.workflow_error_logging import WORKFLOW_OBSERVER_LOG
+from powdrr_lift.workrr.workflow_llm import ProgressDecision, WorkflowActionObservation
+from powdrr_lift.workrr.workflow_observer import (
     ObserverActionRecommendation,
     ObserverActionSummary,
     ObserverDecision,

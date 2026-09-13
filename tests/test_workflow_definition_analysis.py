@@ -14,7 +14,7 @@ from powdrr_lift.process.compiler import (
     discover_workflow_definitions,
     warning_report_data,
 )
-from powdrr_lift.workflow_definition_prompts import render_skill_prompt_snapshots
+from powdrr_lift.workrr.workflow_definition_prompts import render_skill_prompt_snapshots
 
 
 def test_definition_analysis_uses_runtime_action_parser_and_input_contract(

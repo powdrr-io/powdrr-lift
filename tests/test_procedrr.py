@@ -33,6 +33,9 @@ def decision(name: str = "choice") -> DecisionContract:
         {"type": "string", "enum": ["a", "b"]},
         "enum:a,b",
         "decision_result",
+        prompt_system="Return only the declared answer.",
+        instructions=("Use only the supplied subject.",),
+        context_bindings=("context",),
     )
 
 
@@ -46,6 +49,19 @@ def test_single_decision_rejects_model_owned_transition() -> None:
             {"type": "string"},
             "string",
             "next_step",
+        )
+
+
+def test_decision_contract_requires_prompt_context_rules() -> None:
+    with pytest.raises(ValueError, match="prompt_system"):
+        DecisionContract(
+            DecisionKind.CLASSIFY_ONE,
+            "Choose one",
+            "context",
+            "choice",
+            {"type": "string"},
+            "string",
+            "decision_result",
         )
 
 

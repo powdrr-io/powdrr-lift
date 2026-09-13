@@ -39,15 +39,31 @@ _CATEGORIES = (
     "tools",
 )
 
-_EDIT_SCHEMA = {
-    "type": "object",
-    "required": ["added", "deleted"],
-    "additionalProperties": False,
-    "properties": {
-        "added": {"type": "array", "items": {"type": "object"}},
-        "deleted": {"type": "array", "items": {"type": "object", "required": ["id"]}},
-    },
+_CATEGORY_FIELDS = {
+    "entities": ("id", "type", "summary"),
+    "entity-relationships": ("id", "source", "target", "relationship"),
 }
+
+
+def _edit_schema(category: str) -> dict:
+    fields = _CATEGORY_FIELDS.get(category, ("id", "description"))
+    properties = {field: {"type": "string", "minLength": 1} for field in fields}
+    properties.setdefault("state", {"type": "string", "enum": ["added"]})
+    return {
+        "type": "object",
+        "required": ["added", "deleted"],
+        "additionalProperties": False,
+        "properties": {
+            "added": {
+                "type": "array",
+                "items": {"type": "object", "required": list(fields)},
+            },
+            "deleted": {
+                "type": "array",
+                "items": {"type": "object", "required": ["id"]},
+            },
+        },
+    }
 
 
 def _gather(category: str) -> SequenceNode:
@@ -67,9 +83,24 @@ def _gather(category: str) -> SequenceNode:
                     "gathered context?",
                     context,
                     output,
-                    _EDIT_SCHEMA,
+                    _edit_schema(category),
                     "validate_proposal_edits",
                     "decision_result",
+                    prompt_system=(
+                        "You are preparing one design-interview proposal edit. "
+                        "Do not edit files and return only the declared JSON output."
+                    ),
+                    instructions=(
+                        "Read the exact gathered context; do not invent "
+                        "repository facts.",
+                        "Preserve existing items unless an explicit deletion "
+                        "is required.",
+                        "New identifiers must be globally unique across all "
+                        "categories.",
+                        "Return exactly added and deleted arrays matching the "
+                        "output schema.",
+                    ),
+                    context_bindings=("work_item_name", "feature_description", context),
                 )
             ),
         )
@@ -149,6 +180,16 @@ def design_interview() -> WorkflowDefinition:
                                 {"type": "object", "required": ["path", "edits"]},
                                 "validate_yaml_edit",
                                 "decision_result",
+                                prompt_system=(
+                                    "You are repairing one validated proposal. "
+                                    "Return only one YAML edit and do not change scope."
+                                ),
+                                instructions=(
+                                    "Use only the exact evaluator issue as evidence.",
+                                    "Return one edit for the cited issue; do not "
+                                    "repair unrelated issues.",
+                                ),
+                                context_bindings=("work_item_name", "proposal_issue"),
                             )
                         ),
                         OperationNode(

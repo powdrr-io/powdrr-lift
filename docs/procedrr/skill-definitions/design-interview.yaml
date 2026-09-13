@@ -45,6 +45,15 @@ steps:
             kind: construct_one
             question: "What proposed edits follow from this exact gathered category context?"
             subject: category_context
+            prompt_system: >-
+              You are preparing one design-interview proposal edit. Do not edit
+              files and return only the declared JSON output.
+            instructions:
+              - Read the exact gathered context; do not invent repository facts.
+              - Preserve existing items unless an explicit deletion is required.
+              - New identifiers must be globally unique across all categories.
+              - Return exactly added and deleted arrays matching the output schema.
+            context: [work_item_name, feature_description, category_context]
             output: {name: category_edits, type: proposal_edits}
             validator: validate_proposal_edits
 
@@ -74,6 +83,13 @@ steps:
             kind: construct_one
             question: What one YAML edit repairs this exact evaluator issue?
             subject: proposal_issue
+            prompt_system: >-
+              You are repairing one validated proposal. Return only one YAML
+              edit and do not change scope.
+            instructions:
+              - Use only the exact evaluator issue as evidence.
+              - Return one edit for the cited issue; do not repair unrelated issues.
+            context: [work_item_name, proposal_issue]
             output: {name: repair_edit, type: yaml_edit}
             validator: validate_yaml_edit
         - operation:

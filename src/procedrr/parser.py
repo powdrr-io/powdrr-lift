@@ -113,7 +113,15 @@ def _validate_steps(
                     DocumentDiagnostic(f"{step_path}.judge", "judge must be a mapping")
                 )
             else:
-                for key in ("question", "subject", "output", "validator"):
+                for key in (
+                    "question",
+                    "subject",
+                    "prompt_system",
+                    "instructions",
+                    "context",
+                    "output",
+                    "validator",
+                ):
                     if key not in judge:
                         diagnostics.append(
                             DocumentDiagnostic(

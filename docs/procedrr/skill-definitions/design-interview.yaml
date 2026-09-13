@@ -72,7 +72,29 @@ steps:
       tool: edit
       parameters:
         file_path: docs/proposals/${work_item_name}/design-interview-input.json
-        source: [feature_description, category_edits_by_category]
+        document:
+          work_item_name: "${work_item_name}"
+          feature_description: "${feature_description}"
+          requirements_edits: "${category_edits_by_category.requirements}"
+          approach_edits: "${category_edits_by_category.approach}"
+          entities_edits: "${category_edits_by_category.entities}"
+          entity_relationships_edits: "${category_edits_by_category.entity-relationships}"
+          invariants_edits: "${category_edits_by_category.invariants}"
+          guidance_edits: "${category_edits_by_category.guidance}"
+          features_edits: "${category_edits_by_category.features}"
+          human_decisions_edits: "${category_edits_by_category.human-decisions}"
+          intent_edits: "${category_edits_by_category.intent}"
+          intents_edits: "${category_edits_by_category.intents}"
+          acceptance_criteria_edits: "${category_edits_by_category.acceptance_criteria}"
+          expected_tests_edits: "${category_edits_by_category.expected_tests}"
+          required_test_cases_edits: "${category_edits_by_category.required_test_cases}"
+          expected_outcomes_edits: "${category_edits_by_category.expected_outcomes}"
+          non_goals_edits: "${category_edits_by_category.non_goals}"
+          risks_edits: "${category_edits_by_category.risks}"
+          decisions_edits: "${category_edits_by_category.decisions}"
+          proposed_prs_edits: "${category_edits_by_category.proposed_prs}"
+          modules_edits: "${category_edits_by_category.modules}"
+          tools_edits: "${category_edits_by_category.tools}"
       bind: interview_input
   - operation:
       tool: internal

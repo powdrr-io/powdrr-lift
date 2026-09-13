@@ -1,0 +1,121 @@
+version: 1
+name: design-interview
+inputs:
+  - {name: work_item_name, type: string, required: true}
+  - {name: feature_description, type: string, required: true}
+description: >-
+  Gather the repository's design-interview categories one at a time, ask one
+  typed question per category, persist the resulting edits, generate the
+  specification-v1 proposal, and repair evaluator findings with bounded edits.
+limits: {llm_activations: 1024, tool_calls: 2048, max_epochs: 3}
+decision_contract:
+  transport_action_const: decision_result
+  output_schema:
+    type: object
+    required: [added, deleted]
+    additionalProperties: false
+    properties:
+      added: {type: array, items: {type: object}}
+      deleted: {type: array, items: {type: object, required: [id]}}
+
+steps:
+  - operation:
+      tool: internal
+      command: [powdrr-lift, design-interview-input, --work-item-name, "${work_item_name}"]
+      bind: interview_input_template
+
+  # Each category has its own exact gather_context call and output binding.
+  - for_each:
+      snapshot:
+        name: interview_categories
+        max_items: 20
+        values:
+          [requirements, approach, entities, entity-relationships, invariants,
+           guidance, features, human-decisions, intent, intents,
+           acceptance_criteria, expected_tests, required_test_cases,
+           expected_outcomes, non_goals, risks, decisions, proposed_prs,
+           modules, tools]
+      item_binding: category
+      collect: category_edits_by_category
+      body:
+        - operation:
+            tool: gather_context
+            parameters: {types: ["${category}"]}
+            bind: category_context
+        - judge:
+            kind: construct_one
+            question: "What proposed edits follow from this exact gathered category context?"
+            subject: category_context
+            prompt_system: >-
+              You are preparing one design-interview proposal edit. Do not edit
+              files and return only the declared JSON output.
+            instructions:
+              - Read the exact gathered context; do not invent repository facts.
+              - Preserve existing items unless an explicit deletion is required.
+              - New identifiers must be globally unique across all categories.
+              - Return exactly added and deleted arrays matching the output schema.
+            context: [work_item_name, feature_description, category_context]
+            output:
+              name: category_edits
+              schema:
+                type: object
+                required: [added, deleted]
+                additionalProperties: false
+                properties:
+                  added: {type: array, items: {type: object}}
+                  deleted: {type: array, items: {type: object, required: [id]}}
+            validation: {kind: json_schema}
+
+  - operation:
+      tool: edit
+      parameters:
+        file_path: docs/proposals/${work_item_name}/design-interview-input.json
+        source: [feature_description, all_category_edits]
+      bind: interview_input
+  - operation:
+      tool: internal
+      command:
+        [powdrr-lift, feature-pr-specification, --work-item-name, "${work_item_name}",
+         --interview-input, "docs/proposals/${work_item_name}/design-interview-input.json"]
+      bind: proposal_template
+  - operation:
+      tool: internal
+      command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
+      bind: proposal_evaluation
+  - worklist:
+      snapshot: {name: proposal_issues, max_items: 64}
+      item_binding: proposal_issue
+      max_admissions: 64
+      max_epochs: 3
+      body:
+        - judge:
+            kind: construct_one
+            question: What one YAML edit repairs this exact evaluator issue?
+            subject: proposal_issue
+            prompt_system: >-
+              You are repairing one validated proposal. Return only one YAML
+              edit and do not change scope.
+            instructions:
+              - Use only the exact evaluator issue as evidence.
+              - Return one edit for the cited issue; do not repair unrelated issues.
+            context: [work_item_name, proposal_issue]
+            output:
+              name: repair_edit
+              schema:
+                type: object
+                required: [path, edits]
+                additionalProperties: false
+                properties:
+                  path: {type: string, minLength: 1}
+                  edits: {type: array, minItems: 1}
+            validation: {kind: json_schema}
+        - operation:
+            tool: yaml_edit
+            parameters:
+              file_path: docs/proposals/${work_item_name}/feature-pr-specification.yaml
+              edit: repair_edit
+  - operation:
+      tool: internal
+      command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
+      bind: final_proposal_evaluation
+  - terminal: succeeded

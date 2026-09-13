@@ -18,6 +18,7 @@ from procedrr import (
     WorkflowDefinition,
     append_step,
     compile_workflow,
+    design_interview,
     parse_and_validate,
     set_value,
 )
@@ -32,6 +33,9 @@ def decision(name: str = "choice") -> DecisionContract:
         {"type": "string", "enum": ["a", "b"]},
         "enum:a,b",
         "decision_result",
+        prompt_system="Return only the declared answer.",
+        instructions=("Use only the supplied subject.",),
+        context_bindings=("context",),
     )
 
 
@@ -45,6 +49,45 @@ def test_single_decision_rejects_model_owned_transition() -> None:
             {"type": "string"},
             "string",
             "next_step",
+        )
+
+
+def test_decision_contract_requires_prompt_context_rules() -> None:
+    with pytest.raises(ValueError, match="prompt_system"):
+        DecisionContract(
+            DecisionKind.CLASSIFY_ONE,
+            "Choose one",
+            "context",
+            "choice",
+            {"type": "string"},
+            "string",
+            "decision_result",
+        )
+
+
+def test_parser_rejects_unknown_tool_and_validator_references() -> None:
+    with pytest.raises(Exception, match="unknown tool"):
+        parse_and_validate(
+            "name: bad\nsteps:\n  - operation: {tool: imaginary, bind: x}\n"
+        )
+
+
+def test_parser_requires_explicit_collection_for_loop_outputs() -> None:
+    with pytest.raises(Exception, match="collect binding"):
+        parse_and_validate(
+            "name: bad\nsteps:\n"
+            "  - for_each:\n"
+            "      item_binding: item\n"
+            "      body:\n"
+            "        - operation: {tool: internal, command: [echo], bind: output}\n"
+        )
+    with pytest.raises(Exception, match="unknown validator"):
+        parse_and_validate(
+            "name: bad\nsteps:\n  - judge:\n"
+            "      question: q\n      subject: x\n"
+            "      prompt_system: s\n      instructions: [i]\n"
+            "      context: [x]\n      output: {name: y, schema: {type: string}}\n"
+            "      validator: imaginary\n"
         )
 
 
@@ -81,10 +124,34 @@ def test_non_exhaustive_match_is_rejected() -> None:
 
 def test_parser_validates_declarative_steps_and_editor_is_persistent() -> None:
     document = parse_and_validate(
-        "name: demo\nsteps:\n  - operation: {name: inspect}\n"
+        "name: demo\nsteps:\n"
+        "  - operation: {tool: internal, command: [echo], bind: inspected}\n"
     )
     changed = set_value(document, ("name",), "edited")
     extended = append_step(changed, ("steps",), {"terminal": "succeeded"})
     assert document["name"] == "demo"
     assert extended["name"] == "edited"
     assert len(extended["steps"]) == 2
+
+
+def test_checked_in_design_interview_definition_parses() -> None:
+    from pathlib import Path
+
+    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    document = parse_and_validate(source)
+    assert document["name"] == "design-interview"
+
+
+def test_design_interview_uses_real_context_types_and_bounded_repairs() -> None:
+    compiled = compile_workflow(design_interview())
+    data = compiled.definition.to_data()
+    encoded = str(data)
+    for category in (
+        "requirements",
+        "entity-relationships",
+        "acceptance_criteria",
+        "tools",
+    ):
+        assert category in encoded
+    assert compiled.max_llm_activations == 212
+    assert compiled.max_tool_calls == 217

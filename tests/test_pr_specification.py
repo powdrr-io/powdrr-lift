@@ -23,6 +23,24 @@ from powdrr_lift.core import (
 )
 
 
+def test_empty_specification_is_invalid(tmp_path: Path) -> None:
+    report = build_pr_specification_validation_report(
+        "\n".join(
+            [
+                "schema: https://powdrr.io/schemas/proposed-pr-specification-v1",
+                "id: empty",
+                "title: Empty",
+                "",
+            ]
+        ),
+        work_item_name="empty",
+        repo_root=tmp_path,
+    )
+
+    assert not report.validation_successful
+    assert any(issue.code == "empty_specification" for issue in report.issues)
+
+
 def _write_implementation_specification(repo_root: Path) -> Path:
     implementation_specification_path = (
         repo_root

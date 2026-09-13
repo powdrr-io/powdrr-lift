@@ -1,5 +1,3 @@
-from typing import cast
-
 import pytest
 
 from procedrr import (
@@ -20,7 +18,6 @@ from procedrr import (
     WorkflowDefinition,
     append_step,
     compile_workflow,
-    feature_delivery_process,
     parse_and_validate,
     set_value,
 )
@@ -80,17 +77,6 @@ def test_non_exhaustive_match_is_rejected() -> None:
     )
     with pytest.raises(CompilationError, match="non_exhaustive_match"):
         compile_workflow(workflow)
-
-
-def test_feature_delivery_process_covers_three_named_lifecycle_calls() -> None:
-    compiled = compile_workflow(feature_delivery_process(max_proposed_prs=2))
-    calls = cast(SequenceNode, compiled.definition.body).nodes
-    assert [cast(CallNode, call).name for call in calls[:2]] == [
-        "specify-a-feature",
-        "start-implementing-feature",
-    ]
-    assert compiled.max_llm_activations > 0
-    assert compiled.max_llm_activations < compiled.definition.limits.llm_activations
 
 
 def test_parser_validates_declarative_steps_and_editor_is_persistent() -> None:

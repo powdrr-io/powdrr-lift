@@ -180,7 +180,11 @@ class Evaluator:
     ) -> None:
         snapshot = declaration["snapshot"]
         name = snapshot["name"] if isinstance(snapshot, Mapping) else snapshot
-        items = _resolve_binding(state, name)
+        items = (
+            snapshot["values"]
+            if isinstance(snapshot, Mapping) and "values" in snapshot
+            else _resolve_binding(state, name)
+        )
         if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
             raise EvaluationError(f"{path}.{kind}.snapshot must resolve to a sequence")
         max_items = (
@@ -194,6 +198,8 @@ class Evaluator:
         body = declaration.get("body", declaration.get("steps"))
         if not isinstance(body, list):
             raise EvaluationError(f"{path}.{kind}.body must be a list")
+        collect = declaration.get("collect")
+        collected: dict[str, Any] = {}
         for epoch in range(epochs):
             for index, item in enumerate(items):
                 binding = declaration.get("item_binding", declaration.get("item"))
@@ -208,6 +214,12 @@ class Evaluator:
                     limits,
                     f"{path}.{kind}[{epoch}][{index}]",
                 )
+                if isinstance(collect, Mapping) and collect.get("key") == "category":
+                    output = state.get("category_edits")
+                    if output is not None:
+                        collected[str(item)] = output
+        if isinstance(collect, Mapping) and isinstance(collect.get("binding"), str):
+            state[collect["binding"]] = collected
 
     def _gate(
         self, gate: Mapping[str, Any], state: Mapping[str, Any], path: str

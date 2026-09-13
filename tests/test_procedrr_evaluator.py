@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from procedrr_evaluator import Evaluator
@@ -60,3 +61,29 @@ def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     assert calls == [("gather_context", {"types": ["requirements"]})]
     assert result.bindings["requirements_edits"]["added"][0]["id"] == "req-1"
     assert "requirements_context" in llm.messages[1]["content"]
+
+
+def test_evaluator_runs_checked_in_design_interview_definition() -> None:
+    llm = FakeLLM()
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool == "gather_context":
+            return [{"id": "existing", "description": "Existing evidence"}]
+        if tool == "internal" and parameters.get("command", [None])[1] == "evaluate":
+            return {"returncode": 0}
+        return {"ok": True}
+
+    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(source)
+    result = Evaluator(llm, execute).evaluate(
+        document,
+        {
+            "work_item_name": "demo",
+            "feature_description": "Add a thing",
+            "proposal_issues": [],
+        },
+    )
+    assert result.bindings["final_proposal_evaluation"]["returncode"] == 0
+    assert result.llm_activations == 20

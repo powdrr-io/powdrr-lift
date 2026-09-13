@@ -135,43 +135,38 @@ from powdrr_lift.structrr.intent import (
     IntentTrigger,
     make_intent_source,
 )
-from powdrr_lift.workrr.feature_run import (
-    DEFAULT_FEATURE_NAME,
-    DEFAULT_FEATURE_REQUEST,
-    AgentFeatureRunConfig,
-    run_agent_feature_e2e,
-)
-from powdrr_lift.workrr.provider_config import ALL_PROVIDERS, default_llm_mappings
-from powdrr_lift.workrr.providers import (
-    build_workflow_client,
-    resolve_provider_credentials,
-)
-from powdrr_lift.workrr.workflow_ambiguity_review import (
+from powdrr_lift.workrr.ambiguity_review import (
     WorkflowAmbiguityReviewError,
     review_workflow_definition,
     review_workflow_definition_step,
 )
-from powdrr_lift.workrr.workflow_chat_agent import (
+from powdrr_lift.workrr.chat_agent import (
     choose_workflow_provider,
     download_local_qwen_model,
     resolve_workflow_provider,
     run_workflow_chat,
 )
-from powdrr_lift.workrr.workflow_chat_selection import WorkflowChatConfig
-from powdrr_lift.workrr.workflow_chat_tui import run_workflow_chat_tui
-from powdrr_lift.workrr.workflow_definition_comparison import (
+from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
+from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
+from powdrr_lift.workrr.definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
 )
-from powdrr_lift.workrr.workflow_definition_prompts import render_skill_prompt_snapshots
-from powdrr_lift.workrr.workflow_error_analysis import (
+from powdrr_lift.workrr.definition_prompts import render_skill_prompt_snapshots
+from powdrr_lift.workrr.error_analysis import (
     WorkflowErrorAnalysisError,
     cluster_workflow_errors,
     load_workflow_error_records,
     promote_replay_candidates,
     workflow_error_analysis_data,
 )
-from powdrr_lift.workrr.workflow_git import (
+from powdrr_lift.workrr.feature_run import (
+    DEFAULT_FEATURE_NAME,
+    DEFAULT_FEATURE_REQUEST,
+    AgentFeatureRunConfig,
+    run_agent_feature_e2e,
+)
+from powdrr_lift.workrr.git import (
     WorkflowGitState,
     cleanup_workflow_run,
     commit_and_push_workflow_initialization,
@@ -181,18 +176,23 @@ from powdrr_lift.workrr.workflow_git import (
     save_workflow_git_state,
     synchronize_workflow_initialization,
 )
-from powdrr_lift.workrr.workflow_human_task import (
+from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
-from powdrr_lift.workrr.workflow_prompt_probe import (
+from powdrr_lift.workrr.prompt_probe import (
     WorkflowPromptProbeError,
     build_probe_client,
     build_workflow_prompt_probe,
     probe_workflow_step,
     resolve_probe_model,
 )
-from powdrr_lift.workrr.workflow_replay import (
+from powdrr_lift.workrr.provider_config import ALL_PROVIDERS, default_llm_mappings
+from powdrr_lift.workrr.providers import (
+    build_workflow_client,
+    resolve_provider_credentials,
+)
+from powdrr_lift.workrr.replay import (
     WorkflowReplayError,
     load_error_record,
     load_workflow_replay_bundle,
@@ -201,18 +201,18 @@ from powdrr_lift.workrr.workflow_replay import (
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
 )
-from powdrr_lift.workrr.workflow_scenario import (
+from powdrr_lift.workrr.scenario import (
     WorkflowScenarioError,
     extract_scripted_responses,
     extract_scripted_responses_from_report,
     load_workflow_scenario,
     run_workflow_scenario,
 )
-from powdrr_lift.workrr.workflow_task_agent import (
+from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
 )
-from powdrr_lift.workrr.workflow_tuning import (
+from powdrr_lift.workrr.tuning import (
     WorkflowTuningError,
     save_workflow_tuning_report,
     tune_workflow,

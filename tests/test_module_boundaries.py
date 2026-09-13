@@ -11,6 +11,7 @@ SOURCE_ROOT = Path(__file__).parents[1] / "src" / "powdrr_lift"
 def test_language_and_agent_package_surfaces_exist() -> None:
     for package in ("structrr", "process", "workrr"):
         assert (SOURCE_ROOT / package / "__init__.py").is_file()
+    assert not (SOURCE_ROOT / "definitions" / "__init__.py").exists()
 
 
 def test_structrr_language_does_not_import_runtime_or_workrr_modules() -> None:
@@ -18,8 +19,8 @@ def test_structrr_language_does_not_import_runtime_or_workrr_modules() -> None:
         "powdrr_lift.workrr",
         "powdrr_lift.process",
         "powdrr_lift.execution",
-        "powdrr_lift.workrr.workflow_chat_agent",
-        "powdrr_lift.workrr.workflow_task_agent",
+        "powdrr_lift.workrr.chat_agent",
+        "powdrr_lift.workrr.task_agent",
     )
     for path in _python_files("structrr"):
         imports = _imported_modules(path)
@@ -34,8 +35,8 @@ def test_process_language_does_not_import_workrr_or_runtime_modules() -> None:
     forbidden_prefixes = (
         "powdrr_lift.workrr",
         "powdrr_lift.execution",
-        "powdrr_lift.workrr.workflow_chat_agent",
-        "powdrr_lift.workrr.workflow_task_agent",
+        "powdrr_lift.workrr.chat_agent",
+        "powdrr_lift.workrr.task_agent",
     )
     for path in _python_files("process"):
         imports = _imported_modules(path)
@@ -64,10 +65,9 @@ def _python_files(package: str) -> tuple[Path, ...]:
 def test_contracts_do_not_import_runtime_definition_or_provider_modules() -> None:
     forbidden_prefixes = (
         "powdrr_lift.workrr",
-        "powdrr_lift.definitions",
         "powdrr_lift.execution",
-        "powdrr_lift.workrr.workflow_chat_agent",
-        "powdrr_lift.workrr.workflow_task_agent",
+        "powdrr_lift.workrr.chat_agent",
+        "powdrr_lift.workrr.task_agent",
     )
     for path in _python_files("contracts"):
         imports = _imported_modules(path)
@@ -81,8 +81,8 @@ def test_contracts_do_not_import_runtime_definition_or_provider_modules() -> Non
 def test_definitions_do_not_import_workrr_or_provider_modules() -> None:
     forbidden_prefixes = (
         "powdrr_lift.workrr",
-        "powdrr_lift.workrr.workflow_chat_agent",
-        "powdrr_lift.workrr.workflow_task_agent",
+        "powdrr_lift.workrr.chat_agent",
+        "powdrr_lift.workrr.task_agent",
         "powdrr_lift.openai_proxy",
     )
     for path in _python_files("definitions"):
@@ -98,10 +98,9 @@ def test_workrr_protocol_depends_only_on_contracts() -> None:
     imports = _imported_modules(SOURCE_ROOT / "workrr" / "protocol.py")
     forbidden_prefixes = (
         "powdrr_lift.core",
-        "powdrr_lift.definitions",
         "powdrr_lift.execution",
-        "powdrr_lift.workrr.workflow_chat_agent",
-        "powdrr_lift.workrr.workflow_task_agent",
+        "powdrr_lift.workrr.chat_agent",
+        "powdrr_lift.workrr.task_agent",
     )
     assert not any(
         module.startswith(forbidden)
@@ -113,14 +112,23 @@ def test_workrr_protocol_depends_only_on_contracts() -> None:
 def test_workrr_protocol_package_has_no_definition_or_execution_imports() -> None:
     forbidden_prefixes = (
         "powdrr_lift.core",
-        "powdrr_lift.definitions",
         "powdrr_lift.execution",
-        "powdrr_lift.workrr.workflow_chat_agent",
-        "powdrr_lift.workrr.workflow_task_agent",
+        "powdrr_lift.workrr.chat_agent",
+        "powdrr_lift.workrr.task_agent",
     )
-    for path in _python_files("workrr"):
-        if path.name.startswith("workflow_") or path.name == "feature_run.py":
-            continue
+    protocol_modules = (
+        "actions.py",
+        "context.py",
+        "exchanges.py",
+        "progress.py",
+        "protocol.py",
+        "provider_config.py",
+        "providers.py",
+        "repair.py",
+        "runner.py",
+    )
+    for filename in protocol_modules:
+        path = SOURCE_ROOT / "workrr" / filename
         imports = _imported_modules(path)
         assert not any(
             module.startswith(forbidden)
@@ -148,6 +156,20 @@ def test_core_does_not_reexport_process_language() -> None:
         "load_workflow_template",
     }
     assert process_names.isdisjoint(core.__all__)
+
+
+def test_root_does_not_reexport_process_language() -> None:
+    import powdrr_lift
+
+    process_names = {
+        "TaskComplexity",
+        "WorkflowTask",
+        "WorkflowInstance",
+        "WorkflowTemplate",
+        "load_workflow_task",
+        "load_workflow_template",
+    }
+    assert process_names.isdisjoint(powdrr_lift.__all__)
 
 
 def test_proposal_round_keeps_kernel_as_transition_owner() -> None:

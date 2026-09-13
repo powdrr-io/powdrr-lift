@@ -16,7 +16,7 @@ edited.
   runtime-owned document boundary: it rejects unknown keys, invalid dependency
   graphs, unknown/duplicate/missing effect assignments, and invalid compiled
   specifications before persistence.
-- `src/powdrr_lift/workflow_chat_agent.py` already records deterministic
+- `src/powdrr_lift/workrr/chat_agent.py` already records deterministic
   pre-step results as authoritative handoffs and materializes the proposed PR
   YAML through the compiler under a runtime-owned mutation contract.
 - Provider calls currently request only a generic JSON object. Required workflow

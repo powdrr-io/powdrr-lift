@@ -57,8 +57,8 @@ Relevant Powdrr starting points are:
 - [`skill-definitions/run-tests-and-fix.yaml`](../../skill-definitions/run-tests-and-fix.yaml),
   which already models deterministic test execution, structured diagnosis,
   deferred edit validation, repair, and rerun.
-- [`src/powdrr_lift/workflow_chat_agent.py`](../../src/powdrr_lift/workflow_chat_agent.py)
-  and [`src/powdrr_lift/workflow_task_agent.py`](../../src/powdrr_lift/workflow_task_agent.py),
+- [`src/powdrr_lift/workrr/chat_agent.py`](../../src/powdrr_lift/workrr/chat_agent.py)
+  and [`src/powdrr_lift/workrr/task_agent.py`](../../src/powdrr_lift/workrr/task_agent.py),
   which implement action prompting, validation, repair, handoffs, observer
   integration, and context compaction.
 - The existing

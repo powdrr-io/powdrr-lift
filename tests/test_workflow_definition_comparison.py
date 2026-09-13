@@ -6,7 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 
-from powdrr_lift.workrr.workflow_definition_comparison import (
+from powdrr_lift.workrr.definition_comparison import (
     compare_workflow_definitions,
 )
 

@@ -147,12 +147,12 @@ modules:
     on skill-step output declarations.
 - id: mod-workflow-llm
   action: changed
-  relative_location: src/powdrr_lift/workflow_llm.py
+  relative_location: src/powdrr_lift/workrr/llm.py
   purpose: Carry an optional response schema through the shared client protocol and
     timeout-retry request path without changing callers that use generic JSON mode.
 - id: mod-workflow-chat-agent
   action: changed
-  relative_location: src/powdrr_lift/workflow_chat_agent.py
+  relative_location: src/powdrr_lift/workrr/chat_agent.py
   purpose: Derive the active action-envelope schema, pass it to supported providers,
     build the authoritative-effect handoff, compile split inputs, and route evaluation
     outcomes in runtime code.

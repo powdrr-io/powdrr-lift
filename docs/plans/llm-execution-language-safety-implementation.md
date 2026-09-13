@@ -25,12 +25,12 @@ The repository already contains substantial pieces of the target system.
 
 | Area | Current implementation | Useful property |
 | --- | --- | --- |
-| Skill schema | `core/skill_specification.py` | Typed steps, inputs, outputs, actions, pre-steps, gates, completion, and nested skills |
-| Runtime step policy | `workflow_step_behavior.py` | Central ownership rules for governed, predicated, runner, gate, and nested-skill steps |
-| Provider action schema | `workflow_chat_agent.py::_step_action_response_schema` | Per-step action enumeration and typed output envelopes |
-| Shared action engine | `workflow_llm.py` | Common parsing, repair, progress observation, and execution strategy boundary |
-| Static compiler | `workflow_definition_analysis.py` | Parsing, CFG construction, handoff checks, prompt checks, liveness diagnostics, baselines, and warning budgets |
-| Abstract liveness model | `workflow_liveness.py` | Capability summaries, abstract states, transitions, progress, and runtime/static conformance |
+| Skill schema | `process/model.py` | Typed steps, inputs, outputs, actions, pre-steps, gates, completion, and nested skills |
+| Runtime step policy | `process/step_behavior.py` | Central ownership rules for governed, predicated, runner, gate, and nested-skill steps |
+| Provider action schema | `workrr/chat_agent.py::_step_action_response_schema` | Per-step action enumeration and typed output envelopes |
+| Shared action engine | `workrr/llm.py` | Common parsing, repair, progress observation, and execution strategy boundary |
+| Static compiler | `process/compiler.py` | Parsing, CFG construction, handoff checks, prompt checks, liveness diagnostics, baselines, and warning budgets |
+| Abstract liveness model | `process/liveness.py` | Capability summaries, abstract states, transitions, progress, and runtime/static conformance |
 | Runtime tool contract | `core/tool_manifest.py` and `execution/tools.py` | Semantic actions, coarse effects, idempotency, evidence producers, adapter validation, and observed effects |
 | Capability enforcement | `execution/capabilities.py` | Step action checks, effect checks, checkpoints, exception resolution, and decision history |
 | Capability exceptions | `core/capability_exception.py` | Exact argument binding, manifest fingerprint, signed approval, expiration, and use count |
@@ -48,7 +48,7 @@ one semantic contract and to close compatibility paths that weaken guarantees.
 ### Actions are closed only in some definitions
 
 `SkillStep.actions_declared` distinguishes an explicit empty action set from an
-omitted legacy set. When actions are omitted, `workflow_chat_agent.py` infers a
+omitted legacy set. When actions are omitted, `workrr/chat_agent.py` infers a
 broad action catalog and adds universal actions. This preserves compatibility
 but prevents a general action-safety guarantee.
 
@@ -303,7 +303,7 @@ creates a new evidence epoch and must consume an explicit epoch budget.
 Collection bounds, retry counts, parallelism, and activation limits participate
 in the compiled fingerprint and cannot be raised by an LLM decision.
 
-`workflow_step_behavior.py` should remain the source for behavior selection,
+`process/step_behavior.py` should remain the source for behavior selection,
 but it should produce or participate in this compiled contract rather than
 being reinterpreted independently by each runner.
 
@@ -468,7 +468,7 @@ round-trip serialization and fingerprint tests before integrating them.
 
 ### 2. Compile every definition into the canonical contract
 
-Refactor `workflow_definition_analysis.py` so parsing and normalization produce
+Refactor `process/compiler.py` so parsing and normalization produce
 the canonical contract first. Every subsequent pass should consume that
 contract:
 
@@ -496,11 +496,11 @@ in the active step's state projection.
 
 ### 3. Close action contracts and normalize LLM decisions
 
-Change `core/skill_specification.py` and corresponding template/task schemas so
+Change `process/model.py` and corresponding template/task schemas so
 new definitions must declare `actions`, including an explicit empty list.
 
 Remove implicit authority from `_step_actions` in
-`workflow_chat_agent.py` in stages:
+`workrr/chat_agent.py` in stages:
 
 1. emit a migration diagnostic when actions are omitted;
 2. compile omitted actions into an explicit legacy contract;
@@ -539,9 +539,9 @@ single-looking call cannot conceal a multi-action agent loop.
 
 Add outcome parsing and validation to:
 
-- `core/skill_specification.py`;
-- `core/workflow_template_specification.py`;
-- `core/workflow_task_specification.py`; and
+- `process/model.py`;
+- `process/templates.py`;
+- `process/tasks.py`; and
 - template instantiation and execution-plan compilation.
 
 Update `_step_action_response_schema` so provider schemas expose only the one
@@ -604,7 +604,7 @@ mechanism for observed-only channels. A raw, unrestricted process capability
 cannot be classified as enforced merely because its observed trace happened to
 be narrow.
 
-Change `workflow_liveness.py` to project its abstract effects directly from
+Change `process/liveness.py` to project its abstract effects directly from
 these contracts. Remove the separate hard-coded effect registry once all
 built-ins are migrated.
 
@@ -681,7 +681,7 @@ outcomes:
       retry_budget: 1
 ```
 
-Update `workflow_liveness.py` to prove cycles by lexicographic variants or
+Update `process/liveness.py` to prove cycles by lexicographic variants or
 finite resource consumption. Continue inferring obvious progress, but prefer
 explicit declarations when external or semantic state prevents inference.
 

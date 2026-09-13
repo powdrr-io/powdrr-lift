@@ -41,19 +41,19 @@ from powdrr_lift.execution.evidence import EvidenceRequirement
 from powdrr_lift.execution.personas import build_persona_packet
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.execution.tools import ToolContext, ToolResult, ToolValidationReport
-from powdrr_lift.workrr.workflow_execution import ProgressDecision
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.execution import ProgressDecision
+from powdrr_lift.workrr.llm import (
     WorkflowAction,
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionRequest,
     WorkflowStepRunner,
 )
-from powdrr_lift.workrr.workflow_observer import (
+from powdrr_lift.workrr.observer import (
     ObserverExecutionContext,
     ShadowWorkflowObserver,
 )
-from powdrr_lift.workrr.workflow_scenario import (
+from powdrr_lift.workrr.scenario import (
     load_workflow_scenario,
     run_workflow_scenario,
 )

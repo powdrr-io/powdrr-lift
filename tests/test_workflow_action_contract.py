@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from powdrr_lift.workrr.workflow_action_protocol import _parse_action_response
+from powdrr_lift.workrr.action_protocol import _parse_action_response
 
 
 def test_action_contract_requires_the_canonical_action_field() -> None:

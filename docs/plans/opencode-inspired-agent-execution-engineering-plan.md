@@ -164,16 +164,16 @@ agent:
 
 | Responsibility | Current source | Migration role |
 | --- | --- | --- |
-| Shared model request and action loop | `src/powdrr_lift/workflow_llm.py` | Host the common action lifecycle and typed correctable failures. |
-| Repetition and failure accounting | `src/powdrr_lift/workflow_execution.py` | Feed kernel action attempts and semantic-stall events. |
-| Interactive skill execution | `src/powdrr_lift/workflow_chat_agent.py` | Become a presentation/input adapter over the kernel. |
-| Durable task execution | `src/powdrr_lift/workflow_task_agent.py` | Become a task persistence adapter over the kernel. |
-| Workflow task persistence | `src/powdrr_lift/core/workflow_task_specification.py` | Add phase/persona references while retaining root task YAML. |
-| Workflow template persistence | `src/powdrr_lift/core/workflow_template_specification.py` | Compile delivery profiles and plans into typed tasks. |
-| Skill step contracts | `src/powdrr_lift/core/skill_specification.py` | Retain `actions` as the semantic action authority. |
+| Shared model request and action loop | `src/powdrr_lift/workrr/llm.py` | Host the common action lifecycle and typed correctable failures. |
+| Repetition and failure accounting | `src/powdrr_lift/workrr/execution.py` | Feed kernel action attempts and semantic-stall events. |
+| Interactive skill execution | `src/powdrr_lift/workrr/chat_agent.py` | Become a presentation/input adapter over the kernel. |
+| Durable task execution | `src/powdrr_lift/workrr/task_agent.py` | Become a task persistence adapter over the kernel. |
+| Workflow task persistence | `src/powdrr_lift/process/tasks.py` | Add phase/persona references while retaining root task YAML. |
+| Workflow template persistence | `src/powdrr_lift/process/templates.py` | Compile delivery profiles and plans into typed tasks. |
+| Skill step contracts | `src/powdrr_lift/process/model.py` | Retain `actions` as the semantic action authority. |
 | Workflow relationships | `src/powdrr_lift/core/workflow_relationships.py` | Remain specification/task relationships; do not overload it with runtime obligations. |
-| Observer interventions | `src/powdrr_lift/workflow_observer.py` | Observe typed kernel events and shadow/enforcement differences. |
-| Replay and evaluation | `src/powdrr_lift/workflow_replay.py`, `workflow_scenario.py`, `workflow_tuning.py` | Compare old and new decisions on identical fixtures. |
+| Observer interventions | `src/powdrr_lift/workrr/observer.py` | Observe typed kernel events and shadow/enforcement differences. |
+| Replay and evaluation | `src/powdrr_lift/workrr/replay.py`, `workrr/scenario.py`, `workrr/tuning.py` | Compare old and new decisions on identical fixtures. |
 | Existing development tools | `intrinsic_edit.py`, `intrinsic_git_gh.py`, `intrinsic_enrich.py`, `basedpyright_tools.py`, `file_management.py` | Wrap with manifests and constrained adapters. |
 | User surfaces | `src/powdrr_lift/cli.py`, `src/powdrr_lift/mcp_server.py` | Expose shared profile, execution, guidance, and exception operations. |
 
@@ -223,9 +223,9 @@ src/powdrr_lift/
     evidence.py
     checkpoints.py
     kernel.py
-  workflow_llm.py
-  workflow_chat_agent.py
-  workflow_task_agent.py
+  workrr/llm.py
+  workrr/chat_agent.py
+  workrr/task_agent.py
 ```
 
 The module boundaries are:
@@ -942,9 +942,9 @@ Add:
 
 Change:
 
-- `core/workflow_task_specification.py` to accept optional `phase_type` and
+- `process/tasks.py` to accept optional `phase_type` and
   `persona_id`, preserving current `assignee_role` parsing;
-- `core/workflow_template_specification.py` with the same optional references;
+- `process/templates.py` with the same optional references;
 - `core/__init__.py` and package exports;
 - `cli.py` and `mcp_server.py` for shared profile validation.
 

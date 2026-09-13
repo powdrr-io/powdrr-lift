@@ -12,11 +12,11 @@ modules:
     purpose: CLI entry point for powdrr-lift commands.
   - id: powdrr-lift-workflow-chat-agent
     action: added
-    relative_location: src/powdrr_lift/workflow_chat_agent.py
+    relative_location: src/powdrr_lift/workrr/chat_agent.py
     purpose: Agent that drives workflow execution and skill orchestration.
   - id: powdrr-lift-workflow-chat-tui
     action: added
-    relative_location: src/powdrr_lift/workflow_chat_tui.py
+    relative_location: src/powdrr_lift/workrr/chat_tui.py
     purpose: Terminal UI for interactive workflow chat sessions.
   - id: powdrr-lift-mcp-server
     action: added

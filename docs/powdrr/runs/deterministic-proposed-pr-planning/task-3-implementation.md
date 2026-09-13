@@ -35,10 +35,10 @@ validation confirmation branch.
 ## Expected files
 
 - `skill-definitions/start-implementing-feature.yaml`
-- `src/powdrr_lift/core/skill_specification.py`
+- `src/powdrr_lift/process/model.py`
 - `src/powdrr_lift/core/pr_specification.py`
-- `src/powdrr_lift/workflow_llm.py`
-- `src/powdrr_lift/workflow_chat_agent.py`
+- `src/powdrr_lift/workrr/llm.py`
+- `src/powdrr_lift/workrr/chat_agent.py`
 - `scripts/start-implementing-feature-harness.py`
 - focused tests under `tests/`
 

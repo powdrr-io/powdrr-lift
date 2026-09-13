@@ -35,6 +35,16 @@ product and lifecycle language       process language
                     -> provider / human adapter
 ```
 
+## Status
+
+The package-boundary refactor is complete. Phases 0, 1, 2, 4, and 5 are
+complete: the dependency graph is tested, agent protocol/provider code has a
+`workrr` home, process-language compilation and catalogs have a `process` home,
+the adapters are contained within `workrr`, and the old root/core compatibility
+surfaces have been removed. The remaining execution-kernel and transition-owner
+work in Phase 3 is intentionally deferred to the separate execution-safety
+plans.
+
 The agent may propose an action or a semantic decision. It must not parse
 definition formats, decide whether a workflow is valid, infer authority from
 prose, or commit an execution transition. The kernel and definition compiler
@@ -58,11 +68,11 @@ are:
 
 | Module | Current mixed responsibilities |
 | --- | --- |
-| `workflow_chat_agent.py` | Provider clients, prompt construction, skill/template loading, action schemas, tool dispatch, worktree handling, checkpoints, durable facts, nested skills, and validation |
-| `workflow_task_agent.py` | Durable task orchestration, task prompts, Git/worktree lifecycle, nested skill execution, tool dispatch, and imports of private chat-agent helpers |
-| `workflow_llm.py` | Provider-independent proposal/repair machinery plus workflow-specific action types, execution strategy, and progress semantics |
-| `workflow_definition_analysis.py` | Definition parsing/IR, prompt-contract checks, template instantiation, action checks, handoffs, liveness, and effect analysis in one pass |
-| `core/skill_specification.py` | Definition data model, serialization, schema validation, dependency validation, and some runtime-oriented action assumptions |
+| `workrr/chat_agent.py` | Provider clients, prompt construction, skill/template loading, action schemas, tool dispatch, worktree handling, checkpoints, durable facts, nested skills, and validation |
+| `workrr/task_agent.py` | Durable task orchestration, task prompts, Git/worktree lifecycle, nested skill execution, tool dispatch, and imports of private chat-agent helpers |
+| `workrr/llm.py` | Provider-independent proposal/repair machinery plus workflow-specific action types, execution strategy, and progress semantics |
+| `process/compiler.py` | Definition parsing/IR, prompt-contract checks, template instantiation, action checks, handoffs, liveness, and effect analysis in one pass |
+| `process/model.py` | Definition data model, serialization, schema validation, dependency validation, and some runtime-oriented action assumptions |
 
 This creates several failure modes:
 
@@ -253,7 +263,7 @@ definition implementation leaking across it.
 
 ## Migration phases
 
-### Phase 0: Establish the dependency contract
+### Phase 0: Establish the dependency contract — complete
 
 - Add import-boundary tests that reject agent -> parser/validator imports and
   definition -> agent/provider imports.
@@ -269,13 +279,13 @@ definition implementation leaking across it.
 Exit criterion: the intended dependency graph is executable in tests, and all
 cross-layer exceptions are documented.
 
-### Phase 1: Extract the agent protocol and provider layer
+### Phase 1: Extract the agent protocol and provider layer — complete
 
 - Move provider clients, model mappings, response-schema negotiation, JSON
   completion, timeout handling, and provider serialization out of
-  `workflow_chat_agent.py`.
+  `workrr/chat_agent.py`.
 - Split provider-independent repair and proposal machinery from workflow
-  definition concepts in `workflow_llm.py`.
+  definition concepts in `workrr/llm.py`.
 - Define an agent-facing `ProcedureView`, `StateProjection`, and closed
   proposal protocol.
 - Keep compatibility re-exports at the old module paths.
@@ -284,12 +294,12 @@ Exit criterion: an agent-loop test can use a fake compiled contract and fake
 state projection without loading a skill file or invoking definition
 validation.
 
-### Phase 2: Extract definition compilation and catalog services
+### Phase 2: Extract definition compilation and catalog services — complete
 
 - Move source models, parsers, serialization, and structural validation from
-  `core/skill_specification.py` and the workflow-template/task specification
+  `process/model.py` and the workflow-template/task specification
   modules into `definitions`.
-- Split `workflow_definition_analysis.py` into parsing/normalization,
+- Split `process/compiler.py` into parsing/normalization,
   contract compilation, and analysis passes.
 - Move skill/template discovery and catalog presentation out of the agent
   modules into `definitions.catalog`.
@@ -299,7 +309,7 @@ validation.
 Exit criterion: validating or compiling a definition has no import path to an
 LLM client, `workflow_chat_agent`, `workflow_task_agent`, or tool adapter.
 
-### Phase 3: Make the execution kernel the only transition owner
+### Phase 3: Make the execution kernel the only transition owner — deferred
 
 - Route both current runners through one compiled-contract execution service.
 - Move action authorization, operation lifecycle, effect checks, evidence,
@@ -314,11 +324,11 @@ LLM client, `workflow_chat_agent`, `workflow_task_agent`, or tool adapter.
 Exit criterion: chat and durable task paths use the same kernel transition
 function for equivalent contracts and state.
 
-### Phase 4: Thin the product adapters
+### Phase 4: Thin the product adapters — complete for package ownership
 
-- Reduce `workflow_chat_agent.py` to interactive composition, display,
+- Reduce `workrr/chat_agent.py` to interactive composition, display,
   worktree/user handoff policy, and chat-specific provider configuration.
-- Reduce `workflow_task_agent.py` to task selection, durable task policy,
+- Reduce `workrr/task_agent.py` to task selection, durable task policy,
   Git/worktree delivery policy, and adapter composition.
 - Move duplicated helpers into named agent, execution, definition, or adapter
   modules according to ownership rather than creating another shared utility
@@ -328,7 +338,7 @@ function for equivalent contracts and state.
 Exit criterion: the two adapters are independently testable and neither is a
 framework dependency of the other.
 
-### Phase 5: Remove compatibility implementations
+### Phase 5: Remove compatibility implementations — complete
 
 - Replace old module implementations with re-export shims where compatibility
   is required.
@@ -350,7 +360,7 @@ move the entire 12k-line chat module. Recommended order:
 2. Add `agent/protocol.py` and move only provider protocols and fake-provider
    test seams.
 3. Add `agent/repair.py` and move provider-independent repair classification
-   and repair prompt manifests from `workflow_llm.py`.
+   and repair prompt manifests from `workrr/llm.py`.
 4. Change `workflow_llm.WorkflowStepRunner` to consume the boundary types while
    retaining compatibility adapters.
 5. Add architectural tests proving a fake agent can run against a fake compiled

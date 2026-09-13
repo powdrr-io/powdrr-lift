@@ -55,29 +55,15 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.workrr.provider_config import (
-    DEFAULT_LLM_TYPE,
-    DEFAULT_MODEL,
-    LLMModelMapping,
-    default_llm_mappings,
-)
-from powdrr_lift.workrr.providers import (
-    _estimate_message_tokens,
-    build_provider_client,
-    long_context_backup_for,
-    resolve_llm_mapping,
-    resolve_local_model_path,
-    resolve_provider_credentials,
-)
-from powdrr_lift.workrr.workflow_action_operations import (
+from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,
     _list_worktree_files,
     _record_skill_pull_request,
     _resolve_pre_step_template,
 )
-from powdrr_lift.workrr.workflow_action_protocol import _parse_action_response
-from powdrr_lift.workrr.workflow_action_validation import (
+from powdrr_lift.workrr.action_protocol import _parse_action_response
+from powdrr_lift.workrr.action_validation import (
     _invalidate_deterministic_pre_step,
     _step_index_by_id,
     _validate_internal_command,
@@ -86,11 +72,11 @@ from powdrr_lift.workrr.workflow_action_validation import (
     _validate_workflow_handoff,
     _validation_gate_enabled,
 )
-from powdrr_lift.workrr.workflow_chat_agent import (
+from powdrr_lift.workrr.chat_agent import (
     _build_step_execution_messages,
 )
-from powdrr_lift.workrr.workflow_error_logging import record_workflow_llm_error
-from powdrr_lift.workrr.workflow_execution_loop import (
+from powdrr_lift.workrr.error_logging import record_workflow_llm_error
+from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
     _print_waiting_for_model,
     _require_coding_loop_verification,
@@ -99,7 +85,7 @@ from powdrr_lift.workrr.workflow_execution_loop import (
     _run_gate,
     _validate_coding_loop_action,
 )
-from powdrr_lift.workrr.workflow_git import (
+from powdrr_lift.workrr.git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
     claim_workflow_task,
@@ -112,7 +98,7 @@ from powdrr_lift.workrr.workflow_git import (
     workflow_dependencies_completion,
     workflow_id_from_task_id,
 )
-from powdrr_lift.workrr.workflow_llm import (
+from powdrr_lift.workrr.llm import (
     DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,
     ProgrammerInvariantError,
@@ -146,7 +132,7 @@ from powdrr_lift.workrr.workflow_llm import (
     workflow_action_signature,
     workflow_action_summary,
 )
-from powdrr_lift.workrr.workflow_observer import (
+from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,
     ObserverDecision,
     ObserverExecutionContext,
@@ -154,20 +140,34 @@ from powdrr_lift.workrr.workflow_observer import (
     compact_observer_mapping,
     observer_action_matches,
 )
-from powdrr_lift.workrr.workflow_paths import (
+from powdrr_lift.workrr.paths import (
     resolve_project_root,
     resolve_worktree_file_path,
 )
-from powdrr_lift.workrr.workflow_prompting import (
+from powdrr_lift.workrr.prompting import (
     _action_system_prompt,
     _step_needs_prompt_catalog,
     build_modular_action_system_prompt,
     interaction_style_prompt,
 )
-from powdrr_lift.workrr.workflow_provider_runtime import (
+from powdrr_lift.workrr.provider_config import (
+    DEFAULT_LLM_TYPE,
+    DEFAULT_MODEL,
+    LLMModelMapping,
+    default_llm_mappings,
+)
+from powdrr_lift.workrr.provider_runtime import (
     maybe_record_llm_exchanges,
     model_limits_for,
     resolve_workflow_provider,
+)
+from powdrr_lift.workrr.providers import (
+    _estimate_message_tokens,
+    build_provider_client,
+    long_context_backup_for,
+    resolve_llm_mapping,
+    resolve_local_model_path,
+    resolve_provider_credentials,
 )
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")

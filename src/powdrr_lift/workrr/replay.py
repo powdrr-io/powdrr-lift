@@ -13,7 +13,7 @@ from uuid import uuid4
 import yaml
 
 from powdrr_lift.process.model import load_skill
-from powdrr_lift.workrr.workflow_error_logging import WORKFLOW_LLM_ERROR_LOG
+from powdrr_lift.workrr.error_logging import WORKFLOW_LLM_ERROR_LOG
 
 WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION = 1
 WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION = 1
@@ -311,16 +311,16 @@ def render_skill_replay(
         )
 
     from powdrr_lift.process.catalog import SkillCatalogEntry
-    from powdrr_lift.workrr.workflow_action_protocol import _parse_action_response
-    from powdrr_lift.workrr.workflow_action_validation import (
+    from powdrr_lift.workrr.action_protocol import _parse_action_response
+    from powdrr_lift.workrr.action_validation import (
         _validate_workflow_action_for_step,
         _validate_workflow_step_transition,
     )
-    from powdrr_lift.workrr.workflow_chat_agent import (
+    from powdrr_lift.workrr.chat_agent import (
         _build_step_execution_messages,
     )
-    from powdrr_lift.workrr.workflow_execution_loop import _validate_coding_loop_action
-    from powdrr_lift.workrr.workflow_execution_state import _WorkflowExecutionState
+    from powdrr_lift.workrr.execution_loop import _validate_coding_loop_action
+    from powdrr_lift.workrr.execution_state import _WorkflowExecutionState
 
     state = _mapping(bundle.get("prompt_state"), "bundle prompt_state")
     execution_events = [

@@ -151,7 +151,7 @@ _HELP: dict[str, dict[str, Any]] = {
             "help": "Set true to request the tool's conventional --help guidance.",
         },
         "examples": [
-            {"path": "src/powdrr_lift/workflow_chat_agent.py"},
+            {"path": "src/powdrr_lift/workrr/chat_agent.py"},
             {"path": "tests/test_workflow_chat_agent.py"},
         ],
     },

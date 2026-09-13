@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from powdrr_lift.workrr.workflow_execution import (
+from powdrr_lift.workrr.execution import (
     ProgressDecision,
     WorkflowExecutionController,
 )

@@ -19,12 +19,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.workflow_replay import (
+from powdrr_lift.workrr.workflow_replay import (
     WorkflowReplayError,
     load_workflow_replay_bundle,
     render_skill_replay,
 )
-from powdrr_lift.workflow_scenario import (
+from powdrr_lift.workrr.workflow_scenario import (
     WorkflowScenarioError,
     load_workflow_scenario,
     run_workflow_scenario,

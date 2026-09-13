@@ -4,10 +4,9 @@ import json
 from pathlib import Path
 from typing import cast
 
-from powdrr_lift.core import WorkflowInstance
 from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.process.model import SkillToolInvocation
-from powdrr_lift.process.tasks import TaskComplexity
+from powdrr_lift.process.tasks import TaskComplexity, WorkflowInstance
 from powdrr_lift.process.templates import (
     WorkflowTaskTemplate,
     WorkflowTaskTemplateGeneration,

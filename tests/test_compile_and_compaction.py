@@ -78,7 +78,7 @@ def test_compaction_keeps_complete_retrieval_payload(tmp_path: Path) -> None:
 
 
 def test_error_log_bounding_limits_transcript_growth() -> None:
-    from powdrr_lift.workflow_error_logging import _bounded_log_value
+    from powdrr_lift.workrr.workflow_error_logging import _bounded_log_value
 
     bounded = _bounded_log_value({"history": ["x" * 20_000 for _ in range(100)]})
 

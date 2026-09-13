@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.workflow_replay import (
+from powdrr_lift.workrr.workflow_replay import (
     WorkflowReplayError,
     redact_replay_bundle,
     replay_bundle_from_error_record,

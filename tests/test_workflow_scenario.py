@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from powdrr_lift.workflow_scenario import (
+from powdrr_lift.workrr.workflow_scenario import (
     WorkflowScenarioError,
     WorkflowScenarioResult,
     extract_scripted_responses,

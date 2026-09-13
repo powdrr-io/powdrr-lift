@@ -4,7 +4,10 @@ import json
 import subprocess
 from pathlib import Path
 
-from powdrr_lift.workflow_tuning import save_workflow_tuning_report, tune_workflow
+from powdrr_lift.workrr.workflow_tuning import (
+    save_workflow_tuning_report,
+    tune_workflow,
+)
 
 
 def _git(root: Path, *arguments: str) -> None:

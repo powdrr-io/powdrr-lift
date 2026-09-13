@@ -10,41 +10,43 @@ from typing import Any
 
 import pytest
 
-from powdrr_lift import workflow_task_agent
-from powdrr_lift.core import (
-    AgentRole,
-    AssigneeType,
-    HumanRole,
-    Skill,
-    SkillStep,
-    SkillStepPreStep,
-    SkillToolInvocation,
-    TaskComplexity,
-    TaskStatus,
-    WorkflowInstance,
-    WorkflowTask,
-    save_skill,
-)
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workflow_chat_agent import (
+from powdrr_lift.process.model import (
+    Skill,
+    SkillStep,
+    SkillStepPreStep,
+    SkillToolInvocation,
+    save_skill,
+)
+from powdrr_lift.process.tasks import (
+    AgentRole,
+    AssigneeType,
+    HumanRole,
+    TaskComplexity,
+    TaskStatus,
+    WorkflowInstance,
+    WorkflowTask,
+)
+from powdrr_lift.workrr import workflow_task_agent
+from powdrr_lift.workrr.workflow_chat_agent import (
     LLMModelLimits,
 )
-from powdrr_lift.workflow_git import (
+from powdrr_lift.workrr.workflow_git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
     save_workflow_git_state,
 )
-from powdrr_lift.workflow_llm import (
+from powdrr_lift.workrr.workflow_llm import (
     WorkflowAction,
     WorkflowLLMHTTPError,
     complete_json_with_timeout_retry,
 )
-from powdrr_lift.workflow_prompting import _action_system_prompt
-from powdrr_lift.workflow_task_agent import (
+from powdrr_lift.workrr.workflow_prompting import _action_system_prompt
+from powdrr_lift.workrr.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_task_messages,
     _build_workflow_client,
@@ -181,7 +183,7 @@ def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(
     )
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent.workflow_dependencies_completion",
+        "powdrr_lift.workrr.workflow_task_agent.workflow_dependencies_completion",
         lambda _repo_root, state: (not state.depends_on_workflows, ()),
     )
 
@@ -872,7 +874,7 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
     published_roots: list[Path] = []
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._open_final_workflow_pull_request",
+        "powdrr_lift.workrr.workflow_task_agent._open_final_workflow_pull_request",
         lambda *_args, **_kwargs: None,
     )
 
@@ -894,7 +896,7 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         )
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._publish_workflow_progress",
+        "powdrr_lift.workrr.workflow_task_agent._publish_workflow_progress",
         _record_publish,
     )
 
@@ -943,15 +945,15 @@ def test_publish_workflow_progress_pushes_clean_worktree_commits(
     git_calls: list[list[str]] = []
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._is_git_worktree",
+        "powdrr_lift.workrr.workflow_task_agent._is_git_worktree",
         lambda _repo_root: True,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._git_output",
+        "powdrr_lift.workrr.workflow_task_agent._git_output",
         lambda _repo_root, _arguments, **_kwargs: "powdrr/feature-17",
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._git_result",
+        "powdrr_lift.workrr.workflow_task_agent._git_result",
         lambda _repo_root, _arguments, **_kwargs: subprocess.CompletedProcess(
             [], 0, stdout="", stderr=""
         ),
@@ -963,7 +965,9 @@ def test_publish_workflow_progress_pushes_clean_worktree_commits(
         git_calls.append(arguments)
         return ""
 
-    monkeypatch.setattr("powdrr_lift.workflow_task_agent._run_git", _record_git_call)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.workflow_task_agent._run_git", _record_git_call
+    )
 
     _publish_workflow_progress(
         tmp_path,
@@ -1013,7 +1017,7 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         published_reasons.append(reason)
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._publish_workflow_progress",
+        "powdrr_lift.workrr.workflow_task_agent._publish_workflow_progress",
         _record_publish,
     )
     client = _FakeClient(
@@ -1064,7 +1068,7 @@ def test_locked_workflow_task_reports_recovery_command(
         workflow_relative_directory="workflow",
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent.inspect_workflow_run",
+        "powdrr_lift.workrr.workflow_task_agent.inspect_workflow_run",
         lambda _repo_root, _proposed_pr_id: {
             "claim_refs": [
                 "refs/agents/claims/feature-17/agent-task",
@@ -1187,7 +1191,7 @@ def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
         return 10 if "compacted_context" in payload else 100
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._estimate_message_tokens",
+        "powdrr_lift.workrr.workflow_task_agent._estimate_message_tokens",
         _estimate,
     )
     limit_calls = 0
@@ -1200,7 +1204,9 @@ def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
             max_output_tokens=50,
         )
 
-    monkeypatch.setattr("powdrr_lift.workflow_task_agent.model_limits_for", _limits)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.workflow_task_agent.model_limits_for", _limits
+    )
     stderr = io.StringIO()
 
     exit_code = run_workflow_task(
@@ -1248,10 +1254,10 @@ def test_process_workflow_task_compacts_at_proactive_threshold(
         return 10 if "compacted_context" in payload else 4_000
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._estimate_message_tokens", _estimate
+        "powdrr_lift.workrr.workflow_task_agent._estimate_message_tokens", _estimate
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent.model_limits_for",
+        "powdrr_lift.workrr.workflow_task_agent.model_limits_for",
         lambda *_args, **_kwargs: LLMModelLimits(
             context_window=5_000,
             max_output_tokens=500,
@@ -1291,7 +1297,7 @@ def test_process_workflow_task_retries_llm_timeouts_with_backoff(
         return {"action": "complete", "output_state": {"version": "v2"}}
 
     client.complete_json = _complete  # type: ignore[method-assign]
-    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
+    monkeypatch.setattr("powdrr_lift.workrr.workflow_llm.time.sleep", sleeps.append)
     stderr = io.StringIO()
 
     exit_code = run_workflow_task(
@@ -1334,7 +1340,7 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
         return {"action": "complete", "output_state": {"version": "v2"}}
 
     client.complete_json = _complete  # type: ignore[method-assign]
-    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
+    monkeypatch.setattr("powdrr_lift.workrr.workflow_llm.time.sleep", sleeps.append)
     stderr = io.StringIO()
 
     exit_code = run_workflow_task(
@@ -1374,7 +1380,7 @@ def test_workflow_retries_dropped_provider_connection(
         return {"action": "next_step"}
 
     client.complete_json = _complete  # type: ignore[method-assign]
-    monkeypatch.setattr("powdrr_lift.workflow_llm.time.sleep", sleeps.append)
+    monkeypatch.setattr("powdrr_lift.workrr.workflow_llm.time.sleep", sleeps.append)
 
     result = complete_json_with_timeout_retry(
         client,
@@ -1396,7 +1402,7 @@ def test_exhausted_timeout_keeps_workflow_worktree_for_resume(
 ) -> None:
     deleted: list[Path] = []
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent._delete_workflow_task_worktree",
+        "powdrr_lift.workrr.workflow_task_agent._delete_workflow_task_worktree",
         lambda path, *, stderr: deleted.append(path),
     )
     task = _workflow(tmp_path).tasks[0]
@@ -1888,7 +1894,7 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_task_agent.resolve_provider_credentials",
+        "powdrr_lift.workrr.workflow_task_agent.resolve_provider_credentials",
         lambda provider, api_key, base_url: type(
             "Credentials",
             (),

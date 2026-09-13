@@ -18,7 +18,7 @@ import yaml
 from powdrr_lift.core.repo import resolve_repo_root
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.process.model import load_skill
-from powdrr_lift.workflow_chat_agent import _build_step_execution_messages
+from powdrr_lift.workrr.workflow_chat_agent import _build_step_execution_messages
 
 
 def render_skill_prompt_snapshots(

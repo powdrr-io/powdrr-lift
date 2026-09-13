@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from powdrr_lift.core import (
+from powdrr_lift.process.model import (
     CodingLoopSpec,
     Skill,
     SkillStep,

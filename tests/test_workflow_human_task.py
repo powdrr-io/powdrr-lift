@@ -15,12 +15,12 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.workflow_git import (
+from powdrr_lift.workrr.workflow_git import (
     WorkflowGitState,
     create_workflow_worktree,
     save_workflow_git_state,
 )
-from powdrr_lift.workflow_human_task import (
+from powdrr_lift.workrr.workflow_human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
@@ -149,11 +149,11 @@ def test_run_human_task_claims_git_task_and_publishes_completion(
         )
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_human_task.publish_workflow_progress",
+        "powdrr_lift.workrr.workflow_human_task.publish_workflow_progress",
         _fake_publish,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workflow_human_task._open_final_workflow_pull_request",
+        "powdrr_lift.workrr.workflow_human_task._open_final_workflow_pull_request",
         lambda *_args, **_kwargs: None,
     )
     stdout = io.StringIO()

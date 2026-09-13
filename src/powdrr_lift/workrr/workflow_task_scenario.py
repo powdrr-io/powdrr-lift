@@ -14,9 +14,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core import WorkflowInstance
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.workflow_task_agent import (
+from powdrr_lift.process.tasks import WorkflowInstance
+from powdrr_lift.workrr.workflow_task_agent import (
     WorkflowTaskAgentConfig,
     _build_workflow_client,
     _run_task_deterministic_pre_step,

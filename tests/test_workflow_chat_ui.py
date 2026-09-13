@@ -16,8 +16,8 @@ from textual.widgets import Label, ListItem, ListView, Static, TextArea
 
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.process.model import Skill, SkillStep, load_skill
-from powdrr_lift.workflow_chat_selection import SkillChatConfig
-from powdrr_lift.workflow_chat_tui import (
+from powdrr_lift.workrr.workflow_chat_selection import SkillChatConfig
+from powdrr_lift.workrr.workflow_chat_tui import (
     WorkflowChatApp,
     _TextualStdoutOutput,
     _visible_step_indices,
@@ -46,7 +46,7 @@ def test_textual_response_grows_and_submits_on_return(
         return 0 if len(received) == 1 else 1
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
+        "powdrr_lift.workrr.workflow_chat_tui.run_workflow_chat",
         fake_run_workflow_chat,
     )
 
@@ -156,7 +156,7 @@ def test_textual_startup_shows_initial_question(
         return 1
 
     monkeypatch.setattr(
-        "powdrr_lift.workflow_chat_tui.run_workflow_chat",
+        "powdrr_lift.workrr.workflow_chat_tui.run_workflow_chat",
         fake_run_workflow_chat,
     )
 
@@ -1113,7 +1113,7 @@ def test_textual_copy_uses_native_macos_clipboard(
 ) -> None:
     app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
     monkeypatch.setattr(sys, "platform", "darwin")
-    with patch("powdrr_lift.workflow_chat_tui.subprocess.run") as run:
+    with patch("powdrr_lift.workrr.workflow_chat_tui.subprocess.run") as run:
         app.copy_to_clipboard("copy this output")
 
     assert app.clipboard == "copy this output"
@@ -1205,7 +1205,7 @@ def test_textual_response_supports_command_paste_from_native_clipboard(
             return response.text
 
     monkeypatch.setattr(sys, "platform", "darwin")
-    with patch("powdrr_lift.workflow_chat_tui.subprocess.run") as run:
+    with patch("powdrr_lift.workrr.workflow_chat_tui.subprocess.run") as run:
         run.return_value.stdout = "pasted from macOS"
         run.return_value.returncode = 0
         assert asyncio.run(exercise()) == "pasted from macOS"

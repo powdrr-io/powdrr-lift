@@ -36,7 +36,9 @@ steps:
            expected_outcomes, non_goals, risks, decisions, proposed_prs,
            modules, tools]
       item_binding: category
-      collect: category_edits_by_category
+      collect:
+        binding: category_edits_by_category
+        key: category
       body:
         - operation:
             tool: gather_context
@@ -70,7 +72,7 @@ steps:
       tool: edit
       parameters:
         file_path: docs/proposals/${work_item_name}/design-interview-input.json
-        source: [feature_description, all_category_edits]
+        source: [feature_description, category_edits_by_category]
       bind: interview_input
   - operation:
       tool: internal
@@ -118,4 +120,9 @@ steps:
       tool: internal
       command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
       bind: final_proposal_evaluation
+  - gate:
+      subject: final_proposal_evaluation.returncode
+      equals: 0
+      on_failure:
+        terminal: failed
   - terminal: succeeded

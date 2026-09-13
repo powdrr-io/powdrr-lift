@@ -83,6 +83,7 @@ def _validate_steps(
                 "worklist",
                 "call",
                 "terminal",
+                "gate",
             )
             if key in step
         }
@@ -118,8 +119,13 @@ def _validate_steps(
                             "binding",
                         )
                     )
-                if isinstance(value.get("collect"), str):
-                    bindings.add(value["collect"])
+                collect = value.get("collect")
+                if isinstance(collect, str):
+                    bindings.add(collect)
+                elif isinstance(collect, Mapping) and isinstance(
+                    collect.get("binding"), str
+                ):
+                    bindings.add(collect["binding"])
                 _validate_steps(
                     nested, f"{step_path}.{control}.body", diagnostics, local
                 )
@@ -178,6 +184,27 @@ def _validate_steps(
                 operation.get("bind"), str
             ):
                 bindings.add(operation["bind"])
+        elif control == "gate":
+            gate = step[control]
+            if not isinstance(gate, Mapping):
+                diagnostics.append(
+                    DocumentDiagnostic(f"{step_path}.gate", "gate must be a mapping")
+                )
+            else:
+                subject = gate.get("subject")
+                root = subject.split(".", 1)[0] if isinstance(subject, str) else None
+                if not isinstance(subject, str) or root not in bindings:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.gate.subject", f"unknown binding: {subject}"
+                        )
+                    )
+                if "equals" not in gate or "on_failure" not in gate:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.gate", "equals and on_failure are required"
+                        )
+                    )
         elif control == "judge":
             judge = step[control]
             if not isinstance(judge, Mapping):

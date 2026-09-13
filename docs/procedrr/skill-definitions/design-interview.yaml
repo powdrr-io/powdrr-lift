@@ -54,8 +54,16 @@ steps:
               - New identifiers must be globally unique across all categories.
               - Return exactly added and deleted arrays matching the output schema.
             context: [work_item_name, feature_description, category_context]
-            output: {name: category_edits, type: proposal_edits}
-            validator: validate_proposal_edits
+            output:
+              name: category_edits
+              schema:
+                type: object
+                required: [added, deleted]
+                additionalProperties: false
+                properties:
+                  added: {type: array, items: {type: object}}
+                  deleted: {type: array, items: {type: object, required: [id]}}
+            validation: {kind: json_schema}
 
   - operation:
       tool: edit
@@ -90,8 +98,16 @@ steps:
               - Use only the exact evaluator issue as evidence.
               - Return one edit for the cited issue; do not repair unrelated issues.
             context: [work_item_name, proposal_issue]
-            output: {name: repair_edit, type: yaml_edit}
-            validator: validate_yaml_edit
+            output:
+              name: repair_edit
+              schema:
+                type: object
+                required: [path, edits]
+                additionalProperties: false
+                properties:
+                  path: {type: string, minLength: 1}
+                  edits: {type: array, minItems: 1}
+            validation: {kind: json_schema}
         - operation:
             tool: yaml_edit
             parameters:

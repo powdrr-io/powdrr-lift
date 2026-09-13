@@ -65,6 +65,21 @@ def test_decision_contract_requires_prompt_context_rules() -> None:
         )
 
 
+def test_parser_rejects_unknown_tool_and_validator_references() -> None:
+    with pytest.raises(Exception, match="unknown tool"):
+        parse_and_validate(
+            "name: bad\nsteps:\n  - operation: {tool: imaginary, bind: x}\n"
+        )
+    with pytest.raises(Exception, match="unknown validator"):
+        parse_and_validate(
+            "name: bad\nsteps:\n  - judge:\n"
+            "      question: q\n      subject: x\n"
+            "      prompt_system: s\n      instructions: [i]\n"
+            "      context: [x]\n      output: {name: y, schema: {type: string}}\n"
+            "      validator: imaginary\n"
+        )
+
+
 def test_compiler_proves_bounded_sequence_and_counts_repairs() -> None:
     workflow = WorkflowDefinition(
         "feature",
@@ -98,7 +113,7 @@ def test_non_exhaustive_match_is_rejected() -> None:
 
 def test_parser_validates_declarative_steps_and_editor_is_persistent() -> None:
     document = parse_and_validate(
-        "name: demo\nsteps:\n  - operation: {name: inspect}\n"
+        "name: demo\nsteps:\n  - operation: {tool: internal, bind: inspected}\n"
     )
     changed = set_value(document, ("name",), "edited")
     extended = append_step(changed, ("steps",), {"terminal": "succeeded"})

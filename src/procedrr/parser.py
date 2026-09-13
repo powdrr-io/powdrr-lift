@@ -8,6 +8,9 @@ from typing import Any
 
 import yaml
 
+KNOWN_TOOLS = frozenset({"gather_context", "internal", "edit", "yaml_edit"})
+KNOWN_VALIDATORS = frozenset({"json_schema"})
+
 
 @dataclass(frozen=True, slots=True)
 class DocumentDiagnostic:
@@ -42,7 +45,12 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
             DocumentDiagnostic("steps", "steps must be a non-empty list")
         )
     else:
-        _validate_steps(steps, "steps", diagnostics)
+        initial = {
+            item["name"]
+            for item in document.get("inputs", [])
+            if isinstance(item, Mapping) and isinstance(item.get("name"), str)
+        }
+        _validate_steps(steps, "steps", diagnostics, initial)
     return tuple(diagnostics)
 
 
@@ -56,7 +64,10 @@ def parse_and_validate(source: str) -> dict[str, Any]:
 
 
 def _validate_steps(
-    steps: list[Any], path: str, diagnostics: list[DocumentDiagnostic]
+    steps: list[Any],
+    path: str,
+    diagnostics: list[DocumentDiagnostic],
+    bindings: set[str],
 ) -> None:
     for index, step in enumerate(steps):
         step_path = f"{path}[{index}]"
@@ -95,7 +106,14 @@ def _validate_steps(
                     )
                 )
             else:
-                _validate_steps(nested, f"{step_path}.{control}.body", diagnostics)
+                local = set(bindings)
+                for key in ("item_binding", "item"):
+                    if isinstance(value.get(key), str):
+                        local.add(value[key])
+                _validate_steps(
+                    nested, f"{step_path}.{control}.body", diagnostics, local
+                )
+                bindings.update(local)
         elif control == "operation":
             operation = step[control]
             if not isinstance(operation, Mapping) or not isinstance(
@@ -106,6 +124,24 @@ def _validate_steps(
                         f"{step_path}.operation", "operation name is required"
                     )
                 )
+            elif "tool" not in operation:
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.operation.tool",
+                        "a concrete tool reference is required",
+                    )
+                )
+            elif operation.get("tool") not in KNOWN_TOOLS:
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.operation.tool",
+                        f"unknown tool: {operation.get('tool')}",
+                    )
+                )
+            if isinstance(operation, Mapping) and isinstance(
+                operation.get("bind"), str
+            ):
+                bindings.add(operation["bind"])
         elif control == "judge":
             judge = step[control]
             if not isinstance(judge, Mapping):
@@ -120,7 +156,6 @@ def _validate_steps(
                     "instructions",
                     "context",
                     "output",
-                    "validator",
                 ):
                     if key not in judge:
                         diagnostics.append(
@@ -128,6 +163,48 @@ def _validate_steps(
                                 f"{step_path}.judge.{key}", "field is required"
                             )
                         )
+                context = judge.get("context")
+                if isinstance(context, list):
+                    for binding in context:
+                        if binding not in bindings:
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{step_path}.judge.context",
+                                    f"unknown binding: {binding}",
+                                )
+                            )
+                if "validation" not in judge and "validator" not in judge:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.validation",
+                            "a validation reference is required",
+                        )
+                    )
+                output = judge.get("output")
+                if not isinstance(output, Mapping) or not isinstance(
+                    output.get("schema"), Mapping
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.output.schema",
+                            "an inline output schema is required",
+                        )
+                    )
+                validation = judge.get("validation", judge.get("validator"))
+                kind = (
+                    validation.get("kind")
+                    if isinstance(validation, Mapping)
+                    else validation
+                )
+                if kind not in KNOWN_VALIDATORS:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.validation",
+                            f"unknown validator: {kind}",
+                        )
+                    )
+                if isinstance(output, Mapping) and isinstance(output.get("name"), str):
+                    bindings.add(output["name"])
 
 
 __all__ = [

@@ -84,7 +84,7 @@ def _gather(category: str) -> SequenceNode:
                     context,
                     output,
                     _edit_schema(category),
-                    "validate_proposal_edits",
+                    "json_schema",
                     "decision_result",
                     prompt_system=(
                         "You are preparing one design-interview proposal edit. "
@@ -178,7 +178,7 @@ def design_interview() -> WorkflowDefinition:
                                 "proposal_issue",
                                 "repair_edit",
                                 {"type": "object", "required": ["path", "edits"]},
-                                "validate_yaml_edit",
+                                "json_schema",
                                 "decision_result",
                                 prompt_system=(
                                     "You are repairing one validated proposal. "

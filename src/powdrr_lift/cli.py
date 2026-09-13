@@ -14,11 +14,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.agent.provider_config import ALL_PROVIDERS, default_llm_mappings
-from powdrr_lift.agent.providers import (
-    build_workflow_client,
-    resolve_provider_credentials,
-)
 from powdrr_lift.agent_feature_run import (
     DEFAULT_FEATURE_NAME,
     DEFAULT_FEATURE_REQUEST,
@@ -134,7 +129,12 @@ from powdrr_lift.process.templates import (
     instantiated_workflow_relationships,
     load_workflow_template,
 )
-from powdrr_lift.product.intent import (
+from powdrr_lift.pull_request_description import (
+    find_existing_pull_request,
+    render_pull_request_description_template,
+)
+from powdrr_lift.repository_state import render_repository_state
+from powdrr_lift.structrr.intent import (
     IntentClause,
     IntentContract,
     IntentKind,
@@ -142,11 +142,6 @@ from powdrr_lift.product.intent import (
     IntentTrigger,
     make_intent_source,
 )
-from powdrr_lift.pull_request_description import (
-    find_existing_pull_request,
-    render_pull_request_description_template,
-)
-from powdrr_lift.repository_state import render_repository_state
 from powdrr_lift.workflow_ambiguity_review import (
     WorkflowAmbiguityReviewError,
     review_workflow_definition,
@@ -217,6 +212,11 @@ from powdrr_lift.workflow_tuning import (
     WorkflowTuningError,
     save_workflow_tuning_report,
     tune_workflow,
+)
+from powdrr_lift.workrr.provider_config import ALL_PROVIDERS, default_llm_mappings
+from powdrr_lift.workrr.providers import (
+    build_workflow_client,
+    resolve_provider_credentials,
 )
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "

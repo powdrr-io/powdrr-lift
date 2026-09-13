@@ -13,16 +13,6 @@ from typing import Any, TextIO, cast
 
 import laga
 
-from powdrr_lift.agent.provider_config import LLMModelMapping
-from powdrr_lift.agent.providers import (
-    LocalModelRuntimeError,
-    _EmptyProviderResponseError,
-    _estimate_message_tokens,
-    _ModelUnavailableError,
-    _SemanticRepairExhaustedError,
-    backup_model_for,
-    long_context_backup_for,
-)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workflow_chat_io import (
     _prompt_user,
@@ -43,6 +33,16 @@ from powdrr_lift.workflow_llm import (
     complete_json as _request_json,
 )
 from powdrr_lift.workflow_provider_runtime import model_limits_for
+from powdrr_lift.workrr.provider_config import LLMModelMapping
+from powdrr_lift.workrr.providers import (
+    LocalModelRuntimeError,
+    _EmptyProviderResponseError,
+    _estimate_message_tokens,
+    _ModelUnavailableError,
+    _SemanticRepairExhaustedError,
+    backup_model_for,
+    long_context_backup_for,
+)
 
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
 _MAX_REPEATED_REPAIR_ATTEMPTS = 5

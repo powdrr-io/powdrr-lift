@@ -10,7 +10,7 @@ from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.effective_contract import resolve_effective_contract
 from powdrr_lift.execution.compaction import compatibility_report
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.product.intent import (
+from powdrr_lift.structrr.intent import (
     IntentClause,
     IntentContract,
     IntentKind,

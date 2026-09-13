@@ -77,7 +77,7 @@ from powdrr_lift.execution.tools import (
     ToolResult,
 )
 from powdrr_lift.process.tasks import WorkflowInstance
-from powdrr_lift.product.intent import (
+from powdrr_lift.structrr.intent import (
     IntentClause,
     IntentContract,
     IntentKind,

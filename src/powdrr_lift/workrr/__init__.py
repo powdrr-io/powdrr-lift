@@ -1,14 +1,14 @@
 """Agent proposal interfaces and provider adapters."""
 
-from powdrr_lift.agent.actions import (
+from powdrr_lift.workrr.actions import (
     WorkflowAction,
     WorkflowEdit,
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
-from powdrr_lift.agent.context import WorkflowContext
-from powdrr_lift.agent.exchanges import ExchangeRecordingClient
-from powdrr_lift.agent.loop import (
+from powdrr_lift.workrr.context import WorkflowContext
+from powdrr_lift.workrr.exchanges import ExchangeRecordingClient
+from powdrr_lift.workrr.loop import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
@@ -16,25 +16,25 @@ from powdrr_lift.agent.loop import (
     WorkflowExecutionObserver,
     WorkflowExecutionStrategy,
 )
-from powdrr_lift.agent.progress import (
+from powdrr_lift.workrr.progress import (
     ProgressDecision,
     WorkflowExecutionController,
     no_progress_feedback,
 )
-from powdrr_lift.agent.protocol import (
+from powdrr_lift.workrr.protocol import (
     AgentClient,
     AgentProposalError,
     SchemaAwareWorkflowLLMClient,
     WorkflowLLMClient,
 )
-from powdrr_lift.agent.provider_config import (
+from powdrr_lift.workrr.provider_config import (
     LLMModelLimits,
     LLMModelMapping,
     LLMProviderDefinition,
     LLMProviderRole,
     LLMProviderRoles,
 )
-from powdrr_lift.agent.repair import (
+from powdrr_lift.workrr.repair import (
     RepairContext,
     RepairDirective,
     RepairExhaustionReport,
@@ -44,7 +44,7 @@ from powdrr_lift.agent.repair import (
     RepairStage,
     classify_repair_failure,
 )
-from powdrr_lift.agent.runner import ProposalKernel, run_proposal_round
+from powdrr_lift.workrr.runner import ProposalKernel, run_proposal_round
 
 __all__ = [
     "AgentClient",

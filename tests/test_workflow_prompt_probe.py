@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.agent.provider_config import default_llm_mappings
 from powdrr_lift.workflow_prompt_probe import (
     build_workflow_prompt_probe,
     probe_workflow_step,
     resolve_probe_model,
 )
+from powdrr_lift.workrr.provider_config import default_llm_mappings
 
 
 class _Client:

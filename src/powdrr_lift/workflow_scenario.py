@@ -21,12 +21,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.agent.provider_config import DEFAULT_MODEL
-from powdrr_lift.agent.providers import (
-    build_workflow_client,
-    initial_model_for_provider,
-    resolve_provider_credentials,
-)
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -55,6 +49,12 @@ from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
 from powdrr_lift.workflow_llm import WorkflowStepRunner
 from powdrr_lift.workflow_task_agent import _run_skill_for_agent
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
+from powdrr_lift.workrr.provider_config import DEFAULT_MODEL
+from powdrr_lift.workrr.providers import (
+    build_workflow_client,
+    initial_model_for_provider,
+    resolve_provider_credentials,
+)
 
 WORKFLOW_SCENARIO_SCHEMA_VERSION = 1
 

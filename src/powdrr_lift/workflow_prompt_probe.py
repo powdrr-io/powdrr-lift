@@ -12,11 +12,6 @@ from typing import Any, TextIO
 
 import yaml
 
-from powdrr_lift.agent.provider_config import default_llm_mappings
-from powdrr_lift.agent.providers import (
-    build_workflow_client,
-    resolve_provider_credentials,
-)
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.process.branching import select_branch_target
 from powdrr_lift.process.catalog import SkillCatalogEntry
@@ -41,6 +36,11 @@ from powdrr_lift.workflow_llm import (
     complete_json_with_timeout_retry,
 )
 from powdrr_lift.workflow_task_agent import _build_task_messages
+from powdrr_lift.workrr.provider_config import default_llm_mappings
+from powdrr_lift.workrr.providers import (
+    build_workflow_client,
+    resolve_provider_credentials,
+)
 
 
 class WorkflowPromptProbeError(ValueError):

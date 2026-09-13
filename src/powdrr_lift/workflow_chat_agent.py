@@ -18,26 +18,6 @@ from typing import Any, TextIO
 
 import yaml
 
-from powdrr_lift.agent.context import WorkflowContext
-from powdrr_lift.agent.provider_config import (
-    ZAI_LLM_MAPPINGS,
-    LLMModelLimits,
-    LLMModelMapping,
-    LLMProviderRole,
-    LLMProviderRoles,
-    provider_definition,
-    provider_supports_llm_mappings,
-)
-from powdrr_lift.agent.providers import (
-    LOCAL_MODEL_PATTERN,
-    available_provider_names,
-    initial_model_for_provider,
-    provider_model_limits,
-    resolve_llm_mapping,
-    resolve_local_model_context,
-    resolve_provider,
-    resolve_provider_roles,
-)
 from powdrr_lift.core import (
     resolve_repo_root,
 )
@@ -191,6 +171,26 @@ from powdrr_lift.workflow_replay import (
     WORKFLOW_REPLAY_PROMPT_BUILDER_VERSION,
     build_workflow_replay_state,
     definition_content_sha256,
+)
+from powdrr_lift.workrr.context import WorkflowContext
+from powdrr_lift.workrr.provider_config import (
+    ZAI_LLM_MAPPINGS,
+    LLMModelLimits,
+    LLMModelMapping,
+    LLMProviderRole,
+    LLMProviderRoles,
+    provider_definition,
+    provider_supports_llm_mappings,
+)
+from powdrr_lift.workrr.providers import (
+    LOCAL_MODEL_PATTERN,
+    available_provider_names,
+    initial_model_for_provider,
+    provider_model_limits,
+    resolve_llm_mapping,
+    resolve_local_model_context,
+    resolve_provider,
+    resolve_provider_roles,
 )
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "

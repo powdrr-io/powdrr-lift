@@ -249,7 +249,16 @@ def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:
 def _resolve_value(value: Any, state: Mapping[str, Any]) -> Any:
     if isinstance(value, str):
         match = _REFERENCE.fullmatch(value)
-        return _resolve_binding(state, match.group(1)) if match else value
+        if match:
+            return _resolve_binding(state, match.group(1))
+
+        def replace_reference(reference: re.Match[str]) -> str:
+            resolved = _resolve_binding(state, reference.group(1))
+            if isinstance(resolved, (Mapping, list, tuple)):
+                return _json_text(resolved)
+            return str(resolved)
+
+        return _REFERENCE.sub(replace_reference, value)
     if isinstance(value, Mapping):
         return {key: _resolve_value(item, state) for key, item in value.items()}
     if isinstance(value, list):

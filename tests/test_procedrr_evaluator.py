@@ -63,6 +63,45 @@ def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     assert "requirements_context" in llm.messages[1]["content"]
 
 
+def test_evaluator_resolves_embedded_references_in_operation_parameters() -> None:
+    calls: list[dict[str, Any]] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        calls.append(dict(parameters))
+        return None
+
+    Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "interpolation",
+            "steps": [
+                {
+                    "operation": {
+                        "tool": "internal",
+                        "parameters": {
+                            "command": [
+                                "powdrr-lift",
+                                "evaluate",
+                                "docs/proposals/${work_item_name}/design.yaml",
+                            ]
+                        },
+                    }
+                }
+            ],
+        },
+        {"work_item_name": "demo-feature"},
+    )
+
+    assert calls == [
+        {
+            "command": [
+                "powdrr-lift",
+                "evaluate",
+                "docs/proposals/demo-feature/design.yaml",
+            ]
+        }
+    ]
+
+
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     llm = FakeLLM()
 

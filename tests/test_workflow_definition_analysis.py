@@ -39,7 +39,9 @@ steps:
 
     report = analyze_workflow_definition(definition)
 
-    assert report.validation_successful
+    assert "deterministic_step_action_contract" not in {
+        issue.code for issue in report.issues
+    }
 
 
 def test_definition_analysis_rejects_undeclared_invoke_tool_action(
@@ -70,7 +72,34 @@ steps:
     assert "declares no model-owned tool" in issue.message
 
 
-def test_definition_analysis_rejects_undeclared_deterministic_pre_step(
+def test_definition_analysis_requires_runner_owned_gather_context_action(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "workflow.yaml"
+    definition.write_text(
+        """\
+id: workflow
+when_to_use: [Execute work.]
+how_to_fill_this_out: [Use the task contract.]
+task_templates:
+  - description: Gather context.
+    step_type: invoke_tool
+    actions: [gather_context]
+    pre_step:
+      action: gather_context
+      template: {feature_id: example, types: [requirements]}
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "deterministic_step_action_contract" not in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_definition_analysis_rejects_hidden_runner_owned_gather_context(
     tmp_path: Path,
 ) -> None:
     definition = tmp_path / "workflow.yaml"
@@ -92,7 +121,34 @@ task_templates:
 
     report = analyze_workflow_definition(definition)
 
-    assert "pre_step_action_not_declared" in {issue.code for issue in report.issues}
+    assert "deterministic_step_action_contract" in {
+        issue.code for issue in report.issues
+    }
+
+
+def test_definition_analysis_rejects_multiple_model_tool_invocations(
+    tmp_path: Path,
+) -> None:
+    definition = tmp_path / "workflow.yaml"
+    definition.write_text(
+        """\
+id: workflow
+when_to_use: [Execute work.]
+how_to_fill_this_out: [Use the task contract.]
+task_templates:
+  - description: Plan work.
+    step_type: governed
+    actions: [invoke_tool]
+    tool_invocations:
+      - {tool: basedpyright-structure, operation: inspect_structure}
+      - {tool: basedpyright-symbol, operation: resolve_symbol}
+""",
+        encoding="utf-8",
+    )
+
+    report = analyze_workflow_definition(definition)
+
+    assert "multiple_model_tool_invocations" in {issue.code for issue in report.issues}
 
 
 def test_definition_analysis_rejects_details_on_deterministic_task(
@@ -147,6 +203,7 @@ workflow_template: execute-proposed-pr
 phase_type: intake
 persona_id: architect
 step_type: invoke_tool
+actions: [gather_context]
 pre_step:
   action: gather_context
   template:

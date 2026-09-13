@@ -12,13 +12,13 @@ from powdrr_lift.core.delivery_profile import (
     load_delivery_profile,
     validate_delivery_profile_yaml,
 )
-from powdrr_lift.core.workflow_task_specification import (
+from powdrr_lift.process.tasks import (
     TaskComplexity,
     TaskStatus,
     WorkflowTask,
     workflow_task_from_data,
 )
-from powdrr_lift.core.workflow_template_specification import (
+from powdrr_lift.process.templates import (
     WorkflowTaskTemplate,
     WorkflowTemplate,
     workflow_template_from_data,

@@ -8,7 +8,9 @@ from powdrr_lift.core.behavior_rule import (
 )
 from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.effective_contract import resolve_effective_contract
-from powdrr_lift.core.intent import (
+from powdrr_lift.execution.compaction import compatibility_report
+from powdrr_lift.execution.runtime import ExecutionRuntime
+from powdrr_lift.structrr.intent import (
     IntentClause,
     IntentContract,
     IntentKind,
@@ -16,8 +18,6 @@ from powdrr_lift.core.intent import (
     IntentTrigger,
     make_intent_source,
 )
-from powdrr_lift.execution.compaction import compatibility_report
-from powdrr_lift.execution.runtime import ExecutionRuntime
 
 
 def _captured(store: IntentStore) -> tuple[IntentStore, IntentClause, IntentClause]:

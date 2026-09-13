@@ -1,22 +1,9 @@
-"""Shared data models used by workflow agents and workflow tooling."""
+"""Agent-owned workflow execution context values."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-
-from powdrr_lift.core import Skill
-
-
-@dataclass(frozen=True, slots=True)
-class SkillCatalogEntry:
-    """A loaded skill together with the file that defined it."""
-
-    path: Path
-    skill: Skill
-
-
-WorkflowTemplateCatalogEntry = SkillCatalogEntry
 
 
 @dataclass(frozen=True, slots=True)

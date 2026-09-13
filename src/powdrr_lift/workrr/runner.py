@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from powdrr_lift.agent.protocol import AgentClient
 from powdrr_lift.contracts import AgentInput, AgentProposal, KernelResult
+from powdrr_lift.workrr.protocol import AgentClient
 
 
 class ProposalKernel(Protocol):

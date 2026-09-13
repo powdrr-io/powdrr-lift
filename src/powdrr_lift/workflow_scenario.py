@@ -21,12 +21,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.agent.provider_config import DEFAULT_MODEL
-from powdrr_lift.agent.providers import (
-    build_workflow_client,
-    initial_model_for_provider,
-    resolve_provider_credentials,
-)
 from powdrr_lift.core import (
     AgentRole,
     AssigneeType,
@@ -36,12 +30,13 @@ from powdrr_lift.core import (
     load_skill,
     resolve_repo_root,
 )
-from powdrr_lift.core.workflow_template_specification import (
-    instantiate_workflow_template,
-)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, intrinsic_command
+from powdrr_lift.process.catalog import SkillCatalogEntry
+from powdrr_lift.process.templates import (
+    instantiate_workflow_template,
+)
 from powdrr_lift.workflow_chat_agent import (
     LLMProviderRoles,
     _ChatWorkflowExecutionStrategy,
@@ -52,9 +47,14 @@ from powdrr_lift.workflow_chat_agent import (
 from powdrr_lift.workflow_chat_selection import SkillChatConfig, SkillChatSelection
 from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
 from powdrr_lift.workflow_llm import WorkflowStepRunner
-from powdrr_lift.workflow_models import SkillCatalogEntry
 from powdrr_lift.workflow_task_agent import _run_skill_for_agent
 from powdrr_lift.workflow_task_scenario import run_workflow_task_scenario
+from powdrr_lift.workrr.provider_config import DEFAULT_MODEL
+from powdrr_lift.workrr.providers import (
+    build_workflow_client,
+    initial_model_for_provider,
+    resolve_provider_credentials,
+)
 
 WORKFLOW_SCENARIO_SCHEMA_VERSION = 1
 

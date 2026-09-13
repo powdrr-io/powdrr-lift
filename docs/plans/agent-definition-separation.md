@@ -6,12 +6,13 @@ Refactor Powdrr Lift so agent code is a consumer of validated definitions and
 execution contracts, not an alternate owner of their schema, validation, or
 semantics.
 
-Powdrr is intentionally becoming three related but distinct systems:
+Powdrr is intentionally becoming three related but distinct systems and
+packages:
 
 1. **The product/lifecycle language** describes the product and its durable
    knowledge: specification-v1 documents, current state, proposed PRs,
    requirements, architecture, implementation intent, and decisions.
-2. **The process language** describes LLM-led work: skills, workflows, workflow
+2. **The LLM/process language** describes LLM-led work: skills, workflows, workflow
    templates, tasks, steps, actions, effects, outcomes, handoffs, and
    liveness/safety guarantees.
 3. **The agent** authors and manipulates artifacts in both languages and
@@ -38,6 +39,12 @@ The agent may propose an action or a semantic decision. It must not parse
 definition formats, decide whether a workflow is valid, infer authority from
 prose, or commit an execution transition. The kernel and definition compiler
 own those decisions.
+
+The required final package surfaces are `powdrr_lift.structrr` for the product
+and lifecycle language, `powdrr_lift.process` for the LLM-led process language,
+and `powdrr_lift.workrr` for proposal, provider, and runner APIs. The existing
+`core/` and top-level workflow modules are migration locations, not the target
+public architecture.
 
 This plan complements the state-centric execution architecture and the LLM
 execution-language safety plan. It is deliberately focused on module
@@ -73,7 +80,7 @@ the ownership and dependency rules should remain stable.
 
 ```text
 powdrr_lift/
-  product/
+  structrr/
     model.py                 # product/lifecycle artifacts and versioned schemas
     parser.py                # specification-v1 and lifecycle artifact loading
     validation.py            # product coherence and reference validation
@@ -97,7 +104,7 @@ powdrr_lift/
     runtime.py               # execution services and durable state integration
     operations.py            # operation registry and adapters
     projections.py           # current state supplied to an agent
-  agent/
+  workrr/
     protocol.py              # model client and proposal interfaces
     proposal.py              # parse/constrain/validate model proposals
     repair.py                # provider-independent repair policy
@@ -406,3 +413,10 @@ The refactor is complete when:
 - no product adapter imports another adapter's private implementation;
 - all cross-layer data uses immutable, versioned boundary contracts; and
 - CI enforces the dependency graph in addition to functional tests.
+- `powdrr_lift.structrr`, `powdrr_lift.process`, and `powdrr_lift.workrr` are
+  first-class package surfaces; callers do not need to import implementation
+  modules from the repository root.
+- product and process packages expose versioned parse/compile/validation APIs,
+  while the agent package exposes proposal/provider/runner APIs.
+- the package import graph is mechanically checked so provider or adapter code
+  cannot leak into either language package.

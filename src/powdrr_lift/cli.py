@@ -14,11 +14,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.agent.provider_config import ALL_PROVIDERS, default_llm_mappings
-from powdrr_lift.agent.providers import (
-    build_workflow_client,
-    resolve_provider_credentials,
-)
 from powdrr_lift.agent_feature_run import (
     DEFAULT_FEATURE_NAME,
     DEFAULT_FEATURE_REQUEST,
@@ -87,14 +82,6 @@ from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.effective_contract import resolve_effective_contract
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.execution_plan import ExecutionPlan
-from powdrr_lift.core.intent import (
-    IntentClause,
-    IntentContract,
-    IntentKind,
-    IntentStore,
-    IntentTrigger,
-    make_intent_source,
-)
 from powdrr_lift.core.pr_specification import load_proposed_pr_dependency_graph
 from powdrr_lift.core.project_structure import (
     create_project_structure_template,
@@ -109,12 +96,6 @@ from powdrr_lift.core.workflow_relationships import (
     WorkflowRelationshipValidationIssue,
     WorkflowRelationshipValidationReport,
     validate_workflow_relationships,
-)
-from powdrr_lift.core.workflow_task_specification import HumanRole
-from powdrr_lift.core.workflow_template_specification import (
-    instantiate_workflow_template,
-    instantiated_workflow_relationships,
-    load_workflow_template,
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.acceptance import (
@@ -135,11 +116,32 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
+from powdrr_lift.process.compiler import (
+    analyze_workflow_definition,
+    analyze_workflow_definitions,
+    apply_liveness_baseline,
+    apply_warning_budget,
+    warning_report_data,
+)
+from powdrr_lift.process.tasks import HumanRole
+from powdrr_lift.process.templates import (
+    instantiate_workflow_template,
+    instantiated_workflow_relationships,
+    load_workflow_template,
+)
 from powdrr_lift.pull_request_description import (
     find_existing_pull_request,
     render_pull_request_description_template,
 )
 from powdrr_lift.repository_state import render_repository_state
+from powdrr_lift.structrr.intent import (
+    IntentClause,
+    IntentContract,
+    IntentKind,
+    IntentStore,
+    IntentTrigger,
+    make_intent_source,
+)
 from powdrr_lift.workflow_ambiguity_review import (
     WorkflowAmbiguityReviewError,
     review_workflow_definition,
@@ -153,18 +155,11 @@ from powdrr_lift.workflow_chat_agent import (
 )
 from powdrr_lift.workflow_chat_selection import WorkflowChatConfig
 from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
-from powdrr_lift.workflow_definition_analysis import (
-    analyze_workflow_definition,
-    analyze_workflow_definitions,
-    apply_liveness_baseline,
-    apply_warning_budget,
-    render_skill_prompt_snapshots,
-    warning_report_data,
-)
 from powdrr_lift.workflow_definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
 )
+from powdrr_lift.workflow_definition_prompts import render_skill_prompt_snapshots
 from powdrr_lift.workflow_error_analysis import (
     WorkflowErrorAnalysisError,
     cluster_workflow_errors,
@@ -217,6 +212,11 @@ from powdrr_lift.workflow_tuning import (
     WorkflowTuningError,
     save_workflow_tuning_report,
     tune_workflow,
+)
+from powdrr_lift.workrr.provider_config import ALL_PROVIDERS, default_llm_mappings
+from powdrr_lift.workrr.providers import (
+    build_workflow_client,
+    resolve_provider_credentials,
 )
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "

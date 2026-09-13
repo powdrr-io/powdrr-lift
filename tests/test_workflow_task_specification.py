@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from powdrr_lift.core.skill_specification import SkillToolInvocation
-from powdrr_lift.core.workflow_task_specification import (
+from powdrr_lift.process.model import SkillToolInvocation
+from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeType,
     HumanRole,

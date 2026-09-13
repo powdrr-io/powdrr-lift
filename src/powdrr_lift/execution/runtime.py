@@ -34,15 +34,6 @@ from powdrr_lift.core.execution_state import (
     ExecutionObligation,
     ExecutionState,
 )
-from powdrr_lift.core.intent import (
-    IntentClause,
-    IntentContract,
-    IntentKind,
-    IntentStore,
-    IntentTrigger,
-    make_intent_source,
-)
-from powdrr_lift.core.workflow_task_specification import WorkflowInstance
 from powdrr_lift.errors import PersistenceCorruptionError, PowdrrExecutionError
 from powdrr_lift.execution.capabilities import (
     CapabilityBroker,
@@ -62,7 +53,10 @@ from powdrr_lift.execution.compaction import (
     compact_execution_context,
     compact_with_retrieval,
 )
-from powdrr_lift.execution.compile import compile_execution_plan
+from powdrr_lift.execution.compile import (
+    compile_execution_plan,
+    workflow_instance_from_execution_plan,
+)
 from powdrr_lift.execution.evidence import ReadinessEvaluator, ReadinessReport
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.personas import (
@@ -81,6 +75,15 @@ from powdrr_lift.execution.tools import (
     ToolContext,
     ToolRegistry,
     ToolResult,
+)
+from powdrr_lift.process.tasks import WorkflowInstance
+from powdrr_lift.structrr.intent import (
+    IntentClause,
+    IntentContract,
+    IntentKind,
+    IntentStore,
+    IntentTrigger,
+    make_intent_source,
 )
 
 
@@ -830,7 +833,7 @@ class ExecutionRuntime:
             intent_ids_by_phase=intent_ids_by_phase,
             clause_ids_by_phase=clause_ids_by_phase,
         )
-        return WorkflowInstance.from_execution_plan(
+        return workflow_instance_from_execution_plan(
             workflow_directory,
             profile=profile,
             plan=plan,

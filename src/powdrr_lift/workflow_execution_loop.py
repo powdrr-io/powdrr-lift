@@ -48,7 +48,8 @@ from powdrr_lift.workflow_action_validation import (
     _runtime_readiness_report,
     _validate_internal_command,
 )
-from powdrr_lift.workflow_models import WorkflowContext
+from powdrr_lift.workflow_chat_io import _verbose_print
+from powdrr_lift.workrr.context import WorkflowContext
 
 _INTERNAL_TOOL = "internal"
 
@@ -77,10 +78,6 @@ def _required_shell_command_item(*args: Any, **kwargs: Any) -> Any:
 
 def _rtk_command_display(*args: Any, **kwargs: Any) -> Any:
     return _support_call("_rtk_command_display", *args, **kwargs)
-
-
-def _verbose_print(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_verbose_print", *args, **kwargs)
 
 
 def _wrap_argument_command(*args: Any, **kwargs: Any) -> Any:

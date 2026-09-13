@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import yaml
 
-from powdrr_lift.core import load_skill
+from powdrr_lift.process.model import load_skill
 from powdrr_lift.workflow_error_logging import WORKFLOW_LLM_ERROR_LOG
 
 WORKFLOW_REPLAY_BUNDLE_SCHEMA_VERSION = 1
@@ -310,6 +310,7 @@ def render_skill_replay(
             f"has {current_step.id!r} at index {step_index}."
         )
 
+    from powdrr_lift.process.catalog import SkillCatalogEntry
     from powdrr_lift.workflow_action_protocol import _parse_action_response
     from powdrr_lift.workflow_action_validation import (
         _validate_workflow_action_for_step,
@@ -320,7 +321,6 @@ def render_skill_replay(
     )
     from powdrr_lift.workflow_execution_loop import _validate_coding_loop_action
     from powdrr_lift.workflow_execution_state import _WorkflowExecutionState
-    from powdrr_lift.workflow_models import SkillCatalogEntry
 
     state = _mapping(bundle.get("prompt_state"), "bundle prompt_state")
     execution_events = [

@@ -10,7 +10,11 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.core.delivery_profile import PhaseType
-from powdrr_lift.core.skill_specification import (
+from powdrr_lift.core.validation_messages import (
+    ValidationError,
+    validation_error_to_data,
+)
+from powdrr_lift.process.model import (
     SUPPORTED_INTERACTION_STYLES,
     SUPPORTED_STEP_TYPES,
     CodingLoopSpec,
@@ -20,11 +24,7 @@ from powdrr_lift.core.skill_specification import (
     SkillToolInvocation,
     skill_step_from_data,
 )
-from powdrr_lift.core.validation_messages import (
-    ValidationError,
-    validation_error_to_data,
-)
-from powdrr_lift.core.workflow_task_specification import (
+from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeRole,
     AssigneeType,

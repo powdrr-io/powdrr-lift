@@ -8,6 +8,44 @@ from pathlib import Path
 SOURCE_ROOT = Path(__file__).parents[1] / "src" / "powdrr_lift"
 
 
+def test_language_and_agent_package_surfaces_exist() -> None:
+    for package in ("structrr", "process", "workrr"):
+        assert (SOURCE_ROOT / package / "__init__.py").is_file()
+
+
+def test_structrr_language_does_not_import_runtime_or_workrr_modules() -> None:
+    forbidden_prefixes = (
+        "powdrr_lift.workrr",
+        "powdrr_lift.process",
+        "powdrr_lift.execution",
+        "powdrr_lift.workflow_chat_agent",
+        "powdrr_lift.workflow_task_agent",
+    )
+    for path in _python_files("structrr"):
+        imports = _imported_modules(path)
+        assert not any(
+            module.startswith(forbidden)
+            for module in imports
+            for forbidden in forbidden_prefixes
+        ), path
+
+
+def test_process_language_does_not_import_workrr_or_runtime_modules() -> None:
+    forbidden_prefixes = (
+        "powdrr_lift.workrr",
+        "powdrr_lift.execution",
+        "powdrr_lift.workflow_chat_agent",
+        "powdrr_lift.workflow_task_agent",
+    )
+    for path in _python_files("process"):
+        imports = _imported_modules(path)
+        assert not any(
+            module.startswith(forbidden)
+            for module in imports
+            for forbidden in forbidden_prefixes
+        ), path
+
+
 def _imported_modules(path: Path) -> set[str]:
     tree = ast.parse(path.read_text())
     modules: set[str] = set()
@@ -25,7 +63,7 @@ def _python_files(package: str) -> tuple[Path, ...]:
 
 def test_contracts_do_not_import_runtime_definition_or_provider_modules() -> None:
     forbidden_prefixes = (
-        "powdrr_lift.agent",
+        "powdrr_lift.workrr",
         "powdrr_lift.definitions",
         "powdrr_lift.execution",
         "powdrr_lift.workflow_chat_agent",
@@ -40,9 +78,9 @@ def test_contracts_do_not_import_runtime_definition_or_provider_modules() -> Non
         ), path
 
 
-def test_definitions_do_not_import_agent_or_provider_modules() -> None:
+def test_definitions_do_not_import_workrr_or_provider_modules() -> None:
     forbidden_prefixes = (
-        "powdrr_lift.agent",
+        "powdrr_lift.workrr",
         "powdrr_lift.workflow_chat_agent",
         "powdrr_lift.workflow_task_agent",
         "powdrr_lift.openai_proxy",
@@ -56,8 +94,8 @@ def test_definitions_do_not_import_agent_or_provider_modules() -> None:
         ), path
 
 
-def test_agent_protocol_depends_only_on_contracts() -> None:
-    imports = _imported_modules(SOURCE_ROOT / "agent" / "protocol.py")
+def test_workrr_protocol_depends_only_on_contracts() -> None:
+    imports = _imported_modules(SOURCE_ROOT / "workrr" / "protocol.py")
     forbidden_prefixes = (
         "powdrr_lift.core",
         "powdrr_lift.definitions",
@@ -72,7 +110,7 @@ def test_agent_protocol_depends_only_on_contracts() -> None:
     )
 
 
-def test_agent_package_does_not_import_definition_or_execution_implementations() -> (
+def test_workrr_package_does_not_import_definition_or_execution_implementations() -> (
     None
 ):
     forbidden_prefixes = (
@@ -82,7 +120,7 @@ def test_agent_package_does_not_import_definition_or_execution_implementations()
         "powdrr_lift.workflow_chat_agent",
         "powdrr_lift.workflow_task_agent",
     )
-    for path in _python_files("agent"):
+    for path in _python_files("workrr"):
         imports = _imported_modules(path)
         assert not any(
             module.startswith(forbidden)
@@ -92,7 +130,6 @@ def test_agent_package_does_not_import_definition_or_execution_implementations()
 
 
 def test_proposal_round_keeps_kernel_as_transition_owner() -> None:
-    from powdrr_lift.agent import run_proposal_round
     from powdrr_lift.contracts import (
         AgentInput,
         AgentProposal,
@@ -101,6 +138,7 @@ def test_proposal_round_keeps_kernel_as_transition_owner() -> None:
         ProcedureView,
         StateProjection,
     )
+    from powdrr_lift.workrr import run_proposal_round
 
     class FakeClient:
         def propose(self, agent_input: AgentInput) -> AgentProposal:

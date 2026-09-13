@@ -8,24 +8,24 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
 
-from powdrr_lift.agent.actions import (
-    WorkflowAction as SkillChatAction,
-)
-from powdrr_lift.agent.actions import (
-    WorkflowEdit as SkillChatEdit,
-)
-from powdrr_lift.agent.actions import (
-    WorkflowFileEdits as SkillChatFileEdits,
-)
-from powdrr_lift.agent.actions import (
-    WorkflowYamlOperation as SkillChatYamlOperation,
-)
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core.spec_context import normalize_context_type
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.intrinsic_edit import APPLY_EDIT_TOOL, VALIDATE_EDIT_TOOL
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL, intrinsic_command
+from powdrr_lift.workrr.actions import (
+    WorkflowAction as SkillChatAction,
+)
+from powdrr_lift.workrr.actions import (
+    WorkflowEdit as SkillChatEdit,
+)
+from powdrr_lift.workrr.actions import (
+    WorkflowFileEdits as SkillChatFileEdits,
+)
+from powdrr_lift.workrr.actions import (
+    WorkflowYamlOperation as SkillChatYamlOperation,
+)
 
 WorkflowActionParser = Callable[
     [dict[str, Any], str | None, str | None], SkillChatAction

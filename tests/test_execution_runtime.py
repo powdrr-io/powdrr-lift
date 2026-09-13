@@ -831,7 +831,7 @@ def test_compile_plan_to_workflow_uses_runtime_validation_boundary(
 ) -> None:
     from powdrr_lift.core.delivery_profile import load_delivery_profile
     from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
-    from powdrr_lift.core.workflow_task_specification import WorkflowInstance
+    from powdrr_lift.process.tasks import WorkflowInstance
 
     profile = load_delivery_profile(
         Path(__file__).parents[1] / "delivery-profiles/default-software-delivery.yaml"

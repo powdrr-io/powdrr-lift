@@ -180,6 +180,37 @@ _EXPORT_MODULES.update(
         )
     }
 )
+_EXPORT_MODULES.update(
+    {
+        name: "powdrr_lift.process.discovery"
+        for name in (
+            "find_skill_by_name",
+            "load_skill_catalog",
+            "load_workflow_template_catalog",
+        )
+    }
+)
+_EXPORT_MODULES.update(
+    {
+        name: "powdrr_lift.process.compiler"
+        for name in (
+            "WorkflowDefinitionIssue",
+            "WorkflowDefinitionReport",
+            "WorkflowDefinitionsReport",
+            "WorkflowIR",
+            "WorkflowStepIR",
+            "analyze_workflow_definition",
+            "analyze_workflow_definitions",
+            "apply_liveness_baseline",
+            "apply_warning_budget",
+            "compare_prompt_snapshot_contract",
+            "discover_workflow_definitions",
+            "instantiate_template_contract",
+            "warning_counts",
+            "warning_report_data",
+        )
+    }
+)
 
 
 def __getattr__(name: str) -> Any:
@@ -312,4 +343,21 @@ __all__ = [
     "runtime_static_conformance",
     "step_control_contracts",
     "summarize_skill",
+    "find_skill_by_name",
+    "load_skill_catalog",
+    "load_workflow_template_catalog",
+    "WorkflowDefinitionIssue",
+    "WorkflowDefinitionReport",
+    "WorkflowDefinitionsReport",
+    "WorkflowIR",
+    "WorkflowStepIR",
+    "analyze_workflow_definition",
+    "analyze_workflow_definitions",
+    "apply_liveness_baseline",
+    "apply_warning_budget",
+    "compare_prompt_snapshot_contract",
+    "discover_workflow_definitions",
+    "instantiate_template_contract",
+    "warning_counts",
+    "warning_report_data",
 ]

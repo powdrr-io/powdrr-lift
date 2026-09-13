@@ -16,7 +16,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.process.liveness import (
     build_abstract_execution_graph,
     capability_effect,
@@ -452,7 +451,6 @@ def analyze_workflow_definition(path: Path) -> WorkflowDefinitionReport:
                 if ir is not None:
                     issues.extend(_validate_handoffs(ir, path))
                     issues.extend(_validate_liveness(ir, path))
-                    issues.extend(_validate_rendered_prompt_contract(skill, path))
             else:
                 issues.extend(_validate_raw_liveness(data, path))
     if kind == "workflow_task":
@@ -801,44 +799,6 @@ def _has_positive_prompt_directive(text: str, action: str) -> bool:
             flags=re.IGNORECASE,
         )
     )
-
-
-def _validate_rendered_prompt_contract(
-    skill: Skill, definition_path: Path
-) -> list[WorkflowDefinitionIssue]:
-    """Run prompt-contract checks in memory using the production prompt builder."""
-    try:
-        from powdrr_lift.process.catalog import SkillCatalogEntry
-        from powdrr_lift.workflow_chat_agent import (
-            _build_step_execution_messages,
-        )
-
-        entry = SkillCatalogEntry(definition_path, skill)
-        issues: list[WorkflowDefinitionIssue] = []
-        for index, step in enumerate(skill.steps):
-            messages = _build_step_execution_messages(
-                selected_skill=entry,
-                current_step=step,
-                current_step_index=index,
-                transcript=[{"role": "user", "content": "<root-intent>"}],
-                execution_events=[],
-                execution_context=[],
-                handoff_records={},
-                durable_facts={},
-                current_file_path=None,
-                worktree_root=resolve_repo_root(None),
-                catalog=(entry,),
-            )
-            issues.extend(
-                compare_prompt_snapshot_contract(
-                    step,
-                    {"messages": messages},
-                    f"{definition_path}.steps[{index}]",
-                )
-            )
-        return issues
-    except (ImportError, OSError, RuntimeError, ValueError):
-        return []
 
 
 def _validate_template_liveness(
@@ -1492,107 +1452,6 @@ def _validate_repairability(
     return issues
 
 
-def render_skill_prompt_snapshots(
-    definition_path: Path,
-    *,
-    output_dir: Path,
-    repo_root: Path | None = None,
-) -> tuple[Path, ...]:
-    """Render normalized prompt contracts for every skill or template step."""
-    from powdrr_lift.process.catalog import SkillCatalogEntry
-    from powdrr_lift.workflow_chat_agent import (
-        _build_step_execution_messages,
-    )
-
-    root = resolve_repo_root(repo_root)
-    raw = yaml.safe_load(definition_path.read_text(encoding="utf-8"))
-    if isinstance(raw, Mapping) and isinstance(raw.get("task_templates"), list):
-        return _render_template_prompt_snapshots(
-            definition_path, raw, output_dir=output_dir, repo_root=root
-        )
-    skill = load_skill(definition_path)
-    entry = SkillCatalogEntry(definition_path, skill)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    paths: list[Path] = []
-    for index, step in enumerate(skill.steps):
-        messages = _build_step_execution_messages(
-            selected_skill=entry,
-            current_step=step,
-            current_step_index=index,
-            transcript=[{"role": "user", "content": "<root-intent>"}],
-            execution_events=[],
-            execution_context=[],
-            handoff_records={},
-            durable_facts={},
-            current_file_path=None,
-            worktree_root=root,
-            catalog=(entry,),
-        )
-        snapshot = _normalize_snapshot(
-            {
-                "schema_version": 1,
-                "definition": _portable_path(definition_path, root),
-                "skill": skill.name,
-                "step_index": index,
-                "step_id": step.id,
-                "messages": messages,
-            },
-            root,
-        )
-        name = f"{index + 1:03d}-{step.id or 'step'}.json"
-        output_path = output_dir / name
-        output_path.write_text(
-            json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        paths.append(output_path)
-    return tuple(paths)
-
-
-def _render_template_prompt_snapshots(
-    definition_path: Path,
-    template: Mapping[str, Any],
-    *,
-    output_dir: Path,
-    repo_root: Path,
-) -> tuple[Path, ...]:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    paths: list[Path] = []
-    tasks = template["task_templates"]
-    assert isinstance(tasks, list)
-    for index, task in enumerate(tasks):
-        if not isinstance(task, Mapping):
-            continue
-        snapshot = _normalize_snapshot(
-            {
-                "schema_version": 1,
-                "definition": _portable_path(definition_path, repo_root),
-                "workflow_template": template.get("id"),
-                "task_index": index,
-                "description": task.get("description"),
-                "step_type": task.get("step_type"),
-                "input_state": task.get("input_state", {}),
-                "pre_step": task.get("pre_step"),
-                "details": task.get("details"),
-                "output_state_type": task.get("output_state_type"),
-            },
-            repo_root,
-        )
-        name = f"{index + 1:03d}-{_snapshot_name(task.get('description'))}.json"
-        output_path = output_dir / name
-        output_path.write_text(
-            json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        paths.append(output_path)
-    return tuple(paths)
-
-
-def _snapshot_name(value: Any) -> str:
-    text = value if isinstance(value, str) else "task"
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "task"
-
-
 def _validate_step_examples(
     step: Mapping[str, Any], step_path: str
 ) -> list[WorkflowDefinitionIssue]:
@@ -1621,50 +1480,26 @@ def _validate_step_examples(
             continue
         if not isinstance(action_data, dict):
             continue
-        try:
-            from powdrr_lift.workflow_action_validation import (
-                _parse_action_response_with_schema,
+        action_name = action_data.get("action")
+        parsed_step = skill_step_from_data(step)
+        invalid_reason: str | None = None
+        if not isinstance(action_name, str) or action_name not in _ACTION_NAMES:
+            invalid_reason = "the action is not in the process action vocabulary"
+        elif (
+            getattr(parsed_step, "step_type", None) == "predicated"
+            and action_name == "next_step"
+        ):
+            invalid_reason = (
+                "predicated steps publish outputs with emit_outputs before advancing"
             )
-            from powdrr_lift.workflow_chat_contract import (
-                _step_action_response_schema,
-            )
-
-            parsed_step = skill_step_from_data(step)
-            example_events: list[dict[str, Any]] = []
-            if action_data.get("action") == "emit_outputs":
-                completion = getattr(parsed_step, "completion", None)
-                if completion is not None:
-                    for requirement in completion.required_actions:
-                        example_events.append(
-                            {
-                                "kind": requirement.action,
-                                "step_index": 0,
-                                **(requirement.parameters or {}),
-                            }
-                        )
-            _parse_action_response_with_schema(
-                action_data,
-                schema=_step_action_response_schema(
-                    parsed_step,
-                    execution_events=example_events,
-                    step_index=0,
-                ),
-            )
-            action_name = action_data.get("action")
-            if isinstance(action_name, str):
-                example_actions.add(action_name)
-        except RuntimeError as exc:
-            if action_data.get("action") == "complete" and (
-                "response.action must be one of" in str(exc)
-            ):
-                # ``complete`` is a universal runtime action and therefore is
-                # intentionally absent from authored action allowlists.
-                example_actions.add("complete")
-                continue
+        if invalid_reason is None:
+            assert isinstance(action_name, str)
+            example_actions.add(action_name)
+        else:
             issues.append(
                 WorkflowDefinitionIssue(
                     "invalid_action_example",
-                    f"Action example does not match the runtime action schema: {exc}",
+                    f"Action example does not match the process action schema: {invalid_reason}.",
                     f"{step_path}.details",
                 )
             )
@@ -1997,22 +1832,3 @@ def _walk_strings(value: Any, prefix: str = "") -> list[tuple[str, str]]:
             for item in _walk_strings(child, f"{prefix}[{index}]")
         ]
     return []
-
-
-def _normalize_snapshot(value: Any, repo_root: Path) -> Any:
-    if isinstance(value, str):
-        return value.replace(str(repo_root.resolve()), "<repo-root>")
-    if isinstance(value, Mapping):
-        return {
-            key: _normalize_snapshot(item, repo_root) for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_normalize_snapshot(item, repo_root) for item in value]
-    return value
-
-
-def _portable_path(path: Path, repo_root: Path) -> str:
-    try:
-        return path.resolve().relative_to(repo_root.resolve()).as_posix()
-    except ValueError:
-        return str(path)

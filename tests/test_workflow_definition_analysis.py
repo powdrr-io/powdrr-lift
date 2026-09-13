@@ -6,15 +6,15 @@ from io import StringIO
 from pathlib import Path
 
 from powdrr_lift.cli import main
-from powdrr_lift.workflow_definition_analysis import (
+from powdrr_lift.process.compiler import (
     analyze_workflow_definition,
     analyze_workflow_definitions,
     apply_liveness_baseline,
     apply_warning_budget,
     discover_workflow_definitions,
-    render_skill_prompt_snapshots,
     warning_report_data,
 )
+from powdrr_lift.workflow_definition_prompts import render_skill_prompt_snapshots
 
 
 def test_definition_analysis_uses_runtime_action_parser_and_input_contract(

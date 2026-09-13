@@ -121,6 +121,13 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
+from powdrr_lift.process.compiler import (
+    analyze_workflow_definition,
+    analyze_workflow_definitions,
+    apply_liveness_baseline,
+    apply_warning_budget,
+    warning_report_data,
+)
 from powdrr_lift.process.tasks import HumanRole
 from powdrr_lift.process.templates import (
     instantiate_workflow_template,
@@ -153,18 +160,11 @@ from powdrr_lift.workflow_chat_agent import (
 )
 from powdrr_lift.workflow_chat_selection import WorkflowChatConfig
 from powdrr_lift.workflow_chat_tui import run_workflow_chat_tui
-from powdrr_lift.workflow_definition_analysis import (
-    analyze_workflow_definition,
-    analyze_workflow_definitions,
-    apply_liveness_baseline,
-    apply_warning_budget,
-    render_skill_prompt_snapshots,
-    warning_report_data,
-)
 from powdrr_lift.workflow_definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
 )
+from powdrr_lift.workflow_definition_prompts import render_skill_prompt_snapshots
 from powdrr_lift.workflow_error_analysis import (
     WorkflowErrorAnalysisError,
     cluster_workflow_errors,

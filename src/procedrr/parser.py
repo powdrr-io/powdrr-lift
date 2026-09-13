@@ -238,6 +238,13 @@ def _validate_steps(
                                 "retry requires a positive max_attempts",
                             )
                         )
+                    elif retry.get("on_exhausted") not in {"failed", "blocked"}:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.gate.on_failure.retry.on_exhausted",
+                                "retry requires failed or blocked exhaustion",
+                            )
+                        )
         elif control == "judge":
             judge = step[control]
             if not isinstance(judge, Mapping):

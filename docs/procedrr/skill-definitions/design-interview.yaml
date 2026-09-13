@@ -128,4 +128,5 @@ steps:
         retry:
           target: repair-proposal
           max_attempts: 3
+          on_exhausted: failed
   - terminal: succeeded

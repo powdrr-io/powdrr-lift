@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import re
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,6 +11,7 @@ import yaml
 
 KNOWN_TOOLS = frozenset({"gather_context", "internal", "edit", "yaml_edit"})
 KNOWN_VALIDATORS = frozenset({"json_schema"})
+_BINDING = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +182,21 @@ def _validate_steps(
                             "internal requires a non-empty string command list",
                         )
                     )
+            if isinstance(operation, Mapping):
+                references = list(_template_references(operation))
+                if isinstance(operation.get("source"), list):
+                    references.extend(
+                        item for item in operation["source"] if isinstance(item, str)
+                    )
+                for reference in references:
+                    root = reference.split(".", 1)[0]
+                    if root not in bindings:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.operation",
+                                f"unknown binding: {reference}",
+                            )
+                        )
             if isinstance(operation, Mapping) and isinstance(
                 operation.get("bind"), str
             ):
@@ -192,8 +209,10 @@ def _validate_steps(
                 )
             else:
                 subject = gate.get("subject")
-                root = subject.split(".", 1)[0] if isinstance(subject, str) else None
-                if not isinstance(subject, str) or root not in bindings:
+                gate_root: str | None = (
+                    subject.split(".", 1)[0] if isinstance(subject, str) else None
+                )
+                if not isinstance(subject, str) or gate_root not in bindings:
                     diagnostics.append(
                         DocumentDiagnostic(
                             f"{step_path}.gate.subject", f"unknown binding: {subject}"
@@ -205,6 +224,20 @@ def _validate_steps(
                             f"{step_path}.gate", "equals and on_failure are required"
                         )
                     )
+                failure = gate.get("on_failure")
+                if isinstance(failure, Mapping):
+                    retry = failure.get("retry")
+                    if (
+                        not isinstance(retry, Mapping)
+                        or not isinstance(retry.get("max_attempts"), int)
+                        or retry["max_attempts"] <= 0
+                    ):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.gate.on_failure",
+                                "retry requires a positive max_attempts",
+                            )
+                        )
         elif control == "judge":
             judge = step[control]
             if not isinstance(judge, Mapping):
@@ -268,6 +301,17 @@ def _validate_steps(
                     )
                 if isinstance(output, Mapping) and isinstance(output.get("name"), str):
                     bindings.add(output["name"])
+
+
+def _template_references(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield from (match.group(1) for match in _BINDING.finditer(value))
+    elif isinstance(value, Mapping):
+        for child in value.values():
+            yield from _template_references(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _template_references(child)
 
 
 __all__ = [

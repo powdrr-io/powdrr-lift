@@ -84,7 +84,8 @@ steps:
       tool: internal
       command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
       bind: proposal_evaluation
-  - worklist:
+  - id: repair-proposal
+    worklist:
       snapshot: {name: proposal_issues, max_items: 64}
       item_binding: proposal_issue
       max_admissions: 64
@@ -124,5 +125,7 @@ steps:
       subject: final_proposal_evaluation.returncode
       equals: 0
       on_failure:
-        terminal: failed
+        retry:
+          target: repair-proposal
+          max_attempts: 3
   - terminal: succeeded

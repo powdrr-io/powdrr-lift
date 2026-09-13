@@ -12,20 +12,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
 
-from powdrr_lift.agent.provider_config import (
-    DEFAULT_LLM_TYPE,
-    DEFAULT_MODEL,
-    LLMModelMapping,
-    default_llm_mappings,
-)
-from powdrr_lift.agent.providers import (
-    _estimate_message_tokens,
-    build_provider_client,
-    long_context_backup_for,
-    resolve_llm_mapping,
-    resolve_local_model_path,
-    resolve_provider_credentials,
-)
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
@@ -168,6 +154,20 @@ from powdrr_lift.workflow_provider_runtime import (
     maybe_record_llm_exchanges,
     model_limits_for,
     resolve_workflow_provider,
+)
+from powdrr_lift.workrr.provider_config import (
+    DEFAULT_LLM_TYPE,
+    DEFAULT_MODEL,
+    LLMModelMapping,
+    default_llm_mappings,
+)
+from powdrr_lift.workrr.providers import (
+    _estimate_message_tokens,
+    build_provider_client,
+    long_context_backup_for,
+    resolve_llm_mapping,
+    resolve_local_model_path,
+    resolve_provider_credentials,
 )
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")

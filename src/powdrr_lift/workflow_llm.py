@@ -17,39 +17,6 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar, cast
 
-from powdrr_lift.agent.actions import (
-    WorkflowAction,  # noqa: F401 - compatibility export
-    WorkflowEdit,  # noqa: F401 - compatibility export
-    WorkflowFileEdits,  # noqa: F401 - compatibility export
-    WorkflowYamlOperation,  # noqa: F401 - compatibility export
-)
-from powdrr_lift.agent.loop import (
-    WorkflowActionObservation,
-    WorkflowActionOutcome,
-    WorkflowActionProgressStrategy,
-    WorkflowActionRequest,  # noqa: F401 - compatibility export
-    WorkflowExecutionObserver,
-    WorkflowExecutionStrategy,
-)
-from powdrr_lift.agent.progress import (
-    ProgressDecision,
-    WorkflowExecutionController,
-    no_progress_feedback,
-)
-from powdrr_lift.agent.protocol import (
-    SchemaAwareWorkflowLLMClient,  # noqa: F401 - compatibility export
-    WorkflowLLMClient,  # noqa: F401 - compatibility export
-)
-from powdrr_lift.agent.repair import (
-    RepairContext,
-    RepairDirective,
-    RepairExhaustionReport,  # noqa: F401 - compatibility export
-    RepairFailure,
-    RepairFailureClass,
-    RepairPolicy,
-    RepairStage,
-    classify_repair_failure,
-)
 from powdrr_lift.errors import (
     ExecutionCancelled,
     PersistenceCorruptionError,
@@ -59,6 +26,39 @@ from powdrr_lift.errors import (
 )
 from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.runtime import ExecutionRuntime
+from powdrr_lift.workrr.actions import (
+    WorkflowAction,  # noqa: F401 - compatibility export
+    WorkflowEdit,  # noqa: F401 - compatibility export
+    WorkflowFileEdits,  # noqa: F401 - compatibility export
+    WorkflowYamlOperation,  # noqa: F401 - compatibility export
+)
+from powdrr_lift.workrr.loop import (
+    WorkflowActionObservation,
+    WorkflowActionOutcome,
+    WorkflowActionProgressStrategy,
+    WorkflowActionRequest,  # noqa: F401 - compatibility export
+    WorkflowExecutionObserver,
+    WorkflowExecutionStrategy,
+)
+from powdrr_lift.workrr.progress import (
+    ProgressDecision,
+    WorkflowExecutionController,
+    no_progress_feedback,
+)
+from powdrr_lift.workrr.protocol import (
+    SchemaAwareWorkflowLLMClient,  # noqa: F401 - compatibility export
+    WorkflowLLMClient,  # noqa: F401 - compatibility export
+)
+from powdrr_lift.workrr.repair import (
+    RepairContext,
+    RepairDirective,
+    RepairExhaustionReport,  # noqa: F401 - compatibility export
+    RepairFailure,
+    RepairFailureClass,
+    RepairPolicy,
+    RepairStage,
+    classify_repair_failure,
+)
 
 
 class WorkflowLLMTimeoutExhausted(ProviderExecutionError):

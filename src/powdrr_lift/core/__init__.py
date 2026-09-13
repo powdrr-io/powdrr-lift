@@ -40,7 +40,7 @@ from powdrr_lift.core.behavior_rule import (
     nominate_behavior_rule,
     normalize_behavior_text,
 )
-from powdrr_lift.product.intent import (
+from powdrr_lift.structrr.intent import (
     INTENT_SCHEMA_VERSION,
     IntentClause,
     IntentContract,

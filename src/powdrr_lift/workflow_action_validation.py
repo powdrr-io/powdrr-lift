@@ -10,7 +10,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.builtin_tool_help import BUILTIN_TOOL_NAMES
 from powdrr_lift.core.execution_state import ExecutionArtifact
 from powdrr_lift.core.pr_specification import compile_split_pr_specification
@@ -44,6 +43,7 @@ from powdrr_lift.workflow_observer import (
     ObserverActionRecommendation,
     observer_action_matches,
 )
+from powdrr_lift.workrr.context import WorkflowContext
 
 _INTERNAL_TOOL = "internal"
 _INTERNAL_BINARY = "powdrr-lift"

@@ -9,7 +9,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
-from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.builtin_tools import invoke_intrinsic_capability
@@ -18,6 +17,7 @@ from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workflow_chat_io import _prompt_user, _verbose_print
 from powdrr_lift.workflow_paths import is_dedicated_worktree
+from powdrr_lift.workrr.context import WorkflowContext
 
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 

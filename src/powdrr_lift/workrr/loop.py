@@ -6,8 +6,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar
 
-from powdrr_lift.agent.progress import ProgressDecision
-from powdrr_lift.agent.protocol import WorkflowLLMClient
+from powdrr_lift.workrr.progress import ProgressDecision
+from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 ActionT = TypeVar("ActionT", contravariant=True)
 

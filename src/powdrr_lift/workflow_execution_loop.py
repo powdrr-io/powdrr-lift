@@ -17,7 +17,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
-from powdrr_lift.agent.context import WorkflowContext
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.builtin_tool_help import builtin_tool_help
 from powdrr_lift.core.pr_specification import build_authoritative_effect_handoff
@@ -50,6 +49,7 @@ from powdrr_lift.workflow_action_validation import (
     _validate_internal_command,
 )
 from powdrr_lift.workflow_chat_io import _verbose_print
+from powdrr_lift.workrr.context import WorkflowContext
 
 _INTERNAL_TOOL = "internal"
 

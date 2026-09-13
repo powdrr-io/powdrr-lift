@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from powdrr_lift.agent.protocol import (
+from powdrr_lift.workrr.protocol import (
     SchemaAwareWorkflowLLMClient,
     WorkflowLLMClient,
 )

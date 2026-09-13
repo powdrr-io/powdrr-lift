@@ -18,6 +18,7 @@ from procedrr import (
     WorkflowDefinition,
     append_step,
     compile_workflow,
+    design_interview,
     parse_and_validate,
     set_value,
 )
@@ -88,3 +89,26 @@ def test_parser_validates_declarative_steps_and_editor_is_persistent() -> None:
     assert document["name"] == "demo"
     assert extended["name"] == "edited"
     assert len(extended["steps"]) == 2
+
+
+def test_checked_in_design_interview_definition_parses() -> None:
+    from pathlib import Path
+
+    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    document = parse_and_validate(source)
+    assert document["name"] == "design-interview"
+
+
+def test_design_interview_uses_real_context_types_and_bounded_repairs() -> None:
+    compiled = compile_workflow(design_interview())
+    data = compiled.definition.to_data()
+    encoded = str(data)
+    for category in (
+        "requirements",
+        "entity-relationships",
+        "acceptance_criteria",
+        "tools",
+    ):
+        assert category in encoded
+    assert compiled.max_llm_activations == 212
+    assert compiled.max_tool_calls == 217

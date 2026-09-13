@@ -65,7 +65,14 @@ def _validate_steps(
             continue
         controls = {
             key
-            for key in ("operation", "judge", "for_each", "call", "terminal")
+            for key in (
+                "operation",
+                "judge",
+                "for_each",
+                "worklist",
+                "call",
+                "terminal",
+            )
             if key in step
         }
         if len(controls) != 1:
@@ -74,23 +81,25 @@ def _validate_steps(
             )
             continue
         control = next(iter(controls))
-        if control in {"for_each", "call"}:
+        if control in {"for_each", "worklist", "call"}:
             value = step[control]
-            if not isinstance(value, Mapping) or not isinstance(
-                value.get("steps"), list
-            ):
+            nested = (
+                value.get("steps", value.get("body"))
+                if isinstance(value, Mapping)
+                else None
+            )
+            if not isinstance(value, Mapping) or not isinstance(nested, list):
                 diagnostics.append(
                     DocumentDiagnostic(
                         f"{step_path}.{control}", "nested steps must be a list"
                     )
                 )
             else:
-                _validate_steps(
-                    value["steps"], f"{step_path}.{control}.steps", diagnostics
-                )
+                _validate_steps(nested, f"{step_path}.{control}.body", diagnostics)
         elif control == "operation":
-            if not isinstance(step[control], Mapping) or not isinstance(
-                step[control].get("name"), str
+            operation = step[control]
+            if not isinstance(operation, Mapping) or not isinstance(
+                operation.get("name", operation.get("tool")), str
             ):
                 diagnostics.append(
                     DocumentDiagnostic(

@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 677
+change_id: 678
 title: Link bootstrapped Structrr entities to source evidence
 intent:
   problem: The initial Structrr bootstrap records semantic entities and source files separately, but does not explain which source artifacts implement, define, or verify those entities.

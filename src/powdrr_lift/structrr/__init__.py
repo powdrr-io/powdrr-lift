@@ -17,6 +17,13 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_document,
 )
+from powdrr_lift.structrr.rebase import (
+    StructrrChange,
+    StructrrRebaseReport,
+    StructrrRemapping,
+    rebase_structrr_snapshot,
+    snapshot_digest,
+)
 
 __all__ = [
     "BootstrapIssue",
@@ -24,4 +31,9 @@ __all__ = [
     "BootstrapValidationReport",
     "bootstrap_structrr",
     "validate_bootstrap_document",
+    "StructrrChange",
+    "StructrrRebaseReport",
+    "StructrrRemapping",
+    "rebase_structrr_snapshot",
+    "snapshot_digest",
 ]

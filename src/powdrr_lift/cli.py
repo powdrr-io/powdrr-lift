@@ -136,6 +136,7 @@ from powdrr_lift.structrr.intent import (
     IntentTrigger,
     make_intent_source,
 )
+from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 from powdrr_lift.workrr.ambiguity_review import (
     WorkflowAmbiguityReviewError,
     review_workflow_definition,
@@ -327,6 +328,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository-relative taxonomy path.",
     )
     bootstrap_structrr_parser.set_defaults(func=_run_bootstrap_structrr)
+
+    rebase_structrr_parser = subparsers.add_parser(
+        "rebase-structrr",
+        aliases=["rebase_structrr"],
+        help="Compare Structrr snapshots and report proposal rebase impact.",
+    )
+    rebase_structrr_parser.add_argument(
+        "--baseline", type=Path, required=True, help="Proposal baseline snapshot YAML."
+    )
+    rebase_structrr_parser.add_argument(
+        "--current", type=Path, required=True, help="Current Structrr snapshot YAML."
+    )
+    rebase_structrr_parser.add_argument(
+        "--entity-id",
+        action="append",
+        default=[],
+        help="Entity referenced by the proposal; may be repeated.",
+    )
+    rebase_structrr_parser.add_argument(
+        "--source-subject-key",
+        action="append",
+        default=[],
+        help="Source stable_key referenced by the proposal; may be repeated.",
+    )
+    rebase_structrr_parser.add_argument(
+        "--binding-id",
+        action="append",
+        default=[],
+        help="Source binding referenced by the proposal; may be repeated.",
+    )
+    rebase_structrr_parser.add_argument(
+        "--output", type=Path, help="Write the JSON report to this path."
+    )
+    rebase_structrr_parser.set_defaults(func=_run_rebase_structrr)
 
     init_from_plan_diff_parser = subparsers.add_parser(
         "init-from-plan-diff",
@@ -2676,6 +2711,33 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
         f"{len(result.document['files'])} source anchors.",
     )
     return 0
+
+
+def _run_rebase_structrr(args: argparse.Namespace) -> int:
+    baseline = _read_yaml_mapping(args.baseline)
+    current = _read_yaml_mapping(args.current)
+    report = rebase_structrr_snapshot(
+        baseline,
+        current,
+        referenced_entity_ids=args.entity_id,
+        referenced_source_subject_keys=args.source_subject_key,
+        referenced_binding_ids=args.binding_id,
+    )
+    rendered = json.dumps(report.to_data(), indent=2, sort_keys=True) + "\n"
+    if args.output is None:
+        sys.stdout.write(rendered)
+    else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+        print(args.output)
+    return 0
+
+
+def _read_yaml_mapping(path: Path) -> Mapping[str, Any]:
+    value = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Structrr snapshot must be a mapping: {path}")
+    return value
 
 
 def _run_evaluate(args: argparse.Namespace) -> int:

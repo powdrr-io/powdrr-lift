@@ -96,6 +96,7 @@ def test_parser_validates_attempt_recovery_references_and_body() -> None:
 inputs: [{name: ready}]
 steps:
   - attempt:
+      id: work
       max_attempts: 2
       body:
         - gate:

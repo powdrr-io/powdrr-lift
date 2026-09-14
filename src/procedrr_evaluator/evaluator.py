@@ -135,8 +135,15 @@ class Evaluator:
         body = declaration.get("body")
         route = declaration.get("on_failure")
         maximum = declaration.get("max_attempts")
-        if not isinstance(body, list) or not isinstance(route, Mapping):
+        attempt_id = declaration.get("id")
+        if (
+            not isinstance(body, list)
+            or not isinstance(route, Mapping)
+            or not isinstance(attempt_id, str)
+        ):
             raise EvaluationError(f"{path}.attempt is malformed")
+        if route.get("resume") != attempt_id:
+            raise EvaluationError(f"{path}.attempt resume must match its id")
         if not isinstance(maximum, int) or maximum <= 0:
             raise EvaluationError(f"{path}.attempt.max_attempts must be positive")
         recovery_name = route.get("recovery")

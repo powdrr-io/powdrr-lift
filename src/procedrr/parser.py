@@ -145,6 +145,12 @@ def _validate_steps(
                         f"{step_path}.attempt.body", "attempt body must be a list"
                     )
                 )
+            if not isinstance(value, Mapping) or not isinstance(value.get("id"), str):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.attempt.id", "attempt id must be a string"
+                    )
+                )
             if (
                 not isinstance(value, Mapping)
                 or not isinstance(value.get("max_attempts"), int)
@@ -166,6 +172,13 @@ def _validate_steps(
                     DocumentDiagnostic(
                         f"{step_path}.attempt.on_failure",
                         "attempt requires recovery and resume",
+                    )
+                )
+            elif isinstance(value, Mapping) and failure["resume"] != value.get("id"):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.attempt.on_failure.resume",
+                        "resume must match the attempt id",
                     )
                 )
             elif failure["recovery"] not in (recovery_names or set()):

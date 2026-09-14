@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,22 @@ class WorkrrProcedrrClient:
         if response_schema is None:
             raise ProcedrrResponseError("Procedrr judges require an output schema.")
 
+        schema_example = json.dumps(
+            _schema_example(response_schema), ensure_ascii=False, separators=(",", ":")
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a JSON-only function, not a conversational assistant. "
+                    "Do not provide reasoning, analysis, prose, markdown, comments, "
+                    "or code fences. Emit exactly one JSON object and stop. The object "
+                    "must match this schema example shape: " + schema_example
+                ),
+            },
+            *messages,
+        ]
+
         def parse(payload: dict[str, Any]) -> dict[str, Any]:
             try:
                 validate_json(payload, response_schema)
@@ -114,3 +131,27 @@ __all__ = [
     "StructuredToolExecutor",
     "WorkrrProcedrrClient",
 ]
+
+
+def _schema_example(schema: Mapping[str, Any]) -> Any:
+    """Build a minimal concrete example to anchor weak JSON-mode providers."""
+    schema_type = schema.get("type")
+    if schema_type == "object":
+        properties = schema.get("properties", {})
+        if isinstance(properties, Mapping):
+            return {
+                str(name): _schema_example(value)
+                for name, value in properties.items()
+                if isinstance(value, Mapping)
+            }
+        return {}
+    if schema_type == "array":
+        items = schema.get("items")
+        return [_schema_example(items)] if isinstance(items, Mapping) else []
+    if "enum" in schema and isinstance(schema["enum"], list):
+        return schema["enum"][0] if schema["enum"] else None
+    if schema_type == "boolean":
+        return False
+    if schema_type == "integer" or schema_type == "number":
+        return 0
+    return ""

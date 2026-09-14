@@ -180,7 +180,14 @@ def validate_single_decision(
                             f"not single-decision normal form: {reason}",
                         )
                     )
-            for control in ("for_each", "worklist", "call", "attempt", "repeat"):
+            for control in (
+                "for_each",
+                "worklist",
+                "call",
+                "attempt",
+                "repeat",
+                "specialize",
+            ):
                 nested = step.get(control)
                 if isinstance(nested, Mapping):
                     walk(
@@ -229,6 +236,7 @@ def _validate_steps(
                 "attempt",
                 "repeat",
                 "branch",
+                "specialize",
             )
             if key in step
         }
@@ -238,7 +246,106 @@ def _validate_steps(
             )
             continue
         control = next(iter(controls))
-        if control == "repeat":
+        if control == "specialize":
+            value = step[control]
+            if not isinstance(value, Mapping):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.specialize", "specialize must be a mapping"
+                    )
+                )
+                continue
+            for key in ("question", "context", "bind"):
+                if key not in value:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.specialize.{key}",
+                            "field is required",
+                        )
+                    )
+            question = value.get("question")
+            if not isinstance(question, str) or not question.strip():
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.specialize.question",
+                        "question must be a non-empty string",
+                    )
+                )
+            context = value.get("context")
+            if not isinstance(context, list) or not all(
+                isinstance(item, str) for item in context
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.specialize.context",
+                        "context must be a list of binding names",
+                    )
+                )
+            elif any(item.split(".", 1)[0] not in bindings for item in context):
+                for item in context:
+                    if item.split(".", 1)[0] not in bindings:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.specialize.context",
+                                f"unknown binding: {item}",
+                            )
+                        )
+            if not isinstance(value.get("bind"), str) or not value.get("bind"):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.specialize.bind",
+                        "bind must be a non-empty string",
+                    )
+                )
+            allowed_tools = value.get("allowed_tools")
+            if allowed_tools is not None and (
+                not isinstance(allowed_tools, list)
+                or not all(
+                    isinstance(tool, str) and tool in KNOWN_TOOLS
+                    for tool in allowed_tools
+                )
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.specialize.allowed_tools",
+                        "allowed_tools must contain only known tools",
+                    )
+                )
+            if isinstance(value.get("bind"), str):
+                bindings.add(value["bind"])
+        elif (
+            control == "call"
+            and isinstance(step[control], Mapping)
+            and "fragment" in step[control]
+        ):
+            value = step[control]
+            fragment = value.get("fragment")
+            if not isinstance(fragment, str):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.fragment",
+                        "dynamic call fragment must be a binding reference",
+                    )
+                )
+            else:
+                root = fragment.removeprefix("${").removesuffix("}").split(".", 1)[0]
+                if root not in bindings:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.call.fragment",
+                            f"unknown binding: {fragment}",
+                        )
+                    )
+            if "max_steps" in value and (
+                not isinstance(value["max_steps"], int) or value["max_steps"] <= 0
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.max_steps",
+                        "max_steps must be positive",
+                    )
+                )
+        elif control == "repeat":
             value = step[control]
             if not isinstance(value, Mapping) or not isinstance(
                 value.get("body"), list
@@ -412,6 +519,8 @@ def _validate_steps(
                 )
         elif control in {"for_each", "worklist", "call"}:
             value = step[control]
+            if control == "call" and isinstance(value, Mapping) and "fragment" in value:
+                continue
             nested = (
                 value.get("steps", value.get("body"))
                 if isinstance(value, Mapping)

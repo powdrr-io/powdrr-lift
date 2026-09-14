@@ -114,6 +114,14 @@ class Evaluator:
                 self._loop(key, step[key], state, events, usage, limits, step_path)
             elif "attempt" in step:
                 self._attempt(step["attempt"], state, events, usage, limits, step_path)
+            elif "specialize" in step:
+                self._specialize(
+                    step["specialize"], state, events, usage, limits, step_path
+                )
+            elif "call" in step:
+                self._call_fragment(
+                    step["call"], state, events, usage, limits, step_path
+                )
             elif "repeat" in step:
                 self._repeat(step["repeat"], state, events, usage, limits, step_path)
             elif "branch" in step:
@@ -126,6 +134,94 @@ class Evaluator:
                 self._gate(step["gate"], state, step_path)
             else:
                 raise EvaluationError(f"{step_path} has no supported control")
+
+    def _specialize(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        if not isinstance(declaration, Mapping):
+            raise EvaluationError(f"{path}.specialize is malformed")
+        context = declaration.get("context")
+        bind = declaration.get("bind")
+        complete_fragment = getattr(self.llm, "complete_fragment", None)
+        if (
+            not isinstance(context, list)
+            or not isinstance(bind, str)
+            or not callable(complete_fragment)
+        ):
+            raise EvaluationError(f"{path}.specialize is malformed or unsupported")
+        context_limit = _positive_limit(limits, "context_chars", 24000)
+        value_limit = _positive_limit(limits, "context_value_chars", 6000)
+        context_data = {
+            name: _compact_value(_resolve_binding(state, name), max_chars=value_limit)
+            for name in context
+        }
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Generate one complete Procedrr fragment as JSON. Return only "
+                    "the fragment or a structured JSON correction."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Question:\n"
+                    + str(declaration.get("question"))
+                    + "\n\nContext:\n"
+                    + _bounded_context_text(context_data, context_limit)
+                ),
+            },
+        ]
+        usage["llm"] += 1
+        self._limit(usage, limits, "llm_activations", "LLM activations")
+        allowed_tools = declaration.get("allowed_tools")
+        fragment = complete_fragment(
+            messages,
+            allowed_tools=set(allowed_tools)
+            if isinstance(allowed_tools, list)
+            else None,
+        )
+        state[bind] = fragment
+        events.append(
+            EvaluationEvent(
+                "specialize",
+                path,
+                {"bind": bind, "name": fragment.get("name")},
+            )
+        )
+
+    def _call_fragment(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        if not isinstance(declaration, Mapping):
+            raise EvaluationError(f"{path}.call is malformed")
+        reference = declaration.get("fragment")
+        if not isinstance(reference, str):
+            raise EvaluationError(f"{path}.call.fragment is required")
+        fragment = _resolve_value(reference, state)
+        if not isinstance(fragment, Mapping) or not isinstance(
+            fragment.get("steps"), list
+        ):
+            raise EvaluationError(f"{path}.call.fragment must resolve to a fragment")
+        maximum = declaration.get("max_steps", len(fragment["steps"]))
+        if not isinstance(maximum, int) or len(fragment["steps"]) > maximum:
+            raise EvaluationError(f"{path}.call.fragment exceeds its step bound")
+        self._steps(
+            fragment["steps"], state, events, usage, limits, f"{path}.call.body"
+        )
 
     def _attempt(
         self,

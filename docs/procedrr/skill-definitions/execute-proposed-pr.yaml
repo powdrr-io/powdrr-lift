@@ -5,8 +5,9 @@ inputs:
   - {name: proposed_pr_id, type: string, required: true}
   - {name: feature_description, type: string, required: true}
 description: >-
-  Execute one proposed PR through bounded planning, one-action coding rounds,
-  mechanical validation, and completeness, invariant, and security review.
+  Execute one proposed PR through planning, a Workrr-validated JSON Procedrr
+  implementation fragment, mechanical validation, and completeness, invariant,
+  and security review.
 limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
 steps:
   - operation:
@@ -91,96 +92,18 @@ steps:
               minItems: 1
               items: {type: string, minLength: 1}
       validation: {kind: json_schema}
-  - repeat:
-      max_iterations: 16
-      until: {subject: implementation_decision.done, equals: true}
-      collect: {binding: implementation_actions, value: implementation_decision.action}
-      body:
-        - judge:
-            kind: construct_one
-            question: Is implementation planning complete, or what is the next one-file coding action?
-            subject: implementation_plan
-            prompt_system: Return only the declared JSON object. Choose exactly one next action or declare done.
-            instructions:
-              - Set done true only when every required coding action has been emitted.
-              - When done is false, return exactly one action for one repository-relative file.
-              - Never return a list of actions.
-            context: [work_item_name, feature_description, implementation_plan, repository_context, source_document]
-            output:
-              name: implementation_decision
-              schema:
-                type: object
-                required: [done, action]
-                additionalProperties: false
-                properties:
-                  done: {type: boolean}
-                  action:
-                    type: object
-                    required: [id, file_path, intent]
-                    additionalProperties: false
-                    properties:
-                      id: {type: string, minLength: 1}
-                      file_path: {type: string, minLength: 1}
-                      intent: {type: string, minLength: 1}
-            validation: {kind: json_schema}
-        - branch:
-            subject: implementation_decision.done
-            cases:
-              false:
-                - judge:
-                    kind: request_source
-                    question: Which exact file must be read to implement this one action safely?
-                    subject: implementation_decision.action
-                    prompt_system: Return only the declared JSON object.
-                    instructions:
-                      - Request exactly one repository-relative file needed to resolve symbols or integration points.
-                    context: [implementation_decision, repository_context, source_document]
-                    output:
-                      name: coding_source_request
-                      schema:
-                        type: object
-                        required: [file_path, reason]
-                        additionalProperties: false
-                        properties:
-                          file_path: {type: string, minLength: 1}
-                          reason: {type: string, minLength: 1}
-                    validation: {kind: json_schema}
-                - operation:
-                    tool: read_document
-                    parameters: {file_path: "${coding_source_request.file_path}"}
-                    bind: coding_source_document
-                - judge:
-                    kind: construct_one
-                    question: What one edit implements this exact planned action?
-                    subject: implementation_decision.action
-                    prompt_system: Return exactly one safe, minimal file edit as the declared JSON object.
-                    instructions:
-                      - Target exactly the planned file path.
-                      - Preserve unrelated content and existing invariants.
-                    context: [feature_description, implementation_decision, coding_source_document]
-                    output:
-                      name: coding_edit
-                      schema:
-                        type: object
-                        required: [file_path, edit]
-                        additionalProperties: false
-                        properties:
-                          file_path: {type: string, minLength: 1}
-                          edit:
-                            type: object
-                            required: [old_text, new_text]
-                            additionalProperties: false
-                            properties:
-                              old_text: {type: string}
-                              new_text: {type: string}
-                    validation: {kind: json_schema}
-                - operation:
-                    tool: edit
-                    parameters:
-                      file_path: "${coding_edit.file_path}"
-                      edits: ["${coding_edit.edit}"]
-                    bind: applied_edit
-            default: []
+  - specialize:
+      question: >-
+        Generate the validated Procedrr implementation fragment for this
+        proposed feature. The fragment must inspect source on demand, make one
+        edit decision at a time, validate each edit, repair failures, and finish
+        only after all acceptance conditions are evidenced.
+      context: [work_item_name, proposed_pr_id, feature_description, implementation_plan, repository_context, source_document, initial_static_analysis]
+      allowed_tools: [gather_context, internal, edit, read_document, invoke_tool, list_files]
+      bind: implementation_program
+  - call:
+      fragment: "${implementation_program}"
+      max_steps: 128
   - for_each:
       snapshot: {name: implementation_plan.validation_commands, max_items: 16}
       item_binding: validation_command

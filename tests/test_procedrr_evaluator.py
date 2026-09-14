@@ -389,6 +389,43 @@ class HelloWorldLLM:
             return {"safe": True, "findings": []}
         raise AssertionError(f"unexpected judge question: {question}")
 
+    def complete_fragment(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        allowed_tools: set[str] | None = None,
+    ) -> dict[str, Any]:
+        del messages, allowed_tools
+        return {
+            "name": "hello-world-implementation",
+            "steps": [
+                {
+                    "operation": {
+                        "tool": "read_document",
+                        "parameters": {"file_path": "hello.py"},
+                        "bind": "source",
+                    }
+                },
+                {
+                    "operation": {
+                        "tool": "edit",
+                        "parameters": {
+                            "file_path": "hello.py",
+                            "edits": [
+                                {
+                                    "old_text": 'print("Hello, World")\n',
+                                    "new_text": (
+                                        'print("Hello, World")\nprint("Here I Am")\n'
+                                    ),
+                                }
+                            ],
+                        },
+                        "bind": "applied_edit",
+                    }
+                },
+            ],
+        }
+
 
 def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     (tmp_path / "hello.py").write_text('print("Hello, World")\n', encoding="utf-8")

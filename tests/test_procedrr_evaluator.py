@@ -68,6 +68,13 @@ def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     assert calls == [("gather_context", {"types": ["requirements"]})]
     assert result.bindings["requirements_edits"]["added"][0]["id"] == "req-1"
     assert "requirements_context" in llm.messages[1]["content"]
+    metrics = next(
+        event.data["context_metrics"]
+        for event in result.events
+        if event.kind == "judge"
+    )
+    assert metrics["raw_binding_chars"]["requirements_context"] > 0
+    assert metrics["serialized_chars"] <= 24000
 
 
 def test_evaluator_bounds_large_judge_context() -> None:

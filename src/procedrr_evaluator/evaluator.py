@@ -214,16 +214,22 @@ class Evaluator:
         context = judge.get("context", [])
         if not isinstance(context, list):
             raise EvaluationError(f"{path}.judge.context must be a list")
+        value_limit = _positive_limit(limits, "context_value_chars", 6000)
+        resolved_context = {name: _resolve_binding(state, name) for name in context}
         context_data = {
-            name: _compact_value(
-                _resolve_binding(state, name),
-                max_chars=_positive_limit(limits, "context_value_chars", 6000),
-            )
-            for name in context
+            name: _compact_value(value, max_chars=value_limit)
+            for name, value in resolved_context.items()
         }
+        raw_binding_chars = {
+            name: len(_json_text(value)) for name, value in resolved_context.items()
+        }
+        compact_binding_chars = {
+            name: len(_json_text(value)) for name, value in context_data.items()
+        }
+        context_limit = _positive_limit(limits, "context_chars", 24000)
         context_text = _bounded_context_text(
             context_data,
-            _positive_limit(limits, "context_chars", 24000),
+            context_limit,
         )
         messages = [
             {"role": "system", "content": str(judge["prompt_system"])},
@@ -250,7 +256,22 @@ class Evaluator:
         state[judge["output"]["name"]] = output
         events.append(
             EvaluationEvent(
-                "judge", path, {"output": judge["output"]["name"], "messages": messages}
+                "judge",
+                path,
+                {
+                    "output": judge["output"]["name"],
+                    "messages": messages,
+                    "context_metrics": {
+                        "raw_chars": sum(raw_binding_chars.values()),
+                        "compacted_chars": sum(compact_binding_chars.values()),
+                        "serialized_chars": len(context_text),
+                        "limit_chars": context_limit,
+                        "truncated": len(context_text) >= context_limit
+                        and not _context_fits(context_data, context_limit),
+                        "raw_binding_chars": raw_binding_chars,
+                        "compacted_binding_chars": compact_binding_chars,
+                    },
+                },
             )
         )
 
@@ -410,6 +431,10 @@ def _bounded_context_text(value: Any, max_chars: int) -> str:
     if len(encoded) <= max_chars:
         return encoded
     return encoded[:max_chars] + "...<context truncated>"
+
+
+def _context_fits(value: Any, max_chars: int) -> bool:
+    return len(_json_text(value)) <= max_chars
 
 
 __all__ = [

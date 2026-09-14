@@ -1,0 +1,346 @@
+version: 1
+name: execute-proposed-pr
+inputs:
+  - {name: work_item_name, type: string, required: true}
+  - {name: proposed_pr_id, type: string, required: true}
+  - {name: feature_description, type: string, required: true}
+description: >-
+  Execute one proposed PR through bounded planning, one-action coding rounds,
+  mechanical validation, and completeness, invariant, and security review.
+limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3}
+steps:
+  - operation:
+      tool: internal
+      command: [powdrr-lift, show-proposed-pr, "${proposed_pr_id}"]
+      bind: proposed_pr
+  - operation:
+      tool: gather_context
+      parameters:
+        types: [requirements, approach, entities, modules, tools, invariants]
+        feature_id: "${work_item_name}"
+      bind: repository_context
+  - operation:
+      tool: read_document
+      parameters:
+        file_path: docs/proposals/${work_item_name}/proposed-pr-specification.yaml
+      bind: proposed_pr_source
+  - operation:
+      tool: read_document
+      parameters:
+        file_path: docs/proposals/${work_item_name}/implementation-specification.yaml
+      bind: implementation_specification_source
+  - operation:
+      tool: invoke_tool
+      parameters:
+        tool: basedpyright
+        paths: [src]
+      bind: initial_static_analysis
+  - judge:
+      kind: request_source
+      question: Which exact repository files must be read before planning this proposed PR?
+      subject: repository_context
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Request only files needed to resolve symbols, interfaces, and integration points.
+        - Use repository-relative paths and give a reason for every request.
+        - Request no more than 16 files.
+      context: [proposed_pr, repository_context, proposed_pr_source, implementation_specification_source]
+      output:
+        name: planning_source_requests
+        schema:
+          type: object
+          required: [requests]
+          additionalProperties: false
+          properties:
+            requests:
+              type: array
+              maxItems: 16
+              items:
+                type: object
+                required: [file_path, reason]
+                additionalProperties: false
+                properties:
+                  file_path: {type: string, minLength: 1}
+                  reason: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - for_each:
+      snapshot: {name: planning_source_requests.requests, max_items: 16}
+      item_binding: source_request
+      collect: {binding: source_documents, key: file_path, value: source_document}
+      body:
+        - operation:
+            tool: read_document
+            parameters: {file_path: "${source_request.file_path}"}
+            bind: source_document
+  - judge:
+      kind: construct_one
+      question: What is the smallest ordered implementation plan for this proposed PR?
+      subject: proposed_pr
+      prompt_system: >-
+        You are the implementation planner. Return only the declared JSON
+        object. Every action must be independently executable and scoped to the
+        proposed PR.
+      instructions:
+        - Use the proposed PR and gathered repository context as the only evidence.
+        - Name exact repository-relative files for every coding action.
+        - Order actions so each action leaves the tree buildable and testable.
+        - Include the command-level validation needed after the actions.
+        - Do not include unrelated refactors or speculative work.
+      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, proposed_pr_source, implementation_specification_source, repository_context, source_documents, initial_static_analysis]
+      output:
+        name: implementation_plan
+        schema:
+          type: object
+          required: [actions, validation_commands, acceptance_conditions]
+          additionalProperties: false
+          properties:
+            actions:
+              type: array
+              minItems: 1
+              maxItems: 16
+              items:
+                type: object
+                required: [id, file_path, intent]
+                additionalProperties: false
+                properties:
+                  id: {type: string, minLength: 1}
+                  file_path: {type: string, minLength: 1}
+                  intent: {type: string, minLength: 1}
+            validation_commands:
+              type: array
+              minItems: 1
+              maxItems: 16
+              items: {type: array, items: {type: string, minLength: 1}}
+            acceptance_conditions:
+              type: array
+              minItems: 1
+              items: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - for_each:
+      snapshot: {name: implementation_plan.actions, max_items: 16}
+      item_binding: implementation_action
+      collect: {binding: applied_actions, key: id}
+      body:
+        - judge:
+            kind: request_source
+            question: Which exact files must be read to implement this action safely?
+            subject: implementation_action
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Request only files needed to resolve symbols or integration points.
+              - Request no more than 8 repository-relative files.
+            context: [implementation_action, repository_context, source_documents]
+            output:
+              name: coding_source_requests
+              schema:
+                type: object
+                required: [requests]
+                additionalProperties: false
+                properties:
+                  requests:
+                    type: array
+                    maxItems: 8
+                    items:
+                      type: object
+                      required: [file_path, reason]
+                      additionalProperties: false
+                      properties:
+                        file_path: {type: string, minLength: 1}
+                        reason: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+        - for_each:
+            snapshot: {name: coding_source_requests.requests, max_items: 8}
+            item_binding: coding_source_request
+            collect: {binding: coding_source_documents, key: file_path, value: coding_source_document}
+            body:
+              - operation:
+                  tool: read_document
+                  parameters: {file_path: "${coding_source_request.file_path}"}
+                  bind: coding_source_document
+        - judge:
+            kind: construct_one
+            question: What one file edit implements this exact planned action?
+            subject: implementation_action
+            prompt_system: >-
+              You are the coding agent. Return exactly one safe, minimal file
+              edit. Do not edit any other file and do not change the plan.
+            instructions:
+              - Read the action intent, current repository context, and feature request.
+              - Target exactly the planned file path.
+              - Preserve unrelated content and existing invariants.
+              - Return an edit that can be applied by the agent file-edit tool.
+            context: [work_item_name, feature_description, implementation_action, repository_context, source_documents, coding_source_documents]
+            output:
+              name: coding_edit
+              schema:
+                type: object
+                required: [file_path, edits]
+                additionalProperties: false
+                properties:
+                  file_path: {type: string, minLength: 1}
+                  edits: {type: array, minItems: 1, items: {type: object}}
+            validation: {kind: json_schema}
+        - operation:
+            tool: edit
+            parameters:
+              file_path: "${coding_edit.file_path}"
+              edits: "${coding_edit.edits}"
+            bind: applied_edit
+  - for_each:
+      snapshot: {name: implementation_plan.validation_commands, max_items: 16}
+      item_binding: validation_command
+      collect: {binding: validation_results, key: command}
+      body:
+        - operation:
+            tool: internal
+            parameters: {command: "${validation_command}"}
+            bind: validation_result
+  - judge:
+      kind: construct_repair_plan
+      question: Which validation failures require a minimal replan and one new coding action?
+      subject: validation_results
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Treat nonzero command results as actionable failures.
+        - Return no actions when every validation command passed.
+        - For each failure, use the exact output to propose one scoped edit.
+        - Do not broaden the proposed PR.
+      context: [implementation_plan, validation_results, proposed_pr_source, repository_context]
+      output:
+        name: repair_plan
+        schema:
+          type: object
+          required: [actions]
+          additionalProperties: false
+          properties:
+            actions:
+              type: array
+              maxItems: 8
+              items:
+                type: object
+                required: [id, file_path, intent]
+                additionalProperties: false
+                properties:
+                  id: {type: string, minLength: 1}
+                  file_path: {type: string, minLength: 1}
+                  intent: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - for_each:
+      snapshot: {name: repair_plan.actions, max_items: 8}
+      item_binding: repair_action
+      collect: {binding: repair_results, key: id}
+      body:
+        - judge:
+            kind: construct_repair_edit
+            question: What one edit repairs this exact validation failure?
+            subject: repair_action
+            prompt_system: Return only one safe, minimal file edit as JSON.
+            instructions:
+              - Target exactly the planned repair path.
+              - Use the validation failure evidence and preserve unrelated behavior.
+            context: [feature_description, repair_action, validation_results, repository_context]
+            output:
+              name: repair_edit
+              schema:
+                type: object
+                required: [file_path, edits]
+                additionalProperties: false
+                properties:
+                  file_path: {type: string, minLength: 1}
+                  edits: {type: array, minItems: 1, items: {type: object}}
+            validation: {kind: json_schema}
+        - operation:
+            tool: edit
+            parameters:
+              file_path: "${repair_edit.file_path}"
+              edits: "${repair_edit.edits}"
+            bind: repair_result
+  - for_each:
+      snapshot: {name: implementation_plan.validation_commands, max_items: 16}
+      item_binding: revalidation_command
+      collect: {binding: revalidation_results, key: command}
+      body:
+        - operation:
+            tool: internal
+            parameters: {command: "${revalidation_command}"}
+            bind: revalidation_result
+  - operation:
+      tool: gather_context
+      parameters:
+        types: [requirements, features, invariants, expected_tests, expected_outcomes]
+        feature_id: "${work_item_name}"
+      bind: final_repository_context
+  - judge:
+      kind: verify_completeness
+      question: Does the implemented tree satisfy every acceptance condition and requested behavior?
+      subject: implementation_plan.acceptance_conditions
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Judge against the actual final repository context and validation results.
+        - Mark complete only when every condition is evidenced.
+        - List each missing condition precisely.
+      context: [feature_description, implementation_plan, validation_results, revalidation_results, final_repository_context]
+      output:
+        name: completeness_review
+        schema:
+          type: object
+          required: [complete, missing]
+          additionalProperties: false
+          properties:
+            complete: {type: boolean}
+            missing: {type: array, items: {type: string}}
+      validation: {kind: json_schema}
+  - judge:
+      kind: verify_invariants
+      question: Are all declared invariants preserved by the implementation?
+      subject: repository_context.invariants
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Use repository evidence and validation results, not assumptions.
+        - Report every violated or unevidenced invariant.
+      context: [implementation_plan, repository_context, final_repository_context, validation_results, revalidation_results]
+      output:
+        name: invariant_review
+        schema:
+          type: object
+          required: [preserved, violations]
+          additionalProperties: false
+          properties:
+            preserved: {type: boolean}
+            violations: {type: array, items: {type: string}}
+      validation: {kind: json_schema}
+  - judge:
+      kind: verify_security
+      question: Did the implementation introduce a security regression?
+      subject: final_repository_context
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Inspect only the changed scope and its security-relevant effects.
+        - Treat unknown security behavior as a finding, not as approval.
+      context: [implementation_plan, final_repository_context, validation_results, revalidation_results]
+      output:
+        name: security_review
+        schema:
+          type: object
+          required: [safe, findings]
+          additionalProperties: false
+          properties:
+            safe: {type: boolean}
+            findings: {type: array, items: {type: string}}
+      validation: {kind: json_schema}
+  - gate:
+      subject: completeness_review.complete
+      equals: true
+      on_failure:
+        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
+  - gate:
+      subject: invariant_review.preserved
+      equals: true
+      on_failure:
+        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
+  - gate:
+      subject: security_review.safe
+      equals: true
+      on_failure:
+        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
+  - terminal: succeeded

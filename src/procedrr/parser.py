@@ -9,7 +9,17 @@ from typing import Any
 
 import yaml
 
-KNOWN_TOOLS = frozenset({"gather_context", "internal", "edit", "yaml_edit"})
+KNOWN_TOOLS = frozenset(
+    {
+        "gather_context",
+        "internal",
+        "edit",
+        "yaml_edit",
+        "read_document",
+        "invoke_tool",
+        "list_files",
+    }
+)
 KNOWN_VALIDATORS = frozenset({"json_schema"})
 _BINDING = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
 
@@ -171,10 +181,14 @@ def _validate_steps(
                     )
             elif operation.get("tool") == "internal":
                 command = operation.get("command")
+                if command is None and isinstance(operation.get("parameters"), Mapping):
+                    command = operation["parameters"].get("command")
                 if (
                     not isinstance(command, list)
                     or not command
                     or not all(isinstance(part, str) for part in command)
+                ) and not (
+                    isinstance(command, str) and _BINDING.fullmatch(command) is not None
                 ):
                     diagnostics.append(
                         DocumentDiagnostic(

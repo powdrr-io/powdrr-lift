@@ -91,6 +91,30 @@ def test_parser_requires_explicit_collection_for_loop_outputs() -> None:
         )
 
 
+def test_parser_validates_attempt_recovery_references_and_body() -> None:
+    source = """name: recovery
+inputs: [{name: ready}]
+steps:
+  - attempt:
+      max_attempts: 2
+      body:
+        - gate:
+            subject: ready
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: repair, resume: work}
+recoveries:
+  repair:
+    steps:
+      - operation: {tool: internal, command: [echo], bind: ready}
+"""
+    document = parse_and_validate(source)
+    assert document["recoveries"]["repair"]["steps"]
+
+    with pytest.raises(Exception, match="unknown recovery"):
+        parse_and_validate(source.replace("recovery: repair", "recovery: missing"))
+
+
 def test_compiler_proves_bounded_sequence_and_counts_repairs() -> None:
     workflow = WorkflowDefinition(
         "feature",

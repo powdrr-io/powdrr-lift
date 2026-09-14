@@ -80,6 +80,7 @@ class Evaluator:
         bindings: Mapping[str, Any] | None = None,
     ) -> EvaluationResult:
         state = dict(bindings or {})
+        self._document_recoveries = document.get("recoveries", {})
         events: list[EvaluationEvent] = []
         usage = {"llm": 0, "tools": 0}
         limits = document.get("limits", {})
@@ -111,6 +112,8 @@ class Evaluator:
             elif "for_each" in step or "worklist" in step:
                 key = "for_each" if "for_each" in step else "worklist"
                 self._loop(key, step[key], state, events, usage, limits, step_path)
+            elif "attempt" in step:
+                self._attempt(step["attempt"], state, events, usage, limits, step_path)
             elif "terminal" in step:
                 events.append(
                     EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
@@ -119,6 +122,50 @@ class Evaluator:
                 self._gate(step["gate"], state, step_path)
             else:
                 raise EvaluationError(f"{step_path} has no supported control")
+
+    def _attempt(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        body = declaration.get("body")
+        route = declaration.get("on_failure")
+        maximum = declaration.get("max_attempts")
+        if not isinstance(body, list) or not isinstance(route, Mapping):
+            raise EvaluationError(f"{path}.attempt is malformed")
+        if not isinstance(maximum, int) or maximum <= 0:
+            raise EvaluationError(f"{path}.attempt.max_attempts must be positive")
+        recovery_name = route.get("recovery")
+        recoveries = getattr(self, "_document_recoveries", {})
+        recovery = (
+            recoveries.get(recovery_name) if isinstance(recovery_name, str) else None
+        )
+        if not isinstance(recovery, Mapping) or not isinstance(
+            recovery.get("steps"), list
+        ):
+            raise EvaluationError(f"{path}.attempt recovery is not declared")
+        for attempt in range(1, maximum + 1):
+            try:
+                self._steps(
+                    body, state, events, usage, limits, f"{path}.attempt[{attempt}]"
+                )
+                return
+            except EvaluationError as exc:
+                state["failure"] = {"message": str(exc), "attempt": attempt}
+                events.append(EvaluationEvent("recovery", path, state["failure"]))
+                self._steps(
+                    recovery["steps"],
+                    state,
+                    events,
+                    usage,
+                    limits,
+                    f"{path}.recovery[{attempt}]",
+                )
+        raise EvaluationError(f"{path}.attempt exhausted after {maximum} attempts")
 
     def _operation(
         self,

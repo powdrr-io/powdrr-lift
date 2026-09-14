@@ -109,6 +109,62 @@ def test_evaluator_resolves_embedded_references_in_operation_parameters() -> Non
     ]
 
 
+def test_attempt_runs_declared_recovery_and_resumes() -> None:
+    calls = 0
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        nonlocal calls
+        calls += 1
+        return True
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "recovery",
+            "steps": [
+                {
+                    "attempt": {
+                        "id": "work",
+                        "max_attempts": 2,
+                        "body": [
+                            {
+                                "gate": {
+                                    "subject": "ready",
+                                    "equals": True,
+                                    "on_failure": {
+                                        "retry": {
+                                            "target": "repair",
+                                            "max_attempts": 1,
+                                            "on_exhausted": "failed",
+                                        }
+                                    },
+                                }
+                            }
+                        ],
+                        "on_failure": {"recovery": "repair", "resume": "work"},
+                    }
+                }
+            ],
+            "recoveries": {
+                "repair": {
+                    "steps": [
+                        {
+                            "operation": {
+                                "tool": "internal",
+                                "bind": "ready",
+                            }
+                        }
+                    ]
+                }
+            },
+        },
+        {"ready": False},
+    )
+
+    assert result.bindings["ready"] is True
+    assert calls == 1
+    assert any(event.kind == "recovery" for event in result.events)
+
+
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     llm = FakeLLM()
 

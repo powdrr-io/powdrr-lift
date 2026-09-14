@@ -51,6 +51,8 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
         diagnostics.append(
             DocumentDiagnostic("name", "name must be a non-empty string")
         )
+    recoveries = document.get("recoveries", {})
+    recovery_names = set(recoveries) if isinstance(recoveries, Mapping) else set()
     steps = document.get("steps")
     if not isinstance(steps, list) or not steps:
         diagnostics.append(
@@ -62,7 +64,33 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
             for item in document.get("inputs", [])
             if isinstance(item, Mapping) and isinstance(item.get("name"), str)
         }
-        _validate_steps(steps, "steps", diagnostics, initial)
+        _validate_steps(steps, "steps", diagnostics, initial, recovery_names)
+    if recoveries is not None and not isinstance(recoveries, Mapping):
+        diagnostics.append(
+            DocumentDiagnostic("recoveries", "recoveries must be a mapping")
+        )
+    elif isinstance(recoveries, Mapping):
+        for name, recovery in recoveries.items():
+            if not isinstance(name, str) or not isinstance(recovery, Mapping):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        "recoveries", "each recovery must be a named mapping"
+                    )
+                )
+            elif not isinstance(recovery.get("steps"), list):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"recoveries.{name}.steps", "recovery steps must be a list"
+                    )
+                )
+            else:
+                _validate_steps(
+                    recovery["steps"],
+                    f"recoveries.{name}.steps",
+                    diagnostics,
+                    {"failure"},
+                    recovery_names,
+                )
     return tuple(diagnostics)
 
 
@@ -80,6 +108,7 @@ def _validate_steps(
     path: str,
     diagnostics: list[DocumentDiagnostic],
     bindings: set[str],
+    recovery_names: set[Any] | None = None,
 ) -> None:
     for index, step in enumerate(steps):
         step_path = f"{path}[{index}]"
@@ -96,6 +125,7 @@ def _validate_steps(
                 "call",
                 "terminal",
                 "gate",
+                "attempt",
             )
             if key in step
         }
@@ -105,7 +135,56 @@ def _validate_steps(
             )
             continue
         control = next(iter(controls))
-        if control in {"for_each", "worklist", "call"}:
+        if control == "attempt":
+            value = step[control]
+            if not isinstance(value, Mapping) or not isinstance(
+                value.get("body"), list
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.attempt.body", "attempt body must be a list"
+                    )
+                )
+            if (
+                not isinstance(value, Mapping)
+                or not isinstance(value.get("max_attempts"), int)
+                or value["max_attempts"] <= 0
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.attempt.max_attempts",
+                        "attempt max_attempts must be positive",
+                    )
+                )
+            failure = value.get("on_failure") if isinstance(value, Mapping) else None
+            if (
+                not isinstance(failure, Mapping)
+                or not isinstance(failure.get("recovery"), str)
+                or not isinstance(failure.get("resume"), str)
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.attempt.on_failure",
+                        "attempt requires recovery and resume",
+                    )
+                )
+            elif failure["recovery"] not in (recovery_names or set()):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.attempt.on_failure.recovery",
+                        f"unknown recovery: {failure['recovery']}",
+                    )
+                )
+            nested = value.get("body") if isinstance(value, Mapping) else None
+            if isinstance(nested, list):
+                _validate_steps(
+                    nested,
+                    f"{step_path}.attempt.body",
+                    diagnostics,
+                    set(bindings) | {"failure"},
+                    recovery_names,
+                )
+        elif control in {"for_each", "worklist", "call"}:
             value = step[control]
             nested = (
                 value.get("steps", value.get("body"))
@@ -139,7 +218,11 @@ def _validate_steps(
                 ):
                     bindings.add(collect["binding"])
                 _validate_steps(
-                    nested, f"{step_path}.{control}.body", diagnostics, local
+                    nested,
+                    f"{step_path}.{control}.body",
+                    diagnostics,
+                    local,
+                    recovery_names,
                 )
                 bindings.update(local)
         elif control == "operation":

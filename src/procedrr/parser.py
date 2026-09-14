@@ -224,13 +224,30 @@ def _validate_steps(
                         "repeat requires subject and equals",
                     )
                 )
+            collect = value.get("collect") if isinstance(value, Mapping) else None
+            if collect is not None and (
+                not isinstance(collect, Mapping)
+                or not isinstance(collect.get("binding"), str)
+                or not isinstance(collect.get("value"), str)
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.repeat.collect",
+                        "repeat collect requires binding and value references",
+                    )
+                )
             nested = value.get("body") if isinstance(value, Mapping) else None
             if isinstance(nested, list):
+                nested_bindings = set(bindings)
+                if isinstance(collect, Mapping) and isinstance(
+                    collect.get("binding"), str
+                ):
+                    bindings.add(collect["binding"])
                 _validate_steps(
                     nested,
                     f"{step_path}.repeat.body",
                     diagnostics,
-                    set(bindings),
+                    nested_bindings,
                     recovery_names,
                 )
         elif control == "branch":

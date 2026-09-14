@@ -190,6 +190,7 @@ class Evaluator:
         body = declaration.get("body")
         maximum = declaration.get("max_iterations")
         until = declaration.get("until")
+        collect = declaration.get("collect")
         if (
             not isinstance(body, list)
             or not isinstance(maximum, int)
@@ -197,13 +198,22 @@ class Evaluator:
             or not isinstance(until, Mapping)
         ):
             raise EvaluationError(f"{path}.repeat is malformed")
+        collected: list[Any] = []
         for iteration in range(1, maximum + 1):
             self._steps(
                 body, state, events, usage, limits, f"{path}.repeat[{iteration}]"
             )
+            if isinstance(collect, Mapping) and isinstance(collect.get("value"), str):
+                value = _resolve_binding(state, collect["value"])
+                if value is not None:
+                    collected.append(value)
             if _resolve_binding(state, str(until.get("subject"))) == until.get(
                 "equals"
             ):
+                if isinstance(collect, Mapping) and isinstance(
+                    collect.get("binding"), str
+                ):
+                    state[collect["binding"]] = collected
                 return
         raise EvaluationError(f"{path}.repeat exhausted after {maximum} iterations")
 

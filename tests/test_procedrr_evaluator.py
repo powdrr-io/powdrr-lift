@@ -323,27 +323,17 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
 
 
 class HelloWorldLLM:
+    def __init__(self) -> None:
+        self.plan_round = 0
+
     def complete_json(self, messages: list[dict[str, str]], **_: Any) -> dict[str, Any]:
         question = messages[1]["content"]
         if "Which exact repository files" in question:
-            return {
-                "requests": [{"file_path": "hello.py", "reason": "read the program"}]
-            }
-        if "Which exact files must be read" in question:
-            return {
-                "requests": [
-                    {"file_path": "hello.py", "reason": "confirm current output"}
-                ]
-            }
+            return {"file_path": "hello.py", "reason": "read the program"}
+        if "Which exact file must be read" in question:
+            return {"file_path": "hello.py", "reason": "confirm current output"}
         if "smallest ordered implementation plan" in question:
             return {
-                "actions": [
-                    {
-                        "id": "add-second-line",
-                        "file_path": "hello.py",
-                        "intent": "Print Here I Am after Hello, World.",
-                    }
-                ],
                 "validation_commands": [
                     [sys.executable, "-m", "pytest", "-q"],
                     ["ruff", "check", "hello.py"],
@@ -354,18 +344,43 @@ class HelloWorldLLM:
                     "ruff reports no issues",
                 ],
             }
-        if "What one file edit implements" in question:
+        if "Is implementation planning complete" in question:
+            self.plan_round += 1
+            if self.plan_round > 1:
+                return {
+                    "done": True,
+                    "action": {
+                        "id": "done",
+                        "file_path": "hello.py",
+                        "intent": "complete",
+                    },
+                }
+            return {
+                "done": False,
+                "action": {
+                    "id": "add-second-line",
+                    "file_path": "hello.py",
+                    "intent": "Print Here I Am after Hello, World.",
+                },
+            }
+        if "What one edit implements" in question:
             return {
                 "file_path": "hello.py",
-                "edits": [
-                    {
-                        "old_text": 'print("Hello, World")\n',
-                        "new_text": 'print("Hello, World")\nprint("Here I Am")\n',
-                    }
-                ],
+                "edit": {
+                    "old_text": 'print("Hello, World")\n',
+                    "new_text": 'print("Hello, World")\nprint("Here I Am")\n',
+                },
             }
-        if "Which validation failures" in question:
-            return {"actions": []}
+        if "Are all actionable validation failures" in question:
+            return {
+                "done": True,
+                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+            }
+        if "Which validation failures require" in question:
+            return {
+                "done": True,
+                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+            }
         if "Does the implemented tree" in question:
             return {"complete": True, "missing": []}
         if "Are all declared invariants" in question:

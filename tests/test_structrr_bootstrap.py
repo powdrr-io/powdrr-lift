@@ -23,7 +23,14 @@ def _fixture_repo(tmp_path: Path) -> Path:
         taxonomy.read_text(encoding="utf-8"), encoding="utf-8"
     )
     (repo / "src").mkdir()
-    (repo / "src/app.py").write_text("def run() -> None:\n    pass\n", encoding="utf-8")
+    (repo / "src/app.py").write_text(
+        "class App:\n"
+        "    def run(self) -> None:\n"
+        "        pass\n\n"
+        "def run() -> None:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
     (repo / "docs/current").mkdir(parents=True)
     (repo / "docs/current/product").mkdir()
     (repo / "docs/current/product/architecture-specification.yaml").write_text(
@@ -130,6 +137,17 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     assert source_link["source"] == "app"
     assert source_link["target"] == "file:src/app.py"
     assert source_link["relationship"] == "implemented_by"
+    subjects = result.document["source_subjects"]
+    module = next(subject for subject in subjects if subject["kind"] == "module")
+    assert module["stable_key"] == "python::src.app"
+    assert any(subject["qualified_name"] == "src.app.App.run" for subject in subjects)
+    binding = next(
+        binding
+        for binding in result.document["source_bindings"]
+        if binding["entity_id"] == "app"
+    )
+    assert binding["subject_id"].startswith("python:src/app.py::")
+    assert binding["span"]["start_line"] >= 1
     assert result.document["files"][0]["span"]["start_line"] == 1
     statements = [
         statement
@@ -227,3 +245,42 @@ def test_bootstrap_validation_rejects_unknown_statement_kind(tmp_path: Path) -> 
 
     assert not report.successful
     assert any(issue.code == "statement_kind_invalid" for issue in report.issues)
+
+
+def test_bootstrap_validation_rejects_unknown_source_binding(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    result = bootstrap_structrr(repo)
+    document = dict(result.document)
+    document["source_bindings"] = [
+        {
+            "id": "binding:missing",
+            "subject_id": "python:missing.py::run",
+            "entity_id": "missing",
+            "relationship": "implemented_by",
+            "span": {"start_line": 1, "end_line": 1},
+        }
+    ]
+
+    report = validate_bootstrap_document(document, root=repo)
+
+    assert not report.successful
+    assert any(
+        issue.code == "source_binding_subject_unknown" for issue in report.issues
+    )
+
+
+def test_bootstrap_validation_rejects_duplicate_stable_key(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    result = bootstrap_structrr(repo)
+    document = dict(result.document)
+    subjects = list(document["source_subjects"])
+    subjects[1] = dict(subjects[1])
+    subjects[1]["stable_key"] = subjects[0]["stable_key"]
+    document["source_subjects"] = subjects
+
+    report = validate_bootstrap_document(document, root=repo)
+
+    assert not report.successful
+    assert any(
+        issue.code == "source_subject_stable_key_duplicate" for issue in report.issues
+    )

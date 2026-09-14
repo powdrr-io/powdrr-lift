@@ -275,7 +275,11 @@ class Evaluator:
         if not isinstance(body, list):
             raise EvaluationError(f"{path}.{kind}.body must be a list")
         collect = declaration.get("collect")
+        collect_mode = (
+            collect.get("mode", "map") if isinstance(collect, Mapping) else "map"
+        )
         collected: dict[str, Any] = {}
+        collected_list: list[Any] = []
         for epoch in range(epochs):
             for index, item in enumerate(items):
                 binding = declaration.get("item_binding", declaration.get("item"))
@@ -299,9 +303,17 @@ class Evaluator:
                     else:
                         output = item
                     if output is not None:
-                        collected[str(item)] = output
+                        if collect_mode == "list":
+                            key_name = collect.get("key", "item")
+                            collected_list.append(
+                                {str(key_name): item, "result": output}
+                            )
+                        else:
+                            collected[str(item)] = output
         if isinstance(collect, Mapping) and isinstance(collect.get("binding"), str):
-            state[collect["binding"]] = collected
+            state[collect["binding"]] = (
+                collected_list if collect_mode == "list" else collected
+            )
 
     def _gate(
         self, gate: Mapping[str, Any], state: Mapping[str, Any], path: str

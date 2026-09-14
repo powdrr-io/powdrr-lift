@@ -189,7 +189,7 @@ steps:
   - for_each:
       snapshot: {name: implementation_plan.validation_commands, max_items: 16}
       item_binding: validation_command
-      collect: {binding: validation_results, key: command}
+      collect: {binding: validation_results, mode: list, key: command, value: validation_result}
       body:
         - operation:
             tool: internal
@@ -201,9 +201,11 @@ steps:
       subject: validation_results
       prompt_system: Return only the declared JSON object.
       instructions:
+        - Treat each validation_results record as {command, result}.
         - Treat nonzero command results as actionable failures.
         - Return no actions when every validation command passed.
         - For each failure, use the exact output to propose one scoped edit.
+        - Every repair action must be traceable to one validation_results record.
         - Do not broaden the proposed PR.
       context: [implementation_plan, validation_results, proposed_pr_source, repository_context]
       output:
@@ -258,7 +260,7 @@ steps:
   - for_each:
       snapshot: {name: implementation_plan.validation_commands, max_items: 16}
       item_binding: revalidation_command
-      collect: {binding: revalidation_results, key: command}
+      collect: {binding: revalidation_results, mode: list, key: command, value: revalidation_result}
       body:
         - operation:
             tool: internal
@@ -392,7 +394,7 @@ recoveries:
                 instructions:
                   - Target exactly the proposed repair file.
                   - Preserve unrelated content and existing invariants.
-                context: [feature_description, final_repair_action, failure, final_repository_context]
+                context: [feature_description, final_repair_action, failure, validation_results, final_repository_context]
                 output:
                   name: final_repair_edit
                   schema:
@@ -412,7 +414,7 @@ recoveries:
       - for_each:
           snapshot: {name: implementation_plan.validation_commands, max_items: 16}
           item_binding: final_revalidation_command
-          collect: {binding: final_revalidation_results, key: command}
+          collect: {binding: final_revalidation_results, mode: list, key: command, value: final_revalidation_result}
           body:
             - operation:
                 tool: internal
@@ -430,7 +432,7 @@ recoveries:
           subject: implementation_plan.acceptance_conditions
           prompt_system: Return only the declared JSON object.
           instructions:
-            - Judge against the corrected repository context and latest validation results.
+            - Judge against the corrected repository context and latest structured validation results.
             - Mark complete only when every condition is evidenced.
             - List each missing condition precisely.
           context: [feature_description, implementation_plan, validation_results, final_revalidation_results, final_repository_context]

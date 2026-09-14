@@ -226,6 +226,17 @@ def _validate_steps(
                         )
                     )
                 collect = value.get("collect")
+                if isinstance(collect, Mapping) and collect.get("mode") not in {
+                    None,
+                    "map",
+                    "list",
+                }:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.for_each.collect.mode",
+                            "collect mode must be map or list",
+                        )
+                    )
                 if isinstance(collect, str):
                     bindings.add(collect)
                 elif isinstance(collect, Mapping) and isinstance(

@@ -165,6 +165,45 @@ def test_attempt_runs_declared_recovery_and_resumes() -> None:
     assert any(event.kind == "recovery" for event in result.events)
 
 
+def test_for_each_collects_structured_results_in_order() -> None:
+    result = Evaluator(
+        FakeLLM(), lambda _tool, parameters: {"returncode": parameters["code"]}
+    ).evaluate(
+        {
+            "name": "structured-results",
+            "steps": [
+                {
+                    "for_each": {
+                        "snapshot": {"name": "codes", "max_items": 2},
+                        "item_binding": "code",
+                        "collect": {
+                            "binding": "validation_results",
+                            "mode": "list",
+                            "key": "command",
+                            "value": "validation_result",
+                        },
+                        "body": [
+                            {
+                                "operation": {
+                                    "tool": "check",
+                                    "parameters": {"code": "${code}"},
+                                    "bind": "validation_result",
+                                }
+                            }
+                        ],
+                    }
+                }
+            ],
+        },
+        {"codes": [0, 1]},
+    )
+
+    assert result.bindings["validation_results"] == [
+        {"command": 0, "result": {"returncode": 0}},
+        {"command": 1, "result": {"returncode": 1}},
+    ]
+
+
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     llm = FakeLLM()
 

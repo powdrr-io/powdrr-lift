@@ -43,6 +43,51 @@ def _fixture_repo(tmp_path: Path) -> Path:
                         "relationship": "contains",
                     }
                 ],
+                "requirements": [
+                    {
+                        "id": "req-run-app",
+                        "description": (
+                            "The application must expose a runnable entry point."
+                        ),
+                        "state": "added",
+                    }
+                ],
+                "approach": [
+                    {
+                        "id": "app-python-module",
+                        "description": "Implement the entry point as a Python module.",
+                        "state": "added",
+                    }
+                ],
+                "tools": [
+                    {
+                        "id": "run-tests",
+                        "related_modules": ["app"],
+                        "when_to_use": "When validating application changes.",
+                        "validation_action": "pytest",
+                    }
+                ],
+                "invariants": [
+                    {
+                        "id": "app-entry-point",
+                        "description": "The application entry point remains callable.",
+                        "rationale": "Preserve the application contract.",
+                        "related": {"entities": ["app"]},
+                    },
+                    {
+                        "id": "app-reference-valid",
+                        "description": "Every app reference must resolve.",
+                    },
+                ],
+                "guidance": [
+                    {
+                        "id": "run-tests-before-edit",
+                        "description": (
+                            "Run the validation tool before editing application "
+                            "behavior."
+                        ),
+                    }
+                ],
             },
             sort_keys=False,
         ),
@@ -86,6 +131,53 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     assert source_link["target"] == "file:src/app.py"
     assert source_link["relationship"] == "implemented_by"
     assert result.document["files"][0]["span"]["start_line"] == 1
+    statements = [
+        statement
+        for statement in result.document["statements"]
+        if statement["id"] in {"app-python-module", "req-run-app"}
+    ]
+    assert statements == [
+        {
+            "id": "app-python-module",
+            "declared_kind": "approach",
+            "kind": "approach",
+            "action": "added",
+            "description": "Implement the entry point as a Python module.",
+            "source": "docs/current/product/architecture-specification.yaml",
+            "classification": "declared",
+            "classification_reason": "Preserved from the specification section.",
+            "state": "added",
+        },
+        {
+            "id": "req-run-app",
+            "declared_kind": "requirement",
+            "kind": "requirement",
+            "action": "added",
+            "description": "The application must expose a runnable entry point.",
+            "source": "docs/current/product/architecture-specification.yaml",
+            "classification": "declared",
+            "classification_reason": "Preserved from the specification section.",
+            "state": "added",
+        },
+    ]
+    assert result.document["tools"][0]["validation_action"] == "pytest"
+    assert result.document["invariants"][0]["id"] == "app-entry-point"
+    assert result.document["invariants"][0]["kind"] == "invariant"
+    assert result.document["invariants"][0]["classification"] == "declared"
+    validation_invariant = next(
+        item
+        for item in result.document["invariants"]
+        if item["id"] == "app-reference-valid"
+    )
+    assert validation_invariant["kind"] == "validation_rule"
+    assert validation_invariant["classification"] == "inferred"
+    assert any(
+        item["id"] == "app-entry-point" and item["kind"] == "invariant"
+        for item in result.document["statements"]
+    )
+    assert any(
+        item["id"] == "run-tests-before-edit" for item in result.document["guidance"]
+    )
 
 
 def test_bootstrap_is_deterministic_and_does_not_stage_output(tmp_path: Path) -> None:
@@ -116,3 +208,22 @@ def test_bootstrap_validation_rejects_dangling_relationship(tmp_path: Path) -> N
 
     assert not report.successful
     assert any(issue.code == "relationship_dangling" for issue in report.issues)
+
+
+def test_bootstrap_validation_rejects_unknown_statement_kind(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    result = bootstrap_structrr(repo)
+    document = dict(result.document)
+    document["statements"] = [
+        {
+            "id": "bad-statement",
+            "kind": "unsupported",
+            "action": "added",
+            "description": "Invalid statement kind.",
+        }
+    ]
+
+    report = validate_bootstrap_document(document, root=repo)
+
+    assert not report.successful
+    assert any(issue.code == "statement_kind_invalid" for issue in report.issues)

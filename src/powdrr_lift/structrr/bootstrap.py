@@ -16,6 +16,7 @@ from powdrr_lift.core.entity_taxonomy import EntityTaxonomy, load_entity_taxonom
 from powdrr_lift.core.spec_paths import is_specification_path
 
 _SCHEMA = "https://powdrr.io/schema/changelog-v2"
+_BOOTSTRAP_SCHEMA = "https://powdrr.io/schema/structrr-bootstrap-v1"
 _DEFAULT_OUTPUT = Path("docs/structrr/bootstrap-changelog.yaml")
 _IGNORED_PREFIXES = (".git/", ".worktrees/", "node_modules/", "vendor/")
 _IGNORED_FILES = {".DS_Store"}
@@ -38,6 +39,15 @@ _SOURCE_LINKABLE_TYPES = {
     "Service",
     "Skill",
     "Tool",
+}
+_STATEMENT_KINDS = {
+    "requirement",
+    "invariant",
+    "constraint",
+    "validation_rule",
+    "approach",
+    "guidance",
+    "acceptance_criterion",
 }
 
 
@@ -123,6 +133,13 @@ def validate_bootstrap_document(
     if document.get("schema") != _SCHEMA:
         issues.append(
             BootstrapIssue("schema_invalid", "Bootstrap must use changelog-v2.")
+        )
+    if document.get("structrr_schema") != _BOOTSTRAP_SCHEMA:
+        issues.append(
+            BootstrapIssue(
+                "bootstrap_schema_invalid",
+                "Bootstrap must declare structrr-bootstrap-v1.",
+            )
         )
 
     try:
@@ -250,7 +267,235 @@ def validate_bootstrap_document(
                 )
             )
 
+    _validate_lifecycle_section(
+        issues, document.get("invariants"), "invariant", root_path
+    )
+    _validate_lifecycle_section(issues, document.get("guidance"), "guidance", root_path)
+    _validate_tools(issues, document.get("tools"), root_path)
+    _validate_statements(issues, document.get("statements"), root_path)
+
     return BootstrapValidationReport(not issues, tuple(issues))
+
+
+def _validate_lifecycle_section(
+    issues: list[BootstrapIssue],
+    value: object,
+    kind: str,
+    root: Path,
+) -> None:
+    entries = _validated_mapping_list(issues, value, kind)
+    seen: set[str] = set()
+    for index, entry in enumerate(entries):
+        item_id = _text(entry.get("id"))
+        if not item_id:
+            issues.append(
+                BootstrapIssue(
+                    f"{kind}_id_missing", f"{kind} id is required.", f"{kind}s[{index}]"
+                )
+            )
+        elif item_id in seen:
+            issues.append(
+                BootstrapIssue(
+                    f"{kind}_id_duplicate", f"Duplicate {kind} id {item_id!r}.", item_id
+                )
+            )
+        seen.add(item_id)
+        if _text(entry.get("action")) != "added":
+            issues.append(
+                BootstrapIssue(
+                    f"{kind}_action_invalid", f"{kind} action must be added.", item_id
+                )
+            )
+        if not _text(entry.get("description")):
+            issues.append(
+                BootstrapIssue(
+                    f"{kind}_description_missing",
+                    f"{kind} description is required.",
+                    item_id,
+                )
+            )
+        _validate_statement_metadata(issues, entry, kind, item_id)
+        _validate_provenance(issues, entry, root, item_id)
+
+
+def _validate_tools(issues: list[BootstrapIssue], value: object, root: Path) -> None:
+    entries = _validated_mapping_list(issues, value, "tool")
+    seen: set[str] = set()
+    for index, entry in enumerate(entries):
+        tool_id = _text(entry.get("id"))
+        if not tool_id:
+            issues.append(
+                BootstrapIssue(
+                    "tool_id_missing", "tool id is required.", f"tools[{index}]"
+                )
+            )
+        elif tool_id in seen:
+            issues.append(
+                BootstrapIssue(
+                    "tool_id_duplicate", f"Duplicate tool id {tool_id!r}.", tool_id
+                )
+            )
+        seen.add(tool_id)
+        if _text(entry.get("action")) != "added":
+            issues.append(
+                BootstrapIssue(
+                    "tool_action_invalid", "Tool action must be added.", tool_id
+                )
+            )
+        related_modules = entry.get("related_modules")
+        if related_modules is not None and (
+            not isinstance(related_modules, Sequence)
+            or isinstance(related_modules, (str, bytes))
+        ):
+            issues.append(
+                BootstrapIssue(
+                    "tool_related_modules_invalid",
+                    "Tool related_modules must be a list.",
+                    tool_id,
+                )
+            )
+        _validate_provenance(issues, entry, root, tool_id)
+
+
+def _validate_statements(
+    issues: list[BootstrapIssue], value: object, root: Path
+) -> None:
+    entries = _validated_mapping_list(issues, value, "statement")
+    seen: set[str] = set()
+    for index, entry in enumerate(entries):
+        statement_id = _text(entry.get("id"))
+        kind = _text(entry.get("kind"))
+        if not statement_id:
+            issues.append(
+                BootstrapIssue(
+                    "statement_id_missing",
+                    "statement id is required.",
+                    f"statements[{index}]",
+                )
+            )
+        elif statement_id in seen:
+            issues.append(
+                BootstrapIssue(
+                    "statement_id_duplicate",
+                    f"Duplicate statement id {statement_id!r}.",
+                    statement_id,
+                )
+            )
+        seen.add(statement_id)
+        if kind not in _STATEMENT_KINDS:
+            issues.append(
+                BootstrapIssue(
+                    "statement_kind_invalid",
+                    "Statement kind is not recognized.",
+                    statement_id,
+                )
+            )
+        declared_kind = _text(entry.get("declared_kind"))
+        if declared_kind not in {"requirement", "invariant", "approach", "guidance"}:
+            issues.append(
+                BootstrapIssue(
+                    "statement_declared_kind_invalid",
+                    "Statement declared_kind is not recognized.",
+                    statement_id,
+                )
+            )
+        classification = _text(entry.get("classification"))
+        if classification not in {"declared", "inferred"}:
+            issues.append(
+                BootstrapIssue(
+                    "statement_classification_invalid",
+                    "Statement classification must be declared or inferred.",
+                    statement_id,
+                )
+            )
+        if _text(entry.get("action")) != "added":
+            issues.append(
+                BootstrapIssue(
+                    "statement_action_invalid",
+                    "Statement action must be added.",
+                    statement_id,
+                )
+            )
+        if not _text(entry.get("description")):
+            issues.append(
+                BootstrapIssue(
+                    "statement_description_missing",
+                    "Statement description is required.",
+                    statement_id,
+                )
+            )
+        _validate_provenance(issues, entry, root, statement_id)
+
+
+def _validate_provenance(
+    issues: list[BootstrapIssue],
+    entry: Mapping[str, Any],
+    root: Path,
+    item_id: str,
+) -> None:
+    source = _text(entry.get("source"))
+    if source and not (root / source).is_file():
+        issues.append(
+            BootstrapIssue(
+                "semantic_source_missing",
+                "Semantic source file does not exist.",
+                item_id,
+            )
+        )
+
+
+def _validate_statement_metadata(
+    issues: list[BootstrapIssue],
+    entry: Mapping[str, Any],
+    declared_kind: str,
+    item_id: str,
+) -> None:
+    normalized_kind = _text(entry.get("kind"))
+    if normalized_kind not in _STATEMENT_KINDS:
+        issues.append(
+            BootstrapIssue(
+                "lifecycle_kind_invalid",
+                "Lifecycle statement kind is not recognized.",
+                item_id,
+            )
+        )
+    if _text(entry.get("declared_kind")) != declared_kind:
+        issues.append(
+            BootstrapIssue(
+                "lifecycle_declared_kind_invalid",
+                "Lifecycle declared_kind must match its source section.",
+                item_id,
+            )
+        )
+    if _text(entry.get("classification")) not in {"declared", "inferred"}:
+        issues.append(
+            BootstrapIssue(
+                "lifecycle_classification_invalid",
+                "Lifecycle classification must be declared or inferred.",
+                item_id,
+            )
+        )
+
+
+def _validated_mapping_list(
+    issues: list[BootstrapIssue], value: object, kind: str
+) -> list[Mapping[str, Any]]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        issues.append(BootstrapIssue(f"{kind}s_invalid", f"{kind}s must be a list."))
+        return []
+    entries: list[Mapping[str, Any]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            issues.append(
+                BootstrapIssue(
+                    f"{kind}_invalid",
+                    f"{kind} must be a mapping.",
+                    f"{kind}s[{index}]",
+                )
+            )
+            continue
+        entries.append(item)
+    return entries
 
 
 def _tracked_files(root: Path) -> tuple[str, ...]:
@@ -291,6 +536,159 @@ def _load_spec_documents(
     return documents
 
 
+def _collect_lifecycle_items(
+    destination: dict[str, dict[str, Any]],
+    value: object,
+    source: str,
+    declared_kind: str,
+) -> None:
+    for raw_item in _mappings(value):
+        item_id = _text(raw_item.get("id"))
+        description = _text(raw_item.get("description"))
+        if not item_id or not description:
+            continue
+        item: dict[str, Any] = {
+            "id": item_id,
+            "declared_kind": declared_kind,
+            "action": "added",
+            "description": description,
+            "source": source,
+        }
+        kind, classification, reason = _classify_statement(declared_kind, description)
+        item.update(
+            {
+                "kind": kind,
+                "classification": classification,
+                "classification_reason": reason,
+            }
+        )
+        rationale = _text(raw_item.get("rationale"))
+        if rationale:
+            item["rationale"] = rationale
+        related = _snapshot_related(raw_item.get("related"))
+        if related:
+            item["related"] = related
+        destination.setdefault(item_id, item)
+
+
+def _collect_tools(
+    destination: dict[str, dict[str, Any]],
+    value: object,
+    source: str,
+) -> None:
+    for raw_tool in _mappings(value):
+        tool_id = _text(raw_tool.get("id"))
+        if not tool_id:
+            continue
+        tool = {str(key): value for key, value in raw_tool.items()}
+        tool["id"] = tool_id
+        tool["action"] = "added"
+        tool["source"] = source
+        destination.setdefault(tool_id, tool)
+
+
+def _collect_statements(
+    destination: dict[str, dict[str, Any]],
+    kind: str,
+    value: object,
+    source: str,
+) -> None:
+    for raw_statement in _mappings(value):
+        statement_id = _text(raw_statement.get("id"))
+        description = _text(raw_statement.get("description"))
+        if not statement_id or not description:
+            continue
+        statement: dict[str, Any] = {
+            "id": statement_id,
+            "declared_kind": kind,
+            "kind": kind,
+            "action": "added",
+            "description": description,
+            "source": source,
+            "classification": "declared",
+            "classification_reason": "Preserved from the specification section.",
+        }
+        state = _text(raw_statement.get("state"))
+        if state:
+            statement["state"] = state
+        destination.setdefault(statement_id, statement)
+
+
+def _classify_statement(declared_kind: str, description: str) -> tuple[str, str, str]:
+    if declared_kind != "invariant":
+        return (
+            declared_kind,
+            "declared",
+            "Preserved from the specification section.",
+        )
+
+    normalized = description.lower()
+    validation_markers = (
+        "must resolve",
+        "must be unique",
+        "must have",
+        "must point to",
+        "must include",
+        "must survive",
+        "must remain intact",
+        "validator",
+        "round-trip",
+        "roundtrip",
+    )
+    requirement_markers = (
+        "must expose",
+        "must support",
+        "must install",
+        "must be generated",
+        "should expose",
+    )
+    constraint_markers = (
+        "must not",
+        "cannot",
+        "never",
+        "exactly once",
+        "without altering",
+        "owns ",
+    )
+    if any(marker in normalized for marker in validation_markers):
+        return (
+            "validation_rule",
+            "inferred",
+            "The statement describes validation or referential integrity.",
+        )
+    if any(marker in normalized for marker in requirement_markers):
+        return (
+            "requirement",
+            "inferred",
+            "The statement describes a desired product or system capability.",
+        )
+    if any(marker in normalized for marker in constraint_markers):
+        return (
+            "constraint",
+            "inferred",
+            "The statement describes a hard implementation or execution limit.",
+        )
+    return (
+        "invariant",
+        "declared",
+        "No stronger normalized classification was inferred.",
+    )
+
+
+def _snapshot_related(value: object) -> dict[str, list[str]]:
+    if not isinstance(value, Mapping):
+        return {}
+    related: dict[str, list[str]] = {}
+    for key in ("entities", "entity_relationships", "invariants", "guidance"):
+        values = value.get(key)
+        if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+            continue
+        normalized = [_text(item) for item in values if _text(item)]
+        if normalized:
+            related[key] = normalized
+    return related
+
+
 def _build_document(
     *,
     root: Path,
@@ -305,6 +703,10 @@ def _build_document(
     entities: dict[str, dict[str, Any]] = {}
     relationships: dict[str, dict[str, Any]] = {}
     spec_entity_sources: dict[str, tuple[str, str]] = {}
+    invariants: dict[str, dict[str, Any]] = {}
+    guidance: dict[str, dict[str, Any]] = {}
+    tools: dict[str, dict[str, Any]] = {}
+    statements: dict[str, dict[str, Any]] = {}
 
     repository_id = f"repository:{root.name}"
     entities[repository_id] = {
@@ -364,6 +766,24 @@ def _build_document(
                         or f"Inferred from {spec_path}.",
                     },
                 )
+        _collect_lifecycle_items(
+            invariants, spec.get("invariants"), spec_path, "invariant"
+        )
+        _collect_lifecycle_items(guidance, spec.get("guidance"), spec_path, "guidance")
+        _collect_tools(tools, spec.get("tools"), spec_path)
+        _collect_statements(
+            statements, "requirement", spec.get("requirements"), spec_path
+        )
+        _collect_statements(statements, "approach", spec.get("approach"), spec_path)
+
+    for item in (*invariants.values(), *guidance.values()):
+        statements.setdefault(item["id"], item)
+
+    for tool_id in tools:
+        entities.setdefault(
+            tool_id,
+            {"id": tool_id, "type": "Tool", "action": "added"},
+        )
 
     relationships.update(
         _infer_source_relationships(
@@ -396,6 +816,7 @@ def _build_document(
 
     return {
         "schema": _SCHEMA,
+        "structrr_schema": _BOOTSTRAP_SCHEMA,
         "change_id": change_id,
         "title": title,
         "intent": {
@@ -413,17 +834,24 @@ def _build_document(
         "files": files,
         "entities": [entities[key] for key in sorted(entities)],
         "entity_relationships": [relationships[key] for key in sorted(relationships)],
-        "invariants": [],
-        "guidance": [
+        "invariants": [invariants[key] for key in sorted(invariants)],
+        "guidance": [guidance[key] for key in sorted(guidance)]
+        + [
             {
                 "id": "bootstrap-review-before-edit",
+                "declared_kind": "guidance",
+                "kind": "guidance",
                 "action": "added",
+                "classification": "declared",
+                "classification_reason": "Generated bootstrap review guidance.",
                 "description": (
                     "Review inferred entities and relationships before using this "
                     "snapshot to guide changes."
                 ),
             }
         ],
+        "tools": [tools[key] for key in sorted(tools)],
+        "statements": [statements[key] for key in sorted(statements)],
         "features": [],
         "proposed_prs": [],
     }

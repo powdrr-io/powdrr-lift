@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import itertools
 import json
 import math
 import os
@@ -46,6 +47,7 @@ _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_STREAM_CHUNKS = 16384
 _MAX_STREAM_CONTENT_CHARS = 524288
 _STREAM_EXCERPT_CHARS = 512
+_STREAM_CAPTURE_COUNTER = itertools.count(1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -487,6 +489,11 @@ def _read_openai_response(
 
     content_parts: list[str] = []
     capture_path = os.environ.get("POWDRR_STREAM_CAPTURE_PATH")
+    capture_id = next(_STREAM_CAPTURE_COUNTER)
+    if capture_path:
+        with Path(capture_path).open("a", encoding="utf-8") as capture:
+            capture.write(f"\n---STREAM-BEGIN id={capture_id}---\n")
+            capture.flush()
     response_metadata: dict[str, Any] | None = None
     event_data: list[str] = []
     chunk_count = 0
@@ -567,6 +574,10 @@ def _read_openai_response(
             f"partial content: {_stream_excerpt(content_parts)!r}"
         )
     response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
+    if capture_path:
+        with Path(capture_path).open("a", encoding="utf-8") as capture:
+            capture.write(f"\n---STREAM-END id={capture_id}---\n")
+            capture.flush()
     return json.dumps(response_metadata)
 
 

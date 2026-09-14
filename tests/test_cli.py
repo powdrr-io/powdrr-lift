@@ -7,6 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import pytest
+import yaml
 
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import _stage_generated_file, main
@@ -34,7 +35,6 @@ def test_cli_init_writes_template(
                 str(output_path),
             ]
         )
-
     assert exit_code == 0
     assert output_path.exists()
     assert str(output_path) in stdout.getvalue()
@@ -99,6 +99,52 @@ def test_cli_remember_and_explain_intent(tmp_path: Path) -> None:
     explanation = json.loads(stdout.getvalue())
     assert explanation["contract"]["clause_ids"] == ["clause-review"]
     assert explanation["contract"]["clauses"][0]["text"].startswith("Resolve")
+
+
+def test_cli_rebase_structrr_writes_machine_readable_report(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.yaml"
+    current = tmp_path / "current.yaml"
+    output = tmp_path / "rebase.json"
+    snapshot = {
+        "entities": [{"id": "api", "type": "Application"}],
+        "entity_relationships": [],
+        "source_subjects": [],
+        "source_bindings": [],
+    }
+    baseline.write_text(yaml.safe_dump(snapshot), encoding="utf-8")
+    current.write_text(
+        yaml.safe_dump(
+            {
+                **snapshot,
+                "entities": [
+                    {"id": "api", "type": "Application"},
+                    {"id": "billing", "type": "Service"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "rebase-structrr",
+                "--baseline",
+                str(baseline),
+                "--current",
+                str(current),
+                "--entity-id",
+                "api",
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["classification"] == "clean"
+    assert report["baseline_digest"].startswith("sha256:")
 
 
 def test_cli_compiles_plan_into_profiled_workflow(tmp_path: Path) -> None:

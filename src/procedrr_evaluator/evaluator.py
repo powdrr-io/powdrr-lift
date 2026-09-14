@@ -214,8 +214,14 @@ class Evaluator:
                     limits,
                     f"{path}.{kind}[{epoch}][{index}]",
                 )
-                if isinstance(collect, Mapping) and collect.get("key") == "category":
-                    output = state.get("category_edits")
+                if isinstance(collect, Mapping):
+                    value_binding = collect.get("value")
+                    if isinstance(value_binding, str):
+                        output = state.get(value_binding)
+                    elif collect.get("key") == "category":
+                        output = state.get("category_edits")
+                    else:
+                        output = item
                     if output is not None:
                         collected[str(item)] = output
         if isinstance(collect, Mapping) and isinstance(collect.get("binding"), str):

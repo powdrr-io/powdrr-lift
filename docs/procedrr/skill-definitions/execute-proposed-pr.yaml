@@ -35,6 +35,22 @@ steps:
         tool: basedpyright
         paths: [src]
       bind: initial_static_analysis
+  - operation:
+      tool: list_files
+      parameters:
+        paths: [src]
+        extensions: [.py]
+        max_files: 32
+      bind: source_files
+  - for_each:
+      snapshot: {name: source_files, max_items: 32}
+      item_binding: source_file
+      collect: {binding: source_documents, key: source_file, value: source_document}
+      body:
+        - operation:
+            tool: read_document
+            parameters: {file_path: "${source_file}"}
+            bind: source_document
   - judge:
       kind: construct_one
       question: What is the smallest ordered implementation plan for this proposed PR?
@@ -49,7 +65,7 @@ steps:
         - Order actions so each action leaves the tree buildable and testable.
         - Include the command-level validation needed after the actions.
         - Do not include unrelated refactors or speculative work.
-      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, proposed_pr_source, implementation_specification_source, repository_context, initial_static_analysis]
+      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, proposed_pr_source, implementation_specification_source, repository_context, source_documents, initial_static_analysis]
       output:
         name: implementation_plan
         schema:
@@ -96,7 +112,7 @@ steps:
               - Target exactly the planned file path.
               - Preserve unrelated content and existing invariants.
               - Return an edit that can be applied by the agent file-edit tool.
-            context: [work_item_name, feature_description, implementation_action, repository_context]
+            context: [work_item_name, feature_description, implementation_action, repository_context, source_documents]
             output:
               name: coding_edit
               schema:

@@ -17,6 +17,7 @@ KNOWN_TOOLS = frozenset(
         "yaml_edit",
         "read_document",
         "invoke_tool",
+        "list_files",
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})

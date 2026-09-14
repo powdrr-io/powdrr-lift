@@ -1,0 +1,200 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 679
+title: Extract semantic Structrr records during bootstrap
+intent:
+  problem: The Structrr bootstrap snapshot currently captures entities and source links but loses existing invariants, guidance, tools, requirements, and approaches from specification documents.
+  goal: Preserve those semantic records in typed bootstrap sections with provenance, conservative kind classification, and fail-closed validation.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Declare the Structrr bootstrap schema URL.
+    rationale: Give semantic classification output an explicit versioned contract.
+    span:
+      start_line: 19
+      end_line: 19
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Declare the Structrr bootstrap snapshot schema version.
+    rationale: Preserve existing product constraints and operational guidance instead of reducing the initial context to an entity inventory.
+    span:
+      start_line: 43
+      end_line: 51
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+        - semantic-bootstrap-validator
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add validation for the bootstrap schema and semantic lifecycle sections.
+    rationale: Reject malformed semantic records before they become product context.
+    span:
+      start_line: 137
+      end_line: 143
+    related:
+      entities:
+        - semantic-bootstrap-validator
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Validate semantic provenance paths.
+    rationale: Ensure extracted records remain traceable to existing specification files.
+    span:
+      start_line: 270
+      end_line: 276
+    related:
+      entities:
+        - semantic-bootstrap-validator
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add lifecycle, tool, and statement validation helpers.
+    rationale: Give invariants, guidance, tools, requirements, and approaches typed fail-closed validation.
+    span:
+      start_line: 280
+      end_line: 500
+    related:
+      entities:
+        - semantic-bootstrap-validator
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Collect lifecycle records, tools, and typed product statements from specifications.
+    rationale: Preserve existing semantic design evidence in the bootstrap artifact.
+    span:
+      start_line: 539
+      end_line: 691
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add semantic records and tools to the generated snapshot.
+    rationale: Make extracted requirements, approaches, tools, invariants, and guidance available to later context resolution.
+    span:
+      start_line: 706
+      end_line: 709
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Emit extracted semantic sections in deterministic order.
+    rationale: Keep bootstrap output reproducible for review and future rebases.
+    span:
+      start_line: 769
+      end_line: 786
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add semantic extraction helper implementations.
+    rationale: Preserve source provenance and structured relationships while translating specification sections.
+    span:
+      start_line: 819
+      end_line: 819
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Normalize lifecycle, tool, and statement records with source provenance.
+    rationale: Keep extracted semantic data typed and traceable.
+    span:
+      start_line: 837
+      end_line: 839
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Preserve semantic relationships and statement kinds.
+    rationale: Retain the distinctions needed for targeted context delivery.
+    span:
+      start_line: 842
+      end_line: 843
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Classify generated bootstrap review guidance as a typed statement.
+    rationale: Keep generated guidance consistent with extracted semantic records.
+    span:
+      start_line: 853
+      end_line: 854
+    related:
+      entities:
+        - semantic-statement-classifier
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Mark generated guidance with declared classification metadata.
+    rationale: Keep generated guidance consistent with extracted semantic records.
+    span:
+      start_line: 845
+      end_line: 846
+    related:
+      entities:
+        - semantic-statement-classifier
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Add semantic sections to the bootstrap fixture.
+    rationale: Ensure semantic bootstrap records remain deterministic, provenance-backed, and validated.
+    span:
+      start_line: 46
+      end_line: 90
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+        - semantic-bootstrap-validator
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Assert extracted requirements, approaches, tools, invariants, and guidance.
+    rationale: Verify that existing specification semantics survive bootstrap.
+    span:
+      start_line: 134
+      end_line: 180
+    related:
+      entities:
+        - semantic-bootstrap-extractor
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Reject unsupported semantic statement kinds.
+    rationale: Keep the typed statement surface fail closed.
+    span:
+      start_line: 211
+      end_line: 229
+    related:
+      entities:
+        - semantic-bootstrap-validator
+entities:
+  - id: semantic-bootstrap-extractor
+    type: Module
+    action: added
+  - id: semantic-bootstrap-validator
+    type: Module
+    action: added
+  - id: semantic-statement-classifier
+    type: Module
+    action: added
+entity_relationships:
+  - id: semantic-extractor-uses-validator
+    source: semantic-bootstrap-extractor
+    target: semantic-bootstrap-validator
+    relationship: validates_with
+    description: Semantic bootstrap extraction validates provenance, lifecycle records, tools, and typed statements before writing a snapshot.
+    rationale: Keep inferred product context fail-closed and traceable to existing specification files.
+    action: added
+  - id: semantic-classifier-preserves-declared-kind
+    source: semantic-statement-classifier
+    target: semantic-bootstrap-validator
+    relationship: constrains
+    description: Statement classification preserves the source-declared kind and only applies conservative inferred reclassification.
+    rationale: Avoid silently turning ambiguous design statements into stronger semantic claims.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

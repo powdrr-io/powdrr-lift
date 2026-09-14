@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from jsonschema import ValidationError as JsonSchemaError
@@ -51,6 +52,27 @@ class Evaluator:
     ) -> None:
         self.llm = llm
         self.operation_executor = operation_executor
+
+    @classmethod
+    def with_workrr(
+        cls,
+        client: WorkflowLLMClient,
+        operation_executor: OperationExecutor,
+        *,
+        skills_dir: Path,
+        max_retries: int = 3,
+    ) -> Evaluator:
+        """Construct an evaluator using Workrr's structured repair boundary."""
+        from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+
+        return cls(
+            WorkrrProcedrrClient(
+                client,
+                skills_dir=skills_dir,
+                max_retries=max_retries,
+            ),
+            operation_executor,
+        )
 
     def evaluate(
         self,

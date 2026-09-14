@@ -17,9 +17,11 @@ from procedrr import (
     TerminalStatus,
     WorkflowDefinition,
     append_step,
+    apply_json_edits,
     compile_workflow,
     design_interview,
     parse_and_validate,
+    render_document,
     set_value,
     validate_single_decision,
 )
@@ -184,6 +186,72 @@ def test_parser_validates_declarative_steps_and_editor_is_persistent() -> None:
     assert document["name"] == "demo"
     assert extended["name"] == "edited"
     assert len(extended["steps"]) == 2
+
+
+def test_json_is_a_first_class_source_format() -> None:
+    document = parse_and_validate(
+        '{"name":"demo","steps":[{"terminal":"succeeded"}]}',
+        source_format="json",
+    )
+
+    assert document["steps"] == [{"terminal": "succeeded"}]
+    assert (
+        parse_and_validate(
+            render_document(document, source_format="json"), source_format="json"
+        )
+        == document
+    )
+
+    with pytest.raises(Exception, match=r"line 1, column 49"):
+        parse_and_validate(
+            '{"name":"demo","steps":[{"terminal":"succeeded",}]}',
+            source_format="json",
+        )
+
+
+def test_diagnostics_expose_json_pointer_paths() -> None:
+    diagnostics = validate_single_decision(
+        {
+            "steps": [
+                {
+                    "judge": {
+                        "output": {
+                            "schema": {
+                                "type": "array",
+                                "items": {"type": "object"},
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    )
+
+    assert diagnostics[0].json_pointer == "/steps/0/judge/output/schema"
+    assert diagnostics[0].to_data()["json_pointer"] == diagnostics[0].json_pointer
+
+
+def test_json_pointer_edits_are_persistent_and_support_arrays() -> None:
+    document = {"name": "demo", "steps": [{"terminal": "failed"}]}
+
+    changed = apply_json_edits(
+        document,
+        [
+            {"op": "replace", "path": "/steps/0/terminal", "value": "succeeded"},
+            {
+                "op": "add",
+                "path": "/steps/-",
+                "value": {"terminal": "succeeded"},
+            },
+            {"op": "remove", "path": "/steps/0"},
+        ],
+    )
+
+    assert document["steps"] == [{"terminal": "failed"}]
+    assert changed["steps"] == [{"terminal": "succeeded"}]
+
+    with pytest.raises(ValueError, match="value is required"):
+        apply_json_edits(document, [{"op": "replace", "path": "/name"}])
 
 
 def test_checked_in_design_interview_definition_parses() -> None:

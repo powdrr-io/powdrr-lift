@@ -210,6 +210,39 @@ The runtime must refuse to execute when the contract fingerprint does not match
 the validated definition and dependency set. This removes the possibility that
 the validator proves one interpretation while the runtime executes another.
 
+### JSON source and generated fragments
+
+Procedrr has equivalent JSON and YAML source forms. JSON is the canonical form
+for model-generated programs and corrections; YAML remains available for
+human-authored definitions. Both forms parse to the same document model and
+must produce the same compiled contract and fingerprint.
+
+A model-generated fragment is never executable output by itself. Workrr first
+parses it as strict JSON, validates all references and schemas, applies the
+single-decision verifier, checks the fragment's allowed-tool contract, and only
+then passes it to the agent runtime. Validation failures are returned as a list
+of structured diagnostics containing stable error codes and RFC 6901 JSON
+Pointers. Syntax errors also include their JSON line and column.
+
+Corrections may return the complete replacement fragment or a list of
+restricted JSON edits:
+
+```json
+{
+  "edits": [
+    {
+      "op": "replace",
+      "path": "/steps/0/operation/tool",
+      "value": "read_document"
+    }
+  ]
+}
+```
+
+Only `add`, `replace`, and `remove` are accepted. Edits operate on a copy of the
+last rejected fragment. The corrected result must pass the complete validation
+pipeline again; an edit cannot selectively suppress or bypass a diagnostic.
+
 ### Compiled step contract
 
 Add normalized types in a new module such as

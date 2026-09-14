@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -28,14 +29,51 @@ _BINDING = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
 class DocumentDiagnostic:
     path: str
     message: str
+    code: str = "invalid_document"
+    line: int | None = None
+    column: int | None = None
+
+    @property
+    def json_pointer(self) -> str:
+        """Return the diagnostic path as an RFC 6901-style JSON Pointer."""
+        return _path_to_json_pointer(self.path)
+
+    def to_data(self) -> dict[str, Any]:
+        """Return a stable machine-readable diagnostic for model correction."""
+        result: dict[str, Any] = {
+            "code": self.code,
+            "path": self.path,
+            "json_pointer": self.json_pointer,
+            "message": self.message,
+        }
+        if self.line is not None:
+            result["line"] = self.line
+        if self.column is not None:
+            result["column"] = self.column
+        return result
 
 
 class ParseError(ValueError):
     """The source is not a valid procedrr document."""
 
 
-def parse_document(source: str) -> dict[str, Any]:
-    """Parse YAML and reject non-mapping documents."""
+def parse_document(source: str, *, source_format: str = "auto") -> dict[str, Any]:
+    """Parse a JSON or YAML Procedrr document and reject non-mappings."""
+    if source_format not in {"auto", "json", "yaml"}:
+        raise ValueError("source_format must be auto, json, or yaml")
+    selected_format = source_format
+    if selected_format == "auto":
+        selected_format = "json" if source.lstrip().startswith(("{", "[")) else "yaml"
+    if selected_format == "json":
+        try:
+            document = json.loads(source)
+        except json.JSONDecodeError as exc:
+            raise ParseError(
+                f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}"
+            ) from exc
+        if not isinstance(document, Mapping):
+            raise ParseError("a procedrr JSON document must be an object")
+        return dict(document)
     try:
         document = yaml.safe_load(source)
     except yaml.YAMLError as exc:
@@ -99,13 +137,22 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
     return tuple(diagnostics)
 
 
-def parse_and_validate(source: str) -> dict[str, Any]:
-    document = parse_document(source)
+def parse_and_validate(source: str, *, source_format: str = "auto") -> dict[str, Any]:
+    document = parse_document(source, source_format=source_format)
     diagnostics = validate_document(document)
     if diagnostics:
         detail = "; ".join(f"{item.path}: {item.message}" for item in diagnostics)
         raise ParseError(detail)
     return document
+
+
+def render_document(document: Mapping[str, Any], *, source_format: str = "json") -> str:
+    """Render a Procedrr document in its canonical JSON or YAML source form."""
+    if source_format == "json":
+        return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+    if source_format == "yaml":
+        return yaml.safe_dump(dict(document), sort_keys=False)
+    raise ValueError("source_format must be json or yaml")
 
 
 def validate_single_decision(
@@ -630,11 +677,20 @@ def _decision_complexity(schema: Any) -> tuple[str, ...]:
     return tuple(reasons)
 
 
+def _path_to_json_pointer(path: str) -> str:
+    segments = re.findall(r"(?:^|\.)([^.\[\]]+)|\[(\d+)\]", path)
+    values = [name or index for name, index in segments]
+    return "/" + "/".join(
+        value.replace("~", "~0").replace("/", "~1") for value in values
+    )
+
+
 __all__ = [
     "DocumentDiagnostic",
     "ParseError",
     "parse_and_validate",
     "parse_document",
+    "render_document",
     "validate_single_decision",
     "validate_document",
 ]

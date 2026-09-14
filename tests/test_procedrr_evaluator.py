@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.workflow_prompt_probe import build_probe_client
 from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
 from procedrr_evaluator import Evaluator
 
@@ -121,7 +120,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     from procedrr import parse_and_validate
-
     document = parse_and_validate(source)
     result = Evaluator(llm, execute).evaluate(
         document,
@@ -215,7 +213,6 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
         "docs/procedrr/skill-definitions/execute-proposed-pr.yaml"
     ).read_text()
     from procedrr import parse_and_validate
-
     document = parse_and_validate(source)
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
@@ -296,6 +293,11 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
     )
     from procedrr import parse_and_validate
 
+    from importlib import import_module
+
+    build_probe_client = import_module(
+        "powdrr_lift.workflow_prompt_probe"
+    ).build_probe_client
     document = parse_and_validate(
         Path("docs/procedrr/skill-definitions/execute-proposed-pr.yaml").read_text()
     )

@@ -120,6 +120,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     from procedrr import parse_and_validate
+
     document = parse_and_validate(source)
     result = Evaluator(llm, execute).evaluate(
         document,
@@ -213,6 +214,7 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
         "docs/procedrr/skill-definitions/execute-proposed-pr.yaml"
     ).read_text()
     from procedrr import parse_and_validate
+
     document = parse_and_validate(source)
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:

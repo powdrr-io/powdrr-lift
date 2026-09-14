@@ -35,21 +35,42 @@ steps:
         tool: basedpyright
         paths: [src]
       bind: initial_static_analysis
-  - operation:
-      tool: list_files
-      parameters:
-        paths: [src]
-        extensions: [.py]
-        max_files: 32
-      bind: source_files
+  - judge:
+      kind: request_source
+      question: Which exact repository files must be read before planning this proposed PR?
+      subject: repository_context
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Request only files needed to resolve symbols, interfaces, and integration points.
+        - Use repository-relative paths and give a reason for every request.
+        - Request no more than 16 files.
+      context: [proposed_pr, repository_context, proposed_pr_source, implementation_specification_source]
+      output:
+        name: planning_source_requests
+        schema:
+          type: object
+          required: [requests]
+          additionalProperties: false
+          properties:
+            requests:
+              type: array
+              maxItems: 16
+              items:
+                type: object
+                required: [file_path, reason]
+                additionalProperties: false
+                properties:
+                  file_path: {type: string, minLength: 1}
+                  reason: {type: string, minLength: 1}
+      validation: {kind: json_schema}
   - for_each:
-      snapshot: {name: source_files, max_items: 32}
-      item_binding: source_file
-      collect: {binding: source_documents, key: source_file, value: source_document}
+      snapshot: {name: planning_source_requests.requests, max_items: 16}
+      item_binding: source_request
+      collect: {binding: source_documents, key: file_path, value: source_document}
       body:
         - operation:
             tool: read_document
-            parameters: {file_path: "${source_file}"}
+            parameters: {file_path: "${source_request.file_path}"}
             bind: source_document
   - judge:
       kind: construct_one
@@ -101,6 +122,42 @@ steps:
       collect: {binding: applied_actions, key: id}
       body:
         - judge:
+            kind: request_source
+            question: Which exact files must be read to implement this action safely?
+            subject: implementation_action
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Request only files needed to resolve symbols or integration points.
+              - Request no more than 8 repository-relative files.
+            context: [implementation_action, repository_context, source_documents]
+            output:
+              name: coding_source_requests
+              schema:
+                type: object
+                required: [requests]
+                additionalProperties: false
+                properties:
+                  requests:
+                    type: array
+                    maxItems: 8
+                    items:
+                      type: object
+                      required: [file_path, reason]
+                      additionalProperties: false
+                      properties:
+                        file_path: {type: string, minLength: 1}
+                        reason: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+        - for_each:
+            snapshot: {name: coding_source_requests.requests, max_items: 8}
+            item_binding: coding_source_request
+            collect: {binding: coding_source_documents, key: file_path, value: coding_source_document}
+            body:
+              - operation:
+                  tool: read_document
+                  parameters: {file_path: "${coding_source_request.file_path}"}
+                  bind: coding_source_document
+        - judge:
             kind: construct_one
             question: What one file edit implements this exact planned action?
             subject: implementation_action
@@ -112,7 +169,7 @@ steps:
               - Target exactly the planned file path.
               - Preserve unrelated content and existing invariants.
               - Return an edit that can be applied by the agent file-edit tool.
-            context: [work_item_name, feature_description, implementation_action, repository_context, source_documents]
+            context: [work_item_name, feature_description, implementation_action, repository_context, source_documents, coding_source_documents]
             output:
               name: coding_edit
               schema:

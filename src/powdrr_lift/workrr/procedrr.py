@@ -82,6 +82,11 @@ class WorkrrProcedrrClient:
         schema_example = json.dumps(
             _schema_example(response_schema), ensure_ascii=False, separators=(",", ":")
         )
+        schema_contract = json.dumps(
+            _schema_contract(response_schema),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
         messages = [
             {
                 "role": "system",
@@ -89,7 +94,10 @@ class WorkrrProcedrrClient:
                     "You are a JSON-only function, not a conversational assistant. "
                     "Do not provide reasoning, analysis, prose, markdown, comments, "
                     "or code fences. Emit exactly one JSON object and stop. The object "
-                    "must match this schema example shape: " + schema_example
+                    "must satisfy this response contract: "
+                    + schema_contract
+                    + " Valid example: "
+                    + schema_example
                 ),
             },
             *messages,
@@ -155,3 +163,29 @@ def _schema_example(schema: Mapping[str, Any]) -> Any:
     if schema_type == "integer" or schema_type == "number":
         return 0
     return ""
+
+
+def _schema_contract(schema: Mapping[str, Any]) -> Any:
+    """Keep response-shape rules useful in a compact natural-language prompt."""
+    contract: dict[str, Any] = {}
+    for key in (
+        "type",
+        "required",
+        "additionalProperties",
+        "enum",
+        "minItems",
+        "maxItems",
+    ):
+        if key in schema:
+            contract[key] = schema[key]
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping):
+        contract["properties"] = {
+            str(name): _schema_contract(value)
+            for name, value in properties.items()
+            if isinstance(value, Mapping)
+        }
+    items = schema.get("items")
+    if isinstance(items, Mapping):
+        contract["items"] = _schema_contract(items)
+    return contract

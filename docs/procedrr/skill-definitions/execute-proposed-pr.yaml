@@ -19,6 +19,22 @@ steps:
         types: [requirements, approach, entities, modules, tools, invariants]
         feature_id: "${work_item_name}"
       bind: repository_context
+  - operation:
+      tool: read_document
+      parameters:
+        file_path: docs/proposals/${work_item_name}/proposed-pr-specification.yaml
+      bind: proposed_pr_source
+  - operation:
+      tool: read_document
+      parameters:
+        file_path: docs/proposals/${work_item_name}/implementation-specification.yaml
+      bind: implementation_specification_source
+  - operation:
+      tool: invoke_tool
+      parameters:
+        tool: basedpyright
+        paths: [src]
+      bind: initial_static_analysis
   - judge:
       kind: construct_one
       question: What is the smallest ordered implementation plan for this proposed PR?
@@ -33,7 +49,7 @@ steps:
         - Order actions so each action leaves the tree buildable and testable.
         - Include the command-level validation needed after the actions.
         - Do not include unrelated refactors or speculative work.
-      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, repository_context]
+      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, proposed_pr_source, implementation_specification_source, repository_context, initial_static_analysis]
       output:
         name: implementation_plan
         schema:
@@ -106,6 +122,75 @@ steps:
             tool: internal
             parameters: {command: "${validation_command}"}
             bind: validation_result
+  - judge:
+      kind: construct_repair_plan
+      question: Which validation failures require a minimal replan and one new coding action?
+      subject: validation_results
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Treat nonzero command results as actionable failures.
+        - Return no actions when every validation command passed.
+        - For each failure, use the exact output to propose one scoped edit.
+        - Do not broaden the proposed PR.
+      context: [implementation_plan, validation_results, proposed_pr_source, repository_context]
+      output:
+        name: repair_plan
+        schema:
+          type: object
+          required: [actions]
+          additionalProperties: false
+          properties:
+            actions:
+              type: array
+              maxItems: 8
+              items:
+                type: object
+                required: [id, file_path, intent]
+                additionalProperties: false
+                properties:
+                  id: {type: string, minLength: 1}
+                  file_path: {type: string, minLength: 1}
+                  intent: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - for_each:
+      snapshot: {name: repair_plan.actions, max_items: 8}
+      item_binding: repair_action
+      collect: {binding: repair_results, key: id}
+      body:
+        - judge:
+            kind: construct_repair_edit
+            question: What one edit repairs this exact validation failure?
+            subject: repair_action
+            prompt_system: Return only one safe, minimal file edit as JSON.
+            instructions:
+              - Target exactly the planned repair path.
+              - Use the validation failure evidence and preserve unrelated behavior.
+            context: [feature_description, repair_action, validation_results, repository_context]
+            output:
+              name: repair_edit
+              schema:
+                type: object
+                required: [file_path, edits]
+                additionalProperties: false
+                properties:
+                  file_path: {type: string, minLength: 1}
+                  edits: {type: array, minItems: 1, items: {type: object}}
+            validation: {kind: json_schema}
+        - operation:
+            tool: edit
+            parameters:
+              file_path: "${repair_edit.file_path}"
+              edits: "${repair_edit.edits}"
+            bind: repair_result
+  - for_each:
+      snapshot: {name: implementation_plan.validation_commands, max_items: 16}
+      item_binding: revalidation_command
+      collect: {binding: revalidation_results, key: command}
+      body:
+        - operation:
+            tool: internal
+            parameters: {command: "${revalidation_command}"}
+            bind: revalidation_result
   - operation:
       tool: gather_context
       parameters:
@@ -121,7 +206,7 @@ steps:
         - Judge against the actual final repository context and validation results.
         - Mark complete only when every condition is evidenced.
         - List each missing condition precisely.
-      context: [feature_description, implementation_plan, validation_results, final_repository_context]
+      context: [feature_description, implementation_plan, validation_results, revalidation_results, final_repository_context]
       output:
         name: completeness_review
         schema:
@@ -140,7 +225,7 @@ steps:
       instructions:
         - Use repository evidence and validation results, not assumptions.
         - Report every violated or unevidenced invariant.
-      context: [implementation_plan, repository_context, final_repository_context, validation_results]
+      context: [implementation_plan, repository_context, final_repository_context, validation_results, revalidation_results]
       output:
         name: invariant_review
         schema:
@@ -159,7 +244,7 @@ steps:
       instructions:
         - Inspect only the changed scope and its security-relevant effects.
         - Treat unknown security behavior as a finding, not as approval.
-      context: [implementation_plan, final_repository_context, validation_results]
+      context: [implementation_plan, final_repository_context, validation_results, revalidation_results]
       output:
         name: security_review
         schema:

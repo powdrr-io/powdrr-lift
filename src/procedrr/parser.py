@@ -9,7 +9,16 @@ from typing import Any
 
 import yaml
 
-KNOWN_TOOLS = frozenset({"gather_context", "internal", "edit", "yaml_edit"})
+KNOWN_TOOLS = frozenset(
+    {
+        "gather_context",
+        "internal",
+        "edit",
+        "yaml_edit",
+        "read_document",
+        "invoke_tool",
+    }
+)
 KNOWN_VALIDATORS = frozenset({"json_schema"})
 _BINDING = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
 

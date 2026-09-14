@@ -262,6 +262,40 @@ def test_for_each_collects_structured_results_in_order() -> None:
     ]
 
 
+def test_repeat_and_branch_are_bounded_and_data_driven() -> None:
+    calls = 0
+
+    def execute(_tool: str, _parameters: Mapping[str, Any]) -> Any:
+        nonlocal calls
+        calls += 1
+        return calls >= 2
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "repeat-branch",
+            "steps": [
+                {
+                    "repeat": {
+                        "max_iterations": 3,
+                        "until": {"subject": "done", "equals": True},
+                        "body": [{"operation": {"tool": "check", "bind": "done"}}],
+                    }
+                },
+                {
+                    "branch": {
+                        "subject": "done",
+                        "cases": {True: [{"terminal": "succeeded"}]},
+                        "default": [{"terminal": "failed"}],
+                    }
+                },
+            ],
+        }
+    )
+
+    assert calls == 2
+    assert result.events[-1].data["status"] == "succeeded"
+
+
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     llm = FakeLLM()
 

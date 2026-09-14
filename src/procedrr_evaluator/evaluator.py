@@ -114,6 +114,10 @@ class Evaluator:
                 self._loop(key, step[key], state, events, usage, limits, step_path)
             elif "attempt" in step:
                 self._attempt(step["attempt"], state, events, usage, limits, step_path)
+            elif "repeat" in step:
+                self._repeat(step["repeat"], state, events, usage, limits, step_path)
+            elif "branch" in step:
+                self._branch(step["branch"], state, events, usage, limits, step_path)
             elif "terminal" in step:
                 events.append(
                     EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
@@ -173,6 +177,56 @@ class Evaluator:
                     f"{path}.recovery[{attempt}]",
                 )
         raise EvaluationError(f"{path}.attempt exhausted after {maximum} attempts")
+
+    def _repeat(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        body = declaration.get("body")
+        maximum = declaration.get("max_iterations")
+        until = declaration.get("until")
+        if (
+            not isinstance(body, list)
+            or not isinstance(maximum, int)
+            or maximum <= 0
+            or not isinstance(until, Mapping)
+        ):
+            raise EvaluationError(f"{path}.repeat is malformed")
+        for iteration in range(1, maximum + 1):
+            self._steps(
+                body, state, events, usage, limits, f"{path}.repeat[{iteration}]"
+            )
+            if _resolve_binding(state, str(until.get("subject"))) == until.get(
+                "equals"
+            ):
+                return
+        raise EvaluationError(f"{path}.repeat exhausted after {maximum} iterations")
+
+    def _branch(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        subject = declaration.get("subject")
+        cases = declaration.get("cases")
+        if not isinstance(subject, str) or not isinstance(cases, Mapping):
+            raise EvaluationError(f"{path}.branch is malformed")
+        value = _resolve_binding(state, subject)
+        body = cases.get(value, declaration.get("default"))
+        if body is None:
+            raise EvaluationError(f"{path}.branch has no case for {value!r}")
+        if not isinstance(body, list):
+            raise EvaluationError(f"{path}.branch case must be a list")
+        self._steps(body, state, events, usage, limits, f"{path}.branch[{value!r}]")
 
     def _operation(
         self,

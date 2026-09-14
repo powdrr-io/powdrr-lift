@@ -133,13 +133,20 @@ def validate_single_decision(
                             f"not single-decision normal form: {reason}",
                         )
                     )
-            for control in ("for_each", "worklist", "call", "attempt"):
+            for control in ("for_each", "worklist", "call", "attempt", "repeat"):
                 nested = step.get(control)
                 if isinstance(nested, Mapping):
                     walk(
                         nested.get("body", nested.get("steps")),
                         f"{step_path}.{control}",
                     )
+            if "branch" in step and isinstance(step["branch"], Mapping):
+                branch = step["branch"]
+                cases = branch.get("cases", {})
+                if isinstance(cases, Mapping):
+                    for case, case_steps in cases.items():
+                        walk(case_steps, f"{step_path}.branch.cases.{case}")
+                walk(branch.get("default"), f"{step_path}.branch.default")
 
     walk(document.get("steps"), "steps")
     recoveries = document.get("recoveries")
@@ -173,6 +180,8 @@ def _validate_steps(
                 "terminal",
                 "gate",
                 "attempt",
+                "repeat",
+                "branch",
             )
             if key in step
         }
@@ -182,7 +191,100 @@ def _validate_steps(
             )
             continue
         control = next(iter(controls))
-        if control == "attempt":
+        if control == "repeat":
+            value = step[control]
+            if not isinstance(value, Mapping) or not isinstance(
+                value.get("body"), list
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.repeat.body", "repeat body must be a list"
+                    )
+                )
+            if (
+                not isinstance(value, Mapping)
+                or not isinstance(value.get("max_iterations"), int)
+                or value["max_iterations"] <= 0
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.repeat.max_iterations",
+                        "repeat max_iterations must be positive",
+                    )
+                )
+            until = value.get("until") if isinstance(value, Mapping) else None
+            if (
+                not isinstance(until, Mapping)
+                or not isinstance(until.get("subject"), str)
+                or "equals" not in until
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.repeat.until",
+                        "repeat requires subject and equals",
+                    )
+                )
+            nested = value.get("body") if isinstance(value, Mapping) else None
+            if isinstance(nested, list):
+                _validate_steps(
+                    nested,
+                    f"{step_path}.repeat.body",
+                    diagnostics,
+                    set(bindings),
+                    recovery_names,
+                )
+        elif control == "branch":
+            value = step[control]
+            if not isinstance(value, Mapping) or not isinstance(
+                value.get("subject"), str
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.branch.subject", "branch subject is required"
+                    )
+                )
+            cases = value.get("cases") if isinstance(value, Mapping) else None
+            if not isinstance(cases, Mapping) or not cases:
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.branch.cases",
+                        "branch cases must be a non-empty mapping",
+                    )
+                )
+            else:
+                for case, nested in cases.items():
+                    if not isinstance(nested, list):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.branch.cases.{case}",
+                                "branch case steps must be a list",
+                            )
+                        )
+                    else:
+                        _validate_steps(
+                            nested,
+                            f"{step_path}.branch.cases.{case}",
+                            diagnostics,
+                            set(bindings),
+                            recovery_names,
+                        )
+            default = value.get("default") if isinstance(value, Mapping) else None
+            if default is not None and not isinstance(default, list):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.branch.default",
+                        "branch default steps must be a list",
+                    )
+                )
+            elif isinstance(default, list):
+                _validate_steps(
+                    default,
+                    f"{step_path}.branch.default",
+                    diagnostics,
+                    set(bindings),
+                    recovery_names,
+                )
+        elif control == "attempt":
             value = step[control]
             if not isinstance(value, Mapping) or not isinstance(
                 value.get("body"), list
@@ -497,14 +599,13 @@ def _decision_complexity(schema: Any) -> tuple[str, ...]:
         reasons.append("the judge returns a collection; iterate one decision at a time")
     properties = schema.get("properties")
     if isinstance(properties, Mapping):
-        required = schema.get("required", [])
-        if isinstance(required, list) and len(required) > 1:
-            reasons.append(
-                f"the output requires {len(required)} fields; split them into "
-                "separate judges"
-            )
         for name, child in properties.items():
-            if isinstance(child, Mapping) and child.get("type") == "array":
+            if (
+                isinstance(child, Mapping)
+                and child.get("type") == "array"
+                and isinstance(child.get("items"), Mapping)
+                and child["items"].get("type") == "object"
+            ):
                 reasons.append(
                     f"property {name!r} returns multiple values; move it to a "
                     "bounded loop"

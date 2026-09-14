@@ -69,9 +69,22 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
         "app",
         "file:src/app.py",
     }
-    relationship = result.document["entity_relationships"][0]
+    relationships = result.document["entity_relationships"]
+    relationship = next(
+        relationship
+        for relationship in relationships
+        if relationship["id"] == "product-contains-app"
+    )
     assert relationship["source"] == "product"
     assert relationship["target"] == "app"
+    source_link = next(
+        relationship
+        for relationship in relationships
+        if relationship["relationship"] == "implemented_by"
+    )
+    assert source_link["source"] == "app"
+    assert source_link["target"] == "file:src/app.py"
+    assert source_link["relationship"] == "implemented_by"
     assert result.document["files"][0]["span"]["start_line"] == 1
 
 

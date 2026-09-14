@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -18,6 +19,26 @@ _SCHEMA = "https://powdrr.io/schema/changelog-v2"
 _DEFAULT_OUTPUT = Path("docs/structrr/bootstrap-changelog.yaml")
 _IGNORED_PREFIXES = (".git/", ".worktrees/", "node_modules/", "vendor/")
 _IGNORED_FILES = {".DS_Store"}
+_SOURCE_FILE_TYPES = {"Build file", "Configuration file", "Script", "Source file"}
+_SOURCE_LINKABLE_TYPES = {
+    "Application",
+    "Build file",
+    "CLI app",
+    "Class",
+    "Command",
+    "Configuration file",
+    "Function",
+    "Interface",
+    "Library",
+    "Method",
+    "Module",
+    "Package",
+    "Plugin",
+    "Script",
+    "Service",
+    "Skill",
+    "Tool",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,6 +304,7 @@ def _build_document(
     allowed = set(taxonomy.entity_types)
     entities: dict[str, dict[str, Any]] = {}
     relationships: dict[str, dict[str, Any]] = {}
+    spec_entity_sources: dict[str, tuple[str, str]] = {}
 
     repository_id = f"repository:{root.name}"
     entities[repository_id] = {
@@ -304,6 +326,20 @@ def _build_document(
             if entity_id and entity_type in allowed:
                 entities.setdefault(
                     entity_id, {"id": entity_id, "type": entity_type, "action": "added"}
+                )
+                spec_entity_sources.setdefault(
+                    entity_id,
+                    (
+                        entity_type,
+                        " ".join(
+                            value
+                            for value in (
+                                _text(raw_entity.get("summary")),
+                                _text(raw_entity.get("rationale")),
+                            )
+                            if value
+                        ),
+                    ),
                 )
         for raw_relationship in _mappings(spec.get("entity_relationships")):
             source = _text(raw_relationship.get("source"))
@@ -328,6 +364,14 @@ def _build_document(
                         or f"Inferred from {spec_path}.",
                     },
                 )
+
+    relationships.update(
+        _infer_source_relationships(
+            entities=entities,
+            spec_entity_sources=spec_entity_sources,
+            tracked_files=tracked_files,
+        )
+    )
 
     files: list[dict[str, Any]] = []
     structured_files = list(spec_paths)
@@ -417,7 +461,102 @@ def _file_entity_type(relative: str) -> str:
         return "License file"
     if "changelog" in name.lower():
         return "Changelog file"
+    if suffix in {".md", ".rst"}:
+        return "Design doc"
     return "Source file"
+
+
+def _infer_source_relationships(
+    *,
+    entities: Mapping[str, Mapping[str, Any]],
+    spec_entity_sources: Mapping[str, tuple[str, str]],
+    tracked_files: Sequence[str],
+) -> dict[str, dict[str, Any]]:
+    """Link semantic entities to source files only when path evidence is strong."""
+    source_files = [
+        relative
+        for relative in tracked_files
+        if _file_entity_type(relative) in _SOURCE_FILE_TYPES
+    ]
+    inferred: dict[str, dict[str, Any]] = {}
+    for entity_id, (entity_type, source_text) in spec_entity_sources.items():
+        if entity_type not in _SOURCE_LINKABLE_TYPES:
+            continue
+        candidates = sorted(
+            (
+                (_source_link_score(entity_id, source_text, relative), relative)
+                for relative in source_files
+            ),
+            reverse=True,
+        )
+        for score, relative in candidates[:3]:
+            if score < 50:
+                continue
+            file_id = f"file:{relative}"
+            if file_id not in entities:
+                continue
+            relationship_id = (
+                f"{entity_id}-{_source_relationship_kind(relative)}-"
+                f"{_relationship_slug(relative)}"
+            )
+            relationship = _source_relationship_kind(relative)
+            inferred[relationship_id] = {
+                "id": relationship_id,
+                "source": entity_id,
+                "target": file_id,
+                "relationship": relationship,
+                "action": "added",
+                "description": (
+                    f"{entity_id} is linked to {relative} by deterministic "
+                    "identifier and path evidence."
+                ),
+                "rationale": (
+                    f"Bootstrap source-link confidence score: {score}; "
+                    "review inferred links before treating them as authoritative."
+                ),
+            }
+    return inferred
+
+
+def _source_link_score(entity_id: str, source_text: str, relative: str) -> int:
+    entity_tokens = _identifier_tokens(entity_id)
+    path_tokens = _identifier_tokens(relative)
+    if not entity_tokens or not path_tokens:
+        return 0
+    entity_slug = "".join(sorted(entity_tokens))
+    path_slug = "".join(sorted(path_tokens))
+    if entity_slug in path_slug:
+        return 100
+    overlap = entity_tokens & path_tokens
+    if len(entity_tokens) >= 2 and overlap == entity_tokens:
+        return 85
+    if len(entity_tokens) == 1 and entity_tokens <= path_tokens:
+        return 75
+    if entity_id.lower() in source_text.lower():
+        return 55
+    return 0
+
+
+def _identifier_tokens(value: str) -> set[str]:
+    tokens = {
+        token.lower() for token in re.findall(r"[A-Za-z0-9]+", value) if len(token) > 1
+    }
+    if "changelog" in tokens:
+        tokens.remove("changelog")
+        tokens.update({"change", "log"})
+    return tokens
+
+
+def _relationship_slug(value: str) -> str:
+    return "-".join(sorted(_identifier_tokens(value)))
+
+
+def _source_relationship_kind(relative: str) -> str:
+    if relative.startswith(("tests/", "hardening_tests/")):
+        return "verified_by"
+    if _file_entity_type(relative) == "Configuration file":
+        return "defined_in"
+    return "implemented_by"
 
 
 def _mappings(value: object) -> list[Mapping[str, Any]]:

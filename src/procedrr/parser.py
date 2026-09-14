@@ -108,6 +108,48 @@ def parse_and_validate(source: str) -> dict[str, Any]:
     return document
 
 
+def validate_single_decision(
+    document: Mapping[str, Any],
+) -> tuple[DocumentDiagnostic, ...]:
+    """Report judge outputs that encode multiple model decisions at once."""
+    diagnostics: list[DocumentDiagnostic] = []
+
+    def walk(steps: Any, path: str) -> None:
+        if not isinstance(steps, list):
+            return
+        for index, step in enumerate(steps):
+            if not isinstance(step, Mapping):
+                continue
+            step_path = f"{path}[{index}]"
+            judge = step.get("judge")
+            if isinstance(judge, Mapping):
+                output = judge.get("output")
+                schema = output.get("schema") if isinstance(output, Mapping) else None
+                reasons = _decision_complexity(schema)
+                for reason in reasons:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.output.schema",
+                            f"not single-decision normal form: {reason}",
+                        )
+                    )
+            for control in ("for_each", "worklist", "call", "attempt"):
+                nested = step.get(control)
+                if isinstance(nested, Mapping):
+                    walk(
+                        nested.get("body", nested.get("steps")),
+                        f"{step_path}.{control}",
+                    )
+
+    walk(document.get("steps"), "steps")
+    recoveries = document.get("recoveries")
+    if isinstance(recoveries, Mapping):
+        for name, recovery in recoveries.items():
+            if isinstance(recovery, Mapping):
+                walk(recovery.get("steps"), f"recoveries.{name}.steps")
+    return tuple(diagnostics)
+
+
 def _validate_steps(
     steps: list[Any],
     path: str,
@@ -447,10 +489,34 @@ def _template_references(value: Any) -> Iterator[str]:
             yield from _template_references(child)
 
 
+def _decision_complexity(schema: Any) -> tuple[str, ...]:
+    if not isinstance(schema, Mapping):
+        return ("an inline object schema is required",)
+    reasons: list[str] = []
+    if schema.get("type") == "array":
+        reasons.append("the judge returns a collection; iterate one decision at a time")
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping):
+        required = schema.get("required", [])
+        if isinstance(required, list) and len(required) > 1:
+            reasons.append(
+                f"the output requires {len(required)} fields; split them into "
+                "separate judges"
+            )
+        for name, child in properties.items():
+            if isinstance(child, Mapping) and child.get("type") == "array":
+                reasons.append(
+                    f"property {name!r} returns multiple values; move it to a "
+                    "bounded loop"
+                )
+    return tuple(reasons)
+
+
 __all__ = [
     "DocumentDiagnostic",
     "ParseError",
     "parse_and_validate",
     "parse_document",
+    "validate_single_decision",
     "validate_document",
 ]

@@ -21,6 +21,7 @@ from procedrr import (
     design_interview,
     parse_and_validate,
     set_value,
+    validate_single_decision,
 )
 
 
@@ -114,6 +115,32 @@ recoveries:
 
     with pytest.raises(Exception, match="unknown recovery"):
         parse_and_validate(source.replace("recovery: repair", "recovery: missing"))
+
+
+def test_single_decision_verifier_flags_multi_action_judges() -> None:
+    diagnostics = validate_single_decision(
+        {
+            "steps": [
+                {
+                    "judge": {
+                        "output": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["actions"],
+                                "properties": {
+                                    "actions": {
+                                        "type": "array",
+                                        "items": {"type": "object"},
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    )
+    assert any("bounded loop" in diagnostic.message for diagnostic in diagnostics)
 
 
 def test_compiler_proves_bounded_sequence_and_counts_repairs() -> None:

@@ -33,6 +33,7 @@ from procedrr.parser import (
     parse_and_validate,
     parse_document,
     validate_document,
+    validate_single_decision,
 )
 
 __all__ = [
@@ -68,5 +69,6 @@ __all__ = [
     "parse_document",
     "set_value",
     "validate_document",
+    "validate_single_decision",
     "design_interview",
 ]

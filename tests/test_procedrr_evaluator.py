@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -126,3 +128,134 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     )
     assert result.bindings["final_proposal_evaluation"]["returncode"] == 0
     assert result.llm_activations == 20
+
+
+class HelloWorldLLM:
+    def complete_json(self, messages: list[dict[str, str]], **_: Any) -> dict[str, Any]:
+        question = messages[1]["content"]
+        if "Which exact repository files" in question:
+            return {
+                "requests": [{"file_path": "hello.py", "reason": "read the program"}]
+            }
+        if "Which exact files must be read" in question:
+            return {
+                "requests": [
+                    {"file_path": "hello.py", "reason": "confirm current output"}
+                ]
+            }
+        if "smallest ordered implementation plan" in question:
+            return {
+                "actions": [
+                    {
+                        "id": "add-second-line",
+                        "file_path": "hello.py",
+                        "intent": "Print Here I Am after Hello, World.",
+                    }
+                ],
+                "validation_commands": [
+                    [sys.executable, "-m", "pytest", "-q"],
+                    ["ruff", "check", "hello.py"],
+                ],
+                "acceptance_conditions": [
+                    "hello.py prints Hello, World and Here I Am on separate lines",
+                    "the test asserting both lines passes",
+                    "ruff reports no issues",
+                ],
+            }
+        if "What one file edit implements" in question:
+            return {
+                "file_path": "hello.py",
+                "edits": [
+                    {
+                        "old_text": 'print("Hello, World")\n',
+                        "new_text": 'print("Hello, World")\nprint("Here I Am")\n',
+                    }
+                ],
+            }
+        if "Which validation failures" in question:
+            return {"actions": []}
+        if "Does the implemented tree" in question:
+            return {"complete": True, "missing": []}
+        if "Are all declared invariants" in question:
+            return {"preserved": True, "violations": []}
+        if "security regression" in question:
+            return {"safe": True, "findings": []}
+        raise AssertionError(f"unexpected judge question: {question}")
+
+
+def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
+    (tmp_path / "hello.py").write_text('print("Hello, World")\n', encoding="utf-8")
+    proposal_dir = tmp_path / "docs" / "proposals" / "hello-world"
+    proposal_dir.mkdir(parents=True)
+    (proposal_dir / "proposed-pr-specification.yaml").write_text(
+        "id: hello-world\nfeatures: [{id: hello-world, action: added}]\n",
+        encoding="utf-8",
+    )
+    (proposal_dir / "implementation-specification.yaml").write_text(
+        "id: hello-world\nmodules: [{id: hello, action: added}]\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "test_hello.py").write_text(
+        "import subprocess\n"
+        "import sys\n\n"
+        "def test_hello_has_two_lines():\n"
+        "    result = subprocess.run(\n"
+        "        [sys.executable, 'hello.py'], capture_output=True, text=True,\n"
+        "        check=True,\n"
+        "    )\n"
+        "    assert result.stdout.splitlines() == ['Hello, World', 'Here I Am']\n",
+        encoding="utf-8",
+    )
+    source = Path(
+        "docs/procedrr/skill-definitions/execute-proposed-pr.yaml"
+    ).read_text()
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(source)
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool == "internal":
+            command = parameters.get("command", [])
+            if command[:2] == ["powdrr-lift", "show-proposed-pr"]:
+                return {"id": "hello-world", "intent": "Add a second output line."}
+            completed = subprocess.run(
+                command, cwd=tmp_path, capture_output=True, text=True
+            )
+            return {
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            }
+        if tool == "gather_context":
+            return {
+                "types": parameters["types"],
+                "feature_id": parameters.get("feature_id"),
+            }
+        if tool == "read_document":
+            return (tmp_path / parameters["file_path"]).read_text(encoding="utf-8")
+        if tool == "invoke_tool":
+            return {"tool": parameters["tool"], "returncode": 0}
+        if tool == "edit":
+            path = tmp_path / parameters["file_path"]
+            text = path.read_text(encoding="utf-8")
+            for edit in parameters["edits"]:
+                text = text.replace(edit["old_text"], edit["new_text"], 1)
+            path.write_text(text, encoding="utf-8")
+            return {"changed": True, "path": parameters["file_path"]}
+        raise AssertionError(f"unexpected operation: {tool}")
+
+    result = Evaluator(HelloWorldLLM(), execute).evaluate(
+        document,
+        {
+            "work_item_name": "hello-world",
+            "proposed_pr_id": "hello-world",
+            "feature_description": "Print an additional line: Here I Am.",
+        },
+    )
+
+    assert result.bindings["completeness_review"]["complete"] is True
+    assert result.bindings["invariant_review"]["preserved"] is True
+    assert result.bindings["security_review"]["safe"] is True
+    assert (
+        tmp_path / "hello.py"
+    ).read_text() == 'print("Hello, World")\nprint("Here I Am")\n'

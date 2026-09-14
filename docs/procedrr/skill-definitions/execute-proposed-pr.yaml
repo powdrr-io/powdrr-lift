@@ -360,6 +360,8 @@ recoveries:
           instructions:
             - Use the failure, review findings, and repository evidence to identify the smallest correction.
             - Return no more than 4 independently executable file actions.
+            - Include one verification_command for every action.
+            - If actions affect the same file, combine them or order them so each later action uses the prior action's result.
             - Do not broaden the proposed PR or change unrelated behavior.
           context: [failure, feature_description, implementation_plan, completeness_review, invariant_review, security_review, final_repository_context]
           output:
@@ -374,43 +376,58 @@ recoveries:
                   maxItems: 4
                   items:
                     type: object
-                    required: [id, file_path, intent]
+                    required: [id, file_path, intent, verification_command]
                     additionalProperties: false
                     properties:
                       id: {type: string, minLength: 1}
                       file_path: {type: string, minLength: 1}
                       intent: {type: string, minLength: 1}
+                      verification_command: {type: array, minItems: 1, items: {type: string, minLength: 1}}
           validation: {kind: json_schema}
       - for_each:
           snapshot: {name: final_repair_plan.actions, max_items: 4}
           item_binding: final_repair_action
           collect: {binding: final_repair_results, key: id}
           body:
-            - judge:
-                kind: construct_repair_edit
-                question: What one edit corrects this exact final validation finding?
-                subject: final_repair_action
-                prompt_system: Return only one safe, minimal file edit as JSON.
-                instructions:
-                  - Target exactly the proposed repair file.
-                  - Preserve unrelated content and existing invariants.
-                context: [feature_description, final_repair_action, failure, validation_results, final_repository_context]
-                output:
-                  name: final_repair_edit
-                  schema:
-                    type: object
-                    required: [file_path, edits]
-                    additionalProperties: false
-                    properties:
-                      file_path: {type: string, minLength: 1}
-                      edits: {type: array, minItems: 1, items: {type: object}}
-                validation: {kind: json_schema}
-            - operation:
-                tool: edit
-                parameters:
-                  file_path: "${final_repair_edit.file_path}"
-                  edits: "${final_repair_edit.edits}"
-                bind: final_repair_result
+            - attempt:
+                id: final-repair-action
+                max_attempts: 2
+                body:
+                  - judge:
+                      kind: construct_repair_edit
+                      question: What one edit corrects this exact final validation finding?
+                      subject: final_repair_action
+                      prompt_system: Return only one safe, minimal file edit as JSON.
+                      instructions:
+                        - Target exactly the proposed repair file.
+                        - Preserve unrelated content and existing invariants.
+                        - Make only one edit for this one failure before the next failure is processed.
+                      context: [feature_description, final_repair_action, failure, validation_results, final_repository_context]
+                      output:
+                        name: final_repair_edit
+                        schema:
+                          type: object
+                          required: [file_path, edits]
+                          additionalProperties: false
+                          properties:
+                            file_path: {type: string, minLength: 1}
+                            edits: {type: array, minItems: 1, items: {type: object}}
+                      validation: {kind: json_schema}
+                  - operation:
+                      tool: edit
+                      parameters:
+                        file_path: "${final_repair_edit.file_path}"
+                        edits: "${final_repair_edit.edits}"
+                      bind: final_repair_result
+                  - operation:
+                      tool: internal
+                      parameters: {command: "${final_repair_action.verification_command}"}
+                      bind: final_repair_validation
+                  - gate:
+                      subject: final_repair_validation.returncode
+                      equals: 0
+                      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+                on_failure: {recovery: final-repair-action-retry, resume: final-repair-action}
       - for_each:
           snapshot: {name: implementation_plan.validation_commands, max_items: 16}
           item_binding: final_revalidation_command
@@ -484,3 +501,39 @@ recoveries:
                 safe: {type: boolean}
                 findings: {type: array, items: {type: string}}
           validation: {kind: json_schema}
+  final-repair-action-retry:
+    inputs: [final_repair_action, final_repair_validation]
+    steps:
+      - judge:
+          kind: construct_repair_edit
+          question: What revised single edit fixes this same failure after the previous edit did not verify?
+          subject: final_repair_action
+          prompt_system: Return only one safe, minimal file edit as JSON.
+          instructions:
+            - Use the failed verification result and failure details as evidence.
+            - Do not edit any other file or address a different failure.
+          context: [feature_description, final_repair_action, failure, final_repair_validation, final_repository_context]
+          output:
+            name: final_repair_edit
+            schema:
+              type: object
+              required: [file_path, edits]
+              additionalProperties: false
+              properties:
+                file_path: {type: string, minLength: 1}
+                edits: {type: array, minItems: 1, items: {type: object}}
+          validation: {kind: json_schema}
+      - operation:
+          tool: edit
+          parameters:
+            file_path: "${final_repair_edit.file_path}"
+            edits: "${final_repair_edit.edits}"
+          bind: final_repair_result
+      - operation:
+          tool: internal
+          parameters: {command: "${final_repair_action.verification_command}"}
+          bind: final_repair_validation
+      - gate:
+          subject: final_repair_validation.returncode
+          equals: 0
+          on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}

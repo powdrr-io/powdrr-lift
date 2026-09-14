@@ -19,6 +19,39 @@ class ProcedrrResponseError(RuntimeError):
     """A procedrr judge could not produce a schema-valid response."""
 
 
+class StructuredToolExecutor:
+    """Convert agent tool exceptions into Workrr-visible structured results."""
+
+    def __init__(self, executor: Any, *, available_paths: Any = None) -> None:
+        self._executor = executor
+        self._available_paths = available_paths
+
+    def __call__(self, tool: str, parameters: Mapping[str, Any]) -> Any:
+        try:
+            return self._executor(tool, parameters)
+        except FileNotFoundError as exc:
+            path = parameters.get("file_path")
+            details: dict[str, Any] = {
+                "code": "file_not_found",
+                "message": str(exc),
+                "path": path,
+                "retryable": True,
+            }
+            if callable(self._available_paths):
+                details["available_paths"] = list(self._available_paths())
+            return {"ok": False, "error": details}
+        except Exception as exc:  # noqa: BLE001 - normalize tool boundary failures
+            return {
+                "ok": False,
+                "error": {
+                    "code": "tool_execution_failed",
+                    "message": str(exc),
+                    "tool": tool,
+                    "retryable": False,
+                },
+            }
+
+
 class WorkrrProcedrrClient:
     """Adapt Workrr's structured repair transport to the procedrr protocol."""
 
@@ -76,4 +109,8 @@ class WorkrrProcedrrClient:
         return result
 
 
-__all__ = ["ProcedrrResponseError", "WorkrrProcedrrClient"]
+__all__ = [
+    "ProcedrrResponseError",
+    "StructuredToolExecutor",
+    "WorkrrProcedrrClient",
+]

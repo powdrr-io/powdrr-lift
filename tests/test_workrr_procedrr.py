@@ -5,6 +5,7 @@ import pytest
 
 from powdrr_lift.workrr.procedrr import (
     ProcedrrResponseError,
+    StructuredToolExecutor,
     WorkrrProcedrrClient,
 )
 
@@ -59,3 +60,25 @@ def test_evaluator_can_be_constructed_with_workrr_transport(tmp_path: Path) -> N
     )
 
     assert evaluator.llm.__class__.__name__ == "WorkrrProcedrrClient"
+
+
+def test_tool_failures_are_structured_for_workrr(tmp_path: Path) -> None:
+    executor = StructuredToolExecutor(
+        lambda _tool, _parameters: (_ for _ in ()).throw(
+            FileNotFoundError("missing source")
+        ),
+        available_paths=lambda: ["hello.py"],
+    )
+
+    result = executor("read_document", {"file_path": "src/hello_world.py"})
+
+    assert result == {
+        "ok": False,
+        "error": {
+            "code": "file_not_found",
+            "message": "missing source",
+            "path": "src/hello_world.py",
+            "retryable": True,
+            "available_paths": ["hello.py"],
+        },
+    }

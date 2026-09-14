@@ -88,7 +88,9 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
                     recovery["steps"],
                     f"recoveries.{name}.steps",
                     diagnostics,
-                    {"failure"},
+                    set(initial) | {"failure"}
+                    if isinstance(steps, list)
+                    else {"failure"},
                     recovery_names,
                 )
     return tuple(diagnostics)

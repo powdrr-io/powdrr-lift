@@ -328,19 +328,157 @@ steps:
             safe: {type: boolean}
             findings: {type: array, items: {type: string}}
       validation: {kind: json_schema}
-  - gate:
-      subject: completeness_review.complete
-      equals: true
-      on_failure:
-        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
-  - gate:
-      subject: invariant_review.preserved
-      equals: true
-      on_failure:
-        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
-  - gate:
-      subject: security_review.safe
-      equals: true
-      on_failure:
-        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
+  - attempt:
+      id: final-validation
+      max_attempts: 2
+      body:
+        - gate:
+            subject: completeness_review.complete
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+        - gate:
+            subject: invariant_review.preserved
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+        - gate:
+            subject: security_review.safe
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: final-validation-repair, resume: final-validation}
   - terminal: succeeded
+
+recoveries:
+  final-validation-repair:
+    steps:
+      - judge:
+          kind: construct_repair_plan
+          question: What minimal edits correct the failed final validation gate?
+          subject: failure
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Use the failure, review findings, and repository evidence to identify the smallest correction.
+            - Return no more than 4 independently executable file actions.
+            - Do not broaden the proposed PR or change unrelated behavior.
+          context: [failure, feature_description, implementation_plan, completeness_review, invariant_review, security_review, final_repository_context]
+          output:
+            name: final_repair_plan
+            schema:
+              type: object
+              required: [actions]
+              additionalProperties: false
+              properties:
+                actions:
+                  type: array
+                  maxItems: 4
+                  items:
+                    type: object
+                    required: [id, file_path, intent]
+                    additionalProperties: false
+                    properties:
+                      id: {type: string, minLength: 1}
+                      file_path: {type: string, minLength: 1}
+                      intent: {type: string, minLength: 1}
+          validation: {kind: json_schema}
+      - for_each:
+          snapshot: {name: final_repair_plan.actions, max_items: 4}
+          item_binding: final_repair_action
+          collect: {binding: final_repair_results, key: id}
+          body:
+            - judge:
+                kind: construct_repair_edit
+                question: What one edit corrects this exact final validation finding?
+                subject: final_repair_action
+                prompt_system: Return only one safe, minimal file edit as JSON.
+                instructions:
+                  - Target exactly the proposed repair file.
+                  - Preserve unrelated content and existing invariants.
+                context: [feature_description, final_repair_action, failure, final_repository_context]
+                output:
+                  name: final_repair_edit
+                  schema:
+                    type: object
+                    required: [file_path, edits]
+                    additionalProperties: false
+                    properties:
+                      file_path: {type: string, minLength: 1}
+                      edits: {type: array, minItems: 1, items: {type: object}}
+                validation: {kind: json_schema}
+            - operation:
+                tool: edit
+                parameters:
+                  file_path: "${final_repair_edit.file_path}"
+                  edits: "${final_repair_edit.edits}"
+                bind: final_repair_result
+      - for_each:
+          snapshot: {name: implementation_plan.validation_commands, max_items: 16}
+          item_binding: final_revalidation_command
+          collect: {binding: final_revalidation_results, key: command}
+          body:
+            - operation:
+                tool: internal
+                parameters: {command: "${final_revalidation_command}"}
+                bind: final_revalidation_result
+      - operation:
+          tool: gather_context
+          parameters:
+            types: [requirements, features, invariants, expected_tests, expected_outcomes]
+            feature_id: "${work_item_name}"
+          bind: final_repository_context
+      - judge:
+          kind: verify_completeness
+          question: Does the corrected tree satisfy every acceptance condition and requested behavior?
+          subject: implementation_plan.acceptance_conditions
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Judge against the corrected repository context and latest validation results.
+            - Mark complete only when every condition is evidenced.
+            - List each missing condition precisely.
+          context: [feature_description, implementation_plan, validation_results, final_revalidation_results, final_repository_context]
+          output:
+            name: completeness_review
+            schema:
+              type: object
+              required: [complete, missing]
+              additionalProperties: false
+              properties:
+                complete: {type: boolean}
+                missing: {type: array, items: {type: string}}
+          validation: {kind: json_schema}
+      - judge:
+          kind: verify_invariants
+          question: Are all declared invariants preserved after the correction?
+          subject: repository_context.invariants
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Use current repository evidence and latest validation results.
+            - Report every violated or unevidenced invariant.
+          context: [implementation_plan, repository_context, final_repository_context, validation_results, final_revalidation_results]
+          output:
+            name: invariant_review
+            schema:
+              type: object
+              required: [preserved, violations]
+              additionalProperties: false
+              properties:
+                preserved: {type: boolean}
+                violations: {type: array, items: {type: string}}
+          validation: {kind: json_schema}
+      - judge:
+          kind: verify_security
+          question: Did the correction introduce a security regression?
+          subject: final_repository_context
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Inspect only the changed scope and security-relevant effects.
+            - Treat unknown security behavior as a finding, not approval.
+          context: [implementation_plan, final_repository_context, validation_results, final_revalidation_results]
+          output:
+            name: security_review
+            schema:
+              type: object
+              required: [safe, findings]
+              additionalProperties: false
+              properties:
+                safe: {type: boolean}
+                findings: {type: array, items: {type: string}}
+          validation: {kind: json_schema}

@@ -1,9 +1,12 @@
+import os
 import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.workflow_prompt_probe import build_probe_client
+from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
 from procedrr_evaluator import Evaluator
 
 
@@ -256,6 +259,93 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     assert result.bindings["completeness_review"]["complete"] is True
     assert result.bindings["invariant_review"]["preserved"] is True
     assert result.bindings["security_review"]["safe"] is True
+    assert (
+        tmp_path / "hello.py"
+    ).read_text() == 'print("Hello, World")\nprint("Here I Am")\n'
+
+
+def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
+    """Exercise the same flow with a real provider when explicitly enabled."""
+    if os.environ.get("POWDRR_LIVE_LLM") != "1":
+        import pytest
+
+        pytest.skip("set POWDRR_LIVE_LLM=1 to run the paid live-provider test")
+
+    (tmp_path / "hello.py").write_text('print("Hello, World")\n', encoding="utf-8")
+    (tmp_path / "test_hello.py").write_text(
+        "import subprocess\nimport sys\n\n"
+        "def test_hello_has_two_lines():\n"
+        "    result = subprocess.run(\n"
+        "        [sys.executable, 'hello.py'], capture_output=True, text=True,\n"
+        "        check=True,\n"
+        "    )\n"
+        "    assert result.stdout.splitlines() == ['Hello, World', 'Here I Am']\n",
+        encoding="utf-8",
+    )
+    proposal_dir = tmp_path / "docs" / "proposals" / "hello-world-live"
+    proposal_dir.mkdir(parents=True)
+    (proposal_dir / "proposed-pr-specification.yaml").write_text(
+        "id: hello-world-live\nfeatures: [{id: hello-world, action: added}]\n",
+        encoding="utf-8",
+    )
+    (proposal_dir / "implementation-specification.yaml").write_text(
+        "id: hello-world-live\nmodules: [{id: hello, action: added}]\n",
+        encoding="utf-8",
+    )
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(
+        Path("docs/procedrr/skill-definitions/execute-proposed-pr.yaml").read_text()
+    )
+    llm = build_probe_client(
+        provider="deepinfra-cheap",
+        model=DEEPINFRA_CHEAP_MODEL,
+        api_key=None,
+        base_url=None,
+        repo_root=tmp_path,
+    )
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool == "internal":
+            command = parameters.get("command", [])
+            if command[:2] == ["powdrr-lift", "show-proposed-pr"]:
+                return {"id": "hello-world-live", "intent": "Add a second output line."}
+            if command[:2] not in ([sys.executable, "-m"], ["ruff", "check"]):
+                return {"returncode": 1, "stderr": "unsupported command", "stdout": ""}
+            completed = subprocess.run(
+                command, cwd=tmp_path, capture_output=True, text=True
+            )
+            return {
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            }
+        if tool == "gather_context":
+            return {
+                "types": parameters["types"],
+                "feature_id": parameters.get("feature_id"),
+            }
+        if tool == "read_document":
+            return (tmp_path / parameters["file_path"]).read_text(encoding="utf-8")
+        if tool == "invoke_tool":
+            return {"tool": parameters["tool"], "returncode": 0}
+        if tool == "edit":
+            path = tmp_path / parameters["file_path"]
+            text = path.read_text(encoding="utf-8")
+            for edit in parameters["edits"]:
+                text = text.replace(edit["old_text"], edit["new_text"], 1)
+            path.write_text(text, encoding="utf-8")
+            return {"changed": True, "path": parameters["file_path"]}
+        raise AssertionError(f"unexpected operation: {tool}")
+
+    Evaluator(llm, execute).evaluate(
+        document,
+        {
+            "work_item_name": "hello-world-live",
+            "proposed_pr_id": "hello-world-live",
+            "feature_description": "Print an additional line: Here I Am.",
+        },
+    )
     assert (
         tmp_path / "hello.py"
     ).read_text() == 'print("Hello, World")\nprint("Here I Am")\n'

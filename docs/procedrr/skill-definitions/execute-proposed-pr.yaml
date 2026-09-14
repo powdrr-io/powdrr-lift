@@ -7,7 +7,7 @@ inputs:
 description: >-
   Execute one proposed PR through bounded planning, one-action coding rounds,
   mechanical validation, and completeness, invariant, and security review.
-limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3}
+limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
 steps:
   - operation:
       tool: internal
@@ -169,7 +169,7 @@ steps:
               - Target exactly the planned file path.
               - Preserve unrelated content and existing invariants.
               - Return an edit that can be applied by the agent file-edit tool.
-            context: [work_item_name, feature_description, implementation_action, repository_context, source_documents, coding_source_documents]
+            context: [work_item_name, feature_description, implementation_action, coding_source_document]
             output:
               name: coding_edit
               schema:

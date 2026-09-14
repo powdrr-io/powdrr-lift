@@ -486,6 +486,7 @@ def _read_openai_response(
         return response.read().decode("utf-8")
 
     content_parts: list[str] = []
+    capture_path = os.environ.get("POWDRR_STREAM_CAPTURE_PATH")
     response_metadata: dict[str, Any] | None = None
     event_data: list[str] = []
     chunk_count = 0
@@ -530,6 +531,10 @@ def _read_openai_response(
         content = delta.get("content")
         if isinstance(content, str):
             content_parts.append(content)
+            if capture_path:
+                with Path(capture_path).open("a", encoding="utf-8") as capture:
+                    capture.write(content)
+                    capture.flush()
             chunk_count += 1
             content_length = sum(len(part) for part in content_parts)
             if (

@@ -214,7 +214,17 @@ class Evaluator:
         context = judge.get("context", [])
         if not isinstance(context, list):
             raise EvaluationError(f"{path}.judge.context must be a list")
-        context_data = {name: _resolve_binding(state, name) for name in context}
+        context_data = {
+            name: _compact_value(
+                _resolve_binding(state, name),
+                max_chars=_positive_limit(limits, "context_value_chars", 6000),
+            )
+            for name in context
+        }
+        context_text = _bounded_context_text(
+            context_data,
+            _positive_limit(limits, "context_chars", 24000),
+        )
         messages = [
             {"role": "system", "content": str(judge["prompt_system"])},
             {
@@ -225,7 +235,7 @@ class Evaluator:
                     + "\n\nQuestion:\n"
                     + str(judge["question"])
                     + "\n\nContext:\n"
-                    + _json_text(context_data)
+                    + context_text
                 ),
             },
         ]
@@ -364,6 +374,42 @@ def _json_text(value: Any) -> str:
     import json
 
     return json.dumps(value, sort_keys=True, default=str)
+
+
+def _positive_limit(limits: Mapping[str, Any], key: str, default: int) -> int:
+    value = limits.get(key)
+    return value if isinstance(value, int) and value > 0 else default
+
+
+def _compact_value(value: Any, *, max_chars: int) -> Any:
+    if isinstance(value, str):
+        if len(value) <= max_chars:
+            return value
+        return value[:max_chars] + "...<truncated>"
+    if isinstance(value, Mapping):
+        items = list(value.items())
+        compacted = {
+            str(key): _compact_value(item, max_chars=max_chars)
+            for key, item in items[:32]
+        }
+        if len(items) > 32:
+            compacted["__truncated_items__"] = len(items) - 32
+        return compacted
+    if isinstance(value, (list, tuple)):
+        compacted_list = [
+            _compact_value(item, max_chars=max_chars) for item in value[:32]
+        ]
+        if len(value) > 32:
+            compacted_list.append({"__truncated_items__": len(value) - 32})
+        return compacted_list
+    return value
+
+
+def _bounded_context_text(value: Any, max_chars: int) -> str:
+    encoded = _json_text(value)
+    if len(encoded) <= max_chars:
+        return encoded
+    return encoded[:max_chars] + "...<context truncated>"
 
 
 __all__ = [

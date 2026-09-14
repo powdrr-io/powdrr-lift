@@ -70,6 +70,57 @@ def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     assert "requirements_context" in llm.messages[1]["content"]
 
 
+def test_evaluator_bounds_large_judge_context() -> None:
+    llm = FakeLLM()
+    Evaluator(FakeLLM(), lambda _tool, _parameters: None).evaluate(
+        {
+            "name": "bounded",
+            "limits": {"context_chars": 120, "context_value_chars": 40},
+            "steps": [
+                {
+                    "judge": {
+                        "prompt_system": "Return JSON only.",
+                        "instructions": ["Be concise."],
+                        "question": "Summarize.",
+                        "context": ["large"],
+                        "output": {
+                            "name": "summary",
+                            "schema": {"type": "object"},
+                        },
+                    }
+                }
+            ],
+        },
+        {"large": {"document": "x" * 10000}},
+    )
+
+    assert len(llm.messages) == 0
+    bounded = FakeLLM()
+    Evaluator(bounded, lambda _tool, _parameters: None).evaluate(
+        {
+            "name": "bounded",
+            "limits": {"context_chars": 120, "context_value_chars": 40},
+            "steps": [
+                {
+                    "judge": {
+                        "prompt_system": "Return JSON only.",
+                        "instructions": ["Be concise."],
+                        "question": "Summarize.",
+                        "context": ["large"],
+                        "output": {
+                            "name": "summary",
+                            "schema": {"type": "object"},
+                        },
+                    }
+                }
+            ],
+        },
+        {"large": {"document": "x" * 10000}},
+    )
+    assert len(bounded.messages[1]["content"]) < 500
+    assert "<truncated>" in bounded.messages[1]["content"]
+
+
 def test_evaluator_resolves_embedded_references_in_operation_parameters() -> None:
     calls: list[dict[str, Any]] = []
 
@@ -405,6 +456,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
         api_key=None,
         base_url=None,
         repo_root=tmp_path,
+        progress_stream=sys.stderr,
     )
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:

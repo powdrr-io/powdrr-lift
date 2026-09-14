@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -49,6 +50,7 @@ _STATEMENT_KINDS = {
     "guidance",
     "acceptance_criterion",
 }
+_PYTHON_SOURCE_SUFFIXES = {".py", ".pyi"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,6 +269,14 @@ def validate_bootstrap_document(
                 )
             )
 
+    _validate_source_model(
+        issues,
+        document.get("source_subjects"),
+        document.get("source_bindings"),
+        entity_ids,
+        root_path,
+    )
+
     _validate_lifecycle_section(
         issues, document.get("invariants"), "invariant", root_path
     )
@@ -439,6 +449,155 @@ def _validate_provenance(
             BootstrapIssue(
                 "semantic_source_missing",
                 "Semantic source file does not exist.",
+                item_id,
+            )
+        )
+
+
+def _validate_source_model(
+    issues: list[BootstrapIssue],
+    raw_subjects: object,
+    raw_bindings: object,
+    entity_ids: set[str],
+    root: Path,
+) -> None:
+    subjects = _validated_mapping_list(issues, raw_subjects, "source_subject")
+    subject_ids: set[str] = set()
+    stable_keys: set[str] = set()
+    for index, subject in enumerate(subjects):
+        subject_id = _text(subject.get("id"))
+        path_text = _text(subject.get("path"))
+        span = subject.get("span")
+        if not subject_id:
+            issues.append(
+                BootstrapIssue(
+                    "source_subject_id_missing",
+                    "Source subject id is required.",
+                    f"source_subjects[{index}]",
+                )
+            )
+        elif subject_id in subject_ids:
+            issues.append(
+                BootstrapIssue(
+                    "source_subject_id_duplicate",
+                    f"Duplicate source subject id {subject_id!r}.",
+                    subject_id,
+                )
+            )
+        subject_ids.add(subject_id)
+        stable_key = _text(subject.get("stable_key"))
+        if not stable_key:
+            issues.append(
+                BootstrapIssue(
+                    "source_subject_stable_key_missing",
+                    "Source subject stable_key is required.",
+                    subject_id,
+                )
+            )
+        elif stable_key in stable_keys:
+            issues.append(
+                BootstrapIssue(
+                    "source_subject_stable_key_duplicate",
+                    f"Duplicate source subject stable_key {stable_key!r}.",
+                    subject_id,
+                )
+            )
+        stable_keys.add(stable_key)
+        if not path_text or not (root / path_text).is_file():
+            issues.append(
+                BootstrapIssue(
+                    "source_subject_path_missing",
+                    "Source subject path does not exist.",
+                    subject_id,
+                )
+            )
+        _validate_span(issues, span, "source_subject", subject_id)
+
+    bindings = _validated_mapping_list(issues, raw_bindings, "source_binding")
+    binding_ids: set[str] = set()
+    for index, binding in enumerate(bindings):
+        binding_id = _text(binding.get("id"))
+        subject_id = _text(binding.get("subject_id"))
+        entity_id = _text(binding.get("entity_id"))
+        if not binding_id:
+            issues.append(
+                BootstrapIssue(
+                    "source_binding_id_missing",
+                    "Source binding id is required.",
+                    f"source_bindings[{index}]",
+                )
+            )
+        elif binding_id in binding_ids:
+            issues.append(
+                BootstrapIssue(
+                    "source_binding_id_duplicate",
+                    f"Duplicate source binding id {binding_id!r}.",
+                    binding_id,
+                )
+            )
+        binding_ids.add(binding_id)
+        if subject_id not in subject_ids:
+            issues.append(
+                BootstrapIssue(
+                    "source_binding_subject_unknown",
+                    "Source binding subject_id must reference a source subject.",
+                    binding_id,
+                )
+            )
+        if entity_id not in entity_ids:
+            issues.append(
+                BootstrapIssue(
+                    "source_binding_entity_unknown",
+                    "Source binding entity_id must reference an entity.",
+                    binding_id,
+                )
+            )
+        binding_path = _text(binding.get("path"))
+        if not binding_path or not (root / binding_path).is_file():
+            issues.append(
+                BootstrapIssue(
+                    "source_binding_path_missing",
+                    "Source binding path does not exist.",
+                    binding_id,
+                )
+            )
+        if _text(binding.get("relationship")) not in {
+            "implemented_by",
+            "defined_in",
+            "verified_by",
+        }:
+            issues.append(
+                BootstrapIssue(
+                    "source_binding_relationship_invalid",
+                    "Source binding relationship is not recognized.",
+                    binding_id,
+                )
+            )
+        _validate_span(issues, binding.get("span"), "source_binding", binding_id)
+
+
+def _validate_span(
+    issues: list[BootstrapIssue], value: object, kind: str, item_id: str
+) -> None:
+    if not isinstance(value, Mapping):
+        issues.append(
+            BootstrapIssue(
+                "source_span_invalid", "Source span must be a mapping.", item_id
+            )
+        )
+        return
+    start = value.get("start_line")
+    end = value.get("end_line")
+    if (
+        not isinstance(start, int)
+        or not isinstance(end, int)
+        or start < 1
+        or start > end
+    ):
+        issues.append(
+            BootstrapIssue(
+                "source_span_invalid",
+                f"{kind} span must be a positive ordered line range.",
                 item_id,
             )
         )
@@ -792,6 +951,12 @@ def _build_document(
             tracked_files=tracked_files,
         )
     )
+    source_subjects, source_bindings = _extract_python_source_model(
+        root=root,
+        tracked_files=tracked_files,
+        entities=entities,
+        spec_entity_sources=spec_entity_sources,
+    )
 
     files: list[dict[str, Any]] = []
     structured_files = list(spec_paths)
@@ -834,6 +999,8 @@ def _build_document(
         "files": files,
         "entities": [entities[key] for key in sorted(entities)],
         "entity_relationships": [relationships[key] for key in sorted(relationships)],
+        "source_subjects": source_subjects,
+        "source_bindings": source_bindings,
         "invariants": [invariants[key] for key in sorted(invariants)],
         "guidance": [guidance[key] for key in sorted(guidance)]
         + [
@@ -892,6 +1059,148 @@ def _file_entity_type(relative: str) -> str:
     if suffix in {".md", ".rst"}:
         return "Design doc"
     return "Source file"
+
+
+def _extract_python_source_model(
+    *,
+    root: Path,
+    tracked_files: Sequence[str],
+    entities: Mapping[str, Mapping[str, Any]],
+    spec_entity_sources: Mapping[str, tuple[str, str]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    subjects: list[dict[str, Any]] = []
+    bindings: list[dict[str, Any]] = []
+    for relative in tracked_files:
+        if Path(relative).suffix.lower() not in _PYTHON_SOURCE_SUFFIXES:
+            continue
+        source_path = root / relative
+        lines = source_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        module_subject = _make_source_subject(
+            relative=relative,
+            qualified_name=_python_module_name(relative),
+            kind="module",
+            start_line=1,
+            end_line=max(1, len(lines)),
+        )
+        subjects.append(module_subject)
+        try:
+            tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=relative)
+        except (OSError, SyntaxError, UnicodeError):
+            continue
+        for node, qualified_name, kind in _walk_python_symbols(
+            tree, _python_module_name(relative)
+        ):
+            subjects.append(
+                _make_source_subject(
+                    relative=relative,
+                    qualified_name=qualified_name,
+                    kind=kind,
+                    start_line=node.lineno,
+                    end_line=getattr(node, "end_lineno", node.lineno),
+                )
+            )
+
+    for subject in subjects:
+        relative_path = str(subject["path"])
+        file_entity_id = f"file:{relative_path}"
+        subject["file_entity_id"] = file_entity_id
+        for entity_id, (entity_type, _) in _source_entity_candidates(
+            subject, spec_entity_sources
+        ):
+            if entity_id not in entities:
+                continue
+            relationship = _source_relationship_kind(relative_path)
+            binding_id = (
+                f"binding:{_binding_slug(subject['id'])}-{_binding_slug(entity_id)}"
+            )
+            bindings.append(
+                {
+                    "id": binding_id,
+                    "subject_id": subject["id"],
+                    "entity_id": entity_id,
+                    "relationship": relationship,
+                    "path": relative_path,
+                    "span": subject["span"],
+                    "confidence": "high"
+                    if entity_type in _SOURCE_LINKABLE_TYPES
+                    else "medium",
+                    "evidence": "identifier and qualified-name match",
+                }
+            )
+    subjects.sort(key=lambda subject: str(subject["id"]))
+    bindings.sort(key=lambda binding: str(binding["id"]))
+    return subjects, bindings
+
+
+def _make_source_subject(
+    *, relative: str, qualified_name: str, kind: str, start_line: int, end_line: int
+) -> dict[str, Any]:
+    subject_id = f"python:{relative}::{qualified_name}"
+    return {
+        "id": subject_id,
+        "stable_key": f"python::{qualified_name}",
+        "language": "python",
+        "kind": kind,
+        "qualified_name": qualified_name,
+        "path": relative,
+        "span": {"start_line": start_line, "end_line": end_line},
+    }
+
+
+def _walk_python_symbols(
+    tree: ast.AST,
+    module_name: str,
+) -> list[tuple[ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef, str, str]]:
+    symbols: list[
+        tuple[ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef, str, str]
+    ] = []
+
+    def visit_body(
+        body: Sequence[ast.stmt], prefix: tuple[str, ...], in_class: bool
+    ) -> None:
+        for node in body:
+            if isinstance(node, ast.ClassDef):
+                qualified_name = ".".join((*prefix, node.name))
+                symbols.append((node, qualified_name, "class"))
+                visit_body(node.body, (*prefix, node.name), True)
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                qualified_name = ".".join((*prefix, node.name))
+                symbols.append(
+                    (node, qualified_name, "method" if in_class else "function")
+                )
+                visit_body(node.body, (*prefix, node.name), False)
+
+    if isinstance(tree, ast.Module):
+        visit_body(tree.body, (module_name,), False)
+    return symbols
+
+
+def _python_module_name(relative: str) -> str:
+    path = Path(relative)
+    parts = list(path.with_suffix("").parts)
+    if parts[-1] == "__init__":
+        parts.pop()
+    return ".".join(parts)
+
+
+def _source_entity_candidates(
+    subject: Mapping[str, Any],
+    spec_entity_sources: Mapping[str, tuple[str, str]],
+) -> list[tuple[str, tuple[str, str]]]:
+    subject_text = " ".join(
+        str(subject[key]) for key in ("path", "qualified_name") if key in subject
+    )
+    subject_tokens = _identifier_tokens(subject_text)
+    candidates: list[tuple[int, str, tuple[str, str]]] = []
+    for entity_id, evidence in spec_entity_sources.items():
+        entity_type, _ = evidence
+        if entity_type not in _SOURCE_LINKABLE_TYPES:
+            continue
+        entity_tokens = _identifier_tokens(entity_id)
+        if entity_tokens and entity_tokens <= subject_tokens:
+            candidates.append((100, entity_id, evidence))
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    return [(entity_id, evidence) for _, entity_id, evidence in candidates[:3]]
 
 
 def _infer_source_relationships(
@@ -985,6 +1294,10 @@ def _source_relationship_kind(relative: str) -> str:
     if _file_entity_type(relative) == "Configuration file":
         return "defined_in"
     return "implemented_by"
+
+
+def _binding_slug(value: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
 
 
 def _mappings(value: object) -> list[Mapping[str, Any]]:

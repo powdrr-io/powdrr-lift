@@ -1,0 +1,140 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 680
+title: Extract Python source subjects and Structrr bindings
+intent:
+  problem: Structrr bootstrap currently links semantic entities only to files, so source movement and symbol-level impact cannot be represented precisely.
+  goal: Extract deterministic Python source subjects with exact spans and bind semantic entities to those subjects using validated evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add Python source-subject extraction, stable identities, and source-binding validation.
+    rationale: Connect product entities to concrete modules, classes, functions, and methods while preserving evidence spans.
+    span:
+      start_line: 5
+      end_line: 5
+    related:
+      entities:
+        - python-source-subject-extractor
+        - source-binding-validator
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add Python source suffix handling and source-model validation.
+    rationale: Restrict symbol extraction to supported Python files and validate source identity records.
+    span:
+      start_line: 53
+      end_line: 53
+    related:
+      entities:
+        - python-source-subject-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Validate source subject and binding identity, path, span, and relationship references.
+    rationale: Prevent dangling or ambiguous source evidence from entering Structrr.
+    span:
+      start_line: 272
+      end_line: 279
+    related:
+      entities:
+        - source-binding-validator
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add stable-key uniqueness and source-binding validation helpers.
+    rationale: Ensure source subjects remain uniquely addressable across the repository.
+    span:
+      start_line: 457
+      end_line: 605
+    related:
+      entities:
+        - source-binding-validator
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add Python source-subject extraction to generated snapshots.
+    rationale: Materialize symbol-level evidence alongside file-level anchors.
+    span:
+      start_line: 954
+      end_line: 959
+    related:
+      entities:
+        - python-source-subject-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Emit source subjects and bindings in the bootstrap document.
+    rationale: Make symbol-level context available to downstream Structrr queries.
+    span:
+      start_line: 1002
+      end_line: 1003
+    related:
+      entities:
+        - python-source-subject-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Extract Python modules, classes, functions, methods, and semantic bindings.
+    rationale: Connect product entities to exact source spans with deterministic evidence.
+    span:
+      start_line: 1064
+      end_line: 1205
+    related:
+      entities:
+        - python-source-subject-extractor
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add binding slug generation and source identity helpers.
+    rationale: Keep generated binding identifiers collision-free and reproducible.
+    span:
+      start_line: 1299
+      end_line: 1302
+    related:
+      entities:
+        - python-source-subject-extractor
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Test Python subject extraction, semantic bindings, and stable-key rejection.
+    rationale: Protect symbol-level source evidence and prevent ambiguous identities from entering Structrr snapshots.
+    span:
+      start_line: 26
+      end_line: 33
+    related:
+      entities:
+        - python-source-subject-extractor
+        - source-binding-validator
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Assert exact source subject spans and semantic bindings.
+    rationale: Verify symbol extraction and binding evidence in the bootstrap output.
+    span:
+      start_line: 140
+      end_line: 150
+    related:
+      entities:
+        - python-source-subject-extractor
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Reject duplicate source stable keys.
+    rationale: Prevent ambiguous symbol identities from entering a validated snapshot.
+    span:
+      start_line: 248
+      end_line: 286
+    related:
+      entities:
+        - source-binding-validator
+entities:
+  - id: python-source-subject-extractor
+    type: Module
+    action: added
+  - id: source-binding-validator
+    type: Module
+    action: added
+entity_relationships:
+  - id: extractor-produces-source-bindings
+    source: python-source-subject-extractor
+    target: source-binding-validator
+    relationship: validates_with
+    description: Python source-subject extraction emits bindings that the bootstrap validator checks for identity, span, path, and entity integrity.
+    rationale: Prevent source evidence from silently pointing at missing or ambiguous symbols.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

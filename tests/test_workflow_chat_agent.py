@@ -7699,7 +7699,7 @@ def test_openai_streaming_response_is_bounded_before_json_parse(
             1,
         )
 
-    with pytest.raises(RuntimeError, match="exceeded the bounded output limit"):
+    with pytest.raises(RuntimeError, match="partial content prefix: 'xy'"):
         _read_openai_response(_FakeResponse(), progress_stream=None)
 
 
@@ -7717,7 +7717,7 @@ def test_openai_streaming_response_requires_completion_marker() -> None:
             ]
         )
 
-    with pytest.raises(RuntimeError, match="ended before a completion marker"):
+    with pytest.raises(RuntimeError, match=r"partial content: '\{\"ok\":true\}'"):
         _read_openai_response(_FakeResponse(), progress_stream=None)
 
 

@@ -344,7 +344,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
             return {"changed": True, "path": parameters["file_path"]}
         raise AssertionError(f"unexpected operation: {tool}")
 
-    Evaluator(llm, execute).evaluate(
+    Evaluator.with_workrr(llm, execute, skills_dir=tmp_path).evaluate(
         document,
         {
             "work_item_name": "hello-world-live",

@@ -1,0 +1,109 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 676
+title: Bootstrap validated Structrr snapshots from existing repositories
+intent:
+  problem: Existing repositories need a deterministic way to establish an initial Structrr snapshot before later product-language changes can be reviewed against it.
+  goal: Add a read-only bootstrap pipeline that extracts taxonomy-approved entities and source anchors, validates relationships and evidence spans, and exposes the workflow through the CLI.
+human-decisions: []
+files:
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: added
+    summary: Add deterministic Structrr bootstrap extraction and snapshot validation.
+    rationale: Establish a validated product-language baseline from tracked source files and existing specification documents.
+    span:
+      start_line: 1
+      end_line: 430
+    related:
+      entities:
+        - structrr-bootstrap
+        - bootstrap-snapshot-validation
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export the Structrr bootstrap API.
+    rationale: Keep the product-language package as the reusable ownership boundary for snapshot bootstrapping.
+    span:
+      start_line: 12
+      end_line: 27
+    related:
+      entities:
+        - structrr-bootstrap
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Add the bootstrap-structrr command and validation result output.
+    rationale: Give authors and agents a single command that produces a validated snapshot without implicit staging or commits.
+    span:
+      start_line: 130
+      end_line: 130
+      related:
+      entities:
+        - bootstrap-structrr
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Register the bootstrap-structrr command and its options.
+    rationale: Give authors and agents a discoverable command surface for creating the initial product snapshot.
+    span:
+      start_line: 299
+      end_line: 330
+    related:
+      entities:
+        - bootstrap-structrr
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Implement bootstrap-structrr command output and failure reporting.
+    rationale: Report validated bootstrap results while keeping repository mutation under explicit caller control.
+    span:
+      start_line: 2657
+      end_line: 2680
+    related:
+      entities:
+        - bootstrap-structrr
+  - path: tests/test_structrr_bootstrap.py
+    type: added
+    summary: Test semantic extraction, determinism, no implicit staging, and dangling relationship rejection.
+    rationale: Protect the bootstrap safety boundary before it is used to seed product context.
+    span:
+      start_line: 1
+      end_line: 105
+    related:
+      entities:
+        - bootstrap-tests
+entities:
+  - id: structrr-bootstrap
+    type: Module
+    action: added
+  - id: bootstrap-snapshot-validation
+    type: Module
+    action: added
+  - id: bootstrap-structrr
+    type: Command
+    action: added
+  - id: bootstrap-tests
+    type: Source file
+    action: added
+entity_relationships:
+  - id: bootstrap-command-uses-module
+    source: bootstrap-structrr
+    target: structrr-bootstrap
+    relationship: invokes
+    description: The bootstrap-structrr command invokes the Structrr bootstrap module.
+    rationale: Keep the CLI as a thin surface over reusable product-language logic.
+    action: added
+  - id: bootstrap-module-validates-snapshot
+    source: structrr-bootstrap
+    target: bootstrap-snapshot-validation
+    relationship: validates
+    description: The bootstrap module validates the snapshot it generates before writing it.
+    rationale: Fail closed when inferred entities, relationships, or source evidence are invalid.
+    action: added
+  - id: bootstrap-tests-cover-module
+    source: bootstrap-tests
+    target: structrr-bootstrap
+    relationship: verifies
+    description: The bootstrap tests verify deterministic extraction and validation behavior.
+    rationale: Preserve the safety boundary as the bootstrap implementation evolves.
+    action: added
+structured_files: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

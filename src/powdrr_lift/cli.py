@@ -127,6 +127,7 @@ from powdrr_lift.pull_request_description import (
     render_pull_request_description_template,
 )
 from powdrr_lift.repository_state import render_repository_state
+from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.structrr.intent import (
     IntentClause,
     IntentContract,
@@ -294,6 +295,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the default branch name.",
     )
     init_parser.set_defaults(func=_run_init)
+
+    bootstrap_structrr_parser = subparsers.add_parser(
+        "bootstrap-structrr",
+        aliases=["bootstrap_structrr"],
+        help="Generate and validate a Structrr snapshot from repository evidence.",
+    )
+    bootstrap_structrr_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Repository root to inspect; defaults to the current worktree.",
+    )
+    bootstrap_structrr_parser.add_argument(
+        "--output",
+        type=Path,
+        help="Output YAML path (default: docs/structrr/bootstrap-changelog.yaml).",
+    )
+    bootstrap_structrr_parser.add_argument(
+        "--change-id",
+        default="bootstrap",
+        help="Snapshot change id (default: bootstrap).",
+    )
+    bootstrap_structrr_parser.add_argument(
+        "--title",
+        help="Snapshot title; defaults to a title derived from the repository name.",
+    )
+    bootstrap_structrr_parser.add_argument(
+        "--taxonomy",
+        type=Path,
+        default=Path("software_development_entity_taxonomy.md"),
+        help="Repository-relative taxonomy path.",
+    )
+    bootstrap_structrr_parser.set_defaults(func=_run_bootstrap_structrr)
 
     init_from_plan_diff_parser = subparsers.add_parser(
         "init-from-plan-diff",
@@ -2618,6 +2651,30 @@ def _run_init_from_plan_diff(args: argparse.Namespace) -> int:
             "When it passes, include it in the PR as "
             f"docs/changelogs/PR-{args.pr_number}-changelog.yaml"
         )
+    return 0
+
+
+def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    result = bootstrap_structrr(
+        repo_root,
+        output_path=args.output,
+        change_id=args.change_id,
+        title=args.title,
+        taxonomy_path=args.taxonomy,
+    )
+    if not result.validation.successful:
+        print("Structrr bootstrap validation failed:", file=sys.stderr)
+        for issue in result.validation.issues:
+            location = f" ({issue.path})" if issue.path else ""
+            print(f"- {issue.code}{location}: {issue.message}", file=sys.stderr)
+        return 1
+    print(result.output_path)
+    print(
+        f"Validated {len(result.document['entities'])} entities, "
+        f"{len(result.document['entity_relationships'])} relationships, and "
+        f"{len(result.document['files'])} source anchors.",
+    )
     return 0
 
 

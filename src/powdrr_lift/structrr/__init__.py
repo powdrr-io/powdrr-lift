@@ -9,3 +9,19 @@ The current ``powdrr_lift.core`` modules are being migrated here incrementally.
 New product-language APIs belong in this package; this marker is intentionally
 small until each implementation has a clean ownership boundary.
 """
+
+from powdrr_lift.structrr.bootstrap import (
+    BootstrapIssue,
+    BootstrapResult,
+    BootstrapValidationReport,
+    bootstrap_structrr,
+    validate_bootstrap_document,
+)
+
+__all__ = [
+    "BootstrapIssue",
+    "BootstrapResult",
+    "BootstrapValidationReport",
+    "bootstrap_structrr",
+    "validate_bootstrap_document",
+]

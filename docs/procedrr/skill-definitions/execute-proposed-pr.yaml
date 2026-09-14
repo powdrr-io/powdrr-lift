@@ -361,6 +361,7 @@ recoveries:
             - Use the failure, review findings, and repository evidence to identify the smallest correction.
             - Return no more than 4 independently executable file actions.
             - Include one verification_command for every action.
+            - Include the exact structured failure record and a failure_id on every action.
             - If actions affect the same file, combine them or order them so each later action uses the prior action's result.
             - Do not broaden the proposed PR or change unrelated behavior.
           context: [failure, feature_description, implementation_plan, completeness_review, invariant_review, security_review, final_repository_context]
@@ -376,10 +377,12 @@ recoveries:
                   maxItems: 4
                   items:
                     type: object
-                    required: [id, file_path, intent, verification_command]
+                    required: [id, failure_id, failure, file_path, intent, verification_command]
                     additionalProperties: false
                     properties:
                       id: {type: string, minLength: 1}
+                      failure_id: {type: string, minLength: 1}
+                      failure: {type: object}
                       file_path: {type: string, minLength: 1}
                       intent: {type: string, minLength: 1}
                       verification_command: {type: array, minItems: 1, items: {type: string, minLength: 1}}
@@ -389,6 +392,10 @@ recoveries:
           item_binding: final_repair_action
           collect: {binding: final_repair_results, key: id}
           body:
+            - operation:
+                tool: read_document
+                parameters: {file_path: "${final_repair_action.file_path}"}
+                bind: final_repair_source
             - attempt:
                 id: final-repair-action
                 max_attempts: 2
@@ -402,7 +409,7 @@ recoveries:
                         - Target exactly the proposed repair file.
                         - Preserve unrelated content and existing invariants.
                         - Make only one edit for this one failure before the next failure is processed.
-                      context: [feature_description, final_repair_action, failure, validation_results, final_repository_context]
+                      context: [final_repair_action, final_repair_source]
                       output:
                         name: final_repair_edit
                         schema:
@@ -502,7 +509,7 @@ recoveries:
                 findings: {type: array, items: {type: string}}
           validation: {kind: json_schema}
   final-repair-action-retry:
-    inputs: [final_repair_action, final_repair_validation]
+    inputs: [final_repair_action, final_repair_validation, final_repair_source]
     steps:
       - judge:
           kind: construct_repair_edit
@@ -512,7 +519,7 @@ recoveries:
           instructions:
             - Use the failed verification result and failure details as evidence.
             - Do not edit any other file or address a different failure.
-          context: [feature_description, final_repair_action, failure, final_repair_validation, final_repository_context]
+          context: [final_repair_action, final_repair_source, final_repair_validation, failure]
           output:
             name: final_repair_edit
             schema:

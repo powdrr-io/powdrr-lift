@@ -9,6 +9,7 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_document,
 )
+from powdrr_lift.structrr.rebase import rebase_structrr_snapshot, snapshot_digest
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -284,3 +285,99 @@ def test_bootstrap_validation_rejects_duplicate_stable_key(tmp_path: Path) -> No
     assert any(
         issue.code == "source_subject_stable_key_duplicate" for issue in report.issues
     )
+
+
+def _snapshot(
+    *, description: str = "Keep the API stable.", path: str = "src/api.py"
+) -> dict:
+    return {
+        "schema": "https://powdrr.io/schema/changelog-v2",
+        "structrr_schema": "https://powdrr.io/schema/structrr-bootstrap-v1",
+        "entities": [{"id": "api", "type": "Application", "description": description}],
+        "entity_relationships": [],
+        "source_subjects": [
+            {
+                "id": f"python:{path}::api.Client",
+                "stable_key": "python::api.Client",
+                "kind": "class",
+                "qualified_name": "api.Client",
+                "path": path,
+                "span": {"start_line": 1, "end_line": 4},
+            }
+        ],
+        "source_bindings": [
+            {
+                "id": "binding:api",
+                "subject_id": f"python:{path}::api.Client",
+                "entity_id": "api",
+                "relationship": "implemented_by",
+                "path": path,
+                "span": {"start_line": 1, "end_line": 4},
+            }
+        ],
+    }
+
+
+def test_snapshot_digest_ignores_semantic_collection_order() -> None:
+    first = _snapshot()
+    second = _snapshot()
+    second["entities"] = list(reversed(second["entities"]))
+
+    assert snapshot_digest(first) == snapshot_digest(second)
+
+
+def test_rebase_ignores_unrelated_current_changes() -> None:
+    baseline = _snapshot()
+    current = _snapshot()
+    current["entities"].append(
+        {"id": "billing", "type": "Service", "description": "Unrelated."}
+    )
+
+    report = rebase_structrr_snapshot(baseline, current, referenced_entity_ids=("api",))
+
+    assert report.classification == "clean"
+    assert len(report.changes) == 1
+    assert report.affected_changes == ()
+
+
+def test_rebase_reports_entity_contract_change_as_conflict() -> None:
+    baseline = _snapshot()
+    current = _snapshot(description="The API must require authentication.")
+    current["entities"][0]["type"] = "Service"
+
+    report = rebase_structrr_snapshot(baseline, current, referenced_entity_ids=("api",))
+
+    assert report.classification == "conflicted"
+    assert report.conflicts[0].identity == "api"
+    assert report.requires_targeted_review
+
+
+def test_rebase_mechanically_remaps_source_move() -> None:
+    baseline = _snapshot()
+    current = _snapshot(path="src/client_api.py")
+    current["source_subjects"][0]["stable_key"] = "python::client_api.Client"
+
+    report = rebase_structrr_snapshot(
+        baseline,
+        current,
+        referenced_source_subject_keys=("python::api.Client",),
+    )
+
+    assert report.classification == "mechanically_rebased"
+    assert report.remappings[0].before == "python::api.Client"
+    assert report.remappings[0].after == "python::client_api.Client"
+    assert report.conflicts == ()
+
+
+def test_rebase_requires_targeted_update_for_binding_contract_change() -> None:
+    baseline = _snapshot()
+    current = _snapshot()
+    current["source_bindings"][0] = {
+        **current["source_bindings"][0],
+        "relationship": "verified_by",
+    }
+
+    report = rebase_structrr_snapshot(baseline, current, referenced_entity_ids=("api",))
+
+    assert report.classification == "invalidated"
+    assert any("source_binding" in item for item in report.amendment_items)

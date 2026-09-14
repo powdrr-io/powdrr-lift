@@ -1,0 +1,121 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 678
+title: Link bootstrapped Structrr entities to source evidence
+intent:
+  problem: The initial Structrr bootstrap records semantic entities and source files separately, but does not explain which source artifacts implement, define, or verify those entities.
+  goal: Add conservative deterministic source-link inference with confidence thresholds and evidence-specific relationship kinds.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Import the regular-expression support used by source-link inference.
+    rationale: Connect Structrr meaning to implementation evidence without treating weak matches as authoritative.
+    span:
+      start_line: 5
+      end_line: 5
+    related:
+      entities:
+        - structrr-source-linker
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Define source evidence types and linkable semantic entity types.
+    rationale: Restrict inference to entity and file categories where a source relationship is meaningful.
+    span:
+      start_line: 22
+      end_line: 41
+    related:
+      entities:
+        - structrr-source-linker
+        - source-link-confidence
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Preserve specification summaries as source-link matching evidence.
+    rationale: Let deterministic matching use the semantic evidence already present in specifications.
+    span:
+      start_line: 307
+      end_line: 307
+    related:
+      entities:
+        - structrr-source-linker
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Emit inferred source relationships alongside specification relationships.
+    rationale: Connect semantic entities to concrete source artifacts in the generated Structrr graph.
+    span:
+      start_line: 330
+      end_line: 343
+    related:
+      entities:
+        - structrr-source-linker
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Classify Markdown and reStructuredText as design documents.
+    rationale: Prevent documentation from being mislabeled as implementation source evidence.
+    span:
+      start_line: 368
+      end_line: 375
+    related:
+      entities:
+        - source-link-confidence
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add bounded source-link inference with confidence thresholds.
+    rationale: Keep inferred links useful without overstating weak identifier matches.
+    span:
+      start_line: 464
+      end_line: 465
+    related:
+      entities:
+        - structrr-source-linker
+        - source-link-confidence
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add deterministic identifier scoring and evidence-specific relationship kinds.
+    rationale: Distinguish implementation, definition, and verification evidence in the product graph.
+    span:
+      start_line: 469
+      end_line: 561
+    related:
+      entities:
+        - structrr-source-linker
+        - source-link-confidence
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Verify source-link inference for a semantic application entity.
+    rationale: Keep source links deterministic and prevent regressions in the bootstrap safety boundary.
+    span:
+      start_line: 72
+      end_line: 77
+    related:
+      entities:
+        - source-link-confidence
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Assert implementation relationship classification for source evidence.
+    rationale: Ensure source links carry the correct evidence-specific relationship kind.
+    span:
+      start_line: 80
+      end_line: 87
+    related:
+      entities:
+        - source-link-confidence
+entities:
+  - id: structrr-source-linker
+    type: Module
+    action: added
+  - id: source-link-confidence
+    type: Module
+    action: added
+entity_relationships:
+  - id: bootstrap-uses-source-linker
+    source: structrr-source-linker
+    target: source-link-confidence
+    relationship: enforces
+    description: Source-link inference applies a confidence threshold and bounded candidate set before emitting relationships.
+    rationale: Keep inferred product-to-source connections useful without overstating uncertain evidence.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

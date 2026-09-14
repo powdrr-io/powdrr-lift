@@ -43,8 +43,9 @@ LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
-_MAX_STREAM_CHUNKS = 4096
-_MAX_STREAM_CONTENT_CHARS = 131072
+_MAX_STREAM_CHUNKS = 16384
+_MAX_STREAM_CONTENT_CHARS = 524288
+_STREAM_EXCERPT_CHARS = 512
 
 
 @dataclass(frozen=True, slots=True)
@@ -535,7 +536,7 @@ def _read_openai_response(
                 chunk_count > _MAX_STREAM_CHUNKS
                 or content_length > _MAX_STREAM_CONTENT_CHARS
             ):
-                excerpt = "".join(content_parts)[:256]
+                excerpt = _stream_excerpt(content_parts)
                 raise _ModelUnavailableError(
                     "OpenAI streaming response exceeded the bounded output limit "
                     f"({chunk_count} chunks, {content_length} characters); "
@@ -557,10 +558,23 @@ def _read_openai_response(
     if not stream_complete:
         raise _ModelUnavailableError(
             "OpenAI streaming response ended before a completion marker; "
-            f"received {chunk_count} content chunks"
+            f"received {chunk_count} content chunks; "
+            f"partial content: {_stream_excerpt(content_parts)!r}"
         )
     response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
     return json.dumps(response_metadata)
+
+
+def _stream_excerpt(content_parts: Sequence[str]) -> str:
+    """Return bounded beginning/end content for diagnosing truncated streams."""
+    content = "".join(content_parts)
+    if len(content) <= _STREAM_EXCERPT_CHARS * 2:
+        return content
+    return (
+        content[:_STREAM_EXCERPT_CHARS]
+        + "...<truncated>..."
+        + content[-_STREAM_EXCERPT_CHARS:]
+    )
 
 
 class LocalLlamaChatClient:

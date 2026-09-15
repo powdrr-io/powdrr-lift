@@ -91,7 +91,7 @@ def apply_fragment_edit(
     accepted = list(state.get("accepted_fingerprints", []))
     value_fingerprint = _fingerprint(value)
     if value_fingerprint in accepted:
-        return _rejected(
+        result = _rejected(
             state,
             rejected,
             fingerprint,
@@ -100,6 +100,8 @@ def apply_fragment_edit(
             "This exact step was already accepted; append a different step "
             "that advances the fragment.",
         )
+        result["diagnostic"]["suggested_step"] = {"terminal": "succeeded"}
+        return result
     steps = fragment.get("steps")
     maximum = state.get("max_steps")
     if not isinstance(steps, list) or not isinstance(maximum, int):

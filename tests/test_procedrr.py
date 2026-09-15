@@ -311,6 +311,7 @@ def test_fragment_builder_rejects_repeated_accepted_step() -> None:
     repeated = apply_fragment_edit(accepted, step)
     assert repeated["accepted"] is False
     assert repeated["diagnostic"]["code"] == "repeated_fragment_step"
+    assert repeated["diagnostic"]["suggested_step"] == {"terminal": "succeeded"}
 
 
 def test_fragment_builder_rejects_edit_not_grounded_in_source_context() -> None:

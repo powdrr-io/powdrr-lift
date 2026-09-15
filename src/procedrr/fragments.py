@@ -294,8 +294,7 @@ def _operation_contract_diagnostics(
         path = f"steps[{index}].operation.parameters"
         if tool == "read_document" and (
             not isinstance(parameters, Mapping)
-            or not isinstance(parameters.get("file_path"), str)
-            or not parameters["file_path"].strip()
+            or not _nonempty_value(parameters.get("file_path"))
         ):
             diagnostics.append(
                 DocumentDiagnostic(
@@ -308,14 +307,12 @@ def _operation_contract_diagnostics(
             edits = parameters.get("edits") if isinstance(parameters, Mapping) else None
             valid = (
                 isinstance(parameters, Mapping)
-                and isinstance(parameters.get("file_path"), str)
-                and bool(parameters["file_path"].strip())
+                and _nonempty_value(parameters.get("file_path"))
                 and isinstance(edits, list)
                 and len(edits) == 1
                 and isinstance(edits[0], Mapping)
-                and isinstance(edits[0].get("old_text"), str)
-                and bool(edits[0]["old_text"])
-                and isinstance(edits[0].get("new_text"), str)
+                and _nonempty_value(edits[0].get("old_text"))
+                and _nonempty_value(edits[0].get("new_text"))
                 and edits[0]["new_text"] != edits[0]["old_text"]
             )
             if not valid:
@@ -332,8 +329,9 @@ def _operation_contract_diagnostics(
                 first_edit = edits[0]
                 assert isinstance(first_edit, Mapping)
                 old_text = first_edit.get("old_text")
-                assert isinstance(old_text, str)
-                if "${" not in old_text and old_text not in _evidence_text(evidence):
+                if isinstance(old_text, str) and old_text not in _evidence_text(
+                    evidence
+                ):
                     diagnostics.append(
                         DocumentDiagnostic(
                             path,
@@ -359,6 +357,18 @@ def _operation_contract_diagnostics(
                     )
                 )
     return diagnostics
+
+
+def _nonempty_value(value: Any) -> bool:
+    """Accept a concrete string or a typed reference resolved at runtime."""
+    if isinstance(value, str):
+        return bool(value.strip())
+    return (
+        isinstance(value, Mapping)
+        and value.get("type") == "reference"
+        and isinstance(value.get("value"), str)
+        and bool(value["value"].strip())
+    )
 
 
 def _evidence_text(evidence: Any) -> str:

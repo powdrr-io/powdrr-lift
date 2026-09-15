@@ -80,6 +80,7 @@ steps:
                 When the goal is completely implemented and the fragment needs
                 no more steps, append {terminal: succeeded}.
               - If fragment_state.accepted is false, correct only fragment_state.diagnostic and do not repeat a rejected edit fingerprint.
+              - If fragment_state.diagnostic.code is repeated_fragment_step, the prior step is already in the draft; append {terminal: succeeded} when the goal is met, or append one distinct validation/read step. Never emit that same step again.
             context: [fragment_goal, fragment_context, fragment_state]
             output:
               name: fragment_edit

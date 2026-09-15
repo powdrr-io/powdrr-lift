@@ -29,8 +29,7 @@ class EvaluationError(RuntimeError):
 class ValidationGateError(EvaluationError):
     """A validation gate failed with its bound evidence preserved."""
 
-    def __init__(self, subject: str, evidence: Any) -> None:
-        self.subject = subject
+    def __init__(self, evidence: Any) -> None:
         self.evidence = evidence
         super().__init__("validation gate failed")
 
@@ -297,21 +296,13 @@ class Evaluator:
                 )
                 return
             except EvaluationError as exc:
-                failure: dict[str, Any] = {
-                    "code": "validation_failed"
-                    if isinstance(exc, ValidationGateError)
-                    else "execution_failed",
-                    "message": str(exc),
-                    "attempt": attempt,
-                }
+                failure: dict[str, Any] = {}
                 if isinstance(exc, ValidationGateError):
-                    failure.update(
-                        {
-                            "subject": exc.subject,
-                            "evidence": exc.evidence,
-                            "category": _validation_category(exc.evidence),
-                        }
-                    )
+                    failure["category"] = _validation_category(exc.evidence)
+                    failure["validation"] = exc.evidence
+                else:
+                    failure["category"] = "execution_error"
+                    failure["error"] = str(exc)
                 state["failure"] = failure
                 events.append(EvaluationEvent("recovery", path, state["failure"]))
                 self._steps(
@@ -567,7 +558,8 @@ class Evaluator:
     ) -> None:
         if _resolve_binding(state, str(gate["subject"])) != gate["equals"]:
             subject = str(gate["subject"])
-            raise ValidationGateError(subject, _resolve_binding(state, subject))
+            root = subject.split(".", 1)[0]
+            raise ValidationGateError(_resolve_binding(state, root))
 
     @staticmethod
     def _limit(

@@ -46,6 +46,25 @@ class StructuredToolExecutor:
                 return apply_fragment_step_json(
                     state, step_json, evidence=parameters.get("evidence")
                 )
+            if tool == "edit":
+                edits = parameters.get("edits")
+                if isinstance(edits, list) and any(
+                    isinstance(item, Mapping)
+                    and (
+                        not item.get("old_text")
+                        or item.get("old_text") == item.get("new_text")
+                    )
+                    for item in edits
+                ):
+                    return {
+                        "ok": False,
+                        "error": {
+                            "code": "no_op_edit",
+                            "message": "edit must change a non-empty source substring",
+                            "tool": tool,
+                            "retryable": True,
+                        },
+                    }
             return self._executor(tool, parameters)
         except FileNotFoundError as exc:
             path = parameters.get("file_path")

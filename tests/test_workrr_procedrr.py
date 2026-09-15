@@ -84,6 +84,16 @@ def test_tool_failures_are_structured_for_workrr(tmp_path: Path) -> None:
     }
 
 
+def test_no_op_edits_are_structured_retryable_errors() -> None:
+    executor = StructuredToolExecutor(lambda _tool, _parameters: {"changed": True})
+    result = executor(
+        "edit",
+        {"file_path": "hello.py", "edits": [{"old_text": "x", "new_text": "x"}]},
+    )
+    assert result["error"]["code"] == "no_op_edit"
+    assert result["error"]["retryable"] is True
+
+
 def test_structured_executor_exposes_fragment_construction_primitives() -> None:
     executor = StructuredToolExecutor(lambda _tool, _parameters: None)
     state = executor(

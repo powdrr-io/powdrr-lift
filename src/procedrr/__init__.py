@@ -3,6 +3,11 @@
 from procedrr.compiler import CompilationError, CompilationReport, compile_workflow
 from procedrr.design_interview import design_interview
 from procedrr.editor import append_step, apply_json_edits, set_value
+from procedrr.fragments import (
+    apply_fragment_edit,
+    apply_fragment_step_json,
+    start_fragment,
+)
 from procedrr.model import (
     ActivationLimits,
     CallNode,
@@ -66,11 +71,14 @@ __all__ = [
     "DocumentDiagnostic",
     "ParseError",
     "append_step",
+    "apply_fragment_edit",
+    "apply_fragment_step_json",
     "apply_json_edits",
     "parse_and_validate",
     "parse_document",
     "render_document",
     "set_value",
+    "start_fragment",
     "validate_document",
     "validate_single_decision",
     "design_interview",

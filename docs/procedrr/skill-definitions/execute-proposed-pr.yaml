@@ -93,6 +93,8 @@ steps:
               items: {type: string, minLength: 1}
       validation: {kind: json_schema}
   - specialize:
+      process: generate-fragment
+      max_steps: 32
       question: >-
         Generate the validated Procedrr implementation fragment for this
         proposed feature. The fragment must inspect source on demand, make one
@@ -107,57 +109,27 @@ steps:
   - for_each:
       snapshot: {name: implementation_plan.validation_commands, max_items: 16}
       item_binding: validation_command
-      collect: {binding: validation_results, mode: list, key: command, value: validation_result}
+      collect: {binding: current_validation_results, mode: list, key: command, value: validation_result}
       body:
         - operation:
             tool: internal
             parameters: {command: "${validation_command}"}
             bind: validation_result
-  - judge:
-      kind: construct_repair_plan
-      question: Which validation failures require a minimal replan and one new coding action?
-      subject: validation_results
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Treat each validation_results record as {command, result}.
-        - Treat nonzero command results as actionable failures.
-        - Return no actions when every validation command passed.
-        - For each failure, use the exact output to propose one scoped edit.
-        - Every repair action must be traceable to one validation_results record.
-        - Do not broaden the proposed PR.
-      context: [implementation_plan, validation_results, proposed_pr_source, repository_context]
-      output:
-        name: repair_plan
-        schema:
-          type: object
-          required: [done, action]
-          additionalProperties: false
-          properties:
-            done: {type: boolean}
-            action:
-              type: object
-              required: [id, file_path, intent]
-              additionalProperties: false
-              properties:
-                id: {type: string, minLength: 1}
-                file_path: {type: string, minLength: 1}
-                intent: {type: string, minLength: 1}
-      validation: {kind: json_schema}
   - repeat:
       max_iterations: 8
       until: {subject: repair_decision.done, equals: true}
-      collect: {binding: repair_actions, value: repair_decision.action}
       body:
         - judge:
-            kind: construct_repair_plan
-            question: Are all actionable validation failures repaired, or what is the next one-file repair action?
-            subject: validation_results
+            kind: choose_one_repair
+            question: Is there one remaining validation failure to repair, or are all validations complete?
+            subject: current_validation_results
             prompt_system: Return only the declared JSON object. Choose exactly one next repair or declare done.
             instructions:
-              - Set done true only when no actionable validation failures remain.
-              - When done is false, return exactly one repair action for one file.
+              - Inspect only current_validation_results; do not reconsider unrelated design.
+              - Set done true only when every current validation record passed.
+              - When done is false, select exactly one failing validation record.
               - Never return a list of actions.
-            context: [feature_description, validation_results, repository_context]
+            context: [feature_description, current_validation_results, repository_context]
             output:
               name: repair_decision
               schema:
@@ -179,47 +151,24 @@ steps:
             subject: repair_decision.done
             cases:
               false:
-                - judge:
-                    kind: construct_repair_edit
-                    question: What one edit repairs this exact validation failure?
-                    subject: repair_decision.action
-                    prompt_system: Return only one safe, minimal file edit as JSON.
-                    instructions:
-                      - Target exactly the planned repair path.
-                      - Use the validation failure evidence and preserve unrelated behavior.
-                    context: [feature_description, repair_decision, validation_results, repository_context]
-                    output:
-                      name: repair_edit
-                      schema:
-                        type: object
-                        required: [file_path, edit]
-                        additionalProperties: false
-                        properties:
-                          file_path: {type: string, minLength: 1}
-                          edit:
-                            type: object
-                            required: [old_text, new_text]
-                            additionalProperties: false
-                            properties:
-                              old_text: {type: string}
-                              new_text: {type: string}
-                    validation: {kind: json_schema}
-                - operation:
-                    tool: edit
-                    parameters:
-                      file_path: "${repair_edit.file_path}"
-                      edits: ["${repair_edit.edit}"]
-                    bind: repair_result
+                - specialize:
+                    process: generate-fragment
+                    max_steps: 16
+                    question: Repair exactly the selected validation failure with the smallest safe edit.
+                    context: [feature_description, repair_decision, current_validation_results, repository_context]
+                    allowed_tools: [read_document, edit, internal, invoke_tool, list_files]
+                    bind: repair_fragment
+                - call: {fragment: "${repair_fragment}", max_steps: 32}
             default: []
-  - for_each:
-      snapshot: {name: implementation_plan.validation_commands, max_items: 16}
-      item_binding: revalidation_command
-      collect: {binding: revalidation_results, mode: list, key: command, value: revalidation_result}
-      body:
-        - operation:
-            tool: internal
-            parameters: {command: "${revalidation_command}"}
-            bind: revalidation_result
+        - for_each:
+            snapshot: {name: implementation_plan.validation_commands, max_items: 16}
+            item_binding: revalidation_command
+            collect: {binding: current_validation_results, mode: list, key: command, value: revalidation_result}
+            body:
+              - operation:
+                  tool: internal
+                  parameters: {command: "${revalidation_command}"}
+                  bind: revalidation_result
   - operation:
       tool: gather_context
       parameters:
@@ -235,7 +184,7 @@ steps:
         - Judge against the actual final repository context and validation results.
         - Mark complete only when every condition is evidenced.
         - List each missing condition precisely.
-      context: [feature_description, implementation_plan, validation_results, revalidation_results, final_repository_context]
+      context: [feature_description, implementation_plan, current_validation_results, final_repository_context]
       output:
         name: completeness_review
         schema:
@@ -254,7 +203,7 @@ steps:
       instructions:
         - Use repository evidence and validation results, not assumptions.
         - Report every violated or unevidenced invariant.
-      context: [implementation_plan, repository_context, final_repository_context, validation_results, revalidation_results]
+      context: [implementation_plan, repository_context, final_repository_context, current_validation_results]
       output:
         name: invariant_review
         schema:
@@ -273,7 +222,7 @@ steps:
       instructions:
         - Inspect only the changed scope and its security-relevant effects.
         - Treat unknown security behavior as a finding, not as approval.
-      context: [implementation_plan, final_repository_context, validation_results, revalidation_results]
+      context: [implementation_plan, final_repository_context, current_validation_results]
       output:
         name: security_review
         schema:
@@ -405,7 +354,7 @@ recoveries:
             - Judge against the corrected repository context and latest structured validation results.
             - Mark complete only when every condition is evidenced.
             - List each missing condition precisely.
-          context: [feature_description, implementation_plan, validation_results, final_revalidation_results, final_repository_context]
+          context: [feature_description, implementation_plan, current_validation_results, final_revalidation_results, final_repository_context]
           output:
             name: completeness_review
             schema:
@@ -424,7 +373,7 @@ recoveries:
           instructions:
             - Use current repository evidence and latest validation results.
             - Report every violated or unevidenced invariant.
-          context: [implementation_plan, repository_context, final_repository_context, validation_results, final_revalidation_results]
+          context: [implementation_plan, repository_context, final_repository_context, current_validation_results, final_revalidation_results]
           output:
             name: invariant_review
             schema:
@@ -443,7 +392,7 @@ recoveries:
           instructions:
             - Inspect only the changed scope and security-relevant effects.
             - Treat unknown security behavior as a finding, not approval.
-          context: [implementation_plan, final_repository_context, validation_results, final_revalidation_results]
+          context: [implementation_plan, final_repository_context, current_validation_results, final_revalidation_results]
           output:
             name: security_review
             schema:

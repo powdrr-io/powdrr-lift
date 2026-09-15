@@ -2,33 +2,20 @@
 
 from __future__ import annotations
 
-import io
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from jsonschema import ValidationError as JsonSchemaError
 from jsonschema import validate as validate_json
 
-from powdrr_lift.workflow_chat_selection import WorkflowChatConfig
-from powdrr_lift.workflow_chat_transport import _complete_json_with_repair
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
-from procedrr.editor import apply_json_edits
-from procedrr.parser import (
-    KNOWN_TOOLS,
-    DocumentDiagnostic,
-    validate_document,
-    validate_single_decision,
-)
+from procedrr.fragments import apply_fragment_step_json, start_fragment
 
 
 class ProcedrrResponseError(RuntimeError):
     """A procedrr judge could not produce a schema-valid response."""
-
-
-class ProcedrrFragmentError(RuntimeError):
-    """A generated Procedrr fragment failed language or contract validation."""
 
 
 class StructuredToolExecutor:
@@ -40,6 +27,25 @@ class StructuredToolExecutor:
 
     def __call__(self, tool: str, parameters: Mapping[str, Any]) -> Any:
         try:
+            if tool == "procedrr_fragment_start":
+                return start_fragment(
+                    name=str(parameters.get("name", "generated-fragment")),
+                    available_bindings=_string_sequence(
+                        parameters.get("available_bindings")
+                    ),
+                    allowed_tools=_string_sequence(parameters.get("allowed_tools")),
+                    max_steps=int(parameters.get("max_steps", 64)),
+                )
+            if tool == "procedrr_fragment_apply_edit":
+                state = parameters.get("state")
+                step_json = parameters.get("step_json")
+                if not isinstance(state, Mapping) or not isinstance(step_json, str):
+                    raise ValueError(
+                        "fragment apply requires a state mapping and step_json string"
+                    )
+                return apply_fragment_step_json(
+                    state, step_json, evidence=parameters.get("evidence")
+                )
             return self._executor(tool, parameters)
         except FileNotFoundError as exc:
             path = parameters.get("file_path")
@@ -75,11 +81,8 @@ class WorkrrProcedrrClient:
         max_retries: int = 3,
     ) -> None:
         self._client = client
-        self._config = WorkflowChatConfig(
-            skills_dir=skills_dir,
-            provider_retry_attempts=max_retries,
-            provider_retry_delay_seconds=0,
-        )
+        self._skills_dir = skills_dir
+        self._max_retries = max_retries
 
     def complete_json(
         self,
@@ -121,292 +124,46 @@ class WorkrrProcedrrClient:
                 raise RuntimeError(f"response_schema: {exc.message}") from exc
             return payload
 
-        result = _complete_json_with_repair(
-            self._client,
-            messages,
-            context="procedrr judge",
-            model="procedrr",
-            parser=parse,
-            repair_instructions=(
-                "Return only one JSON object matching the declared schema. "
-                "Preserve the original objective and correct the specific "
-                "schema error; do not repeat the invalid object."
-            ),
-            config=self._config,
-            input_func=lambda: "abort",
-            stdout=io.StringIO(),
-            stderr=io.StringIO(),
-            response_schema=response_schema,
-        )
-        if not isinstance(result, dict):
-            raise ProcedrrResponseError(
-                "Workrr exhausted structured repair for a procedrr judge."
-            )
-        return result
-
-    def complete_fragment(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        allowed_tools: set[str] | frozenset[str] | None = None,
-    ) -> dict[str, Any]:
-        """Produce a validated JSON Procedrr fragment with pointer-based repair."""
-        latest_fragment: dict[str, Any] | None = None
-        response_schema = _fragment_or_edit_schema()
-        language_contract = _fragment_language_contract(allowed_tools)
-        fragment_messages = [
-            {
-                "role": "system",
-                "content": (
-                    "Return one Procedrr program as a JSON object with name and "
-                    "steps. Do not return YAML, markdown, prose, comments, or code "
-                    "fences. Every judge must make exactly one decision. If you are "
-                    "correcting a previously rejected program, you may instead return "
-                    "a JSON edit object whose edits use add, replace, or remove with "
-                    "RFC 6901 JSON Pointer paths. The exact language contract is: "
-                    + json.dumps(
-                        language_contract, ensure_ascii=False, separators=(",", ":")
-                    )
-                ),
-            },
-            *messages,
-        ]
-
-        def parse(payload: dict[str, Any]) -> dict[str, Any]:
-            nonlocal latest_fragment
+        last_error = ""
+        for attempt in range(self._max_retries + 1):
+            if attempt:
+                messages = [
+                    *messages,
+                    {
+                        "role": "user",
+                        "content": (
+                            "The previous response was invalid: "
+                            + last_error
+                            + " Return one corrected JSON object only."
+                        ),
+                    },
+                ]
             try:
-                validate_json(payload, response_schema)
-            except JsonSchemaError as exc:
-                raise ProcedrrFragmentError(
-                    _json_error("fragment_response_schema", exc.json_path, exc.message)
-                ) from exc
-            if "edits" in payload:
-                if latest_fragment is None:
-                    raise ProcedrrFragmentError(
-                        _json_error(
-                            "fragment_edit_without_base",
-                            "/edits",
-                            "JSON edits require a previously rejected fragment",
-                        )
-                    )
-                try:
-                    candidate = apply_json_edits(latest_fragment, payload["edits"])
-                except (KeyError, IndexError, TypeError, ValueError) as exc:
-                    raise ProcedrrFragmentError(
-                        _json_error("invalid_fragment_edit", "/edits", str(exc))
-                    ) from exc
-            else:
-                candidate = dict(payload)
-            latest_fragment = candidate
-            diagnostics = [
-                *validate_document(candidate),
-                *validate_single_decision(candidate),
-                *_tool_contract_diagnostics(candidate, allowed_tools),
-            ]
-            if diagnostics:
-                raise ProcedrrFragmentError(
-                    json.dumps(
-                        {
-                            "code": "invalid_procedrr_fragment",
-                            "diagnostics": [item.to_data() for item in diagnostics],
-                        },
-                        ensure_ascii=False,
-                        separators=(",", ":"),
+                return parse(
+                    cast(Any, self._client).complete_json(
+                        messages, response_schema=response_schema
                     )
                 )
-            return candidate
-
-        result = _complete_json_with_repair(
-            self._client,
-            fragment_messages,
-            context="procedrr fragment",
-            model="procedrr",
-            parser=parse,
-            repair_instructions=(
-                "Correct every reported diagnostic. Use each diagnostic's "
-                "json_pointer to target the invalid value. Return either the full "
-                'corrected Procedrr JSON object or {"edits":[{"op":'
-                '"replace","path":"/pointer","value":...}]}. Do not '
-                "weaken guards, gates, schemas, or single-decision constraints."
-            ),
-            config=self._config,
-            input_func=lambda: "abort",
-            stdout=io.StringIO(),
-            stderr=io.StringIO(),
-            response_schema=response_schema,
+            except (JsonSchemaError, RuntimeError, ValueError) as exc:
+                last_error = str(exc)
+        raise ProcedrrResponseError(
+            "Workrr exhausted structured repair for a procedrr judge: " + last_error
         )
-        if not isinstance(result, dict):
-            raise ProcedrrResponseError(
-                "Workrr exhausted structured repair for a procedrr fragment."
-            )
-        return result
 
 
 __all__ = [
-    "ProcedrrFragmentError",
     "ProcedrrResponseError",
     "StructuredToolExecutor",
     "WorkrrProcedrrClient",
 ]
 
 
-def _fragment_or_edit_schema() -> dict[str, Any]:
-    edit = {
-        "type": "object",
-        "required": ["op", "path"],
-        "additionalProperties": False,
-        "properties": {
-            "op": {"type": "string", "enum": ["add", "replace", "remove"]},
-            "path": {"type": "string", "pattern": "^/"},
-            "value": {},
-        },
-    }
-    return {
-        "oneOf": [
-            {
-                "type": "object",
-                "required": ["name", "steps"],
-                "not": {"required": ["edits"]},
-                "properties": {
-                    "name": {"type": "string", "minLength": 1},
-                    "steps": {"type": "array", "minItems": 1},
-                },
-            },
-            {
-                "type": "object",
-                "required": ["edits"],
-                "additionalProperties": False,
-                "properties": {
-                    "edits": {"type": "array", "minItems": 1, "items": edit}
-                },
-            },
-        ]
-    }
-
-
-def _fragment_language_contract(
-    allowed_tools: set[str] | frozenset[str] | None,
-) -> dict[str, Any]:
-    return {
-        "document": {
-            "required": ["name", "steps"],
-            "steps": "non-empty array of step objects",
-        },
-        "step": {
-            "exactly_one_control": [
-                "operation",
-                "judge",
-                "for_each",
-                "worklist",
-                "call",
-                "terminal",
-                "gate",
-                "attempt",
-                "repeat",
-                "branch",
-            ]
-        },
-        "operation": {
-            "required": ["tool"],
-            "optional": ["parameters", "command", "bind"],
-            "allowed_tools": sorted(allowed_tools or KNOWN_TOOLS),
-        },
-        "judge": {
-            "required": [
-                "question",
-                "subject",
-                "prompt_system",
-                "instructions",
-                "context",
-                "output",
-                "validation",
-            ],
-            "output": {"required": ["name", "schema"]},
-            "validation": {"kind": "json_schema"},
-            "single_decision": (
-                "output must describe one value; arrays of independently chosen "
-                "objects are forbidden"
-            ),
-        },
-        "bindings": "reference prior bindings as ${binding.path}",
-        "example": {
-            "name": "read-one-file",
-            "inputs": [{"name": "file_path"}],
-            "steps": [
-                {
-                    "operation": {
-                        "tool": "read_document",
-                        "parameters": {"file_path": "${file_path}"},
-                        "bind": "source",
-                    }
-                },
-                {"terminal": "succeeded"},
-            ],
-        },
-    }
-
-
-def _json_error(code: str, path: str, message: str) -> str:
-    return json.dumps(
-        {
-            "code": code,
-            "diagnostics": [
-                {"code": code, "json_pointer": path or "/", "message": message}
-            ],
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
-
-
-def _tool_contract_diagnostics(
-    document: Mapping[str, Any], allowed_tools: set[str] | frozenset[str] | None
-) -> list[DocumentDiagnostic]:
-    if allowed_tools is None:
-        return []
-
-    diagnostics: list[DocumentDiagnostic] = []
-
-    def walk(steps: Any, path: str) -> None:
-        if not isinstance(steps, list):
-            return
-        for index, step in enumerate(steps):
-            if not isinstance(step, Mapping):
-                continue
-            step_path = f"{path}[{index}]"
-            operation = step.get("operation")
-            if isinstance(operation, Mapping):
-                tool = operation.get("tool")
-                if isinstance(tool, str) and tool not in allowed_tools:
-                    diagnostics.append(
-                        DocumentDiagnostic(
-                            f"{step_path}.operation.tool",
-                            f"tool {tool!r} is not allowed by the fragment contract",
-                            code="tool_not_allowed",
-                        )
-                    )
-            for control in ("for_each", "worklist", "call", "attempt", "repeat"):
-                nested = step.get(control)
-                if isinstance(nested, Mapping):
-                    walk(
-                        nested.get("body", nested.get("steps")),
-                        f"{step_path}.{control}",
-                    )
-            branch = step.get("branch")
-            if isinstance(branch, Mapping):
-                cases = branch.get("cases")
-                if isinstance(cases, Mapping):
-                    for case, body in cases.items():
-                        walk(body, f"{step_path}.branch.cases.{case}")
-                walk(branch.get("default"), f"{step_path}.branch.default")
-
-    walk(document.get("steps"), "steps")
-    recoveries = document.get("recoveries")
-    if isinstance(recoveries, Mapping):
-        for name, recovery in recoveries.items():
-            if isinstance(recovery, Mapping):
-                walk(recovery.get("steps"), f"recoveries.{name}.steps")
-    return diagnostics
+def _string_sequence(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple)) or not all(
+        isinstance(item, str) for item in value
+    ):
+        raise ValueError("expected a list of strings")
+    return list(value)
 
 
 def _schema_example(schema: Mapping[str, Any]) -> Any:
@@ -430,6 +187,10 @@ def _schema_example(schema: Mapping[str, Any]) -> Any:
         return False
     if schema_type == "integer" or schema_type == "number":
         return 0
+    if schema_type == "string" and schema.get("pattern") == r"^\{.*\}$":
+        return "{}"
+    if schema_type == "string" and schema.get("minLength", 0):
+        return "value"
     return ""
 
 
@@ -443,6 +204,9 @@ def _schema_contract(schema: Mapping[str, Any]) -> Any:
         "enum",
         "minItems",
         "maxItems",
+        "minLength",
+        "maxLength",
+        "pattern",
     ):
         if key in schema:
             contract[key] = schema[key]

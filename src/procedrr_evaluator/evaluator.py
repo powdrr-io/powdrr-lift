@@ -48,10 +48,17 @@ class Evaluator:
     """Run a parsed, procedrr-validated document using agent-owned adapters."""
 
     def __init__(
-        self, llm: WorkflowLLMClient, operation_executor: OperationExecutor
+        self,
+        llm: WorkflowLLMClient,
+        operation_executor: OperationExecutor,
+        *,
+        process_directory: Path | None = None,
     ) -> None:
         self.llm = llm
         self.operation_executor = operation_executor
+        self.process_directory = process_directory or Path(
+            "docs/procedrr/skill-definitions"
+        )
 
     @classmethod
     def with_workrr(
@@ -72,6 +79,7 @@ class Evaluator:
                 max_retries=max_retries,
             ),
             operation_executor,
+            process_directory=Path("docs/procedrr/skill-definitions"),
         )
 
     def evaluate(
@@ -148,46 +156,54 @@ class Evaluator:
             raise EvaluationError(f"{path}.specialize is malformed")
         context = declaration.get("context")
         bind = declaration.get("bind")
-        complete_fragment = getattr(self.llm, "complete_fragment", None)
-        if (
-            not isinstance(context, list)
-            or not isinstance(bind, str)
-            or not callable(complete_fragment)
-        ):
-            raise EvaluationError(f"{path}.specialize is malformed or unsupported")
-        context_limit = _positive_limit(limits, "context_chars", 24000)
+        if not isinstance(context, list) or not isinstance(bind, str):
+            raise EvaluationError(f"{path}.specialize is malformed")
         value_limit = _positive_limit(limits, "context_value_chars", 6000)
         context_data = {
             name: _compact_value(_resolve_binding(state, name), max_chars=value_limit)
             for name in context
         }
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "Generate one complete Procedrr fragment as JSON. Return only "
-                    "the fragment or a structured JSON correction."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "Question:\n"
-                    + str(declaration.get("question"))
-                    + "\n\nContext:\n"
-                    + _bounded_context_text(context_data, context_limit)
-                ),
-            },
-        ]
-        usage["llm"] += 1
-        self._limit(usage, limits, "llm_activations", "LLM activations")
         allowed_tools = declaration.get("allowed_tools")
-        fragment = complete_fragment(
-            messages,
-            allowed_tools=set(allowed_tools)
-            if isinstance(allowed_tools, list)
-            else None,
+        process_name = declaration.get("process", "generate-fragment")
+        if not isinstance(process_name, str) or not process_name:
+            raise EvaluationError(f"{path}.specialize.process must be a name")
+        process = self._load_process(process_name)
+        maximum = declaration.get("max_steps", 64)
+        if not isinstance(maximum, int) or maximum <= 0:
+            raise EvaluationError(f"{path}.specialize.max_steps must be positive")
+        generator_state = {
+            "fragment_name": f"{bind}-generated",
+            "fragment_goal": str(declaration.get("question")),
+            "fragment_context": context_data,
+            "fragment_available_bindings": list(context),
+            "fragment_allowed_tools": (
+                list(allowed_tools) if isinstance(allowed_tools, list) else []
+            ),
+            "fragment_max_steps": maximum,
+        }
+        generator_usage = {"llm": 0, "tools": 0}
+        self._steps(
+            process["steps"],
+            generator_state,
+            events,
+            generator_usage,
+            process.get("limits", {}),
+            f"{path}.subprocess[{process_name}]",
         )
+        fragment_state = generator_state.get("fragment_state")
+        fragment = (
+            fragment_state.get("fragment")
+            if isinstance(fragment_state, Mapping)
+            else None
+        )
+        if not isinstance(fragment_state, Mapping):
+            raise EvaluationError(f"{path}.specialize subprocess returned no state")
+        if not isinstance(fragment, Mapping) or fragment_state.get("done") is not True:
+            raise EvaluationError(f"{path}.specialize subprocess returned no fragment")
+        usage["llm"] += generator_usage["llm"]
+        usage["tools"] += generator_usage["tools"]
+        self._limit(usage, limits, "llm_activations", "LLM activations")
+        self._limit(usage, limits, "tool_calls", "tool calls")
         state[bind] = fragment
         events.append(
             EvaluationEvent(
@@ -196,6 +212,16 @@ class Evaluator:
                 {"bind": bind, "name": fragment.get("name")},
             )
         )
+
+    def _load_process(self, name: str) -> Mapping[str, Any]:
+        from procedrr import parse_and_validate
+
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", name):
+            raise EvaluationError(f"invalid subprocess name: {name!r}")
+        path = self.process_directory / f"{name}.yaml"
+        if not path.is_file():
+            raise EvaluationError(f"Procedrr subprocess does not exist: {path}")
+        return parse_and_validate(path.read_text(encoding="utf-8"))
 
     def _call_fragment(
         self,
@@ -311,7 +337,13 @@ class Evaluator:
                 ):
                     state[collect["binding"]] = collected
                 return
-        raise EvaluationError(f"{path}.repeat exhausted after {maximum} iterations")
+        subject = str(until.get("subject"))
+        root = subject.split(".", 1)[0]
+        last_state = _compact_value(state.get(root), max_chars=2000)
+        raise EvaluationError(
+            f"{path}.repeat exhausted after {maximum} iterations; "
+            f"last {root}={_json_text(last_state)}"
+        )
 
     def _branch(
         self,
@@ -532,6 +564,14 @@ def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:
 
 
 def _resolve_value(value: Any, state: Mapping[str, Any]) -> Any:
+    if isinstance(value, Mapping) and value.get("type") in {"literal", "reference"}:
+        kind = value.get("type")
+        if kind == "literal":
+            return value.get("value")
+        reference = value.get("value")
+        if not isinstance(reference, str):
+            raise EvaluationError("reference value must be a binding path")
+        return _resolve_binding(state, reference)
     if isinstance(value, str):
         match = _REFERENCE.fullmatch(value)
         if match:

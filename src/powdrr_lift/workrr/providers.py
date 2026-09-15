@@ -353,6 +353,7 @@ class OpenAIChatClient:
         timeout: float = 120.0,
         limits: LLMModelLimits | None = None,
         progress_stream: TextIO | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
@@ -360,6 +361,7 @@ class OpenAIChatClient:
         self._timeout = timeout
         self._limits = limits or DEFAULT_MODEL_LIMITS
         self._progress_stream = progress_stream
+        self._reasoning_effort = reasoning_effort
         self.last_usage: dict[str, Any] = {}
         self.last_serialized_messages: str | None = None
 
@@ -395,6 +397,8 @@ class OpenAIChatClient:
             ),
             "stream": True,
         }
+        if self._reasoning_effort is not None:
+            payload["reasoning_effort"] = self._reasoning_effort
         request = Request(
             f"{self._base_url}/chat/completions",
             data=_serialize_openai_payload(
@@ -462,7 +466,23 @@ class OpenAIChatClient:
             )
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise PowdrrExecutionError("OpenAI response message content was empty.")
+            # Some OpenAI-compatible providers put a refusal or reasoning-only
+            # response in a separate field. Preserve that metadata so Workrr's
+            # structured recovery can distinguish an unsupported response mode
+            # from a genuinely empty generation.
+            metadata = {
+                key: value
+                for key, value in message.items()
+                if key != "content" and value not in (None, "", [], {})
+            }
+            detail = (
+                f"; message fields={json.dumps(metadata, ensure_ascii=False)[:1000]}"
+                if metadata
+                else ""
+            )
+            raise PowdrrExecutionError(
+                f"OpenAI response message content was empty{detail}."
+            )
 
         return _parse_json_object(content, "OpenAI response content")
 
@@ -566,7 +586,17 @@ def _read_openai_response(
             "OpenAI streaming response did not include any events."
         )
     if not content_parts:
-        raise PowdrrExecutionError("OpenAI streaming response content was empty.")
+        metadata = response_metadata or {}
+        choices = metadata.get("choices")
+        detail = ""
+        if choices:
+            detail = (
+                "; first event="
+                + json.dumps({"choices": choices}, ensure_ascii=False)[:1000]
+            )
+        raise PowdrrExecutionError(
+            f"OpenAI streaming response content was empty{detail}."
+        )
     if not stream_complete:
         raise _ModelUnavailableError(
             "OpenAI streaming response ended before a completion marker; "
@@ -997,6 +1027,7 @@ def build_provider_client(
         base_url=base_url,
         limits=limits,
         progress_stream=progress_stream,
+        reasoning_effort="none" if provider.startswith("deepinfra") else None,
     )
 
 

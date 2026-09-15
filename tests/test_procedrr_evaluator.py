@@ -1,11 +1,12 @@
 # ruff: noqa: I001
 
 import os
+import json
 import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
 from powdrr_lift.workrr.procedrr import StructuredToolExecutor
@@ -325,6 +326,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
 class HelloWorldLLM:
     def __init__(self) -> None:
         self.plan_round = 0
+        self.fragment_round = 0
 
     def complete_json(self, messages: list[dict[str, str]], **_: Any) -> dict[str, Any]:
         question = messages[1]["content"]
@@ -344,6 +346,38 @@ class HelloWorldLLM:
                     "ruff reports no issues",
                 ],
             }
+        if "What one JSON-encoded Procedrr step should be appended" in question:
+            self.fragment_round += 1
+            value: Any
+            if self.fragment_round == 1:
+                value = {
+                    "operation": {
+                        "tool": "read_document",
+                        "parameters": {"file_path": "hello.py"},
+                        "bind": "source",
+                    }
+                }
+            elif self.fragment_round == 2:
+                value = {
+                    "operation": {
+                        "tool": "edit",
+                        "parameters": {
+                            "file_path": "hello.py",
+                            "edits": [
+                                {
+                                    "old_text": 'print("Hello, World")\n',
+                                    "new_text": (
+                                        'print("Hello, World")\nprint("Here I Am")\n'
+                                    ),
+                                }
+                            ],
+                        },
+                        "bind": "applied_edit",
+                    }
+                }
+            else:
+                value = {"terminal": "succeeded"}
+            return {"step_json": json.dumps(value)}
         if "Is implementation planning complete" in question:
             self.plan_round += 1
             if self.plan_round > 1:
@@ -376,6 +410,11 @@ class HelloWorldLLM:
                 "done": True,
                 "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
             }
+        if "Is there one remaining validation failure" in question:
+            return {
+                "done": True,
+                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+            }
         if "Which validation failures require" in question:
             return {
                 "done": True,
@@ -388,43 +427,6 @@ class HelloWorldLLM:
         if "security regression" in question:
             return {"safe": True, "findings": []}
         raise AssertionError(f"unexpected judge question: {question}")
-
-    def complete_fragment(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        allowed_tools: set[str] | None = None,
-    ) -> dict[str, Any]:
-        del messages, allowed_tools
-        return {
-            "name": "hello-world-implementation",
-            "steps": [
-                {
-                    "operation": {
-                        "tool": "read_document",
-                        "parameters": {"file_path": "hello.py"},
-                        "bind": "source",
-                    }
-                },
-                {
-                    "operation": {
-                        "tool": "edit",
-                        "parameters": {
-                            "file_path": "hello.py",
-                            "edits": [
-                                {
-                                    "old_text": 'print("Hello, World")\n',
-                                    "new_text": (
-                                        'print("Hello, World")\nprint("Here I Am")\n'
-                                    ),
-                                }
-                            ],
-                        },
-                        "bind": "applied_edit",
-                    }
-                },
-            ],
-        }
 
 
 def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
@@ -488,7 +490,7 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
             return {"changed": True, "path": parameters["file_path"]}
         raise AssertionError(f"unexpected operation: {tool}")
 
-    result = Evaluator(HelloWorldLLM(), execute).evaluate(
+    result = Evaluator(HelloWorldLLM(), StructuredToolExecutor(execute)).evaluate(
         document,
         {
             "work_item_name": "hello-world",
@@ -503,6 +505,36 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     assert (
         tmp_path / "hello.py"
     ).read_text() == 'print("Hello, World")\nprint("Here I Am")\n'
+
+
+def test_operation_resolves_explicit_literal_and_reference_values() -> None:
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(
+        """
+version: 1
+name: values
+inputs: [{name: source, type: string, required: true}]
+steps:
+  - operation:
+      tool: internal
+      parameters:
+        command:
+          - {type: literal, value: echo}
+          - {type: reference, value: source}
+      bind: result
+"""
+    )
+    seen: list[dict[str, Any]] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        seen.append(dict(parameters))
+        return {"ok": True}
+
+    Evaluator(cast(Any, lambda *_args, **_kwargs: {}), execute).evaluate(
+        document, {"source": "hello"}
+    )
+    assert seen == [{"command": ["echo", "hello"]}]
 
 
 def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
@@ -554,9 +586,13 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "internal":
-            command = parameters.get("command", [])
+            command = list(parameters.get("command", []))
             if command[:2] == ["powdrr-lift", "show-proposed-pr"]:
                 return {"id": "hello-world-live", "intent": "Add a second output line."}
+            if command and command[0] in {"python", "python3"}:
+                command[0] = sys.executable
+            if command and command[0] == "pytest":
+                command = [sys.executable, "-m", "pytest", *command[1:]]
             if command[:2] not in ([sys.executable, "-m"], ["ruff", "check"]):
                 return {"returncode": 1, "stderr": "unsupported command", "stdout": ""}
             completed = subprocess.run(

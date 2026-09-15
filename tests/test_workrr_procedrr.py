@@ -22,18 +22,6 @@ class RepairingClient:
         return response
 
 
-class RecordingRepairingClient(RepairingClient):
-    def __init__(self, responses: list[dict[str, Any]]) -> None:
-        super().__init__(responses)
-        self.messages: list[list[dict[str, str]]] = []
-
-    def complete_json(
-        self, messages: list[dict[str, str]], **kwargs: Any
-    ) -> dict[str, Any]:
-        self.messages.append(messages)
-        return super().complete_json(messages, **kwargs)
-
-
 SCHEMA = {
     "type": "object",
     "required": ["complete"],
@@ -96,71 +84,26 @@ def test_tool_failures_are_structured_for_workrr(tmp_path: Path) -> None:
     }
 
 
-def test_workrr_repairs_generated_fragment_using_json_pointer(tmp_path: Path) -> None:
-    provider = RecordingRepairingClient(
-        [
-            {
-                "name": "generated",
-                "steps": [{"operation": {"tool": "imaginary", "bind": "result"}}],
-            },
-            {
-                "edits": [
-                    {
-                        "op": "replace",
-                        "path": "/steps/0/operation/tool",
-                        "value": "list_files",
-                    }
-                ]
-            },
-        ]
-    )
-    client = WorkrrProcedrrClient(provider, skills_dir=tmp_path)
-
-    result = client.complete_fragment(
-        [{"role": "user", "content": "Generate the inspection fragment."}],
-        allowed_tools={"list_files"},
+def test_structured_executor_exposes_fragment_construction_primitives() -> None:
+    executor = StructuredToolExecutor(lambda _tool, _parameters: None)
+    state = executor(
+        "procedrr_fragment_start",
+        {
+            "name": "generated",
+            "available_bindings": ["request"],
+            "allowed_tools": ["read_document"],
+            "max_steps": 2,
+        },
     )
 
-    assert result["steps"][0]["operation"]["tool"] == "list_files"
-    assert provider.calls == 2
-    assert "/steps/0/operation/tool" in str(provider.messages[1])
-
-
-def test_workrr_repairs_fragment_that_violates_single_decision_form(
-    tmp_path: Path,
-) -> None:
-    provider = RepairingClient(
-        [
-            {
-                "name": "generated",
-                "steps": [
-                    {
-                        "judge": {
-                            "question": "Which actions?",
-                            "subject": "request",
-                            "prompt_system": "Return JSON.",
-                            "instructions": ["Use the request."],
-                            "context": ["request"],
-                            "output": {
-                                "name": "actions",
-                                "schema": {
-                                    "type": "array",
-                                    "items": {"type": "object"},
-                                },
-                            },
-                            "validation": {"kind": "json_schema"},
-                        }
-                    }
-                ],
-                "inputs": [{"name": "request"}],
-            },
-            {"name": "generated", "steps": [{"terminal": "succeeded"}]},
-        ]
+    result = executor(
+        "procedrr_fragment_apply_edit",
+        {
+            "state": state,
+            "step_json": '{"terminal":"succeeded"}',
+            "evidence": {},
+        },
     )
 
-    result = WorkrrProcedrrClient(provider, skills_dir=tmp_path).complete_fragment(
-        [{"role": "user", "content": "Generate a fragment."}]
-    )
-
-    assert result["steps"] == [{"terminal": "succeeded"}]
-    assert provider.calls == 2
+    assert result["done"] is True
+    assert result["fragment"]["steps"] == [{"terminal": "succeeded"}]

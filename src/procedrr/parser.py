@@ -19,6 +19,8 @@ KNOWN_TOOLS = frozenset(
         "read_document",
         "invoke_tool",
         "list_files",
+        "procedrr_fragment_start",
+        "procedrr_fragment_apply_edit",
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})
@@ -295,6 +297,25 @@ def _validate_steps(
                     DocumentDiagnostic(
                         f"{step_path}.specialize.bind",
                         "bind must be a non-empty string",
+                    )
+                )
+            process = value.get("process", "generate-fragment")
+            if not isinstance(process, str) or not re.fullmatch(
+                r"[a-z][a-z0-9-]*", process
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.specialize.process",
+                        "process must be a lowercase Procedrr process name",
+                    )
+                )
+            if "max_steps" in value and (
+                not isinstance(value["max_steps"], int) or value["max_steps"] <= 0
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.specialize.max_steps",
+                        "max_steps must be positive",
                     )
                 )
             allowed_tools = value.get("allowed_tools")
@@ -612,11 +633,20 @@ def _validate_steps(
                 command = operation.get("command")
                 if command is None and isinstance(operation.get("parameters"), Mapping):
                     command = operation["parameters"].get("command")
-                if (
-                    not isinstance(command, list)
-                    or not command
-                    or not all(isinstance(part, str) for part in command)
-                ) and not (
+                command_parts_valid = (
+                    isinstance(command, list)
+                    and bool(command)
+                    and all(
+                        isinstance(part, str)
+                        or (
+                            isinstance(part, Mapping)
+                            and part.get("type") in {"literal", "reference"}
+                            and isinstance(part.get("value"), (str, int, float, bool))
+                        )
+                        for part in command
+                    )
+                )
+                if not command_parts_valid and not (
                     isinstance(command, str) and _BINDING.fullmatch(command) is not None
                 ):
                     diagnostics.append(
@@ -757,6 +787,13 @@ def _template_references(value: Any) -> Iterator[str]:
     if isinstance(value, str):
         yield from (match.group(1) for match in _BINDING.finditer(value))
     elif isinstance(value, Mapping):
+        if value.get("type") == "reference":
+            reference = value.get("value")
+            if isinstance(reference, str):
+                yield reference
+            return
+        if value.get("type") == "literal":
+            return
         for child in value.values():
             yield from _template_references(child)
     elif isinstance(value, list):

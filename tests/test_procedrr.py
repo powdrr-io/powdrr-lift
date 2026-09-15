@@ -17,12 +17,14 @@ from procedrr import (
     TerminalStatus,
     WorkflowDefinition,
     append_step,
+    apply_fragment_edit,
     apply_json_edits,
     compile_workflow,
     design_interview,
     parse_and_validate,
     render_document,
     set_value,
+    start_fragment,
     validate_single_decision,
 )
 
@@ -252,6 +254,87 @@ def test_json_pointer_edits_are_persistent_and_support_arrays() -> None:
 
     with pytest.raises(ValueError, match="value is required"):
         apply_json_edits(document, [{"op": "replace", "path": "/name"}])
+
+
+def test_fragment_builder_accepts_one_step_and_rejects_repeated_invalid_edit() -> None:
+    state = start_fragment(
+        name="generated",
+        available_bindings=["request"],
+        allowed_tools=["read_document"],
+        max_steps=3,
+    )
+    invalid = {
+        "op": "add",
+        "path": "/steps/-",
+        "value": {"operation": {"tool": "edit", "bind": "changed"}},
+    }
+
+    rejected = apply_fragment_edit(state, invalid)
+    repeated = apply_fragment_edit(rejected, invalid)
+    accepted = apply_fragment_edit(
+        repeated,
+        {
+            "op": "add",
+            "path": "/steps/-",
+            "value": {
+                "operation": {
+                    "tool": "read_document",
+                    "parameters": {"file_path": "hello.py"},
+                    "bind": "source",
+                }
+            },
+        },
+    )
+
+    assert rejected["accepted"] is False
+    assert repeated["diagnostic"]["code"] == "repeated_fragment_edit"
+    assert accepted["accepted"] is True
+    assert len(accepted["fragment"]["steps"]) == 1
+
+
+def test_fragment_builder_rejects_edit_not_grounded_in_source_context() -> None:
+    state = start_fragment(
+        name="generated",
+        allowed_tools=["edit"],
+        max_steps=2,
+    )
+
+    result = apply_fragment_edit(
+        state,
+        {
+            "op": "add",
+            "path": "/steps/-",
+            "value": {
+                "operation": {
+                    "tool": "edit",
+                    "parameters": {
+                        "file_path": "hello.py",
+                        "edits": [
+                            {
+                                "old_text": "invented source",
+                                "new_text": "replacement",
+                            }
+                        ],
+                    },
+                    "bind": "changed",
+                }
+            },
+        },
+        evidence={"source": 'print("Hello, World")\n'},
+    )
+
+    assert result["accepted"] is False
+    assert result["diagnostic"]["code"] == "ungrounded_edit"
+
+
+def test_checked_in_generate_fragment_definition_is_single_decision() -> None:
+    from pathlib import Path
+
+    source = Path("docs/procedrr/skill-definitions/generate-fragment.yaml").read_text()
+    document = parse_and_validate(source)
+
+    assert document["name"] == "generate-fragment"
+    assert validate_single_decision(document) == ()
 
 
 def test_checked_in_design_interview_definition_parses() -> None:

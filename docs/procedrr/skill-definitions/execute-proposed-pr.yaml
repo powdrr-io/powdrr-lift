@@ -8,7 +8,7 @@ description: >-
   Execute one proposed PR through planning, a Workrr-validated JSON Procedrr
   implementation fragment, mechanical validation, and completeness, invariant,
   and security review.
-limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
+limits: {llm_activations: 128, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
 steps:
   - operation:
       tool: internal

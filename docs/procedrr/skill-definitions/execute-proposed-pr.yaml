@@ -115,53 +115,43 @@ steps:
             tool: internal
             parameters: {command: "${validation_command}"}
             bind: validation_result
-  - repeat:
-      max_iterations: 8
-      until: {subject: repair_decision.done, equals: true}
+  - for_each:
+      snapshot: {name: current_validation_results, max_items: 16}
+      item_binding: validation_record
+      collect: {binding: repair_actions, mode: list, value: repair_action}
       body:
-        - judge:
-            kind: choose_one_repair
-            question: Are all validations passing, or which one failing validation index should be repaired next?
-            subject: current_validation_results
-            prompt_system: Return only the declared JSON object. Choose done or one zero-based failure index.
-            instructions:
-              - Inspect only current_validation_results; do not reconsider unrelated design.
-              - Set done true only when every current validation record passed.
-              - When done is false, return only the zero-based index of one failing record.
-              - When done is true, return failure_index -1.
-            context: [feature_description, current_validation_results, repository_context]
-            output:
-              name: repair_decision
-              schema:
-                type: object
-                required: [done, failure_index]
-                additionalProperties: false
-                properties:
-                  done: {type: boolean}
-                  failure_index: {type: integer, minimum: -1}
-            validation: {kind: json_schema}
         - branch:
-            subject: repair_decision.done
+            subject: validation_record.result.returncode
             cases:
-              false:
-                - specialize:
-                    process: generate-fragment
-                    max_steps: 16
-                    question: Repair exactly the selected validation failure with the smallest safe edit.
-                    context: [feature_description, repair_decision, current_validation_results, repository_context]
-                    allowed_tools: [read_document, edit, internal, invoke_tool, list_files]
-                    bind: repair_fragment
-                - call: {fragment: "${repair_fragment}", max_steps: 32}
-            default: []
-        - for_each:
-            snapshot: {name: implementation_plan.validation_commands, max_items: 16}
-            item_binding: revalidation_command
-            collect: {binding: current_validation_results, mode: list, key: command, value: revalidation_result}
-            body:
-              - operation:
-                  tool: internal
-                  parameters: {command: "${revalidation_command}"}
-                  bind: revalidation_result
+              0: []
+            default:
+              - judge:
+                  kind: plan_one_repair
+                  question: What is the smallest safe repair for this one validation failure?
+                  subject: validation_record
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Use only this validation record as failure evidence.
+                    - Describe one concrete repair objective; do not discuss other failures.
+                  context: [feature_description, validation_record]
+                  output:
+                    name: repair_action
+                    schema:
+                      type: object
+                      required: [file_path, intent]
+                      additionalProperties: false
+                      properties:
+                        file_path: {type: string, minLength: 1}
+                        intent: {type: string, minLength: 1}
+                  validation: {kind: json_schema}
+              - specialize:
+                  process: generate-fragment
+                  max_steps: 16
+                  question: Repair exactly this validation failure with the smallest safe edit.
+                  context: [feature_description, validation_record, repair_action, repository_context]
+                  allowed_tools: [read_document, edit, internal, invoke_tool, list_files]
+                  bind: repair_fragment
+              - call: {fragment: "${repair_fragment}", max_steps: 32}
   - operation:
       tool: gather_context
       parameters:

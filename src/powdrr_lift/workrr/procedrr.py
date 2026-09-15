@@ -47,6 +47,7 @@ class StructuredToolExecutor:
                     state, step_json, evidence=parameters.get("evidence")
                 )
             if tool == "edit":
+                parameters = _materialize_line_edits(parameters, self._executor)
                 edits = parameters.get("edits")
                 if isinstance(edits, list) and any(
                     isinstance(item, Mapping)
@@ -189,6 +190,41 @@ def _string_sequence(value: Any) -> list[str]:
     ):
         raise ValueError("expected a list of strings")
     return list(value)
+
+
+def _materialize_line_edits(
+    parameters: Mapping[str, Any], executor: Any
+) -> dict[str, Any]:
+    edits = parameters.get("edits")
+    file_path = parameters.get("file_path")
+    if not isinstance(edits, list) or not isinstance(file_path, str):
+        return dict(parameters)
+    if not any(isinstance(item, Mapping) and "start" in item for item in edits):
+        return dict(parameters)
+    source = executor("read_document", {"file_path": file_path})
+    if not isinstance(source, str):
+        raise ValueError("line edit could not read the target source")
+    lines = source.splitlines(keepends=True)
+    materialized: list[dict[str, Any]] = []
+    for item in edits:
+        if not isinstance(item, Mapping):
+            raise ValueError("line edit must be an object")
+        start, end = item.get("start"), item.get("end")
+        if (
+            not isinstance(start, int)
+            or not isinstance(end, int)
+            or not 1 <= start <= end <= len(lines)
+        ):
+            raise ValueError("line edit range is outside the source")
+        materialized.append(
+            {
+                "old_text": "".join(lines[start - 1 : end]),
+                "new_text": item.get("new_text"),
+            }
+        )
+    result = dict(parameters)
+    result["edits"] = materialized
+    return result
 
 
 def _schema_example(schema: Mapping[str, Any]) -> Any:

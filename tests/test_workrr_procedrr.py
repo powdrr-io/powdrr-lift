@@ -94,6 +94,30 @@ def test_no_op_edits_are_structured_retryable_errors() -> None:
     assert result["error"]["retryable"] is True
 
 
+def test_line_edits_are_materialized_for_underlying_executor() -> None:
+    calls: list[tuple[str, Any]] = []
+
+    def execute(tool: str, parameters: Any) -> Any:
+        calls.append((tool, parameters))
+        return "one\ntwo\n" if tool == "read_document" else {"changed": True}
+
+    result = StructuredToolExecutor(execute)(
+        "edit",
+        {
+            "file_path": "hello.py",
+            "edits": [{"start": 1, "end": 1, "new_text": "ONE\n"}],
+        },
+    )
+    assert result == {"changed": True}
+    assert calls[-1] == (
+        "edit",
+        {
+            "file_path": "hello.py",
+            "edits": [{"old_text": "one\n", "new_text": "ONE\n"}],
+        },
+    )
+
+
 def test_structured_executor_exposes_fragment_construction_primitives() -> None:
     executor = StructuredToolExecutor(lambda _tool, _parameters: None)
     state = executor(

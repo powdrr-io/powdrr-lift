@@ -299,6 +299,43 @@ def _compare_source_subjects(
             for new_key, new_subject in unmatched_after.items()
             if new_key not in paired_after
             and _text(old_subject, "kind") == _text(new_subject, "kind")
+            and _symbol_leaf(old_subject) == _symbol_leaf(new_subject)
+            and _spans_overlap(old_subject.get("span"), new_subject.get("span"))
+        ]
+        if len(candidates) == 1:
+            new_key, new_subject = candidates[0]
+            paired_before.add(old_key)
+            paired_after.add(new_key)
+            changes.append(
+                StructrrChange(
+                    "source_subject",
+                    "moved",
+                    old_key,
+                    before=old_subject,
+                    after=new_subject,
+                    reason=(
+                        "The source symbol leaf and span are preserved "
+                        "across a path move."
+                    ),
+                )
+            )
+            remappings.append(
+                StructrrRemapping(
+                    "source_subject",
+                    old_key,
+                    new_key,
+                    "The source symbol leaf and span are preserved across a path move.",
+                )
+            )
+
+    for old_key, old_subject in unmatched_before.items():
+        if old_key in paired_before:
+            continue
+        candidates = [
+            (new_key, new_subject)
+            for new_key, new_subject in unmatched_after.items()
+            if new_key not in paired_after
+            and _text(old_subject, "kind") == _text(new_subject, "kind")
             and _text(old_subject, "path") == _text(new_subject, "path")
             and _spans_overlap(old_subject.get("span"), new_subject.get("span"))
         ]
@@ -336,6 +373,11 @@ def _compare_source_subjects(
             StructrrChange("source_subject", "added", identity, after=after[identity])
         )
     return changes, remappings
+
+
+def _symbol_leaf(subject: Mapping[str, Any]) -> str:
+    qualified_name = _text(subject, "qualified_name")
+    return qualified_name.rsplit(".", 1)[-1] if qualified_name else ""
 
 
 def _compare_bindings(

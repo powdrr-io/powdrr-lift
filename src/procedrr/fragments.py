@@ -44,6 +44,7 @@ def start_fragment(
             "message": "Append exactly one Procedrr step.",
         },
         "rejected_fingerprints": [],
+        "accepted_fingerprints": [],
     }
 
 
@@ -86,6 +87,18 @@ def apply_fragment_edit(
             "fragment_step_shape",
             "/value",
             "The appended value must be one step with exactly one control.",
+        )
+    accepted = list(state.get("accepted_fingerprints", []))
+    value_fingerprint = _fingerprint(value)
+    if value_fingerprint in accepted:
+        return _rejected(
+            state,
+            rejected,
+            fingerprint,
+            "repeated_fragment_step",
+            "/value",
+            "This exact step was already accepted; append a different step "
+            "that advances the fragment.",
         )
     steps = fragment.get("steps")
     maximum = state.get("max_steps")
@@ -139,6 +152,7 @@ def apply_fragment_edit(
                     else "Append the next single Procedrr step."
                 ),
             },
+            "accepted_fingerprints": [*accepted, value_fingerprint],
         }
     )
     return result

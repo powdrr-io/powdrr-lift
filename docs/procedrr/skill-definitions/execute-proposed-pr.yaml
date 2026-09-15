@@ -5,9 +5,10 @@ inputs:
   - {name: proposed_pr_id, type: string, required: true}
   - {name: feature_description, type: string, required: true}
 description: >-
-  Execute one proposed PR through bounded planning, one-action coding rounds,
-  mechanical validation, and completeness, invariant, and security review.
-limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3}
+  Execute one proposed PR through planning, a Workrr-validated JSON Procedrr
+  implementation fragment, mechanical validation, and completeness, invariant,
+  and security review.
+limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
 steps:
   - operation:
       tool: internal
@@ -46,32 +47,19 @@ steps:
         - Request no more than 16 files.
       context: [proposed_pr, repository_context, proposed_pr_source, implementation_specification_source]
       output:
-        name: planning_source_requests
+        name: planning_source_request
         schema:
           type: object
-          required: [requests]
+          required: [file_path, reason]
           additionalProperties: false
           properties:
-            requests:
-              type: array
-              maxItems: 16
-              items:
-                type: object
-                required: [file_path, reason]
-                additionalProperties: false
-                properties:
-                  file_path: {type: string, minLength: 1}
-                  reason: {type: string, minLength: 1}
+            file_path: {type: string, minLength: 1}
+            reason: {type: string, minLength: 1}
       validation: {kind: json_schema}
-  - for_each:
-      snapshot: {name: planning_source_requests.requests, max_items: 16}
-      item_binding: source_request
-      collect: {binding: source_documents, key: file_path, value: source_document}
-      body:
-        - operation:
-            tool: read_document
-            parameters: {file_path: "${source_request.file_path}"}
-            bind: source_document
+  - operation:
+      tool: read_document
+      parameters: {file_path: "${planning_source_request.file_path}"}
+      bind: source_document
   - judge:
       kind: construct_one
       question: What is the smallest ordered implementation plan for this proposed PR?
@@ -86,26 +74,14 @@ steps:
         - Order actions so each action leaves the tree buildable and testable.
         - Include the command-level validation needed after the actions.
         - Do not include unrelated refactors or speculative work.
-      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, proposed_pr_source, implementation_specification_source, repository_context, source_documents, initial_static_analysis]
+      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, proposed_pr_source, implementation_specification_source, repository_context, source_document, initial_static_analysis]
       output:
         name: implementation_plan
         schema:
           type: object
-          required: [actions, validation_commands, acceptance_conditions]
+          required: [validation_commands, acceptance_conditions]
           additionalProperties: false
           properties:
-            actions:
-              type: array
-              minItems: 1
-              maxItems: 16
-              items:
-                type: object
-                required: [id, file_path, intent]
-                additionalProperties: false
-                properties:
-                  id: {type: string, minLength: 1}
-                  file_path: {type: string, minLength: 1}
-                  intent: {type: string, minLength: 1}
             validation_commands:
               type: array
               minItems: 1
@@ -116,154 +92,83 @@ steps:
               minItems: 1
               items: {type: string, minLength: 1}
       validation: {kind: json_schema}
-  - for_each:
-      snapshot: {name: implementation_plan.actions, max_items: 16}
-      item_binding: implementation_action
-      collect: {binding: applied_actions, key: id}
-      body:
-        - judge:
-            kind: request_source
-            question: Which exact files must be read to implement this action safely?
-            subject: implementation_action
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Request only files needed to resolve symbols or integration points.
-              - Request no more than 8 repository-relative files.
-            context: [implementation_action, repository_context, source_documents]
-            output:
-              name: coding_source_requests
-              schema:
-                type: object
-                required: [requests]
-                additionalProperties: false
-                properties:
-                  requests:
-                    type: array
-                    maxItems: 8
-                    items:
-                      type: object
-                      required: [file_path, reason]
-                      additionalProperties: false
-                      properties:
-                        file_path: {type: string, minLength: 1}
-                        reason: {type: string, minLength: 1}
-            validation: {kind: json_schema}
-        - for_each:
-            snapshot: {name: coding_source_requests.requests, max_items: 8}
-            item_binding: coding_source_request
-            collect: {binding: coding_source_documents, key: file_path, value: coding_source_document}
-            body:
-              - operation:
-                  tool: read_document
-                  parameters: {file_path: "${coding_source_request.file_path}"}
-                  bind: coding_source_document
-        - judge:
-            kind: construct_one
-            question: What one file edit implements this exact planned action?
-            subject: implementation_action
-            prompt_system: >-
-              You are the coding agent. Return exactly one safe, minimal file
-              edit. Do not edit any other file and do not change the plan.
-            instructions:
-              - Read the action intent, current repository context, and feature request.
-              - Target exactly the planned file path.
-              - Preserve unrelated content and existing invariants.
-              - Return an edit that can be applied by the agent file-edit tool.
-            context: [work_item_name, feature_description, implementation_action, repository_context, source_documents, coding_source_documents]
-            output:
-              name: coding_edit
-              schema:
-                type: object
-                required: [file_path, edits]
-                additionalProperties: false
-                properties:
-                  file_path: {type: string, minLength: 1}
-                  edits: {type: array, minItems: 1, items: {type: object}}
-            validation: {kind: json_schema}
-        - operation:
-            tool: edit
-            parameters:
-              file_path: "${coding_edit.file_path}"
-              edits: "${coding_edit.edits}"
-            bind: applied_edit
+  - specialize:
+      process: generate-fragment
+      max_steps: 32
+      question: >-
+        Generate the validated Procedrr implementation fragment for this
+        proposed feature. The fragment must inspect source on demand, make one
+        edit decision at a time, validate each edit, repair failures, and finish
+        only after all acceptance conditions are evidenced.
+      context: [work_item_name, proposed_pr_id, feature_description, implementation_plan, repository_context, source_document, initial_static_analysis]
+      allowed_tools: [gather_context, internal, edit, read_document, invoke_tool, list_files]
+      bind: implementation_program
+  - call:
+      fragment: "${implementation_program}"
+      max_steps: 128
   - for_each:
       snapshot: {name: implementation_plan.validation_commands, max_items: 16}
       item_binding: validation_command
-      collect: {binding: validation_results, key: command}
+      collect: {binding: current_validation_results, mode: list, key: command, value: validation_result}
       body:
         - operation:
             tool: internal
             parameters: {command: "${validation_command}"}
             bind: validation_result
-  - judge:
-      kind: construct_repair_plan
-      question: Which validation failures require a minimal replan and one new coding action?
-      subject: validation_results
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Treat nonzero command results as actionable failures.
-        - Return no actions when every validation command passed.
-        - For each failure, use the exact output to propose one scoped edit.
-        - Do not broaden the proposed PR.
-      context: [implementation_plan, validation_results, proposed_pr_source, repository_context]
-      output:
-        name: repair_plan
-        schema:
-          type: object
-          required: [actions]
-          additionalProperties: false
-          properties:
-            actions:
-              type: array
-              maxItems: 8
-              items:
-                type: object
-                required: [id, file_path, intent]
-                additionalProperties: false
-                properties:
-                  id: {type: string, minLength: 1}
-                  file_path: {type: string, minLength: 1}
-                  intent: {type: string, minLength: 1}
-      validation: {kind: json_schema}
-  - for_each:
-      snapshot: {name: repair_plan.actions, max_items: 8}
-      item_binding: repair_action
-      collect: {binding: repair_results, key: id}
+  - repeat:
+      max_iterations: 8
+      until: {subject: repair_decision.done, equals: true}
       body:
         - judge:
-            kind: construct_repair_edit
-            question: What one edit repairs this exact validation failure?
-            subject: repair_action
-            prompt_system: Return only one safe, minimal file edit as JSON.
+            kind: choose_one_repair
+            question: Is there one remaining validation failure to repair, or are all validations complete?
+            subject: current_validation_results
+            prompt_system: Return only the declared JSON object. Choose exactly one next repair or declare done.
             instructions:
-              - Target exactly the planned repair path.
-              - Use the validation failure evidence and preserve unrelated behavior.
-            context: [feature_description, repair_action, validation_results, repository_context]
+              - Inspect only current_validation_results; do not reconsider unrelated design.
+              - Set done true only when every current validation record passed.
+              - When done is false, select exactly one failing validation record.
+              - Never return a list of actions.
+            context: [feature_description, current_validation_results, repository_context]
             output:
-              name: repair_edit
+              name: repair_decision
               schema:
                 type: object
-                required: [file_path, edits]
+                required: [done, action]
                 additionalProperties: false
                 properties:
-                  file_path: {type: string, minLength: 1}
-                  edits: {type: array, minItems: 1, items: {type: object}}
+                  done: {type: boolean}
+                  action:
+                    type: object
+                    required: [id, file_path, intent]
+                    additionalProperties: false
+                    properties:
+                      id: {type: string, minLength: 1}
+                      file_path: {type: string, minLength: 1}
+                      intent: {type: string, minLength: 1}
             validation: {kind: json_schema}
-        - operation:
-            tool: edit
-            parameters:
-              file_path: "${repair_edit.file_path}"
-              edits: "${repair_edit.edits}"
-            bind: repair_result
-  - for_each:
-      snapshot: {name: implementation_plan.validation_commands, max_items: 16}
-      item_binding: revalidation_command
-      collect: {binding: revalidation_results, key: command}
-      body:
-        - operation:
-            tool: internal
-            parameters: {command: "${revalidation_command}"}
-            bind: revalidation_result
+        - branch:
+            subject: repair_decision.done
+            cases:
+              false:
+                - specialize:
+                    process: generate-fragment
+                    max_steps: 16
+                    question: Repair exactly the selected validation failure with the smallest safe edit.
+                    context: [feature_description, repair_decision, current_validation_results, repository_context]
+                    allowed_tools: [read_document, edit, internal, invoke_tool, list_files]
+                    bind: repair_fragment
+                - call: {fragment: "${repair_fragment}", max_steps: 32}
+            default: []
+        - for_each:
+            snapshot: {name: implementation_plan.validation_commands, max_items: 16}
+            item_binding: revalidation_command
+            collect: {binding: current_validation_results, mode: list, key: command, value: revalidation_result}
+            body:
+              - operation:
+                  tool: internal
+                  parameters: {command: "${revalidation_command}"}
+                  bind: revalidation_result
   - operation:
       tool: gather_context
       parameters:
@@ -279,7 +184,7 @@ steps:
         - Judge against the actual final repository context and validation results.
         - Mark complete only when every condition is evidenced.
         - List each missing condition precisely.
-      context: [feature_description, implementation_plan, validation_results, revalidation_results, final_repository_context]
+      context: [feature_description, implementation_plan, current_validation_results, final_repository_context]
       output:
         name: completeness_review
         schema:
@@ -298,7 +203,7 @@ steps:
       instructions:
         - Use repository evidence and validation results, not assumptions.
         - Report every violated or unevidenced invariant.
-      context: [implementation_plan, repository_context, final_repository_context, validation_results, revalidation_results]
+      context: [implementation_plan, repository_context, final_repository_context, current_validation_results]
       output:
         name: invariant_review
         schema:
@@ -317,7 +222,7 @@ steps:
       instructions:
         - Inspect only the changed scope and its security-relevant effects.
         - Treat unknown security behavior as a finding, not as approval.
-      context: [implementation_plan, final_repository_context, validation_results, revalidation_results]
+      context: [implementation_plan, final_repository_context, current_validation_results]
       output:
         name: security_review
         schema:
@@ -328,19 +233,215 @@ steps:
             safe: {type: boolean}
             findings: {type: array, items: {type: string}}
       validation: {kind: json_schema}
-  - gate:
-      subject: completeness_review.complete
-      equals: true
-      on_failure:
-        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
-  - gate:
-      subject: invariant_review.preserved
-      equals: true
-      on_failure:
-        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
-  - gate:
-      subject: security_review.safe
-      equals: true
-      on_failure:
-        retry: {target: execute-proposed-pr, max_attempts: 1, on_exhausted: failed}
+  - attempt:
+      id: final-validation
+      max_attempts: 2
+      body:
+        - gate:
+            subject: completeness_review.complete
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+        - gate:
+            subject: invariant_review.preserved
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+        - gate:
+            subject: security_review.safe
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: final-validation-repair, resume: final-validation}
   - terminal: succeeded
+
+recoveries:
+  final-validation-repair:
+    steps:
+      - judge:
+          kind: construct_repair_plan
+          question: What minimal edits correct the failed final validation gate?
+          subject: failure
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Use the failure, review findings, and repository evidence to identify the smallest correction.
+            - Return no more than 4 independently executable file actions.
+            - Include one verification_command for every action.
+            - Include the exact structured failure record and a failure_id on every action.
+            - If actions affect the same file, combine them or order them so each later action uses the prior action's result.
+            - Do not broaden the proposed PR or change unrelated behavior.
+          context: [failure, feature_description, implementation_plan, completeness_review, invariant_review, security_review, final_repository_context]
+          output:
+            name: final_repair_action
+            schema:
+              type: object
+              required: [id, failure_id, failure, file_path, intent, verification_command]
+              additionalProperties: false
+              properties:
+                id: {type: string, minLength: 1}
+                failure_id: {type: string, minLength: 1}
+                failure: {type: object}
+                file_path: {type: string, minLength: 1}
+                intent: {type: string, minLength: 1}
+                verification_command: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+          validation: {kind: json_schema}
+      - operation:
+          tool: read_document
+          parameters: {file_path: "${final_repair_action.file_path}"}
+          bind: final_repair_source
+      - attempt:
+          id: final-repair-action
+          max_attempts: 2
+          body:
+            - judge:
+                kind: construct_repair_edit
+                question: What one edit corrects this exact final validation finding?
+                subject: final_repair_action
+                prompt_system: Return only one safe, minimal file edit as JSON.
+                instructions:
+                  - Target exactly the proposed repair file.
+                  - Preserve unrelated content and existing invariants.
+                context: [final_repair_action, final_repair_source]
+                output:
+                  name: final_repair_edit
+                  schema:
+                    type: object
+                    required: [file_path, edit]
+                    additionalProperties: false
+                    properties:
+                      file_path: {type: string, minLength: 1}
+                      edit:
+                        type: object
+                        required: [old_text, new_text]
+                        additionalProperties: false
+                        properties:
+                          old_text: {type: string}
+                          new_text: {type: string}
+                validation: {kind: json_schema}
+            - operation:
+                tool: edit
+                parameters:
+                  file_path: "${final_repair_edit.file_path}"
+                  edits: ["${final_repair_edit.edit}"]
+                bind: final_repair_result
+            - operation:
+                tool: internal
+                parameters: {command: "${final_repair_action.verification_command}"}
+                bind: final_repair_validation
+            - gate:
+                subject: final_repair_validation.returncode
+                equals: 0
+                on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+          on_failure: {recovery: final-repair-action-retry, resume: final-repair-action}
+      - for_each:
+          snapshot: {name: implementation_plan.validation_commands, max_items: 16}
+          item_binding: final_revalidation_command
+          collect: {binding: final_revalidation_results, mode: list, key: command, value: final_revalidation_result}
+          body:
+            - operation:
+                tool: internal
+                parameters: {command: "${final_revalidation_command}"}
+                bind: final_revalidation_result
+      - operation:
+          tool: gather_context
+          parameters:
+            types: [requirements, features, invariants, expected_tests, expected_outcomes]
+            feature_id: "${work_item_name}"
+          bind: final_repository_context
+      - judge:
+          kind: verify_completeness
+          question: Does the corrected tree satisfy every acceptance condition and requested behavior?
+          subject: implementation_plan.acceptance_conditions
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Judge against the corrected repository context and latest structured validation results.
+            - Mark complete only when every condition is evidenced.
+            - List each missing condition precisely.
+          context: [feature_description, implementation_plan, current_validation_results, final_revalidation_results, final_repository_context]
+          output:
+            name: completeness_review
+            schema:
+              type: object
+              required: [complete, missing]
+              additionalProperties: false
+              properties:
+                complete: {type: boolean}
+                missing: {type: array, items: {type: string}}
+          validation: {kind: json_schema}
+      - judge:
+          kind: verify_invariants
+          question: Are all declared invariants preserved after the correction?
+          subject: repository_context.invariants
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Use current repository evidence and latest validation results.
+            - Report every violated or unevidenced invariant.
+          context: [implementation_plan, repository_context, final_repository_context, current_validation_results, final_revalidation_results]
+          output:
+            name: invariant_review
+            schema:
+              type: object
+              required: [preserved, violations]
+              additionalProperties: false
+              properties:
+                preserved: {type: boolean}
+                violations: {type: array, items: {type: string}}
+          validation: {kind: json_schema}
+      - judge:
+          kind: verify_security
+          question: Did the correction introduce a security regression?
+          subject: final_repository_context
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Inspect only the changed scope and security-relevant effects.
+            - Treat unknown security behavior as a finding, not approval.
+          context: [implementation_plan, final_repository_context, current_validation_results, final_revalidation_results]
+          output:
+            name: security_review
+            schema:
+              type: object
+              required: [safe, findings]
+              additionalProperties: false
+              properties:
+                safe: {type: boolean}
+                findings: {type: array, items: {type: string}}
+          validation: {kind: json_schema}
+  final-repair-action-retry:
+    inputs: [final_repair_action, final_repair_validation, final_repair_source]
+    steps:
+      - judge:
+          kind: construct_repair_edit
+          question: What revised single edit fixes this same failure after the previous edit did not verify?
+          subject: final_repair_action
+          prompt_system: Return only one safe, minimal file edit as JSON.
+          instructions:
+            - Use the failed verification result and failure details as evidence.
+            - Do not edit any other file or address a different failure.
+          context: [final_repair_action, final_repair_source, final_repair_validation, failure]
+          output:
+            name: final_repair_edit
+            schema:
+              type: object
+              required: [file_path, edit]
+              additionalProperties: false
+              properties:
+                file_path: {type: string, minLength: 1}
+                edit:
+                  type: object
+                  required: [old_text, new_text]
+                  additionalProperties: false
+                  properties:
+                    old_text: {type: string}
+                    new_text: {type: string}
+          validation: {kind: json_schema}
+      - operation:
+          tool: edit
+          parameters:
+            file_path: "${final_repair_edit.file_path}"
+            edits: ["${final_repair_edit.edit}"]
+          bind: final_repair_result
+      - operation:
+          tool: internal
+          parameters: {command: "${final_repair_action.verification_command}"}
+          bind: final_repair_validation
+      - gate:
+          subject: final_repair_validation.returncode
+          equals: 0
+          on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}

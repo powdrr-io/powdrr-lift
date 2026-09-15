@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import itertools
 import json
 import math
 import os
@@ -43,8 +44,10 @@ LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
 LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
-_MAX_STREAM_CHUNKS = 4096
-_MAX_STREAM_CONTENT_CHARS = 131072
+_MAX_STREAM_CHUNKS = 16384
+_MAX_STREAM_CONTENT_CHARS = 524288
+_STREAM_EXCERPT_CHARS = 512
+_STREAM_CAPTURE_COUNTER = itertools.count(1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -350,6 +353,7 @@ class OpenAIChatClient:
         timeout: float = 120.0,
         limits: LLMModelLimits | None = None,
         progress_stream: TextIO | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
@@ -357,6 +361,7 @@ class OpenAIChatClient:
         self._timeout = timeout
         self._limits = limits or DEFAULT_MODEL_LIMITS
         self._progress_stream = progress_stream
+        self._reasoning_effort = reasoning_effort
         self.last_usage: dict[str, Any] = {}
         self.last_serialized_messages: str | None = None
 
@@ -392,6 +397,8 @@ class OpenAIChatClient:
             ),
             "stream": True,
         }
+        if self._reasoning_effort is not None:
+            payload["reasoning_effort"] = self._reasoning_effort
         request = Request(
             f"{self._base_url}/chat/completions",
             data=_serialize_openai_payload(
@@ -459,7 +466,23 @@ class OpenAIChatClient:
             )
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise PowdrrExecutionError("OpenAI response message content was empty.")
+            # Some OpenAI-compatible providers put a refusal or reasoning-only
+            # response in a separate field. Preserve that metadata so Workrr's
+            # structured recovery can distinguish an unsupported response mode
+            # from a genuinely empty generation.
+            metadata = {
+                key: value
+                for key, value in message.items()
+                if key != "content" and value not in (None, "", [], {})
+            }
+            detail = (
+                f"; message fields={json.dumps(metadata, ensure_ascii=False)[:1000]}"
+                if metadata
+                else ""
+            )
+            raise PowdrrExecutionError(
+                f"OpenAI response message content was empty{detail}."
+            )
 
         return _parse_json_object(content, "OpenAI response content")
 
@@ -485,6 +508,12 @@ def _read_openai_response(
         return response.read().decode("utf-8")
 
     content_parts: list[str] = []
+    capture_path = os.environ.get("POWDRR_STREAM_CAPTURE_PATH")
+    capture_id = next(_STREAM_CAPTURE_COUNTER)
+    if capture_path:
+        with Path(capture_path).open("a", encoding="utf-8") as capture:
+            capture.write(f"\n---STREAM-BEGIN id={capture_id}---\n")
+            capture.flush()
     response_metadata: dict[str, Any] | None = None
     event_data: list[str] = []
     chunk_count = 0
@@ -529,13 +558,17 @@ def _read_openai_response(
         content = delta.get("content")
         if isinstance(content, str):
             content_parts.append(content)
+            if capture_path:
+                with Path(capture_path).open("a", encoding="utf-8") as capture:
+                    capture.write(content)
+                    capture.flush()
             chunk_count += 1
             content_length = sum(len(part) for part in content_parts)
             if (
                 chunk_count > _MAX_STREAM_CHUNKS
                 or content_length > _MAX_STREAM_CONTENT_CHARS
             ):
-                excerpt = "".join(content_parts)[:256]
+                excerpt = _stream_excerpt(content_parts)
                 raise _ModelUnavailableError(
                     "OpenAI streaming response exceeded the bounded output limit "
                     f"({chunk_count} chunks, {content_length} characters); "
@@ -553,14 +586,41 @@ def _read_openai_response(
             "OpenAI streaming response did not include any events."
         )
     if not content_parts:
-        raise PowdrrExecutionError("OpenAI streaming response content was empty.")
+        metadata = response_metadata or {}
+        choices = metadata.get("choices")
+        detail = ""
+        if choices:
+            detail = (
+                "; first event="
+                + json.dumps({"choices": choices}, ensure_ascii=False)[:1000]
+            )
+        raise PowdrrExecutionError(
+            f"OpenAI streaming response content was empty{detail}."
+        )
     if not stream_complete:
         raise _ModelUnavailableError(
             "OpenAI streaming response ended before a completion marker; "
-            f"received {chunk_count} content chunks"
+            f"received {chunk_count} content chunks; "
+            f"partial content: {_stream_excerpt(content_parts)!r}"
         )
     response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
+    if capture_path:
+        with Path(capture_path).open("a", encoding="utf-8") as capture:
+            capture.write(f"\n---STREAM-END id={capture_id}---\n")
+            capture.flush()
     return json.dumps(response_metadata)
+
+
+def _stream_excerpt(content_parts: Sequence[str]) -> str:
+    """Return bounded beginning/end content for diagnosing truncated streams."""
+    content = "".join(content_parts)
+    if len(content) <= _STREAM_EXCERPT_CHARS * 2:
+        return content
+    return (
+        content[:_STREAM_EXCERPT_CHARS]
+        + "...<truncated>..."
+        + content[-_STREAM_EXCERPT_CHARS:]
+    )
 
 
 class LocalLlamaChatClient:
@@ -967,6 +1027,7 @@ def build_provider_client(
         base_url=base_url,
         limits=limits,
         progress_stream=progress_stream,
+        reasoning_effort="none" if provider.startswith("deepinfra") else None,
     )
 
 

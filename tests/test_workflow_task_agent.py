@@ -1876,12 +1876,14 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
             base_url: str,
             limits: object,
             progress_stream: object = None,
+            reasoning_effort: str | None = None,
         ) -> None:
             captured.update(
                 {
                     "model": model,
                     "api_key": api_key,
                     "base_url": base_url,
+                    "reasoning_effort": str(reasoning_effort),
                 }
             )
 
@@ -1907,6 +1909,7 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
         "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
         "api_key": "test-token",
         "base_url": "https://example.test",
+        "reasoning_effort": "none",
     }
 
 

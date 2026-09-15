@@ -1,13 +1,15 @@
 # ruff: noqa: I001
 
 import os
+import json
 import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
+from powdrr_lift.workrr.procedrr import StructuredToolExecutor
 from procedrr_evaluator import Evaluator
 
 
@@ -67,6 +69,64 @@ def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     assert calls == [("gather_context", {"types": ["requirements"]})]
     assert result.bindings["requirements_edits"]["added"][0]["id"] == "req-1"
     assert "requirements_context" in llm.messages[1]["content"]
+    metrics = next(
+        event.data["context_metrics"]
+        for event in result.events
+        if event.kind == "judge"
+    )
+    assert metrics["raw_binding_chars"]["requirements_context"] > 0
+    assert metrics["serialized_chars"] <= 24000
+
+
+def test_evaluator_bounds_large_judge_context() -> None:
+    llm = FakeLLM()
+    Evaluator(FakeLLM(), lambda _tool, _parameters: None).evaluate(
+        {
+            "name": "bounded",
+            "limits": {"context_chars": 120, "context_value_chars": 40},
+            "steps": [
+                {
+                    "judge": {
+                        "prompt_system": "Return JSON only.",
+                        "instructions": ["Be concise."],
+                        "question": "Summarize.",
+                        "context": ["large"],
+                        "output": {
+                            "name": "summary",
+                            "schema": {"type": "object"},
+                        },
+                    }
+                }
+            ],
+        },
+        {"large": {"document": "x" * 10000}},
+    )
+
+    assert len(llm.messages) == 0
+    bounded = FakeLLM()
+    Evaluator(bounded, lambda _tool, _parameters: None).evaluate(
+        {
+            "name": "bounded",
+            "limits": {"context_chars": 120, "context_value_chars": 40},
+            "steps": [
+                {
+                    "judge": {
+                        "prompt_system": "Return JSON only.",
+                        "instructions": ["Be concise."],
+                        "question": "Summarize.",
+                        "context": ["large"],
+                        "output": {
+                            "name": "summary",
+                            "schema": {"type": "object"},
+                        },
+                    }
+                }
+            ],
+        },
+        {"large": {"document": "x" * 10000}},
+    )
+    assert len(bounded.messages[1]["content"]) < 500
+    assert "<truncated>" in bounded.messages[1]["content"]
 
 
 def test_evaluator_resolves_embedded_references_in_operation_parameters() -> None:
@@ -108,6 +168,135 @@ def test_evaluator_resolves_embedded_references_in_operation_parameters() -> Non
     ]
 
 
+def test_attempt_runs_declared_recovery_and_resumes() -> None:
+    calls = 0
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        nonlocal calls
+        calls += 1
+        return True
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "recovery",
+            "steps": [
+                {
+                    "attempt": {
+                        "id": "work",
+                        "max_attempts": 2,
+                        "body": [
+                            {
+                                "gate": {
+                                    "subject": "ready",
+                                    "equals": True,
+                                    "on_failure": {
+                                        "retry": {
+                                            "target": "repair",
+                                            "max_attempts": 1,
+                                            "on_exhausted": "failed",
+                                        }
+                                    },
+                                }
+                            }
+                        ],
+                        "on_failure": {"recovery": "repair", "resume": "work"},
+                    }
+                }
+            ],
+            "recoveries": {
+                "repair": {
+                    "steps": [
+                        {
+                            "operation": {
+                                "tool": "internal",
+                                "bind": "ready",
+                            }
+                        }
+                    ]
+                }
+            },
+        },
+        {"ready": False},
+    )
+
+    assert result.bindings["ready"] is True
+    assert calls == 1
+    assert any(event.kind == "recovery" for event in result.events)
+
+
+def test_for_each_collects_structured_results_in_order() -> None:
+    result = Evaluator(
+        FakeLLM(), lambda _tool, parameters: {"returncode": parameters["code"]}
+    ).evaluate(
+        {
+            "name": "structured-results",
+            "steps": [
+                {
+                    "for_each": {
+                        "snapshot": {"name": "codes", "max_items": 2},
+                        "item_binding": "code",
+                        "collect": {
+                            "binding": "validation_results",
+                            "mode": "list",
+                            "key": "command",
+                            "value": "validation_result",
+                        },
+                        "body": [
+                            {
+                                "operation": {
+                                    "tool": "check",
+                                    "parameters": {"code": "${code}"},
+                                    "bind": "validation_result",
+                                }
+                            }
+                        ],
+                    }
+                }
+            ],
+        },
+        {"codes": [0, 1]},
+    )
+
+    assert result.bindings["validation_results"] == [
+        {"command": 0, "result": {"returncode": 0}},
+        {"command": 1, "result": {"returncode": 1}},
+    ]
+
+
+def test_repeat_and_branch_are_bounded_and_data_driven() -> None:
+    calls = 0
+
+    def execute(_tool: str, _parameters: Mapping[str, Any]) -> Any:
+        nonlocal calls
+        calls += 1
+        return calls >= 2
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "repeat-branch",
+            "steps": [
+                {
+                    "repeat": {
+                        "max_iterations": 3,
+                        "until": {"subject": "done", "equals": True},
+                        "body": [{"operation": {"tool": "check", "bind": "done"}}],
+                    }
+                },
+                {
+                    "branch": {
+                        "subject": "done",
+                        "cases": {True: [{"terminal": "succeeded"}]},
+                        "default": [{"terminal": "failed"}],
+                    }
+                },
+            ],
+        }
+    )
+
+    assert calls == 2
+    assert result.events[-1].data["status"] == "succeeded"
+
+
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     llm = FakeLLM()
 
@@ -135,27 +324,18 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
 
 
 class HelloWorldLLM:
+    def __init__(self) -> None:
+        self.plan_round = 0
+        self.fragment_round = 0
+
     def complete_json(self, messages: list[dict[str, str]], **_: Any) -> dict[str, Any]:
         question = messages[1]["content"]
         if "Which exact repository files" in question:
-            return {
-                "requests": [{"file_path": "hello.py", "reason": "read the program"}]
-            }
-        if "Which exact files must be read" in question:
-            return {
-                "requests": [
-                    {"file_path": "hello.py", "reason": "confirm current output"}
-                ]
-            }
+            return {"file_path": "hello.py", "reason": "read the program"}
+        if "Which exact file must be read" in question:
+            return {"file_path": "hello.py", "reason": "confirm current output"}
         if "smallest ordered implementation plan" in question:
             return {
-                "actions": [
-                    {
-                        "id": "add-second-line",
-                        "file_path": "hello.py",
-                        "intent": "Print Here I Am after Hello, World.",
-                    }
-                ],
                 "validation_commands": [
                     [sys.executable, "-m", "pytest", "-q"],
                     ["ruff", "check", "hello.py"],
@@ -166,18 +346,80 @@ class HelloWorldLLM:
                     "ruff reports no issues",
                 ],
             }
-        if "What one file edit implements" in question:
+        if "What one JSON-encoded Procedrr step should be appended" in question:
+            self.fragment_round += 1
+            value: Any
+            if self.fragment_round == 1:
+                value = {
+                    "operation": {
+                        "tool": "read_document",
+                        "parameters": {"file_path": "hello.py"},
+                        "bind": "source",
+                    }
+                }
+            elif self.fragment_round == 2:
+                value = {
+                    "operation": {
+                        "tool": "edit",
+                        "parameters": {
+                            "file_path": "hello.py",
+                            "edits": [
+                                {
+                                    "old_text": 'print("Hello, World")\n',
+                                    "new_text": (
+                                        'print("Hello, World")\nprint("Here I Am")\n'
+                                    ),
+                                }
+                            ],
+                        },
+                        "bind": "applied_edit",
+                    }
+                }
+            else:
+                value = {"terminal": "succeeded"}
+            return {"step_json": json.dumps(value)}
+        if "Is implementation planning complete" in question:
+            self.plan_round += 1
+            if self.plan_round > 1:
+                return {
+                    "done": True,
+                    "action": {
+                        "id": "done",
+                        "file_path": "hello.py",
+                        "intent": "complete",
+                    },
+                }
+            return {
+                "done": False,
+                "action": {
+                    "id": "add-second-line",
+                    "file_path": "hello.py",
+                    "intent": "Print Here I Am after Hello, World.",
+                },
+            }
+        if "What one edit implements" in question:
             return {
                 "file_path": "hello.py",
-                "edits": [
-                    {
-                        "old_text": 'print("Hello, World")\n',
-                        "new_text": 'print("Hello, World")\nprint("Here I Am")\n',
-                    }
-                ],
+                "edit": {
+                    "old_text": 'print("Hello, World")\n',
+                    "new_text": 'print("Hello, World")\nprint("Here I Am")\n',
+                },
             }
-        if "Which validation failures" in question:
-            return {"actions": []}
+        if "Are all actionable validation failures" in question:
+            return {
+                "done": True,
+                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+            }
+        if "Is there one remaining validation failure" in question:
+            return {
+                "done": True,
+                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+            }
+        if "Which validation failures require" in question:
+            return {
+                "done": True,
+                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+            }
         if "Does the implemented tree" in question:
             return {"complete": True, "missing": []}
         if "Are all declared invariants" in question:
@@ -248,7 +490,7 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
             return {"changed": True, "path": parameters["file_path"]}
         raise AssertionError(f"unexpected operation: {tool}")
 
-    result = Evaluator(HelloWorldLLM(), execute).evaluate(
+    result = Evaluator(HelloWorldLLM(), StructuredToolExecutor(execute)).evaluate(
         document,
         {
             "work_item_name": "hello-world",
@@ -263,6 +505,36 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     assert (
         tmp_path / "hello.py"
     ).read_text() == 'print("Hello, World")\nprint("Here I Am")\n'
+
+
+def test_operation_resolves_explicit_literal_and_reference_values() -> None:
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(
+        """
+version: 1
+name: values
+inputs: [{name: source, type: string, required: true}]
+steps:
+  - operation:
+      tool: internal
+      parameters:
+        command:
+          - {type: literal, value: echo}
+          - {type: reference, value: source}
+      bind: result
+"""
+    )
+    seen: list[dict[str, Any]] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        seen.append(dict(parameters))
+        return {"ok": True}
+
+    Evaluator(cast(Any, lambda *_args, **_kwargs: {}), execute).evaluate(
+        document, {"source": "hello"}
+    )
+    assert seen == [{"command": ["echo", "hello"]}]
 
 
 def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
@@ -309,13 +581,18 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
         api_key=None,
         base_url=None,
         repo_root=tmp_path,
+        progress_stream=sys.stderr,
     )
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "internal":
-            command = parameters.get("command", [])
+            command = list(parameters.get("command", []))
             if command[:2] == ["powdrr-lift", "show-proposed-pr"]:
                 return {"id": "hello-world-live", "intent": "Add a second output line."}
+            if command and command[0] in {"python", "python3"}:
+                command[0] = sys.executable
+            if command and command[0] == "pytest":
+                command = [sys.executable, "-m", "pytest", *command[1:]]
             if command[:2] not in ([sys.executable, "-m"], ["ruff", "check"]):
                 return {"returncode": 1, "stderr": "unsupported command", "stdout": ""}
             completed = subprocess.run(
@@ -344,7 +621,14 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
             return {"changed": True, "path": parameters["file_path"]}
         raise AssertionError(f"unexpected operation: {tool}")
 
-    Evaluator(llm, execute).evaluate(
+    Evaluator.with_workrr(
+        llm,
+        StructuredToolExecutor(
+            execute,
+            available_paths=lambda: ["hello.py", "test_hello.py"],
+        ),
+        skills_dir=tmp_path,
+    ).evaluate(
         document,
         {
             "work_item_name": "hello-world-live",

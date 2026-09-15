@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from jsonschema import ValidationError as JsonSchemaError
@@ -47,10 +48,39 @@ class Evaluator:
     """Run a parsed, procedrr-validated document using agent-owned adapters."""
 
     def __init__(
-        self, llm: WorkflowLLMClient, operation_executor: OperationExecutor
+        self,
+        llm: WorkflowLLMClient,
+        operation_executor: OperationExecutor,
+        *,
+        process_directory: Path | None = None,
     ) -> None:
         self.llm = llm
         self.operation_executor = operation_executor
+        self.process_directory = process_directory or Path(
+            "docs/procedrr/skill-definitions"
+        )
+
+    @classmethod
+    def with_workrr(
+        cls,
+        client: WorkflowLLMClient,
+        operation_executor: OperationExecutor,
+        *,
+        skills_dir: Path,
+        max_retries: int = 3,
+    ) -> Evaluator:
+        """Construct an evaluator using Workrr's structured repair boundary."""
+        from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+
+        return cls(
+            WorkrrProcedrrClient(
+                client,
+                skills_dir=skills_dir,
+                max_retries=max_retries,
+            ),
+            operation_executor,
+            process_directory=Path("docs/procedrr/skill-definitions"),
+        )
 
     def evaluate(
         self,
@@ -58,6 +88,7 @@ class Evaluator:
         bindings: Mapping[str, Any] | None = None,
     ) -> EvaluationResult:
         state = dict(bindings or {})
+        self._document_recoveries = document.get("recoveries", {})
         events: list[EvaluationEvent] = []
         usage = {"llm": 0, "tools": 0}
         limits = document.get("limits", {})
@@ -89,6 +120,20 @@ class Evaluator:
             elif "for_each" in step or "worklist" in step:
                 key = "for_each" if "for_each" in step else "worklist"
                 self._loop(key, step[key], state, events, usage, limits, step_path)
+            elif "attempt" in step:
+                self._attempt(step["attempt"], state, events, usage, limits, step_path)
+            elif "specialize" in step:
+                self._specialize(
+                    step["specialize"], state, events, usage, limits, step_path
+                )
+            elif "call" in step:
+                self._call_fragment(
+                    step["call"], state, events, usage, limits, step_path
+                )
+            elif "repeat" in step:
+                self._repeat(step["repeat"], state, events, usage, limits, step_path)
+            elif "branch" in step:
+                self._branch(step["branch"], state, events, usage, limits, step_path)
             elif "terminal" in step:
                 events.append(
                     EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
@@ -97,6 +142,229 @@ class Evaluator:
                 self._gate(step["gate"], state, step_path)
             else:
                 raise EvaluationError(f"{step_path} has no supported control")
+
+    def _specialize(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        if not isinstance(declaration, Mapping):
+            raise EvaluationError(f"{path}.specialize is malformed")
+        context = declaration.get("context")
+        bind = declaration.get("bind")
+        if not isinstance(context, list) or not isinstance(bind, str):
+            raise EvaluationError(f"{path}.specialize is malformed")
+        value_limit = _positive_limit(limits, "context_value_chars", 6000)
+        context_data = {
+            name: _compact_value(_resolve_binding(state, name), max_chars=value_limit)
+            for name in context
+        }
+        allowed_tools = declaration.get("allowed_tools")
+        process_name = declaration.get("process", "generate-fragment")
+        if not isinstance(process_name, str) or not process_name:
+            raise EvaluationError(f"{path}.specialize.process must be a name")
+        process = self._load_process(process_name)
+        maximum = declaration.get("max_steps", 64)
+        if not isinstance(maximum, int) or maximum <= 0:
+            raise EvaluationError(f"{path}.specialize.max_steps must be positive")
+        generator_state = {
+            "fragment_name": f"{bind}-generated",
+            "fragment_goal": str(declaration.get("question")),
+            "fragment_context": context_data,
+            "fragment_available_bindings": list(context),
+            "fragment_allowed_tools": (
+                list(allowed_tools) if isinstance(allowed_tools, list) else []
+            ),
+            "fragment_max_steps": maximum,
+        }
+        generator_usage = {"llm": 0, "tools": 0}
+        self._steps(
+            process["steps"],
+            generator_state,
+            events,
+            generator_usage,
+            process.get("limits", {}),
+            f"{path}.subprocess[{process_name}]",
+        )
+        fragment_state = generator_state.get("fragment_state")
+        fragment = (
+            fragment_state.get("fragment")
+            if isinstance(fragment_state, Mapping)
+            else None
+        )
+        if not isinstance(fragment_state, Mapping):
+            raise EvaluationError(f"{path}.specialize subprocess returned no state")
+        if not isinstance(fragment, Mapping) or fragment_state.get("done") is not True:
+            raise EvaluationError(f"{path}.specialize subprocess returned no fragment")
+        usage["llm"] += generator_usage["llm"]
+        usage["tools"] += generator_usage["tools"]
+        self._limit(usage, limits, "llm_activations", "LLM activations")
+        self._limit(usage, limits, "tool_calls", "tool calls")
+        state[bind] = fragment
+        events.append(
+            EvaluationEvent(
+                "specialize",
+                path,
+                {"bind": bind, "name": fragment.get("name")},
+            )
+        )
+
+    def _load_process(self, name: str) -> Mapping[str, Any]:
+        from procedrr import parse_and_validate
+
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", name):
+            raise EvaluationError(f"invalid subprocess name: {name!r}")
+        path = self.process_directory / f"{name}.yaml"
+        if not path.is_file():
+            raise EvaluationError(f"Procedrr subprocess does not exist: {path}")
+        return parse_and_validate(path.read_text(encoding="utf-8"))
+
+    def _call_fragment(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        if not isinstance(declaration, Mapping):
+            raise EvaluationError(f"{path}.call is malformed")
+        reference = declaration.get("fragment")
+        if not isinstance(reference, str):
+            raise EvaluationError(f"{path}.call.fragment is required")
+        fragment = _resolve_value(reference, state)
+        if not isinstance(fragment, Mapping) or not isinstance(
+            fragment.get("steps"), list
+        ):
+            raise EvaluationError(f"{path}.call.fragment must resolve to a fragment")
+        maximum = declaration.get("max_steps", len(fragment["steps"]))
+        if not isinstance(maximum, int) or len(fragment["steps"]) > maximum:
+            raise EvaluationError(f"{path}.call.fragment exceeds its step bound")
+        self._steps(
+            fragment["steps"], state, events, usage, limits, f"{path}.call.body"
+        )
+
+    def _attempt(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        body = declaration.get("body")
+        route = declaration.get("on_failure")
+        maximum = declaration.get("max_attempts")
+        attempt_id = declaration.get("id")
+        if (
+            not isinstance(body, list)
+            or not isinstance(route, Mapping)
+            or not isinstance(attempt_id, str)
+        ):
+            raise EvaluationError(f"{path}.attempt is malformed")
+        if route.get("resume") != attempt_id:
+            raise EvaluationError(f"{path}.attempt resume must match its id")
+        if not isinstance(maximum, int) or maximum <= 0:
+            raise EvaluationError(f"{path}.attempt.max_attempts must be positive")
+        recovery_name = route.get("recovery")
+        recoveries = getattr(self, "_document_recoveries", {})
+        recovery = (
+            recoveries.get(recovery_name) if isinstance(recovery_name, str) else None
+        )
+        if not isinstance(recovery, Mapping) or not isinstance(
+            recovery.get("steps"), list
+        ):
+            raise EvaluationError(f"{path}.attempt recovery is not declared")
+        for attempt in range(1, maximum + 1):
+            try:
+                self._steps(
+                    body, state, events, usage, limits, f"{path}.attempt[{attempt}]"
+                )
+                return
+            except EvaluationError as exc:
+                state["failure"] = {"message": str(exc), "attempt": attempt}
+                events.append(EvaluationEvent("recovery", path, state["failure"]))
+                self._steps(
+                    recovery["steps"],
+                    state,
+                    events,
+                    usage,
+                    limits,
+                    f"{path}.recovery[{attempt}]",
+                )
+        raise EvaluationError(f"{path}.attempt exhausted after {maximum} attempts")
+
+    def _repeat(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        body = declaration.get("body")
+        maximum = declaration.get("max_iterations")
+        until = declaration.get("until")
+        collect = declaration.get("collect")
+        if (
+            not isinstance(body, list)
+            or not isinstance(maximum, int)
+            or maximum <= 0
+            or not isinstance(until, Mapping)
+        ):
+            raise EvaluationError(f"{path}.repeat is malformed")
+        collected: list[Any] = []
+        for iteration in range(1, maximum + 1):
+            self._steps(
+                body, state, events, usage, limits, f"{path}.repeat[{iteration}]"
+            )
+            if isinstance(collect, Mapping) and isinstance(collect.get("value"), str):
+                value = _resolve_binding(state, collect["value"])
+                if value is not None:
+                    collected.append(value)
+            if _resolve_binding(state, str(until.get("subject"))) == until.get(
+                "equals"
+            ):
+                if isinstance(collect, Mapping) and isinstance(
+                    collect.get("binding"), str
+                ):
+                    state[collect["binding"]] = collected
+                return
+        subject = str(until.get("subject"))
+        root = subject.split(".", 1)[0]
+        last_state = _compact_value(state.get(root), max_chars=2000)
+        raise EvaluationError(
+            f"{path}.repeat exhausted after {maximum} iterations; "
+            f"last {root}={_json_text(last_state)}"
+        )
+
+    def _branch(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        subject = declaration.get("subject")
+        cases = declaration.get("cases")
+        if not isinstance(subject, str) or not isinstance(cases, Mapping):
+            raise EvaluationError(f"{path}.branch is malformed")
+        value = _resolve_binding(state, subject)
+        body = cases.get(value, declaration.get("default"))
+        if body is None:
+            raise EvaluationError(f"{path}.branch has no case for {value!r}")
+        if not isinstance(body, list):
+            raise EvaluationError(f"{path}.branch case must be a list")
+        self._steps(body, state, events, usage, limits, f"{path}.branch[{value!r}]")
 
     def _operation(
         self,
@@ -138,7 +406,23 @@ class Evaluator:
         context = judge.get("context", [])
         if not isinstance(context, list):
             raise EvaluationError(f"{path}.judge.context must be a list")
-        context_data = {name: _resolve_binding(state, name) for name in context}
+        value_limit = _positive_limit(limits, "context_value_chars", 6000)
+        resolved_context = {name: _resolve_binding(state, name) for name in context}
+        context_data = {
+            name: _compact_value(value, max_chars=value_limit)
+            for name, value in resolved_context.items()
+        }
+        raw_binding_chars = {
+            name: len(_json_text(value)) for name, value in resolved_context.items()
+        }
+        compact_binding_chars = {
+            name: len(_json_text(value)) for name, value in context_data.items()
+        }
+        context_limit = _positive_limit(limits, "context_chars", 24000)
+        context_text = _bounded_context_text(
+            context_data,
+            context_limit,
+        )
         messages = [
             {"role": "system", "content": str(judge["prompt_system"])},
             {
@@ -149,7 +433,7 @@ class Evaluator:
                     + "\n\nQuestion:\n"
                     + str(judge["question"])
                     + "\n\nContext:\n"
-                    + _json_text(context_data)
+                    + context_text
                 ),
             },
         ]
@@ -164,7 +448,22 @@ class Evaluator:
         state[judge["output"]["name"]] = output
         events.append(
             EvaluationEvent(
-                "judge", path, {"output": judge["output"]["name"], "messages": messages}
+                "judge",
+                path,
+                {
+                    "output": judge["output"]["name"],
+                    "messages": messages,
+                    "context_metrics": {
+                        "raw_chars": sum(raw_binding_chars.values()),
+                        "compacted_chars": sum(compact_binding_chars.values()),
+                        "serialized_chars": len(context_text),
+                        "limit_chars": context_limit,
+                        "truncated": len(context_text) >= context_limit
+                        and not _context_fits(context_data, context_limit),
+                        "raw_binding_chars": raw_binding_chars,
+                        "compacted_binding_chars": compact_binding_chars,
+                    },
+                },
             )
         )
 
@@ -199,7 +498,11 @@ class Evaluator:
         if not isinstance(body, list):
             raise EvaluationError(f"{path}.{kind}.body must be a list")
         collect = declaration.get("collect")
+        collect_mode = (
+            collect.get("mode", "map") if isinstance(collect, Mapping) else "map"
+        )
         collected: dict[str, Any] = {}
+        collected_list: list[Any] = []
         for epoch in range(epochs):
             for index, item in enumerate(items):
                 binding = declaration.get("item_binding", declaration.get("item"))
@@ -223,9 +526,17 @@ class Evaluator:
                     else:
                         output = item
                     if output is not None:
-                        collected[str(item)] = output
+                        if collect_mode == "list":
+                            key_name = collect.get("key", "item")
+                            collected_list.append(
+                                {str(key_name): item, "result": output}
+                            )
+                        else:
+                            collected[str(item)] = output
         if isinstance(collect, Mapping) and isinstance(collect.get("binding"), str):
-            state[collect["binding"]] = collected
+            state[collect["binding"]] = (
+                collected_list if collect_mode == "list" else collected
+            )
 
     def _gate(
         self, gate: Mapping[str, Any], state: Mapping[str, Any], path: str
@@ -253,6 +564,14 @@ def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:
 
 
 def _resolve_value(value: Any, state: Mapping[str, Any]) -> Any:
+    if isinstance(value, Mapping) and value.get("type") in {"literal", "reference"}:
+        kind = value.get("type")
+        if kind == "literal":
+            return value.get("value")
+        reference = value.get("value")
+        if not isinstance(reference, str):
+            raise EvaluationError("reference value must be a binding path")
+        return _resolve_binding(state, reference)
     if isinstance(value, str):
         match = _REFERENCE.fullmatch(value)
         if match:
@@ -276,6 +595,46 @@ def _json_text(value: Any) -> str:
     import json
 
     return json.dumps(value, sort_keys=True, default=str)
+
+
+def _positive_limit(limits: Mapping[str, Any], key: str, default: int) -> int:
+    value = limits.get(key)
+    return value if isinstance(value, int) and value > 0 else default
+
+
+def _compact_value(value: Any, *, max_chars: int) -> Any:
+    if isinstance(value, str):
+        if len(value) <= max_chars:
+            return value
+        return value[:max_chars] + "...<truncated>"
+    if isinstance(value, Mapping):
+        items = list(value.items())
+        compacted = {
+            str(key): _compact_value(item, max_chars=max_chars)
+            for key, item in items[:32]
+        }
+        if len(items) > 32:
+            compacted["__truncated_items__"] = len(items) - 32
+        return compacted
+    if isinstance(value, (list, tuple)):
+        compacted_list = [
+            _compact_value(item, max_chars=max_chars) for item in value[:32]
+        ]
+        if len(value) > 32:
+            compacted_list.append({"__truncated_items__": len(value) - 32})
+        return compacted_list
+    return value
+
+
+def _bounded_context_text(value: Any, max_chars: int) -> str:
+    encoded = _json_text(value)
+    if len(encoded) <= max_chars:
+        return encoded
+    return encoded[:max_chars] + "...<context truncated>"
+
+
+def _context_fits(value: Any, max_chars: int) -> bool:
+    return len(_json_text(value)) <= max_chars
 
 
 __all__ = [

@@ -54,11 +54,12 @@ steps:
                 PATH, edits: [{old_text: EXACT, new_text: REPLACEMENT}]}, bind:
                 NAME}.
               - An edit old_text must be a non-empty exact substring of source already present in fragment_context.
+              - The runtime edit judge must return non-empty file_path, old_text, and new_text. If the requested behavior is already present, append terminal succeeded instead of an empty edit.
               - A runtime edit judge uses an object schema with exactly file_path, old_text, and new_text string properties; the following edit references those properties.
               - >-
                 A complete runtime edit judge must use this exact shape (replace
                 names and question text, but keep every field):
-                {"judge":{"question":"Decide the exact edit using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact edit."],"context":["hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","old_text","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string"},"old_text":{"type":"string"},"new_text":{"type":"string"}}}},"validation":{"kind":"json_schema"}}}
+                {"judge":{"question":"Decide the exact edit using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact edit."],"context":["hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","old_text","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string","minLength":1},"old_text":{"type":"string","minLength":1},"new_text":{"type":"string","minLength":1}}}},"validation":{"kind":"json_schema"}}}
               - >-
                 Do not invent condition, then, else, prompt, schema, source,
                 or subject-object fields; they are not Procedrr judge fields.

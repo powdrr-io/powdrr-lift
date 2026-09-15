@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 682
+title: Test Structrr against real repositories and Git history
+intent:
+  problem: Structrr extraction and rebase behavior need evidence from actual repository contents and commit histories, not only hand-built mappings.
+  goal: Exercise the current repository and real temporary Git histories, while preserving source identity across module moves.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/rebase.py
+    type: modified
+    summary: Remap moved source symbols using unique symbol leaves and overlapping spans.
+    rationale: A module move changes the qualified name as well as the path, so qualified-name equality alone cannot preserve identity.
+    span:
+      start_line: 294
+      end_line: 330
+    related:
+      entities:
+        - real-git-history-rebase-test
+  - path: src/powdrr_lift/structrr/rebase.py
+    type: modified
+    summary: Add source-symbol leaf identity helper for move remapping.
+    rationale: Compare the stable symbol suffix and span when a module path changes its qualified name.
+    span:
+      start_line: 378
+      end_line: 382
+    related:
+      entities:
+        - real-git-history-rebase-test
+  - path: tests/test_structrr_real_repositories.py
+    type: added
+    summary: Bootstrap the real Powdrr checkout and verify repeatable validated snapshots.
+    rationale: Ensure source extraction, bindings, spans, and digests remain meaningful on the actual codebase.
+    span:
+      start_line: 1
+      end_line: 105
+    related:
+      entities:
+        - real-repository-bootstrap-test
+entities:
+  - id: real-repository-bootstrap-test
+    type: Module
+    action: added
+  - id: real-git-history-rebase-test
+    type: Module
+    action: added
+entity_relationships:
+  - id: real-bootstrap-test-exercises-bootstrap
+    source: real-repository-bootstrap-test
+    target: real-git-history-rebase-test
+    relationship: verifies
+    description: The real checkout test and Git history test together exercise the validated source graph and rebase behavior.
+    rationale: Fixture-only extraction tests can miss repository-scale and history-dependent problems.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

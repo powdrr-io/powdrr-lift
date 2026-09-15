@@ -118,6 +118,22 @@ def test_line_edits_are_materialized_for_underlying_executor() -> None:
     )
 
 
+def test_line_edit_rejects_replacement_identical_to_source() -> None:
+    executor = StructuredToolExecutor(
+        lambda tool, _parameters: (
+            "one\n" if tool == "read_document" else {"changed": True}
+        )
+    )
+    result = executor(
+        "edit",
+        {
+            "file_path": "hello.py",
+            "edits": [{"start": 1, "end": 1, "new_text": "one\n"}],
+        },
+    )
+    assert result["error"]["code"] == "no_op_edit"
+
+
 def test_structured_executor_exposes_fragment_construction_primitives() -> None:
     executor = StructuredToolExecutor(lambda _tool, _parameters: None)
     state = executor(

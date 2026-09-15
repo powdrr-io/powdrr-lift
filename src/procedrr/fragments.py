@@ -91,16 +91,32 @@ def apply_fragment_edit(
     accepted = list(state.get("accepted_fingerprints", []))
     value_fingerprint = _fingerprint(value)
     if value_fingerprint in accepted:
-        result = _rejected(
-            state,
-            rejected,
-            fingerprint,
-            "repeated_fragment_step",
-            "/value",
-            "This exact step was already accepted; append a different step "
-            "that advances the fragment.",
+        # A replay after an accepted edit is a deterministic stall. Close the
+        # fragment with the machine-suggested terminal step instead of asking
+        # the model to emit the same correction indefinitely.
+        terminal_edit = {
+            "op": "add",
+            "path": "/steps/-",
+            "value": {"terminal": "succeeded"},
+        }
+        candidate = apply_json_edits(fragment, [terminal_edit])
+        result = dict(state)
+        result.update(
+            {
+                "fragment": candidate,
+                "done": True,
+                "accepted": True,
+                "diagnostic": {
+                    "code": "fragment_complete_after_replay",
+                    "json_pointer": "/steps/-",
+                    "message": "Closed after replaying an already accepted step.",
+                },
+                "accepted_fingerprints": [
+                    *accepted,
+                    _fingerprint({"terminal": "succeeded"}),
+                ],
+            }
         )
-        result["diagnostic"]["suggested_step"] = {"terminal": "succeeded"}
         return result
     steps = fragment.get("steps")
     maximum = state.get("max_steps")

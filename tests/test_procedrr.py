@@ -309,9 +309,10 @@ def test_fragment_builder_rejects_repeated_accepted_step() -> None:
     }
     accepted = apply_fragment_edit(state, step)
     repeated = apply_fragment_edit(accepted, step)
-    assert repeated["accepted"] is False
-    assert repeated["diagnostic"]["code"] == "repeated_fragment_step"
-    assert repeated["diagnostic"]["suggested_step"] == {"terminal": "succeeded"}
+    assert repeated["accepted"] is True
+    assert repeated["done"] is True
+    assert repeated["diagnostic"]["code"] == "fragment_complete_after_replay"
+    assert repeated["fragment"]["steps"][-1] == {"terminal": "succeeded"}
 
 
 def test_fragment_builder_rejects_edit_not_grounded_in_source_context() -> None:

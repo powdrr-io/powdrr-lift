@@ -292,6 +292,29 @@ def test_fragment_builder_accepts_one_step_and_rejects_repeated_invalid_edit() -
     assert len(accepted["fragment"]["steps"]) == 1
 
 
+def test_fragment_builder_rejects_repeated_accepted_step() -> None:
+    state = start_fragment(
+        name="generated", allowed_tools=["read_document"], max_steps=3
+    )
+    step = {
+        "op": "add",
+        "path": "/steps/-",
+        "value": {
+            "operation": {
+                "tool": "read_document",
+                "parameters": {"file_path": "hello.py"},
+                "bind": "source",
+            }
+        },
+    }
+    accepted = apply_fragment_edit(state, step)
+    repeated = apply_fragment_edit(accepted, step)
+    assert repeated["accepted"] is True
+    assert repeated["done"] is True
+    assert repeated["diagnostic"]["code"] == "fragment_complete_after_replay"
+    assert repeated["fragment"]["steps"][-1] == {"terminal": "succeeded"}
+
+
 def test_fragment_builder_rejects_edit_not_grounded_in_source_context() -> None:
     state = start_fragment(
         name="generated",

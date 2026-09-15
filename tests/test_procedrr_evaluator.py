@@ -410,10 +410,13 @@ class HelloWorldLLM:
                 "done": True,
                 "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
             }
-        if "Is there one remaining validation failure" in question:
+        if (
+            "Is there one remaining validation failure" in question
+            or "Are all validations passing" in question
+        ):
             return {
                 "done": True,
-                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+                "failure_index": -1,
             }
         if "Which validation failures require" in question:
             return {

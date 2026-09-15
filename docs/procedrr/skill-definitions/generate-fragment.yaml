@@ -40,8 +40,8 @@ steps:
               - Inspect fragment_state.fragment and append the single next necessary step.
               - Steps in the draft have not executed; do not assume a read_document binding is available while generating later steps.
               - If required source is not in fragment_context, append read_document first, then append a judge that uses the runtime read binding to choose the exact edit.
-              - Never invent old_text for a source that has not been supplied during generation.
-              - A runtime source edit should be represented as three steps: read_document, one judge returning file_path/old_text/new_text, and an edit operation whose fields reference that judge binding.
+              - Never invent start/end positions for a source that has not been supplied during generation.
+              - A runtime source edit should be represented as three steps: read_document, one judge returning file_path/start/end/new_text, and an edit operation whose fields reference that judge binding.
               - Return the step encoded as JSON in the single step_json string field.
               - The decoded step must contain exactly one control key.
               - Allowed control keys are operation, judge, gate, attempt, repeat, branch, for_each, worklist, call, and terminal.
@@ -51,14 +51,15 @@ steps:
                 parameters: {file_path: PATH}, bind: NAME}.
               - >-
                 An edit operation uses {tool: edit, parameters: {file_path:
-                PATH, edits: [{old_text: EXACT, new_text: REPLACEMENT}]}, bind:
+                PATH, edits: [{start: START, end: END, new_text: REPLACEMENT}]}, bind:
                 NAME}.
-              - An edit old_text must be a non-empty exact substring of source already present in fragment_context.
-              - A runtime edit judge uses an object schema with exactly file_path, old_text, and new_text string properties; the following edit references those properties.
+              - An edit start/end range is one-based inclusive line numbers: start 1/end 1 means exactly the first line, and start must be less than or equal to end.
+              - The runtime edit judge must return non-empty file_path, integer start/end, and non-empty new_text. If the requested behavior is already present, append terminal succeeded instead of an empty edit.
+              - A runtime edit judge uses an object schema with exactly file_path, start, end, and new_text properties; the following edit references those properties.
               - >-
                 A complete runtime edit judge must use this exact shape (replace
                 names and question text, but keep every field):
-                {"judge":{"question":"Decide the exact edit using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact edit."],"context":["hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","old_text","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string"},"old_text":{"type":"string"},"new_text":{"type":"string"}}}},"validation":{"kind":"json_schema"}}}
+                {"judge":{"question":"Decide the exact edit using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact edit."],"context":["hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","start","end","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string","minLength":1},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"new_text":{"type":"string","minLength":1}}}},"validation":{"kind":"json_schema"}}}
               - >-
                 Do not invent condition, then, else, prompt, schema, source,
                 or subject-object fields; they are not Procedrr judge fields.
@@ -69,7 +70,7 @@ steps:
                 a bare string.
               - >-
                 The canonical edit following the example judge is:
-                {"operation":{"tool":"edit","parameters":{"file_path":{"type":"reference","value":"hello_edit_decision.file_path"},"edits":[{"old_text":{"type":"reference","value":"hello_edit_decision.old_text"},"new_text":{"type":"reference","value":"hello_edit_decision.new_text"}}]},"bind":"hello_edit_result"}}
+                {"operation":{"tool":"edit","parameters":{"file_path":{"type":"reference","value":"hello_edit_decision.file_path"},"edits":[{"start":{"type":"reference","value":"hello_edit_decision.start"},"end":{"type":"reference","value":"hello_edit_decision.end"},"new_text":{"type":"reference","value":"hello_edit_decision.new_text"}}]},"bind":"hello_edit_result"}}
               - >-
                 An internal operation uses {tool: internal, parameters:
                 {command: [PARTS...]}, bind: NAME}.
@@ -79,6 +80,7 @@ steps:
                 When the goal is completely implemented and the fragment needs
                 no more steps, append {terminal: succeeded}.
               - If fragment_state.accepted is false, correct only fragment_state.diagnostic and do not repeat a rejected edit fingerprint.
+              - If fragment_state.diagnostic.code is repeated_fragment_step, the prior step is already in the draft; append {terminal: succeeded} when the goal is met, or append one distinct validation/read step. Never emit that same step again.
             context: [fragment_goal, fragment_context, fragment_state]
             output:
               name: fragment_edit

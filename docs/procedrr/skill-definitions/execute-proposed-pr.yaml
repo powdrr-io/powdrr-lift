@@ -8,7 +8,7 @@ description: >-
   Execute one proposed PR through planning, a Workrr-validated JSON Procedrr
   implementation fragment, mechanical validation, and completeness, invariant,
   and security review.
-limits: {llm_activations: 64, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
+limits: {llm_activations: 128, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
 steps:
   - operation:
       tool: internal
@@ -121,31 +121,24 @@ steps:
       body:
         - judge:
             kind: choose_one_repair
-            question: Is there one remaining validation failure to repair, or are all validations complete?
+            question: Are all validations passing, or which one failing validation index should be repaired next?
             subject: current_validation_results
-            prompt_system: Return only the declared JSON object. Choose exactly one next repair or declare done.
+            prompt_system: Return only the declared JSON object. Choose done or one zero-based failure index.
             instructions:
               - Inspect only current_validation_results; do not reconsider unrelated design.
               - Set done true only when every current validation record passed.
-              - When done is false, select exactly one failing validation record.
-              - Never return a list of actions.
+              - When done is false, return only the zero-based index of one failing record.
+              - When done is true, return failure_index -1.
             context: [feature_description, current_validation_results, repository_context]
             output:
               name: repair_decision
               schema:
                 type: object
-                required: [done, action]
+                required: [done, failure_index]
                 additionalProperties: false
                 properties:
                   done: {type: boolean}
-                  action:
-                    type: object
-                    required: [id, file_path, intent]
-                    additionalProperties: false
-                    properties:
-                      id: {type: string, minLength: 1}
-                      file_path: {type: string, minLength: 1}
-                      intent: {type: string, minLength: 1}
+                  failure_index: {type: integer, minimum: -1}
             validation: {kind: json_schema}
         - branch:
             subject: repair_decision.done

@@ -1,0 +1,64 @@
+symbols:
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    kind: module
+    qualified_name: src.powdrr_lift.structrr.bootstrap
+    stable_key: python::src.powdrr_lift.structrr.bootstrap
+    span:
+      start_line: 1
+      end_line: 1310
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    kind: function
+    qualified_name: src.powdrr_lift.structrr.bootstrap.bootstrap_structrr
+    stable_key: python::src.powdrr_lift.structrr.bootstrap.bootstrap_structrr
+    span:
+      start_line: 77
+      end_line: 123
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    kind: function
+    qualified_name: src.powdrr_lift.structrr.bootstrap._extract_python_source_model
+    stable_key: python::src.powdrr_lift.structrr.bootstrap._extract_python_source_model
+    span:
+      start_line: 1064
+      end_line: 1132
+  - path: src/powdrr_lift/structrr/rebase.py
+    kind: function
+    qualified_name: src.powdrr_lift.structrr.rebase.rebase_structrr_snapshot
+    stable_key: python::src.powdrr_lift.structrr.rebase.rebase_structrr_snapshot
+    span:
+      start_line: 132
+      end_line: 184
+  - path: src/powdrr_lift/structrr/rebase.py
+    kind: method
+    qualified_name: src.powdrr_lift.structrr.rebase.StructrrRebaseReport.to_data
+    stable_key: python::src.powdrr_lift.structrr.rebase.StructrrRebaseReport.to_data
+    span:
+      start_line: 105
+      end_line: 116
+  - path: src/powdrr_lift/workrr/procedrr.py
+    kind: class
+    qualified_name: src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient
+    stable_key: python::src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient
+    span:
+      start_line: 73
+      end_line: 151
+  - path: src/powdrr_lift/workrr/procedrr.py
+    kind: method
+    qualified_name: src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient.complete_json
+    stable_key: python::src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient.complete_json
+    span:
+      start_line: 87
+      end_line: 151
+  - path: src/procedrr/model.py
+    kind: class
+    qualified_name: src.procedrr.model.WorkflowDefinition
+    stable_key: python::src.procedrr.model.WorkflowDefinition
+    span:
+      start_line: 424
+      end_line: 443
+  - path: src/procedrr/model.py
+    kind: method
+    qualified_name: src.procedrr.model.WorkflowDefinition.fingerprint
+    stable_key: python::src.procedrr.model.WorkflowDefinition.fingerprint
+    span:
+      start_line: 441
+      end_line: 443

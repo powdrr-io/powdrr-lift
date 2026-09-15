@@ -53,6 +53,12 @@ class StructuredToolExecutor:
                     and (
                         not item.get("old_text")
                         or item.get("old_text") == item.get("new_text")
+                        or (
+                            isinstance(item.get("start"), int)
+                            and isinstance(item.get("end"), int)
+                            and item["start"] == item["end"]
+                            and not item.get("new_text")
+                        )
                     )
                     for item in edits
                 ):

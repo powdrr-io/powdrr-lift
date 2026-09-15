@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from procedrr.editor import apply_json_edits
 from procedrr.parser import (
@@ -305,16 +305,43 @@ def _operation_contract_diagnostics(
             )
         if tool == "edit":
             edits = parameters.get("edits") if isinstance(parameters, Mapping) else None
-            valid = (
+            first_edit: Mapping[str, Any] = (
+                cast(Mapping[str, Any], edits[0])
+                if isinstance(edits, list) and edits and isinstance(edits[0], Mapping)
+                else {}
+            )
+            positional = (
+                isinstance(edits, list)
+                and len(edits) == 1
+                and "start" in first_edit
+                and "end" in first_edit
+            )
+            positional_valid = (
+                (
+                    positional
+                    and _range_value(first_edit.get("start"))
+                    and _range_value(first_edit.get("end"))
+                    and (
+                        not isinstance(first_edit.get("start"), int)
+                        or not isinstance(first_edit.get("end"), int)
+                        or 1 <= first_edit["start"] <= first_edit["end"]
+                    )
+                    and _nonempty_value(first_edit.get("new_text"))
+                )
+                if positional
+                else False
+            )
+            legacy_valid = (
                 isinstance(parameters, Mapping)
                 and _nonempty_value(parameters.get("file_path"))
                 and isinstance(edits, list)
                 and len(edits) == 1
-                and isinstance(edits[0], Mapping)
-                and _nonempty_value(edits[0].get("old_text"))
-                and _nonempty_value(edits[0].get("new_text"))
-                and edits[0]["new_text"] != edits[0]["old_text"]
+                and bool(first_edit)
+                and _nonempty_value(first_edit.get("old_text"))
+                and _nonempty_value(first_edit.get("new_text"))
+                and first_edit.get("new_text") != first_edit.get("old_text")
             )
+            valid = legacy_valid or positional_valid
             if not valid:
                 diagnostics.append(
                     DocumentDiagnostic(
@@ -368,6 +395,14 @@ def _nonempty_value(value: Any) -> bool:
         and value.get("type") == "reference"
         and isinstance(value.get("value"), str)
         and bool(value["value"].strip())
+    )
+
+
+def _range_value(value: Any) -> bool:
+    return isinstance(value, int) or (
+        isinstance(value, Mapping)
+        and value.get("type") == "reference"
+        and isinstance(value.get("value"), str)
     )
 
 

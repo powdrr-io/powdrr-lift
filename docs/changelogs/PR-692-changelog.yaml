@@ -1,0 +1,81 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 692
+title: Bootstrap the real Structrr baseline and preserve request context
+intent:
+  problem: The repository has a validated bootstrap implementation and a real coding-agent boundary, but the real repository does not yet carry a reviewed Structrr baseline and compiled worker prompts omit the concrete acceptance criteria from the execution unit.
+  goal: Commit the validated real-repository Structrr snapshot and make plan-to-request compilation preserve the acceptance criteria and validation profile context that the worker needs.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/structrr/bootstrap-changelog.yaml
+    type: added
+    summary: Add the validated Structrr bootstrap snapshot for the Powdrr repository, including entities, relationships, source subjects, and source bindings.
+    rationale: Establish a versioned product/source baseline for rebasing and specifying the first real-repository feature.
+    span:
+      start_line: 1
+      end_line: 60102
+    related:
+      entities:
+        - powdrr-structrr-bootstrap-snapshot
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Render allowed paths, acceptance criteria, and validation profiles in compiled implementation-request prompts.
+    rationale: Ensure the real worker receives the structured constraints that the execution plan already carries.
+    span:
+      start_line: 88
+      end_line: 93
+    related:
+      entities:
+        - implementation-request
+        - external-coding-agent-worker
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Render the structured request fields in the worker prompt.
+    rationale: Preserve the execution unit context at the handoff boundary.
+    span:
+      start_line: 95
+      end_line: 101
+    related:
+      entities:
+        - implementation-request
+        - external-coding-agent-worker
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Assert that compiled worker prompts include acceptance criteria and validation profile context.
+    rationale: Prevent future compiler changes from silently dropping plan context at the worker boundary.
+    span:
+      start_line: 135
+      end_line: 136
+    related:
+      entities:
+        - implementation-request
+        - external-coding-agent-worker
+entities:
+  - id: powdrr-structrr-bootstrap-snapshot
+    type: Changelog file
+    action: added
+  - id: implementation-request
+    type: Task
+    action: modified
+  - id: external-coding-agent-worker
+    type: Tool
+    action: modified
+entity_relationships:
+  - id: bootstrap-snapshot-anchors-real-repository
+    source: powdrr-structrr-bootstrap-snapshot
+    target: external-coding-agent-worker
+    relationship: informs
+    description: The validated Structrr snapshot provides versioned repository and source context for future feature requests handed to the coding worker.
+    rationale: Keep real-repository implementation requests grounded in the product/source baseline.
+    action: added
+  - id: request-preserves-plan-criteria
+    source: implementation-request
+    target: external-coding-agent-worker
+    relationship: constrains
+    description: A compiled request explicitly carries the selected unit's allowed paths, acceptance criteria, and validation profile context into the worker prompt.
+    rationale: Prevent the worker from receiving an underspecified implementation handoff.
+    action: modified
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

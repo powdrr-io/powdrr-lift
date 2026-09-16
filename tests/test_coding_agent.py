@@ -132,6 +132,8 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     assert request.allowed_paths == ("src/powdrr_lift/workrr",)
     assert request.context_refs == ("entity:worker-adapter",)
     assert "unit-1" in request.prompt
+    assert "Acceptance criteria:\n- the adapter is bounded" in request.prompt
+    assert "Validation profiles Workrr will run: unit-tests" in request.prompt
     assert (
         json.loads(request.to_json())["schema_version"] == "implementation-request-v1"
     )

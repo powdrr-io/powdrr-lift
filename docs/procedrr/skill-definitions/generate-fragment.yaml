@@ -51,11 +51,11 @@ steps:
                 A read_document operation uses {tool: read_document,
                 parameters: {file_path: PATH}, bind: NAME}.
               - >-
-                An edit operation uses {tool: edit, parameters: {file_path:
-                PATH, edits: [{start: START, end: END, new_text: REPLACEMENT}]}, bind:
-                NAME}.
+                A model-facing line edit uses {tool: edit, parameters:
+                {operation: replace_lines, file_path: PATH, start_line: START,
+                end_line: END, replacement: REPLACEMENT}, bind: NAME}.
               - An edit start/end range is one-based inclusive line numbers: start 1/end 1 means exactly the first line, and start must be less than or equal to end.
-              - The runtime edit judge must return non-empty file_path, integer start/end, and non-empty new_text. If the requested behavior is already present, append terminal succeeded instead of an empty edit.
+              - The runtime edit judge must return non-empty file_path, integer start/end, and non-empty replacement. If the requested behavior is already present, append terminal succeeded instead of an empty edit.
               - A runtime edit judge uses an object schema with exactly file_path, start, end, and new_text properties; the following edit references those properties.
               - Decide the semantic change from the feature description and the supplied source, not merely a formatting change. The replacement must visibly implement the requested behavior. Never return the unchanged source, a whitespace-only variation, planning prose, comments about assumptions, or instructions for a future edit.
               - >-

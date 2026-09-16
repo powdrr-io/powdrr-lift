@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
@@ -305,6 +306,19 @@ def _operation_contract_diagnostics(
             )
         if tool == "edit":
             edits = parameters.get("edits") if isinstance(parameters, Mapping) else None
+            line_operation = (
+                isinstance(parameters, Mapping)
+                and parameters.get("operation") == "replace_lines"
+            )
+            if line_operation:
+                assert isinstance(parameters, Mapping)
+                edits = [
+                    {
+                        "start": parameters.get("start_line"),
+                        "end": parameters.get("end_line", parameters.get("start_line")),
+                        "new_text": parameters.get("replacement"),
+                    }
+                ]
             first_edit: Mapping[str, Any] = (
                 cast(Mapping[str, Any], edits[0])
                 if isinstance(edits, list) and edits and isinstance(edits[0], Mapping)
@@ -319,6 +333,8 @@ def _operation_contract_diagnostics(
             positional_valid = (
                 (
                     positional
+                    and isinstance(parameters, Mapping)
+                    and _nonempty_value(parameters.get("file_path"))
                     and _range_value(first_edit.get("start"))
                     and _range_value(first_edit.get("end"))
                     and (
@@ -327,6 +343,7 @@ def _operation_contract_diagnostics(
                         or 1 <= first_edit["start"] <= first_edit["end"]
                     )
                     and _nonempty_value(first_edit.get("new_text"))
+                    and not _prose_edit_value(first_edit.get("new_text"))
                 )
                 if positional
                 else False
@@ -404,6 +421,27 @@ def _range_value(value: Any) -> bool:
         and value.get("type") == "reference"
         and isinstance(value.get("value"), str)
     )
+
+
+def _prose_edit_value(value: Any) -> bool:
+    """Reject model explanations accidentally emitted as replacement source."""
+    if not isinstance(value, str):
+        return False
+    lowered = value.lower()
+    markers = (
+        "placeholder",
+        "actual edit",
+        "we replace",
+        "the minimal edit",
+        "the instruction says",
+        "we must replace",
+    )
+    if any(marker in lowered for marker in markers):
+        return True
+    words = re.findall(r"\b\w+\b", lowered)
+    if len(words) >= 24 and len(words) > 2 * len(set(words)):
+        return True
+    return False
 
 
 def _evidence_text(evidence: Any) -> str:

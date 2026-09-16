@@ -134,6 +134,27 @@ def test_line_edit_rejects_replacement_identical_to_source() -> None:
     assert result["error"]["code"] == "no_op_edit"
 
 
+def test_replace_lines_shape_is_materialized() -> None:
+    calls: list[tuple[str, Any]] = []
+
+    def execute(tool: str, parameters: Any) -> Any:
+        calls.append((tool, parameters))
+        return "one\ntwo\n" if tool == "read_document" else {"changed": True}
+
+    result = StructuredToolExecutor(execute)(
+        "edit",
+        {
+            "operation": "replace_lines",
+            "file_path": "hello.py",
+            "start_line": 1,
+            "end_line": 1,
+            "replacement": "ONE\n",
+        },
+    )
+    assert result == {"changed": True}
+    assert calls[-1][1]["edits"] == [{"old_text": "one\n", "new_text": "ONE\n"}]
+
+
 def test_structured_executor_exposes_fragment_construction_primitives() -> None:
     executor = StructuredToolExecutor(lambda _tool, _parameters: None)
     state = executor(

@@ -47,6 +47,21 @@ class StructuredToolExecutor:
                     state, step_json, evidence=parameters.get("evidence")
                 )
             if tool == "edit":
+                # Accept the explicit model-facing operation name and normalize
+                # it to the underlying edit tool contract.
+                if parameters.get("operation") == "replace_lines":
+                    parameters = {
+                        "file_path": parameters.get("file_path"),
+                        "edits": [
+                            {
+                                "start": parameters.get("start_line"),
+                                "end": parameters.get(
+                                    "end_line", parameters.get("start_line")
+                                ),
+                                "new_text": parameters.get("replacement"),
+                            }
+                        ],
+                    }
                 parameters = _materialize_line_edits(parameters, self._executor)
                 edits = parameters.get("edits")
                 if isinstance(edits, list) and any(

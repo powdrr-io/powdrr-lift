@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 687
+title: Persist bounded coding-agent runs and expose a runner CLI
+intent:
+  problem: Workrr can describe and invoke a bounded coding-agent provider, but it does not yet persist the handoff or expose a repeatable execution entry point.
+  goal: Persist every implementation request and terminal attempt, provide a runner that records outcomes, and expose the bounded OpenCode invocation through the CLI.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Add request deserialization, request and attempt artifact storage, and a Workrr runner around the bounded provider.
+    rationale: Preserve the exact handoff and observed terminal outcome for later validation and review.
+    span:
+      start_line: 1
+      end_line: 465
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-request
+        - implementation-attempt
+  - path: src/powdrr_lift/workrr/__init__.py
+    type: modified
+    summary: Export the coding-agent runner and attempt store.
+    rationale: Make persistence and execution available through the Workrr package boundary.
+    span:
+      start_line: 1
+      end_line: 108
+    related:
+      entities:
+        - external-coding-agent-worker
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Add the run-coding-agent command for loading requests and reporting persisted attempts.
+    rationale: Provide a stable command boundary for Workrr-driven external implementation.
+    span:
+      start_line: 1
+      end_line: 2653
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-request
+        - implementation-attempt
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Test request and attempt persistence, policy-denied attempts, and the CLI runner path.
+    rationale: Prove that every runner outcome is recorded and reported without requiring a real model.
+    span:
+      start_line: 1
+      end_line: 259
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-attempt
+  - path: docs/design/external-coding-agent-boundary.md
+    type: modified
+    summary: Document the persisted runner boundary and CLI entry point.
+    rationale: Keep the worker protocol and deferred lifecycle responsibilities explicit.
+    span:
+      start_line: 1
+      end_line: 57
+    related:
+      entities:
+        - external-coding-agent-worker
+entities:
+  - id: external-coding-agent-worker
+    type: Tool
+    action: modified
+  - id: implementation-request
+    type: Task
+    action: modified
+  - id: implementation-attempt
+    type: Experiment
+    action: modified
+entity_relationships:
+  - id: request-bounds-worker
+    source: implementation-request
+    target: external-coding-agent-worker
+    relationship: constrains
+    description: Workrr supplies the worker with scoped paths, acceptance criteria, validation profiles, and selected context references.
+    rationale: The worker should implement a validated unit without owning workflow decisions.
+    action: unchanged
+  - id: attempt-observes-worker
+    source: implementation-attempt
+    target: external-coding-agent-worker
+    relationship: observes
+    description: Workrr records the worker exit result, events, changed paths, and diff fingerprint as a persisted artifact.
+    rationale: Acceptance must be based on observed repository state rather than worker claims.
+    action: modified
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

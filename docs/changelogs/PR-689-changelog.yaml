@@ -42,6 +42,26 @@ files:
         - execution-plan
         - implementation-request
         - external-coding-agent-worker
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    summary: Load current changelog rationale and parent entity IDs without rebuilding the historical provenance index.
+    rationale: Keep single-changelog validation bounded to current documents and avoid walking every commit in repository history.
+    span:
+      start_line: 1
+      end_line: 1720
+    related:
+      entities:
+        - changelog-validation
+  - path: tests/test_change_log_validation.py
+    type: modified
+    summary: Guard changelog validation against accidentally reintroducing historical commit walks.
+    rationale: Make the bounded validation behavior an executable regression constraint.
+    span:
+      start_line: 1
+      end_line: 500
+    related:
+      entities:
+        - changelog-validation
   - path: docs/design/external-coding-agent-boundary.md
     type: modified
     summary: Document the plan compiler and enforced base-commit precondition.
@@ -57,13 +77,16 @@ files:
 entities:
   - id: execution-plan
     type: Task
-    action: modified
+    action: added
   - id: implementation-request
     type: Task
     action: modified
   - id: external-coding-agent-worker
     type: Tool
     action: modified
+  - id: changelog-validation
+    type: Tool
+    action: added
 entity_relationships:
   - id: execution-plan-compiles-request
     source: execution-plan

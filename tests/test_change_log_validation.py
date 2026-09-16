@@ -3,7 +3,30 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from powdrr_lift import parse_validation_report, validate_change_log_yaml
+import pytest
+
+from powdrr_lift import (
+    change_log_validation,
+    parse_validation_report,
+    validate_change_log_yaml,
+)
+from powdrr_lift.core import index as core_index
+
+
+def test_rationale_and_parent_entity_loading_do_not_walk_commit_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_commit_walk(*args: object, **kwargs: object) -> list[object]:
+        raise AssertionError("changelog validation must not walk commit history")
+
+    monkeypatch.setattr(core_index, "_load_mainline_commits", fail_commit_walk)
+    monkeypatch.setattr(core_index, "_load_mainline_commits_at_ref", fail_commit_walk)
+
+    assert change_log_validation._load_available_rationale_ids(tmp_path) == set()
+    assert (
+        change_log_validation._load_entity_ids_from_changelogs_at_ref(tmp_path, "main")
+        == set()
+    )
 
 
 def test_validate_change_log_yaml_reports_success_when_changes_match(

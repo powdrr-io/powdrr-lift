@@ -53,7 +53,7 @@ files:
     rationale: Make the generated artifact naming contract visible at the command boundary.
     span:
       start_line: 326
-      end_line: 328
+      end_line: 329
     related:
       entities:
         - structrr-baseline-snapshot
@@ -63,7 +63,7 @@ files:
     rationale: Prevent regressions in the bootstrap input and artifact naming boundaries.
     span:
       start_line: 118
-      end_line: 124
+      end_line: 126
     related:
       entities:
         - structrr-baseline-snapshot
@@ -72,8 +72,8 @@ files:
     summary: Verify tracked .github files are absent from bootstrap evidence and file anchors.
     rationale: Keep repository automation out of the product/source baseline by executable rule.
     span:
-      start_line: 208
-      end_line: 225
+      start_line: 210
+      end_line: 227
     related:
       entities:
         - structrr-baseline-snapshot

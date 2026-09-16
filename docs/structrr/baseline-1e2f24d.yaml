@@ -32,34 +32,6 @@ structured_files:
 - docs/proposals/interactive-entity-exploration/proposed-pr-specification.yaml
 - docs/proposals/interactive-entity-exploration/system-specification.yaml
 files:
-- path: .github/workflow-liveness-baseline.json
-  type: modified
-  summary: Capture .github/workflow-liveness-baseline.json as bootstrap source evidence.
-  rationale: Preserve a source anchor for future Structrr context lookup.
-  span:
-    start_line: 1
-    end_line: 4
-  entities:
-  - file:.github/workflow-liveness-baseline.json
-- path: .github/workflow-liveness-warning-budget.json
-  type: modified
-  summary: Capture .github/workflow-liveness-warning-budget.json as bootstrap source
-    evidence.
-  rationale: Preserve a source anchor for future Structrr context lookup.
-  span:
-    start_line: 1
-    end_line: 4
-  entities:
-  - file:.github/workflow-liveness-warning-budget.json
-- path: .github/workflows/ci.yml
-  type: modified
-  summary: Capture .github/workflows/ci.yml as bootstrap source evidence.
-  rationale: Preserve a source anchor for future Structrr context lookup.
-  span:
-    start_line: 1
-    end_line: 113
-  entities:
-  - file:.github/workflows/ci.yml
 - path: .gitignore
   type: modified
   summary: Capture .gitignore as bootstrap source evidence.
@@ -3891,15 +3863,6 @@ entities:
   action: added
 - id: exploration-loop
   type: Module
-  action: added
-- id: file:.github/workflow-liveness-baseline.json
-  type: Configuration file
-  action: added
-- id: file:.github/workflow-liveness-warning-budget.json
-  type: Configuration file
-  action: added
-- id: file:.github/workflows/ci.yml
-  type: Configuration file
   action: added
 - id: file:.gitignore
   type: Source file

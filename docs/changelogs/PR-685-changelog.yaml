@@ -1,0 +1,74 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 685
+title: Add reproducible Python execution-error classifier tooling
+intent:
+  problem: Repair guidance needs a dependable mapping from actual Python execution failures to stable error classes before repair techniques are selected.
+  goal: Generate verified ground-truth failures, fine-tune a ModernBERT classifier, and evaluate it on an exact held-out split.
+human-decisions: []
+structured_files: []
+files:
+  - path: scripts/generate_python_error_dataset.py
+    type: added
+    summary: Execute deterministic Python failure fixtures and write verified JSONL records.
+    rationale: Ground truth must come from real interpreter behavior, including argument-binding and common runtime failures.
+    related:
+      entities: [python-error-dataset]
+  - path: scripts/finetune_python_error_classifier.py
+    type: added
+    summary: Fine-tune a sequence classifier and persist labels and split membership.
+    rationale: Make the error-message classification stage reproducible while keeping heavyweight ML dependencies optional.
+    related:
+      entities: [python-error-classifier]
+  - path: scripts/evaluate_python_error_classifier.py
+    type: added
+    summary: Evaluate a saved classifier against its exact held-out records.
+    rationale: Prevent accidental leakage and report per-class quality before agent integration.
+    related:
+      entities: [python-error-classifier-evaluation]
+  - path: src/powdrr_lift/python_error_classifier.py
+    type: added
+    summary: Provide shared JSONL loading, deterministic stratified splitting, and metrics.
+    rationale: Keep dataset contracts and evaluation calculations identical across the training and evaluation scripts.
+    related:
+      entities: [python-error-classifier]
+  - path: docs/python-error-classifier.md
+    type: added
+    summary: Document the dataset, fine-tuning, and evaluation workflow.
+    rationale: Make the experiment reproducible and clarify that repair-technique mapping is a later stage.
+    related:
+      entities: [python-error-classifier]
+  - path: tests/test_python_error_classifier.py
+    type: added
+    summary: Verify real failure capture, deterministic splits, and metrics.
+    rationale: Keep the data-generation contract testable without downloading an ML model.
+    related:
+      entities: [python-error-dataset, python-error-classifier-evaluation]
+entities:
+  - id: python-error-dataset
+    type: Dataset
+    action: added
+  - id: python-error-classifier
+    type: ML model
+    action: added
+  - id: python-error-classifier-evaluation
+    type: Experiment
+    action: added
+entity_relationships:
+  - id: generator-produces-error-dataset
+    source: python-error-dataset
+    target: python-error-classifier
+    relationship: trains
+    description: Verified interpreter failures become classifier training examples.
+    rationale: Keep classification grounded in actual Python behavior.
+    action: added
+  - id: evaluation-measures-classifier
+    source: python-error-classifier-evaluation
+    target: python-error-classifier
+    relationship: evaluates
+    description: The evaluation script measures the saved model on its held-out split.
+    rationale: Detect generalization problems before agent guidance.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

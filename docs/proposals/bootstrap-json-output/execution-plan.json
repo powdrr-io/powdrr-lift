@@ -9,8 +9,14 @@
       "paths": [
         "src/powdrr_lift/cli.py",
         "src/powdrr_lift/structrr/bootstrap.py",
+        "src/powdrr_lift/core/execution_plan.py",
+        "src/powdrr_lift/workrr/coding_agent.py",
         "tests/test_cli.py",
-        "tests/test_structrr_bootstrap.py"
+        "tests/test_structrr_bootstrap.py",
+        "tests/test_coding_agent.py"
+      ],
+      "ephemeral_paths": [
+        "test_bootstrap_json.py"
       ],
       "validation_profiles": [
         "bootstrap-json-cli-test",
@@ -22,6 +28,7 @@
         "The JSON includes output_path and all five evidence counts",
         "The default invocation remains human-readable",
         "Generated snapshots under docs/structrr/current are excluded from later scans",
+        "Ephemeral helper files may be created only at declared ephemeral paths and are removed before the durable diff is evaluated",
         "Only paths declared by this execution unit are changed"
       ]
     }

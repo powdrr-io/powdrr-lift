@@ -49,6 +49,11 @@ class FakeProvider:
         if self.action == "out-of-scope":
             (worktree_root / "README.md").write_text("changed\n")
             return subprocess.CompletedProcess(["fake"], 0, "", "")
+        if self.action == "ephemeral":
+            (worktree_root / "src").mkdir()
+            (worktree_root / "src" / "change.py").write_text("value = 1\n")
+            (worktree_root / "test_helper.py").write_text("print('scratch')\n")
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
         (worktree_root / "README.md").write_text("committed unexpectedly\n")
         subprocess.run(["git", "add", "README.md"], cwd=worktree_root, check=True)
         subprocess.run(
@@ -139,6 +144,31 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     )
 
 
+def test_opencode_provider_pins_requested_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    provider = OpenCodeProvider(
+        executable="opencode",
+        model="deepinfra/deepseek-flash",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="a")
+
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert command[command.index("--model") + 1] == "deepinfra/deepseek-flash"
+
+
 def test_execution_plan_compiles_selected_unit_to_worker_request() -> None:
     request = ImplementationRequest.from_execution_plan(
         ExecutionPlan(
@@ -192,6 +222,35 @@ def test_allowed_worker_result_captures_json_events_and_diff(tmp_path: Path) -> 
     assert attempt.out_of_scope_paths == ()
     assert attempt.diff_fingerprint
     assert attempt.events == ({"type": "session.completed"},)
+
+
+def test_worker_removes_declared_ephemeral_artifacts_before_final_diff(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+    request = _request(_head(worktree))
+    request = ImplementationRequest(
+        **{
+            **request.to_data(),
+            "allowed_paths": list(request.allowed_paths),
+            "acceptance_criteria": list(request.acceptance_criteria),
+            "validation_profiles": list(request.validation_profiles),
+            "context_refs": list(request.context_refs),
+            "allowed_commands": list(request.allowed_commands),
+            "ephemeral_paths": ["test_helper.py"],
+        }
+    )
+
+    attempt = run_coding_agent(
+        FakeProvider("ephemeral"),
+        request,
+        worktree_root=worktree,
+        attempt_id="attempt-ephemeral",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.changed_paths == ("src/change.py",)
+    assert not (worktree / "test_helper.py").exists()
 
 
 def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:

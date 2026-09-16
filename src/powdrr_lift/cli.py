@@ -1998,6 +1998,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="opencode",
         help="OpenCode executable name or path.",
     )
+    coding_agent_parser.add_argument(
+        "--opencode-model",
+        help=(
+            "OpenCode model reference in provider/model form, for example "
+            "deepinfra/deepseek-flash."
+        ),
+    )
     coding_agent_parser.add_argument("--timeout-seconds", type=float, default=1800.0)
     coding_agent_parser.add_argument(
         "--validation-timeout-seconds", type=float, default=600.0
@@ -2677,6 +2684,7 @@ def _run_coding_agent(args: argparse.Namespace) -> int:
     request = ImplementationRequest.from_data(request_data)
     provider = OpenCodeProvider(
         executable=args.opencode_executable,
+        model=args.opencode_model,
         timeout_seconds=args.timeout_seconds,
         permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
     )

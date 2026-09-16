@@ -42,7 +42,18 @@ class FakeProvider:
         (worktree_root / "README.md").write_text("committed unexpectedly\n")
         subprocess.run(["git", "add", "README.md"], cwd=worktree_root, check=True)
         subprocess.run(
-            ["git", "commit", "-m", "unexpected"], cwd=worktree_root, check=True
+            [
+                "git",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "-m",
+                "unexpected",
+            ],
+            cwd=worktree_root,
+            check=True,
         )
         return subprocess.CompletedProcess(["fake"], 0, "", "")
 

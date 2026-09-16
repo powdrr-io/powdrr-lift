@@ -85,12 +85,20 @@ class ImplementationRequest:
         allowed_commands: tuple[str, ...] = (),
     ) -> ImplementationRequest:
         """Compile one validated execution unit into a worker handoff."""
+        criteria = (
+            "\n".join(f"- {criterion}" for criterion in unit.acceptance_criteria)
+            or "- No acceptance criteria declared."
+        )
+        validation_profiles = ", ".join(unit.validation_profiles) or "none"
+        allowed_paths = ", ".join(unit.paths) or "none"
         prompt = (
-            f"Implement execution unit {unit.unit_id}: {unit.objective}\n"
-            "Use only the allowed paths. Satisfy every acceptance criterion and "
-            "do not create helper or validation files; Workrr will run the "
-            "declared validation profiles after you finish. Do not commit, push, "
-            "or alter files outside the request."
+            f"Implement execution unit {unit.unit_id}: {unit.objective}\n\n"
+            f"Allowed paths: {allowed_paths}\n"
+            f"Acceptance criteria:\n{criteria}\n"
+            f"Validation profiles Workrr will run: {validation_profiles}\n\n"
+            "Use only the allowed paths. Do not create helper or validation "
+            "files; Workrr runs the declared validation profiles after you "
+            "finish. Do not commit, push, or alter files outside the request."
         )
         return cls(
             request_id=request_id,

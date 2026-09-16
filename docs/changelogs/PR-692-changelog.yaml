@@ -7,7 +7,7 @@ intent:
 human-decisions: []
 structured_files: []
 files:
-  - path: docs/structrr/baseline-1e2f24d.yaml
+  - path: docs/structrr/current/baseline-1e2f24d.yaml
     type: added
     summary: Add the validated Structrr bootstrap snapshot for the Powdrr repository, including entities, relationships, source subjects, and source bindings.
     rationale: Establish a versioned product/source baseline for rebasing and specifying the first real-repository feature.

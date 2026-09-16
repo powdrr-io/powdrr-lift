@@ -88,8 +88,9 @@ class ImplementationRequest:
         prompt = (
             f"Implement execution unit {unit.unit_id}: {unit.objective}\n"
             "Use only the allowed paths. Satisfy every acceptance criterion and "
-            "run the declared validation profiles. Do not commit, push, or alter "
-            "files outside the request."
+            "do not create helper or validation files; Workrr will run the "
+            "declared validation profiles after you finish. Do not commit, push, "
+            "or alter files outside the request."
         )
         return cls(
             request_id=request_id,
@@ -230,6 +231,10 @@ class OpenCodeProvider:
     ) -> subprocess.CompletedProcess[str]:
         del attempt_id
         environment = os.environ.copy()
+        # Some OpenCode integrations resolve the project root from PWD rather
+        # than the subprocess cwd. Keep both locations aligned so a worker
+        # cannot accidentally inspect or edit the caller's repository.
+        environment["PWD"] = str(worktree_root.resolve())
         environment["OPENCODE_PERMISSION"] = self.permission_policy.to_json()
         command = [
             self.executable,

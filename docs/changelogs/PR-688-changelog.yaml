@@ -1,0 +1,103 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 688
+title: Execute and persist coding-agent validation profiles
+intent:
+  problem: A completed coding-agent process does not prove that the implementation satisfies its declared validation profiles.
+  goal: Execute every registered validation profile with bounded argv commands, persist a versioned validation report, and make the CLI fail closed when validation is blocked or fails.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    summary: Define validation profiles, per-profile results, validation reports, deterministic command execution, and CLI profile parsing.
+    rationale: Make validation an observed and persisted Workrr state rather than an unverified instruction to the coding agent.
+    span:
+      start_line: 1
+      end_line: 295
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-attempt
+        - implementation-validation-report
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Persist and reload validation reports beside request and attempt artifacts.
+    rationale: Keep the complete handoff, worker observation, and validation observation in one Workrr artifact store.
+    span:
+      start_line: 230
+      end_line: 488
+    related:
+      entities:
+        - implementation-attempt
+        - implementation-validation-report
+  - path: src/powdrr_lift/workrr/__init__.py
+    type: modified
+    summary: Export the validation protocol and runner types.
+    rationale: Make the validation boundary available through the Workrr package API.
+    span:
+      start_line: 1
+      end_line: 126
+    related:
+      entities:
+        - implementation-validation-report
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Register validation profiles for run-coding-agent, persist their report, and return failure for blocked or failed validation.
+    rationale: Prevent the operational entry point from treating process completion as delivery success without validation evidence.
+    span:
+      start_line: 1930
+      end_line: 4668
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-validation-report
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Test validation execution, authorization, blocked states, report persistence, parsing, and CLI failure gating.
+    rationale: Prove every declared profile receives an explicit outcome and unsafe or incomplete validation cannot pass.
+    span:
+      start_line: 1
+      end_line: 335
+    related:
+      entities:
+        - implementation-attempt
+        - implementation-validation-report
+  - path: docs/design/external-coding-agent-boundary.md
+    type: modified
+    summary: Document the versioned validation report and fail-closed validation boundary.
+    rationale: Keep the worker handoff and its required evidence explicit for later review and reconciliation slices.
+    span:
+      start_line: 1
+      end_line: 68
+    related:
+      entities:
+        - implementation-validation-report
+entities:
+  - id: external-coding-agent-worker
+    type: Tool
+    action: modified
+  - id: implementation-attempt
+    type: Experiment
+    action: modified
+  - id: implementation-validation-report
+    type: Experiment
+    action: added
+entity_relationships:
+  - id: attempt-produces-validation-report
+    source: implementation-attempt
+    target: implementation-validation-report
+    relationship: produces
+    description: A completed implementation attempt is followed by validation of every profile declared by its request.
+    rationale: Process exit status alone is insufficient evidence that an implementation is acceptable.
+    action: added
+  - id: validation-report-observes-worker-result
+    source: implementation-validation-report
+    target: implementation-attempt
+    relationship: evaluates
+    description: The validation report records command-level evidence against the observed worker attempt.
+    rationale: Later review must be able to distinguish worker failure, blocked validation, and failed validation.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

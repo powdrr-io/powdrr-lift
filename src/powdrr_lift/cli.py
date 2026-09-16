@@ -150,6 +150,19 @@ from powdrr_lift.workrr.chat_agent import (
 )
 from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
 from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
+from powdrr_lift.workrr.coding_agent import (
+    CodingAgentAttemptStore,
+    CodingAgentRunner,
+    CodingAgentStatus,
+    ImplementationRequest,
+    OpenCodePermissionPolicy,
+    OpenCodeProvider,
+)
+from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationReportStatus,
+    ValidationRunner,
+    parse_validation_profile,
+)
 from powdrr_lift.workrr.definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
@@ -1923,6 +1936,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compile_workflow_parser.set_defaults(func=_run_compile_execution_plan)
 
+    coding_agent_parser = subparsers.add_parser(
+        "run-coding-agent",
+        aliases=["run_coding_agent"],
+        help="Run one bounded external coding-agent implementation attempt.",
+    )
+    coding_agent_parser.add_argument(
+        "--request",
+        type=Path,
+        required=True,
+        help="Implementation request JSON produced from a validated execution unit.",
+    )
+    coding_agent_parser.add_argument(
+        "--worktree",
+        type=Path,
+        required=True,
+        help="Clean dedicated worktree in which the worker may edit.",
+    )
+    coding_agent_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="Directory for persisted request and attempt artifacts.",
+    )
+    coding_agent_parser.add_argument("--attempt-id", required=True)
+    coding_agent_parser.add_argument(
+        "--validation-profile",
+        action="append",
+        default=[],
+        metavar="NAME=COMMAND",
+        help="Registered validation profile, repeatable; COMMAND is parsed as argv.",
+    )
+    coding_agent_parser.add_argument(
+        "--opencode-executable",
+        default="opencode",
+        help="OpenCode executable name or path.",
+    )
+    coding_agent_parser.add_argument("--timeout-seconds", type=float, default=1800.0)
+    coding_agent_parser.add_argument(
+        "--validation-timeout-seconds", type=float, default=600.0
+    )
+    coding_agent_parser.set_defaults(func=_run_coding_agent)
+
     workflow_recovery_parser = subparsers.add_parser(
         "workflow-recovery",
         aliases=["workflow_recovery"],
@@ -2589,6 +2644,41 @@ def _run_compile_execution_plan(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _run_coding_agent(args: argparse.Namespace) -> int:
+    request_data = _load_structured_mapping(args.request)
+    request = ImplementationRequest.from_data(request_data)
+    provider = OpenCodeProvider(
+        executable=args.opencode_executable,
+        timeout_seconds=args.timeout_seconds,
+        permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
+    )
+    runner = CodingAgentRunner(
+        provider=provider,
+        store=CodingAgentAttemptStore(args.output_dir),
+    )
+    store = runner.store
+    attempt = runner.run(
+        request,
+        worktree_root=args.worktree,
+        attempt_id=args.attempt_id,
+    )
+    profiles = {}
+    for value in args.validation_profile:
+        profile = parse_validation_profile(value)
+        profiles[profile.name] = profile
+    validation = ValidationRunner(
+        profiles, timeout_seconds=args.validation_timeout_seconds
+    ).run(request, attempt, worktree_root=args.worktree)
+    store.save_validation_report(validation)
+    output = attempt.to_data()
+    output["validation"] = validation.to_data()
+    print(json.dumps(output, indent=2, sort_keys=True))
+    return int(
+        attempt.status is not CodingAgentStatus.COMPLETED
+        or validation.status is not ValidationReportStatus.PASSED
+    )
 
 
 def _load_structured_mapping(path: Path) -> dict[str, Any]:

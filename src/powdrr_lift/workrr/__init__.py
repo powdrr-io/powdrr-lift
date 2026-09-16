@@ -6,6 +6,29 @@ from powdrr_lift.workrr.actions import (
     WorkflowFileEdits,
     WorkflowYamlOperation,
 )
+from powdrr_lift.workrr.coding_agent import (
+    CODING_AGENT_ATTEMPT_SCHEMA_VERSION,
+    CODING_AGENT_REQUEST_SCHEMA_VERSION,
+    CodingAgentAttempt,
+    CodingAgentAttemptStore,
+    CodingAgentProvider,
+    CodingAgentRunner,
+    CodingAgentStatus,
+    ImplementationRequest,
+    OpenCodePermissionPolicy,
+    OpenCodeProvider,
+    run_coding_agent,
+)
+from powdrr_lift.workrr.coding_agent_validation import (
+    CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION,
+    ValidationProfile,
+    ValidationReport,
+    ValidationReportStatus,
+    ValidationResult,
+    ValidationResultStatus,
+    ValidationRunner,
+    parse_validation_profile,
+)
 from powdrr_lift.workrr.context import WorkflowContext
 from powdrr_lift.workrr.exchanges import ExchangeRecordingClient
 from powdrr_lift.workrr.loop import (
@@ -81,4 +104,23 @@ __all__ = [
     "WorkflowExecutionObserver",
     "WorkflowExecutionStrategy",
     "WorkflowContext",
+    "CODING_AGENT_ATTEMPT_SCHEMA_VERSION",
+    "CODING_AGENT_REQUEST_SCHEMA_VERSION",
+    "CodingAgentAttempt",
+    "CodingAgentAttemptStore",
+    "CodingAgentProvider",
+    "CodingAgentRunner",
+    "CodingAgentStatus",
+    "ImplementationRequest",
+    "OpenCodePermissionPolicy",
+    "OpenCodeProvider",
+    "run_coding_agent",
+    "CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION",
+    "ValidationProfile",
+    "ValidationReport",
+    "ValidationReportStatus",
+    "ValidationResult",
+    "ValidationResultStatus",
+    "ValidationRunner",
+    "parse_validation_profile",
 ]

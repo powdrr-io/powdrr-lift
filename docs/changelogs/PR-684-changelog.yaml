@@ -1,0 +1,59 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 684
+title: Add gold-source accuracy tests for Structrr
+intent:
+  problem: Repository-scale bootstrap tests prove validity and repeatability but do not detect precise symbol identity or span regressions for representative code.
+  goal: Maintain explicit expected Python source subjects across Structrr, Workrr, and Procedrr code and verify bootstrap output against them.
+human-decisions: []
+structured_files: []
+files:
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: added
+    summary: Record expected Python module, class, function, and method identities and spans.
+    rationale: Make source extraction accuracy an explicit, reviewable contract.
+    span:
+      start_line: 1
+      end_line: 64
+    related:
+      entities:
+        - golden-source-symbol-fixture
+  - path: tests/test_structrr_real_repositories.py
+    type: modified
+    summary: Compare the real Powdrr bootstrap against the gold source-symbol fixture.
+    rationale: Detect qualified-name, stable-key, kind, and exact-span regressions on representative production code.
+    span:
+      start_line: 6
+      end_line: 7
+    related:
+      entities:
+        - golden-source-accuracy-test
+  - path: tests/test_structrr_real_repositories.py
+    type: modified
+    summary: Compare the real Powdrr bootstrap against the gold source-symbol fixture.
+    rationale: Detect qualified-name, stable-key, kind, and exact-span regressions on representative production code.
+    span:
+      start_line: 53
+      end_line: 68
+    related:
+      entities:
+        - golden-source-accuracy-test
+        - golden-source-symbol-fixture
+entities:
+  - id: golden-source-symbol-fixture
+    type: Module
+    action: added
+  - id: golden-source-accuracy-test
+    type: Module
+    action: added
+entity_relationships:
+  - id: accuracy-test-reads-golden-fixture
+    source: golden-source-accuracy-test
+    target: golden-source-symbol-fixture
+    relationship: verifies
+    description: The source accuracy test compares bootstrap subjects against the checked-in expected symbol fixture.
+    rationale: Keep extraction correctness explicit and reviewable as source evolves.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

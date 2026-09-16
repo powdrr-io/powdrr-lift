@@ -61,7 +61,7 @@ steps:
               - >-
                 A complete runtime edit judge must use this exact shape (replace
                 names and question text, but keep every field):
-                {"judge":{"question":"Decide the exact edit using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact edit."],"context":["hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","start","end","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string","minLength":1},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"new_text":{"type":"string","minLength":1}}}},"validation":{"kind":"json_schema"}}}
+                {"judge":{"question":"Decide the exact edit implementing fragment_goal using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact semantic edit and include fragment_goal and hello_source in context."],"context":["fragment_goal","hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","start","end","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string","minLength":1},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"new_text":{"type":"string","minLength":1}}}},"validation":{"kind":"json_schema"}}}
               - >-
                 Do not invent condition, then, else, prompt, schema, source,
                 or subject-object fields; they are not Procedrr judge fields.
@@ -72,7 +72,7 @@ steps:
                 a bare string.
               - >-
                 The canonical edit following the example judge is:
-                {"operation":{"tool":"edit","parameters":{"file_path":{"type":"reference","value":"hello_edit_decision.file_path"},"edits":[{"start":{"type":"reference","value":"hello_edit_decision.start"},"end":{"type":"reference","value":"hello_edit_decision.end"},"new_text":{"type":"reference","value":"hello_edit_decision.new_text"}}]},"bind":"hello_edit_result"}}
+                {"operation":{"tool":"edit","parameters":{"operation":"replace_lines","file_path":{"type":"reference","value":"hello_edit_decision.file_path"},"start_line":{"type":"reference","value":"hello_edit_decision.start"},"end_line":{"type":"reference","value":"hello_edit_decision.end"},"replacement":{"type":"reference","value":"hello_edit_decision.new_text"}},"bind":"hello_edit_result"}}
               - >-
                 An internal operation uses {tool: internal, parameters:
                 {command: [PARTS...]}, bind: NAME}.

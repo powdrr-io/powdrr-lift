@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from powdrr_lift.cli import main
 
 
@@ -111,7 +113,7 @@ def _compile_request(
 
 
 def test_cli_compiles_and_runs_a_complete_coding_agent_handoff(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repo = _git_repo(tmp_path / "repo")
     plan = _plan(tmp_path / "plan.json")
@@ -174,7 +176,7 @@ def test_cli_compiles_and_runs_a_complete_coding_agent_handoff(
 
 
 def test_cli_fails_closed_when_declared_validation_fails(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repo = _git_repo(tmp_path / "repo")
     plan = _plan(tmp_path / "plan.json")

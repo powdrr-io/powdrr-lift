@@ -18,7 +18,7 @@ from powdrr_lift.core.spec_paths import is_specification_path
 
 _SCHEMA = "https://powdrr.io/schema/changelog-v2"
 _BOOTSTRAP_SCHEMA = "https://powdrr.io/schema/structrr-bootstrap-v1"
-_DEFAULT_OUTPUT_DIRECTORY = Path("docs/structrr")
+_DEFAULT_OUTPUT_DIRECTORY = Path("docs/structrr/current")
 _IGNORED_PREFIXES = (
     ".git/",
     ".github/",

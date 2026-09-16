@@ -9,7 +9,7 @@ structured_files: []
 files:
   - path: src/powdrr_lift/structrr/bootstrap.py
     type: modified
-    summary: Exclude tracked .github paths and derive the default output filename as baseline-<short-git-hash>.yaml.
+    summary: Exclude tracked .github paths and derive the default output filename as docs/structrr/current/baseline-<short-git-hash>.yaml.
     rationale: Keep CI automation out of the Structrr product/source baseline and make each generated baseline traceable to its Git revision.
     span:
       start_line: 21

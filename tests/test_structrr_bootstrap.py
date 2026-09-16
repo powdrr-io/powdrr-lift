@@ -121,7 +121,9 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
         capture_output=True,
         text=True,
     ).stdout.strip()
-    assert result.output_path == repo / f"docs/structrr/baseline-{short_hash}.yaml"
+    assert result.output_path == repo / (
+        f"docs/structrr/current/baseline-{short_hash}.yaml"
+    )
     assert result.output_path.is_file()
     assert {entity["id"] for entity in result.document["entities"]} >= {
         "product",

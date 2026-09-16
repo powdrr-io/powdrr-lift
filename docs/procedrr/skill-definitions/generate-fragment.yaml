@@ -42,6 +42,7 @@ steps:
               - If required source is not in fragment_context, append read_document first, then append a judge that uses the runtime read binding to choose the exact edit.
               - Never invent start/end positions for a source that has not been supplied during generation.
               - A runtime source edit should be represented as three steps: read_document, one judge returning file_path/start/end/new_text, and an edit operation whose fields reference that judge binding.
+              - The edit judge must include both the source binding and fragment_goal (or the specific acceptance condition) in its context, and its instructions must state the exact requested behavior to implement. A source-only judge is invalid because it cannot select a semantic change.
               - Return the step encoded as JSON in the single step_json string field.
               - The decoded step must contain exactly one control key.
               - Allowed control keys are operation, judge, gate, attempt, repeat, branch, for_each, worklist, call, and terminal.

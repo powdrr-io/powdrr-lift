@@ -115,7 +115,15 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     result = bootstrap_structrr(repo)
 
     assert result.validation.successful
-    assert result.output_path == repo / "docs/structrr/bootstrap-changelog.yaml"
+    short_hash = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert result.output_path == repo / (
+        f"docs/structrr/current/baseline-{short_hash}.yaml"
+    )
     assert result.output_path.is_file()
     assert {entity["id"] for entity in result.document["entities"]} >= {
         "product",
@@ -196,6 +204,24 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     )
     assert any(
         item["id"] == "run-tests-before-edit" for item in result.document["guidance"]
+    )
+
+
+def test_bootstrap_ignores_tracked_github_metadata(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    github_workflow = repo / ".github" / "workflows" / "ci.yml"
+    github_workflow.parent.mkdir(parents=True)
+    github_workflow.write_text("name: CI\n", encoding="utf-8")
+    _git(repo, "add", ".github/workflows/ci.yml")
+    _git(repo, "commit", "-qm", "add GitHub automation")
+
+    result = bootstrap_structrr(repo, output_path=tmp_path / "bootstrap.yaml")
+
+    assert result.validation.successful
+    assert ".github/workflows/ci.yml" not in result.evidence_files
+    assert all(
+        file_entry["path"] != ".github/workflows/ci.yml"
+        for file_entry in result.document["files"]
     )
 
 

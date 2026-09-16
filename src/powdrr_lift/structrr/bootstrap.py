@@ -18,8 +18,14 @@ from powdrr_lift.core.spec_paths import is_specification_path
 
 _SCHEMA = "https://powdrr.io/schema/changelog-v2"
 _BOOTSTRAP_SCHEMA = "https://powdrr.io/schema/structrr-bootstrap-v1"
-_DEFAULT_OUTPUT = Path("docs/structrr/bootstrap-changelog.yaml")
-_IGNORED_PREFIXES = (".git/", ".worktrees/", "node_modules/", "vendor/")
+_DEFAULT_OUTPUT_DIRECTORY = Path("docs/structrr/current")
+_IGNORED_PREFIXES = (
+    ".git/",
+    ".github/",
+    ".worktrees/",
+    "node_modules/",
+    "vendor/",
+)
 _IGNORED_FILES = {".DS_Store"}
 _SOURCE_FILE_TYPES = {"Build file", "Configuration file", "Script", "Source file"}
 _SOURCE_LINKABLE_TYPES = {
@@ -104,10 +110,11 @@ def bootstrap_structrr(
         title=title or f"Bootstrap Structrr for {root.name}",
     )
     validation = validate_bootstrap_document(document, root=root, taxonomy=taxonomy)
+    selected_output = (
+        Path(output_path) if output_path is not None else _default_output_path(root)
+    )
     resolved_output = (
-        root / (output_path or _DEFAULT_OUTPUT)
-        if not Path(output_path or _DEFAULT_OUTPUT).is_absolute()
-        else Path(output_path or _DEFAULT_OUTPUT)
+        root / selected_output if not selected_output.is_absolute() else selected_output
     )
     if validation.successful:
         resolved_output.parent.mkdir(parents=True, exist_ok=True)
@@ -121,6 +128,17 @@ def bootstrap_structrr(
         validation=validation,
         evidence_files=tracked_files,
     )
+
+
+def _default_output_path(root: Path) -> Path:
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    short_hash = result.stdout.strip() if result.returncode == 0 else "unknown"
+    return _DEFAULT_OUTPUT_DIRECTORY / f"baseline-{short_hash}.yaml"
 
 
 def validate_bootstrap_document(

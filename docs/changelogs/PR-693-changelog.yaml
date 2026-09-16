@@ -1,0 +1,118 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 693
+title: Name Structrr baselines by revision and ignore GitHub metadata
+intent:
+  problem: Structrr bootstrap outputs are named as changelogs even though they are repository baselines, and tracked GitHub automation is not part of the desired bootstrap evidence.
+  goal: Name default bootstrap outputs with the short source revision and exclude tracked .github metadata while preserving all other tracked repository files.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Exclude tracked .github paths and derive the default output filename as docs/structrr/current/baseline-<short-git-hash>.yaml.
+    rationale: Keep CI automation out of the Structrr product/source baseline and make each generated baseline traceable to its Git revision.
+    span:
+      start_line: 21
+      end_line: 28
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Resolve explicit and revision-derived bootstrap output paths without changing the tracked-input boundary.
+    rationale: Preserve caller-selected output paths while making the default revision-aware.
+    span:
+      start_line: 113
+      end_line: 115
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Resolve a revision-aware relative output path against the repository root.
+    rationale: Keep default and caller-supplied relative artifacts inside the selected repository.
+    span:
+      start_line: 117
+      end_line: 117
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add short-Git-hash output path resolution with a non-Git fallback.
+    rationale: Give default baselines stable revision identity even when a caller supplies a nonstandard repository root.
+    span:
+      start_line: 133
+      end_line: 143
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Document the revision-aware Structrr baseline output name in CLI help.
+    rationale: Make the generated artifact naming contract visible at the command boundary.
+    span:
+      start_line: 326
+      end_line: 329
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Test revision-aware default output naming and exclusion of tracked GitHub metadata.
+    rationale: Prevent regressions in the bootstrap input and artifact naming boundaries.
+    span:
+      start_line: 118
+      end_line: 126
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Verify tracked .github files are absent from bootstrap evidence and file anchors.
+    rationale: Keep repository automation out of the product/source baseline by executable rule.
+    span:
+      start_line: 210
+      end_line: 227
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update source-span fixtures for the bootstrap implementation changes.
+    rationale: Keep source-anchor regression coverage aligned with the current tracked source.
+    span:
+      start_line: 8
+      end_line: 8
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the bootstrap function source span fixture.
+    rationale: Keep the golden source model aligned with the renamed-output implementation.
+    span:
+      start_line: 14
+      end_line: 15
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the Python source-model extraction span fixture.
+    rationale: Preserve exact source-anchor regression coverage after bootstrap changes.
+    span:
+      start_line: 21
+      end_line: 22
+    related:
+      entities:
+        - structrr-baseline-snapshot
+entities:
+  - id: structrr-baseline-snapshot
+    type: Changelog file
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

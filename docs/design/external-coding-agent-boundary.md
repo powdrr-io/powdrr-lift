@@ -20,6 +20,13 @@ The worker boundary defines two versioned artifacts:
 from the existing validated execution-plan model into this worker protocol.
 The request prompt is deliberately only a rendering of the typed request.
 
+`ImplementationRequest.from_execution_plan` is the plan-owned compiler
+boundary. It selects one unit by ID, carries the plan's proposed-PR
+fingerprint, and copies the unit's paths, acceptance criteria, and validation
+profiles into the request. The `compile-implementation-request` CLI command
+writes that artifact from a typed execution-plan file instead of requiring a
+caller to hand-author the request JSON.
+
 ## Persisted runner
 
 `CodingAgentAttemptStore` persists requests and attempts as individual JSON
@@ -31,6 +38,11 @@ lets later validation or review load the exact request and observed result.
 `CodingAgentRunner` owns that persistence boundary while keeping provider
 invocation replaceable. It accepts an already-created clean worktree for this
 slice; worktree creation and lifecycle management remain separate concerns.
+
+Before invoking a provider, Workrr requires the worktree's current `HEAD` to
+equal `implementation-request-v1.base_commit`. A stale worktree is recorded as
+a policy-denied attempt and the provider is never started. This makes the
+request's plan version an enforced precondition rather than documentation.
 
 The `run-coding-agent` CLI command is the initial operational entry point. It
 loads a JSON or YAML implementation request, invokes the bounded OpenCode

@@ -241,6 +241,24 @@ def test_bootstrap_is_deterministic_and_does_not_stage_output(tmp_path: Path) ->
     assert status.stdout == ""
 
 
+def test_bootstrap_ignores_tracked_current_snapshots(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+
+    first = bootstrap_structrr(repo)
+    relative_output = first.output_path.relative_to(repo)
+    _git(repo, "add", str(relative_output))
+    _git(repo, "commit", "-qm", "record current snapshot")
+
+    second = bootstrap_structrr(repo, output_path=tmp_path / "second.yaml")
+
+    assert second.validation.successful
+    assert str(relative_output) not in second.evidence_files
+    assert all(
+        file_entry["path"] != str(relative_output)
+        for file_entry in second.document["files"]
+    )
+
+
 def test_bootstrap_validation_rejects_dangling_relationship(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     result = bootstrap_structrr(repo)

@@ -22,6 +22,7 @@ _DEFAULT_OUTPUT_DIRECTORY = Path("docs/structrr/current")
 _IGNORED_PREFIXES = (
     ".git/",
     ".github/",
+    "docs/structrr/current/",
     ".worktrees/",
     "node_modules/",
     "vendor/",

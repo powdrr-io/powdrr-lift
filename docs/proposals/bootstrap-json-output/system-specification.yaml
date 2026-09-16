@@ -1,0 +1,14 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: bootstrap-json-output
+title: Bootstrap Structrr JSON output
+requirements:
+  - id: req-json-summary
+    description: The bootstrap command must emit a stable JSON summary after validation succeeds.
+    state: added
+  - id: req-human-default
+    description: The bootstrap command must retain its human-readable output by default.
+    state: added
+approach:
+  - id: appr-json-serialization
+    description: Add an opt-in --json flag that serializes the validated summary.
+    state: added

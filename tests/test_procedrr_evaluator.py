@@ -410,10 +410,20 @@ class HelloWorldLLM:
                 "done": True,
                 "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
             }
-        if "Is there one remaining validation failure" in question:
+        if "What is the smallest safe repair" in question:
+            return {
+                "file_path": "hello.py",
+                "start": 1,
+                "end": 1,
+                "new_text": 'print("Hello, World")\nprint("Here I Am")\n',
+            }
+        if (
+            "Is there one remaining validation failure" in question
+            or "Are all validations passing" in question
+        ):
             return {
                 "done": True,
-                "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
+                "failure_index": -1,
             }
         if "Which validation failures require" in question:
             return {
@@ -570,7 +580,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
     from importlib import import_module
 
     build_probe_client = import_module(
-        "powdrr_lift.workflow_prompt_probe"
+        "powdrr_lift.workrr.prompt_probe"
     ).build_probe_client
     document = parse_and_validate(
         Path("docs/procedrr/skill-definitions/execute-proposed-pr.yaml").read_text()

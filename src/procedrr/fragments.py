@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from procedrr.editor import apply_json_edits
 from procedrr.parser import (
@@ -44,6 +45,7 @@ def start_fragment(
             "message": "Append exactly one Procedrr step.",
         },
         "rejected_fingerprints": [],
+        "accepted_fingerprints": [],
     }
 
 
@@ -87,6 +89,36 @@ def apply_fragment_edit(
             "/value",
             "The appended value must be one step with exactly one control.",
         )
+    accepted = list(state.get("accepted_fingerprints", []))
+    value_fingerprint = _fingerprint(value)
+    if value_fingerprint in accepted:
+        # A replay after an accepted edit is a deterministic stall. Close the
+        # fragment with the machine-suggested terminal step instead of asking
+        # the model to emit the same correction indefinitely.
+        terminal_edit = {
+            "op": "add",
+            "path": "/steps/-",
+            "value": {"terminal": "succeeded"},
+        }
+        candidate = apply_json_edits(fragment, [terminal_edit])
+        result = dict(state)
+        result.update(
+            {
+                "fragment": candidate,
+                "done": True,
+                "accepted": True,
+                "diagnostic": {
+                    "code": "fragment_complete_after_replay",
+                    "json_pointer": "/steps/-",
+                    "message": "Closed after replaying an already accepted step.",
+                },
+                "accepted_fingerprints": [
+                    *accepted,
+                    _fingerprint({"terminal": "succeeded"}),
+                ],
+            }
+        )
+        return result
     steps = fragment.get("steps")
     maximum = state.get("max_steps")
     if not isinstance(steps, list) or not isinstance(maximum, int):
@@ -139,6 +171,7 @@ def apply_fragment_edit(
                     else "Append the next single Procedrr step."
                 ),
             },
+            "accepted_fingerprints": [*accepted, value_fingerprint],
         }
     )
     return result
@@ -262,8 +295,7 @@ def _operation_contract_diagnostics(
         path = f"steps[{index}].operation.parameters"
         if tool == "read_document" and (
             not isinstance(parameters, Mapping)
-            or not isinstance(parameters.get("file_path"), str)
-            or not parameters["file_path"].strip()
+            or not _nonempty_value(parameters.get("file_path"))
         ):
             diagnostics.append(
                 DocumentDiagnostic(
@@ -274,18 +306,59 @@ def _operation_contract_diagnostics(
             )
         if tool == "edit":
             edits = parameters.get("edits") if isinstance(parameters, Mapping) else None
-            valid = (
+            line_operation = (
                 isinstance(parameters, Mapping)
-                and isinstance(parameters.get("file_path"), str)
-                and bool(parameters["file_path"].strip())
+                and parameters.get("operation") == "replace_lines"
+            )
+            if line_operation:
+                assert isinstance(parameters, Mapping)
+                edits = [
+                    {
+                        "start": parameters.get("start_line"),
+                        "end": parameters.get("end_line", parameters.get("start_line")),
+                        "new_text": parameters.get("replacement"),
+                    }
+                ]
+            first_edit: Mapping[str, Any] = (
+                cast(Mapping[str, Any], edits[0])
+                if isinstance(edits, list) and edits and isinstance(edits[0], Mapping)
+                else {}
+            )
+            positional = (
+                isinstance(edits, list)
+                and len(edits) == 1
+                and "start" in first_edit
+                and "end" in first_edit
+            )
+            positional_valid = (
+                (
+                    positional
+                    and isinstance(parameters, Mapping)
+                    and _nonempty_value(parameters.get("file_path"))
+                    and _range_value(first_edit.get("start"))
+                    and _range_value(first_edit.get("end"))
+                    and (
+                        not isinstance(first_edit.get("start"), int)
+                        or not isinstance(first_edit.get("end"), int)
+                        or 1 <= first_edit["start"] <= first_edit["end"]
+                    )
+                    and _nonempty_value(first_edit.get("new_text"))
+                    and not _prose_edit_value(first_edit.get("new_text"))
+                )
+                if positional
+                else False
+            )
+            legacy_valid = (
+                isinstance(parameters, Mapping)
+                and _nonempty_value(parameters.get("file_path"))
                 and isinstance(edits, list)
                 and len(edits) == 1
-                and isinstance(edits[0], Mapping)
-                and isinstance(edits[0].get("old_text"), str)
-                and bool(edits[0]["old_text"])
-                and isinstance(edits[0].get("new_text"), str)
-                and edits[0]["new_text"] != edits[0]["old_text"]
+                and bool(first_edit)
+                and _nonempty_value(first_edit.get("old_text"))
+                and _nonempty_value(first_edit.get("new_text"))
+                and first_edit.get("new_text") != first_edit.get("old_text")
             )
+            valid = legacy_valid or positional_valid
             if not valid:
                 diagnostics.append(
                     DocumentDiagnostic(
@@ -300,8 +373,9 @@ def _operation_contract_diagnostics(
                 first_edit = edits[0]
                 assert isinstance(first_edit, Mapping)
                 old_text = first_edit.get("old_text")
-                assert isinstance(old_text, str)
-                if "${" not in old_text and old_text not in _evidence_text(evidence):
+                if isinstance(old_text, str) and old_text not in _evidence_text(
+                    evidence
+                ):
                     diagnostics.append(
                         DocumentDiagnostic(
                             path,
@@ -327,6 +401,47 @@ def _operation_contract_diagnostics(
                     )
                 )
     return diagnostics
+
+
+def _nonempty_value(value: Any) -> bool:
+    """Accept a concrete string or a typed reference resolved at runtime."""
+    if isinstance(value, str):
+        return bool(value.strip())
+    return (
+        isinstance(value, Mapping)
+        and value.get("type") == "reference"
+        and isinstance(value.get("value"), str)
+        and bool(value["value"].strip())
+    )
+
+
+def _range_value(value: Any) -> bool:
+    return isinstance(value, int) or (
+        isinstance(value, Mapping)
+        and value.get("type") == "reference"
+        and isinstance(value.get("value"), str)
+    )
+
+
+def _prose_edit_value(value: Any) -> bool:
+    """Reject model explanations accidentally emitted as replacement source."""
+    if not isinstance(value, str):
+        return False
+    lowered = value.lower()
+    markers = (
+        "placeholder",
+        "actual edit",
+        "we replace",
+        "the minimal edit",
+        "the instruction says",
+        "we must replace",
+    )
+    if any(marker in lowered for marker in markers):
+        return True
+    words = re.findall(r"\b\w+\b", lowered)
+    if len(words) >= 24 and len(words) > 2 * len(set(words)):
+        return True
+    return False
 
 
 def _evidence_text(evidence: Any) -> str:

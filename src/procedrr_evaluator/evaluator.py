@@ -26,6 +26,14 @@ class EvaluationError(RuntimeError):
     """A declaration, model response, or injected operation failed."""
 
 
+class ValidationGateError(EvaluationError):
+    """A validation gate failed with its bound evidence preserved."""
+
+    def __init__(self, evidence: Any) -> None:
+        self.evidence = evidence
+        super().__init__("validation gate failed")
+
+
 OperationExecutor = Callable[[str, Mapping[str, Any]], Any]
 
 
@@ -288,7 +296,14 @@ class Evaluator:
                 )
                 return
             except EvaluationError as exc:
-                state["failure"] = {"message": str(exc), "attempt": attempt}
+                failure: dict[str, Any] = {}
+                if isinstance(exc, ValidationGateError):
+                    failure["category"] = _validation_category(exc.evidence)
+                    failure["validation"] = exc.evidence
+                else:
+                    failure["category"] = "execution_error"
+                    failure["error"] = str(exc)
+                state["failure"] = failure
                 events.append(EvaluationEvent("recovery", path, state["failure"]))
                 self._steps(
                     recovery["steps"],
@@ -542,7 +557,9 @@ class Evaluator:
         self, gate: Mapping[str, Any], state: Mapping[str, Any], path: str
     ) -> None:
         if _resolve_binding(state, str(gate["subject"])) != gate["equals"]:
-            raise EvaluationError(f"{path} failed")
+            subject = str(gate["subject"])
+            root = subject.split(".", 1)[0]
+            raise ValidationGateError(_resolve_binding(state, root))
 
     @staticmethod
     def _limit(
@@ -595,6 +612,19 @@ def _json_text(value: Any) -> str:
     import json
 
     return json.dumps(value, sort_keys=True, default=str)
+
+
+def _validation_category(evidence: Any) -> str:
+    text = _json_text(evidence).lower()
+    if "syntaxerror" in text or "syntax error" in text:
+        return "syntax_error"
+    if "assertionerror" in text or "assertion failed" in text:
+        return "assertion_failure"
+    if "filenotfounderror" in text or "no such file" in text:
+        return "missing_file"
+    if "traceback" in text or "error" in text:
+        return "runtime_error"
+    return "validation_failure"
 
 
 def _positive_limit(limits: Mapping[str, Any], key: str, default: int) -> int:

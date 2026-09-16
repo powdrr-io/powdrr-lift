@@ -84,6 +84,77 @@ def test_tool_failures_are_structured_for_workrr(tmp_path: Path) -> None:
     }
 
 
+def test_no_op_edits_are_structured_retryable_errors() -> None:
+    executor = StructuredToolExecutor(lambda _tool, _parameters: {"changed": True})
+    result = executor(
+        "edit",
+        {"file_path": "hello.py", "edits": [{"old_text": "x", "new_text": "x"}]},
+    )
+    assert result["error"]["code"] == "no_op_edit"
+    assert result["error"]["retryable"] is True
+
+
+def test_line_edits_are_materialized_for_underlying_executor() -> None:
+    calls: list[tuple[str, Any]] = []
+
+    def execute(tool: str, parameters: Any) -> Any:
+        calls.append((tool, parameters))
+        return "one\ntwo\n" if tool == "read_document" else {"changed": True}
+
+    result = StructuredToolExecutor(execute)(
+        "edit",
+        {
+            "file_path": "hello.py",
+            "edits": [{"start": 1, "end": 1, "new_text": "ONE\n"}],
+        },
+    )
+    assert result == {"changed": True}
+    assert calls[-1] == (
+        "edit",
+        {
+            "file_path": "hello.py",
+            "edits": [{"old_text": "one\n", "new_text": "ONE\n"}],
+        },
+    )
+
+
+def test_line_edit_rejects_replacement_identical_to_source() -> None:
+    executor = StructuredToolExecutor(
+        lambda tool, _parameters: (
+            "one\n" if tool == "read_document" else {"changed": True}
+        )
+    )
+    result = executor(
+        "edit",
+        {
+            "file_path": "hello.py",
+            "edits": [{"start": 1, "end": 1, "new_text": "one\n"}],
+        },
+    )
+    assert result["error"]["code"] == "no_op_edit"
+
+
+def test_replace_lines_shape_is_materialized() -> None:
+    calls: list[tuple[str, Any]] = []
+
+    def execute(tool: str, parameters: Any) -> Any:
+        calls.append((tool, parameters))
+        return "one\ntwo\n" if tool == "read_document" else {"changed": True}
+
+    result = StructuredToolExecutor(execute)(
+        "edit",
+        {
+            "operation": "replace_lines",
+            "file_path": "hello.py",
+            "start_line": 1,
+            "end_line": 1,
+            "replacement": "ONE\n",
+        },
+    )
+    assert result == {"changed": True}
+    assert calls[-1][1]["edits"] == [{"old_text": "one\n", "new_text": "ONE\n"}]
+
+
 def test_structured_executor_exposes_fragment_construction_primitives() -> None:
     executor = StructuredToolExecutor(lambda _tool, _parameters: None)
     state = executor(

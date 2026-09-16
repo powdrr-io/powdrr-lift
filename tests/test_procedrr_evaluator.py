@@ -580,7 +580,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
     from importlib import import_module
 
     build_probe_client = import_module(
-        "powdrr_lift.workflow_prompt_probe"
+        "powdrr_lift.workrr.prompt_probe"
     ).build_probe_client
     document = parse_and_validate(
         Path("docs/procedrr/skill-definitions/execute-proposed-pr.yaml").read_text()

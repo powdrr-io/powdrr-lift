@@ -34,9 +34,9 @@ from powdrr_lift.core.implementation_specification import (
 )
 from powdrr_lift.core.index import (
     _file_change_entity_ids,
+    _load_changelog_documents,
+    _load_changelog_documents_at_ref,
     _normalize_entity_id,
-    build_changelog_index,
-    build_changelog_index_at_ref,
 )
 from powdrr_lift.core.pr_specification import (
     build_pr_specification_validation_report,
@@ -382,11 +382,8 @@ def build_validation_report(
             file_change
         )
 
-    parent_entity_ids = set(
-        build_changelog_index_at_ref(
-            repo_root=repo_root_path,
-            ref=default_branch_name,
-        ).entity_graph.entities
+    parent_entity_ids = _load_entity_ids_from_changelogs_at_ref(
+        repo_root_path, default_branch_name
     )
     proposed_entity_ids = set(proposed_entities_by_id)
 
@@ -1684,15 +1681,28 @@ def _load_available_rationale_ids(repo_root: Path) -> set[str]:
         rationale_ids.update(_load_specification_ids(repo_root, specification_kind))
 
     try:
-        changelog_index = build_changelog_index(repo_root=repo_root)
+        changelog_documents = _load_changelog_documents(repo_root, "docs/changelogs")
     except Exception:  # noqa: BLE001
-        changelog_index = None
+        changelog_documents = []
 
-    if changelog_index is not None:
-        for document in changelog_index.documents:
-            rationale_ids.update(_collect_changelog_defined_ids(document.changelog))
+    for document in changelog_documents:
+        rationale_ids.update(_collect_changelog_defined_ids(document.changelog))
 
     return rationale_ids
+
+
+def _load_entity_ids_from_changelogs_at_ref(repo_root: Path, ref: str) -> set[str]:
+    try:
+        documents = _load_changelog_documents_at_ref(repo_root, ref)
+    except Exception:  # noqa: BLE001
+        return set()
+
+    return {
+        entity_id
+        for document in documents
+        for entity in (document.changelog.entity_changes or [])
+        if (entity_id := _normalize_entity_id(entity.id)) is not None
+    }
 
 
 def _load_specification_ids(repo_root: Path, specification_kind: str) -> set[str]:

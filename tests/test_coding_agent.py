@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from powdrr_lift.cli import main
-from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttemptStore,
     CodingAgentRunner,
@@ -90,17 +90,27 @@ def _git_repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _request() -> ImplementationRequest:
+def _head(worktree: Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _request(base_commit: str = "base") -> ImplementationRequest:
     return ImplementationRequest(
         request_id="request-1",
         objective="Implement the change.",
         prompt="Implement the attached request.",
-        base_commit="base",
+        base_commit=base_commit,
         plan_fingerprint="plan-fingerprint",
         allowed_paths=("src",),
         acceptance_criteria=("the test passes",),
         validation_profiles=("python",),
-        allowed_commands=("python *",),
+        allowed_commands=("python3 *",),
     )
 
 
@@ -127,11 +137,51 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     )
 
 
+def test_execution_plan_compiles_selected_unit_to_worker_request() -> None:
+    request = ImplementationRequest.from_execution_plan(
+        ExecutionPlan(
+            plan_id="plan-1",
+            proposed_pr_fingerprint="plan-fingerprint",
+            units=(
+                ExecutionUnit(
+                    unit_id="hello",
+                    objective="Create the hello world program.",
+                    paths=("hello_world.py",),
+                    validation_profiles=("hello-world-output",),
+                    acceptance_criteria=("the output is correct",),
+                ),
+            ),
+            allowed_paths=("hello_world.py",),
+        ),
+        unit_id="hello",
+        request_id="request-plan",
+        base_commit="abc123",
+        allowed_commands=("python3 *",),
+    )
+
+    assert request.plan_fingerprint == "plan-fingerprint"
+    assert request.allowed_paths == ("hello_world.py",)
+    assert request.validation_profiles == ("hello-world-output",)
+
+
+def test_execution_plan_rejects_unknown_unit() -> None:
+    plan = ExecutionPlan("plan-1", "fingerprint", (), ("src",))
+
+    with pytest.raises(ValueError, match="no unit 'missing'"):
+        ImplementationRequest.from_execution_plan(
+            plan,
+            unit_id="missing",
+            request_id="request-plan",
+            base_commit="abc123",
+        )
+
+
 def test_allowed_worker_result_captures_json_events_and_diff(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(
         FakeProvider("allowed"),
-        _request(),
-        worktree_root=_git_repo(tmp_path),
+        _request(_head(worktree)),
+        worktree_root=worktree,
         attempt_id="attempt-1",
     )
 
@@ -143,10 +193,11 @@ def test_allowed_worker_result_captures_json_events_and_diff(tmp_path: Path) -> 
 
 
 def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(
         FakeProvider("out-of-scope"),
-        _request(),
-        worktree_root=_git_repo(tmp_path),
+        _request(_head(worktree)),
+        worktree_root=worktree,
         attempt_id="attempt-2",
     )
 
@@ -155,15 +206,30 @@ def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
 
 
 def test_worker_commit_is_policy_denied(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(
         FakeProvider("commit"),
-        _request(),
-        worktree_root=_git_repo(tmp_path),
+        _request(_head(worktree)),
+        worktree_root=worktree,
         attempt_id="attempt-3",
     )
 
     assert attempt.status is CodingAgentStatus.POLICY_DENIED
     assert attempt.error == "worker changed HEAD"
+
+
+def test_worker_rejects_worktree_at_wrong_base_commit(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+    attempt = run_coding_agent(
+        FakeProvider("allowed"),
+        _request("different-base"),
+        worktree_root=worktree,
+        attempt_id="attempt-wrong-base",
+    )
+
+    assert attempt.status is CodingAgentStatus.POLICY_DENIED
+    assert "base commit" in (attempt.error or "")
+    assert not (worktree / "src" / "change.py").exists()
 
 
 def test_opencode_policy_is_noninteractive_and_denies_publication() -> None:
@@ -213,11 +279,13 @@ def test_runner_persists_request_and_attempt_artifacts(tmp_path: Path) -> None:
     runner = CodingAgentRunner(FakeProvider("allowed"), store)
 
     attempt = runner.run(
-        _request(), worktree_root=worktree, attempt_id="attempt-persisted"
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-persisted",
     )
 
     assert attempt.status is CodingAgentStatus.COMPLETED
-    assert store.load_request("request-1") == _request()
+    assert store.load_request("request-1") == _request(_head(worktree))
     assert store.load_attempt("attempt-persisted") == attempt
     assert (tmp_path / "artifacts" / "requests" / "request-1.json").exists()
     assert (tmp_path / "artifacts" / "attempts" / "attempt-persisted.json").exists()
@@ -229,7 +297,9 @@ def test_runner_persists_policy_denial_for_dirty_worktree(tmp_path: Path) -> Non
     store = CodingAgentAttemptStore(tmp_path / "artifacts")
 
     attempt = CodingAgentRunner(FakeProvider("allowed"), store).run(
-        _request(), worktree_root=worktree, attempt_id="attempt-dirty"
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-dirty",
     )
 
     assert attempt.status is CodingAgentStatus.POLICY_DENIED
@@ -243,14 +313,14 @@ def test_validation_runner_executes_every_declared_profile_and_persists_report(
 ) -> None:
     worktree = _git_repo(tmp_path / "repo")
     store = CodingAgentAttemptStore(tmp_path / "artifacts")
-    request = _request()
+    request = _request(_head(worktree))
     attempt = CodingAgentRunner(FakeProvider("allowed"), store).run(
         request, worktree_root=worktree, attempt_id="attempt-validation"
     )
     report = ValidationRunner(
         {
             "python": ValidationProfile(
-                "python", ("python", "-c", "print('validation passed')")
+                "python", ("python3", "-c", "print('validation passed')")
             )
         }
     ).run(request, attempt, worktree_root=worktree)
@@ -265,7 +335,7 @@ def test_validation_runner_blocks_unregistered_or_unauthorized_profiles(
     tmp_path: Path,
 ) -> None:
     worktree = _git_repo(tmp_path / "repo")
-    request = _request()
+    request = _request(_head(worktree))
     attempt = run_coding_agent(
         FakeProvider("allowed"), request, worktree_root=worktree, attempt_id="attempt-4"
     )
@@ -280,7 +350,7 @@ def test_validation_runner_blocks_unregistered_or_unauthorized_profiles(
 
 def test_validation_runner_blocks_after_worker_failure(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path / "repo")
-    request = _request()
+    request = _request(_head(worktree))
     attempt = run_coding_agent(
         FakeProvider("out-of-scope"),
         request,
@@ -288,7 +358,7 @@ def test_validation_runner_blocks_after_worker_failure(tmp_path: Path) -> None:
         attempt_id="attempt-5",
     )
     report = ValidationRunner(
-        {"python": ValidationProfile("python", ("python", "-c", "pass"))}
+        {"python": ValidationProfile("python", ("python3", "-c", "pass"))}
     ).run(request, attempt, worktree_root=worktree)
 
     assert report.status is ValidationReportStatus.BLOCKED
@@ -307,7 +377,7 @@ def test_run_coding_agent_cli_persists_and_reports_attempt(
 ) -> None:
     worktree = _git_repo(tmp_path / "repo")
     request_path = tmp_path / "request.json"
-    request_path.write_text(_request().to_json(), encoding="utf-8")
+    request_path.write_text(_request(_head(worktree)).to_json(), encoding="utf-8")
     monkeypatch.setattr(
         "powdrr_lift.cli.OpenCodeProvider",
         lambda **_: FakeProvider("allowed"),
@@ -325,7 +395,7 @@ def test_run_coding_agent_cli_persists_and_reports_attempt(
             "--attempt-id",
             "attempt-cli",
             "--validation-profile",
-            "python=python -c \"print('ok')\"",
+            "python=python3 -c \"print('ok')\"",
         ]
     )
 
@@ -333,3 +403,55 @@ def test_run_coding_agent_cli_persists_and_reports_attempt(
     output = json.loads(capsys.readouterr().out)
     assert output["status"] == "completed"
     assert output["validation"]["status"] == "passed"
+
+
+def test_compile_implementation_request_cli_writes_selected_unit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "execution-plan-v1",
+                "plan_id": "plan-cli",
+                "proposed_pr_fingerprint": "fingerprint-cli",
+                "units": [
+                    {
+                        "unit_id": "hello",
+                        "objective": "Create hello world.",
+                        "paths": ["hello_world.py"],
+                        "validation_profiles": ["hello-world-output"],
+                        "acceptance_criteria": ["output is exact"],
+                    }
+                ],
+                "allowed_paths": ["hello_world.py"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    request_path = tmp_path / "request.json"
+
+    result = main(
+        [
+            "compile-implementation-request",
+            "--plan",
+            str(plan_path),
+            "--unit-id",
+            "hello",
+            "--request-id",
+            "request-cli",
+            "--base-commit",
+            _head(worktree),
+            "--output",
+            str(request_path),
+            "--allowed-command",
+            "python3 *",
+        ]
+    )
+
+    assert result == 0
+    assert json.loads(request_path.read_text(encoding="utf-8"))["request_id"] == (
+        "request-cli"
+    )
+    assert json.loads(capsys.readouterr().out)["plan_fingerprint"] == "fingerprint-cli"

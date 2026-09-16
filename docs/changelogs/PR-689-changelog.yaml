@@ -1,0 +1,108 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 689
+title: Compile implementation requests from execution plans
+intent:
+  problem: The external worker boundary still requires hand-authored request JSON and does not enforce that a worktree is based on the plan's recorded commit.
+  goal: Compile requests from selected execution-plan units and deny provider execution when the worktree base commit differs from the request.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Add execution-plan request compilation and base-commit preflight enforcement.
+    rationale: Make the plan-to-worker handoff reproducible and prevent implementation against stale design or source state.
+    span:
+      start_line: 1
+      end_line: 525
+    related:
+      entities:
+        - execution-plan
+        - implementation-request
+        - external-coding-agent-worker
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Add compile-implementation-request for producing a request artifact from one execution-plan unit.
+    rationale: Provide an inspectable command boundary between validated planning and worker execution.
+    span:
+      start_line: 1900
+      end_line: 4702
+    related:
+      entities:
+        - execution-plan
+        - implementation-request
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Test plan compilation, unknown-unit rejection, CLI request generation, and stale-base denial.
+    rationale: Prove that the real handoff path carries plan identity and refuses stale worktrees.
+    span:
+      start_line: 1
+      end_line: 457
+    related:
+      entities:
+        - execution-plan
+        - implementation-request
+        - external-coding-agent-worker
+  - path: src/powdrr_lift/change_log_validation.py
+    type: modified
+    summary: Load current changelog rationale and parent entity IDs without rebuilding the historical provenance index.
+    rationale: Keep single-changelog validation bounded to current documents and avoid walking every commit in repository history.
+    span:
+      start_line: 1
+      end_line: 1720
+    related:
+      entities:
+        - changelog-validation
+  - path: tests/test_change_log_validation.py
+    type: modified
+    summary: Guard changelog validation against accidentally reintroducing historical commit walks.
+    rationale: Make the bounded validation behavior an executable regression constraint.
+    span:
+      start_line: 1
+      end_line: 500
+    related:
+      entities:
+        - changelog-validation
+  - path: docs/design/external-coding-agent-boundary.md
+    type: modified
+    summary: Document the plan compiler and enforced base-commit precondition.
+    rationale: Keep the source of request fields and the stale-worktree safety boundary explicit.
+    span:
+      start_line: 1
+      end_line: 80
+    related:
+      entities:
+        - execution-plan
+        - implementation-request
+        - external-coding-agent-worker
+entities:
+  - id: execution-plan
+    type: Task
+    action: added
+  - id: implementation-request
+    type: Task
+    action: modified
+  - id: external-coding-agent-worker
+    type: Tool
+    action: modified
+  - id: changelog-validation
+    type: Tool
+    action: added
+entity_relationships:
+  - id: execution-plan-compiles-request
+    source: execution-plan
+    target: implementation-request
+    relationship: produces
+    description: A selected execution-plan unit is compiled into a versioned implementation request carrying its fingerprint, paths, criteria, and validation profiles.
+    rationale: The worker must receive plan-derived constraints rather than an independently authored handoff.
+    action: added
+  - id: request-gates-worker-base
+    source: implementation-request
+    target: external-coding-agent-worker
+    relationship: constrains
+    description: The worker may start only when the target worktree HEAD equals the request base commit.
+    rationale: Prevent stale worktrees from receiving implementation authority for a newer plan.
+    action: modified
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

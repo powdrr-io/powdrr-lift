@@ -1936,6 +1936,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compile_workflow_parser.set_defaults(func=_run_compile_execution_plan)
 
+    request_parser = subparsers.add_parser(
+        "compile-implementation-request",
+        aliases=["compile_implementation_request"],
+        help="Compile one execution-plan unit into a coding-agent request artifact.",
+    )
+    request_parser.add_argument("--plan", type=Path, required=True)
+    request_parser.add_argument("--unit-id", required=True)
+    request_parser.add_argument("--request-id", required=True)
+    request_parser.add_argument("--base-commit", required=True)
+    request_parser.add_argument("--output", type=Path, required=True)
+    request_parser.add_argument(
+        "--context-ref", action="append", default=[], metavar="REFERENCE"
+    )
+    request_parser.add_argument(
+        "--allowed-command", action="append", default=[], metavar="PREFIX"
+    )
+    request_parser.set_defaults(func=_run_compile_implementation_request)
+
     coding_agent_parser = subparsers.add_parser(
         "run-coding-agent",
         aliases=["run_coding_agent"],
@@ -2679,6 +2697,22 @@ def _run_coding_agent(args: argparse.Namespace) -> int:
         attempt.status is not CodingAgentStatus.COMPLETED
         or validation.status is not ValidationReportStatus.PASSED
     )
+
+
+def _run_compile_implementation_request(args: argparse.Namespace) -> int:
+    plan = ExecutionPlan.from_data(_load_structured_mapping(args.plan))
+    request = ImplementationRequest.from_execution_plan(
+        plan,
+        unit_id=args.unit_id,
+        request_id=args.request_id,
+        base_commit=args.base_commit,
+        context_refs=tuple(args.context_ref),
+        allowed_commands=tuple(args.allowed_command),
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(request.to_json(), encoding="utf-8")
+    print(json.dumps(request.to_data(), indent=2, sort_keys=True))
+    return 0
 
 
 def _load_structured_mapping(path: Path) -> dict[str, Any]:

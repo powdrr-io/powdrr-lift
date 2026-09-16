@@ -17,7 +17,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v1"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
@@ -100,6 +100,31 @@ class ImplementationRequest:
             allowed_paths=unit.paths,
             acceptance_criteria=unit.acceptance_criteria,
             validation_profiles=unit.validation_profiles,
+            context_refs=context_refs,
+            allowed_commands=allowed_commands,
+        )
+
+    @classmethod
+    def from_execution_plan(
+        cls,
+        plan: ExecutionPlan,
+        *,
+        unit_id: str,
+        request_id: str,
+        base_commit: str,
+        context_refs: tuple[str, ...] = (),
+        allowed_commands: tuple[str, ...] = (),
+    ) -> ImplementationRequest:
+        """Compile one unit from a typed execution plan into a worker handoff."""
+        try:
+            unit = next(unit for unit in plan.units if unit.unit_id == unit_id)
+        except StopIteration as error:
+            raise ValueError(f"execution plan has no unit {unit_id!r}") from error
+        return cls.from_execution_unit(
+            unit,
+            request_id=request_id,
+            base_commit=base_commit,
+            plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=context_refs,
             allowed_commands=allowed_commands,
         )
@@ -350,6 +375,18 @@ def run_coding_agent(
 ) -> CodingAgentAttempt:
     """Run one worker and derive the result from the observed repository state."""
     before_head = _git_output(worktree_root, "rev-parse", "HEAD")
+    if before_head != request.base_commit:
+        return CodingAgentAttempt(
+            attempt_id,
+            request.request_id,
+            provider.provider_name,
+            CodingAgentStatus.POLICY_DENIED,
+            None,
+            error=(
+                "worktree HEAD does not match implementation request base commit: "
+                f"expected {request.base_commit}, found {before_head}"
+            ),
+        )
     before_status = _working_paths(worktree_root)
     if before_status:
         return CodingAgentAttempt(

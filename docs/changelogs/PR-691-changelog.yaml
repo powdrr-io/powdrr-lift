@@ -1,0 +1,89 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 691
+title: Prove a real OpenCode feature handoff
+intent:
+  problem: The external coding-agent path has deterministic coverage, but it does not yet prove that a structured feature request can drive a real OpenCode edit in the intended worktree and pass post-worker validation.
+  goal: Add an opt-in real-provider hello-world feature test and harden the OpenCode handoff against inherited working-directory confusion and helper-file drift.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Align OpenCode PWD with the requested worktree and clarify that Workrr, not the worker, runs declared validation profiles.
+    rationale: Keep real-provider file operations in the bounded worktree and prevent model-generated validation helpers from expanding the requested diff.
+    span:
+      start_line: 91
+      end_line: 93
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-request
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Assert that the OpenCode subprocess receives the requested worktree as PWD.
+    rationale: Prevent regressions where provider integrations resolve the caller repository instead of the worker worktree.
+    span:
+      start_line: 273
+      end_line: 273
+    related:
+      entities:
+        - external-coding-agent-worker
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Set the subprocess working-directory environment explicitly for OpenCode.
+    rationale: Ensure provider project discovery follows the bounded worktree even when the caller has a different PWD.
+    span:
+      start_line: 234
+      end_line: 237
+    related:
+      entities:
+        - external-coding-agent-worker
+  - path: tests/test_real_opencode_hello_feature.py
+    type: added
+    summary: Run an opt-in real OpenCode feature handoff that adds a second greeting line to an existing hello-world app.
+    rationale: Prove structured planning, request compilation, real provider execution, scope enforcement, validation, and artifact persistence together.
+    span:
+      start_line: 1
+      end_line: 167
+    related:
+      entities:
+        - real-opencode-hello-feature-test
+        - external-coding-agent-worker
+        - implementation-request
+        - implementation-attempt
+  - path: docs/design/external-coding-agent-boundary.md
+    type: modified
+    summary: Document the opt-in real-provider hello-world proof and its runtime requirements.
+    rationale: Make the live acceptance path discoverable while keeping provider cost and credentials out of default CI.
+    span:
+      start_line: 81
+      end_line: 92
+    related:
+      entities:
+        - real-opencode-hello-feature-test
+        - external-coding-agent-worker
+entities:
+  - id: external-coding-agent-worker
+    type: Tool
+    action: modified
+  - id: implementation-request
+    type: Task
+    action: modified
+  - id: implementation-attempt
+    type: Experiment
+    action: modified
+  - id: real-opencode-hello-feature-test
+    type: End-to-end test
+    action: added
+entity_relationships:
+  - id: real-feature-test-verifies-worker-boundary
+    source: real-opencode-hello-feature-test
+    target: external-coding-agent-worker
+    relationship: validates
+    description: The live test verifies that a structured feature request drives a real OpenCode edit only in the requested worktree and that Workrr accepts it only after declared validation passes.
+    rationale: Establish real-provider evidence for the bounded worker contract.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

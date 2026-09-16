@@ -270,6 +270,7 @@ def test_opencode_provider_uses_json_events_and_inline_policy(
     ]
     environment = captured["environment"]
     assert isinstance(environment, dict)
+    assert environment["PWD"] == str(tmp_path.resolve())
     assert json.loads(str(environment["OPENCODE_PERMISSION"]))["question"] == "deny"
 
 

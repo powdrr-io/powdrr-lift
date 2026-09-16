@@ -257,17 +257,20 @@ def run_coding_agent(
     fingerprint = _worktree_fingerprint(worktree_root, changed_paths)
     if before_head != after_head or out_of_scope:
         status = CodingAgentStatus.POLICY_DENIED
-        error = (
+        terminal_error = (
             "worker changed HEAD"
             if before_head != after_head
             else "worker changed paths outside the implementation request"
         )
     elif completed.returncode == 124:
-        status, error = CodingAgentStatus.TIMED_OUT, "coding-agent process timed out"
+        status, terminal_error = (
+            CodingAgentStatus.TIMED_OUT,
+            "coding-agent process timed out",
+        )
     elif completed.returncode == 0:
-        status, error = CodingAgentStatus.COMPLETED, None
+        status, terminal_error = CodingAgentStatus.COMPLETED, None
     else:
-        status, error = CodingAgentStatus.FAILED, "coding-agent process failed"
+        status, terminal_error = CodingAgentStatus.FAILED, "coding-agent process failed"
     return CodingAgentAttempt(
         attempt_id=attempt_id,
         request_id=request.request_id,
@@ -280,7 +283,7 @@ def run_coding_agent(
         events=_json_events(completed.stdout),
         stdout=completed.stdout,
         stderr=completed.stderr,
-        error=error,
+        error=terminal_error,
     )
 
 

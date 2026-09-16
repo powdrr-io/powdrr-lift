@@ -323,7 +323,9 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_structrr_parser.add_argument(
         "--output",
         type=Path,
-        help="Output YAML path (default: docs/structrr/bootstrap-changelog.yaml).",
+        help=(
+            "Output YAML path (default: docs/structrr/baseline-<short-git-hash>.yaml)."
+        ),
     )
     bootstrap_structrr_parser.add_argument(
         "--change-id",

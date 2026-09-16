@@ -410,6 +410,8 @@ class HelloWorldLLM:
                 "done": True,
                 "action": {"id": "done", "file_path": "hello.py", "intent": "complete"},
             }
+        if "What is the smallest safe repair" in question:
+            return {"file_path": "hello.py", "intent": "repair the failing test"}
         if (
             "Is there one remaining validation failure" in question
             or "Are all validations passing" in question

@@ -13,7 +13,7 @@ files:
     rationale: Establish a versioned product/source baseline for rebasing and specifying the first real-repository feature.
     span:
       start_line: 1
-      end_line: 60102
+      end_line: 60065
     related:
       entities:
         - powdrr-structrr-bootstrap-snapshot

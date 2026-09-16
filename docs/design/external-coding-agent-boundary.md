@@ -78,3 +78,18 @@ The fake-provider tests exercise the policy boundary, persistence, and
 validation state machine without requiring an OpenCode installation or model
 credentials. Review feedback, retry budgets, worktree lifecycle, and Structrr
 reconciliation are subsequent slices.
+
+## Deterministic integration harness
+
+`tests/test_coding_agent_end_to_end.py` exercises the complete local handoff
+without a model or provider credentials. It creates a temporary Git repository,
+compiles a real `ExecutionPlan` unit into an implementation request, invokes a
+fake OpenCode executable through the production CLI, runs the request's
+declared validation, and checks the persisted request, attempt, and validation
+artifacts. It also verifies that a failed declared validation produces a
+nonzero command result even when the worker itself completed.
+
+This is the repeatable end-to-end contract for the current slice. A separate,
+opt-in real-provider smoke test can test OpenCode installation, credentials,
+and model behavior without making those external dependencies part of the
+deterministic suite.

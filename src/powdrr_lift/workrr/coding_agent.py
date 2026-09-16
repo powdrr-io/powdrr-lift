@@ -15,7 +15,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from powdrr_lift.core.execution_plan import ExecutionUnit
 
@@ -56,6 +56,22 @@ class ImplementationRequest:
 
     def to_json(self) -> str:
         return json.dumps(self.to_data(), indent=2, sort_keys=True) + "\n"
+
+    @classmethod
+    def from_data(cls, data: Mapping[str, Any]) -> ImplementationRequest:
+        return cls(
+            request_id=cast(str, data["request_id"]),
+            objective=cast(str, data["objective"]),
+            prompt=cast(str, data["prompt"]),
+            base_commit=cast(str, data["base_commit"]),
+            plan_fingerprint=cast(str, data["plan_fingerprint"]),
+            allowed_paths=tuple(cast(list[str], data["allowed_paths"])),
+            acceptance_criteria=tuple(cast(list[str], data["acceptance_criteria"])),
+            validation_profiles=tuple(cast(list[str], data["validation_profiles"])),
+            context_refs=tuple(cast(list[str], data.get("context_refs", []))),
+            allowed_commands=tuple(cast(list[str], data.get("allowed_commands", []))),
+            schema_version=cast(str, data["schema_version"]),
+        )
 
     @classmethod
     def from_execution_unit(
@@ -215,6 +231,93 @@ class OpenCodeProvider:
             return subprocess.CompletedProcess(command, 124, stdout, stderr)
 
 
+class CodingAgentAttemptStore:
+    """Persist worker requests and observations for one Workrr run."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.requests_root = root / "requests"
+        self.attempts_root = root / "attempts"
+
+    def save_request(self, request: ImplementationRequest) -> Path:
+        path = self._path(self.requests_root, request.request_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(request.to_json(), encoding="utf-8")
+        return path
+
+    def save_attempt(self, attempt: CodingAgentAttempt) -> Path:
+        path = self._path(self.attempts_root, attempt.attempt_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(attempt.to_data(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def load_request(self, request_id: str) -> ImplementationRequest:
+        data = json.loads(
+            self._path(self.requests_root, request_id).read_text(encoding="utf-8")
+        )
+        if not isinstance(data, dict):
+            raise ValueError("implementation request artifact must contain an object")
+        return ImplementationRequest.from_data(data)
+
+    def load_attempt(self, attempt_id: str) -> CodingAgentAttempt:
+        data = json.loads(
+            self._path(self.attempts_root, attempt_id).read_text(encoding="utf-8")
+        )
+        if not isinstance(data, dict):
+            raise ValueError("implementation attempt artifact must contain an object")
+        return CodingAgentAttempt(
+            attempt_id=cast(str, data["attempt_id"]),
+            request_id=cast(str, data["request_id"]),
+            provider=cast(str, data["provider"]),
+            status=CodingAgentStatus(cast(str, data["status"])),
+            exit_code=cast(int | None, data["exit_code"]),
+            changed_paths=tuple(cast(list[str], data.get("changed_paths", []))),
+            out_of_scope_paths=tuple(
+                cast(list[str], data.get("out_of_scope_paths", []))
+            ),
+            diff_fingerprint=cast(str | None, data.get("diff_fingerprint")),
+            events=tuple(cast(list[Mapping[str, Any]], data.get("events", []))),
+            stdout=cast(str, data.get("stdout", "")),
+            stderr=cast(str, data.get("stderr", "")),
+            error=cast(str | None, data.get("error")),
+            schema_version=cast(str, data["schema_version"]),
+        )
+
+    @staticmethod
+    def _path(root: Path, artifact_id: str) -> Path:
+        if not artifact_id or Path(artifact_id).name != artifact_id:
+            raise ValueError("artifact ids must be simple file names")
+        return root / f"{artifact_id}.json"
+
+
+@dataclass(slots=True)
+class CodingAgentRunner:
+    """Execute and persist one bounded implementation attempt."""
+
+    provider: CodingAgentProvider
+    store: CodingAgentAttemptStore
+
+    def run(
+        self,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> CodingAgentAttempt:
+        self.store.save_request(request)
+        attempt = run_coding_agent(
+            self.provider,
+            request,
+            worktree_root=worktree_root,
+            attempt_id=attempt_id,
+        )
+        self.store.save_attempt(attempt)
+        return attempt
+
+
 def run_coding_agent(
     provider: CodingAgentProvider,
     request: ImplementationRequest,
@@ -351,8 +454,10 @@ __all__ = [
     "CODING_AGENT_ATTEMPT_SCHEMA_VERSION",
     "CODING_AGENT_REQUEST_SCHEMA_VERSION",
     "CodingAgentAttempt",
+    "CodingAgentAttemptStore",
     "CodingAgentProvider",
     "CodingAgentStatus",
+    "CodingAgentRunner",
     "ImplementationRequest",
     "OpenCodePermissionPolicy",
     "OpenCodeProvider",

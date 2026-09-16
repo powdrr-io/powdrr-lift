@@ -150,6 +150,14 @@ from powdrr_lift.workrr.chat_agent import (
 )
 from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
 from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
+from powdrr_lift.workrr.coding_agent import (
+    CodingAgentAttemptStore,
+    CodingAgentRunner,
+    CodingAgentStatus,
+    ImplementationRequest,
+    OpenCodePermissionPolicy,
+    OpenCodeProvider,
+)
 from powdrr_lift.workrr.definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
@@ -1923,6 +1931,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compile_workflow_parser.set_defaults(func=_run_compile_execution_plan)
 
+    coding_agent_parser = subparsers.add_parser(
+        "run-coding-agent",
+        aliases=["run_coding_agent"],
+        help="Run one bounded external coding-agent implementation attempt.",
+    )
+    coding_agent_parser.add_argument(
+        "--request",
+        type=Path,
+        required=True,
+        help="Implementation request JSON produced from a validated execution unit.",
+    )
+    coding_agent_parser.add_argument(
+        "--worktree",
+        type=Path,
+        required=True,
+        help="Clean dedicated worktree in which the worker may edit.",
+    )
+    coding_agent_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="Directory for persisted request and attempt artifacts.",
+    )
+    coding_agent_parser.add_argument("--attempt-id", required=True)
+    coding_agent_parser.add_argument(
+        "--opencode-executable",
+        default="opencode",
+        help="OpenCode executable name or path.",
+    )
+    coding_agent_parser.add_argument("--timeout-seconds", type=float, default=1800.0)
+    coding_agent_parser.set_defaults(func=_run_coding_agent)
+
     workflow_recovery_parser = subparsers.add_parser(
         "workflow-recovery",
         aliases=["workflow_recovery"],
@@ -2589,6 +2629,27 @@ def _run_compile_execution_plan(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _run_coding_agent(args: argparse.Namespace) -> int:
+    request_data = _load_structured_mapping(args.request)
+    request = ImplementationRequest.from_data(request_data)
+    provider = OpenCodeProvider(
+        executable=args.opencode_executable,
+        timeout_seconds=args.timeout_seconds,
+        permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
+    )
+    runner = CodingAgentRunner(
+        provider=provider,
+        store=CodingAgentAttemptStore(args.output_dir),
+    )
+    attempt = runner.run(
+        request,
+        worktree_root=args.worktree,
+        attempt_id=args.attempt_id,
+    )
+    print(json.dumps(attempt.to_data(), indent=2, sort_keys=True))
+    return 0 if attempt.status is CodingAgentStatus.COMPLETED else 1
 
 
 def _load_structured_mapping(path: Path) -> dict[str, Any]:

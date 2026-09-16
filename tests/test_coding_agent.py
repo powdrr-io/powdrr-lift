@@ -6,8 +6,11 @@ from pathlib import Path
 
 import pytest
 
+from powdrr_lift.cli import main
 from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.workrr.coding_agent import (
+    CodingAgentAttemptStore,
+    CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
     OpenCodePermissionPolicy,
@@ -194,3 +197,63 @@ def test_opencode_provider_uses_json_events_and_inline_policy(
     environment = captured["environment"]
     assert isinstance(environment, dict)
     assert json.loads(str(environment["OPENCODE_PERMISSION"]))["question"] == "deny"
+
+
+def test_runner_persists_request_and_attempt_artifacts(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    store = CodingAgentAttemptStore(tmp_path / "artifacts")
+    runner = CodingAgentRunner(FakeProvider("allowed"), store)
+
+    attempt = runner.run(
+        _request(), worktree_root=worktree, attempt_id="attempt-persisted"
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert store.load_request("request-1") == _request()
+    assert store.load_attempt("attempt-persisted") == attempt
+    assert (tmp_path / "artifacts" / "requests" / "request-1.json").exists()
+    assert (tmp_path / "artifacts" / "attempts" / "attempt-persisted.json").exists()
+
+
+def test_runner_persists_policy_denial_for_dirty_worktree(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    (worktree / "README.md").write_text("already dirty\n")
+    store = CodingAgentAttemptStore(tmp_path / "artifacts")
+
+    attempt = CodingAgentRunner(FakeProvider("allowed"), store).run(
+        _request(), worktree_root=worktree, attempt_id="attempt-dirty"
+    )
+
+    assert attempt.status is CodingAgentStatus.POLICY_DENIED
+    assert store.load_attempt("attempt-dirty").error == (
+        "coding-agent worktree must be clean before an attempt"
+    )
+
+
+def test_run_coding_agent_cli_persists_and_reports_attempt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request_path = tmp_path / "request.json"
+    request_path.write_text(_request().to_json(), encoding="utf-8")
+    monkeypatch.setattr(
+        "powdrr_lift.cli.OpenCodeProvider",
+        lambda **_: FakeProvider("allowed"),
+    )
+
+    result = main(
+        [
+            "run-coding-agent",
+            "--request",
+            str(request_path),
+            "--worktree",
+            str(worktree),
+            "--output-dir",
+            str(tmp_path / "artifacts"),
+            "--attempt-id",
+            "attempt-cli",
+        ]
+    )
+
+    assert result == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "completed"

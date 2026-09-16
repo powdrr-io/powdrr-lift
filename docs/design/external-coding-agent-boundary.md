@@ -4,7 +4,7 @@ Workrr can use an external coding agent as an implementation worker after a
 Structrr/Procedrr plan has been validated. The worker is not the owner of the
 plan, product context, workflow state, or publication.
 
-The first slice defines two versioned artifacts:
+The worker boundary defines two versioned artifacts:
 
 - `implementation-request-v1`: the bounded handoff to a worker. It carries the
   objective, base commit, plan fingerprint, allowed paths, acceptance criteria,
@@ -16,6 +16,24 @@ The first slice defines two versioned artifacts:
 `ImplementationRequest.from_execution_unit` is the first compiler boundary
 from the existing validated execution-plan model into this worker protocol.
 The request prompt is deliberately only a rendering of the typed request.
+
+## Persisted runner
+
+`CodingAgentAttemptStore` persists requests and attempts as individual JSON
+artifacts. The request is saved before provider invocation and the attempt is
+saved for every terminal outcome, including policy denials and provider
+failures. This gives Workrr an explicit record that the handoff occurred and
+lets later validation or review load the exact request and observed result.
+
+`CodingAgentRunner` owns that persistence boundary while keeping provider
+invocation replaceable. It accepts an already-created clean worktree for this
+slice; worktree creation and lifecycle management remain separate concerns.
+
+The `run-coding-agent` CLI command is the initial operational entry point. It
+loads a JSON or YAML implementation request, invokes the bounded OpenCode
+provider, writes the request and attempt artifacts, and emits the terminal
+attempt as JSON. A non-completed attempt exits nonzero, so callers cannot
+mistake a denied or failed worker invocation for successful implementation.
 
 ## OpenCode adapter
 
@@ -33,6 +51,7 @@ before and after invocation and derives changed paths from Git state. A worker
 that commits, changes an out-of-scope path, or starts from a dirty worktree is
 not accepted as a normal completed attempt.
 
-The fake-provider tests exercise the policy boundary without requiring an
-OpenCode installation or model credentials. Review feedback, validation
-execution, retry budgets, and Structrr reconciliation are subsequent slices.
+The fake-provider tests exercise the policy boundary and persistence without
+requiring an OpenCode installation or model credentials. Review feedback,
+validation execution, retry budgets, worktree lifecycle, and Structrr
+reconciliation are subsequent slices.

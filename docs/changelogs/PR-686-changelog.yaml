@@ -1,0 +1,81 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 686
+title: Add bounded external coding-agent worker boundary
+intent:
+  problem: Workrr needs a safe handoff boundary when another coding agent performs implementation edits after a validated plan.
+  goal: Define a versioned implementation request, observe bounded worker attempts, and provide an OpenCode adapter without giving the worker orchestration or publication authority.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: added
+    summary: Define implementation-request and implementation-attempt contracts, OpenCode invocation, permission policy, and worktree scope enforcement.
+    rationale: Make an external coding agent a replaceable, untrusted worker behind a Workrr-owned protocol.
+    span:
+      start_line: 1
+      end_line: 347
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-request
+        - implementation-attempt
+  - path: src/powdrr_lift/workrr/__init__.py
+    type: modified
+    summary: Export the external coding-agent worker contracts.
+    rationale: Keep the worker boundary available through the Workrr package API.
+    span:
+      start_line: 1
+      end_line: 103
+    related:
+      entities:
+        - external-coding-agent-worker
+  - path: tests/test_coding_agent.py
+    type: added
+    summary: Test execution-unit compilation, JSON event capture, scope enforcement, commit rejection, and OpenCode policy construction.
+    rationale: Prove the worker boundary deterministically without invoking a real model.
+    span:
+      start_line: 1
+      end_line: 185
+    related:
+      entities:
+        - external-coding-agent-worker
+        - implementation-attempt
+  - path: docs/design/external-coding-agent-boundary.md
+    type: added
+    summary: Document the first external coding-agent handoff slice and its deferred responsibilities.
+    rationale: Keep the boundary explicit as later review and reconciliation slices are added.
+    span:
+      start_line: 1
+      end_line: 36
+    related:
+      entities:
+        - external-coding-agent-worker
+entities:
+  - id: external-coding-agent-worker
+    type: Tool
+    action: added
+  - id: implementation-request
+    type: Task
+    action: added
+  - id: implementation-attempt
+    type: Experiment
+    action: added
+entity_relationships:
+  - id: request-bounds-worker
+    source: implementation-request
+    target: external-coding-agent-worker
+    relationship: constrains
+    description: Workrr supplies the worker with scoped paths, acceptance criteria, validation profiles, and selected context references.
+    rationale: The worker should implement a validated unit without owning workflow decisions.
+    action: added
+  - id: attempt-observes-worker
+    source: implementation-attempt
+    target: external-coding-agent-worker
+    relationship: observes
+    description: Workrr records the worker exit result, events, changed paths, and diff fingerprint.
+    rationale: Acceptance must be based on observed repository state rather than worker claims.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -158,6 +158,11 @@ from powdrr_lift.workrr.coding_agent import (
     OpenCodePermissionPolicy,
     OpenCodeProvider,
 )
+from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationReportStatus,
+    ValidationRunner,
+    parse_validation_profile,
+)
 from powdrr_lift.workrr.definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
@@ -1956,11 +1961,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     coding_agent_parser.add_argument("--attempt-id", required=True)
     coding_agent_parser.add_argument(
+        "--validation-profile",
+        action="append",
+        default=[],
+        metavar="NAME=COMMAND",
+        help="Registered validation profile, repeatable; COMMAND is parsed as argv.",
+    )
+    coding_agent_parser.add_argument(
         "--opencode-executable",
         default="opencode",
         help="OpenCode executable name or path.",
     )
     coding_agent_parser.add_argument("--timeout-seconds", type=float, default=1800.0)
+    coding_agent_parser.add_argument(
+        "--validation-timeout-seconds", type=float, default=600.0
+    )
     coding_agent_parser.set_defaults(func=_run_coding_agent)
 
     workflow_recovery_parser = subparsers.add_parser(
@@ -2643,13 +2658,27 @@ def _run_coding_agent(args: argparse.Namespace) -> int:
         provider=provider,
         store=CodingAgentAttemptStore(args.output_dir),
     )
+    store = runner.store
     attempt = runner.run(
         request,
         worktree_root=args.worktree,
         attempt_id=args.attempt_id,
     )
-    print(json.dumps(attempt.to_data(), indent=2, sort_keys=True))
-    return 0 if attempt.status is CodingAgentStatus.COMPLETED else 1
+    profiles = {}
+    for value in args.validation_profile:
+        profile = parse_validation_profile(value)
+        profiles[profile.name] = profile
+    validation = ValidationRunner(
+        profiles, timeout_seconds=args.validation_timeout_seconds
+    ).run(request, attempt, worktree_root=args.worktree)
+    store.save_validation_report(validation)
+    output = attempt.to_data()
+    output["validation"] = validation.to_data()
+    print(json.dumps(output, indent=2, sort_keys=True))
+    return int(
+        attempt.status is not CodingAgentStatus.COMPLETED
+        or validation.status is not ValidationReportStatus.PASSED
+    )
 
 
 def _load_structured_mapping(path: Path) -> dict[str, Any]:

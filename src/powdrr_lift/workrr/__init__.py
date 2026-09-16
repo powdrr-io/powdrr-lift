@@ -19,6 +19,16 @@ from powdrr_lift.workrr.coding_agent import (
     OpenCodeProvider,
     run_coding_agent,
 )
+from powdrr_lift.workrr.coding_agent_validation import (
+    CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION,
+    ValidationProfile,
+    ValidationReport,
+    ValidationReportStatus,
+    ValidationResult,
+    ValidationResultStatus,
+    ValidationRunner,
+    parse_validation_profile,
+)
 from powdrr_lift.workrr.context import WorkflowContext
 from powdrr_lift.workrr.exchanges import ExchangeRecordingClient
 from powdrr_lift.workrr.loop import (
@@ -105,4 +115,12 @@ __all__ = [
     "OpenCodePermissionPolicy",
     "OpenCodeProvider",
     "run_coding_agent",
+    "CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION",
+    "ValidationProfile",
+    "ValidationReport",
+    "ValidationReportStatus",
+    "ValidationResult",
+    "ValidationResultStatus",
+    "ValidationRunner",
+    "parse_validation_profile",
 ]

@@ -17,6 +17,13 @@ from powdrr_lift.workrr.coding_agent import (
     OpenCodeProvider,
     run_coding_agent,
 )
+from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationProfile,
+    ValidationReportStatus,
+    ValidationResultStatus,
+    ValidationRunner,
+    parse_validation_profile,
+)
 
 
 class FakeProvider:
@@ -93,6 +100,7 @@ def _request() -> ImplementationRequest:
         allowed_paths=("src",),
         acceptance_criteria=("the test passes",),
         validation_profiles=("python",),
+        allowed_commands=("python *",),
     )
 
 
@@ -230,6 +238,70 @@ def test_runner_persists_policy_denial_for_dirty_worktree(tmp_path: Path) -> Non
     )
 
 
+def test_validation_runner_executes_every_declared_profile_and_persists_report(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    store = CodingAgentAttemptStore(tmp_path / "artifacts")
+    request = _request()
+    attempt = CodingAgentRunner(FakeProvider("allowed"), store).run(
+        request, worktree_root=worktree, attempt_id="attempt-validation"
+    )
+    report = ValidationRunner(
+        {
+            "python": ValidationProfile(
+                "python", ("python", "-c", "print('validation passed')")
+            )
+        }
+    ).run(request, attempt, worktree_root=worktree)
+
+    assert report.status is ValidationReportStatus.PASSED
+    assert report.results[0].status is ValidationResultStatus.PASSED
+    store.save_validation_report(report)
+    assert store.load_validation_report("attempt-validation") == report
+
+
+def test_validation_runner_blocks_unregistered_or_unauthorized_profiles(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request = _request()
+    attempt = run_coding_agent(
+        FakeProvider("allowed"), request, worktree_root=worktree, attempt_id="attempt-4"
+    )
+    report = ValidationRunner(
+        {"python": ValidationProfile("python", ("ruff", "check", "."))}
+    ).run(request, attempt, worktree_root=worktree)
+
+    assert report.status is ValidationReportStatus.BLOCKED
+    assert report.results[0].status is ValidationResultStatus.BLOCKED
+    assert "not allowed" in (report.results[0].error or "")
+
+
+def test_validation_runner_blocks_after_worker_failure(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request = _request()
+    attempt = run_coding_agent(
+        FakeProvider("out-of-scope"),
+        request,
+        worktree_root=worktree,
+        attempt_id="attempt-5",
+    )
+    report = ValidationRunner(
+        {"python": ValidationProfile("python", ("python", "-c", "pass"))}
+    ).run(request, attempt, worktree_root=worktree)
+
+    assert report.status is ValidationReportStatus.BLOCKED
+    assert report.results[0].status is ValidationResultStatus.BLOCKED
+
+
+def test_parse_validation_profile_uses_argv_not_shell() -> None:
+    profile = parse_validation_profile("unit-tests=python -m pytest tests -q")
+
+    assert profile.name == "unit-tests"
+    assert profile.command == ("python", "-m", "pytest", "tests", "-q")
+
+
 def test_run_coding_agent_cli_persists_and_reports_attempt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -252,8 +324,12 @@ def test_run_coding_agent_cli_persists_and_reports_attempt(
             str(tmp_path / "artifacts"),
             "--attempt-id",
             "attempt-cli",
+            "--validation-profile",
+            "python=python -c \"print('ok')\"",
         ]
     )
 
     assert result == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "completed"
+    output = json.loads(capsys.readouterr().out)
+    assert output["status"] == "completed"
+    assert output["validation"]["status"] == "passed"

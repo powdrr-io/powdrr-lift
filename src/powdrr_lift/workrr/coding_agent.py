@@ -254,6 +254,29 @@ class CodingAgentAttemptStore:
         )
         return path
 
+    def save_validation_report(self, report: Any) -> Path:
+        path = self._path(self.root / "validations", report.attempt_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(report.to_data(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def load_validation_report(self, attempt_id: str) -> Any:
+        from powdrr_lift.workrr.coding_agent_validation import (
+            validation_report_from_data,
+        )
+
+        data = json.loads(
+            self._path(self.root / "validations", attempt_id).read_text(
+                encoding="utf-8"
+            )
+        )
+        if not isinstance(data, dict):
+            raise ValueError("validation report artifact must contain an object")
+        return validation_report_from_data(data)
+
     def load_request(self, request_id: str) -> ImplementationRequest:
         data = json.loads(
             self._path(self.requests_root, request_id).read_text(encoding="utf-8")

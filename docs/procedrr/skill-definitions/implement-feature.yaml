@@ -19,8 +19,8 @@ steps:
         feature_description: {type: reference, value: feature_description}
       outputs:
         interview_input: interview_input
-        proposal: proposal_template
-        proposal_evaluation: final_proposal_evaluation
+        proposal: proposal
+        proposal_evaluation: proposal_evaluation
   - operation:
       tool: internal
       command: [plan_structrr_diff]

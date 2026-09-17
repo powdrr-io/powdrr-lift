@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shlex
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -196,9 +197,15 @@ class ValidationRunner:
                 error="validation command is not allowed by the implementation request",
             )
         try:
+            environment = os.environ.copy()
+            # Validation runs in the worker worktree. Ignore any activated
+            # environment belonging to the caller's checkout so uv resolves
+            # the project from this worktree.
+            environment.pop("VIRTUAL_ENV", None)
             completed = subprocess.run(
                 list(profile.command),
                 cwd=worktree_root,
+                env=environment,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout_seconds,

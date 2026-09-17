@@ -127,6 +127,12 @@ def test_execution_unit_compiles_to_worker_request() -> None:
             paths=("src/powdrr_lift/workrr",),
             validation_profiles=("unit-tests",),
             acceptance_criteria=("the adapter is bounded",),
+            planned_additions=(
+                {"section": "features", "id": "worker-adapter", "action": "added"},
+            ),
+            planned_deletions=(
+                {"section": "features", "id": "old-adapter", "action": "removed"},
+            ),
         ),
         request_id="request-1",
         base_commit="abc123",
@@ -138,6 +144,10 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     assert request.context_refs == ("entity:worker-adapter",)
     assert "unit-1" in request.prompt
     assert "Acceptance criteria:\n- the adapter is bounded" in request.prompt
+    assert "Planned Structrr additions" in request.prompt
+    assert '"id": "worker-adapter"' in request.prompt
+    assert "Planned Structrr deletions" in request.prompt
+    assert '"id": "old-adapter"' in request.prompt
     assert "Validation profiles Workrr will run: unit-tests" in request.prompt
     assert (
         json.loads(request.to_json())["schema_version"] == "implementation-request-v1"
@@ -167,6 +177,11 @@ def test_opencode_provider_pins_requested_model(
     command = captured["command"]
     assert isinstance(command, list)
     assert command[command.index("--model") + 1] == "deepinfra/deepseek-flash"
+    kwargs = captured["kwargs"]
+    assert isinstance(kwargs, dict)
+    environment = kwargs["env"]
+    assert isinstance(environment, dict)
+    assert environment.get("VIRTUAL_ENV") is None
 
 
 def test_execution_plan_compiles_selected_unit_to_worker_request() -> None:
@@ -371,9 +386,10 @@ def test_runner_persists_policy_denial_for_dirty_worktree(tmp_path: Path) -> Non
 
 
 def test_validation_runner_executes_every_declared_profile_and_persists_report(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     worktree = _git_repo(tmp_path / "repo")
+    monkeypatch.setenv("VIRTUAL_ENV", "/another-checkout/.venv")
     store = CodingAgentAttemptStore(tmp_path / "artifacts")
     request = _request(_head(worktree))
     attempt = CodingAgentRunner(FakeProvider("allowed"), store).run(
@@ -382,7 +398,12 @@ def test_validation_runner_executes_every_declared_profile_and_persists_report(
     report = ValidationRunner(
         {
             "python": ValidationProfile(
-                "python", ("python3", "-c", "print('validation passed')")
+                "python",
+                (
+                    "python3",
+                    "-c",
+                    "import os; assert not os.environ.get('VIRTUAL_ENV')",
+                ),
             )
         }
     ).run(request, attempt, worktree_root=worktree)

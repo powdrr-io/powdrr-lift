@@ -39,6 +39,8 @@ class ImplementationRequest:
     context_refs: tuple[str, ...] = ()
     allowed_commands: tuple[str, ...] = ()
     ephemeral_paths: tuple[str, ...] = ()
+    planned_additions: tuple[Mapping[str, Any], ...] = ()
+    planned_deletions: tuple[Mapping[str, Any], ...] = ()
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
@@ -55,6 +57,8 @@ class ImplementationRequest:
             "context_refs": list(self.context_refs),
             "allowed_commands": list(self.allowed_commands),
             "ephemeral_paths": list(self.ephemeral_paths),
+            "planned_additions": [dict(item) for item in self.planned_additions],
+            "planned_deletions": [dict(item) for item in self.planned_deletions],
         }
 
     def to_json(self) -> str:
@@ -74,6 +78,12 @@ class ImplementationRequest:
             context_refs=tuple(cast(list[str], data.get("context_refs", []))),
             allowed_commands=tuple(cast(list[str], data.get("allowed_commands", []))),
             ephemeral_paths=tuple(cast(list[str], data.get("ephemeral_paths", []))),
+            planned_additions=tuple(
+                cast(list[Mapping[str, Any]], data.get("planned_additions", []))
+            ),
+            planned_deletions=tuple(
+                cast(list[Mapping[str, Any]], data.get("planned_deletions", []))
+            ),
             schema_version=cast(str, data["schema_version"]),
         )
 
@@ -96,12 +106,18 @@ class ImplementationRequest:
         validation_profiles = ", ".join(unit.validation_profiles) or "none"
         allowed_paths = ", ".join(unit.paths) or "none"
         ephemeral_paths = ", ".join(unit.ephemeral_paths) or "none"
+        planned_additions = _format_planned_changes(unit.planned_additions)
+        planned_deletions = _format_planned_changes(unit.planned_deletions)
         prompt = (
             f"Implement execution unit {unit.unit_id}: {unit.objective}\n\n"
             f"Allowed paths: {allowed_paths}\n"
             "Ephemeral paths (Workrr removes these after the attempt): "
             f"{ephemeral_paths}\n"
             f"Acceptance criteria:\n{criteria}\n"
+            "Planned Structrr additions (implement these intentionally):\n"
+            f"{planned_additions}\n"
+            "Planned Structrr deletions (remove or retire these intentionally):\n"
+            f"{planned_deletions}\n"
             f"Validation profiles Workrr will run: {validation_profiles}\n\n"
             "Use only the allowed paths or declared ephemeral paths. Temporary "
             "helpers are permitted only in the declared ephemeral paths; Workrr "
@@ -121,6 +137,8 @@ class ImplementationRequest:
             context_refs=context_refs,
             allowed_commands=allowed_commands,
             ephemeral_paths=unit.ephemeral_paths,
+            planned_additions=unit.planned_additions,
+            planned_deletions=unit.planned_deletions,
         )
 
     @classmethod
@@ -147,6 +165,15 @@ class ImplementationRequest:
             context_refs=context_refs,
             allowed_commands=allowed_commands,
         )
+
+
+def _format_planned_changes(changes: Sequence[Mapping[str, Any]]) -> str:
+    if not changes:
+        return "- None declared. Do not invent additional product changes."
+    return "\n".join(
+        f"- {json.dumps(dict(change), sort_keys=True, ensure_ascii=False)}"
+        for change in changes
+    )
 
 
 class CodingAgentStatus(StrEnum):
@@ -250,6 +277,9 @@ class OpenCodeProvider:
     ) -> subprocess.CompletedProcess[str]:
         del attempt_id
         environment = os.environ.copy()
+        # Do not let a caller's activated environment point uv at another
+        # checkout when the worker runs inside its own worktree.
+        environment.pop("VIRTUAL_ENV", None)
         # Some OpenCode integrations resolve the project root from PWD rather
         # than the subprocess cwd. Keep both locations aligned so a worker
         # cannot accidentally inspect or edit the caller's repository.

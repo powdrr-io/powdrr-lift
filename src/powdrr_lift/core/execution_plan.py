@@ -19,6 +19,8 @@ class ExecutionUnit:
     validation_profiles: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = ()
     ephemeral_paths: tuple[str, ...] = ()
+    planned_additions: tuple[dict[str, Any], ...] = ()
+    planned_deletions: tuple[dict[str, Any], ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -29,6 +31,8 @@ class ExecutionUnit:
             "validation_profiles": list(self.validation_profiles),
             "acceptance_criteria": list(self.acceptance_criteria),
             "ephemeral_paths": list(self.ephemeral_paths),
+            "planned_additions": list(self.planned_additions),
+            "planned_deletions": list(self.planned_deletions),
         }
 
 
@@ -67,6 +71,8 @@ class ExecutionPlan:
                 tuple(item.get("validation_profiles", ())),
                 tuple(item.get("acceptance_criteria", ())),
                 tuple(item.get("ephemeral_paths", ())),
+                tuple(item.get("planned_additions", ())),
+                tuple(item.get("planned_deletions", ())),
             )
             for item in data["units"]
         )

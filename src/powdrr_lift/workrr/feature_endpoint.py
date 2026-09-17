@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -396,6 +396,9 @@ def _run_opencode_phase(
         raise PowdrrExecutionError("implementation inputs do not match the plan state")
     feature_description = _require_flow_text(parameters, "feature_description")
     _require_flow_text(parameters, "work_item_name")
+    planned_additions, planned_deletions, acceptance_criteria = (
+        _load_implementation_plan(plan_path, feature_description)
+    )
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
@@ -409,10 +412,9 @@ def _run_opencode_phase(
                 objective=feature_description,
                 paths=config.allowed_paths,
                 validation_profiles=("feature-validation",),
-                acceptance_criteria=(
-                    "The requested feature behavior is implemented.",
-                    "Only the declared implementation paths are changed.",
-                ),
+                acceptance_criteria=acceptance_criteria,
+                planned_additions=planned_additions,
+                planned_deletions=planned_deletions,
             ),
         ),
         allowed_paths=config.allowed_paths,
@@ -449,6 +451,53 @@ def _run_opencode_phase(
         attempt_store=attempt_store,
     )
     return {"request_id": request.request_id, "attempt": attempt.to_data()}
+
+
+def _load_implementation_plan(
+    path: Path, feature_description: str
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...], tuple[str, ...]]:
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PowdrrExecutionError(
+            f"could not read Structrr plan {path}: {error}"
+        ) from error
+    if not isinstance(raw, Mapping):
+        raise PowdrrExecutionError(f"Structrr plan {path} must contain a mapping")
+
+    additions: list[dict[str, Any]] = []
+    deletions: list[dict[str, Any]] = []
+    for section, value in raw.items():
+        if not isinstance(section, str) or not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, Mapping):
+                continue
+            action = item.get("action")
+            if action not in {"added", "deleted", "removed"}:
+                continue
+            planned = {"section": section, **dict(item)}
+            if action == "added":
+                additions.append(planned)
+            else:
+                deletions.append(planned)
+
+    criteria: list[str] = []
+    raw_criteria = raw.get("acceptance_criteria")
+    if isinstance(raw_criteria, list):
+        for item in raw_criteria:
+            if isinstance(item, str) and item.strip():
+                criteria.append(item.strip())
+            elif isinstance(item, Mapping):
+                description = item.get("description", item.get("text"))
+                if isinstance(description, str) and description.strip():
+                    criteria.append(description.strip())
+    if not criteria:
+        criteria.append(
+            f"The requested feature behavior is implemented: {feature_description}"
+        )
+    criteria.append("Only the declared implementation paths are changed.")
+    return tuple(additions), tuple(deletions), tuple(dict.fromkeys(criteria))
 
 
 def _validate_implementation_phase(
@@ -596,6 +645,13 @@ def _write_structrr_plan(
         ],
         "invariants": sections["invariants"],
         "guidance": sections["guidance"],
+        "acceptance_criteria": _plan_text_items(
+            sections["acceptance_criteria"],
+            fallback=(
+                f"The requested feature behavior is implemented: "
+                f"{config.feature_description}"
+            ),
+        ),
         "proposed_prs": sections["proposed_prs"],
     }
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
@@ -617,6 +673,18 @@ def _interview_edits(value: Any) -> list[dict[str, Any]]:
             if isinstance(item, Mapping):
                 edits.append({**item, "action": action})
     return edits
+
+
+def _plan_text_items(items: Sequence[Mapping[str, Any]], *, fallback: str) -> list[str]:
+    values: list[str] = []
+    for item in items:
+        description = item.get("description")
+        if isinstance(description, str) and description.strip():
+            values.append(description.strip())
+            continue
+        if isinstance(item.get("text"), str) and item["text"].strip():
+            values.append(item["text"].strip())
+    return values or [fallback]
 
 
 def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:

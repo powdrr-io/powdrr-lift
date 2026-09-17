@@ -21,6 +21,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
     _ensure_current_baseline,
+    _load_implementation_plan,
     _validate_procedrr_flow,
     review_feature_diff,
 )
@@ -149,6 +150,52 @@ def test_feature_flow_is_shared_and_validated() -> None:
 
     assert validated == (Path.cwd() / path).resolve()
     assert not any(Path("docs/proposals").glob("*/procedrr-flow.yaml"))
+
+
+def test_implementation_plan_exposes_changes_and_acceptance_criteria(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan.write_text(
+        """
+acceptance_criteria:
+  - The transcript is ordered by execution.
+features:
+  - id: step-transcript
+    action: added
+    description: Record each step.
+invariants:
+  - id: old-invariant
+    action: removed
+    description: Retire the old behavior.
+""",
+        encoding="utf-8",
+    )
+
+    additions, deletions, criteria = _load_implementation_plan(
+        plan, "Add step transcripts"
+    )
+
+    assert additions == (
+        {
+            "section": "features",
+            "id": "step-transcript",
+            "action": "added",
+            "description": "Record each step.",
+        },
+    )
+    assert deletions == (
+        {
+            "section": "invariants",
+            "id": "old-invariant",
+            "action": "removed",
+            "description": "Retire the old behavior.",
+        },
+    )
+    assert criteria == (
+        "The transcript is ordered by execution.",
+        "Only the declared implementation paths are changed.",
+    )
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

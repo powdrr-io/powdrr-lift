@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import yaml
+from jsonschema import Draft7Validator
+from jsonschema.exceptions import SchemaError
 
 KNOWN_TOOLS = frozenset(
     {
@@ -655,6 +657,27 @@ def _validate_steps(
                             "internal requires a non-empty string command list",
                         )
                     )
+            returns = (
+                operation.get("returns") if isinstance(operation, Mapping) else None
+            )
+            if returns is not None:
+                if not isinstance(returns, Mapping):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.operation.returns",
+                            "returns must be an inline JSON Schema object",
+                        )
+                    )
+                else:
+                    try:
+                        Draft7Validator.check_schema(dict(returns))
+                    except SchemaError as error:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.operation.returns",
+                                f"invalid return schema: {error.message}",
+                            )
+                        )
             if isinstance(operation, Mapping):
                 references = list(_template_references(operation))
                 if isinstance(operation.get("source"), list):
@@ -700,7 +723,10 @@ def _validate_steps(
                 failure = gate.get("on_failure")
                 if isinstance(failure, Mapping):
                     retry = failure.get("retry")
-                    if (
+                    terminal = failure.get("terminal")
+                    if isinstance(terminal, str) and terminal in {"failed", "blocked"}:
+                        pass
+                    elif (
                         not isinstance(retry, Mapping)
                         or not isinstance(retry.get("max_attempts"), int)
                         or retry["max_attempts"] <= 0

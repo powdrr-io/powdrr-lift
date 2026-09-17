@@ -8,9 +8,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
 from powdrr_lift.workrr.procedrr import StructuredToolExecutor
-from procedrr_evaluator import Evaluator
+from procedrr_evaluator import EvaluationError, Evaluator
 
 
 class FakeLLM:
@@ -23,6 +25,32 @@ class FakeLLM:
             "added": [{"id": "req-1", "description": "Do the thing"}],
             "deleted": [],
         }
+
+
+def test_evaluator_enforces_declared_operation_return_schema() -> None:
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(
+        """
+version: 1
+name: typed-operation
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [demo]}
+      returns:
+        type: object
+        required: [path]
+        properties: {path: {type: string}}
+      bind: result
+  - terminal: succeeded
+"""
+    )
+
+    with pytest.raises(EvaluationError):
+        Evaluator(FakeLLM(), lambda _tool, _parameters: {"wrong": "shape"}).evaluate(
+            document
+        )
 
 
 def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:

@@ -400,10 +400,13 @@ class Evaluator:
             raw_parameters = {
                 key: value
                 for key, value in operation.items()
-                if key not in {"tool", "bind"}
+                if key not in {"tool", "bind", "returns"}
             }
         parameters = _resolve_value(raw_parameters, state)
         result = self.operation_executor(tool, parameters)
+        returns = operation.get("returns")
+        if isinstance(returns, Mapping):
+            validate_json(result, returns)
         bind = operation.get("bind")
         if isinstance(bind, str):
             state[bind] = result

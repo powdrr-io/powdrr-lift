@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -31,6 +32,8 @@ from powdrr_lift.workrr.coding_agent_validation import (
 )
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from procedrr import parse_and_validate
+from procedrr_evaluator import Evaluator
+from procedrr_evaluator.evaluator import ValidationGateError
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -61,6 +64,7 @@ class FeatureEndpointResult:
     validation: ValidationReport | None
     review: dict[str, Any]
     pull_request_url: str | None = None
+    changelog_path: Path | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -74,6 +78,7 @@ class FeatureEndpointResult:
             "validation": self.validation.to_data() if self.validation else None,
             "review": self.review,
             "pull_request_url": self.pull_request_url,
+            "changelog_path": str(self.changelog_path) if self.changelog_path else None,
         }
 
 
@@ -112,112 +117,290 @@ def run_feature_endpoint(
         ],
     )
     try:
-        short_hash = _git_output(
-            runner, worktree, ["git", "rev-parse", "--short", "HEAD"]
+        return _execute_procedrr_flow(
+            config,
+            runner=runner,
+            worktree=worktree,
+            output_root=output_root,
+            branch=branch,
         )
-        baseline_path = (
-            worktree / "docs" / "structrr" / "current" / f"baseline-{short_hash}.yaml"
-        )
-        baseline = bootstrap_structrr(worktree, output_path=baseline_path)
-        if not baseline.validation.successful:
-            raise PowdrrExecutionError("Structrr bootstrap validation failed.")
-        _commit(runner, worktree, "Bootstrap Structrr baseline")
-
-        plan_path = _write_structrr_plan(worktree, config)
-        _write_procedrr_flow(plan_path.parent)
-        _commit(runner, worktree, "Record feature plan and Procedrr flow")
-
-        base_commit = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
-        plan = ExecutionPlan(
-            plan_id=f"{slug}-execution",
-            proposed_pr_fingerprint=f"{slug}-v1",
-            units=(
-                ExecutionUnit(
-                    unit_id=f"implement-{slug}",
-                    objective=config.feature_description,
-                    paths=config.allowed_paths,
-                    validation_profiles=("feature-validation",),
-                    acceptance_criteria=(
-                        "The requested feature behavior is implemented.",
-                        "Only the declared implementation paths are changed.",
-                    ),
-                ),
-            ),
-            allowed_paths=config.allowed_paths,
-        )
-        request = ImplementationRequest.from_execution_plan(
-            plan,
-            unit_id=f"implement-{slug}",
-            request_id=f"{slug}-implementation",
-            base_commit=base_commit,
-            context_refs=(
-                f"structrr:{baseline_path.relative_to(worktree)}",
-                f"structrr-diff:{plan_path.relative_to(worktree)}",
-            ),
-            allowed_commands=(" ".join(config.validation_command) + " *",),
-        )
-        request_path = output_root / "implementation-request.json"
-        request_path.write_text(request.to_json(), encoding="utf-8")
-        attempt_store = CodingAgentAttemptStore(output_root / "artifacts")
-        attempt = CodingAgentRunner(
-            provider=OpenCodeProvider(
-                executable=config.opencode_executable,
-                model=config.opencode_model,
-                permission_policy=OpenCodePermissionPolicy(
-                    (" ".join(config.validation_command) + " *",)
-                ),
-            ),
-            store=attempt_store,
-        ).run(
-            request,
-            worktree_root=worktree,
-            attempt_id=f"{slug}-attempt",
-        )
-        validation = ValidationRunner(
-            {
-                "feature-validation": ValidationProfile(
-                    "feature-validation", config.validation_command
-                )
-            }
-        ).run(request, attempt, worktree_root=worktree)
-        attempt_store.save_validation_report(validation)
-        review = review_feature_diff(
-            worktree, request, attempt, validation=validation, runner=runner
-        )
-        if not review["passed"]:
-            return FeatureEndpointResult(
-                "review_failed",
-                branch,
-                worktree,
-                baseline_path,
-                plan_path,
-                request_path,
-                attempt,
-                validation,
-                review,
-            )
-        _commit(runner, worktree, f"Implement {config.work_item_name}")
-        _run(runner, worktree, ["git", "push", "--set-upstream", "origin", branch])
-        pull_request_url = (
-            _open_pull_request(runner, worktree, config, branch, plan_path)
-            if config.open_pr
-            else None
-        )
-        return FeatureEndpointResult(
-            "pr_opened" if pull_request_url else "completed",
-            branch,
-            worktree,
-            baseline_path,
-            plan_path,
-            request_path,
-            attempt,
-            validation,
-            review,
-            pull_request_url,
-        )
-
     except Exception:
         raise
+
+
+def _execute_procedrr_flow(
+    config: FeatureEndpointConfig,
+    *,
+    runner: Runner,
+    worktree: Path,
+    output_root: Path,
+    branch: str,
+) -> FeatureEndpointResult:
+    slug = slugify_workflow_id(config.work_item_name)
+    state: dict[str, Any] = {}
+    flow_path = _validate_procedrr_flow(worktree)
+    flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool != "internal":
+            raise PowdrrExecutionError(
+                f"feature flow requested unsupported tool {tool!r}"
+            )
+        command = parameters.get("command")
+        if not isinstance(command, list) or len(command) != 1:
+            raise PowdrrExecutionError("feature flow operation command is malformed")
+        name = command[0]
+        if name == "ensure_current_structrr":
+            _require_flow_text(parameters, "work_item_name")
+            _require_flow_text(parameters, "feature_description")
+            state["baseline_path"] = _ensure_current_baseline(worktree, runner)
+            return {"path": str(state["baseline_path"])}
+        if name == "plan_structrr_diff":
+            baseline = _require_flow_text(parameters, "baseline")
+            if baseline != str(state["baseline_path"]):
+                raise PowdrrExecutionError(
+                    "planning baseline does not match ensured baseline"
+                )
+            plan_config = replace(
+                config,
+                work_item_name=_require_flow_text(parameters, "work_item_name"),
+                feature_description=_require_flow_text(
+                    parameters, "feature_description"
+                ),
+            )
+            state["plan_path"] = _write_structrr_plan(worktree, plan_config)
+            _commit(runner, worktree, "Record Structrr feature diff")
+            return {"path": str(state["plan_path"])}
+        if name == "run_opencode":
+            return _run_opencode_phase(
+                config,
+                runner=runner,
+                worktree=worktree,
+                output_root=output_root,
+                branch=branch,
+                slug=slug,
+                state=state,
+                parameters=parameters,
+            )
+        if name == "validate_implementation":
+            if not isinstance(parameters.get("implementation"), Mapping):
+                raise PowdrrExecutionError(
+                    "validation did not receive implementation state"
+                )
+            return _validate_implementation_phase(
+                config, worktree=worktree, state=state
+            )
+        if name == "review_worker_diff":
+            if not isinstance(parameters.get("implementation"), Mapping):
+                raise PowdrrExecutionError(
+                    "review did not receive implementation state"
+                )
+            if not isinstance(parameters.get("validation"), Mapping):
+                raise PowdrrExecutionError("review did not receive validation state")
+            review = review_feature_diff(
+                worktree,
+                state["request"],
+                state["attempt"],
+                validation=state["validation"],
+                runner=runner,
+            )
+            state["review"] = review
+            return review
+        if name == "open_pull_request":
+            review_value = parameters.get("review")
+            if (
+                not isinstance(review_value, Mapping)
+                or review_value.get("passed") is not True
+            ):
+                raise PowdrrExecutionError("cannot open a PR before a passing review")
+            work_item_name = _require_flow_text(parameters, "work_item_name")
+            if Path(_require_flow_text(parameters, "plan")) != state["plan_path"]:
+                raise PowdrrExecutionError(
+                    "PR input plan does not match the planned diff"
+                )
+            feature_config = replace(
+                config,
+                work_item_name=work_item_name,
+                feature_description=_require_flow_text(
+                    parameters, "feature_description"
+                ),
+            )
+            _commit(runner, worktree, f"Implement {work_item_name}")
+            _run(runner, worktree, ["git", "push", "--set-upstream", "origin", branch])
+            if not config.open_pr:
+                return None
+            state["pull_request_url"] = _open_pull_request(
+                runner, worktree, feature_config, branch, state["plan_path"]
+            )
+            return state["pull_request_url"]
+        if name == "create_pr_changelog":
+            pull_request = _require_flow_text(parameters, "pull_request")
+            if not pull_request:
+                return None
+            if Path(_require_flow_text(parameters, "plan")) != state["plan_path"]:
+                raise PowdrrExecutionError(
+                    "changelog input plan does not match the planned diff"
+                )
+            feature_config = replace(
+                config,
+                work_item_name=_require_flow_text(parameters, "work_item_name"),
+                feature_description=_require_flow_text(
+                    parameters, "feature_description"
+                ),
+            )
+            state["changelog_path"] = _create_pr_changelog(
+                runner,
+                worktree,
+                branch,
+                pull_request,
+                feature_config,
+            )
+            return str(state["changelog_path"])
+        if name == "update_pull_request":
+            pull_request_value = parameters.get("pull_request")
+            changelog = parameters.get("changelog")
+            if isinstance(pull_request_value, str) and isinstance(changelog, str):
+                _update_pull_request_description(
+                    runner,
+                    worktree,
+                    pull_request_value,
+                    config,
+                    Path(changelog).relative_to(worktree),
+                )
+            return pull_request_value
+        raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")
+
+    try:
+        Evaluator(cast(Any, lambda *_args, **_kwargs: None), execute).evaluate(
+            flow,
+            {
+                "feature_description": config.feature_description,
+                "work_item_name": config.work_item_name,
+            },
+        )
+    except ValidationGateError:
+        return _feature_endpoint_result(state, branch, worktree, "review_failed")
+    return _feature_endpoint_result(
+        state,
+        branch,
+        worktree,
+        "pr_opened" if state.get("pull_request_url") else "completed",
+    )
+
+
+def _run_opencode_phase(
+    config: FeatureEndpointConfig,
+    *,
+    runner: Runner,
+    worktree: Path,
+    output_root: Path,
+    branch: str,
+    slug: str,
+    state: dict[str, Any],
+    parameters: Mapping[str, Any],
+) -> dict[str, Any]:
+    del branch
+    baseline_path = Path(_require_flow_text(parameters, "baseline"))
+    plan_path = Path(_require_flow_text(parameters, "plan"))
+    if baseline_path != state["baseline_path"] or plan_path != state["plan_path"]:
+        raise PowdrrExecutionError("implementation inputs do not match the plan state")
+    feature_description = _require_flow_text(parameters, "feature_description")
+    _require_flow_text(parameters, "work_item_name")
+    procedrr_path = (
+        worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
+    )
+    base_commit = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+    plan = ExecutionPlan(
+        plan_id=f"{slug}-execution",
+        proposed_pr_fingerprint=f"{slug}-v1",
+        units=(
+            ExecutionUnit(
+                unit_id=f"implement-{slug}",
+                objective=feature_description,
+                paths=config.allowed_paths,
+                validation_profiles=("feature-validation",),
+                acceptance_criteria=(
+                    "The requested feature behavior is implemented.",
+                    "Only the declared implementation paths are changed.",
+                ),
+            ),
+        ),
+        allowed_paths=config.allowed_paths,
+    )
+    request = ImplementationRequest.from_execution_plan(
+        plan,
+        unit_id=f"implement-{slug}",
+        request_id=f"{slug}-implementation",
+        base_commit=base_commit,
+        context_refs=(
+            f"structrr:{baseline_path.relative_to(worktree)}",
+            f"structrr-diff:{plan_path.relative_to(worktree)}",
+            f"procedrr:{procedrr_path.relative_to(worktree)}",
+        ),
+        allowed_commands=(" ".join(config.validation_command) + " *",),
+    )
+    request_path = output_root / "implementation-request.json"
+    request_path.write_text(request.to_json(), encoding="utf-8")
+    attempt_store = CodingAgentAttemptStore(output_root / "artifacts")
+    attempt = CodingAgentRunner(
+        provider=OpenCodeProvider(
+            executable=config.opencode_executable,
+            model=config.opencode_model,
+            permission_policy=OpenCodePermissionPolicy(
+                (" ".join(config.validation_command) + " *",)
+            ),
+        ),
+        store=attempt_store,
+    ).run(request, worktree_root=worktree, attempt_id=f"{slug}-attempt")
+    state.update(
+        request=request,
+        request_path=request_path,
+        attempt=attempt,
+        attempt_store=attempt_store,
+    )
+    return {"request_id": request.request_id, "attempt": attempt.to_data()}
+
+
+def _validate_implementation_phase(
+    config: FeatureEndpointConfig, *, worktree: Path, state: dict[str, Any]
+) -> dict[str, Any]:
+    validation = ValidationRunner(
+        {
+            "feature-validation": ValidationProfile(
+                "feature-validation", config.validation_command
+            )
+        }
+    ).run(state["request"], state["attempt"], worktree_root=worktree)
+    state["attempt_store"].save_validation_report(validation)
+    state["validation"] = validation
+    return validation.to_data()
+
+
+def _require_flow_text(parameters: Mapping[str, Any], name: str) -> str:
+    value = parameters.get(name)
+    if not isinstance(value, str) or not value.strip():
+        raise PowdrrExecutionError(
+            f"feature flow parameter {name!r} must be a non-empty string"
+        )
+    return value
+
+
+def _feature_endpoint_result(
+    state: dict[str, Any], branch: str, worktree: Path, status: str
+) -> FeatureEndpointResult:
+    return FeatureEndpointResult(
+        status,
+        branch,
+        worktree,
+        state["baseline_path"],
+        state["plan_path"],
+        state["request_path"],
+        state.get("attempt"),
+        state.get("validation"),
+        state.get("review", {"passed": False}),
+        state.get("pull_request_url"),
+        state.get("changelog_path"),
+    )
 
 
 def review_feature_diff(
@@ -286,43 +469,42 @@ def _write_structrr_plan(worktree: Path, config: FeatureEndpointConfig) -> Path:
     return path
 
 
-def _write_procedrr_flow(proposal: Path) -> Path:
-    path = proposal / "procedrr-flow.yaml"
-    flow = """
-version: 1
-name: workrr-feature-endpoint
-inputs:
-  - {name: feature_description, type: string, required: true}
-steps:
-  - operation:
-      tool: internal
-      command: [bootstrap_structrr]
-      bind: bootstrap
-  - operation:
-      tool: internal
-      command: [plan_structrr_diff]
-      bind: plan
-  - operation:
-      tool: internal
-      command: [run_opencode]
-      bind: implementation
-  - operation:
-      tool: internal
-      command: [review_worker_diff]
-      bind: review
-  - gate:
-      subject: review.passed
-      equals: true
-      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-  - operation:
-      tool: internal
-      command: [open_pull_request]
-      bind: pull_request
-  - terminal: succeeded
-"""
-    parse_and_validate(flow)
-    path.write_text(flow.lstrip(), encoding="utf-8")
+def _validate_procedrr_flow(worktree: Path) -> Path:
+    path = (
+        worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
+    )
+    try:
+        parse_and_validate(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"Shared feature Procedrr definition is invalid: {path}: {error}"
+        ) from error
     return path
+
+
+def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
+    """Reuse the current baseline or bootstrap it once before planning."""
+    relative_paths = _git_output(
+        runner,
+        worktree,
+        ["git", "ls-files", "docs/structrr/current/baseline-*.yaml"],
+    ).splitlines()
+    if not relative_paths:
+        baseline = bootstrap_structrr(worktree)
+        if not baseline.validation.successful:
+            raise PowdrrExecutionError("Structrr bootstrap validation failed.")
+        _commit(runner, worktree, "Bootstrap Structrr baseline")
+        return baseline.output_path
+    ranked: list[tuple[int, str]] = []
+    for relative_path in relative_paths:
+        timestamp = _git_output(
+            runner,
+            worktree,
+            ["git", "log", "-1", "--format=%ct", "--", relative_path],
+        )
+        ranked.append((int(timestamp or "0"), relative_path))
+    _, selected = max(ranked)
+    return worktree / selected
 
 
 def _require_clean_root(root: Path, runner: Runner) -> None:
@@ -334,6 +516,102 @@ def _require_clean_root(root: Path, runner: Runner) -> None:
 def _commit(runner: Runner, worktree: Path, message: str) -> None:
     _run(runner, worktree, ["git", "add", "docs"])
     _run(runner, worktree, ["git", "commit", "-am", message])
+
+
+def _create_pr_changelog(
+    runner: Runner,
+    worktree: Path,
+    branch: str,
+    pull_request_url: str,
+    config: FeatureEndpointConfig,
+) -> Path:
+    match = re.search(r"/pull/(\d+)", pull_request_url)
+    if match is None:
+        raise PowdrrExecutionError(
+            f"Could not determine the pull request number from {pull_request_url!r}."
+        )
+    pr_number = match.group(1)
+    path = worktree / "docs" / "changelogs" / f"PR-{pr_number}-changelog.yaml"
+    changed_paths = _git_output(
+        runner,
+        worktree,
+        ["git", "diff", "--name-only", f"origin/{config.base_branch}...HEAD"],
+    ).splitlines()
+    descriptor = {
+        "schema": "https://powdrr.io/schema/changelog-v2",
+        "change_id": f"PR-{pr_number}",
+        "title": config.work_item_name,
+        "intent": {
+            "problem": "The requested product behavior is not yet available.",
+            "goal": config.feature_description,
+        },
+        "human-decisions": [],
+        "files": [
+            {
+                "path": changed_path,
+                "type": _changelog_file_type(changed_path),
+                "span": {"start_line": 1, "end_line": 1},
+                "summary": f"Changed as part of {config.work_item_name}.",
+                "rationale": config.feature_description,
+            }
+            for changed_path in changed_paths
+        ],
+        "entities": [
+            {
+                "id": slugify_workflow_id(config.work_item_name),
+                "type": "Feature",
+                "action": "added",
+            }
+        ],
+        "entity_relationships": [],
+        "invariants": [],
+        "guidance": [],
+        "features": [
+            {
+                "id": slugify_workflow_id(config.work_item_name),
+                "description": config.feature_description,
+                "action": "added",
+            }
+        ],
+        "proposed_prs": [],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(descriptor, sort_keys=False), encoding="utf-8")
+    parse_change_log(path.read_text(encoding="utf-8"))
+    _commit(runner, worktree, f"Add PR-{pr_number} changelog descriptor")
+    _run(runner, worktree, ["git", "push", "origin", branch])
+    return path
+
+
+def _changelog_file_type(path: str) -> str:
+    if path.startswith("tests/"):
+        return "Test file"
+    if path.endswith((".yaml", ".yml", ".json", ".toml")):
+        return "Configuration file"
+    if path.startswith("docs/"):
+        return "Documentation"
+    return "Source file"
+
+
+def _update_pull_request_description(
+    runner: Runner,
+    worktree: Path,
+    pull_request_url: str,
+    config: FeatureEndpointConfig,
+    changelog_relative_path: Path,
+) -> None:
+    body = (
+        f"## Feature\n\n{config.feature_description}\n\n"
+        f"Structrr plan: `docs/proposals/{slugify_workflow_id(config.work_item_name)}"
+        "/structrr-diff.yaml`\n"
+        f"PR changelog descriptor: `{changelog_relative_path}`\n"
+        "Implemented by the bounded Workrr/OpenCode handoff and reviewed before commit."
+    )
+    _run(
+        runner,
+        worktree,
+        ["gh", "pr", "edit", pull_request_url, "--body", body],
+    )
 
 
 def _open_pull_request(

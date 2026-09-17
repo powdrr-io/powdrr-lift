@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+import io
+import subprocess
+from contextlib import redirect_stdout
+from pathlib import Path
+
+import pytest
+
+from powdrr_lift.cli import main
+from powdrr_lift.workrr.coding_agent import (
+    CodingAgentAttempt,
+    CodingAgentStatus,
+    ImplementationRequest,
+)
+from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationReport,
+    ValidationReportStatus,
+)
+from powdrr_lift.workrr.feature_endpoint import (
+    FeatureEndpointConfig,
+    FeatureEndpointResult,
+    review_feature_diff,
+)
+
+
+def test_workrr_feature_cli_builds_endpoint_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _git(tmp_path, "init", "-q")
+    captured: dict[str, FeatureEndpointConfig] = {}
+
+    def fake_endpoint(config: FeatureEndpointConfig) -> FeatureEndpointResult:
+        captured["config"] = config
+        return FeatureEndpointResult(
+            status="completed",
+            branch="feature/hello",
+            worktree=tmp_path,
+            baseline_path=tmp_path / "baseline.yaml",
+            plan_path=tmp_path / "plan.yaml",
+            request_path=tmp_path / "request.json",
+            attempt=None,
+            validation=None,
+            review={"passed": True},
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.run_feature_endpoint", fake_endpoint)
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "workrr-feature",
+                    "--feature-description",
+                    "Add a greeting line.",
+                    "--work-item-name",
+                    "Add greeting",
+                    "--repo-root",
+                    str(tmp_path),
+                    "--allowed-path",
+                    "src/app.py",
+                    "--allowed-path",
+                    "tests/test_app.py",
+                    "--validation-command",
+                    "python -m pytest",
+                    "--no-open-pr",
+                    "--json",
+                ]
+            )
+            == 0
+        )
+
+    config = captured["config"]
+    assert config.feature_description == "Add a greeting line."
+    assert config.allowed_paths == ("src/app.py", "tests/test_app.py")
+    assert config.validation_command == ("python", "-m", "pytest")
+    assert config.open_pr is False
+
+
+def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("print('updated')\n", encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", "app.py")
+    _git(tmp_path, "commit", "-qm", "initial")
+    (tmp_path / "app.py").write_text("print('changed')\n", encoding="utf-8")
+
+    request = ImplementationRequest(
+        request_id="request",
+        objective="change app",
+        prompt="change app",
+        base_commit="initial",
+        plan_fingerprint="plan",
+        allowed_paths=("app.py",),
+        acceptance_criteria=(),
+        validation_profiles=("feature-validation",),
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt",
+        request_id="request",
+        provider="opencode",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+    )
+    validation = ValidationReport(
+        attempt_id="attempt",
+        request_id="request",
+        status=ValidationReportStatus.FAILED,
+        results=(),
+    )
+
+    review = review_feature_diff(tmp_path, request, attempt, validation)
+
+    assert review["changed_paths"] == ["app.py"]
+    assert review["validation_status"] == "failed"
+    assert review["passed"] is False
+
+
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, check=True
+    )

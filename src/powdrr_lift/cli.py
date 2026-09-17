@@ -5,6 +5,7 @@ import difflib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -174,6 +175,10 @@ from powdrr_lift.workrr.error_analysis import (
     load_workflow_error_records,
     promote_replay_candidates,
     workflow_error_analysis_data,
+)
+from powdrr_lift.workrr.feature_endpoint import (
+    FeatureEndpointConfig,
+    run_feature_endpoint,
 )
 from powdrr_lift.workrr.feature_run import (
     DEFAULT_FEATURE_NAME,
@@ -1316,6 +1321,40 @@ def build_parser() -> argparse.ArgumentParser:
     agent_feature_parser.add_argument("--transcript-dir", type=Path)
     agent_feature_parser.add_argument("--json", action="store_true")
     agent_feature_parser.set_defaults(func=_run_agent_feature_e2e)
+
+    workrr_feature_parser = subparsers.add_parser(
+        "workrr-feature",
+        aliases=["workrr_feature"],
+        help=(
+            "Plan a feature in Structrr, implement it with OpenCode, validate and "
+            "review the diff, then open a pull request."
+        ),
+    )
+    workrr_feature_parser.add_argument("--feature-description", required=True)
+    workrr_feature_parser.add_argument("--work-item-name", required=True)
+    workrr_feature_parser.add_argument("--repo-root", type=Path)
+    workrr_feature_parser.add_argument(
+        "--allowed-path", action="append", required=True, dest="allowed_paths"
+    )
+    workrr_feature_parser.add_argument(
+        "--validation-command",
+        required=True,
+        help="Validation command as one shell-style argument, e.g. 'uv run pytest'.",
+    )
+    workrr_feature_parser.add_argument("--base-branch", default="main")
+    workrr_feature_parser.add_argument("--opencode-executable", default="opencode")
+    workrr_feature_parser.add_argument(
+        "--opencode-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
+    workrr_feature_parser.add_argument("--output-root", type=Path)
+    workrr_feature_parser.add_argument(
+        "--no-open-pr",
+        action="store_true",
+        help="Run all local phases but stop before creating the pull request.",
+    )
+    workrr_feature_parser.add_argument("--json", action="store_true")
+    workrr_feature_parser.set_defaults(func=_run_workrr_feature)
 
     extract_responses_parser = subparsers.add_parser(
         "extract-workflow-responses",
@@ -4242,6 +4281,34 @@ def _run_agent_feature_e2e(args: argparse.Namespace) -> int:
         for phase in result.phases:
             print(f"{phase['name']}: returncode={phase['returncode']}")
     return 0 if result.status == "passed" else 1
+
+
+def _run_workrr_feature(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    result = run_feature_endpoint(
+        FeatureEndpointConfig(
+            feature_description=args.feature_description,
+            work_item_name=args.work_item_name,
+            repo_root=repo_root,
+            allowed_paths=tuple(args.allowed_paths),
+            validation_command=tuple(shlex.split(args.validation_command)),
+            base_branch=args.base_branch,
+            opencode_executable=args.opencode_executable,
+            opencode_model=args.opencode_model,
+            output_root=args.output_root,
+            open_pr=not args.no_open_pr,
+        )
+    )
+    if args.json:
+        print(json.dumps(result.to_data(), indent=2, sort_keys=True))
+    else:
+        print(f"Workrr feature run {result.status}")
+        print(f"Branch: {result.branch}")
+        print(f"Worktree: {result.worktree}")
+        print(f"Review passed: {result.review['passed']}")
+        if result.pull_request_url:
+            print(f"Pull request: {result.pull_request_url}")
+    return 0 if result.status in {"completed", "pr_opened"} else 1
 
 
 def _extract_workflow_responses(args: argparse.Namespace) -> int:

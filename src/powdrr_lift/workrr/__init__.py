@@ -31,6 +31,12 @@ from powdrr_lift.workrr.coding_agent_validation import (
 )
 from powdrr_lift.workrr.context import WorkflowContext
 from powdrr_lift.workrr.exchanges import ExchangeRecordingClient
+from powdrr_lift.workrr.feature_endpoint import (
+    FeatureEndpointConfig,
+    FeatureEndpointResult,
+    review_feature_diff,
+    run_feature_endpoint,
+)
 from powdrr_lift.workrr.loop import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
@@ -73,6 +79,8 @@ __all__ = [
     "AgentClient",
     "AgentProposalError",
     "ExchangeRecordingClient",
+    "FeatureEndpointConfig",
+    "FeatureEndpointResult",
     "LLMModelLimits",
     "LLMModelMapping",
     "LLMProviderDefinition",
@@ -100,6 +108,8 @@ __all__ = [
     "classify_repair_failure",
     "no_progress_feedback",
     "run_proposal_round",
+    "review_feature_diff",
+    "run_feature_endpoint",
     "WorkflowExecutionController",
     "WorkflowExecutionObserver",
     "WorkflowExecutionStrategy",

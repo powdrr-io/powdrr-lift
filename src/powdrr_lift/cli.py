@@ -4308,6 +4308,8 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
         print(f"Review passed: {result.review['passed']}")
         if result.pull_request_url:
             print(f"Pull request: {result.pull_request_url}")
+        if result.changelog_path:
+            print(f"Changelog: {result.changelog_path}")
     return 0 if result.status in {"completed", "pr_opened"} else 1
 
 

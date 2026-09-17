@@ -1,0 +1,43 @@
+version: 1
+name: implement-feature
+inputs:
+  - {name: feature_description, type: string, required: true}
+  - {name: work_item_name, type: string, required: true}
+steps:
+  - operation:
+      tool: internal
+      command: [resolve_current_structrr]
+      bind: baseline
+  - operation:
+      tool: internal
+      command: [plan_structrr_diff]
+      bind: plan
+  - operation:
+      tool: internal
+      command: [run_opencode]
+      bind: implementation
+  - operation:
+      tool: internal
+      command: [validate_implementation]
+      bind: validation
+  - operation:
+      tool: internal
+      command: [review_worker_diff]
+      bind: review
+  - gate:
+      subject: review.passed
+      equals: true
+      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+  - operation:
+      tool: internal
+      command: [open_pull_request]
+      bind: pull_request
+  - operation:
+      tool: internal
+      command: [create_pr_changelog]
+      bind: changelog
+  - operation:
+      tool: internal
+      command: [update_pull_request]
+      bind: updated_pull_request
+  - terminal: succeeded

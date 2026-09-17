@@ -20,6 +20,8 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
+    _resolve_current_baseline,
+    _validate_procedrr_flow,
     review_feature_diff,
 )
 
@@ -115,6 +117,38 @@ def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None
     assert review["changed_paths"] == ["app.py"]
     assert review["validation_status"] == "failed"
     assert review["passed"] is False
+
+
+def test_endpoint_resolves_existing_latest_baseline_without_writing(
+    tmp_path: Path,
+) -> None:
+    current = tmp_path / "docs" / "structrr" / "current"
+    current.mkdir(parents=True)
+    first = current / "baseline-first.yaml"
+    second = current / "baseline-second.yaml"
+    first.write_text("schema: one\n", encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "first baseline")
+    second.write_text("schema: two\n", encoding="utf-8")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "second baseline")
+
+    selected = _resolve_current_baseline(tmp_path, subprocess.run)
+
+    assert selected == second
+    assert not (current / "baseline.yaml").exists()
+
+
+def test_feature_flow_is_shared_and_validated() -> None:
+    path = Path("docs/procedrr/skill-definitions/implement-feature.yaml")
+
+    validated = _validate_procedrr_flow(Path.cwd())
+
+    assert validated == (Path.cwd() / path).resolve()
+    assert not any(Path("docs/proposals").glob("*/procedrr-flow.yaml"))
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

@@ -1,0 +1,35 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-696
+title: Add JSON output to pull request description
+intent:
+  problem: The pull-request-description command only emits human-readable output.
+  goal: Provide an opt-in machine-readable JSON representation while preserving the default output.
+human-decisions: []
+files:
+  - path: src/powdrr_lift/cli.py
+    type: Source file
+    span: {start_line: 1, end_line: 1}
+    summary: Add the pull-request-description --json option and payload.
+    rationale: Consumers need structured pull-request description data.
+  - path: tests/test_cli.py
+    type: Test file
+    span: {start_line: 1, end_line: 1}
+    summary: Cover JSON output and preserved human-readable defaults.
+    rationale: Keep both output contracts intentional and tested.
+  - path: docs/proposals/add-json-output-to-pull-request-description/structrr-diff.yaml
+    type: Documentation
+    span: {start_line: 1, end_line: 1}
+    summary: Record the Structrr feature diff.
+    rationale: Keep product intent alongside the source change.
+entities:
+  - id: add-json-output-to-pull-request-description
+    type: Feature
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features:
+  - id: add-json-output-to-pull-request-description
+    description: Add an opt-in JSON output contract to pull-request-description.
+    action: added
+proposed_prs: []

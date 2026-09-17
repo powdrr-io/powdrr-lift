@@ -219,6 +219,13 @@ def _execute_procedrr_flow(
                 if isinstance(evaluation, Mapping)
                 else []
             )
+        if name == "aggregate_category_edits":
+            decisions = parameters.get("decisions")
+            if not isinstance(decisions, Mapping):
+                raise PowdrrExecutionError(
+                    "aggregate_category_edits requires category decisions"
+                )
+            return _aggregate_category_edits(decisions)
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -610,6 +617,22 @@ def _interview_edits(value: Any) -> list[dict[str, Any]]:
             if isinstance(item, Mapping):
                 edits.append({**item, "action": action})
     return edits
+
+
+def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:
+    aggregated: dict[str, Any] = {}
+    for category, decision in decisions.items():
+        added: list[dict[str, Any]] = []
+        deleted: list[dict[str, Any]] = []
+        if isinstance(decision, Mapping):
+            action = decision.get("action")
+            item = decision.get("item")
+            if action == "add" and isinstance(item, Mapping):
+                added.append(dict(item))
+            elif action == "delete" and isinstance(item, Mapping):
+                deleted.append(dict(item))
+        aggregated[str(category)] = {"added": added, "deleted": deleted}
+    return aggregated
 
 
 def _resolve_flow_path(worktree: Path, relative_path: str) -> Path:

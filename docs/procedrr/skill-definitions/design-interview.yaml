@@ -16,11 +16,11 @@ decision_contract:
   transport_action_const: decision_result
   output_schema:
     type: object
-    required: [added, deleted]
+    required: [action]
     additionalProperties: false
     properties:
-      added: {type: array, items: {type: object}}
-      deleted: {type: array, items: {type: object, required: [id]}}
+      action: {type: string, enum: [add, delete, no_change]}
+      item: {type: object}
 
 steps:
   - operation:
@@ -59,19 +59,25 @@ steps:
               - Read the exact gathered context; do not invent repository facts.
               - Preserve existing items unless an explicit deletion is required.
               - New identifiers must be globally unique across all categories.
-              - Return exactly added and deleted arrays matching the output schema.
+              - Return exactly one action and, for add or delete, one item.
             context: [work_item_name, feature_description, category_context]
             output:
               name: category_edits
               schema:
                 type: object
-                required: [added, deleted]
+                required: [action]
                 additionalProperties: false
                 properties:
-                  added: {type: array, items: {type: object}}
-                  deleted: {type: array, items: {type: object, required: [id]}}
+                  action: {type: string, enum: [add, delete, no_change]}
+                  item: {type: object}
             validation: {kind: json_schema}
 
+  - operation:
+      tool: internal
+      command: [aggregate_category_edits]
+      parameters:
+        decisions: {type: reference, value: category_edits_by_category}
+      bind: category_edits
   - operation:
       tool: edit
       parameters:
@@ -79,26 +85,26 @@ steps:
         document:
           work_item_name: "${work_item_name}"
           feature_description: "${feature_description}"
-          requirements_edits: "${category_edits_by_category.requirements}"
-          approach_edits: "${category_edits_by_category.approach}"
-          entities_edits: "${category_edits_by_category.entities}"
-          entity_relationships_edits: "${category_edits_by_category.entity-relationships}"
-          invariants_edits: "${category_edits_by_category.invariants}"
-          guidance_edits: "${category_edits_by_category.guidance}"
-          features_edits: "${category_edits_by_category.features}"
-          human_decisions_edits: "${category_edits_by_category.human-decisions}"
-          intent_edits: "${category_edits_by_category.intent}"
-          intents_edits: "${category_edits_by_category.intents}"
-          acceptance_criteria_edits: "${category_edits_by_category.acceptance_criteria}"
-          expected_tests_edits: "${category_edits_by_category.expected_tests}"
-          required_test_cases_edits: "${category_edits_by_category.required_test_cases}"
-          expected_outcomes_edits: "${category_edits_by_category.expected_outcomes}"
-          non_goals_edits: "${category_edits_by_category.non_goals}"
-          risks_edits: "${category_edits_by_category.risks}"
-          decisions_edits: "${category_edits_by_category.decisions}"
-          proposed_prs_edits: "${category_edits_by_category.proposed_prs}"
-          modules_edits: "${category_edits_by_category.modules}"
-          tools_edits: "${category_edits_by_category.tools}"
+          requirements_edits: "${category_edits.requirements}"
+          approach_edits: "${category_edits.approach}"
+          entities_edits: "${category_edits.entities}"
+          entity_relationships_edits: "${category_edits.entity-relationships}"
+          invariants_edits: "${category_edits.invariants}"
+          guidance_edits: "${category_edits.guidance}"
+          features_edits: "${category_edits.features}"
+          human_decisions_edits: "${category_edits.human-decisions}"
+          intent_edits: "${category_edits.intent}"
+          intents_edits: "${category_edits.intents}"
+          acceptance_criteria_edits: "${category_edits.acceptance_criteria}"
+          expected_tests_edits: "${category_edits.expected_tests}"
+          required_test_cases_edits: "${category_edits.required_test_cases}"
+          expected_outcomes_edits: "${category_edits.expected_outcomes}"
+          non_goals_edits: "${category_edits.non_goals}"
+          risks_edits: "${category_edits.risks}"
+          decisions_edits: "${category_edits.decisions}"
+          proposed_prs_edits: "${category_edits.proposed_prs}"
+          modules_edits: "${category_edits.modules}"
+          tools_edits: "${category_edits.tools}"
       bind: interview_input
   - operation:
       tool: internal

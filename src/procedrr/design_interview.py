@@ -47,22 +47,42 @@ _CATEGORY_FIELDS = {
 
 def _edit_schema(category: str) -> dict:
     fields = _CATEGORY_FIELDS.get(category, ("id", "description"))
-    properties = {field: {"type": "string", "minLength": 1} for field in fields}
-    properties.setdefault("state", {"type": "string", "enum": ["added"]})
+    item_properties = {field: {"type": "string", "minLength": 1} for field in fields}
     return {
-        "type": "object",
-        "required": ["added", "deleted"],
-        "additionalProperties": False,
-        "properties": {
-            "added": {
-                "type": "array",
-                "items": {"type": "object", "required": list(fields)},
+        "oneOf": [
+            {
+                "type": "object",
+                "required": ["action", "item"],
+                "additionalProperties": False,
+                "properties": {
+                    "action": {"const": "add"},
+                    "item": {
+                        "type": "object",
+                        "required": list(fields),
+                        "properties": item_properties,
+                    },
+                },
             },
-            "deleted": {
-                "type": "array",
-                "items": {"type": "object", "required": ["id"]},
+            {
+                "type": "object",
+                "required": ["action", "item"],
+                "additionalProperties": False,
+                "properties": {
+                    "action": {"const": "delete"},
+                    "item": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {"id": {"type": "string", "minLength": 1}},
+                    },
+                },
             },
-        },
+            {
+                "type": "object",
+                "required": ["action"],
+                "additionalProperties": False,
+                "properties": {"action": {"const": "no_change"}},
+            },
+        ],
     }
 
 
@@ -97,8 +117,8 @@ def _gather(category: str) -> SequenceNode:
                         "is required.",
                         "New identifiers must be globally unique across all "
                         "categories.",
-                        "Return exactly added and deleted arrays matching the "
-                        "output schema.",
+                        "Return exactly one action and, for add or delete, "
+                        "one item matching the output schema.",
                     ),
                     context_bindings=("work_item_name", "feature_description", context),
                 )

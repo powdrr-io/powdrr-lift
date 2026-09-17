@@ -372,7 +372,13 @@ def test_repeat_and_branch_are_bounded_and_data_driven() -> None:
 
 
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
-    llm = FakeLLM()
+    class DesignInterviewLLM:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            return {"action": "no_change"}
+
+    llm = DesignInterviewLLM()
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "gather_context":
@@ -385,6 +391,11 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 return {"path": "docs/proposals/demo/feature-pr-specification.yaml"}
             if command and command[0] == "extract_proposal_issues":
                 return []
+            if command and command[0] == "aggregate_category_edits":
+                decisions = parameters.get("decisions", {})
+                return {
+                    category: {"added": [], "deleted": []} for category in decisions
+                }
         return {"ok": True}
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()

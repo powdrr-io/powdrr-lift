@@ -20,7 +20,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
-    _resolve_current_baseline,
+    _ensure_current_baseline,
     _validate_procedrr_flow,
     review_feature_diff,
 )
@@ -119,7 +119,7 @@ def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None
     assert review["passed"] is False
 
 
-def test_endpoint_resolves_existing_latest_baseline_without_writing(
+def test_endpoint_reuses_existing_latest_baseline_without_writing(
     tmp_path: Path,
 ) -> None:
     current = tmp_path / "docs" / "structrr" / "current"
@@ -136,7 +136,7 @@ def test_endpoint_resolves_existing_latest_baseline_without_writing(
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "second baseline")
 
-    selected = _resolve_current_baseline(tmp_path, subprocess.run)
+    selected = _ensure_current_baseline(tmp_path, subprocess.run)
 
     assert selected == second
     assert not (current / "baseline.yaml").exists()

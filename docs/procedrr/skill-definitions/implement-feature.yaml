@@ -6,7 +6,7 @@ inputs:
 steps:
   - operation:
       tool: internal
-      command: [resolve_current_structrr]
+      command: [ensure_current_structrr]
       bind: baseline
   - operation:
       tool: internal

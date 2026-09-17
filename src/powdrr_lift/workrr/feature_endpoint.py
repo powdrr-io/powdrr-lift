@@ -14,6 +14,7 @@ import yaml
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -149,8 +150,8 @@ def _execute_procedrr_flow(
         if not isinstance(command, list) or len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         name = command[0]
-        if name == "resolve_current_structrr":
-            state["baseline_path"] = _resolve_current_baseline(worktree, runner)
+        if name == "ensure_current_structrr":
+            state["baseline_path"] = _ensure_current_baseline(worktree, runner)
             return {"path": str(state["baseline_path"])}
         if name == "plan_structrr_diff":
             state["plan_path"] = _write_structrr_plan(worktree, config)
@@ -410,18 +411,19 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     return path
 
 
-def _resolve_current_baseline(worktree: Path, runner: Runner) -> Path:
-    """Resolve an existing baseline; endpoint execution never bootstraps one."""
+def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
+    """Reuse the current baseline or bootstrap it once before planning."""
     relative_paths = _git_output(
         runner,
         worktree,
         ["git", "ls-files", "docs/structrr/current/baseline-*.yaml"],
     ).splitlines()
     if not relative_paths:
-        raise PowdrrExecutionError(
-            "No Structrr baseline exists under docs/structrr/current. "
-            "Bootstrap Structrr before running a feature endpoint."
-        )
+        baseline = bootstrap_structrr(worktree)
+        if not baseline.validation.successful:
+            raise PowdrrExecutionError("Structrr bootstrap validation failed.")
+        _commit(runner, worktree, "Bootstrap Structrr baseline")
+        return baseline.output_path
     ranked: list[tuple[int, str]] = []
     for relative_path in relative_paths:
         timestamp = _git_output(

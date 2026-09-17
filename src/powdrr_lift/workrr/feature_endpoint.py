@@ -313,7 +313,7 @@ steps:
   - gate:
       subject: review.passed
       equals: true
-      on_failure: {terminal: failed}
+      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
   - operation:
       tool: internal
       command: [open_pull_request]

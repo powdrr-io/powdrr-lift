@@ -1,0 +1,24 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: add-json-output-to-pull-request-description
+title: Add JSON output to pull request description
+intent:
+  problem: The requested product behavior is not yet available.
+  goal: Add a --json option to the pull-request-description command. The option must
+    emit the rendered pull-request description as machine-readable JSON while preserving
+    the existing human-readable output by default. Add focused CLI coverage.
+human-decisions: []
+files: []
+entities:
+- id: add-json-output-to-pull-request-description
+  type: Feature
+  action: added
+entity_relationships: []
+features:
+- id: add-json-output-to-pull-request-description
+  description: Add a --json option to the pull-request-description command. The option
+    must emit the rendered pull-request description as machine-readable JSON while
+    preserving the existing human-readable output by default. Add focused CLI coverage.
+  action: added
+invariants: []
+guidance: []
+proposed_prs: []

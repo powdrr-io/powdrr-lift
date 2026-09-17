@@ -111,7 +111,7 @@ steps:
       command:
         [powdrr-lift, feature-pr-specification, --work-item-name, "${work_item_name}",
          --interview-input, "docs/proposals/${work_item_name}/design-interview-input.json"]
-      bind: proposal_template
+      bind: proposal
   - operation:
       tool: internal
       command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]

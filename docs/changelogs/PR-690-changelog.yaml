@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 690
+title: Add deterministic coding-agent end-to-end coverage
+intent:
+  problem: The plan-to-worker path is covered by component tests but does not yet have a repeatable test of compilation, provider execution, validation, scope, and persisted artifacts together.
+  goal: Exercise the complete local coding-agent handoff with a deterministic fake provider and document the boundary before adding an opt-in real-provider smoke test.
+human-decisions: []
+structured_files: []
+files:
+  - path: tests/test_coding_agent_end_to_end.py
+    type: added
+    summary: Exercise plan compilation, fake OpenCode execution, validation, scope, artifacts, and failed-validation exit behavior through the production CLI.
+    rationale: Make the current end-to-end contract executable without model credentials or network-dependent provider behavior.
+    span:
+      start_line: 1
+      end_line: 210
+    related:
+      entities:
+        - coding-agent-end-to-end-harness
+        - external-coding-agent-worker
+        - implementation-request
+        - implementation-attempt
+  - path: docs/design/external-coding-agent-boundary.md
+    type: modified
+    summary: Document the deterministic integration harness and its separation from real-provider smoke tests.
+    rationale: Define which worker guarantees are continuously exercised and which external behaviors remain opt-in.
+    span:
+      start_line: 81
+      end_line: 95
+    related:
+      entities:
+        - coding-agent-end-to-end-harness
+        - external-coding-agent-worker
+entities:
+  - id: coding-agent-end-to-end-harness
+    type: Test suite
+    action: added
+  - id: external-coding-agent-worker
+    type: Tool
+    action: modified
+  - id: implementation-request
+    type: Task
+    action: modified
+  - id: implementation-attempt
+    type: Experiment
+    action: modified
+entity_relationships:
+  - id: harness-verifies-coding-agent-boundary
+    source: coding-agent-end-to-end-harness
+    target: external-coding-agent-worker
+    relationship: validates
+    description: The deterministic harness verifies that a compiled request is executed within scope and cannot report success when declared validation fails.
+    rationale: Keep the complete handoff contract observable at the CLI boundary.
+    action: added
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -1,0 +1,60 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-700
+title: Add Procedrr step execution transcripts
+intent:
+  problem: The requested product behavior is not yet available.
+  goal: Add a durable transcript of every Procedrr step execution, recording the step
+    identity, inputs, outputs, and outcome in order so an operator can inspect exactly
+    what the flow received and produced.
+human-decisions: []
+files:
+- path: docs/proposals/Add Procedrr step execution transcripts/design-interview-input.json
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: docs/proposals/Add Procedrr step execution transcripts/feature-pr-specification.yaml
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: docs/proposals/add-procedrr-step-execution-transcripts/structrr-diff.yaml
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: src/procedrr_evaluator/evaluator.py
+  type: Source file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+entities:
+- id: add-procedrr-step-execution-transcripts
+  type: Feature
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features:
+- id: add-procedrr-step-execution-transcripts
+  description: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+  action: added
+proposed_prs: []

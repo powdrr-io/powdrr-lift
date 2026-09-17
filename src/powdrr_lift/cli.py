@@ -1347,6 +1347,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--opencode-model",
         default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
     )
+    workrr_feature_parser.add_argument(
+        "--planning-provider",
+        default="deepinfra-cheap",
+        choices=ALL_PROVIDERS,
+        help="Provider used for the design-interview planning subprocess.",
+    )
+    workrr_feature_parser.add_argument(
+        "--planning-model",
+        help="Override the planning provider's standard-reasoning model.",
+    )
+    workrr_feature_parser.add_argument("--planning-api-key")
+    workrr_feature_parser.add_argument("--planning-base-url")
     workrr_feature_parser.add_argument("--output-root", type=Path)
     workrr_feature_parser.add_argument(
         "--no-open-pr",
@@ -4285,6 +4297,30 @@ def _run_agent_feature_e2e(args: argparse.Namespace) -> int:
 
 def _run_workrr_feature(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
+    planning_provider = resolve_workflow_provider(args.planning_provider)
+    planning_mapping = default_llm_mappings(planning_provider)["standard_reasoning"]
+    try:
+        planning_credentials = resolve_provider_credentials(
+            planning_mapping.provider,
+            args.planning_api_key,
+            args.planning_base_url,
+        )
+    except PowdrrExecutionError:
+        # Keep endpoint construction side-effect free when callers only need to
+        # inspect or replace the runner (for example, CLI tests). The endpoint
+        # itself still rejects a missing planning client before it can execute
+        # the planning flow, while real invocations with credentials continue
+        # to fail early during CLI setup.
+        if args.planning_api_key or args.planning_base_url:
+            raise
+        planning_client = None
+    else:
+        planning_client = build_workflow_client(
+            planning_credentials,
+            model=args.planning_model or planning_mapping.model,
+            model_cache_dir=repo_root / ".powdrr" / "models",
+            progress_stream=sys.stderr,
+        )
     result = run_feature_endpoint(
         FeatureEndpointConfig(
             feature_description=args.feature_description,
@@ -4297,6 +4333,7 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             opencode_model=args.opencode_model,
             output_root=args.output_root,
             open_pr=not args.no_open_pr,
+            planning_client=planning_client,
         )
     )
     if args.json:

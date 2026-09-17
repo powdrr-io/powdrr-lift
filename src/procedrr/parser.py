@@ -95,6 +95,62 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
         )
     recoveries = document.get("recoveries", {})
     recovery_names = set(recoveries) if isinstance(recoveries, Mapping) else set()
+    outputs = document.get("outputs")
+    if outputs is not None:
+        if not isinstance(outputs, Mapping) or not outputs:
+            diagnostics.append(
+                DocumentDiagnostic("outputs", "outputs must be a non-empty mapping")
+            )
+        else:
+            for name, schema in outputs.items():
+                if not isinstance(name, str) or not re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_.-]*", name
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            "outputs", "output names must be valid binding names"
+                        )
+                    )
+                if not isinstance(schema, Mapping):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"outputs.{name}",
+                            "output declarations must be JSON Schema objects",
+                        )
+                    )
+                else:
+                    try:
+                        Draft7Validator.check_schema(dict(schema))
+                    except SchemaError as error:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"outputs.{name}",
+                                f"invalid output schema: {error.message}",
+                            )
+                        )
+    inputs = document.get("inputs", [])
+    if not isinstance(inputs, list):
+        diagnostics.append(DocumentDiagnostic("inputs", "inputs must be a list"))
+    else:
+        input_names: set[str] = set()
+        for index, item in enumerate(inputs):
+            path = f"inputs[{index}]"
+            if not isinstance(item, Mapping):
+                diagnostics.append(DocumentDiagnostic(path, "input must be a mapping"))
+                continue
+            name = item.get("name")
+            if not isinstance(name, str) or not re.fullmatch(
+                r"[A-Za-z_][A-Za-z0-9_.-]*", name
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(f"{path}.name", "input name is invalid")
+                )
+            elif name in input_names:
+                diagnostics.append(
+                    DocumentDiagnostic(f"{path}.name", "input name is duplicated")
+                )
+            else:
+                input_names.add(name)
     steps = document.get("steps")
     if not isinstance(steps, list) or not steps:
         diagnostics.append(
@@ -368,6 +424,65 @@ def _validate_steps(
                         "max_steps must be positive",
                     )
                 )
+        elif (
+            control == "call"
+            and isinstance(step[control], Mapping)
+            and "process" in step[control]
+        ):
+            value = step[control]
+            process = value.get("process")
+            if not isinstance(process, str) or not re.fullmatch(
+                r"[a-z][a-z0-9-]*", process
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.process",
+                        "process must be a lowercase Procedrr process name",
+                    )
+                )
+            inputs = value.get("inputs", {})
+            if not isinstance(inputs, Mapping):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.inputs", "inputs must be a mapping"
+                    )
+                )
+            else:
+                for reference in _template_references(inputs):
+                    root = reference.split(".", 1)[0]
+                    if root not in bindings:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.call.inputs",
+                                f"unknown binding: {reference}",
+                            )
+                        )
+            outputs = value.get("outputs")
+            if not isinstance(outputs, Mapping) or not outputs:
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.outputs",
+                        "outputs must be a non-empty mapping",
+                    )
+                )
+            else:
+                for name, reference in outputs.items():
+                    if not isinstance(name, str) or not isinstance(reference, str):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.call.outputs",
+                                "outputs must map names to string references",
+                            )
+                        )
+                    elif not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", reference):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.call.outputs.{name}",
+                                "output reference must be a binding path",
+                            )
+                        )
+                    else:
+                        bindings.add(name)
         elif control == "repeat":
             value = step[control]
             if not isinstance(value, Mapping) or not isinstance(

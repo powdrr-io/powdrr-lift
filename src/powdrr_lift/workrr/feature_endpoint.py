@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+from powdrr_lift.core.spec_context import (
+    gather_specification_context,
+    render_gather_context_report,
+)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.workrr.coding_agent import (
@@ -31,6 +36,8 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationRunner,
 )
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 from procedrr_evaluator.evaluator import ValidationGateError
@@ -50,6 +57,7 @@ class FeatureEndpointConfig:
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
     output_root: Path | None = None
     open_pr: bool = True
+    planning_client: WorkflowLLMClient | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,19 +150,84 @@ def _execute_procedrr_flow(
     flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool == "gather_context":
+            types = parameters.get("types")
+            if not isinstance(types, list) or not all(
+                isinstance(item, str) for item in types
+            ):
+                raise PowdrrExecutionError("gather_context types are malformed")
+            report = gather_specification_context(worktree, types=types)
+            return json.loads(render_gather_context_report(report))
+        if tool == "edit":
+            file_path = parameters.get("file_path")
+            document = parameters.get("document")
+            if not isinstance(file_path, str) or not isinstance(document, Mapping):
+                raise PowdrrExecutionError("design interview edit is malformed")
+            target = _resolve_flow_path(worktree, file_path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+            return dict(document)
+        if tool == "yaml_edit":
+            return _apply_flow_yaml_edit(worktree, parameters)
         if tool != "internal":
             raise PowdrrExecutionError(
                 f"feature flow requested unsupported tool {tool!r}"
             )
         command = parameters.get("command")
-        if not isinstance(command, list) or len(command) != 1:
+        if not isinstance(command, list) or not command:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         name = command[0]
         if name == "ensure_current_structrr":
-            _require_flow_text(parameters, "work_item_name")
-            _require_flow_text(parameters, "feature_description")
             state["baseline_path"] = _ensure_current_baseline(worktree, runner)
             return {"path": str(state["baseline_path"])}
+        if command[:2] == ["powdrr-lift", "design-interview-input"]:
+            _run(runner, worktree, command)
+            work_item_name = _command_option(command, "--work-item-name")
+            return {
+                "path": str(
+                    worktree
+                    / "docs"
+                    / "proposals"
+                    / work_item_name
+                    / "design-interview-input.json"
+                )
+            }
+        if command[:2] == ["powdrr-lift", "feature-pr-specification"]:
+            _run(runner, worktree, command)
+            work_item_name = _command_option(command, "--work-item-name")
+            return {
+                "path": str(
+                    worktree
+                    / "docs"
+                    / "proposals"
+                    / work_item_name
+                    / "feature-pr-specification.yaml"
+                )
+            }
+        if command[:2] == ["powdrr-lift", "evaluate"]:
+            result = _run(runner, worktree, command)
+            return {
+                "returncode": result.returncode,
+                "issues": [],
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
+        if name == "extract_proposal_issues":
+            evaluation = parameters.get("evaluation")
+            return (
+                list(evaluation.get("issues", []))
+                if isinstance(evaluation, Mapping)
+                else []
+            )
+        if name == "aggregate_category_edits":
+            decisions = parameters.get("decisions")
+            if not isinstance(decisions, Mapping):
+                raise PowdrrExecutionError(
+                    "aggregate_category_edits requires category decisions"
+                )
+            return _aggregate_category_edits(decisions)
+        if len(command) != 1:
+            raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
             baseline = _require_flow_text(parameters, "baseline")
             if baseline != str(state["baseline_path"]):
@@ -168,7 +241,11 @@ def _execute_procedrr_flow(
                     parameters, "feature_description"
                 ),
             )
-            state["plan_path"] = _write_structrr_plan(worktree, plan_config)
+            state["plan_path"] = _write_structrr_plan(
+                worktree,
+                plan_config,
+                interview_input=parameters.get("interview_input"),
+            )
             _commit(runner, worktree, "Record Structrr feature diff")
             return {"path": str(state["plan_path"])}
         if name == "run_opencode":
@@ -270,8 +347,21 @@ def _execute_procedrr_flow(
             return pull_request_value
         raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")
 
+    if config.planning_client is None:
+        raise PowdrrExecutionError(
+            "implement-feature requires a planning_client for its "
+            "design-interview subprocess"
+        )
     try:
-        Evaluator(cast(Any, lambda *_args, **_kwargs: None), execute).evaluate(
+        evaluator = Evaluator(
+            WorkrrProcedrrClient(
+                config.planning_client,
+                skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+            ),
+            execute,
+            process_directory=worktree / "docs" / "procedrr" / "skill-definitions",
+        )
+        evaluator.evaluate(
             flow,
             {
                 "feature_description": config.feature_description,
@@ -385,6 +475,17 @@ def _require_flow_text(parameters: Mapping[str, Any], name: str) -> str:
     return value
 
 
+def _command_option(command: list[Any], option: str) -> str:
+    try:
+        index = command.index(option)
+        value = command[index + 1]
+    except (ValueError, IndexError) as error:
+        raise PowdrrExecutionError(f"flow command is missing {option}") from error
+    if not isinstance(value, str) or not value.strip():
+        raise PowdrrExecutionError(f"flow command option {option} is malformed")
+    return value
+
+
 def _feature_endpoint_result(
     state: dict[str, Any], branch: str, worktree: Path, status: str
 ) -> FeatureEndpointResult:
@@ -436,11 +537,42 @@ def review_feature_diff(
     }
 
 
-def _write_structrr_plan(worktree: Path, config: FeatureEndpointConfig) -> Path:
+def _write_structrr_plan(
+    worktree: Path,
+    config: FeatureEndpointConfig,
+    *,
+    interview_input: Any,
+) -> Path:
     slug = slugify_workflow_id(config.work_item_name)
     proposal = worktree / "docs" / "proposals" / slug
     proposal.mkdir(parents=True, exist_ok=True)
     path = proposal / "structrr-diff.yaml"
+    interview = dict(interview_input) if isinstance(interview_input, Mapping) else {}
+    sections = {
+        key: _interview_edits(interview.get(f"{key}_edits"))
+        for key in (
+            "requirements",
+            "approach",
+            "entities",
+            "entity_relationships",
+            "invariants",
+            "guidance",
+            "features",
+            "human_decisions",
+            "intent",
+            "intents",
+            "acceptance_criteria",
+            "expected_tests",
+            "required_test_cases",
+            "expected_outcomes",
+            "non_goals",
+            "risks",
+            "decisions",
+            "proposed_prs",
+            "modules",
+            "tools",
+        )
+    }
     document = {
         "schema": "https://powdrr.io/schema/changelog-v2",
         "change_id": slug,
@@ -449,24 +581,102 @@ def _write_structrr_plan(worktree: Path, config: FeatureEndpointConfig) -> Path:
             "problem": "The requested product behavior is not yet available.",
             "goal": config.feature_description,
         },
-        "human-decisions": [],
+        "human-decisions": sections["human_decisions"],
         "files": [],
-        "entities": [{"id": slug, "type": "Feature", "action": "added"}],
-        "entity_relationships": [],
-        "features": [
+        "entities": sections["entities"]
+        or [{"id": slug, "type": "Feature", "action": "added"}],
+        "entity_relationships": sections["entity_relationships"],
+        "features": sections["features"]
+        or [
             {
                 "id": slug,
                 "description": config.feature_description,
                 "action": "added",
             }
         ],
-        "invariants": [],
-        "guidance": [],
-        "proposed_prs": [],
+        "invariants": sections["invariants"],
+        "guidance": sections["guidance"],
+        "proposed_prs": sections["proposed_prs"],
     }
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     parse_change_log(path.read_text(encoding="utf-8"))
     return path
+
+
+def _interview_edits(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, Mapping):
+        return []
+    edits: list[dict[str, Any]] = []
+    for action, items in (
+        ("added", value.get("added")),
+        ("deleted", value.get("deleted")),
+    ):
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, Mapping):
+                edits.append({**item, "action": action})
+    return edits
+
+
+def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:
+    aggregated: dict[str, Any] = {}
+    for category, decision in decisions.items():
+        added: list[dict[str, Any]] = []
+        deleted: list[dict[str, Any]] = []
+        if isinstance(decision, Mapping):
+            action = decision.get("action")
+            item = decision.get("item")
+            if action == "add" and isinstance(item, Mapping):
+                added.append(dict(item))
+            elif action == "delete" and isinstance(item, Mapping):
+                deleted.append(dict(item))
+        aggregated[str(category)] = {"added": added, "deleted": deleted}
+    return aggregated
+
+
+def _resolve_flow_path(worktree: Path, relative_path: str) -> Path:
+    target = (worktree / relative_path).resolve()
+    if target != worktree.resolve() and worktree.resolve() not in target.parents:
+        raise PowdrrExecutionError(f"flow path escapes worktree: {relative_path}")
+    return target
+
+
+def _apply_flow_yaml_edit(
+    worktree: Path, parameters: Mapping[str, Any]
+) -> dict[str, Any]:
+    edit = parameters.get("edit")
+    if not isinstance(edit, Mapping):
+        raise PowdrrExecutionError("yaml_edit requires an edit mapping")
+    file_path = edit.get("path", parameters.get("file_path"))
+    edits = edit.get("edits")
+    if not isinstance(file_path, str) or not isinstance(edits, list):
+        raise PowdrrExecutionError("yaml_edit requires path and edits")
+    target = _resolve_flow_path(worktree, file_path)
+    document = yaml.safe_load(target.read_text(encoding="utf-8"))
+    if not isinstance(document, Mapping):
+        raise PowdrrExecutionError("yaml_edit target must contain a mapping")
+    updated = dict(document)
+    for item in edits:
+        if not isinstance(item, Mapping):
+            raise PowdrrExecutionError("yaml_edit entries must be mappings")
+        path = item.get("path")
+        if (
+            not isinstance(path, list)
+            or not path
+            or not all(isinstance(part, str) for part in path)
+        ):
+            raise PowdrrExecutionError("yaml_edit entries require a path list")
+        cursor: Any = updated
+        for part in path[:-1]:
+            if not isinstance(cursor, Mapping) or part not in cursor:
+                raise PowdrrExecutionError(f"yaml_edit path does not exist: {path}")
+            cursor = cursor[part]
+        if not isinstance(cursor, dict):
+            raise PowdrrExecutionError(f"yaml_edit parent is not a mapping: {path}")
+        cursor[path[-1]] = item.get("value")
+    target.write_text(yaml.safe_dump(updated, sort_keys=False), encoding="utf-8")
+    return {"path": str(target), "edits": len(edits)}
 
 
 def _validate_procedrr_flow(worktree: Path) -> Path:

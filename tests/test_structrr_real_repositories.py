@@ -48,15 +48,10 @@ def test_bootstrap_real_powdrr_checkout_is_valid_and_repeatable(
     assert all(binding["subject_id"] in subject_ids for binding in bindings)
     assert all(binding["entity_id"] in entity_ids for binding in bindings)
     assert snapshot_digest(first) == snapshot_digest(second)
-
-
-def test_bootstrap_matches_gold_python_symbols(tmp_path: Path) -> None:
     gold_path = PROJECT_ROOT / "tests/fixtures/structrr/golden-python-symbols.yaml"
     expected = yaml.safe_load(gold_path.read_text(encoding="utf-8"))["symbols"]
-    document = _bootstrap(PROJECT_ROOT, tmp_path / "gold.yaml")
     actual = {
-        (subject["path"], subject["qualified_name"]): subject
-        for subject in document["source_subjects"]
+        (subject["path"], subject["qualified_name"]): subject for subject in subjects
     }
 
     for item in expected:

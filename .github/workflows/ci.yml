@@ -67,7 +67,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Run tests
-        run: uv run pytest tests
+        run: uv run pytest -n auto tests
 
       - name: Run deterministic workflow scenario suite
         run: ./scripts/run-deterministic-workflow-suite.sh

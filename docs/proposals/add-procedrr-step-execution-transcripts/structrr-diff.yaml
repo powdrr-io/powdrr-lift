@@ -1,0 +1,47 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: add-procedrr-step-execution-transcripts
+title: Add Procedrr step execution transcripts
+intent:
+  problem: The requested product behavior is not yet available.
+  goal: Add a durable transcript of every Procedrr step execution, recording the step
+    identity, inputs, outputs, and outcome in order so an operator can inspect exactly
+    what the flow received and produced.
+human-decisions: []
+files: []
+entities:
+- id: step-execution-transcript
+  type: Configuration file
+  summary: Durable ordered record of step identity, inputs, outputs, and outcome for
+    operator inspection.
+  rationale: Directly implements the feature by persisting each step execution's full
+    context and result.
+  action: added
+entity_relationships:
+- id: step-transcript-records-execution
+  description: The step execution transcript records step identity, inputs, outputs,
+    and outcome in order.
+  rationale: Provide durable operator inspection of exact flow behavior.
+  relationship: records
+  source: step-execution-transcript
+  target: step-execution
+  action: added
+features:
+- id: add-procedrr-step-execution-transcripts
+  description: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+  action: added
+invariants: []
+guidance:
+- id: guide-transcript-step-identity-inputs-outputs-outcome
+  description: Record the step identity, inputs, outputs, and outcome in order for
+    every Procedrr step execution so an operator can inspect exactly what the flow
+    received and produced.
+  section: guidance
+  action: added
+acceptance_criteria:
+- The transcript records the step identity, inputs, outputs, and outcome in the order
+  the steps executed, so an operator can inspect exactly what the flow received and
+  produced.
+proposed_prs:
+- action: added

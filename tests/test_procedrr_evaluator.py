@@ -608,6 +608,66 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     ).read_text() == 'print("Hello, World")\nprint("Here I Am")\n'
 
 
+def test_step_execution_transcript_records_identity_inputs_outputs_in_order() -> None:
+    result = Evaluator(
+        FakeLLM(), lambda _tool, parameters: {"echo": parameters["value"]}
+    ).evaluate(
+        {
+            "name": "transcript",
+            "steps": [
+                {
+                    "operation": {
+                        "tool": "internal",
+                        "parameters": {"value": "first"},
+                        "bind": "first",
+                    }
+                },
+                {
+                    "operation": {
+                        "tool": "internal",
+                        "parameters": {"value": "second"},
+                        "bind": "second",
+                    }
+                },
+                {"terminal": "succeeded"},
+            ],
+        }
+    )
+
+    assert [
+        (entry.kind, entry.path, entry.outcome) for entry in result.transcript
+    ] == [
+        ("operation", "steps[0]", "succeeded"),
+        ("operation", "steps[1]", "succeeded"),
+        ("terminal", "steps[2]", "succeeded"),
+    ]
+    assert result.transcript[0].inputs == {"tool": "internal"}
+    assert result.transcript[0].outputs == {"first": {"echo": "first"}}
+    assert result.transcript[1].outputs == {"second": {"echo": "second"}}
+    assert result.transcript[2].inputs == {"status": "succeeded"}
+
+
+def test_step_execution_transcript_marks_failed_gate_outcome() -> None:
+    with pytest.raises(EvaluationError):
+        Evaluator(
+            FakeLLM(), lambda _tool, parameters: None
+        ).evaluate(
+            {
+                "name": "transcript-gate",
+                "steps": [
+                    {
+                        "gate": {
+                            "subject": "ready",
+                            "equals": True,
+                            "on_failure": {"retry": {"target": "repair"}},
+                        }
+                    }
+                ],
+            },
+            {"ready": False},
+        )
+
+
 def test_operation_resolves_explicit_literal_and_reference_values() -> None:
     from procedrr import parse_and_validate
 

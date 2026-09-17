@@ -45,11 +45,28 @@ class EvaluationEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class StepTranscript:
+    """A durable record of a single Procedrr step execution.
+
+    Captures the step identity, the inputs the step received, the outputs it
+    produced, and its outcome, ordered by execution so an operator can inspect
+    exactly what the flow received and produced.
+    """
+
+    kind: str
+    path: str
+    inputs: Mapping[str, Any] = field(default_factory=dict)
+    outputs: Mapping[str, Any] = field(default_factory=dict)
+    outcome: str = "succeeded"
+
+
+@dataclass(frozen=True, slots=True)
 class EvaluationResult:
     bindings: Mapping[str, Any]
     events: tuple[EvaluationEvent, ...]
     llm_activations: int
     tool_calls: int
+    transcript: tuple[StepTranscript, ...] = ()
 
 
 class Evaluator:
@@ -98,19 +115,35 @@ class Evaluator:
         state = dict(bindings or {})
         self._document_recoveries = document.get("recoveries", {})
         events: list[EvaluationEvent] = []
+        transcript: list[StepTranscript] = []
         usage = {"llm": 0, "tools": 0}
         limits = document.get("limits", {})
         try:
-            self._steps(document["steps"], state, events, usage, limits, "steps")
+            self._steps(
+                document["steps"],
+                state,
+                events,
+                transcript,
+                usage,
+                limits,
+                "steps",
+            )
         except (KeyError, TypeError, ValueError, JsonSchemaError) as exc:
             raise EvaluationError(str(exc)) from exc
-        return EvaluationResult(state, tuple(events), usage["llm"], usage["tools"])
+        return EvaluationResult(
+            state,
+            tuple(events),
+            usage["llm"],
+            usage["tools"],
+            tuple(transcript),
+        )
 
     def _steps(
         self,
         steps: Sequence[Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -119,49 +152,123 @@ class Evaluator:
             step_path = f"{path}[{index}]"
             if not isinstance(step, Mapping):
                 raise EvaluationError(f"{step_path} must be a mapping")
-            if "operation" in step:
-                self._operation(
-                    step["operation"], state, events, usage, limits, step_path
-                )
-            elif "judge" in step:
-                self._judge(step["judge"], state, events, usage, limits, step_path)
-            elif "for_each" in step or "worklist" in step:
-                key = "for_each" if "for_each" in step else "worklist"
-                self._loop(key, step[key], state, events, usage, limits, step_path)
-            elif "attempt" in step:
-                self._attempt(step["attempt"], state, events, usage, limits, step_path)
-            elif "specialize" in step:
-                self._specialize(
-                    step["specialize"], state, events, usage, limits, step_path
-                )
-            elif "call" in step:
-                declaration = step["call"]
-                if isinstance(declaration, Mapping) and "process" in declaration:
+            kind = _step_kind(step)
+            try:
+                if kind == "operation":
+                    self._operation(
+                        step["operation"], state, events, usage, limits, step_path
+                    )
+                elif kind == "judge":
+                    self._judge(step["judge"], state, events, usage, limits, step_path)
+                elif kind == "loop":
+                    key = "for_each" if "for_each" in step else "worklist"
+                    self._loop(
+                        key,
+                        step[key],
+                        state,
+                        events,
+                        transcript,
+                        usage,
+                        limits,
+                        step_path,
+                    )
+                elif kind == "attempt":
+                    self._attempt(
+                        step["attempt"],
+                        state,
+                        events,
+                        transcript,
+                        usage,
+                        limits,
+                        step_path,
+                    )
+                elif kind == "specialize":
+                    self._specialize(
+                        step["specialize"],
+                        state,
+                        events,
+                        transcript,
+                        usage,
+                        limits,
+                        step_path,
+                    )
+                elif kind == "call_process":
                     self._call_process(
-                        declaration, state, events, usage, limits, step_path
+                        step["call"],
+                        state,
+                        events,
+                        transcript,
+                        usage,
+                        limits,
+                        step_path,
                     )
-                else:
+                elif kind == "call_fragment":
                     self._call_fragment(
-                        declaration, state, events, usage, limits, step_path
+                        step["call"],
+                        state,
+                        events,
+                        transcript,
+                        usage,
+                        limits,
+                        step_path,
                     )
-            elif "repeat" in step:
-                self._repeat(step["repeat"], state, events, usage, limits, step_path)
-            elif "branch" in step:
-                self._branch(step["branch"], state, events, usage, limits, step_path)
-            elif "terminal" in step:
-                events.append(
-                    EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
-                )
-            elif "gate" in step:
-                self._gate(step["gate"], state, step_path)
-            else:
-                raise EvaluationError(f"{step_path} has no supported control")
+                elif kind == "repeat":
+                    self._repeat(
+                        step["repeat"],
+                        state,
+                        events,
+                        transcript,
+                        usage,
+                        limits,
+                        step_path,
+                    )
+                elif kind == "branch":
+                    self._branch(
+                        step["branch"],
+                        state,
+                        events,
+                        transcript,
+                        usage,
+                        limits,
+                        step_path,
+                    )
+                elif kind == "terminal":
+                    status = step["terminal"]
+                    events.append(
+                        EvaluationEvent("terminal", step_path, {"status": status})
+                    )
+                elif kind == "gate":
+                    self._gate(step["gate"], state, step_path)
+                else:
+                    raise EvaluationError(f"{step_path} has no supported control")
+                scrape_exc: BaseException | None = None
+            except BaseException as exc:
+                scrape_exc = exc
+                raise
+            finally:
+                try:
+                    transcript.append(
+                        _build_transcript(
+                            kind,
+                            step,
+                            state,
+                            path=step_path,
+                            outcome=(
+                                "failed"
+                                if scrape_exc is not None
+                                else "succeeded"
+                            ),
+                        )
+                    )
+                except Exception:
+                    pass
 
     def _specialize(
         self,
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -200,6 +307,7 @@ class Evaluator:
             process["steps"],
             generator_state,
             events,
+            transcript,
             generator_usage,
             process.get("limits", {}),
             f"{path}.subprocess[{process_name}]",
@@ -242,6 +350,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -260,7 +369,13 @@ class Evaluator:
         if not isinstance(maximum, int) or len(fragment["steps"]) > maximum:
             raise EvaluationError(f"{path}.call.fragment exceeds its step bound")
         self._steps(
-            fragment["steps"], state, events, usage, limits, f"{path}.call.body"
+            fragment["steps"],
+            state,
+            events,
+            transcript,
+            usage,
+            limits,
+            f"{path}.call.body",
         )
 
     def _call_process(
@@ -268,6 +383,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -331,7 +447,9 @@ class Evaluator:
         steps = process.get("steps")
         if not isinstance(steps, list):
             raise EvaluationError(f"{path}.call process has no steps")
-        self._steps(steps, child_state, events, usage, child_limits, f"{path}.call")
+        self._steps(
+            steps, child_state, events, transcript, usage, child_limits, f"{path}.call"
+        )
         for parent_name, child_reference in outputs.items():
             if not isinstance(parent_name, str) or not isinstance(child_reference, str):
                 raise EvaluationError(
@@ -360,6 +478,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -390,7 +509,13 @@ class Evaluator:
         for attempt in range(1, maximum + 1):
             try:
                 self._steps(
-                    body, state, events, usage, limits, f"{path}.attempt[{attempt}]"
+                    body,
+                    state,
+                    events,
+                    transcript,
+                    usage,
+                    limits,
+                    f"{path}.attempt[{attempt}]",
                 )
                 return
             except EvaluationError as exc:
@@ -407,6 +532,7 @@ class Evaluator:
                     recovery["steps"],
                     state,
                     events,
+                    transcript,
                     usage,
                     limits,
                     f"{path}.recovery[{attempt}]",
@@ -418,6 +544,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -436,7 +563,13 @@ class Evaluator:
         collected: list[Any] = []
         for iteration in range(1, maximum + 1):
             self._steps(
-                body, state, events, usage, limits, f"{path}.repeat[{iteration}]"
+                body,
+                state,
+                events,
+                transcript,
+                usage,
+                limits,
+                f"{path}.repeat[{iteration}]",
             )
             if isinstance(collect, Mapping) and isinstance(collect.get("value"), str):
                 value = _resolve_binding(state, collect["value"])
@@ -463,6 +596,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -477,7 +611,15 @@ class Evaluator:
             raise EvaluationError(f"{path}.branch has no case for {value!r}")
         if not isinstance(body, list):
             raise EvaluationError(f"{path}.branch case must be a list")
-        self._steps(body, state, events, usage, limits, f"{path}.branch[{value!r}]")
+        self._steps(
+            body,
+            state,
+            events,
+            transcript,
+            usage,
+            limits,
+            f"{path}.branch[{value!r}]",
+        )
 
     def _operation(
         self,
@@ -596,6 +738,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[StepTranscript],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -636,6 +779,7 @@ class Evaluator:
                     body,
                     state,
                     events,
+                    transcript,
                     usage,
                     limits,
                     f"{path}.{kind}[{epoch}][{index}]",
@@ -677,6 +821,168 @@ class Evaluator:
         usage_key = "llm" if key == "llm_activations" else "tools"
         if isinstance(bound, int) and usage[usage_key] > bound:
             raise EvaluationError(f"{label} budget exceeded")
+
+
+def _step_kind(step: Mapping[str, Any]) -> str:
+    """Identify a step's control kind for the execution transcript."""
+    if "operation" in step:
+        return "operation"
+    if "judge" in step:
+        return "judge"
+    if "for_each" in step or "worklist" in step:
+        return "loop"
+    if "attempt" in step:
+        return "attempt"
+    if "specialize" in step:
+        return "specialize"
+    if "call" in step:
+        declaration = step["call"]
+        if isinstance(declaration, Mapping) and "process" in declaration:
+            return "call_process"
+        return "call_fragment"
+    if "repeat" in step:
+        return "repeat"
+    if "branch" in step:
+        return "branch"
+    if "terminal" in step:
+        return "terminal"
+    if "gate" in step:
+        return "gate"
+    return "unknown"
+
+
+def _build_transcript(
+    kind: str,
+    step: Mapping[str, Any],
+    state: Mapping[str, Any],
+    *,
+    path: str,
+    outcome: str,
+) -> StepTranscript:
+    """Capture a step's identity, inputs, outputs, and outcome."""
+    if kind == "operation":
+        declaration = step["operation"]
+        tool = declaration.get("tool")
+        bind = (
+            declaration.get("bind")
+            if isinstance(declaration, Mapping) and isinstance(declaration.get("bind"), str)
+            else None
+        )
+        outputs: dict[str, Any] = {}
+        if isinstance(bind, str) and bind in state:
+            outputs[bind] = state[bind]
+        return StepTranscript(
+            kind,
+            path,
+            inputs={"tool": tool},
+            outputs=outputs,
+            outcome=outcome,
+        )
+    if kind == "judge":
+        declaration = step["judge"]
+        context = declaration.get("context", [])
+        inputs = {
+            name: state.get(name)
+            for name in context
+            if isinstance(name, str)
+        }
+        output_name = (
+            declaration.get("output", {}).get("name")
+            if isinstance(declaration.get("output"), Mapping)
+            else None
+        )
+        outputs: dict[str, Any] = {}
+        if isinstance(output_name, str) and output_name in state:
+            outputs[output_name] = state[output_name]
+        return StepTranscript(
+            kind, path, inputs=inputs, outputs=outputs, outcome=outcome
+        )
+    if kind in {"loop", "repeat", "branch"}:
+        declaration = step.get(
+            "for_each", step.get("worklist", step.get("repeat", step.get("branch")))
+        )
+        inputs = _declared_step_inputs(declaration, state)
+        return StepTranscript(
+            kind, path, inputs=inputs, outcome=outcome
+        )
+    if kind == "attempt":
+        return StepTranscript(
+            kind,
+            path,
+            inputs={"id": step["attempt"].get("id")},
+            outcome=outcome,
+        )
+    if kind == "specialize":
+        return StepTranscript(
+            kind,
+            path,
+            inputs={"bind": step["specialize"].get("bind")},
+            outcome=outcome,
+        )
+    if kind == "call_process":
+        declaration = step["call"]
+        process_name = declaration.get("process")
+        inputs = {
+            name: state.get(name)
+            for name in declaration.get("inputs", {})
+        }
+        outputs = {
+            name: state.get(name)
+            for name in declaration.get("outputs", {})
+        }
+        return StepTranscript(
+            kind,
+            path,
+            inputs={"process": process_name, "inputs": inputs},
+            outputs=outputs,
+            outcome=outcome,
+        )
+    if kind == "call_fragment":
+        return StepTranscript(
+            kind,
+            path,
+            inputs={"fragment": step["call"].get("fragment")},
+            outcome=outcome,
+        )
+    if kind == "terminal":
+        return StepTranscript(
+            kind,
+            path,
+            inputs={"status": step.get("terminal")},
+            outcome=outcome,
+        )
+    if kind == "gate":
+        return StepTranscript(
+            kind,
+            path,
+            inputs={"subject": step["gate"].get("subject")},
+            outcome=outcome,
+        )
+    return StepTranscript(kind, path, outcome=outcome)
+
+
+def _declared_step_inputs(
+    declaration: Any, state: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    if not isinstance(declaration, Mapping):
+        return {}
+    snapshot = declaration.get("snapshot")
+    if isinstance(snapshot, Mapping):
+        name = snapshot.get("name")
+        if isinstance(name, str) and name in state:
+            return {"snapshot": name, "values": state[name]}
+    subject = declaration.get("subject")
+    if isinstance(subject, str):
+        try:
+            return {"subject": _resolve_binding(state, subject)}
+        except EvaluationError:
+            return {"subject": subject}
+    until = declaration.get("until")
+    if isinstance(until, Mapping):
+        subject = until.get("subject")
+        if isinstance(subject, str) and subject in state:
+            return {"until": state[subject]}
+    return {}
 
 
 def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:
@@ -796,4 +1102,5 @@ __all__ = [
     "EvaluationResult",
     "Evaluator",
     "OperationExecutor",
+    "StepTranscript",
 ]

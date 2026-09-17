@@ -3,6 +3,10 @@ name: design-interview
 inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
+outputs:
+  interview_input: {type: object}
+  proposal: {type: object, required: [path]}
+  proposal_evaluation: {type: object, required: [returncode]}
 description: >-
   Gather the repository's design-interview categories one at a time, ask one
   typed question per category, persist the resulting edits, generate the

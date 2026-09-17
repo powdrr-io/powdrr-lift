@@ -60,7 +60,8 @@ def test_evaluator_calls_a_named_procedrr_process(tmp_path: Path) -> None:
         """
 version: 1
 name: design-interview
-inputs: [{name: feature_description, required: true}]
+inputs: [{name: feature_description, type: string, required: true}]
+outputs: {receipt: {type: object, required: [feature]}}
 limits: {llm_activations: 2, tool_calls: 2}
 steps:
   - operation:
@@ -75,7 +76,7 @@ steps:
         """
 version: 1
 name: implement-feature
-inputs: [{name: feature_description, required: true}]
+inputs: [{name: feature_description, type: string, required: true}]
 steps:
   - call:
       process: design-interview
@@ -380,6 +381,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             command = parameters.get("command", [])
             if len(command) > 1 and command[1] == "evaluate":
                 return {"returncode": 0}
+            if len(command) > 1 and command[1] == "feature-pr-specification":
+                return {"path": "docs/proposals/demo/feature-pr-specification.yaml"}
             if command and command[0] == "extract_proposal_issues":
                 return []
         return {"ok": True}

@@ -95,6 +95,62 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
         )
     recoveries = document.get("recoveries", {})
     recovery_names = set(recoveries) if isinstance(recoveries, Mapping) else set()
+    outputs = document.get("outputs")
+    if outputs is not None:
+        if not isinstance(outputs, Mapping) or not outputs:
+            diagnostics.append(
+                DocumentDiagnostic("outputs", "outputs must be a non-empty mapping")
+            )
+        else:
+            for name, schema in outputs.items():
+                if not isinstance(name, str) or not re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_.-]*", name
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            "outputs", "output names must be valid binding names"
+                        )
+                    )
+                if not isinstance(schema, Mapping):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"outputs.{name}",
+                            "output declarations must be JSON Schema objects",
+                        )
+                    )
+                else:
+                    try:
+                        Draft7Validator.check_schema(dict(schema))
+                    except SchemaError as error:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"outputs.{name}",
+                                f"invalid output schema: {error.message}",
+                            )
+                        )
+    inputs = document.get("inputs", [])
+    if not isinstance(inputs, list):
+        diagnostics.append(DocumentDiagnostic("inputs", "inputs must be a list"))
+    else:
+        input_names: set[str] = set()
+        for index, item in enumerate(inputs):
+            path = f"inputs[{index}]"
+            if not isinstance(item, Mapping):
+                diagnostics.append(DocumentDiagnostic(path, "input must be a mapping"))
+                continue
+            name = item.get("name")
+            if not isinstance(name, str) or not re.fullmatch(
+                r"[A-Za-z_][A-Za-z0-9_.-]*", name
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(f"{path}.name", "input name is invalid")
+                )
+            elif name in input_names:
+                diagnostics.append(
+                    DocumentDiagnostic(f"{path}.name", "input name is duplicated")
+                )
+            else:
+                input_names.add(name)
     steps = document.get("steps")
     if not isinstance(steps, list) or not steps:
         diagnostics.append(

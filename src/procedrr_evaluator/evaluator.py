@@ -280,7 +280,22 @@ class Evaluator:
         if not isinstance(outputs, Mapping) or not outputs:
             raise EvaluationError(f"{path}.call.outputs is required")
         process = self._load_process(process_name)
+        declared_outputs = process.get("outputs")
+        if not isinstance(declared_outputs, Mapping) or not declared_outputs:
+            raise EvaluationError(f"{path}.call process must declare named outputs")
         process_inputs = process.get("inputs", [])
+        if not isinstance(process_inputs, list):
+            raise EvaluationError(f"{path}.call process has malformed inputs")
+        declared_inputs = {
+            item.get("name"): item
+            for item in process_inputs
+            if isinstance(item, Mapping) and isinstance(item.get("name"), str)
+        }
+        undeclared = sorted(set(inputs) - set(declared_inputs))
+        if undeclared:
+            raise EvaluationError(
+                f"{path}.call supplied undeclared inputs: {', '.join(undeclared)}"
+            )
         required_inputs = {
             name
             for item in process_inputs
@@ -296,6 +311,22 @@ class Evaluator:
             raise EvaluationError(
                 f"{path}.call process is missing inputs: {', '.join(missing)}"
             )
+        for name, value in child_state.items():
+            input_declaration = declared_inputs[name]
+            schema = input_declaration.get("schema")
+            if not isinstance(schema, Mapping):
+                schema_type = input_declaration.get("type")
+                if schema_type in {
+                    "string",
+                    "integer",
+                    "number",
+                    "boolean",
+                    "object",
+                    "array",
+                }:
+                    schema = {"type": schema_type}
+            if isinstance(schema, Mapping):
+                validate_json(value, schema)
         child_limits = _bounded_limits(limits, process.get("limits"))
         steps = process.get("steps")
         if not isinstance(steps, list):
@@ -306,7 +337,16 @@ class Evaluator:
                 raise EvaluationError(
                     f"{path}.call.outputs must map names to references"
                 )
-            state[parent_name] = _resolve_binding(child_state, child_reference)
+            if child_reference not in declared_outputs:
+                raise EvaluationError(
+                    f"{path}.call output is not declared by {process_name}: "
+                    f"{child_reference}"
+                )
+            value = _resolve_binding(child_state, child_reference)
+            schema = declared_outputs[child_reference]
+            if isinstance(schema, Mapping):
+                validate_json(value, schema)
+            state[parent_name] = value
         events.append(
             EvaluationEvent(
                 "process",

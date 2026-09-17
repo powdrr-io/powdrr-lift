@@ -67,7 +67,15 @@ jobs:
           if-no-files-found: ignore
 
       - name: Run tests
-        run: uv run pytest -n auto tests
+        run: uv run pytest -n auto --cov=powdrr_lift --cov-branch --cov-report=term-missing --cov-report=xml tests
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-coverage-report
+          path: coverage.xml
+          if-no-files-found: ignore
 
       - name: Run deterministic workflow scenario suite
         run: ./scripts/run-deterministic-workflow-suite.sh

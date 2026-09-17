@@ -12,6 +12,15 @@ steps:
         required: [path]
         properties: {path: {type: string, minLength: 1}}
       bind: baseline
+  - call:
+      process: design-interview
+      inputs:
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
+      outputs:
+        interview_input: interview_input
+        proposal: proposal_template
+        proposal_evaluation: final_proposal_evaluation
   - operation:
       tool: internal
       command: [plan_structrr_diff]
@@ -19,6 +28,9 @@ steps:
         baseline: {type: reference, value: baseline.path}
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
+        interview_input: {type: reference, value: interview_input}
+        proposal: {type: reference, value: proposal}
+        proposal_evaluation: {type: reference, value: proposal_evaluation}
       returns:
         type: object
         required: [path]

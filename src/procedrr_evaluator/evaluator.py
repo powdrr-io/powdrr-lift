@@ -135,9 +135,15 @@ class Evaluator:
                     step["specialize"], state, events, usage, limits, step_path
                 )
             elif "call" in step:
-                self._call_fragment(
-                    step["call"], state, events, usage, limits, step_path
-                )
+                declaration = step["call"]
+                if isinstance(declaration, Mapping) and "process" in declaration:
+                    self._call_process(
+                        declaration, state, events, usage, limits, step_path
+                    )
+                else:
+                    self._call_fragment(
+                        declaration, state, events, usage, limits, step_path
+                    )
             elif "repeat" in step:
                 self._repeat(step["repeat"], state, events, usage, limits, step_path)
             elif "branch" in step:
@@ -255,6 +261,58 @@ class Evaluator:
             raise EvaluationError(f"{path}.call.fragment exceeds its step bound")
         self._steps(
             fragment["steps"], state, events, usage, limits, f"{path}.call.body"
+        )
+
+    def _call_process(
+        self,
+        declaration: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> None:
+        process_name = declaration.get("process")
+        inputs = declaration.get("inputs", {})
+        outputs = declaration.get("outputs", {})
+        if not isinstance(process_name, str) or not isinstance(inputs, Mapping):
+            raise EvaluationError(f"{path}.call process is malformed")
+        if not isinstance(outputs, Mapping) or not outputs:
+            raise EvaluationError(f"{path}.call.outputs is required")
+        process = self._load_process(process_name)
+        process_inputs = process.get("inputs", [])
+        required_inputs = {
+            name
+            for item in process_inputs
+            if isinstance(item, Mapping)
+            and item.get("required") is True
+            and isinstance((name := item.get("name")), str)
+        }
+        child_state = {
+            str(name): _resolve_value(value, state) for name, value in inputs.items()
+        }
+        missing = sorted(name for name in required_inputs if name not in child_state)
+        if missing:
+            raise EvaluationError(
+                f"{path}.call process is missing inputs: {', '.join(missing)}"
+            )
+        child_limits = _bounded_limits(limits, process.get("limits"))
+        steps = process.get("steps")
+        if not isinstance(steps, list):
+            raise EvaluationError(f"{path}.call process has no steps")
+        self._steps(steps, child_state, events, usage, child_limits, f"{path}.call")
+        for parent_name, child_reference in outputs.items():
+            if not isinstance(parent_name, str) or not isinstance(child_reference, str):
+                raise EvaluationError(
+                    f"{path}.call.outputs must map names to references"
+                )
+            state[parent_name] = _resolve_binding(child_state, child_reference)
+        events.append(
+            EvaluationEvent(
+                "process",
+                path,
+                {"name": process_name, "outputs": list(outputs)},
+            )
         )
 
     def _attempt(
@@ -403,6 +461,13 @@ class Evaluator:
                 if key not in {"tool", "bind", "returns"}
             }
         parameters = _resolve_value(raw_parameters, state)
+        if tool == "internal" and "command" in operation:
+            if not isinstance(parameters, Mapping):
+                raise EvaluationError(f"{path}.operation.parameters must be a mapping")
+            parameters = {
+                "command": _resolve_value(operation["command"], state),
+                **parameters,
+            }
         result = self.operation_executor(tool, parameters)
         returns = operation.get("returns")
         if isinstance(returns, Mapping):
@@ -581,6 +646,21 @@ def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:
             raise EvaluationError(f"unknown binding: {path}")
         value = value[segment]
     return value
+
+
+def _bounded_limits(parent: Mapping[str, Any], child: Any) -> Mapping[str, Any]:
+    """Keep a subprocess inside both its declaration and its caller budget."""
+    if not isinstance(child, Mapping):
+        return parent
+    bounded = dict(parent)
+    for key in ("llm_activations", "tool_calls", "max_epochs"):
+        child_value = child.get(key)
+        parent_value = parent.get(key)
+        if isinstance(child_value, int) and isinstance(parent_value, int):
+            bounded[key] = min(child_value, parent_value)
+        elif isinstance(child_value, int):
+            bounded[key] = child_value
+    return bounded
 
 
 def _resolve_value(value: Any, state: Mapping[str, Any]) -> Any:

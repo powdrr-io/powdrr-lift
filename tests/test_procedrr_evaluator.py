@@ -53,6 +53,51 @@ steps:
         )
 
 
+def test_evaluator_calls_a_named_procedrr_process(tmp_path: Path) -> None:
+    from procedrr import parse_and_validate
+
+    (tmp_path / "design-interview.yaml").write_text(
+        """
+version: 1
+name: design-interview
+inputs: [{name: feature_description, required: true}]
+limits: {llm_activations: 2, tool_calls: 2}
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [record_feature, "${feature_description}"]}
+      bind: receipt
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    document = parse_and_validate(
+        """
+version: 1
+name: implement-feature
+inputs: [{name: feature_description, required: true}]
+steps:
+  - call:
+      process: design-interview
+      inputs: {feature_description: {type: reference, value: feature_description}}
+      outputs: {interview: receipt}
+  - terminal: succeeded
+"""
+    )
+    calls: list[dict[str, Any]] = []
+
+    def execute(_tool: str, parameters: Mapping[str, Any]) -> Any:
+        calls.append(dict(parameters))
+        return {"feature": parameters["command"][1]}
+
+    result = Evaluator(FakeLLM(), execute, process_directory=tmp_path).evaluate(
+        document, {"feature_description": "Add a greeting"}
+    )
+
+    assert result.bindings["interview"] == {"feature": "Add a greeting"}
+    assert calls == [{"command": ["record_feature", "Add a greeting"]}]
+
+
 def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     llm = FakeLLM()
     calls: list[tuple[str, dict[str, Any]]] = []
@@ -331,8 +376,12 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "gather_context":
             return [{"id": "existing", "description": "Existing evidence"}]
-        if tool == "internal" and parameters.get("command", [None])[1] == "evaluate":
-            return {"returncode": 0}
+        if tool == "internal":
+            command = parameters.get("command", [])
+            if len(command) > 1 and command[1] == "evaluate":
+                return {"returncode": 0}
+            if command and command[0] == "extract_proposal_issues":
+                return []
         return {"ok": True}
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()

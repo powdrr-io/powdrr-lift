@@ -106,6 +106,12 @@ steps:
       tool: internal
       command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
       bind: proposal_evaluation
+  - operation:
+      tool: internal
+      command: [extract_proposal_issues, proposal_issues]
+      parameters:
+        evaluation: {type: reference, value: proposal_evaluation}
+      bind: proposal_issues
   - id: repair-proposal
     worklist:
       snapshot: {name: proposal_issues, max_items: 64}

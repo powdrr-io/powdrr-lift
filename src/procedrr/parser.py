@@ -368,6 +368,65 @@ def _validate_steps(
                         "max_steps must be positive",
                     )
                 )
+        elif (
+            control == "call"
+            and isinstance(step[control], Mapping)
+            and "process" in step[control]
+        ):
+            value = step[control]
+            process = value.get("process")
+            if not isinstance(process, str) or not re.fullmatch(
+                r"[a-z][a-z0-9-]*", process
+            ):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.process",
+                        "process must be a lowercase Procedrr process name",
+                    )
+                )
+            inputs = value.get("inputs", {})
+            if not isinstance(inputs, Mapping):
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.inputs", "inputs must be a mapping"
+                    )
+                )
+            else:
+                for reference in _template_references(inputs):
+                    root = reference.split(".", 1)[0]
+                    if root not in bindings:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.call.inputs",
+                                f"unknown binding: {reference}",
+                            )
+                        )
+            outputs = value.get("outputs")
+            if not isinstance(outputs, Mapping) or not outputs:
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.call.outputs",
+                        "outputs must be a non-empty mapping",
+                    )
+                )
+            else:
+                for name, reference in outputs.items():
+                    if not isinstance(name, str) or not isinstance(reference, str):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.call.outputs",
+                                "outputs must map names to string references",
+                            )
+                        )
+                    elif not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", reference):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.call.outputs.{name}",
+                                "output reference must be a binding path",
+                            )
+                        )
+                    else:
+                        bindings.add(name)
         elif control == "repeat":
             value = step[control]
             if not isinstance(value, Mapping) or not isinstance(

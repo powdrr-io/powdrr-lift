@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import subprocess
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -151,10 +151,24 @@ def _execute_procedrr_flow(
             raise PowdrrExecutionError("feature flow operation command is malformed")
         name = command[0]
         if name == "ensure_current_structrr":
+            _require_flow_text(parameters, "work_item_name")
+            _require_flow_text(parameters, "feature_description")
             state["baseline_path"] = _ensure_current_baseline(worktree, runner)
             return {"path": str(state["baseline_path"])}
         if name == "plan_structrr_diff":
-            state["plan_path"] = _write_structrr_plan(worktree, config)
+            baseline = _require_flow_text(parameters, "baseline")
+            if baseline != str(state["baseline_path"]):
+                raise PowdrrExecutionError(
+                    "planning baseline does not match ensured baseline"
+                )
+            plan_config = replace(
+                config,
+                work_item_name=_require_flow_text(parameters, "work_item_name"),
+                feature_description=_require_flow_text(
+                    parameters, "feature_description"
+                ),
+            )
+            state["plan_path"] = _write_structrr_plan(worktree, plan_config)
             _commit(runner, worktree, "Record Structrr feature diff")
             return {"path": str(state["plan_path"])}
         if name == "run_opencode":
@@ -166,12 +180,23 @@ def _execute_procedrr_flow(
                 branch=branch,
                 slug=slug,
                 state=state,
+                parameters=parameters,
             )
         if name == "validate_implementation":
+            if not isinstance(parameters.get("implementation"), Mapping):
+                raise PowdrrExecutionError(
+                    "validation did not receive implementation state"
+                )
             return _validate_implementation_phase(
                 config, worktree=worktree, state=state
             )
         if name == "review_worker_diff":
+            if not isinstance(parameters.get("implementation"), Mapping):
+                raise PowdrrExecutionError(
+                    "review did not receive implementation state"
+                )
+            if not isinstance(parameters.get("validation"), Mapping):
+                raise PowdrrExecutionError("review did not receive validation state")
             review = review_feature_diff(
                 worktree,
                 state["request"],
@@ -182,35 +207,67 @@ def _execute_procedrr_flow(
             state["review"] = review
             return review
         if name == "open_pull_request":
-            _commit(runner, worktree, f"Implement {config.work_item_name}")
+            review_value = parameters.get("review")
+            if (
+                not isinstance(review_value, Mapping)
+                or review_value.get("passed") is not True
+            ):
+                raise PowdrrExecutionError("cannot open a PR before a passing review")
+            work_item_name = _require_flow_text(parameters, "work_item_name")
+            if Path(_require_flow_text(parameters, "plan")) != state["plan_path"]:
+                raise PowdrrExecutionError(
+                    "PR input plan does not match the planned diff"
+                )
+            feature_config = replace(
+                config,
+                work_item_name=work_item_name,
+                feature_description=_require_flow_text(
+                    parameters, "feature_description"
+                ),
+            )
+            _commit(runner, worktree, f"Implement {work_item_name}")
             _run(runner, worktree, ["git", "push", "--set-upstream", "origin", branch])
             if not config.open_pr:
                 return None
             state["pull_request_url"] = _open_pull_request(
-                runner, worktree, config, branch, state["plan_path"]
+                runner, worktree, feature_config, branch, state["plan_path"]
             )
             return state["pull_request_url"]
         if name == "create_pr_changelog":
-            if not state.get("pull_request_url"):
+            pull_request = _require_flow_text(parameters, "pull_request")
+            if not pull_request:
                 return None
+            if Path(_require_flow_text(parameters, "plan")) != state["plan_path"]:
+                raise PowdrrExecutionError(
+                    "changelog input plan does not match the planned diff"
+                )
+            feature_config = replace(
+                config,
+                work_item_name=_require_flow_text(parameters, "work_item_name"),
+                feature_description=_require_flow_text(
+                    parameters, "feature_description"
+                ),
+            )
             state["changelog_path"] = _create_pr_changelog(
                 runner,
                 worktree,
                 branch,
-                state["pull_request_url"],
-                config,
+                pull_request,
+                feature_config,
             )
             return str(state["changelog_path"])
         if name == "update_pull_request":
-            if state.get("pull_request_url") and state.get("changelog_path"):
+            pull_request_value = parameters.get("pull_request")
+            changelog = parameters.get("changelog")
+            if isinstance(pull_request_value, str) and isinstance(changelog, str):
                 _update_pull_request_description(
                     runner,
                     worktree,
-                    state["pull_request_url"],
+                    pull_request_value,
                     config,
-                    state["changelog_path"].relative_to(worktree),
+                    Path(changelog).relative_to(worktree),
                 )
-            return state.get("pull_request_url")
+            return pull_request_value
         raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")
 
     try:
@@ -240,10 +297,15 @@ def _run_opencode_phase(
     branch: str,
     slug: str,
     state: dict[str, Any],
+    parameters: Mapping[str, Any],
 ) -> dict[str, Any]:
     del branch
-    baseline_path = state["baseline_path"]
-    plan_path = state["plan_path"]
+    baseline_path = Path(_require_flow_text(parameters, "baseline"))
+    plan_path = Path(_require_flow_text(parameters, "plan"))
+    if baseline_path != state["baseline_path"] or plan_path != state["plan_path"]:
+        raise PowdrrExecutionError("implementation inputs do not match the plan state")
+    feature_description = _require_flow_text(parameters, "feature_description")
+    _require_flow_text(parameters, "work_item_name")
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
@@ -254,7 +316,7 @@ def _run_opencode_phase(
         units=(
             ExecutionUnit(
                 unit_id=f"implement-{slug}",
-                objective=config.feature_description,
+                objective=feature_description,
                 paths=config.allowed_paths,
                 validation_profiles=("feature-validation",),
                 acceptance_criteria=(
@@ -296,7 +358,7 @@ def _run_opencode_phase(
         attempt=attempt,
         attempt_store=attempt_store,
     )
-    return attempt.to_data()
+    return {"request_id": request.request_id, "attempt": attempt.to_data()}
 
 
 def _validate_implementation_phase(
@@ -312,6 +374,15 @@ def _validate_implementation_phase(
     state["attempt_store"].save_validation_report(validation)
     state["validation"] = validation
     return validation.to_data()
+
+
+def _require_flow_text(parameters: Mapping[str, Any], name: str) -> str:
+    value = parameters.get(name)
+    if not isinstance(value, str) or not value.strip():
+        raise PowdrrExecutionError(
+            f"feature flow parameter {name!r} must be a non-empty string"
+        )
+    return value
 
 
 def _feature_endpoint_result(

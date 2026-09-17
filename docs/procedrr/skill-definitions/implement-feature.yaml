@@ -7,22 +7,39 @@ steps:
   - operation:
       tool: internal
       command: [ensure_current_structrr]
+      parameters:
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
       bind: baseline
   - operation:
       tool: internal
       command: [plan_structrr_diff]
+      parameters:
+        baseline: {type: reference, value: baseline.path}
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
       bind: plan
   - operation:
       tool: internal
       command: [run_opencode]
+      parameters:
+        baseline: {type: reference, value: baseline.path}
+        plan: {type: reference, value: plan.path}
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
       bind: implementation
   - operation:
       tool: internal
       command: [validate_implementation]
+      parameters:
+        implementation: {type: reference, value: implementation}
       bind: validation
   - operation:
       tool: internal
       command: [review_worker_diff]
+      parameters:
+        implementation: {type: reference, value: implementation}
+        validation: {type: reference, value: validation}
       bind: review
   - gate:
       subject: review.passed
@@ -31,13 +48,26 @@ steps:
   - operation:
       tool: internal
       command: [open_pull_request]
+      parameters:
+        review: {type: reference, value: review}
+        plan: {type: reference, value: plan.path}
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
       bind: pull_request
   - operation:
       tool: internal
       command: [create_pr_changelog]
+      parameters:
+        pull_request: {type: reference, value: pull_request}
+        plan: {type: reference, value: plan.path}
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
       bind: changelog
   - operation:
       tool: internal
       command: [update_pull_request]
+      parameters:
+        pull_request: {type: reference, value: pull_request}
+        changelog: {type: reference, value: changelog}
       bind: updated_pull_request
   - terminal: succeeded

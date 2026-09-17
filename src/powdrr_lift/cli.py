@@ -343,6 +343,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("software_development_entity_taxonomy.md"),
         help="Repository-relative taxonomy path.",
     )
+    bootstrap_structrr_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the validated bootstrap summary as JSON.",
+    )
     bootstrap_structrr_parser.set_defaults(func=_run_bootstrap_structrr)
 
     rebase_structrr_parser = subparsers.add_parser(
@@ -1993,6 +1998,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="opencode",
         help="OpenCode executable name or path.",
     )
+    coding_agent_parser.add_argument(
+        "--opencode-model",
+        help=(
+            "OpenCode model reference in provider/model form, for example "
+            "deepinfra/deepseek-flash."
+        ),
+    )
     coding_agent_parser.add_argument("--timeout-seconds", type=float, default=1800.0)
     coding_agent_parser.add_argument(
         "--validation-timeout-seconds", type=float, default=600.0
@@ -2672,6 +2684,7 @@ def _run_coding_agent(args: argparse.Namespace) -> int:
     request = ImplementationRequest.from_data(request_data)
     provider = OpenCodeProvider(
         executable=args.opencode_executable,
+        model=args.opencode_model,
         timeout_seconds=args.timeout_seconds,
         permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
     )
@@ -2831,12 +2844,23 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
             location = f" ({issue.path})" if issue.path else ""
             print(f"- {issue.code}{location}: {issue.message}", file=sys.stderr)
         return 1
-    print(result.output_path)
-    print(
-        f"Validated {len(result.document['entities'])} entities, "
-        f"{len(result.document['entity_relationships'])} relationships, and "
-        f"{len(result.document['files'])} source anchors.",
-    )
+    summary = {
+        "output_path": str(result.output_path),
+        "entity_count": len(result.document["entities"]),
+        "relationship_count": len(result.document["entity_relationships"]),
+        "source_anchor_count": len(result.document["files"]),
+        "source_subject_count": len(result.document["source_subjects"]),
+        "source_binding_count": len(result.document["source_bindings"]),
+    }
+    if args.json:
+        print(json.dumps(summary, sort_keys=True))
+    else:
+        print(result.output_path)
+        print(
+            f"Validated {summary['entity_count']} entities, "
+            f"{summary['relationship_count']} relationships, and "
+            f"{summary['source_anchor_count']} source anchors.",
+        )
     return 0
 
 

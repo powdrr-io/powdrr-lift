@@ -1,0 +1,367 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 694
+title: Add validated JSON output for Structrr bootstrap
+intent:
+  problem: The Structrr bootstrap command only exposed human-readable output, so a Procedrr or Workrr step could not consume its validated result without parsing text; generated current snapshots could also become recursive bootstrap evidence.
+  goal: Add an opt-in JSON summary contract, preserve the human-readable default, exclude generated current snapshots from future scans, and record the feature as a validated Structrr/Procedrr/Workrr handoff.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/structrr/current/baseline-5f4747b.yaml
+    type: added
+    summary: Add the validated Structrr snapshot produced from the committed JSON bootstrap feature state.
+    rationale: Preserve the post-change product/source baseline for future targeted context and rebases.
+    span:
+      start_line: 1
+      end_line: 60299
+    related:
+      entities:
+        - structrr-baseline-snapshot
+  - path: docs/proposals/bootstrap-json-output/execution-plan.json
+    type: added
+    summary: Declare the bounded implementation unit, allowed paths, acceptance criteria, and validation profiles.
+    rationale: Provide Workrr with a typed handoff to the external coding worker.
+    span:
+      start_line: 1
+      end_line: 43
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Add --json output for bootstrap-structrr with validated evidence counts while retaining the default human-readable output.
+    rationale: Give automation a stable machine-readable handoff only after validation succeeds.
+    span:
+      start_line: 346
+      end_line: 350
+    related:
+      entities:
+        - bootstrap-json-output
+        - bootstrap-structrr-command
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Serialize the validated bootstrap summary and preserve the existing text output branch.
+    rationale: Keep operator output stable while supporting Procedrr and Workrr consumers.
+    span:
+      start_line: 2847
+      end_line: 2863
+    related:
+      entities:
+        - bootstrap-json-output
+        - bootstrap-structrr-command
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Add the OpenCode model selector to the coding-agent command.
+    rationale: Allow the external worker to be pinned to the configured DeepInfra model.
+    span:
+      start_line: 2001
+      end_line: 2007
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    summary: Pass the requested OpenCode model into the worker provider.
+    rationale: Ensure the selected provider/model reaches the actual OpenCode subprocess.
+    span:
+      start_line: 2687
+      end_line: 2687
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Exclude docs/structrr/current generated snapshots from tracked bootstrap evidence.
+    rationale: Prevent successive baselines from recursively describing prior generated baselines.
+    span:
+      start_line: 25
+      end_line: 25
+    related:
+      entities:
+        - structrr-current-snapshot-filter
+  - path: src/powdrr_lift/core/execution_plan.py
+    type: modified
+    summary: Carry declared ephemeral helper paths through validated execution plans.
+    rationale: Let Workrr distinguish disposable worker scaffolding from durable product changes.
+    span:
+      start_line: 21
+      end_line: 21
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/core/execution_plan.py
+    type: modified
+    summary: Serialize ephemeral paths in execution units.
+    rationale: Preserve the worker helper boundary in durable plan artifacts.
+    span:
+      start_line: 31
+      end_line: 31
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/core/execution_plan.py
+    type: modified
+    summary: Load ephemeral paths when reading execution plans.
+    rationale: Keep compiled worker requests aligned with validated plans.
+    span:
+      start_line: 69
+      end_line: 69
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Import cleanup support for ephemeral worker artifacts.
+    rationale: Bound helper files to the execution unit while making the external worker provider/model observable and reproducible.
+    span:
+      start_line: 13
+      end_line: 13
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Add ephemeral paths to implementation requests.
+    rationale: Preserve the declared helper boundary in the worker handoff.
+    span:
+      start_line: 41
+      end_line: 41
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Serialize ephemeral request paths.
+    rationale: Keep request artifacts complete and reproducible.
+    span:
+      start_line: 57
+      end_line: 57
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Deserialize ephemeral request paths.
+    rationale: Restore the helper boundary when loading a request artifact.
+    span:
+      start_line: 76
+      end_line: 76
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Render ephemeral paths in the worker prompt.
+    rationale: Tell the external worker which temporary helpers are permitted.
+    span:
+      start_line: 98
+      end_line: 98
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Explain the ephemeral helper policy in the worker prompt.
+    rationale: Prevent temporary scaffolding from being mistaken for durable product work.
+    span:
+      start_line: 102
+      end_line: 103
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Carry ephemeral paths into compiled requests.
+    rationale: Align execution-unit policy with the coding-agent request.
+    span:
+      start_line: 106
+      end_line: 109
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Carry ephemeral paths into the request object.
+    rationale: Preserve the execution-unit boundary after compilation.
+    span:
+      start_line: 123
+      end_line: 123
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Add explicit OpenCode model selection.
+    rationale: Pin the worker to DeepInfra DeepSeek V4 Flash 0731.
+    span:
+      start_line: 245
+      end_line: 245
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Build the OpenCode command with an optional model flag.
+    rationale: Make provider/model selection reach the real subprocess.
+    span:
+      start_line: 254
+      end_line: 254
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Append the selected OpenCode model to the worker command.
+    rationale: Ensure the requested model is used instead of the last interactive selection.
+    span:
+      start_line: 266
+      end_line: 268
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Remove ephemeral artifacts before evaluating the worker result.
+    rationale: Keep helper files out of the durable diff.
+    span:
+      start_line: 439
+      end_line: 439
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Include ephemeral paths when checking worker scope.
+    rationale: Permit only the explicitly declared temporary paths.
+    span:
+      start_line: 445
+      end_line: 447
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Implement deterministic ephemeral artifact removal.
+    rationale: Delete newly created temporary files and directories before fingerprinting.
+    span:
+      start_line: 513
+      end_line: 529
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Verify ephemeral cleanup and explicit OpenCode model selection.
+    rationale: Keep the worker boundary and DeepInfra-compatible model handoff executable.
+    span:
+      start_line: 147
+      end_line: 171
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Exercise a worker-created ephemeral helper path.
+    rationale: Prove temporary scaffolding is removed before durable diff evaluation.
+    span:
+      start_line: 52
+      end_line: 56
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Verify ephemeral worker cleanup behavior.
+    rationale: Keep the temporary-helper policy executable.
+    span:
+      start_line: 227
+      end_line: 255
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: tests/test_cli.py
+    type: modified
+    summary: Verify JSON summary fields and the unchanged human-readable default.
+    rationale: Keep the command output contract executable.
+    span:
+      start_line: 150
+      end_line: 212
+    related:
+      entities:
+        - bootstrap-json-output
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Verify tracked current snapshots are excluded from subsequent bootstrap evidence.
+    rationale: Prevent recursive baseline input regressions.
+    span:
+      start_line: 244
+      end_line: 261
+    related:
+      entities:
+        - structrr-current-snapshot-filter
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the CLI module source span after adding the JSON output branch.
+    rationale: Keep source-anchor regression expectations aligned with the intentional code change.
+    span:
+      start_line: 8
+      end_line: 8
+    related:
+      entities:
+        - bootstrap-structrr-command
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the bootstrap function source span after the CLI change shifted the module.
+    rationale: Keep exact source-anchor regression coverage aligned with the intentional line movement.
+    span:
+      start_line: 14
+      end_line: 15
+    related:
+      entities:
+        - bootstrap-structrr-command
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the Python source-model extraction span after the CLI change shifted the module.
+    rationale: Keep exact source-anchor regression coverage aligned with the intentional line movement.
+    span:
+      start_line: 21
+      end_line: 22
+    related:
+      entities:
+        - bootstrap-structrr-command
+entities:
+  - id: structrr-baseline-snapshot
+    type: Changelog file
+    action: modified
+  - id: bootstrap-json-output
+    type: Feature
+    action: added
+  - id: bootstrap-json-output-contract
+    type: Feature
+    action: added
+  - id: bootstrap-structrr-command
+    type: Command
+    action: added
+  - id: structrr-current-snapshot-filter
+    type: Module
+    action: added
+entity_relationships:
+  - id: bootstrap-command-produces-json-summary
+    source: bootstrap-structrr-command
+    target: bootstrap-json-output
+    relationship: produces
+    description: The bootstrap command produces a validated machine-readable summary when requested.
+    rationale: Connect the CLI behavior to the automation-facing feature contract.
+    action: added
+invariants:
+  - id: bootstrap-json-after-validation
+    description: JSON output is emitted only after the Structrr bootstrap document validates successfully.
+    rationale: Prevent downstream steps from consuming invalid bootstrap state.
+    action: added
+guidance:
+  - id: bootstrap-human-output-default
+    description: Keep human-readable output as the default and use --json for automation.
+    rationale: Preserve the existing operator-facing command contract.
+    action: added
+features: []
+proposed_prs: []

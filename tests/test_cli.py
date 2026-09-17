@@ -147,6 +147,69 @@ def test_cli_rebase_structrr_writes_machine_readable_report(tmp_path: Path) -> N
     assert report["baseline_digest"].startswith("sha256:")
 
 
+def test_cli_bootstrap_structrr_json_reports_validated_summary(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    taxonomy = Path(__file__).parents[1] / "software_development_entity_taxonomy.md"
+    (repo_root / taxonomy.name).write_text(
+        taxonomy.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "app.py").write_text(
+        "def run() -> str:\n    return 'ok'\n", encoding="utf-8"
+    )
+    _git(repo_root, "init", "-q")
+    _git(repo_root, "config", "user.email", "test@example.com")
+    _git(repo_root, "config", "user.name", "Test")
+    _git(repo_root, "add", ".")
+    _git(repo_root, "commit", "-qm", "initial")
+    output_path = tmp_path / "bootstrap.yaml"
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "bootstrap-structrr",
+                    "--repo-root",
+                    str(repo_root),
+                    "--output",
+                    str(output_path),
+                    "--json",
+                ]
+            )
+            == 0
+        )
+
+    summary = json.loads(stdout.getvalue())
+    assert summary == {
+        "entity_count": 3,
+        "relationship_count": 0,
+        "source_anchor_count": 2,
+        "source_binding_count": 0,
+        "source_subject_count": 2,
+        "output_path": str(output_path),
+    }
+    assert output_path.is_file()
+
+    human_stdout = io.StringIO()
+    with redirect_stdout(human_stdout):
+        assert (
+            main(
+                [
+                    "bootstrap-structrr",
+                    "--repo-root",
+                    str(repo_root),
+                    "--output",
+                    str(output_path),
+                ]
+            )
+            == 0
+        )
+    assert str(output_path) in human_stdout.getvalue()
+    assert "Validated" in human_stdout.getvalue()
+
+
 def test_cli_compiles_plan_into_profiled_workflow(tmp_path: Path) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
     plan_path = repo_root / "execution-plan.json"

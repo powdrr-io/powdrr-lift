@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ class ImplementationRequest:
     validation_profiles: tuple[str, ...]
     context_refs: tuple[str, ...] = ()
     allowed_commands: tuple[str, ...] = ()
+    ephemeral_paths: tuple[str, ...] = ()
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
@@ -52,6 +54,7 @@ class ImplementationRequest:
             "validation_profiles": list(self.validation_profiles),
             "context_refs": list(self.context_refs),
             "allowed_commands": list(self.allowed_commands),
+            "ephemeral_paths": list(self.ephemeral_paths),
         }
 
     def to_json(self) -> str:
@@ -70,6 +73,7 @@ class ImplementationRequest:
             validation_profiles=tuple(cast(list[str], data["validation_profiles"])),
             context_refs=tuple(cast(list[str], data.get("context_refs", []))),
             allowed_commands=tuple(cast(list[str], data.get("allowed_commands", []))),
+            ephemeral_paths=tuple(cast(list[str], data.get("ephemeral_paths", []))),
             schema_version=cast(str, data["schema_version"]),
         )
 
@@ -91,13 +95,18 @@ class ImplementationRequest:
         )
         validation_profiles = ", ".join(unit.validation_profiles) or "none"
         allowed_paths = ", ".join(unit.paths) or "none"
+        ephemeral_paths = ", ".join(unit.ephemeral_paths) or "none"
         prompt = (
             f"Implement execution unit {unit.unit_id}: {unit.objective}\n\n"
             f"Allowed paths: {allowed_paths}\n"
+            "Ephemeral paths (Workrr removes these after the attempt): "
+            f"{ephemeral_paths}\n"
             f"Acceptance criteria:\n{criteria}\n"
             f"Validation profiles Workrr will run: {validation_profiles}\n\n"
-            "Use only the allowed paths. Do not create helper or validation "
-            "files; Workrr runs the declared validation profiles after you "
+            "Use only the allowed paths or declared ephemeral paths. Temporary "
+            "helpers are permitted only in the declared ephemeral paths; Workrr "
+            "removes them before evaluating the durable diff. Workrr runs the "
+            "declared validation profiles after you "
             "finish. Do not commit, push, or alter files outside the request."
         )
         return cls(
@@ -111,6 +120,7 @@ class ImplementationRequest:
             validation_profiles=unit.validation_profiles,
             context_refs=context_refs,
             allowed_commands=allowed_commands,
+            ephemeral_paths=unit.ephemeral_paths,
         )
 
     @classmethod
@@ -232,6 +242,7 @@ class OpenCodeProvider:
     permission_policy: OpenCodePermissionPolicy = field(
         default_factory=OpenCodePermissionPolicy
     )
+    model: str | None = None
     provider_name: str = "opencode"
 
     def run(
@@ -251,8 +262,10 @@ class OpenCodeProvider:
             "json",
             "--agent",
             self.agent,
-            request.prompt,
         ]
+        if self.model is not None:
+            command.extend(("--model", self.model))
+        command.append(request.prompt)
         try:
             return subprocess.run(
                 command,
@@ -423,12 +436,15 @@ def run_coding_agent(
             exit_code=None,
             error=f"could not start coding-agent provider: {error}",
         )
+    _remove_ephemeral_paths(worktree_root, request, before_status)
     after_head = _git_output(worktree_root, "rev-parse", "HEAD")
     changed_paths = tuple(sorted(_working_paths(worktree_root)))
     out_of_scope = tuple(
         path
         for path in changed_paths
-        if not _path_is_allowed(path, request.allowed_paths)
+        if not _path_is_allowed(
+            path, (*request.allowed_paths, *request.ephemeral_paths)
+        )
     )
     fingerprint = _worktree_fingerprint(worktree_root, changed_paths)
     if before_head != after_head or out_of_scope:
@@ -492,6 +508,23 @@ def _path_is_allowed(path: str, allowed_paths: Sequence[str]) -> bool:
         scope == "." or candidate == Path(scope) or Path(scope) in candidate.parents
         for scope in allowed_paths
     )
+
+
+def _remove_ephemeral_paths(
+    worktree_root: Path,
+    request: ImplementationRequest,
+    before_status: set[str],
+) -> None:
+    """Remove worker-created ephemeral artifacts before final diff evaluation."""
+    current_paths = _working_paths(worktree_root)
+    for relative_path in current_paths - before_status:
+        if not _path_is_allowed(relative_path, request.ephemeral_paths):
+            continue
+        target = worktree_root / relative_path
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        elif target.exists() or target.is_symlink():
+            target.unlink()
 
 
 def _worktree_fingerprint(worktree_root: Path, paths: Sequence[str]) -> str:

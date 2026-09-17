@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-704
+title: Add Procedrr step execution transcripts from main
+intent:
+  problem: The requested product behavior is not yet available.
+  goal: Add a durable transcript of every Procedrr step execution, recording the step
+    identity, inputs, outputs, and outcome in order so an operator can inspect exactly
+    what the flow received and produced.
+human-decisions: []
+files:
+- path: docs/proposals/Add Procedrr step execution transcripts from main/design-interview-input.json
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts from main.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: docs/proposals/Add Procedrr step execution transcripts from main/feature-pr-specification.yaml
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts from main.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: docs/proposals/add-procedrr-step-execution-transcripts-from-main/structrr-diff.yaml
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts from main.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: src/procedrr_evaluator/evaluator.py
+  type: Source file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts from main.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: tests/test_procedrr_evaluator.py
+  type: Test file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts from main.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+entities:
+- id: add-procedrr-step-execution-transcripts-from-main
+  type: Feature
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features:
+- id: add-procedrr-step-execution-transcripts-from-main
+  description: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+  action: added
+proposed_prs: []

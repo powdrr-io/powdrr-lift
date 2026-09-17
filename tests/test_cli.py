@@ -545,6 +545,53 @@ def test_cli_pull_request_description_preserves_existing_pr_body(
     assert "## CI Failure" in template
 
 
+def test_cli_pull_request_description_json_emits_machine_readable_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_body = "## Historical Validation\n\nPassed on the previous update."
+    monkeypatch.setattr(
+        "powdrr_lift.pull_request_description.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=json.dumps(
+                {
+                    "url": "https://github.com/example/repo/pull/42",
+                    "body": existing_body,
+                }
+            ),
+            stderr="",
+        ),
+    )
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "pull-request-description",
+                    "--kind",
+                    "feature",
+                    "--repo-root",
+                    str(Path.cwd()),
+                    "--json",
+                ]
+            )
+            == 0
+        )
+
+    payload = json.loads(stdout.getvalue())
+    assert payload["kind"] == "feature"
+    description = payload["description"]
+    assert "## Summary" in description
+    assert "## Feature Plan" in description
+    existing = payload["existing_pull_request"]
+    assert existing["url"] == "https://github.com/example/repo/pull/42"
+    assert existing["body"] == existing_body
+    assert "## Existing PR Body (preserve and reconcile)" in description
+    assert "Do not leave placeholders" in description
+
+
 def test_cli_process_workflow_task_wires_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

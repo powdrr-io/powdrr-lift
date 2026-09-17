@@ -275,6 +275,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Worktree to inspect for an existing pull request; defaults to cwd.",
     )
+    pull_request_description_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the rendered pull-request description as machine-readable JSON.",
+    )
     pull_request_description_parser.set_defaults(func=_run_pull_request_description)
 
     init_parser = subparsers.add_parser(
@@ -2146,12 +2151,21 @@ def _run_repository_state(args: argparse.Namespace) -> int:
 
 def _run_pull_request_description(args: argparse.Namespace) -> int:
     existing_pull_request = find_existing_pull_request(args.repo_root)
-    sys.stdout.write(
-        render_pull_request_description_template(
-            args.kind,
-            existing_pull_request=existing_pull_request,
-        )
+    description = render_pull_request_description_template(
+        args.kind,
+        existing_pull_request=existing_pull_request,
     )
+    if args.json:
+        payload: dict[str, object] = {
+            "kind": args.kind,
+            "description": description,
+        }
+        if existing_pull_request is not None:
+            url, body = existing_pull_request
+            payload["existing_pull_request"] = {"url": url, "body": body}
+        sys.stdout.write(json.dumps(payload, indent=2) + "\n")
+        return 0
+    sys.stdout.write(description)
     return 0
 
 

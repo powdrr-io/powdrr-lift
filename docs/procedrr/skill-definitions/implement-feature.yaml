@@ -48,15 +48,6 @@ steps:
         required: [operation, file_path, destination_path]
       bind: current_specification
   - operation:
-      tool: file_management
-      parameters:
-        operation: delete
-        file_path: docs/proposals/${work_item_slug}/design-interview-input.json
-      returns:
-        type: object
-        required: [operation, file_path]
-      bind: interview_cleanup
-  - operation:
       tool: internal
       command: [run_opencode]
       parameters:

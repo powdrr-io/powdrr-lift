@@ -110,6 +110,15 @@ steps:
          --interview-input, "docs/proposals/${work_item_name}/design-interview-input.json"]
       bind: proposal
   - operation:
+      tool: file_management
+      parameters:
+        operation: delete
+        file_path: docs/proposals/${work_item_name}/design-interview-input.json
+      returns:
+        type: object
+        required: [operation, file_path]
+      bind: interview_input_cleanup
+  - operation:
       tool: internal
       command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
       bind: proposal_evaluation

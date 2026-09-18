@@ -396,6 +396,12 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 return {
                     category: {"added": [], "deleted": []} for category in decisions
                 }
+        if tool == "file_management":
+            return {
+                "operation": parameters["operation"],
+                "file_path": parameters["file_path"],
+                "destination_path": parameters.get("destination_path"),
+            }
         return {"ok": True}
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()

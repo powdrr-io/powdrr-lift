@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v1"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
@@ -265,7 +266,7 @@ class OpenCodeProvider:
 
     executable: str = "opencode"
     agent: str = "build"
-    timeout_seconds: float = 1800.0
+    timeout_seconds: float = 300.0
     permission_policy: OpenCodePermissionPolicy = field(
         default_factory=OpenCodePermissionPolicy
     )
@@ -296,20 +297,13 @@ class OpenCodeProvider:
         if self.model is not None:
             command.extend(("--model", self.model))
         command.append(request.prompt)
-        try:
-            return subprocess.run(
-                command,
-                cwd=worktree_root,
-                env=environment,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-                check=False,
-            )
-        except subprocess.TimeoutExpired as error:
-            stdout = _as_text(error.stdout)
-            stderr = _as_text(error.stderr)
-            return subprocess.CompletedProcess(command, 124, stdout, stderr)
+        return run_opencode(
+            command,
+            log_path=None,
+            cwd=worktree_root,
+            env=environment,
+            inactivity_timeout=self.timeout_seconds,
+        )
 
 
 class CodingAgentAttemptStore:
@@ -578,12 +572,6 @@ def _json_events(stdout: str) -> tuple[Mapping[str, Any], ...]:
         if isinstance(value, Mapping):
             events.append(dict(value))
     return tuple(events)
-
-
-def _as_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    return value.decode(errors="replace") if isinstance(value, bytes) else value
 
 
 __all__ = [

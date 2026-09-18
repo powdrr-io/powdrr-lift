@@ -266,6 +266,11 @@ def render_feature_pr_specification_template(
         if key in {"requirements", "approach"}:
             for item in items:
                 item.setdefault("state", "added")
+        if key == "acceptance_criteria":
+            for index, item in enumerate(items, start=1):
+                identifier = item.get("id")
+                if not isinstance(identifier, str) or not identifier.strip():
+                    item["id"] = f"{normalized_work_item_name}-acceptance-{index}"
         if key == "intent":
             intent = items[0] if items else {}
             document[key] = {

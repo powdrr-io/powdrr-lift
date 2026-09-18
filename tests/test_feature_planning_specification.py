@@ -248,6 +248,10 @@ def test_feature_pr_template_consumes_design_interview_input(tmp_path: Path) -> 
                     ],
                     "deleted": [],
                 },
+                "acceptance_criteria_edits": {
+                    "added": [{"description": "The workflow records every step."}],
+                    "deleted": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -266,6 +270,12 @@ def test_feature_pr_template_consumes_design_interview_input(tmp_path: Path) -> 
             "id": "requirement-example-workflows",
             "description": "Example workflows are supported.",
             "state": "added",
+        }
+    ]
+    assert document["acceptance_criteria"] == [
+        {
+            "id": "example-feature-acceptance-1",
+            "description": "The workflow records every step.",
         }
     ]
 

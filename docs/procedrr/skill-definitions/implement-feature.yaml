@@ -170,30 +170,34 @@ steps:
 recoveries:
   worker-repair:
     steps:
-      - operation:
-          tool: internal
-          command: [collect_repair_issues]
-          parameters:
-            validation: {type: reference, value: validation}
-            review: {type: reference, value: review}
-          returns: {type: array}
-          bind: repair_issues
-      - for_each:
-          snapshot: {name: repair_issues, max_items: 32}
-          item_binding: repair_issue
-          collect: {binding: repair_outputs, mode: list}
+      - repeat:
+          max_iterations: 4
+          until: {subject: review.passed, equals: true}
           body:
             - operation:
                 tool: internal
-                command: [run_opencode]
+                command: [collect_repair_issues]
                 parameters:
-                  baseline: {type: reference, value: baseline.path}
-                  plan: {type: reference, value: plan.path}
-                  work_item_name: {type: reference, value: work_item_name}
-                  feature_description: {type: reference, value: feature_description}
-                  repair_issue: {type: reference, value: repair_issue}
-                returns: {type: object}
-                bind: implementation
+                  validation: {type: reference, value: validation}
+                  review: {type: reference, value: review}
+                returns: {type: array}
+                bind: repair_issues
+            - for_each:
+                snapshot: {name: repair_issues, max_items: 32}
+                item_binding: repair_issue
+                collect: {binding: repair_outputs, mode: list}
+                body:
+                  - operation:
+                      tool: internal
+                      command: [run_opencode]
+                      parameters:
+                        baseline: {type: reference, value: baseline.path}
+                        plan: {type: reference, value: plan.path}
+                        work_item_name: {type: reference, value: work_item_name}
+                        feature_description: {type: reference, value: feature_description}
+                        repair_issue: {type: reference, value: repair_issue}
+                      returns: {type: object}
+                      bind: implementation
             - operation:
                 tool: internal
                 command: [validate_implementation]

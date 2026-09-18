@@ -429,7 +429,7 @@ def _run_opencode_phase(
     if baseline_path != state["baseline_path"] or plan_path != state["plan_path"]:
         raise PowdrrExecutionError("implementation inputs do not match the plan state")
     feature_description = _require_flow_text(parameters, "feature_description")
-    _require_flow_text(parameters, "work_item_name")
+    work_item_name = _require_flow_text(parameters, "work_item_name")
     planned_additions, planned_deletions, acceptance_criteria = (
         _load_implementation_plan(plan_path, feature_description)
     )
@@ -465,27 +465,6 @@ def _run_opencode_phase(
         ),
         allowed_commands=(" ".join(config.validation_command) + " *",),
     )
-    repair_request = parameters.get("repair_request")
-    repair_issue = parameters.get("repair_issue")
-    if isinstance(repair_issue, Mapping):
-        repair_request = (
-            "Continue the current OpenCode implementation session. Fix only this "
-            "specific observed issue in the existing worktree, then stop:\n"
-            f"{json.dumps(dict(repair_issue), indent=2, sort_keys=True, default=str)}"
-        )
-    if isinstance(repair_request, str) and repair_request.strip():
-        request = replace(
-            request,
-            prompt=(
-                f"{repair_request}\n"
-                "Use the current session context and current worktree state; do not "
-                "re-plan the feature or revisit unrelated changes."
-            ),
-            allow_existing_changes=True,
-        )
-    request_path = output_root / "implementation-request.json"
-    request_path.write_text(request.to_json(), encoding="utf-8")
-    attempt_store = CodingAgentAttemptStore(output_root / "artifacts")
     provider = state.get("opencode_provider")
     if not isinstance(provider, OpenCodeProvider):
         provider = OpenCodeProvider(
@@ -496,6 +475,35 @@ def _run_opencode_phase(
             ),
         )
         state["opencode_provider"] = provider
+    repair_request = parameters.get("repair_request")
+    repair_issue = parameters.get("repair_issue")
+    if isinstance(repair_issue, Mapping):
+        repair_request = (
+            "Continue the current OpenCode implementation session. Fix only this "
+            "specific observed issue in the existing worktree, then stop:\n"
+            f"{json.dumps(dict(repair_issue), indent=2, sort_keys=True, default=str)}"
+        )
+    if isinstance(repair_request, str) and repair_request.strip():
+        fallback_context = ""
+        if provider.session_id is None:
+            fallback_context = (
+                f"Work item: {work_item_name}\n"
+                f"Feature: {feature_description}\n"
+                "This is a new repair session; use the existing worktree and "
+                "repair only the reported issue.\n\n"
+            )
+        request = replace(
+            request,
+            prompt=(
+                fallback_context + f"{repair_request}\n"
+                "Use the current session context and current worktree state; do not "
+                "re-plan the feature or revisit unrelated changes."
+            ),
+            allow_existing_changes=True,
+        )
+    request_path = output_root / "implementation-request.json"
+    request_path.write_text(request.to_json(), encoding="utf-8")
+    attempt_store = CodingAgentAttemptStore(output_root / "artifacts")
     attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
     state["opencode_attempt_number"] = attempt_number
     attempt = CodingAgentRunner(

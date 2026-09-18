@@ -49,6 +49,14 @@ steps:
       bind: current_specification
   - operation:
       tool: internal
+      command: [commit_design_artifacts]
+      returns:
+        type: object
+        required: [committed]
+        properties: {committed: {type: boolean}}
+      bind: design_commit
+  - operation:
+      tool: internal
       command: [run_opencode]
       parameters:
         baseline: {type: reference, value: baseline.path}

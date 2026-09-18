@@ -278,8 +278,10 @@ def _execute_procedrr_flow(
                 plan_config,
                 interview_input=parameters.get("interview_input"),
             )
-            _commit(runner, worktree, "Record Structrr feature diff")
             return {"path": str(state["plan_path"])}
+        if name == "commit_design_artifacts":
+            _commit(runner, worktree, "Record Structrr feature design")
+            return {"committed": True}
         if name == "run_opencode":
             return _run_opencode_phase(
                 config,

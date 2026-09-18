@@ -1,0 +1,45 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: add_procedrr_step_execution_transcripts
+title: Add Procedrr step execution transcripts
+intent:
+  problem: The requested product behavior is not yet available.
+  goal: Add a durable transcript of every Procedrr step execution, recording the step
+    identity, inputs, outputs, and outcome in order so an operator can inspect exactly
+    what the flow received and produced.
+human-decisions: []
+files: []
+entities:
+- id: procedrr-step-execution-transcript
+  rationale: Add a durable transcript entity to record step identity, inputs, outputs,
+    and outcome for every Procedrr step execution, enabling operator inspection of
+    flow behavior.
+  summary: Structured record capturing step execution details including identity,
+    inputs, outputs, and outcome in chronological order.
+  type: Configuration file
+  action: added
+entity_relationships:
+- id: step-execution-transcript-records-step-identity
+  description: Each step execution transcript records the step identity, inputs, outputs,
+    and outcome in order.
+  rationale: Enable operator inspection of exactly what the flow received and produced.
+  relationship: records
+  source: step-execution-transcript
+  target: step-identity
+  action: added
+features:
+- id: add_procedrr_step_execution_transcripts
+  description: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+  action: added
+invariants: []
+guidance:
+- id: guide-record-step-execution-transcript
+  description: Record each Procedrr step execution as a durable transcript entry containing
+    step identity, inputs, outputs, and outcome in execution order.
+  action: added
+acceptance_criteria:
+- id: add_procedrr_step_execution_transcripts-acceptance-1
+  description: The transcript records the step identity, inputs, outputs, and outcome
+    in the order the step executed.
+proposed_prs: []

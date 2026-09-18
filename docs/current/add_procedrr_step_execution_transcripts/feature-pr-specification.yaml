@@ -1,0 +1,54 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: add_procedrr_step_execution_transcripts
+title: Add a durable transcript of every Procedrr step execution, recording the step
+  identity, inputs, outputs, and outcome in order so an operator can inspect exactly
+  what the flow received and produced.
+requirements:
+- id: req-step-execution-transcript
+  description: Record a durable transcript of every Procedrr step execution, capturing
+    step identity, inputs, outputs, and outcome in execution order for operator inspection.
+  state: added
+approach:
+- id: app-step-execution-transcript-recorder
+  description: Record each Procedrr step execution with step identity, inputs, outputs,
+    and outcome in a durable ordered transcript for operator inspection.
+  state: added
+entities:
+- id: procedrr-step-execution-transcript
+  rationale: Add a durable transcript entity to record step identity, inputs, outputs,
+    and outcome for every Procedrr step execution, enabling operator inspection of
+    flow behavior.
+  summary: Structured record capturing step execution details including identity,
+    inputs, outputs, and outcome in chronological order.
+  type: Configuration file
+entity_relationships:
+- id: step-execution-transcript-records-step-identity
+  description: Each step execution transcript records the step identity, inputs, outputs,
+    and outcome in order.
+  rationale: Enable operator inspection of exactly what the flow received and produced.
+  relationship: records
+  source: step-execution-transcript
+  target: step-identity
+guidance:
+- id: guide-record-step-execution-transcript
+  description: Record each Procedrr step execution as a durable transcript entry containing
+    step identity, inputs, outputs, and outcome in execution order.
+intent:
+  problem: Add a durable transcript of every Procedrr step execution, recording the
+    step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+  goal: Add a durable transcript of every Procedrr step execution, recording the step
+    identity, inputs, outputs, and outcome in order so an operator can inspect exactly
+    what the flow received and produced.
+  reasoning: This directly implements the feature description by persisting a complete,
+    ordered audit trail of each step's execution details, enabling operators to review
+    the exact data flow and results.
+acceptance_criteria:
+- description: The transcript records the step identity, inputs, outputs, and outcome
+    in the order the step executed.
+  id: add_procedrr_step_execution_transcripts-acceptance-1
+expected_outcomes:
+- description: The operator can inspect the durable transcript of every Procedrr step
+    execution to see the step identity, inputs, outputs, and outcome in the exact
+    order they occurred.
+  id: outcome-step-transcript-inspectable

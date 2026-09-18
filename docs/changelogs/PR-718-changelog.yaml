@@ -1,0 +1,264 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 718
+title: Add operation-scoped coding intent packets
+intent:
+  problem: OpenCode currently receives a broad execution-unit prompt and repair prompts can omit the original preservation contract, making weaker models more likely to broaden scope or regress already-correct behavior.
+  goal: Compile each execution unit into a deterministic intent packet containing required operations, must-preserve constraints, explicit non-goals, source references, and a fingerprint, then carry that packet through implementation and repair prompts.
+human-decisions:
+  - id: use-operation-scoped-intent-packets
+    summary: Give OpenCode the smallest complete intent context for one execution unit instead of repeating the full feature intent.
+  - id: preserve-packet-contract-during-repair
+    summary: Include the original operation contract in finding-specific repair prompts and require repair to preserve requirements not contradicted by the finding.
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/intent_packet.py
+    type: added
+    summary: Add the canonical IntentPacket model with deterministic serialization, fingerprinting, tamper detection, and stable model-facing rendering.
+    rationale: Give each bounded coding operation an immutable and explainable intent closure.
+    span:
+      start_line: 1
+      end_line: 136
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+        - preserve-packet-contract-during-repair
+      invariants:
+        - packet-fingerprint-covers-rendered-intent
+  - path: src/powdrr_lift/core/execution_plan.py
+    type: modified
+    summary: Allow execution units to carry explicit preservation constraints, non-goals, and source references.
+    rationale: Preserve the intent inputs needed to compile a targeted packet through durable execution-plan serialization.
+    span:
+      start_line: 24
+      end_line: 26
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/core/execution_plan.py
+    type: modified
+    summary: Serialize execution-unit preservation and source context.
+    rationale: Keep packet inputs durable in execution plans.
+    span:
+      start_line: 39
+      end_line: 41
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/core/execution_plan.py
+    type: modified
+    summary: Restore packet context when loading execution plans.
+    rationale: Preserve targeted context across plan round trips.
+    span:
+      start_line: 82
+      end_line: 84
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    summary: Export the operation-scoped intent packet contract from the core package.
+    rationale: Make the packet a reusable core boundary for Structrr-derived planning and Workrr handoff.
+    span:
+      start_line: 35
+      end_line: 38
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    summary: Register the intent packet module in the lazy core export map.
+    rationale: Make the packet available through the established core export boundary.
+    span:
+      start_line: 269
+      end_line: 269
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    summary: Export the packet schema version and packet type.
+    rationale: Make the packet contract discoverable through the core package.
+    span:
+      start_line: 290
+      end_line: 291
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Compile execution units into versioned ImplementationRequest packets and render packet-preserving repair prompts.
+    rationale: Ensure OpenCode receives targeted operations and preservation constraints on initial and corrective invocations.
+    span:
+      start_line: 22
+      end_line: 22
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+        - preserve-packet-contract-during-repair
+      invariants:
+        - worker-repair-preserves-operation-contract
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Version implementation requests for packet-bearing handoffs.
+    rationale: Make packet-bearing requests distinguishable from the prior contract.
+    span:
+      start_line: 25
+      end_line: 25
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Store the typed packet on implementation requests.
+    rationale: Carry the exact operation contract through persistence and invocation.
+    span:
+      start_line: 46
+      end_line: 46
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Serialize the packet with the implementation request.
+    rationale: Persist targeted context and its fingerprint with the worker handoff.
+    span:
+      start_line: 67
+      end_line: 69
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Render finding-specific repair prompts that retain the operation contract.
+    rationale: Prevent repair attempts from discarding already-satisfied intent.
+    span:
+      start_line: 75
+      end_line: 92
+    related:
+      decisions:
+        - preserve-packet-contract-during-repair
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Restore and verify packets when loading requests.
+    rationale: Reject tampered packet artifacts before reuse.
+    span:
+      start_line: 114
+      end_line: 118
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Compile required operations and preservation context from one execution unit.
+    rationale: Give OpenCode targeted instructions derived from the selected unit.
+    span:
+      start_line: 141
+      end_line: 160
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Place the restored packet on the loaded request.
+    rationale: Preserve packet identity when deserializing a worker request.
+    span:
+      start_line: 121
+      end_line: 124
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Render the compiled packet in the initial worker prompt.
+    rationale: Make the packet the model-facing source of required work.
+    span:
+      start_line: 163
+      end_line: 163
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    summary: Attach the compiled packet to the returned request.
+    rationale: Keep prompt context and persisted request identity aligned.
+    span:
+      start_line: 189
+      end_line: 189
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use the ImplementationRequest packet renderer when converting observed repair findings into OpenCode repair prompts.
+    rationale: Keep production repair behavior aligned with the same operation-scoped contract used for initial implementation.
+    span:
+      start_line: 484
+      end_line: 484
+    related:
+      decisions:
+        - preserve-packet-contract-during-repair
+  - path: tests/test_intent_packet.py
+    type: added
+    summary: Test canonical packet fingerprints, tamper rejection, execution-unit compilation, request round trips, and repair preservation.
+    rationale: Prove the targeted packet is deterministic and survives the implementation-to-repair boundary.
+    span:
+      start_line: 1
+      end_line: 105
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+        - preserve-packet-contract-during-repair
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Update the coding-agent request schema expectation for the packet-bearing request version and packet prompt content.
+    rationale: Keep existing bounded-worker coverage aligned with the new request contract.
+    span:
+      start_line: 147
+      end_line: 147
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Update the packet operation assertion.
+    rationale: Verify the packet is the model-facing operation representation.
+    span:
+      start_line: 149
+      end_line: 149
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+  - path: tests/test_coding_agent.py
+    type: modified
+    summary: Update the request schema assertion for version two.
+    rationale: Verify packet-bearing requests use the new artifact contract.
+    span:
+      start_line: 152
+      end_line: 152
+    related:
+      decisions:
+        - use-operation-scoped-intent-packets
+entities:
+  - id: operation-scoped-intent-packet
+    type: Module
+    action: added
+  - id: packet-preserving-worker-repair
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: packet-fingerprint-covers-rendered-intent
+    action: added
+    description: The intent packet fingerprint covers all canonical required operations, preservation constraints, non-goals, source references, and selection explanations used to render the worker context.
+    rationale: Prevent silent changes to the targeted intent context between compilation, persistence, and invocation.
+  - id: worker-repair-preserves-operation-contract
+    action: added
+    description: A finding-specific repair prompt carries the original operation packet and instructs the worker to preserve requirements not contradicted by the finding.
+    rationale: Prevent corrective attempts from fixing one validation issue by weakening an already-satisfied requirement.
+guidance:
+  - id: prompt-opencode-with-targeted-intent
+    action: added
+    description: Compile one execution unit into a packet containing required operations, must-preserve constraints, non-goals, source references, and selection explanations; do not repeat the full feature intent.
+    rationale: Improve implementation accuracy for less sophisticated models by reducing inference and context breadth.
+features: []
+proposed_prs: []

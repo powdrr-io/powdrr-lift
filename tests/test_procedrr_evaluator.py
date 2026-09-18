@@ -13,6 +13,7 @@ import pytest
 from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
 from powdrr_lift.workrr.procedrr import StructuredToolExecutor
 from procedrr_evaluator import EvaluationError, Evaluator
+from procedrr_evaluator.evaluator import StepExecutionTranscript
 
 
 class FakeLLM:
@@ -240,6 +241,65 @@ def test_evaluator_resolves_embedded_references_in_operation_parameters() -> Non
             ]
         }
     ]
+
+
+def test_evaluator_records_step_execution_transcript_in_order() -> None:
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        return {"tool": tool, **parameters}
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "transcript",
+            "inputs": [{"name": "feature_description"}],
+            "steps": [
+                {
+                    "operation": {
+                        "tool": "gather_context",
+                        "parameters": {"types": ["requirements"]},
+                        "bind": "requirements_context",
+                    }
+                },
+                {
+                    "judge": {
+                        "prompt_system": "Return JSON only.",
+                        "instructions": ["Preserve existing items."],
+                        "question": "What edits are needed?",
+                        "context": ["feature_description", "requirements_context"],
+                        "output": {
+                            "name": "requirements_edits",
+                            "schema": {"type": "object"},
+                        },
+                    }
+                },
+                {"terminal": "succeeded"},
+            ],
+        },
+        {"feature_description": "Add a thing"},
+    )
+
+    assert isinstance(result.transcript, tuple)
+    assert all(isinstance(item, StepExecutionTranscript) for item in result.transcript)
+
+    operation, judge, terminal = result.transcript
+    assert operation.step == "steps[0]"
+    assert operation.inputs["tool"] == "gather_context"
+    assert operation.inputs["parameters"] == {"types": ["requirements"]}
+    assert operation.outputs["requirements_context"] == {
+        "tool": "gather_context",
+        "types": ["requirements"],
+    }
+    assert operation.outcome == "succeeded"
+
+    assert judge.step == "steps[1]"
+    assert judge.inputs["context"]["feature_description"] == "Add a thing"
+    assert "requirements_context" in judge.inputs["context"]
+    assert "requirements_edits" in judge.outputs
+    assert judge.outcome == "succeeded"
+
+    assert terminal.step == "steps[2]"
+    assert terminal.inputs == {"terminal": "succeeded"}
+    assert terminal.outputs["status"] == "succeeded"
+    assert terminal.outcome == "succeeded"
 
 
 def test_attempt_runs_declared_recovery_and_resumes() -> None:

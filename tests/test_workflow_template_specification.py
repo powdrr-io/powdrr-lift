@@ -673,6 +673,7 @@ def test_fully_review_pr_template_runs_reviews_sequentially(
     template = load_workflow_template(template_path)
     assert [task.uses_skills for task in template.task_templates] == [
         ("feature-functionality-review",),
+        ("adversarial-pr-review",),
         ("feature-test-coverage-review",),
         ("security-review",),
     ]
@@ -680,8 +681,10 @@ def test_fully_review_pr_template_runs_reviews_sequentially(
         "fast_iteration",
         "fast_iteration",
         "fast_iteration",
+        "fast_iteration",
     ]
     assert [task.input_state["pull_request"] for task in template.task_templates] == [
+        "<pull-request-id>",
         "<pull-request-id>",
         "<pull-request-id>",
         "<pull-request-id>",
@@ -699,11 +702,19 @@ def test_fully_review_pr_template_runs_reviews_sequentially(
         (),
         ("full-review-pr-42-task-001",),
         ("full-review-pr-42-task-001", "full-review-pr-42-task-002"),
+        (
+            "full-review-pr-42-task-001",
+            "full-review-pr-42-task-002",
+            "full-review-pr-42-task-003",
+        ),
     ]
     assert all(task.input_state["pull_request"] == "42" for task in tasks)
     assert tasks[1].input_state["functionality_review"] == (
         "full-review-pr-42-task-001.functionality-review-state"
     )
-    assert tasks[2].input_state["test_coverage_review"] == (
-        "full-review-pr-42-task-002.test-coverage-review-state"
+    assert tasks[2].input_state["scope_review"] == (
+        "full-review-pr-42-task-002.scope-review-state"
+    )
+    assert tasks[3].input_state["test_coverage_review"] == (
+        "full-review-pr-42-task-003.test-coverage-review-state"
     )

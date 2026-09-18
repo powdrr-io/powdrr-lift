@@ -4,6 +4,8 @@ interaction_style: devils_advocate
 adversarial: true
 when_to_use:
 - When the user asks for an adversarial engineering review of a pull request.
+- When a feature pull request must be challenged for changes not justified by
+  its authoritative feature or proposed-PR specification.
 - When a pull request should be challenged for unnecessary frameworks, reduced
   readability, or branching that is becoming difficult to reason about.
 - When review findings must be reported directly on GitHub as inline pull-request
@@ -18,10 +20,12 @@ steps:
     top-level adversarial option. Inspect the referenced pull request's title,
     body, labels, commits, complete diff,
     changed files, base and head branches, head SHA, review history, and current
-    state. Read the complete diff and the surrounding implementations, callers,
-    tests, configuration, and documentation. Establish the PR's intended
-    behavior and constraints before challenging its design; adversarial means
-    rigorous and evidence-driven, not reflexively negative.
+    state. Locate the authoritative feature and proposed-PR specifications
+    before deciding whether a change is in scope. Read the complete diff and
+    the surrounding implementations, callers, tests, configuration, and
+    documentation. Establish the PR's intended behavior and constraints before
+    challenging its design; adversarial means rigorous and evidence-driven, not
+    reflexively negative.
   tool_invocation_packages: [gh_readonly]
   tool_invocations:
   - tool: shell
@@ -36,8 +40,13 @@ steps:
   step_type: governed
   llm_type: high_reasoning
   details: >-
-    Act as a senior engineer educating a junior engineer on production-level
-    design. For every new framework, library, abstraction layer, service, or
+    First build a per-file and per-change justification ledger. Every changed
+    behavior, API, test, document, dependency, and configuration edit must map
+    to an explicit feature or proposed-PR requirement, acceptance criterion,
+    necessary compatibility correction, or required validation. Treat a change
+    without such a mapping as an unnecessary-scope candidate and identify the
+    smallest removal. Then act as a senior engineer educating a junior engineer
+    on production-level design. For every new framework, library, abstraction layer, service, or
     custom mechanism, search the repository and its existing dependencies for
     an established solution that can meet the requirement. Challenge the new
     choice when an existing framework or local pattern can do the job without

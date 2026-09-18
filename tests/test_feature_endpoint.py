@@ -161,6 +161,7 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "docs/proposals/${work_item_name}/design-interview-input.json" in (
         design_interview
     )
+    assert "tool: file_management" in design_interview
     implement_feature = Path(
         "docs/procedrr/skill-definitions/implement-feature.yaml"
     ).read_text(encoding="utf-8")

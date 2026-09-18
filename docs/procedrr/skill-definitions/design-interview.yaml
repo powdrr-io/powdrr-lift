@@ -23,11 +23,6 @@ decision_contract:
       item: {type: object}
 
 steps:
-  - operation:
-      tool: internal
-      command: [powdrr-lift, design-interview-input, --work-item-name, "${work_item_name}"]
-      bind: interview_input_template
-
   # Each category has its own exact gather_context call and output binding.
   - for_each:
       snapshot:
@@ -79,7 +74,8 @@ steps:
         decisions: {type: reference, value: category_edits_by_category}
       bind: category_edits
   - operation:
-      tool: edit
+      tool: internal
+      command: [build_interview_input]
       parameters:
         file_path: docs/proposals/${work_item_name}/design-interview-input.json
         document:
@@ -110,8 +106,18 @@ steps:
       tool: internal
       command:
         [powdrr-lift, feature-pr-specification, --work-item-name, "${work_item_name}",
+         --output, "docs/proposals/${work_item_name}/feature-pr-specification.yaml",
          --interview-input, "docs/proposals/${work_item_name}/design-interview-input.json"]
       bind: proposal
+  - operation:
+      tool: file_management
+      parameters:
+        operation: delete
+        file_path: docs/proposals/${work_item_name}/design-interview-input.json
+      returns:
+        type: object
+        required: [operation, file_path]
+      bind: interview_input_cleanup
   - operation:
       tool: internal
       command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]

@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 import pytest
+import yaml
 
 from powdrr_lift.cli import main
 from powdrr_lift.workrr.coding_agent import (
@@ -20,10 +21,13 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
+    _create_pr_changelog,
     _ensure_current_baseline,
     _load_implementation_plan,
     _plan_text_items,
+    _snake_case_work_item_name,
     _validate_procedrr_flow,
+    _write_structrr_plan,
     review_feature_diff,
 )
 
@@ -151,6 +155,93 @@ def test_feature_flow_is_shared_and_validated() -> None:
 
     assert validated == (Path.cwd() / path).resolve()
     assert not any(Path("docs/proposals").glob("*/procedrr-flow.yaml"))
+    design_interview = Path(
+        "docs/procedrr/skill-definitions/design-interview.yaml"
+    ).read_text(encoding="utf-8")
+    assert "docs/proposals/${work_item_name}/design-interview-input.json" in (
+        design_interview
+    )
+    assert "tool: file_management" in design_interview
+    implement_feature = Path(
+        "docs/procedrr/skill-definitions/implement-feature.yaml"
+    ).read_text(encoding="utf-8")
+    assert "work_item_slug" in implement_feature
+    assert "tool: file_management" in implement_feature
+    assert "destination_path: docs/current/${work_item_slug}" in implement_feature
+
+
+def test_feature_artifacts_use_snake_case_current_paths(tmp_path: Path) -> None:
+    config = FeatureEndpointConfig(
+        feature_description="Record each step.",
+        work_item_name="Add Procedrr Step Transcripts",
+        repo_root=tmp_path,
+        allowed_paths=("src/app.py",),
+        validation_command=("pytest",),
+    )
+
+    assert _snake_case_work_item_name(config.work_item_name) == (
+        "add_procedrr_step_transcripts"
+    )
+    plan_path = _write_structrr_plan(tmp_path, config, interview_input={})
+
+    assert plan_path == (
+        tmp_path
+        / "docs"
+        / "current"
+        / "add_procedrr_step_transcripts"
+        / "structrr-diff.yaml"
+    )
+
+
+def test_pr_changelog_promotes_the_provisional_structrr_plan(
+    tmp_path: Path,
+) -> None:
+    config = FeatureEndpointConfig(
+        feature_description="Record each step.",
+        work_item_name="Add Procedrr Step Transcripts",
+        repo_root=tmp_path,
+        allowed_paths=("src/app.py",),
+        validation_command=("pytest",),
+    )
+    plan_path = _write_structrr_plan(tmp_path, config, interview_input={})
+    commands: list[list[str]] = []
+
+    def runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        if command[:3] == ["git", "diff", "--name-only"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=(
+                    "docs/current/add_procedrr_step_transcripts/structrr-diff.yaml\n"
+                    "docs/current/add_procedrr_step_transcripts/feature-pr-specification.yaml\n"
+                    "src/app.py\n"
+                ),
+                stderr="",
+            )
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    changelog_path = _create_pr_changelog(
+        runner,
+        tmp_path,
+        "powdrr/add-procedrr-step-transcripts",
+        "https://github.com/powdrr-io/powdrr-lift/pull/123",
+        config,
+        plan_path,
+    )
+
+    assert changelog_path == tmp_path / "docs/changelogs/PR-123-changelog.yaml"
+    assert not plan_path.exists()
+    changelog = yaml.safe_load(changelog_path.read_text(encoding="utf-8"))
+    assert changelog["change_id"] == "PR-123"
+    assert all(
+        item["path"] != "docs/current/add_procedrr_step_transcripts/structrr-diff.yaml"
+        for item in changelog["files"]
+    )
+    assert [command[:2] for command in commands[-2:]] == [
+        ["git", "commit"],
+        ["git", "push"],
+    ]
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

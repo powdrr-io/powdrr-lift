@@ -17,6 +17,7 @@ KNOWN_TOOLS = frozenset(
         "gather_context",
         "internal",
         "edit",
+        "file_management",
         "yaml_edit",
         "read_document",
         "invoke_tool",
@@ -772,6 +773,40 @@ def _validate_steps(
                             "internal requires a non-empty string command list",
                         )
                     )
+            elif operation.get("tool") == "file_management":
+                parameters = operation.get("parameters")
+                operation_name = (
+                    parameters.get("operation")
+                    if isinstance(parameters, Mapping)
+                    else None
+                )
+                if operation_name not in {"delete", "move", "rename"}:
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.operation.parameters.operation",
+                            "file_management operation must be delete, move, or rename",
+                        )
+                    )
+                if not isinstance(parameters, Mapping) or not _nonempty_operation_value(
+                    parameters.get("file_path")
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.operation.parameters.file_path",
+                            "file_management requires a non-empty file_path",
+                        )
+                    )
+                if operation_name in {"move", "rename"} and (
+                    not isinstance(parameters, Mapping)
+                    or not _nonempty_operation_value(parameters.get("destination_path"))
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.operation.parameters.destination_path",
+                            "file_management move and rename require a non-empty "
+                            "destination_path",
+                        )
+                    )
             returns = (
                 operation.get("returns") if isinstance(operation, Mapping) else None
             )
@@ -940,6 +975,17 @@ def _template_references(value: Any) -> Iterator[str]:
     elif isinstance(value, list):
         for child in value:
             yield from _template_references(child)
+
+
+def _nonempty_operation_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    return (
+        isinstance(value, Mapping)
+        and value.get("type") == "reference"
+        and isinstance(value.get("value"), str)
+        and bool(value["value"].strip())
+    )
 
 
 def _decision_complexity(schema: Any) -> tuple[str, ...]:

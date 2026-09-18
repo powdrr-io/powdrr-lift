@@ -71,7 +71,7 @@ steps:
       bind: review
   - attempt:
       id: worker-validation-review
-      max_attempts: 2
+      max_attempts: 4
       body:
         - gate:
             subject: review.passed

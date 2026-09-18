@@ -197,6 +197,7 @@ def test_feature_flow_is_shared_and_validated() -> None:
 
     flow = path.read_text(encoding="utf-8")
     assert "id: worker-validation-review" in flow
+    assert "max_attempts: 4" in flow
     assert "recovery: worker-repair" in flow
     assert "repair_validation" in flow
     assert "repair_review" in flow

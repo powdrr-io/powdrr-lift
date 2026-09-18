@@ -39,15 +39,15 @@ symbols:
     qualified_name: src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient
     stable_key: python::src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient
     span:
-      start_line: 130
-      end_line: 208
+      start_line: 217
+      end_line: 295
   - path: src/powdrr_lift/workrr/procedrr.py
     kind: method
     qualified_name: src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient.complete_json
     stable_key: python::src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient.complete_json
     span:
-      start_line: 144
-      end_line: 208
+      start_line: 231
+      end_line: 295
   - path: src/procedrr/model.py
     kind: class
     qualified_name: src.procedrr.model.WorkflowDefinition

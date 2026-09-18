@@ -1,0 +1,133 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 714
+title: Document intent-preserving change control
+intent:
+  problem: Powdrr has Structrr state, Procedrr single-decision execution, and a bounded Workrr/OpenCode handoff, but it does not yet define one mandatory intent transaction, while the older OpenCode-inspired proposal set no longer represents the desired control architecture.
+  goal: Define the complete intent-preserving change-control protocol and incremental implementation sequence, then retire the superseded OpenCode-inspired plans and their companion audit.
+human-decisions:
+  - id: document-intent-preserving-change-control
+    summary: Record the agreed intent-diff, three-gate, single-decision, drift-monitoring, and targeted OpenCode handoff design as detailed repository documentation and submit it for review.
+  - id: retire-opencode-inspired-document-set
+    summary: Delete the complete OpenCode-inspired plan set and its companion implementation audit after the intent-preserving design supersedes them.
+structured_files: []
+files:
+  - path: docs/plans/intent-preserving-change-control.md
+    type: added
+    summary: Define the state model, ownership boundaries, data contracts, single-decision rules, three mandatory gates, targeted OpenCode intent packets, evidence invalidation, and cumulative drift monitoring.
+    rationale: Preserve the agreed end-to-end architecture as a precise reviewable contract before implementation begins.
+    span:
+      start_line: 1
+      end_line: 902
+    related:
+      entities:
+        - intent-preserving-change-control-design
+      decisions:
+        - document-intent-preserving-change-control
+      invariants:
+        - procedrr-controls-intent-gates
+      guidance:
+        - target-opencode-with-compiled-intent
+  - path: docs/plans/intent-preserving-change-implementation-plan.md
+    type: added
+    summary: Break the control design into seven vertical change sets tied to existing Structrr, Procedrr, Workrr, execution-runtime, and OpenCode implementation seams.
+    rationale: Provide an incremental path that adds enforced production boundaries rather than disconnected schema types.
+    span:
+      start_line: 1
+      end_line: 534
+    related:
+      entities:
+        - intent-preserving-change-control-design
+        - intent-preserving-change-implementation-plan
+      decisions:
+        - document-intent-preserving-change-control
+      invariants:
+        - procedrr-controls-intent-gates
+      guidance:
+        - target-opencode-with-compiled-intent
+  - path: docs/plans/durable-user-intent-retrieval-and-enforcement.md
+    type: modified
+    summary: Point the durable-intent foundation directly to the new intent-preserving change-control design without relying on the retired OpenCode-inspired plans.
+    rationale: Keep the surviving intent documentation connected to the current follow-on architecture.
+    span:
+      start_line: 23
+      end_line: 28
+    related:
+      entities:
+        - intent-preserving-change-control-design
+  - path: docs/plans/opencode-inspired-agent-execution.md
+    type: deleted
+    summary: Remove the superseded OpenCode-inspired execution proposal.
+    rationale: Keep the repository's forward-looking architecture focused on the accepted intent-preserving change-control design.
+    span:
+      start_line: 1
+      end_line: 1282
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
+  - path: docs/plans/opencode-inspired-agent-execution-engineering-plan.md
+    type: deleted
+    summary: Remove the superseded engineering plan for the OpenCode-inspired execution proposal.
+    rationale: Retire implementation sequencing that is replaced by the new seven-change-set intent-control plan.
+    span:
+      start_line: 1
+      end_line: 1528
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
+  - path: docs/plans/opencode-inspired-agent-execution-remaining-work.md
+    type: deleted
+    summary: Remove the historical remaining-work document for the OpenCode-inspired execution proposal.
+    rationale: Avoid retaining a stale work queue after adopting the replacement implementation plan.
+    span:
+      start_line: 1
+      end_line: 312
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
+  - path: docs/plans/opencode-inspired-agent-execution-completion-plan.md
+    type: deleted
+    summary: Remove the completion plan for the superseded OpenCode-inspired execution proposal.
+    rationale: Keep completion criteria aligned with the replacement intent-preserving control design.
+    span:
+      start_line: 1
+      end_line: 247
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
+  - path: docs/audits/opencode-implementation-audit.md
+    type: deleted
+    summary: Remove the implementation audit whose scope and findings are tied to the retired OpenCode-inspired plans.
+    rationale: Remove the companion artifact with the plan set it audits instead of leaving an orphaned historical review.
+    span:
+      start_line: 1
+      end_line: 446
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
+entities:
+  - id: intent-preserving-change-control-design
+    type: Design doc
+    action: added
+  - id: intent-preserving-change-implementation-plan
+    type: Design doc
+    action: added
+entity_relationships:
+  - id: implementation-plan-realizes-intent-control-design
+    source: intent-preserving-change-implementation-plan
+    target: intent-preserving-change-control-design
+    relationship: implements
+    description: The implementation plan decomposes the intent-preserving control protocol into seven independently reviewable production change sets.
+    rationale: Keep implementation sequencing traceable to the accepted architectural design.
+    action: added
+invariants:
+  - id: procedrr-controls-intent-gates
+    action: added
+    description: Procedrr determines which atomic checks run and whether a transition is legal; Workrr, OpenCode, and other model-backed workers cannot select, skip, or satisfy their own control gates without valid evidence.
+    rationale: Keep proposal acceptance, implementation eligibility, and resulting-state acceptance outside model discretion.
+guidance:
+  - id: target-opencode-with-compiled-intent
+    action: added
+    description: Compile the smallest complete and explainable active-intent closure for each bounded OpenCode work order, and split work rather than dropping mandatory intent when the packet is too large.
+    rationale: Improve first-pass implementation accuracy without relying on an undifferentiated dump of historical instructions.
+features: []
+proposed_prs: []

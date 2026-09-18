@@ -20,12 +20,12 @@ durable structured intent, resolve their applicability deterministically, place
 the relevant subset into each model request, and enforce objective consequences
 through obligations, evidence, and transition guards.
 
-This document is a focused companion to the broader
-[`OpenCode-inspired execution engineering plan`](opencode-inspired-agent-execution-engineering-plan.md)
-and its
-[`remaining-work audit`](opencode-inspired-agent-execution-remaining-work.md).
-It specifies the end-to-end path for remembered design decisions, invariants,
-and procedures.
+This document specifies the end-to-end path for remembered design decisions,
+invariants, and procedures. The
+[`intent-preserving change control`](intent-preserving-change-control.md)
+design extends this retrieval and enforcement foundation into versioned intent
+diffs, proposal-time consistency review, implementation-start revalidation,
+targeted OpenCode intent packets, and post-implementation reconciliation.
 
 ## Required outcome
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import sys
+import time
 from pathlib import Path
 
 from powdrr_lift.opencode_monitor import (
@@ -8,6 +10,7 @@ from powdrr_lift.opencode_monitor import (
     append_event,
     parse_event_line,
     replay_events,
+    run_opencode,
 )
 
 
@@ -72,3 +75,38 @@ def test_append_and_replay_event_log(tmp_path: Path) -> None:
     assert records[0]["event"]["type"] == "server.connected"
     assert records[1]["captured_monotonic"] == 13.5
     assert replay_events(records).events[1].event_type == "message.updated"
+
+
+def test_run_opencode_resets_inactivity_timeout_on_streamed_events(
+    tmp_path: Path,
+) -> None:
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import sys, time; "
+            'print(\'{"type":"session.started"}\', flush=True); '
+            "time.sleep(0.05); "
+            'print(\'{"type":"session.completed"}\', flush=True)'
+        ),
+    ]
+    result = run_opencode(
+        command,
+        log_path=tmp_path / "events.ndjson",
+        inactivity_timeout=0.1,
+    )
+
+    assert result.returncode == 0
+    assert len(result.stdout.splitlines()) == 2
+
+
+def test_run_opencode_times_out_when_no_activity_is_seen(tmp_path: Path) -> None:
+    started = time.monotonic()
+    result = run_opencode(
+        [sys.executable, "-c", "import time; time.sleep(1)"],
+        log_path=None,
+        inactivity_timeout=0.05,
+    )
+
+    assert result.returncode == 124
+    assert time.monotonic() - started < 0.5

@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
 import selectors
+import signal
 import subprocess
 import time
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, TextIO, cast
+from typing import Any, BinaryIO, Literal, cast
 
 Liveness = Literal["active", "slow", "stalled", "completed", "failed"]
 
@@ -159,54 +161,92 @@ def append_event(
 def run_opencode(
     command: Sequence[str],
     *,
-    log_path: Path,
+    log_path: Path | None,
     cwd: Path | None = None,
-    slow_after: float = 60.0,
-    stalled_after: float = 180.0,
+    env: Mapping[str, str] | None = None,
+    inactivity_timeout: float = 300.0,
     on_snapshot: Callable[[LivenessSnapshot], None] | None = None,
-) -> int:
-    """Run an OpenCode JSON-producing command while capturing its events."""
+    on_activity: Callable[[], None] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run OpenCode and stop it after five minutes without activity.
+
+    Activity includes any streamed OpenCode output/event and can also be
+    reported by the owning Procedrr flow through ``on_activity``.
+    """
+    if inactivity_timeout <= 0:
+        raise ValueError("inactivity_timeout must be greater than zero")
     monitor = OpenCodeLiveness(
-        slow_after=slow_after,
-        stalled_after=stalled_after,
+        slow_after=inactivity_timeout,
+        stalled_after=inactivity_timeout * 2,
     )
     process = subprocess.Popen(
         list(command),
         cwd=cwd,
+        env=env,
         stdout=subprocess.PIPE,
-        stderr=None,
-        text=True,
-        bufsize=1,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
     )
     if process.stdout is None:
         raise RuntimeError("OpenCode process did not provide stdout")
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ, process.stdout)
+    output: list[bytes] = []
+    pending = ""
+    last_activity = time.monotonic()
+    timed_out = False
     while selector.get_map() or process.poll() is None:
-        ready = selector.select(timeout=0.5)
+        remaining = inactivity_timeout - (time.monotonic() - last_activity)
+        if remaining <= 0:
+            timed_out = True
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            break
+        ready = selector.select(timeout=min(0.5, remaining))
         if not ready:
             if on_snapshot is not None:
                 on_snapshot(monitor.snapshot())
             continue
         for key, _ in ready:
-            stream = cast(TextIO, key.data)
-            line = stream.readline()
-            if line == "":
+            stream = cast(BinaryIO, key.data)
+            chunk = os.read(stream.fileno(), 65536)
+            if not chunk:
                 selector.unregister(stream)
                 continue
-            captured_at = time.monotonic()
-            payload = parse_event_line(line)
-            if payload is None:
-                continue
-            monitor.observe(payload, captured_at=captured_at)
-            append_event(log_path, payload, captured_at=captured_at)
-            if on_snapshot is not None:
-                on_snapshot(monitor.snapshot())
+            output.append(chunk)
+            last_activity = time.monotonic()
+            if on_activity is not None:
+                on_activity()
+            pending += chunk.decode("utf-8", errors="replace")
+            lines = pending.splitlines(keepends=True)
+            pending = (
+                lines.pop() if lines and not lines[-1].endswith(("\n", "\r")) else ""
+            )
+            for line in lines:
+                payload = parse_event_line(line)
+                if payload is None:
+                    continue
+                monitor.observe(payload, captured_at=last_activity)
+                if log_path is not None:
+                    append_event(log_path, payload, captured_at=last_activity)
+                if on_snapshot is not None:
+                    on_snapshot(monitor.snapshot())
     selector.close()
     returncode = process.wait()
+    if timed_out:
+        returncode = 124
     if on_snapshot is not None:
         on_snapshot(monitor.snapshot(process_returncode=returncode))
-    return returncode
+    if pending:
+        output.append(pending.encode("utf-8"))
+    return subprocess.CompletedProcess(
+        list(command),
+        returncode,
+        b"".join(output).decode("utf-8", errors="replace"),
+        "",
+    )
 
 
 def replay_events(records: Iterable[dict[str, Any]]) -> OpenCodeLiveness:

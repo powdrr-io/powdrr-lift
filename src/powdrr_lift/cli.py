@@ -2056,7 +2056,12 @@ def build_parser() -> argparse.ArgumentParser:
             "deepinfra/deepseek-flash."
         ),
     )
-    coding_agent_parser.add_argument("--timeout-seconds", type=float, default=1800.0)
+    coding_agent_parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=300.0,
+        help="Maximum seconds without Procedrr or OpenCode activity (default: 300).",
+    )
     coding_agent_parser.add_argument(
         "--validation-timeout-seconds", type=float, default=600.0
     )

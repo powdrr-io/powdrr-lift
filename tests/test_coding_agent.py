@@ -171,7 +171,7 @@ def test_opencode_provider_pins_requested_model(
         captured["kwargs"] = kwargs
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_opencode", fake_run)
     provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="a")
 
     command = captured["command"]
@@ -318,6 +318,10 @@ def test_opencode_policy_is_noninteractive_and_denies_publication() -> None:
     assert policy.to_data()["bash"]["pytest *"] == "allow"
 
 
+def test_opencode_provider_defaults_to_five_minutes_of_inactivity() -> None:
+    assert OpenCodeProvider().timeout_seconds == 300.0
+
+
 def test_opencode_provider_uses_json_events_and_inline_policy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -330,7 +334,7 @@ def test_opencode_provider_uses_json_events_and_inline_policy(
         captured["environment"] = kwargs["env"]
         return subprocess.CompletedProcess(command, 0, "{}\n", "")
 
-    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.subprocess.run", fake_run)
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_opencode", fake_run)
     provider = OpenCodeProvider(timeout_seconds=4.0)
     result = provider.run(_request(), worktree_root=tmp_path, attempt_id="attempt-1")
 

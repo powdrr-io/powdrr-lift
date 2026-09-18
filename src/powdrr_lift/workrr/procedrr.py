@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+import os
+import subprocess
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -16,6 +18,91 @@ from procedrr.fragments import apply_fragment_step_json, start_fragment
 
 class ProcedrrResponseError(RuntimeError):
     """A procedrr judge could not produce a schema-valid response."""
+
+
+class OpenCodeReviewClient:
+    """Send Procedrr review prompts to OpenCode in read-only JSON mode."""
+
+    def __init__(
+        self,
+        *,
+        executable: str,
+        model: str,
+        worktree: Path,
+        runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+        timeout: float = 1800.0,
+    ) -> None:
+        self.executable = executable
+        self.model = model
+        self.worktree = worktree
+        self.runner = runner
+        self.timeout = timeout
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if response_schema is None:
+            raise ProcedrrResponseError("OpenCode reviews require an output schema.")
+        prompt = "\n\n".join(
+            f"{message['role'].upper()}:\n{message['content']}" for message in messages
+        )
+        command = [
+            self.executable,
+            "run",
+            "--format",
+            "default",
+            "--model",
+            self.model,
+            "--dir",
+            str(self.worktree),
+            prompt,
+        ]
+        environment = os.environ.copy()
+        environment["PWD"] = str(self.worktree.resolve())
+        environment["OPENCODE_PERMISSION"] = json.dumps(
+            {
+                "*": "deny",
+                "read": "allow",
+                "edit": "deny",
+                "bash": "deny",
+                "task": "deny",
+                "question": "deny",
+                "external_directory": "deny",
+                "webfetch": "deny",
+            }
+        )
+        completed = self.runner(
+            command,
+            cwd=self.worktree,
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=self.timeout,
+        )
+        if completed.returncode != 0:
+            raise ProcedrrResponseError(
+                f"OpenCode review failed with exit code {completed.returncode}"
+            )
+        output = (completed.stdout or "") + (completed.stderr or "")
+        decoder = json.JSONDecoder()
+        for index, character in enumerate(output):
+            if character != "{":
+                continue
+            try:
+                value, _ = decoder.raw_decode(output[index:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                try:
+                    validate_json(value, response_schema)
+                except JsonSchemaError:
+                    continue
+                return value
+        raise ProcedrrResponseError("OpenCode review did not return valid JSON")
 
 
 class StructuredToolExecutor:
@@ -209,6 +296,7 @@ class WorkrrProcedrrClient:
 
 
 __all__ = [
+    "OpenCodeReviewClient",
     "ProcedrrResponseError",
     "StructuredToolExecutor",
     "WorkrrProcedrrClient",

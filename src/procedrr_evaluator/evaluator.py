@@ -61,9 +61,11 @@ class Evaluator:
         operation_executor: OperationExecutor,
         *,
         process_directory: Path | None = None,
+        judge_clients: Mapping[str, WorkflowLLMClient] | None = None,
     ) -> None:
         self.llm = llm
         self.operation_executor = operation_executor
+        self.judge_clients = dict(judge_clients or {})
         self.process_directory = process_directory or Path(
             "docs/procedrr/skill-definitions"
         )
@@ -563,10 +565,11 @@ class Evaluator:
         usage["llm"] += 1
         self._limit(usage, limits, "llm_activations", "LLM activations")
         schema = judge["output"]["schema"]
+        client = self.judge_clients.get(str(judge.get("provider", "")), self.llm)
         try:
-            output = self.llm.complete_json(messages, response_schema=schema)  # type: ignore[call-arg]
+            output = client.complete_json(messages, response_schema=schema)  # type: ignore[call-arg]
         except TypeError:
-            output = self.llm.complete_json(messages)
+            output = client.complete_json(messages)
         validate_json(output, judge["output"]["schema"])
         state[judge["output"]["name"]] = output
         events.append(

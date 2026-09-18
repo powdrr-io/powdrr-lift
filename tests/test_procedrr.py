@@ -368,6 +368,29 @@ def test_checked_in_design_interview_definition_parses() -> None:
     assert document["name"] == "design-interview"
 
 
+def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
+    from pathlib import Path
+
+    source = Path("docs/procedrr/skill-definitions/implement-feature.yaml").read_text()
+    document = parse_and_validate(source)
+
+    assert document["name"] == "implement-feature"
+    assert validate_single_decision(document) == ()
+    assert set(document["recoveries"]) == {"completeness-repair", "scope-repair"}
+    step_text = str(document["steps"])
+    assert "specification-completeness-review" in step_text
+    assert "change-scope-review" in step_text
+    review_schemas = [
+        step["judge"]["output"]["schema"]
+        for step in document["steps"]
+        if isinstance(step, dict) and "judge" in step
+    ]
+    assert [set(schema["properties"]) for schema in review_schemas] == [
+        {"verdict"},
+        {"verdict"},
+    ]
+
+
 def test_design_interview_uses_real_context_types_and_bounded_repairs() -> None:
     compiled = compile_workflow(design_interview())
     data = compiled.definition.to_data()

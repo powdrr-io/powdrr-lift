@@ -77,25 +77,24 @@ steps:
       instructions:
         - Compare the implementation and validation evidence with the complete feature specification.
         - Mark complete only when every requested behavior is implemented and validated.
-        - List each missing or contradicted requirement precisely.
+        - Return one verdict: satisfied or missing.
       context: [feature_description, plan, implementation, validation, review]
       output:
         name: completeness_review
         schema:
           type: object
-          required: [complete, findings]
+          required: [verdict]
           additionalProperties: false
           properties:
-            complete: {type: boolean}
-            findings: {type: array, items: {type: string, minLength: 1}}
+            verdict: {type: string, enum: [satisfied, missing]}
       validation: {kind: json_schema}
   - attempt:
       id: specification-completeness-review
       max_attempts: 2
       body:
         - gate:
-            subject: completeness_review.complete
-            equals: true
+            subject: completeness_review.verdict
+            equals: satisfied
             on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
       on_failure: {recovery: completeness-repair, resume: specification-completeness-review}
   - judge:
@@ -107,24 +106,24 @@ steps:
         - Inspect the complete implementation diff, not only the worker summary.
         - Mark justified only when every change is required by the specification or its validation.
         - Treat unrelated refactors, cleanup, and speculative improvements as findings.
+        - Return one verdict: justified or unjustified.
       context: [feature_description, plan, implementation, validation, review, completeness_review]
       output:
         name: scope_review
         schema:
           type: object
-          required: [justified, findings]
+          required: [verdict]
           additionalProperties: false
           properties:
-            justified: {type: boolean}
-            findings: {type: array, items: {type: string, minLength: 1}}
+            verdict: {type: string, enum: [justified, unjustified]}
       validation: {kind: json_schema}
   - attempt:
       id: change-scope-review
       max_attempts: 2
       body:
         - gate:
-            subject: scope_review.justified
-            equals: true
+            subject: scope_review.verdict
+            equals: justified
             on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
       on_failure: {recovery: scope-repair, resume: change-scope-review}
   - operation:
@@ -162,11 +161,11 @@ recoveries:
     steps:
       - judge:
           kind: construct_repair_plan
-          question: What is the smallest implementation repair that resolves every completeness finding?
-          subject: completeness_review.findings
+          question: What one repair request should be sent to OpenCode for the incomplete implementation?
+          subject: completeness_review
           prompt_system: Return only the declared JSON object.
           instructions:
-            - Address only the listed completeness findings.
+            - Address only the completeness failure identified by the review verdict.
             - Preserve the feature scope and do not rewrite unrelated code.
           context: [feature_description, plan, implementation, validation, completeness_review]
           output:
@@ -187,7 +186,7 @@ recoveries:
             work_item_name: {type: reference, value: work_item_name}
             feature_description: {type: reference, value: feature_description}
             repair_request: {type: reference, value: completeness_repair.request}
-            review_findings: {type: reference, value: completeness_review.findings}
+            review_verdict: {type: reference, value: completeness_review.verdict}
           returns: {type: object}
           bind: implementation
       - operation:
@@ -201,11 +200,11 @@ recoveries:
     steps:
       - judge:
           kind: construct_repair_plan
-          question: What is the smallest implementation repair that removes every unjustified change?
-          subject: scope_review.findings
+          question: What one repair request should be sent to OpenCode for the unjustified change scope?
+          subject: scope_review
           prompt_system: Return only the declared JSON object.
           instructions:
-            - Remove or revert only changes identified as unrelated to the feature.
+            - Remove or revert only the change scope identified by the review verdict.
             - Preserve all behavior required by the specification.
           context: [feature_description, plan, implementation, validation, scope_review]
           output:
@@ -226,7 +225,7 @@ recoveries:
             work_item_name: {type: reference, value: work_item_name}
             feature_description: {type: reference, value: feature_description}
             repair_request: {type: reference, value: scope_repair.request}
-            review_findings: {type: reference, value: scope_review.findings}
+            review_verdict: {type: reference, value: scope_review.verdict}
           returns: {type: object}
           bind: implementation
       - operation:

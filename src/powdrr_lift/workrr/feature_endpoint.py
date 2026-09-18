@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -187,6 +188,13 @@ def _execute_procedrr_flow(
                     "build_interview_input requires a document mapping"
                 )
             state["interview_input"] = dict(document)
+            file_path = parameters.get("file_path")
+            if isinstance(file_path, str):
+                target = _resolve_flow_path(worktree, file_path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(
+                    json.dumps(document, indent=2) + "\n", encoding="utf-8"
+                )
             return dict(document)
         if command[:2] == ["powdrr-lift", "feature-pr-specification"]:
             interview_path = _command_option(command, "--interview-input")
@@ -251,6 +259,7 @@ def _execute_procedrr_flow(
                     parameters, "feature_description"
                 ),
             )
+            _promote_feature_specification(worktree, slug)
             state["plan_path"] = _write_structrr_plan(
                 worktree,
                 plan_config,
@@ -604,6 +613,23 @@ def review_feature_diff(
         "validation_status": validation.status.value,
         "validation_error": validation.error,
     }
+
+
+def _promote_feature_specification(worktree: Path, slug: str) -> Path:
+    proposal_root = worktree / "docs" / "proposals" / slug
+    proposal_path = proposal_root / "feature-pr-specification.yaml"
+    current_root = worktree / "docs" / "current" / slug
+    current_path = current_root / proposal_path.name
+    if not proposal_path.is_file():
+        raise PowdrrExecutionError(f"design interview did not produce {proposal_path}")
+    current_root.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(proposal_path), str(current_path))
+    (proposal_root / "design-interview-input.json").unlink(missing_ok=True)
+    try:
+        proposal_root.rmdir()
+    except OSError:
+        pass
+    return current_path
 
 
 def _write_structrr_plan(

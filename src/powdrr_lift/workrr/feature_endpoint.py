@@ -283,6 +283,29 @@ def _execute_procedrr_flow(
             )
             state["review"] = review
             return review
+        if name == "collect_repair_issues":
+            validation = parameters.get("validation")
+            review = parameters.get("review")
+            issues: list[dict[str, Any]] = []
+            if isinstance(validation, Mapping):
+                results = validation.get("results")
+                if isinstance(results, list):
+                    issues.extend(
+                        {
+                            "kind": "validation",
+                            "issue": result,
+                        }
+                        for result in results
+                        if isinstance(result, Mapping)
+                        and result.get("status") != "passed"
+                    )
+                if validation.get("error"):
+                    issues.append(
+                        {"kind": "validation_report", "issue": validation["error"]}
+                    )
+            if isinstance(review, Mapping) and review.get("passed") is not True:
+                issues.append({"kind": "worker_review", "issue": dict(review)})
+            return issues
         if name == "open_pull_request":
             review_value = parameters.get("review")
             if (
@@ -443,6 +466,12 @@ def _run_opencode_phase(
         allowed_commands=(" ".join(config.validation_command) + " *",),
     )
     repair_request = parameters.get("repair_request")
+    repair_issue = parameters.get("repair_issue")
+    if isinstance(repair_issue, Mapping):
+        repair_request = (
+            "Fix this specific observed issue before doing anything else:\n"
+            f"{json.dumps(dict(repair_issue), indent=2, sort_keys=True, default=str)}"
+        )
     if isinstance(repair_request, str) and repair_request.strip():
         repair_evidence = {
             "validation": parameters.get("repair_validation"),
@@ -458,20 +487,31 @@ def _run_opencode_phase(
                 "\n"
                 "Apply only this repair request, then stop."
             ),
+            allow_existing_changes=True,
         )
     request_path = output_root / "implementation-request.json"
     request_path.write_text(request.to_json(), encoding="utf-8")
     attempt_store = CodingAgentAttemptStore(output_root / "artifacts")
-    attempt = CodingAgentRunner(
-        provider=OpenCodeProvider(
+    provider = state.get("opencode_provider")
+    if not isinstance(provider, OpenCodeProvider):
+        provider = OpenCodeProvider(
             executable=config.opencode_executable,
             model=config.opencode_model,
             permission_policy=OpenCodePermissionPolicy(
                 (" ".join(config.validation_command) + " *",)
             ),
-        ),
+        )
+        state["opencode_provider"] = provider
+    attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
+    state["opencode_attempt_number"] = attempt_number
+    attempt = CodingAgentRunner(
+        provider=provider,
         store=attempt_store,
-    ).run(request, worktree_root=worktree, attempt_id=f"{slug}-attempt")
+    ).run(
+        request,
+        worktree_root=worktree,
+        attempt_id=f"{slug}-attempt-{attempt_number}",
+    )
     state.update(
         request=request,
         request_path=request_path,

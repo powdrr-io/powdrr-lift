@@ -42,6 +42,7 @@ class ImplementationRequest:
     ephemeral_paths: tuple[str, ...] = ()
     planned_additions: tuple[Mapping[str, Any], ...] = ()
     planned_deletions: tuple[Mapping[str, Any], ...] = ()
+    allow_existing_changes: bool = False
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
@@ -60,6 +61,7 @@ class ImplementationRequest:
             "ephemeral_paths": list(self.ephemeral_paths),
             "planned_additions": [dict(item) for item in self.planned_additions],
             "planned_deletions": [dict(item) for item in self.planned_deletions],
+            "allow_existing_changes": self.allow_existing_changes,
         }
 
     def to_json(self) -> str:
@@ -85,6 +87,7 @@ class ImplementationRequest:
             planned_deletions=tuple(
                 cast(list[Mapping[str, Any]], data.get("planned_deletions", []))
             ),
+            allow_existing_changes=bool(data.get("allow_existing_changes", False)),
             schema_version=cast(str, data["schema_version"]),
         )
 
@@ -272,6 +275,7 @@ class OpenCodeProvider:
     )
     model: str | None = None
     provider_name: str = "opencode"
+    session_id: str | None = field(default=None, init=False)
 
     def run(
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
@@ -296,14 +300,20 @@ class OpenCodeProvider:
         ]
         if self.model is not None:
             command.extend(("--model", self.model))
+        if self.session_id is not None:
+            command.extend(("--session", self.session_id))
         command.append(request.prompt)
-        return run_opencode(
+        completed = run_opencode(
             command,
             log_path=None,
             cwd=worktree_root,
             env=environment,
             inactivity_timeout=self.timeout_seconds,
         )
+        session_id = _extract_opencode_session_id(_json_events(completed.stdout))
+        if session_id is not None:
+            self.session_id = session_id
+        return completed
 
 
 class CodingAgentAttemptStore:
@@ -438,7 +448,7 @@ def run_coding_agent(
             ),
         )
     before_status = _working_paths(worktree_root)
-    if before_status:
+    if before_status and not request.allow_existing_changes:
         return CodingAgentAttempt(
             attempt_id,
             request.request_id,
@@ -572,6 +582,41 @@ def _json_events(stdout: str) -> tuple[Mapping[str, Any], ...]:
         if isinstance(value, Mapping):
             events.append(dict(value))
     return tuple(events)
+
+
+def _extract_opencode_session_id(
+    events: Sequence[Mapping[str, Any]],
+) -> str | None:
+    """Extract the resumable session id from OpenCode lifecycle events."""
+    for event in events:
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type.startswith("session."):
+            continue
+        candidate = _find_session_id(event)
+        if candidate is not None:
+            return candidate
+    return None
+
+
+def _find_session_id(value: Any) -> str | None:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            normalized = str(key).replace("-", "_").lower()
+            if normalized in {"sessionid", "session_id", "session"} and isinstance(
+                nested, str
+            ):
+                return nested
+            if key == "id" and isinstance(nested, str):
+                return nested
+            found = _find_session_id(nested)
+            if found is not None:
+                return found
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        for nested in value:
+            found = _find_session_id(nested)
+            if found is not None:
+                return found
+    return None
 
 
 __all__ = [

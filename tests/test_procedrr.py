@@ -376,7 +376,11 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
 
     assert document["name"] == "implement-feature"
     assert validate_single_decision(document) == ()
-    assert set(document["recoveries"]) == {"completeness-repair", "scope-repair"}
+    assert set(document["recoveries"]) == {
+        "completeness-repair",
+        "scope-repair",
+        "worker-repair",
+    }
     step_text = str(document["steps"])
     assert "specification-completeness-review" in step_text
     assert "change-scope-review" in step_text

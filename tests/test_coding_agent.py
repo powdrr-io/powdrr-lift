@@ -354,6 +354,65 @@ def test_opencode_provider_uses_json_events_and_inline_policy(
     assert json.loads(str(environment["OPENCODE_PERMISSION"]))["question"] == "deny"
 
 
+def test_opencode_provider_resumes_the_session_for_repair_attempts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        stdout = '{"type":"session.created","properties":{"info":{"id":"session-1"}}}\n'
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_opencode", fake_run)
+    provider = OpenCodeProvider()
+    provider.run(_request(), worktree_root=tmp_path, attempt_id="attempt-1")
+    provider.run(_request(), worktree_root=tmp_path, attempt_id="attempt-2")
+
+    assert "--session" not in commands[0]
+    assert commands[1][commands[1].index("--session") + 1] == "session-1"
+
+
+def test_repair_attempt_can_continue_with_existing_in_scope_changes(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+    request = ImplementationRequest(
+        **{**_request(_head(worktree)).to_data(), "allow_existing_changes": True}
+    )
+
+    class ExistingChangeProvider:
+        provider_name = "fake"
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del request, attempt_id
+            (worktree_root / "src").mkdir(exist_ok=True)
+            (worktree_root / "src" / "change.py").write_text("value = 2\n")
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+
+    first = run_coding_agent(
+        ExistingChangeProvider(),
+        request,
+        worktree_root=worktree,
+        attempt_id="first",
+    )
+    second = run_coding_agent(
+        ExistingChangeProvider(),
+        request,
+        worktree_root=worktree,
+        attempt_id="second",
+    )
+
+    assert first.status is CodingAgentStatus.COMPLETED
+    assert second.status is CodingAgentStatus.COMPLETED
+
+
 def test_runner_persists_request_and_attempt_artifacts(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path / "repo")
     store = CodingAgentAttemptStore(tmp_path / "artifacts")

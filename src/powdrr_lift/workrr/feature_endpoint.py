@@ -702,9 +702,7 @@ def _plan_text_items(
                     "description": item["text"].strip(),
                 }
             )
-    return values or [
-        {"id": f"{prefix}-acceptance-1", "description": fallback}
-    ]
+    return values or [{"id": f"{prefix}-acceptance-1", "description": fallback}]
 
 
 def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:

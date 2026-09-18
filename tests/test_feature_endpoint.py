@@ -26,6 +26,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _validate_procedrr_flow,
     review_feature_diff,
 )
+from powdrr_lift.workrr.procedrr import OpenCodeReviewClient
 
 
 def test_workrr_feature_cli_builds_endpoint_config(
@@ -119,6 +120,48 @@ def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None
     assert review["changed_paths"] == ["app.py"]
     assert review["validation_status"] == "failed"
     assert review["passed"] is False
+
+
+def test_opencode_review_client_sends_prompt_to_read_only_opencode(
+    tmp_path: Path,
+) -> None:
+    calls: list[list[str]] = []
+
+    def runner(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        environment = kwargs["env"]
+        assert isinstance(environment, dict)
+        assert '"edit": "deny"' in environment["OPENCODE_PERMISSION"]
+        return subprocess.CompletedProcess(command, 0, '{"verdict":"satisfied"}', "")
+
+    client = OpenCodeReviewClient(
+        executable="opencode",
+        model="review-model",
+        worktree=tmp_path,
+        runner=runner,
+    )
+
+    result = client.complete_json(
+        [{"role": "user", "content": "Review this implementation."}],
+        response_schema={
+            "type": "object",
+            "required": ["verdict"],
+            "properties": {"verdict": {"enum": ["satisfied", "missing"]}},
+        },
+    )
+
+    assert result == {"verdict": "satisfied"}
+    assert calls[0][:6] == [
+        "opencode",
+        "run",
+        "--format",
+        "default",
+        "--model",
+        "review-model",
+    ]
+    assert "Review this implementation." in calls[0][-1]
 
 
 def test_endpoint_reuses_existing_latest_baseline_without_writing(

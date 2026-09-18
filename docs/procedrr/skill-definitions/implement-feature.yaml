@@ -71,6 +71,7 @@ steps:
       bind: review
   - judge:
       kind: verify_completeness
+      provider: opencode
       question: Does the implementation satisfy every requirement in the feature specification?
       subject: feature_description
       prompt_system: Return only the declared JSON object.
@@ -99,6 +100,7 @@ steps:
       on_failure: {recovery: completeness-repair, resume: specification-completeness-review}
   - judge:
       kind: verify_scope
+      provider: opencode
       question: Is every changed file and hunk justified by the feature specification?
       subject: review
       prompt_system: Return only the declared JSON object.
@@ -161,6 +163,7 @@ recoveries:
     steps:
       - judge:
           kind: construct_repair_plan
+          provider: opencode
           question: What one repair request should be sent to OpenCode for the incomplete implementation?
           subject: completeness_review
           prompt_system: Return only the declared JSON object.
@@ -200,6 +203,7 @@ recoveries:
     steps:
       - judge:
           kind: construct_repair_plan
+          provider: opencode
           question: What one repair request should be sent to OpenCode for the unjustified change scope?
           subject: scope_review
           prompt_system: Return only the declared JSON object.

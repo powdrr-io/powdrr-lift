@@ -36,7 +36,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationRunner,
 )
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+from powdrr_lift.workrr.procedrr import OpenCodeReviewClient, WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
@@ -360,6 +360,17 @@ def _execute_procedrr_flow(
             ),
             execute,
             process_directory=worktree / "docs" / "procedrr" / "skill-definitions",
+            judge_clients={
+                "opencode": WorkrrProcedrrClient(
+                    OpenCodeReviewClient(
+                        executable=config.opencode_executable,
+                        model=config.opencode_model,
+                        worktree=worktree,
+                        runner=runner,
+                    ),
+                    skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+                )
+            },
         )
         evaluator.evaluate(
             flow,
@@ -431,6 +442,16 @@ def _run_opencode_phase(
         ),
         allowed_commands=(" ".join(config.validation_command) + " *",),
     )
+    repair_request = parameters.get("repair_request")
+    if isinstance(repair_request, str) and repair_request.strip():
+        request = replace(
+            request,
+            prompt=(
+                f"{request.prompt}\n\nREPAIR REQUEST FROM REVIEW:\n"
+                f"{repair_request}\n"
+                "Apply only this repair request, then stop."
+            ),
+        )
     request_path = output_root / "implementation-request.json"
     request_path.write_text(request.to_json(), encoding="utf-8")
     attempt_store = CodingAgentAttemptStore(output_root / "artifacts")

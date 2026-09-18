@@ -8,6 +8,10 @@ into an incremental implementation sequence for the current Powdrr codebase.
 Each change set establishes a complete vertical capability and leaves the
 normal feature flow working.
 
+For the implementation-ready PR sequence, required validation gates, and the
+recommended first vertical slice, see
+[`intent-preserving-change-pr-plan.md`](intent-preserving-change-pr-plan.md).
+
 The implementation must reuse the existing Structrr snapshot/rebase,
 Procedrr evaluator and single-decision validation, Workrr coding-agent boundary,
 execution obligations, evidence, and readiness mechanisms. It must not create a
@@ -531,4 +535,3 @@ The program is complete only when the production Workrr feature command cannot:
 - accept stale evidence;
 - publish before every required decision is terminal and passing; or
 - install a Structrr state against a stale parent fingerprint.
-

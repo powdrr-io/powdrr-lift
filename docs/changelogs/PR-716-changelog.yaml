@@ -1,0 +1,71 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 716
+title: Document the intent-control PR execution plan
+intent:
+  problem: The intent-preserving change-control documentation defines the architecture and broad implementation increments, but it does not identify the first enforceable production slice or give another agent PR-by-PR validation gates and handoff criteria.
+  goal: Record an implementation-ready sequence that starts with a fingerprinted accepted-proposal boundary, then builds proposal review, applicability, targeted OpenCode context, actualization, and cumulative drift auditing in dependency order.
+human-decisions:
+  - id: start-at-accepted-proposal-boundary
+    summary: Begin implementation with a vertical accepted-proposal contract enforced by Procedrr and Workrr before OpenCode invocation.
+  - id: sequence-intent-control-prs
+    summary: Implement the remaining intent-control capabilities as six dependent PRs with explicit validation gates, non-goals, and exit conditions.
+structured_files: []
+files:
+  - path: docs/plans/intent-preserving-change-pr-plan.md
+    type: added
+    summary: Define the recommended first implementation slice and six-PR sequence with schemas, production integration points, validation gates, exit conditions, and an agent handoff checklist.
+    rationale: Give implementing agents a deterministic path from the accepted architecture to enforced production controls without leaving gate selection to model judgment.
+    span:
+      start_line: 1
+      end_line: 674
+    related:
+      entities:
+        - intent-preserving-change-pr-plan
+      decisions:
+        - start-at-accepted-proposal-boundary
+        - sequence-intent-control-prs
+      invariants:
+        - intent-control-gates-fail-closed
+      guidance:
+        - implement-intent-control-in-dependency-order
+  - path: docs/plans/intent-preserving-change-implementation-plan.md
+    type: modified
+    summary: Link the architectural implementation plan to the implementation-ready PR plan.
+    rationale: Keep the broad architecture and concrete execution checklist discoverable from one another.
+    span:
+      start_line: 11
+      end_line: 14
+    related:
+      entities:
+        - intent-preserving-change-pr-plan
+      decisions:
+        - sequence-intent-control-prs
+  - path: docs/plans/intent-preserving-change-implementation-plan.md
+    type: modified
+    summary: Normalize the trailing blank line while adding the execution-plan cross-link.
+    rationale: Keep the touched Markdown document consistently terminated.
+    span:
+      start_line: 534
+      end_line: 534
+    related:
+      entities:
+        - intent-preserving-change-pr-plan
+      decisions:
+        - sequence-intent-control-prs
+entities:
+  - id: intent-preserving-change-pr-plan
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: intent-control-gates-fail-closed
+    action: added
+    description: Missing, stale, unknown, conflicting, or unevaluable required intent-control evidence blocks the transition protected by that evidence.
+    rationale: Prevent model failures, stale artifacts, or incomplete reviews from becoming implicit authorization to proceed.
+guidance:
+  - id: implement-intent-control-in-dependency-order
+    action: added
+    description: Establish the accepted proposal identity and pre-worker gate before implementing hidden-intent review, proposal rebasing, targeted intent packets, actualization, or cumulative drift auditing.
+    rationale: Ensure every later control references one stable authoritative proposal transaction rather than inventing incompatible identities.
+features: []
+proposed_prs: []

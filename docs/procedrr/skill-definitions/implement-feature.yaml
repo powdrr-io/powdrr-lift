@@ -69,6 +69,15 @@ steps:
         required: [passed]
         properties: {passed: {type: boolean}}
       bind: review
+  - attempt:
+      id: worker-validation-review
+      max_attempts: 2
+      body:
+        - gate:
+            subject: review.passed
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: worker-repair, resume: worker-validation-review}
   - judge:
       kind: verify_completeness
       provider: opencode
@@ -159,6 +168,56 @@ steps:
   - terminal: succeeded
 
 recoveries:
+  worker-repair:
+    steps:
+      - judge:
+          kind: construct_repair_plan
+          provider: opencode
+          question: What one concrete repair request should be sent to OpenCode to fix the failed implementation validation or worker review?
+          subject: review
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Use the validation error and worker review evidence, not speculation.
+            - Address only the failing implementation or test behavior.
+            - Preserve the feature scope and do not rewrite unrelated code.
+          context: [feature_description, plan, implementation, validation, review]
+          output:
+            name: worker_repair
+            schema:
+              type: object
+              required: [request]
+              additionalProperties: false
+              properties:
+                request: {type: string, minLength: 1}
+          validation: {kind: json_schema}
+      - operation:
+          tool: internal
+          command: [run_opencode]
+          parameters:
+            baseline: {type: reference, value: baseline.path}
+            plan: {type: reference, value: plan.path}
+            work_item_name: {type: reference, value: work_item_name}
+            feature_description: {type: reference, value: feature_description}
+            repair_request: {type: reference, value: worker_repair.request}
+            repair_validation: {type: reference, value: validation}
+            repair_review: {type: reference, value: review}
+          returns: {type: object}
+          bind: implementation
+      - operation:
+          tool: internal
+          command: [validate_implementation]
+          parameters:
+            implementation: {type: reference, value: implementation}
+          returns: {type: object}
+          bind: validation
+      - operation:
+          tool: internal
+          command: [review_worker_diff]
+          parameters:
+            implementation: {type: reference, value: implementation}
+            validation: {type: reference, value: validation}
+          returns: {type: object}
+          bind: review
   completeness-repair:
     steps:
       - judge:

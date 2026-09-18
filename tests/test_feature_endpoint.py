@@ -195,6 +195,12 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert validated == (Path.cwd() / path).resolve()
     assert not any(Path("docs/proposals").glob("*/procedrr-flow.yaml"))
 
+    flow = path.read_text(encoding="utf-8")
+    assert "id: worker-validation-review" in flow
+    assert "recovery: worker-repair" in flow
+    assert "repair_validation" in flow
+    assert "repair_review" in flow
+
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(
     tmp_path: Path,

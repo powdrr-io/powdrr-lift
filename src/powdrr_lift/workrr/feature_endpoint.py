@@ -444,11 +444,18 @@ def _run_opencode_phase(
     )
     repair_request = parameters.get("repair_request")
     if isinstance(repair_request, str) and repair_request.strip():
+        repair_evidence = {
+            "validation": parameters.get("repair_validation"),
+            "review": parameters.get("repair_review"),
+        }
         request = replace(
             request,
             prompt=(
                 f"{request.prompt}\n\nREPAIR REQUEST FROM REVIEW:\n"
                 f"{repair_request}\n"
+                "Observed repair evidence (treat as authoritative):\n"
+                f"{json.dumps(repair_evidence, indent=2, sort_keys=True, default=str)}"
+                "\n"
                 "Apply only this repair request, then stop."
             ),
         )

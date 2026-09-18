@@ -38,6 +38,25 @@ steps:
         properties: {path: {type: string, minLength: 1}}
       bind: plan
   - operation:
+      tool: file_management
+      parameters:
+        operation: move
+        file_path: {type: reference, value: proposal.path}
+        destination_path: docs/current/${work_item_slug}/feature-pr-specification.yaml
+      returns:
+        type: object
+        required: [operation, file_path, destination_path]
+      bind: current_specification
+  - operation:
+      tool: file_management
+      parameters:
+        operation: delete
+        file_path: docs/proposals/${work_item_slug}/design-interview-input.json
+      returns:
+        type: object
+        required: [operation, file_path]
+      bind: interview_cleanup
+  - operation:
       tool: internal
       command: [run_opencode]
       parameters:

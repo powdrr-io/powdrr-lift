@@ -25,7 +25,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     _ensure_current_baseline,
     _load_implementation_plan,
     _plan_text_items,
-    _promote_feature_specification,
     _snake_case_work_item_name,
     _validate_procedrr_flow,
     _write_structrr_plan,
@@ -166,6 +165,8 @@ def test_feature_flow_is_shared_and_validated() -> None:
         "docs/procedrr/skill-definitions/implement-feature.yaml"
     ).read_text(encoding="utf-8")
     assert "work_item_slug" in implement_feature
+    assert "tool: file_management" in implement_feature
+    assert "destination_path: docs/current/${work_item_slug}" in implement_feature
 
 
 def test_feature_artifacts_use_snake_case_current_paths(tmp_path: Path) -> None:
@@ -189,24 +190,6 @@ def test_feature_artifacts_use_snake_case_current_paths(tmp_path: Path) -> None:
         / "add_procedrr_step_transcripts"
         / "structrr-diff.yaml"
     )
-
-
-def test_feature_flow_promotes_spec_and_discards_interview_input(
-    tmp_path: Path,
-) -> None:
-    proposal = tmp_path / "docs" / "proposals" / "add_feature"
-    proposal.mkdir(parents=True)
-    specification = proposal / "feature-pr-specification.yaml"
-    specification.write_text("schema: test\n", encoding="utf-8")
-    (proposal / "design-interview-input.json").write_text("{}\n", encoding="utf-8")
-
-    current = _promote_feature_specification(tmp_path, "add_feature")
-
-    assert current == (
-        tmp_path / "docs" / "current" / "add_feature" / "feature-pr-specification.yaml"
-    )
-    assert current.read_text(encoding="utf-8") == "schema: test\n"
-    assert not proposal.exists()
 
 
 def test_pr_changelog_promotes_the_provisional_structrr_plan(

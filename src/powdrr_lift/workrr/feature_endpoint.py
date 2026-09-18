@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -20,6 +19,7 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.file_management import manage_worktree_file
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
@@ -170,6 +170,24 @@ def _execute_procedrr_flow(
             return dict(document)
         if tool == "yaml_edit":
             return _apply_flow_yaml_edit(worktree, parameters)
+        if tool == "file_management":
+            operation = parameters.get("operation")
+            file_path = parameters.get("file_path")
+            destination_path = parameters.get("destination_path")
+            if not isinstance(operation, str) or not isinstance(file_path, str):
+                raise PowdrrExecutionError(
+                    "file_management requires operation and file_path"
+                )
+            if destination_path is not None and not isinstance(destination_path, str):
+                raise PowdrrExecutionError(
+                    "file_management destination_path must be a string"
+                )
+            return manage_worktree_file(
+                worktree,
+                operation=operation,
+                file_path=file_path,
+                destination_path=destination_path,
+            )
         if tool != "internal":
             raise PowdrrExecutionError(
                 f"feature flow requested unsupported tool {tool!r}"
@@ -208,16 +226,12 @@ def _execute_procedrr_flow(
             temporary_interview_path.write_text(
                 json.dumps(interview_document, indent=2) + "\n", encoding="utf-8"
             )
-            try:
-                _run(runner, worktree, command)
-            finally:
-                temporary_interview_path.unlink(missing_ok=True)
+            _run(runner, worktree, command)
             work_item_name = _command_option(command, "--work-item-name")
             return {
                 "path": str(
-                    worktree
-                    / "docs"
-                    / "current"
+                    Path("docs")
+                    / "proposals"
                     / work_item_name
                     / "feature-pr-specification.yaml"
                 )
@@ -259,7 +273,6 @@ def _execute_procedrr_flow(
                     parameters, "feature_description"
                 ),
             )
-            _promote_feature_specification(worktree, slug)
             state["plan_path"] = _write_structrr_plan(
                 worktree,
                 plan_config,
@@ -613,23 +626,6 @@ def review_feature_diff(
         "validation_status": validation.status.value,
         "validation_error": validation.error,
     }
-
-
-def _promote_feature_specification(worktree: Path, slug: str) -> Path:
-    proposal_root = worktree / "docs" / "proposals" / slug
-    proposal_path = proposal_root / "feature-pr-specification.yaml"
-    current_root = worktree / "docs" / "current" / slug
-    current_path = current_root / proposal_path.name
-    if not proposal_path.is_file():
-        raise PowdrrExecutionError(f"design interview did not produce {proposal_path}")
-    current_root.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(proposal_path), str(current_path))
-    (proposal_root / "design-interview-input.json").unlink(missing_ok=True)
-    try:
-        proposal_root.rmdir()
-    except OSError:
-        pass
-    return current_path
 
 
 def _write_structrr_plan(

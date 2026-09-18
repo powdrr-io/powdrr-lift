@@ -19,9 +19,10 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+from powdrr_lift.core.intent_packet import IntentPacket
 from powdrr_lift.opencode_monitor import run_opencode
 
-CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v1"
+CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
 
 
@@ -42,6 +43,7 @@ class ImplementationRequest:
     ephemeral_paths: tuple[str, ...] = ()
     planned_additions: tuple[Mapping[str, Any], ...] = ()
     planned_deletions: tuple[Mapping[str, Any], ...] = ()
+    intent_packet: IntentPacket | None = None
     allow_existing_changes: bool = False
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
 
@@ -62,10 +64,31 @@ class ImplementationRequest:
             "planned_additions": [dict(item) for item in self.planned_additions],
             "planned_deletions": [dict(item) for item in self.planned_deletions],
             "allow_existing_changes": self.allow_existing_changes,
+            "intent_packet": (
+                self.intent_packet.to_data() if self.intent_packet is not None else None
+            ),
         }
 
     def to_json(self) -> str:
         return json.dumps(self.to_data(), indent=2, sort_keys=True) + "\n"
+
+    def repair_prompt(self, issue: Mapping[str, Any]) -> str:
+        """Render a finding-specific repair prompt with preserved intent."""
+        packet = (
+            self.intent_packet.render()
+            if self.intent_packet is not None
+            else "No operation-scoped intent packet was supplied."
+        )
+        return (
+            "Repair only the reported issue in the existing worktree, then stop.\n"
+            "Do not re-plan the feature or revisit unrelated changes.\n\n"
+            "Observed issue:\n"
+            f"{json.dumps(dict(issue), indent=2, sort_keys=True, default=str)}\n\n"
+            f"The original operation contract remains in force:\n{packet}\n\n"
+            "Preserve every requirement that is not contradicted by the observed "
+            "issue. Workrr will rerun the affected validators and invalidate "
+            "evidence affected by your diff."
+        )
 
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> ImplementationRequest:
@@ -88,6 +111,11 @@ class ImplementationRequest:
                 cast(list[Mapping[str, Any]], data.get("planned_deletions", []))
             ),
             allow_existing_changes=bool(data.get("allow_existing_changes", False)),
+            intent_packet=(
+                IntentPacket.from_data(cast(Mapping[str, Any], packet))
+                if isinstance(packet := data.get("intent_packet"), Mapping)
+                else None
+            ),
             schema_version=cast(str, data["schema_version"]),
         )
 
@@ -110,18 +138,33 @@ class ImplementationRequest:
         validation_profiles = ", ".join(unit.validation_profiles) or "none"
         allowed_paths = ", ".join(unit.paths) or "none"
         ephemeral_paths = ", ".join(unit.ephemeral_paths) or "none"
-        planned_additions = _format_planned_changes(unit.planned_additions)
-        planned_deletions = _format_planned_changes(unit.planned_deletions)
+        intent_packet = IntentPacket(
+            operation_id=unit.unit_id,
+            required_operations=tuple(
+                {"kind": "addition", "change": dict(change)}
+                for change in unit.planned_additions
+            )
+            + tuple(
+                {"kind": "deletion", "change": dict(change)}
+                for change in unit.planned_deletions
+            ),
+            must_preserve=unit.must_preserve or unit.acceptance_criteria,
+            non_goals=unit.non_goals
+            or ("Do not implement unplanned product behavior.",),
+            source_refs=tuple(dict.fromkeys((*unit.source_refs, *context_refs))),
+            selection_explanations=(
+                "Required operations come from the selected Structrr execution unit.",
+                "Preservation constraints come from the unit acceptance contract.",
+            ),
+        )
+        intent_packet_text = intent_packet.render()
         prompt = (
             f"Implement execution unit {unit.unit_id}: {unit.objective}\n\n"
+            f"{intent_packet_text}\n\n"
             f"Allowed paths: {allowed_paths}\n"
             "Ephemeral paths (Workrr removes these after the attempt): "
             f"{ephemeral_paths}\n"
             f"Acceptance criteria:\n{criteria}\n"
-            "Planned Structrr additions (implement these intentionally):\n"
-            f"{planned_additions}\n"
-            "Planned Structrr deletions (remove or retire these intentionally):\n"
-            f"{planned_deletions}\n"
             f"Validation profiles Workrr will run: {validation_profiles}\n\n"
             "Use only the allowed paths or declared ephemeral paths. Temporary "
             "helpers are permitted only in the declared ephemeral paths; Workrr "
@@ -143,6 +186,7 @@ class ImplementationRequest:
             ephemeral_paths=unit.ephemeral_paths,
             planned_additions=unit.planned_additions,
             planned_deletions=unit.planned_deletions,
+            intent_packet=intent_packet,
         )
 
     @classmethod

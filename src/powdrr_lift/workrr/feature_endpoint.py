@@ -481,11 +481,7 @@ def _run_opencode_phase(
     repair_request = parameters.get("repair_request")
     repair_issue = parameters.get("repair_issue")
     if isinstance(repair_issue, Mapping):
-        repair_request = (
-            "Continue the current OpenCode implementation session. Fix only this "
-            "specific observed issue in the existing worktree, then stop:\n"
-            f"{json.dumps(dict(repair_issue), indent=2, sort_keys=True, default=str)}"
-        )
+        repair_request = request.repair_prompt(repair_issue)
     if isinstance(repair_request, str) and repair_request.strip():
         fallback_context = ""
         if provider.session_id is None:

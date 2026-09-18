@@ -192,8 +192,6 @@ recoveries:
                   work_item_name: {type: reference, value: work_item_name}
                   feature_description: {type: reference, value: feature_description}
                   repair_issue: {type: reference, value: repair_issue}
-                  repair_validation: {type: reference, value: validation}
-                  repair_review: {type: reference, value: review}
                 returns: {type: object}
                 bind: implementation
             - operation:

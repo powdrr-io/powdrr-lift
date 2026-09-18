@@ -469,23 +469,17 @@ def _run_opencode_phase(
     repair_issue = parameters.get("repair_issue")
     if isinstance(repair_issue, Mapping):
         repair_request = (
-            "Fix this specific observed issue before doing anything else:\n"
+            "Continue the current OpenCode implementation session. Fix only this "
+            "specific observed issue in the existing worktree, then stop:\n"
             f"{json.dumps(dict(repair_issue), indent=2, sort_keys=True, default=str)}"
         )
     if isinstance(repair_request, str) and repair_request.strip():
-        repair_evidence = {
-            "validation": parameters.get("repair_validation"),
-            "review": parameters.get("repair_review"),
-        }
         request = replace(
             request,
             prompt=(
-                f"{request.prompt}\n\nREPAIR REQUEST FROM REVIEW:\n"
                 f"{repair_request}\n"
-                "Observed repair evidence (treat as authoritative):\n"
-                f"{json.dumps(repair_evidence, indent=2, sort_keys=True, default=str)}"
-                "\n"
-                "Apply only this repair request, then stop."
+                "Use the current session context and current worktree state; do not "
+                "re-plan the feature or revisit unrelated changes."
             ),
             allow_existing_changes=True,
         )

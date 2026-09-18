@@ -69,10 +69,64 @@ steps:
         required: [passed]
         properties: {passed: {type: boolean}}
       bind: review
-  - gate:
-      subject: review.passed
-      equals: true
-      on_failure: {terminal: failed}
+  - judge:
+      kind: verify_completeness
+      question: Does the implementation satisfy every requirement in the feature specification?
+      subject: feature_description
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Compare the implementation and validation evidence with the complete feature specification.
+        - Mark complete only when every requested behavior is implemented and validated.
+        - List each missing or contradicted requirement precisely.
+      context: [feature_description, plan, implementation, validation, review]
+      output:
+        name: completeness_review
+        schema:
+          type: object
+          required: [complete, findings]
+          additionalProperties: false
+          properties:
+            complete: {type: boolean}
+            findings: {type: array, items: {type: string, minLength: 1}}
+      validation: {kind: json_schema}
+  - attempt:
+      id: specification-completeness-review
+      max_attempts: 2
+      body:
+        - gate:
+            subject: completeness_review.complete
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: completeness-repair, resume: specification-completeness-review}
+  - judge:
+      kind: verify_scope
+      question: Is every changed file and hunk justified by the feature specification?
+      subject: review
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Inspect the complete implementation diff, not only the worker summary.
+        - Mark justified only when every change is required by the specification or its validation.
+        - Treat unrelated refactors, cleanup, and speculative improvements as findings.
+      context: [feature_description, plan, implementation, validation, review, completeness_review]
+      output:
+        name: scope_review
+        schema:
+          type: object
+          required: [justified, findings]
+          additionalProperties: false
+          properties:
+            justified: {type: boolean}
+            findings: {type: array, items: {type: string, minLength: 1}}
+      validation: {kind: json_schema}
+  - attempt:
+      id: change-scope-review
+      max_attempts: 2
+      body:
+        - gate:
+            subject: scope_review.justified
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: scope-repair, resume: change-scope-review}
   - operation:
       tool: internal
       command: [open_pull_request]
@@ -102,3 +156,83 @@ steps:
       returns: {type: [string, 'null']}
       bind: updated_pull_request
   - terminal: succeeded
+
+recoveries:
+  completeness-repair:
+    steps:
+      - judge:
+          kind: construct_repair_plan
+          question: What is the smallest implementation repair that resolves every completeness finding?
+          subject: completeness_review.findings
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Address only the listed completeness findings.
+            - Preserve the feature scope and do not rewrite unrelated code.
+          context: [feature_description, plan, implementation, validation, completeness_review]
+          output:
+            name: completeness_repair
+            schema:
+              type: object
+              required: [request]
+              additionalProperties: false
+              properties:
+                request: {type: string, minLength: 1}
+          validation: {kind: json_schema}
+      - operation:
+          tool: internal
+          command: [run_opencode]
+          parameters:
+            baseline: {type: reference, value: baseline.path}
+            plan: {type: reference, value: plan.path}
+            work_item_name: {type: reference, value: work_item_name}
+            feature_description: {type: reference, value: feature_description}
+            repair_request: {type: reference, value: completeness_repair.request}
+            review_findings: {type: reference, value: completeness_review.findings}
+          returns: {type: object}
+          bind: implementation
+      - operation:
+          tool: internal
+          command: [validate_implementation]
+          parameters:
+            implementation: {type: reference, value: implementation}
+          returns: {type: object}
+          bind: validation
+  scope-repair:
+    steps:
+      - judge:
+          kind: construct_repair_plan
+          question: What is the smallest implementation repair that removes every unjustified change?
+          subject: scope_review.findings
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Remove or revert only changes identified as unrelated to the feature.
+            - Preserve all behavior required by the specification.
+          context: [feature_description, plan, implementation, validation, scope_review]
+          output:
+            name: scope_repair
+            schema:
+              type: object
+              required: [request]
+              additionalProperties: false
+              properties:
+                request: {type: string, minLength: 1}
+          validation: {kind: json_schema}
+      - operation:
+          tool: internal
+          command: [run_opencode]
+          parameters:
+            baseline: {type: reference, value: baseline.path}
+            plan: {type: reference, value: plan.path}
+            work_item_name: {type: reference, value: work_item_name}
+            feature_description: {type: reference, value: feature_description}
+            repair_request: {type: reference, value: scope_repair.request}
+            review_findings: {type: reference, value: scope_review.findings}
+          returns: {type: object}
+          bind: implementation
+      - operation:
+          tool: internal
+          command: [validate_implementation]
+          parameters:
+            implementation: {type: reference, value: implementation}
+          returns: {type: object}
+          bind: validation

@@ -2,11 +2,13 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 714
 title: Document intent-preserving change control
 intent:
-  problem: Powdrr has Structrr state, Procedrr single-decision execution, and a bounded Workrr/OpenCode handoff, but it does not yet define one mandatory transaction that reviews intent changes at proposal time, revalidates them before implementation, targets the governing intent for OpenCode, and reconciles actual changes before acceptance.
-  goal: Define the complete intent-preserving change-control protocol and an incremental implementation sequence grounded in the repository's existing Structrr, Procedrr, Workrr, and OpenCode boundaries.
+  problem: Powdrr has Structrr state, Procedrr single-decision execution, and a bounded Workrr/OpenCode handoff, but it does not yet define one mandatory intent transaction, while the older OpenCode-inspired proposal set no longer represents the desired control architecture.
+  goal: Define the complete intent-preserving change-control protocol and incremental implementation sequence, then retire the superseded OpenCode-inspired plans and their companion audit.
 human-decisions:
   - id: document-intent-preserving-change-control
     summary: Record the agreed intent-diff, three-gate, single-decision, drift-monitoring, and targeted OpenCode handoff design as detailed repository documentation and submit it for review.
+  - id: retire-opencode-inspired-document-set
+    summary: Delete the complete OpenCode-inspired plan set and its companion implementation audit after the intent-preserving design supersedes them.
 structured_files: []
 files:
   - path: docs/plans/intent-preserving-change-control.md
@@ -44,25 +46,64 @@ files:
         - target-opencode-with-compiled-intent
   - path: docs/plans/durable-user-intent-retrieval-and-enforcement.md
     type: modified
-    summary: Link the durable-intent foundation to the new proposal, implementation, OpenCode targeting, and reconciliation design.
-    rationale: Make the relationship between durable intent retrieval and the follow-on transaction protocol discoverable.
+    summary: Point the durable-intent foundation directly to the new intent-preserving change-control design without relying on the retired OpenCode-inspired plans.
+    rationale: Keep the surviving intent documentation connected to the current follow-on architecture.
     span:
-      start_line: 30
-      end_line: 35
+      start_line: 23
+      end_line: 28
     related:
       entities:
         - intent-preserving-change-control-design
+  - path: docs/plans/opencode-inspired-agent-execution.md
+    type: deleted
+    summary: Remove the superseded OpenCode-inspired execution proposal.
+    rationale: Keep the repository's forward-looking architecture focused on the accepted intent-preserving change-control design.
+    span:
+      start_line: 1
+      end_line: 1282
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
+  - path: docs/plans/opencode-inspired-agent-execution-engineering-plan.md
+    type: deleted
+    summary: Remove the superseded engineering plan for the OpenCode-inspired execution proposal.
+    rationale: Retire implementation sequencing that is replaced by the new seven-change-set intent-control plan.
+    span:
+      start_line: 1
+      end_line: 1528
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
+  - path: docs/plans/opencode-inspired-agent-execution-remaining-work.md
+    type: deleted
+    summary: Remove the historical remaining-work document for the OpenCode-inspired execution proposal.
+    rationale: Avoid retaining a stale work queue after adopting the replacement implementation plan.
+    span:
+      start_line: 1
+      end_line: 312
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
   - path: docs/plans/opencode-inspired-agent-execution-completion-plan.md
-    type: modified
-    summary: Link the completed execution foundation to the follow-on intent-control design and implementation sequence.
-    rationale: Show that the new control protocol builds on the existing runtime rather than replacing it with a parallel stack.
+    type: deleted
+    summary: Remove the completion plan for the superseded OpenCode-inspired execution proposal.
+    rationale: Keep completion criteria aligned with the replacement intent-preserving control design.
     span:
-      start_line: 11
-      end_line: 18
+      start_line: 1
+      end_line: 247
     related:
-      entities:
-        - intent-preserving-change-control-design
-        - intent-preserving-change-implementation-plan
+      decisions:
+        - retire-opencode-inspired-document-set
+  - path: docs/audits/opencode-implementation-audit.md
+    type: deleted
+    summary: Remove the implementation audit whose scope and findings are tied to the retired OpenCode-inspired plans.
+    rationale: Remove the companion artifact with the plan set it audits instead of leaving an orphaned historical review.
+    span:
+      start_line: 1
+      end_line: 446
+    related:
+      decisions:
+        - retire-opencode-inspired-document-set
 entities:
   - id: intent-preserving-change-control-design
     type: Design doc

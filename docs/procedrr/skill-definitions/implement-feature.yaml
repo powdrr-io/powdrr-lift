@@ -3,6 +3,7 @@ name: implement-feature
 inputs:
   - {name: feature_description, type: string, required: true}
   - {name: work_item_name, type: string, required: true}
+  - {name: work_item_slug, type: string, required: true}
 steps:
   - operation:
       tool: internal
@@ -15,7 +16,7 @@ steps:
   - call:
       process: design-interview
       inputs:
-        work_item_name: {type: reference, value: work_item_name}
+        work_item_name: {type: reference, value: work_item_slug}
         feature_description: {type: reference, value: feature_description}
       outputs:
         interview_input: interview_input

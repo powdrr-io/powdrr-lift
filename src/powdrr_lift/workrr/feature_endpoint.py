@@ -35,7 +35,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationReportStatus,
     ValidationRunner,
 )
-from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
+from powdrr_lift.workrr.git import integration_branch_name
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from procedrr import parse_and_validate
@@ -101,7 +101,7 @@ def run_feature_endpoint(
     if not config.allowed_paths:
         raise ValueError("at least one allowed path is required")
     root = config.repo_root.resolve()
-    slug = slugify_workflow_id(config.work_item_name)
+    slug = _snake_case_work_item_name(config.work_item_name)
     branch = integration_branch_name(config.work_item_name)
     worktree = root / ".worktrees" / "powdrr" / slug
     output_root = (
@@ -144,7 +144,7 @@ def _execute_procedrr_flow(
     output_root: Path,
     branch: str,
 ) -> FeatureEndpointResult:
-    slug = slugify_workflow_id(config.work_item_name)
+    slug = _snake_case_work_item_name(config.work_item_name)
     state: dict[str, Any] = {}
     flow_path = _validate_procedrr_flow(worktree)
     flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
@@ -180,26 +180,36 @@ def _execute_procedrr_flow(
         if name == "ensure_current_structrr":
             state["baseline_path"] = _ensure_current_baseline(worktree, runner)
             return {"path": str(state["baseline_path"])}
-        if command[:2] == ["powdrr-lift", "design-interview-input"]:
-            _run(runner, worktree, command)
-            work_item_name = _command_option(command, "--work-item-name")
-            return {
-                "path": str(
-                    worktree
-                    / "docs"
-                    / "proposals"
-                    / work_item_name
-                    / "design-interview-input.json"
+        if name == "build_interview_input":
+            document = parameters.get("document")
+            if not isinstance(document, Mapping):
+                raise PowdrrExecutionError(
+                    "build_interview_input requires a document mapping"
                 )
-            }
+            state["interview_input"] = dict(document)
+            return dict(document)
         if command[:2] == ["powdrr-lift", "feature-pr-specification"]:
-            _run(runner, worktree, command)
+            interview_path = _command_option(command, "--interview-input")
+            interview_document = state.get("interview_input")
+            if not isinstance(interview_document, Mapping):
+                raise PowdrrExecutionError(
+                    "feature specification did not receive interview input"
+                )
+            temporary_interview_path = _resolve_flow_path(worktree, interview_path)
+            temporary_interview_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary_interview_path.write_text(
+                json.dumps(interview_document, indent=2) + "\n", encoding="utf-8"
+            )
+            try:
+                _run(runner, worktree, command)
+            finally:
+                temporary_interview_path.unlink(missing_ok=True)
             work_item_name = _command_option(command, "--work-item-name")
             return {
                 "path": str(
                     worktree
                     / "docs"
-                    / "proposals"
+                    / "current"
                     / work_item_name
                     / "feature-pr-specification.yaml"
                 )
@@ -331,7 +341,9 @@ def _execute_procedrr_flow(
                 branch,
                 pull_request,
                 feature_config,
+                state["plan_path"],
             )
+            state["plan_path"] = state["changelog_path"]
             return str(state["changelog_path"])
         if name == "update_pull_request":
             pull_request_value = parameters.get("pull_request")
@@ -366,6 +378,7 @@ def _execute_procedrr_flow(
             {
                 "feature_description": config.feature_description,
                 "work_item_name": config.work_item_name,
+                "work_item_slug": slug,
             },
         )
     except ValidationGateError:
@@ -535,6 +548,13 @@ def _command_option(command: list[Any], option: str) -> str:
     return value
 
 
+def _snake_case_work_item_name(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", value.strip().casefold()).strip("_")
+    if not slug:
+        raise ValueError("The work item name must contain a letter or digit.")
+    return slug
+
+
 def _feature_endpoint_result(
     state: dict[str, Any], branch: str, worktree: Path, status: str
 ) -> FeatureEndpointResult:
@@ -592,8 +612,8 @@ def _write_structrr_plan(
     *,
     interview_input: Any,
 ) -> Path:
-    slug = slugify_workflow_id(config.work_item_name)
-    proposal = worktree / "docs" / "proposals" / slug
+    slug = _snake_case_work_item_name(config.work_item_name)
+    proposal = worktree / "docs" / "current" / slug
     proposal.mkdir(parents=True, exist_ok=True)
     path = proposal / "structrr-diff.yaml"
     interview = dict(interview_input) if isinstance(interview_input, Mapping) else {}
@@ -820,6 +840,7 @@ def _create_pr_changelog(
     branch: str,
     pull_request_url: str,
     config: FeatureEndpointConfig,
+    plan_path: Path,
 ) -> Path:
     match = re.search(r"/pull/(\d+)", pull_request_url)
     if match is None:
@@ -833,47 +854,43 @@ def _create_pr_changelog(
         worktree,
         ["git", "diff", "--name-only", f"origin/{config.base_branch}...HEAD"],
     ).splitlines()
-    descriptor = {
-        "schema": "https://powdrr.io/schema/changelog-v2",
-        "change_id": f"PR-{pr_number}",
-        "title": config.work_item_name,
-        "intent": {
-            "problem": "The requested product behavior is not yet available.",
-            "goal": config.feature_description,
-        },
-        "human-decisions": [],
-        "files": [
-            {
-                "path": changed_path,
-                "type": _changelog_file_type(changed_path),
-                "span": {"start_line": 1, "end_line": 1},
-                "summary": f"Changed as part of {config.work_item_name}.",
-                "rationale": config.feature_description,
-            }
-            for changed_path in changed_paths
-        ],
-        "entities": [
-            {
-                "id": slugify_workflow_id(config.work_item_name),
-                "type": "Feature",
-                "action": "added",
-            }
-        ],
-        "entity_relationships": [],
-        "invariants": [],
-        "guidance": [],
-        "features": [
-            {
-                "id": slugify_workflow_id(config.work_item_name),
-                "description": config.feature_description,
-                "action": "added",
-            }
-        ],
-        "proposed_prs": [],
+    try:
+        descriptor = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PowdrrExecutionError(
+            f"could not read provisional Structrr plan {plan_path}: {error}"
+        ) from error
+    if not isinstance(descriptor, dict):
+        raise PowdrrExecutionError("provisional Structrr plan must contain a mapping")
+    descriptor["schema"] = "https://powdrr.io/schema/changelog-v2"
+    descriptor["change_id"] = f"PR-{pr_number}"
+    descriptor["title"] = config.work_item_name
+    descriptor["intent"] = {
+        "problem": "The requested product behavior is not yet available.",
+        "goal": config.feature_description,
     }
+    descriptor["files"] = [
+        {
+            "path": changed_path,
+            "type": _changelog_file_type(changed_path),
+            "span": {"start_line": 1, "end_line": 1},
+            "summary": f"Changed as part of {config.work_item_name}.",
+            "rationale": config.feature_description,
+        }
+        for changed_path in changed_paths
+        if changed_path != str(plan_path.relative_to(worktree))
+    ]
+    descriptor.setdefault("human-decisions", [])
+    descriptor.setdefault("entities", [])
+    descriptor.setdefault("entity_relationships", [])
+    descriptor.setdefault("invariants", [])
+    descriptor.setdefault("guidance", [])
+    descriptor.setdefault("features", [])
+    descriptor.setdefault("proposed_prs", [])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(descriptor, sort_keys=False), encoding="utf-8")
     parse_change_log(path.read_text(encoding="utf-8"))
+    plan_path.unlink()
     _commit(runner, worktree, f"Add PR-{pr_number} changelog descriptor")
     _run(runner, worktree, ["git", "push", "origin", branch])
     return path
@@ -898,9 +915,10 @@ def _update_pull_request_description(
 ) -> None:
     body = (
         f"## Feature\n\n{config.feature_description}\n\n"
-        f"Structrr plan: `docs/proposals/{slugify_workflow_id(config.work_item_name)}"
-        "/structrr-diff.yaml`\n"
-        f"PR changelog descriptor: `{changelog_relative_path}`\n"
+        f"Structrr change and PR changelog: `{changelog_relative_path}`\n"
+        "Current feature specification: "
+        f"`docs/current/{_snake_case_work_item_name(config.work_item_name)}"
+        "/feature-pr-specification.yaml`\n"
         "Implemented by the bounded Workrr/OpenCode handoff and reviewed before commit."
     )
     _run(

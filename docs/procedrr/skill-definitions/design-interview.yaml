@@ -23,11 +23,6 @@ decision_contract:
       item: {type: object}
 
 steps:
-  - operation:
-      tool: internal
-      command: [powdrr-lift, design-interview-input, --work-item-name, "${work_item_name}"]
-      bind: interview_input_template
-
   # Each category has its own exact gather_context call and output binding.
   - for_each:
       snapshot:
@@ -79,9 +74,9 @@ steps:
         decisions: {type: reference, value: category_edits_by_category}
       bind: category_edits
   - operation:
-      tool: edit
+      tool: internal
+      command: [build_interview_input]
       parameters:
-        file_path: docs/proposals/${work_item_name}/design-interview-input.json
         document:
           work_item_name: "${work_item_name}"
           feature_description: "${feature_description}"
@@ -110,11 +105,12 @@ steps:
       tool: internal
       command:
         [powdrr-lift, feature-pr-specification, --work-item-name, "${work_item_name}",
-         --interview-input, "docs/proposals/${work_item_name}/design-interview-input.json"]
+         --output, "docs/current/${work_item_name}/feature-pr-specification.yaml",
+         --interview-input, ".powdrr/feature-runs/${work_item_name}/interview-input.json"]
       bind: proposal
   - operation:
       tool: internal
-      command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
+      command: [powdrr-lift, evaluate, "docs/current/${work_item_name}/feature-pr-specification.yaml"]
       bind: proposal_evaluation
   - operation:
       tool: internal
@@ -153,11 +149,11 @@ steps:
         - operation:
             tool: yaml_edit
             parameters:
-              file_path: docs/proposals/${work_item_name}/feature-pr-specification.yaml
+              file_path: docs/current/${work_item_name}/feature-pr-specification.yaml
               edit: repair_edit
   - operation:
       tool: internal
-      command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
+      command: [powdrr-lift, evaluate, "docs/current/${work_item_name}/feature-pr-specification.yaml"]
       bind: final_proposal_evaluation
   - gate:
       subject: final_proposal_evaluation.returncode

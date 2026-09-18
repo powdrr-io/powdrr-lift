@@ -285,7 +285,7 @@ def _execute_procedrr_flow(
             return review
         if name == "collect_repair_issues":
             validation = parameters.get("validation")
-            review = parameters.get("review")
+            review_value = parameters.get("review")
             issues: list[dict[str, Any]] = []
             if isinstance(validation, Mapping):
                 results = validation.get("results")
@@ -303,8 +303,11 @@ def _execute_procedrr_flow(
                     issues.append(
                         {"kind": "validation_report", "issue": validation["error"]}
                     )
-            if isinstance(review, Mapping) and review.get("passed") is not True:
-                issues.append({"kind": "worker_review", "issue": dict(review)})
+            if (
+                isinstance(review_value, Mapping)
+                and review_value.get("passed") is not True
+            ):
+                issues.append({"kind": "worker_review", "issue": dict(review_value)})
             return issues
         if name == "open_pull_request":
             review_value = parameters.get("review")

@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: add_procedrr_step_execution_transcripts
+change_id: PR-708
 title: Add Procedrr step execution transcripts
 intent:
   problem: The requested product behavior is not yet available.
@@ -7,7 +7,34 @@ intent:
     identity, inputs, outputs, and outcome in order so an operator can inspect exactly
     what the flow received and produced.
 human-decisions: []
-files: []
+files:
+- path: docs/current/add_procedrr_step_execution_transcripts/feature-pr-specification.yaml
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: src/procedrr_evaluator/evaluator.py
+  type: Source file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
+- path: tests/test_procedrr_evaluator.py
+  type: Test file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of Add Procedrr step execution transcripts.
+  rationale: Add a durable transcript of every Procedrr step execution, recording
+    the step identity, inputs, outputs, and outcome in order so an operator can inspect
+    exactly what the flow received and produced.
 entities:
 - id: procedrr-step-execution-transcript
   rationale: Add a durable transcript entity to record step identity, inputs, outputs,

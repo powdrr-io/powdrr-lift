@@ -22,6 +22,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointResult,
     _ensure_current_baseline,
     _load_implementation_plan,
+    _plan_text_items,
     _validate_procedrr_flow,
     review_feature_diff,
 )
@@ -196,6 +197,19 @@ invariants:
         "The transcript is ordered by execution.",
         "Only the declared implementation paths are changed.",
     )
+
+
+def test_plan_acceptance_criteria_have_stable_ids() -> None:
+    assert _plan_text_items(
+        [{"description": "Record every step."}],
+        fallback="fallback",
+        prefix="step-transcript",
+    ) == [
+        {
+            "id": "step-transcript-acceptance-1",
+            "description": "Record every step.",
+        }
+    ]
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

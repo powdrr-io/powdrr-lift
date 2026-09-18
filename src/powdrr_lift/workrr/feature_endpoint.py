@@ -651,6 +651,7 @@ def _write_structrr_plan(
                 f"The requested feature behavior is implemented: "
                 f"{config.feature_description}"
             ),
+            prefix=slug,
         ),
         "proposed_prs": sections["proposed_prs"],
     }
@@ -675,16 +676,33 @@ def _interview_edits(value: Any) -> list[dict[str, Any]]:
     return edits
 
 
-def _plan_text_items(items: Sequence[Mapping[str, Any]], *, fallback: str) -> list[str]:
-    values: list[str] = []
-    for item in items:
+def _plan_text_items(
+    items: Sequence[Mapping[str, Any]], *, fallback: str, prefix: str
+) -> list[dict[str, str]]:
+    values: list[dict[str, str]] = []
+    for index, item in enumerate(items, start=1):
         description = item.get("description")
         if isinstance(description, str) and description.strip():
-            values.append(description.strip())
+            identifier = item.get("id")
+            values.append(
+                {
+                    "id": (
+                        identifier.strip()
+                        if isinstance(identifier, str) and identifier.strip()
+                        else f"{prefix}-acceptance-{index}"
+                    ),
+                    "description": description.strip(),
+                }
+            )
             continue
         if isinstance(item.get("text"), str) and item["text"].strip():
-            values.append(item["text"].strip())
-    return values or [fallback]
+            values.append(
+                {
+                    "id": f"{prefix}-acceptance-{index}",
+                    "description": item["text"].strip(),
+                }
+            )
+    return values or [{"id": f"{prefix}-acceptance-1", "description": fallback}]
 
 
 def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:

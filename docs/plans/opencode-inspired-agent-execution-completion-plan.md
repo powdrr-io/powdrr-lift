@@ -8,6 +8,14 @@ the [implementation audit](../audits/opencode-implementation-audit.md). It
 replaces the open-ended sequence of foundation changes with five dependent
 implementation PRs and one final acceptance PR.
 
+The subsequent
+[intent-preserving change control design](intent-preserving-change-control.md)
+builds on this runtime foundation to define proposal intent transactions,
+mandatory three-stage gates, and targeted intent compilation for each OpenCode
+work order. Its
+[implementation plan](intent-preserving-change-implementation-plan.md) defines
+the follow-on change sequence.
+
 No PR in this plan is complete because a type or isolated helper exists. Each
 PR must connect its behavior to the normal specification-to-proposed-PR path,
 and must include the end-to-end fixtures needed to prove that connection.

@@ -27,6 +27,12 @@ and its
 It specifies the end-to-end path for remembered design decisions, invariants,
 and procedures.
 
+The later
+[`intent-preserving change control`](intent-preserving-change-control.md)
+design extends this retrieval and enforcement foundation into versioned intent
+diffs, proposal-time consistency review, implementation-start revalidation,
+targeted OpenCode intent packets, and post-implementation reconciliation.
+
 ## Required outcome
 
 The implementation is complete when a user can state a decision, invariant, or

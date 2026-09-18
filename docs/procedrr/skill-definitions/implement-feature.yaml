@@ -49,7 +49,7 @@ steps:
       bind: current_specification
   - operation:
       tool: internal
-      command: [commit_design_artifacts]
+      command: [commit, docs]
       returns:
         type: object
         required: [committed]

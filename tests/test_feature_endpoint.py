@@ -168,6 +168,8 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "work_item_slug" in implement_feature
     assert "tool: file_management" in implement_feature
     assert "destination_path: docs/current/${work_item_slug}" in implement_feature
+    assert "command: [commit, docs]" in implement_feature
+    assert "commit_design_artifacts" not in implement_feature
 
 
 def test_feature_artifacts_use_snake_case_current_paths(tmp_path: Path) -> None:

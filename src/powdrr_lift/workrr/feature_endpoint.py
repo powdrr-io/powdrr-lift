@@ -258,6 +258,18 @@ def _execute_procedrr_flow(
                     "aggregate_category_edits requires category decisions"
                 )
             return _aggregate_category_edits(decisions)
+        if name == "commit":
+            if (
+                len(command) != 2
+                or not isinstance(command[1], str)
+                or not command[1].strip()
+            ):
+                raise PowdrrExecutionError(
+                    "commit command requires exactly one non-empty path"
+                )
+            path = command[1]
+            _commit_path(runner, worktree, path, f"Commit {path} changes")
+            return {"committed": True}
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -279,9 +291,6 @@ def _execute_procedrr_flow(
                 interview_input=parameters.get("interview_input"),
             )
             return {"path": str(state["plan_path"])}
-        if name == "commit_design_artifacts":
-            _commit(runner, worktree, "Record Structrr feature design")
-            return {"committed": True}
         if name == "run_opencode":
             return _run_opencode_phase(
                 config,
@@ -854,7 +863,11 @@ def _require_clean_root(root: Path, runner: Runner) -> None:
 
 
 def _commit(runner: Runner, worktree: Path, message: str) -> None:
-    _run(runner, worktree, ["git", "add", "docs"])
+    _commit_path(runner, worktree, "docs", message)
+
+
+def _commit_path(runner: Runner, worktree: Path, path: str, message: str) -> None:
+    _run(runner, worktree, ["git", "add", path])
     _run(runner, worktree, ["git", "commit", "-am", message])
 
 

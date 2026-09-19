@@ -38,6 +38,8 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
     ValidationReport,
     ValidationReportStatus,
+    ValidationResult,
+    ValidationResultStatus,
     ValidationRunner,
 )
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
@@ -571,6 +573,7 @@ def _run_opencode_phase(
         operation_request_path = output_root / "requests" / f"{unit.unit_id}.json"
         operation_request_path.parent.mkdir(parents=True, exist_ok=True)
         operation_request_path.write_text(request.to_json(), encoding="utf-8")
+        before_paths = _changed_paths(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
         state["opencode_attempt_number"] = attempt_number
         if not repair_mode and isinstance(provider, OpenCodeProvider):
@@ -586,7 +589,23 @@ def _run_opencode_phase(
         )
         requests.append(request)
         attempts.append(attempt)
-        if attempt.status is not CodingAgentStatus.COMPLETED:
+        checkpoint = _operation_checkpoint(
+            runner=runner,
+            worktree=worktree,
+            unit=unit,
+            request=request,
+            attempt=attempt,
+            before_paths=before_paths,
+        )
+        checkpoint_path = _write_operation_checkpoint(
+            output_root, attempt.attempt_id, checkpoint
+        )
+        if repair_mode:
+            state["operation_checkpoints"] = [checkpoint]
+        else:
+            state.setdefault("operation_checkpoints", []).append(checkpoint)
+        state.setdefault("operation_checkpoint_paths", []).append(checkpoint_path)
+        if not checkpoint["passed"]:
             break
     request = requests[-1]
     attempt = attempts[-1]
@@ -701,6 +720,85 @@ def _aggregate_execution_unit(
             dict.fromkeys(item for unit in units for item in unit.source_refs)
         ),
     )
+
+
+def _changed_paths(runner: Runner, worktree: Path) -> set[str]:
+    paths: set[str] = set()
+    for command in (
+        ["git", "diff", "--name-only"],
+        ["git", "diff", "--cached", "--name-only"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
+        paths.update(_git_output(runner, worktree, command).splitlines())
+    return {path for path in paths if path}
+
+
+def _operation_checkpoint(
+    *,
+    runner: Runner,
+    worktree: Path,
+    unit: ExecutionUnit,
+    request: ImplementationRequest,
+    attempt: CodingAgentAttempt,
+    before_paths: set[str],
+) -> dict[str, Any]:
+    after_paths = _changed_paths(runner, worktree)
+    task_paths = tuple(sorted(after_paths - before_paths))
+    out_of_scope = tuple(
+        path
+        for path in task_paths
+        if not any(
+            scope == "."
+            or Path(path) == Path(scope)
+            or Path(scope) in Path(path).parents
+            for scope in request.allowed_paths
+        )
+    )
+    diff_check = runner(
+        ["git", "diff", "--check"],
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    passed = (
+        attempt.status is CodingAgentStatus.COMPLETED
+        and bool(task_paths)
+        and not out_of_scope
+        and diff_check.returncode == 0
+    )
+    reason = None
+    if attempt.status is not CodingAgentStatus.COMPLETED:
+        reason = f"coding-agent attempt was {attempt.status.value}"
+    elif not task_paths:
+        reason = "operation produced no new worktree changes"
+    elif out_of_scope:
+        reason = f"operation changed out-of-scope paths: {list(out_of_scope)}"
+    elif diff_check.returncode != 0:
+        reason = "operation produced a diff that fails git diff --check"
+    return {
+        "unit_id": unit.unit_id,
+        "request_id": request.request_id,
+        "attempt_id": attempt.attempt_id,
+        "status": "passed" if passed else "failed",
+        "passed": passed,
+        "changed_paths": list(task_paths),
+        "out_of_scope_paths": list(out_of_scope),
+        "diff_check_returncode": diff_check.returncode,
+        "error": reason,
+    }
+
+
+def _write_operation_checkpoint(
+    output_root: Path, attempt_id: str, checkpoint: Mapping[str, Any]
+) -> Path:
+    path = output_root / "artifacts" / "checkpoints" / f"{attempt_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(dict(checkpoint), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def _load_implementation_plan(
@@ -823,6 +921,32 @@ def _validate_implementation_phase(
             )
         }
     ).run(state["request"], state["attempt"], worktree_root=worktree)
+    failed_checkpoints = [
+        checkpoint
+        for checkpoint in state.get("operation_checkpoints", [])
+        if isinstance(checkpoint, Mapping) and checkpoint.get("passed") is not True
+    ]
+    if failed_checkpoints:
+        first_failure = failed_checkpoints[0]
+        validation = ValidationReport(
+            attempt_id=validation.attempt_id,
+            request_id=validation.request_id,
+            status=ValidationReportStatus.FAILED,
+            results=(
+                *validation.results,
+                ValidationResult(
+                    profile="operation-checkpoint",
+                    command=(),
+                    status=ValidationResultStatus.FAILED,
+                    returncode=None,
+                    error=(
+                        "operation checkpoint failed: "
+                        f"{first_failure.get('error', 'unknown failure')}"
+                    ),
+                ),
+            ),
+            error="one or more operation checkpoints failed",
+        )
     state["attempt_store"].save_validation_report(validation)
     state["validation"] = validation
     return validation.to_data()

@@ -1,0 +1,142 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 741
+title: Add executable verification contracts for feature intent
+intent:
+  problem: Required test cases only carried identifiers and descriptions, so feature intent was not connected to a provider, executable selector, validation profile, or explicit expected result.
+  goal: Define a provider-neutral verification contract that links required checks to active intent, validates contract completeness, preserves legacy entries during migration, and teaches feature and PR planning to emit the contract shape.
+human-decisions:
+  - id: extend-required-test-cases-model
+    summary: Extend required test cases with intent references, execution metadata, applicability, protected inputs, and lifecycle status.
+  - id: legacy-contracts-remain-readable
+    summary: Keep existing identifier-and-description test cases parseable while marking them incomplete until verification metadata is supplied.
+  - id: contracts-fingerprint-semantic-fields
+    summary: Derive a stable content fingerprint from the versioned contract schema and normalized contract data.
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    summary: Export verification contract constants and the contract model through the core package boundary.
+    rationale: Make the shared contract API available to planning, validation, and later execution phases.
+    span: {start_line: 229, end_line: 236}
+    related:
+      entities: [verification-contract-model]
+      decisions: [extend-required-test-cases-model]
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    summary: Register verification contract symbols in lazy core exports.
+    rationale: Preserve the package's public export mechanism for the new model.
+    span: {start_line: 281, end_line: 281}
+    related: {entities: [verification-contract-model]}
+  - path: src/powdrr_lift/core/__init__.py
+    type: modified
+    summary: Add verification contract names to the core export map.
+    rationale: Keep all contract symbols discoverable through the established package API.
+    span: {start_line: 330, end_line: 335}
+    related: {entities: [verification-contract-model]}
+  - path: src/powdrr_lift/core/feature_planning_specification.py
+    type: modified
+    summary: Add the executable verification contract skeleton to feature planning output.
+    rationale: Ensure new feature proposals have a concrete place to declare intent-linked validation.
+    span: {start_line: 197, end_line: 208}
+    related:
+      entities: [verification-contract-model]
+      decisions: [extend-required-test-cases-model]
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    summary: Import the verification contract model and field vocabulary.
+    rationale: Give PR specification validation one canonical contract definition.
+    span: {start_line: 21, end_line: 24}
+    related: {entities: [verification-contract-model]}
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    summary: Add the executable verification contract skeleton to PR specification output.
+    rationale: Carry intent-linked validation requirements into implementation planning.
+    span: {start_line: 205, end_line: 216}
+    related:
+      entities: [verification-contract-model]
+      decisions: [extend-required-test-cases-model]
+  - path: src/powdrr_lift/core/pr_specification.py
+    type: modified
+    summary: Validate required test case contract fields and reject unknown fields.
+    rationale: Prevent incomplete or ambiguous verification requirements from reaching implementation.
+    span: {start_line: 2036, end_line: 2067}
+    related:
+      entities: [verification-contract-model]
+      invariants:
+        - executable-contracts-are-validated
+        - legacy-contracts-are-explicitly-incomplete
+  - path: src/powdrr_lift/core/verification_contract.py
+    type: added
+    summary: Add the provider-neutral verification contract model, validation, normalization, and fingerprinting.
+    rationale: Give Workrr and later verification phases a stable executable representation of feature intent checks.
+    span: {start_line: 1, end_line: 199}
+    related:
+      entities: [verification-contract-model]
+      decisions:
+        - extend-required-test-cases-model
+        - legacy-contracts-remain-readable
+        - contracts-fingerprint-semantic-fields
+      invariants:
+        - executable-contracts-are-validated
+        - legacy-contracts-are-explicitly-incomplete
+        - verification-contract-fingerprint-is-stable
+  - path: tests/test_feature_planning_specification.py
+    type: modified
+    summary: Verify feature planning templates include executable verification contract fields.
+    rationale: Keep generated planning documents aligned with the contract schema.
+    span: {start_line: 205, end_line: 207}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_feature_planning_specification.py
+    type: modified
+    summary: Verify required test cases remain part of generated feature planning output.
+    rationale: Prevent the new contract section from being omitted from the structured template.
+    span: {start_line: 231, end_line: 231}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: added
+    summary: Test complete verification contracts and incomplete contract diagnostics in PR specifications.
+    rationale: Lock down acceptance of executable contracts and fail-closed validation of partial migrations.
+    span: {start_line: 44, end_line: 100}
+    related:
+      entities: [verification-contract-model]
+      invariants: [executable-contracts-are-validated, legacy-contracts-are-explicitly-incomplete]
+  - path: tests/test_verification_contract.py
+    type: added
+    summary: Test contract round-tripping, stable fingerprints, legacy compatibility, required fields, enum validation, and malformed collections.
+    rationale: Protect the contract model's migration and validation behavior before execution support is added.
+    span: {start_line: 1, end_line: 75}
+    related:
+      entities: [verification-contract-model]
+      invariants:
+        - executable-contracts-are-validated
+        - legacy-contracts-are-explicitly-incomplete
+        - verification-contract-fingerprint-is-stable
+entities:
+  - id: verification-contract-model
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: executable-contracts-are-validated
+    action: added
+    description: A non-legacy required test case must declare at least one intent reference, provider, selector, profile, supported expectation, and supported lifecycle status; malformed collection fields and unknown fields are rejected.
+    rationale: Make every newly authored verification requirement structurally actionable and unambiguous.
+  - id: legacy-contracts-are-explicitly-incomplete
+    action: added
+    description: Identifier-and-description-only required test cases remain parseable for migration but are not considered complete verification contracts.
+    rationale: Preserve existing documents without allowing legacy entries to claim executable intent coverage.
+  - id: verification-contract-fingerprint-is-stable
+    action: added
+    description: A contract fingerprint is content-addressed by the versioned schema and normalized contract data, so semantic contract changes produce a different fingerprint.
+    rationale: Provide a durable identity for later evidence and drift checks.
+guidance:
+  - id: use-verification-contracts-for-intent-evidence
+    action: added
+    description: Later execution and evidence phases should resolve required test cases through VerificationContract and use intent_refs, selector, profile, expectation, applicability, and protected_inputs rather than inventing parallel metadata.
+    rationale: Keep intent-to-test traceability on one provider-neutral contract boundary.
+  - id: migrate-legacy-required-tests
+    action: added
+    description: New feature and PR specifications should emit complete verification contracts; existing legacy entries should be upgraded before they are treated as executable intent evidence.
+    rationale: Allow incremental adoption without silently weakening verification claims.
+features: []
+proposed_prs: []

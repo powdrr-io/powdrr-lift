@@ -179,6 +179,17 @@ class PowdrrAgent(BaseInstalledAgent):
             )
             if (value := self._get_env(key)) is not None
         }
+        provider_env.update(
+            {
+                "GIT_AUTHOR_NAME": self._get_env("GIT_AUTHOR_NAME") or "Powdrr Agent",
+                "GIT_AUTHOR_EMAIL": self._get_env("GIT_AUTHOR_EMAIL")
+                or "powdrr@localhost",
+                "GIT_COMMITTER_NAME": self._get_env("GIT_COMMITTER_NAME")
+                or "Powdrr Agent",
+                "GIT_COMMITTER_EMAIL": self._get_env("GIT_COMMITTER_EMAIL")
+                or "powdrr@localhost",
+            }
+        )
         command_text = shlex.join(command)
         command_log = self._get_env("POWDRR_COMMAND_LOG")
         if command_log:

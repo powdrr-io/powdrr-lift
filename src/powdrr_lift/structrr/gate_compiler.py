@@ -34,6 +34,7 @@ def compile_proposal_worklist(
                 "source-coverage",
                 source_ref,
                 "the proposal source is present and addressable",
+                evidence_requirements=(source_ref,),
             )
         )
     for operation in proposal.operations:
@@ -45,12 +46,14 @@ def compile_proposal_worklist(
                     "intent-operation-validity",
                     subject,
                     "the operation has one supported action and a stable subject",
+                    evidence_requirements=("proposal", "plan"),
                 ),
                 _spec(
                     proposal,
                     "architecture-intent-effect",
                     subject,
                     "the operation explicitly declares its intent effect",
+                    evidence_requirements=("proposal", "plan"),
                 ),
                 _spec(
                     proposal,
@@ -58,6 +61,11 @@ def compile_proposal_worklist(
                     subject,
                     "every affected active intent clause has an explicit disposition",
                     active_intent_clause_ids,
+                    evidence_requirements=(
+                        "proposal",
+                        "plan",
+                        *(f"intent:{item}" for item in active_intent_clause_ids),
+                    ),
                 ),
             )
         )
@@ -68,6 +76,7 @@ def compile_proposal_worklist(
                 "acceptance-verifier-completeness",
                 f"criterion-{index}",
                 f"acceptance criterion is verifiable: {criterion}",
+                evidence_requirements=("proposal", "plan"),
             )
         )
     specs.append(
@@ -76,6 +85,7 @@ def compile_proposal_worklist(
             "resulting-state-consistency",
             proposal.proposal_id,
             "the resulting Structrr state is self-consistent",
+            evidence_requirements=("baseline", "proposal", "plan"),
         )
     )
     return DecisionWorklist.compile(tuple(specs))
@@ -121,6 +131,7 @@ def _spec(
     subject: str,
     predicate: str,
     active_intent_clause_ids: Sequence[str] = (),
+    evidence_requirements: Sequence[str] = (),
 ) -> DecisionSpecification:
     input_data = {
         "proposal": proposal.fingerprint,
@@ -128,6 +139,7 @@ def _spec(
         "subject": subject,
         "predicate": predicate,
         "active_intent_clause_ids": sorted(active_intent_clause_ids),
+        "evidence_requirements": list(evidence_requirements),
     }
     encoded = json.dumps(input_data, sort_keys=True, separators=(",", ":")).encode()
     fingerprint = f"sha256:{hashlib.sha256(encoded).hexdigest()}"
@@ -137,6 +149,7 @@ def _spec(
         subject=subject,
         predicate=predicate,
         input_fingerprint=fingerprint,
+        evidence_requirements=tuple(evidence_requirements),
     )
 
 

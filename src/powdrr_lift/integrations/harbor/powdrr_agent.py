@@ -6,11 +6,22 @@ import shlex
 from pathlib import PurePosixPath
 from typing import Any
 
-from harbor.agents.installed.base import (  # type: ignore[import-not-found]
-    BaseInstalledAgent,
-)
-from harbor.environments.base import BaseEnvironment  # type: ignore[import-not-found]
-from harbor.models.agent.context import AgentContext  # type: ignore[import-not-found]
+try:
+    from pier.agents.installed.base import (  # type: ignore[import-not-found]
+        BaseInstalledAgent,
+    )
+    from pier.environments.base import BaseEnvironment  # type: ignore[import-not-found]
+    from pier.models.agent.context import AgentContext  # type: ignore[import-not-found]
+except ImportError:
+    from harbor.agents.installed.base import (  # type: ignore[import-not-found]
+        BaseInstalledAgent,
+    )
+    from harbor.environments.base import (  # type: ignore[import-not-found]
+        BaseEnvironment,
+    )
+    from harbor.models.agent.context import (  # type: ignore[import-not-found]
+        AgentContext,
+    )
 
 POWDRR_VERSION = "0.1.0"
 OPENCODE_VERSION = "1.18.31"

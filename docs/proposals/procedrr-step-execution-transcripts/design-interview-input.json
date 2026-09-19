@@ -1,0 +1,153 @@
+{
+  "work_item_name": "procedrr-step-execution-transcripts",
+  "feature_description": "Add Procedrr step execution transcripts. Extend the Procedrr evaluator so EvaluationResult exposes an ordered, durable transcript of every executed step, including step kind and path, relevant inputs, produced outputs, and succeeded or failed outcome. Capture transcripts consistently across operations, judges, loops, retries/attempts, specializations, calls, repeats, branches, terminal steps, gates, nested fragments/processes, and failures. Preserve existing evaluator behavior and public compatibility, and add focused tests proving ordering, nested execution, captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py and tests/test_procedrr_evaluator.py.",
+  "requirements_edits": {
+    "added": [
+      {
+        "id": "req-transcript-ordered-durable",
+        "description": "EvaluationResult must expose an ordered, durable transcript of every executed step, including step kind and path, relevant inputs, produced outputs, and succeeded or failed outcome.",
+        "state": "added"
+      }
+    ],
+    "deleted": []
+  },
+  "approach_edits": {
+    "added": [
+      {
+        "description": "Extend the Procedrr evaluator so EvaluationResult exposes an ordered, durable transcript of every executed step, including step kind and path, relevant inputs, produced outputs, and succeeded or failed outcome.",
+        "id": "app-step-transcript-evaluator",
+        "state": "added"
+      }
+    ],
+    "deleted": []
+  },
+  "entities_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "entity_relationships_edits": {
+    "added": [
+      {
+        "id": "evaluator-transcript-records-step-execution",
+        "description": "The evaluator records an ordered, durable transcript entry for every executed step, including step kind, path, relevant inputs, produced outputs, and outcome.",
+        "rationale": "The feature requires consistent transcript capture across all execution paths without altering existing behavior.",
+        "relationship": "produces",
+        "source": "procedrr-evaluator",
+        "target": "step-execution-transcript"
+      }
+    ],
+    "deleted": []
+  },
+  "invariants_edits": {
+    "added": [
+      {
+        "id": "inv-transcript-captures-step-kind-path-inputs-outputs-outcome",
+        "description": "Every executed step transcript entry must record step kind, path, relevant inputs, produced outputs, and succeeded or failed outcome.",
+        "section": "invariants",
+        "specification_type": "current-state",
+        "work_item_name": "procedrr-step-execution-transcripts"
+      }
+    ],
+    "deleted": []
+  },
+  "guidance_edits": {
+    "added": [
+      {
+        "id": "guide-transcript-capture-consistency",
+        "description": "Capture step execution transcripts consistently across all evaluator operations, judges, loops, retries, attempts, specializations, calls, repeats, branches, terminal steps, gates, nested fragments/processes, and failures.",
+        "section": "guidance",
+        "specification_type": "current-state",
+        "work_item_name": "procedrr-step-execution-transcripts"
+      }
+    ],
+    "deleted": []
+  },
+  "features_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "human_decisions_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "intent_edits": {
+    "added": [
+      {
+        "goal": "Add Procedrr step execution transcripts to the evaluator so EvaluationResult exposes an ordered, durable record of every executed step, including step kind, path, inputs, outputs, and outcome.",
+        "reasoning": "The feature description requires capturing transcripts consistently across all execution constructs while preserving existing behavior and public compatibility, with focused tests proving ordering, nesting, values, and failures."
+      }
+    ],
+    "deleted": []
+  },
+  "intents_edits": {
+    "added": [
+      {
+        "id": "procedrr-step-execution-transcripts",
+        "type": "intent",
+        "description": "Add Procedrr step execution transcripts. Extend the Procedrr evaluator so EvaluationResult exposes an ordered, durable transcript of every executed step, including step kind and path, relevant inputs, produced outputs, and succeeded or failed outcome. Capture transcripts consistently across operations, judges, loops, retries/attempts, specializations, calls, repeats, branches, terminal steps, gates, nested fragments/processes, and failures. Preserve existing evaluator behavior and public compatibility, and add focused tests proving ordering, nested execution, captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py and tests/test_procedrr_evaluator.py."
+      }
+    ],
+    "deleted": []
+  },
+  "acceptance_criteria_edits": {
+    "added": [
+      {
+        "description": "The Procedrr evaluator exposes an ordered, durable transcript of every executed step, including step kind and path, relevant inputs, produced outputs, and succeeded or failed outcome.",
+        "id": "ac-transcript-exposed"
+      }
+    ],
+    "deleted": []
+  },
+  "expected_tests_edits": {
+    "added": [
+      {
+        "description": "Add tests proving EvaluationResult exposes an ordered, durable transcript of every executed step, including step kind, path, inputs, outputs, and success/failure outcome, across operations, judges, loops, retries, specializations, calls, repeats, branches, terminal steps, gates, nested fragments/processes, and failures.",
+        "id": "test-step-execution-transcripts"
+      }
+    ],
+    "deleted": []
+  },
+  "required_test_cases_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "expected_outcomes_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "non_goals_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "risks_edits": {
+    "added": [
+      {
+        "description": "The new transcript capture must not break existing evaluator behavior, so regression risk from adding ordered step recording across all execution paths must be tracked.",
+        "id": "risk-transcript-regression"
+      }
+    ],
+    "deleted": []
+  },
+  "decisions_edits": {
+    "added": [
+      {
+        "id": "decision-transcript-capture-scope",
+        "description": "Capture step execution transcripts across all evaluator constructs including operations, judges, loops, retries, specializations, calls, repeats, branches, terminal steps, gates, nested fragments/processes, and failures.",
+        "section": "decisions"
+      }
+    ],
+    "deleted": []
+  },
+  "proposed_prs_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "modules_edits": {
+    "added": [],
+    "deleted": []
+  },
+  "tools_edits": {
+    "added": [],
+    "deleted": []
+  }
+}

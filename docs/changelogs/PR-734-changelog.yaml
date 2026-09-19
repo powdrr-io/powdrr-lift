@@ -1,0 +1,295 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 734
+title: Harden proposal review evidence before OpenCode
+intent:
+  problem: Proposal review decisions need explicit evidence requirements, deterministic structural checks, and repository-grounded active intent before they can authorize OpenCode.
+  goal: Harden the existing proposal review gate without changing the single-task OpenCode boundary.
+human-decisions:
+  - id: evidence-is-explicit-and-verified
+    summary: Bind every decision to exact evidence references and independently validate those references.
+  - id: structural-checks-run-before-llm-review
+    summary: Reject mechanically invalid proposals before dispatching semantic judges.
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove OpenCode as the proposal-decision judge provider.
+    rationale: Evaluate proposal predicates through the direct LLM client rather than the code-editing agent.
+    span: {start_line: 104, end_line: 104}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove OpenCode as the implementation completeness judge provider.
+    rationale: Keep post-implementation review separate from code-editing execution.
+    span: {start_line: 133, end_line: 133}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove OpenCode from completeness repair planning.
+    rationale: Generate repair instructions with the direct LLM before sending edits to OpenCode.
+    span: {start_line: 255, end_line: 255}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove OpenCode from scope repair planning.
+    rationale: Keep repair-plan reasoning separate from the code-editing provider.
+    span: {start_line: 309, end_line: 309}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Expand the review output with explicit evidence references and current intent context.
+    rationale: Make the LLM state exactly which evidence supports one predicate.
+    span: {start_line: 46, end_line: 115}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Preserve the shifted receipt reference passed into OpenCode.
+    rationale: Keep the exact reviewed receipt bound to worker dispatch.
+    span: {start_line: 122, end_line: 122}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Add explicit evidence requirements and reference-derived fingerprints to decision contracts.
+    rationale: Prevent free-form model evidence claims and make evidence changes stale decisions.
+    span: {start_line: 12, end_line: 12}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Extend decision specification serialization and validation with evidence requirements.
+    rationale: Persist the exact evidence contract used during review.
+    span: {start_line: 35, end_line: 35}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Normalize and decode evidence requirements.
+    rationale: Reject malformed evidence contracts during replay.
+    span: {start_line: 58, end_line: 62}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Decode persisted evidence requirements.
+    rationale: Preserve deterministic worklist reconstruction.
+    span: {start_line: 74, end_line: 74}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Require result evidence references and verify their derived fingerprint.
+    rationale: Make a decision result prove the declared evidence identity.
+    span: {start_line: 77, end_line: 101}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Serialize evidence references in decision results.
+    rationale: Preserve the evidence basis in durable artifacts.
+    span: {start_line: 112, end_line: 112}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Decode evidence references in decision results.
+    rationale: Apply the same typed contract on load.
+    span: {start_line: 127, end_line: 137}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Include evidence requirements in decision input fingerprints.
+    rationale: Invalidate results when the evidence contract changes.
+    span: {start_line: 151, end_line: 151}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Add canonical evidence fingerprint and reference helpers.
+    rationale: Derive identity from normalized references.
+    span: {start_line: 154, end_line: 166}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Export evidence fingerprint support.
+    rationale: Share one evidence identity algorithm.
+    span: {start_line: 191, end_line: 234}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Include evidence fingerprinting in the public exports.
+    rationale: Keep review code on the canonical contract.
+    span: {start_line: 241, end_line: 241}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Add evidence requirements to source coverage decisions.
+    rationale: Make source coverage predicates declare their required evidence.
+    span: {start_line: 37, end_line: 37}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Add proposal and plan evidence to operation validity decisions.
+    rationale: Require the operation predicate to cite its proposal and execution plan.
+    span: {start_line: 49, end_line: 49}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Add proposal and plan evidence to architecture intent decisions.
+    rationale: Require the architecture predicate to cite its proposal and execution plan.
+    span: {start_line: 56, end_line: 56}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Add proposal, plan, and active intent evidence to disposition decisions.
+    rationale: Require affected-intent decisions to cite every active clause they evaluate.
+    span: {start_line: 64, end_line: 68}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Add proposal and plan evidence to acceptance verifier decisions.
+    rationale: Require acceptance predicates to cite their proposal and execution plan.
+    span: {start_line: 79, end_line: 79}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Add baseline, proposal, and plan evidence to resulting-state decisions.
+    rationale: Require state consistency to cite all compared states.
+    span: {start_line: 88, end_line: 88}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Add evidence requirements to the decision compiler interface.
+    rationale: Let all compiled decisions carry their exact evidence contract.
+    span: {start_line: 134, end_line: 134}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Include evidence requirements in compiler input identity.
+    rationale: Make changes to the evidence contract invalidate prior decisions.
+    span: {start_line: 142, end_line: 142}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Persist evidence requirements on compiled specifications.
+    rationale: Preserve the contract used to validate each result.
+    span: {start_line: 152, end_line: 152}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/proposal_review.py
+    type: modified
+    summary: Use canonical evidence fingerprints for structural receipts.
+    rationale: Keep generated receipts valid under the stricter result contract.
+    span: {start_line: 15, end_line: 15}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/proposal_review.py
+    type: modified
+    summary: Generate evidence-bound structural review results.
+    rationale: Make structural review receipts independently verifiable.
+    span: {start_line: 125, end_line: 129}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/proposal_review.py
+    type: modified
+    summary: Reuse canonical result decoding when loading receipts.
+    rationale: Avoid divergent evidence validation rules.
+    span: {start_line: 151, end_line: 155}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/structrr/proposal_review.py
+    type: modified
+    summary: Remove duplicate receipt result parsing.
+    rationale: Keep one decoding implementation.
+    span: {start_line: 163, end_line: 176}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import decision, active-intent, structural-gate, and evidence contracts.
+    rationale: Give Workrr the inputs needed for grounded review.
+    span: {start_line: 17, end_line: 21}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import active intent and structural gate support.
+    rationale: Ground the worklist in current repository intent.
+    span: {start_line: 32, end_line: 36}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import proposal revision loading.
+    rationale: Finalize against immutable proposal input.
+    span: {start_line: 40, end_line: 40}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import proposal review persistence helpers.
+    rationale: Persist the hardened review artifacts.
+    span: {start_line: 43, end_line: 47}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Dispatch proposal review operations.
+    rationale: Keep preparation and finalization explicit Workrr transitions.
+    span: {start_line: 304, end_line: 321}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Remove the OpenCode review-client override.
+    rationale: Route judge steps through the direct planning LLM; reserve OpenCode for code edits.
+    span: {start_line: 69, end_line: 69}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Remove the dedicated OpenCode judge client.
+    rationale: Prevent review prompts from being dispatched through the code-editing provider.
+    span: {start_line: 422, end_line: 432}
+    related: {decisions: [structural-checks-run-before-llm-review]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Run structural checks and include active intent clauses before LLM review.
+    rationale: Reject mechanical failures and expose current intent as evidence.
+    span: {start_line: 474, end_line: 623}
+    related: {decisions: [structural-checks-run-before-llm-review, evidence-is-explicit-and-verified]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Validate evidence sources and current active intent before OpenCode.
+    rationale: Prevent stale or invented evidence from authorizing work.
+    span: {start_line: 684, end_line: 709}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import evidence and review helpers for endpoint tests.
+    rationale: Exercise exact evidence-bound finalization.
+    span: {start_line: 4, end_line: 4}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import typed decision and compiler helpers.
+    rationale: Construct the exact review worklist in tests.
+    span: {start_line: 15, end_line: 19}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import proposal review finalization.
+    rationale: Exercise the production receipt writer.
+    span: {start_line: 22, end_line: 22}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import the endpoint review helper.
+    rationale: Test the production finalization path.
+    span: {start_line: 38, end_line: 38}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Test receipt finalization with derived evidence identity.
+    rationale: Prove exact proposal, worklist, and evidence binding.
+    span: {start_line: 507, end_line: 566}
+    related: {decisions: [evidence-is-explicit-and-verified]}
+entities: []
+entity_relationships: []
+invariants:
+  - id: opencode-requires-verified-evidence
+    action: added
+    description: OpenCode requires an accepted receipt whose evidence references and fingerprints match the current proposal worklist.
+    rationale: Keep worker dispatch behind grounded review.
+  - id: structural-review-precedes-semantic-review
+    action: added
+    description: Mechanically invalid proposals are rejected before LLM judges run.
+    rationale: Do not delegate deterministic checks to the model.
+guidance:
+  - id: use-active-intent-in-review
+    action: added
+    description: Proposal worklists must include the active intent clauses loaded from the current repository state.
+    rationale: Ground affected-intent decisions in durable intent.
+features: []
+proposed_prs: []

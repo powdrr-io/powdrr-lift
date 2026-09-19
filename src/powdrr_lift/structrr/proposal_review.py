@@ -12,6 +12,7 @@ from powdrr_lift.core.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
     DecisionWorklist,
+    evidence_fingerprint,
 )
 from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
@@ -121,7 +122,11 @@ def build_structural_review_receipt(
                 predicate_version=specification.predicate_version,
                 subject=specification.subject,
                 input_fingerprint=specification.input_fingerprint,
-                evidence_fingerprint=worklist.fingerprint,
+                evidence_fingerprint=evidence_fingerprint(
+                    specification.input_fingerprint,
+                    specification.evidence_requirements,
+                ),
+                evidence_refs=specification.evidence_requirements,
             )
         )
     receipt = ProposalReviewReceipt(
@@ -143,7 +148,11 @@ def load_review_receipt(path: Path) -> ProposalReviewReceipt:
     raw_results = raw.get("decision_results")
     if not isinstance(raw_results, list):
         raise ValueError("proposal review receipt decision_results must be a list")
-    results = tuple(_result_from_data(item) for item in raw_results)
+    results = tuple(
+        DecisionResult.from_data(item)
+        for item in raw_results
+        if isinstance(item, Mapping)
+    )
     accepted = raw.get("accepted")
     if not isinstance(accepted, bool):
         raise ValueError("proposal review receipt accepted must be a boolean")
@@ -158,20 +167,6 @@ def load_review_receipt(path: Path) -> ProposalReviewReceipt:
 def write_review_receipt(path: Path, receipt: ProposalReviewReceipt) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(receipt.to_data(), indent=2, sort_keys=True) + "\n")
-
-
-def _result_from_data(raw: Any) -> DecisionResult:
-    if not isinstance(raw, Mapping):
-        raise ValueError("decision result must contain an object")
-    return DecisionResult(
-        decision_id=_string(raw, "decision_id"),
-        outcome=DecisionOutcome(_string(raw, "outcome")),
-        explanation=_string(raw, "explanation"),
-        predicate_version=_string(raw, "predicate_version"),
-        subject=_string(raw, "subject"),
-        input_fingerprint=_string(raw, "input_fingerprint"),
-        evidence_fingerprint=_string(raw, "evidence_fingerprint"),
-    )
 
 
 def _string(raw: Mapping[str, Any], key: str) -> str:

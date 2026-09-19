@@ -1,0 +1,55 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 739
+title: Plan intent-linked verification across Structrr, Procedrr, and Workrr
+intent:
+  problem: The intent-preserving feature flow identifies and reviews intent, but it cannot yet prove that each affected invariant has an executable verifier, that the exact verifier ran against the current candidate, or that an implementation did not weaken its own tests.
+  goal: Define an implementation-ready sequence that links canonical active intent to provider-neutral verification contracts, typed execution evidence, deterministic reconciliation, verifier-change controls, and longitudinal verification health.
+human-decisions:
+  - id: extend-required-test-cases
+    summary: Extend the existing required_test_cases model into verification contracts instead of creating a second intent-test system.
+  - id: separate-verification-ownership
+    summary: Assign accepted intent and contracts to Structrr, orchestration and gates to Procedrr, provider execution to Workrr, and implementation only to OpenCode.
+  - id: require-fresh-deterministic-evidence
+    summary: Allow PR creation only after every applicable contract has fresh typed evidence or an authorized disposition that model output cannot fabricate.
+structured_files: []
+files:
+  - path: docs/plans/intent-linked-verification-implementation-plan.md
+    type: added
+    summary: Define the architecture, schemas, invariants, eight implementation phases, tests, migration rules, acceptance scenario, and agent handoff for intent-linked verification.
+    rationale: Give implementing agents a deterministic path from durable intent to executable regression protection without hardcoding test frameworks or allowing OpenCode to certify its own output.
+    span:
+      start_line: 1
+      end_line: 582
+    related:
+      entities:
+        - intent-linked-verification-implementation-plan
+      decisions:
+        - extend-required-test-cases
+        - separate-verification-ownership
+        - require-fresh-deterministic-evidence
+      invariants:
+        - deterministic-verification-fails-closed
+        - verifier-changes-invalidate-evidence
+      guidance:
+        - implement-intent-verification-in-phases
+entities:
+  - id: intent-linked-verification-implementation-plan
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: deterministic-verification-fails-closed
+    action: added
+    description: Missing, stale, unknown, or non-passing deterministic evidence cannot be converted into acceptance by OpenCode or a model-generated semantic judgment.
+    rationale: Ensure PR eligibility depends on execution evidence from the exact required verifier and candidate.
+  - id: verifier-changes-invalidate-evidence
+    action: added
+    description: Changing, deleting, skipping, deselecting, or replacing a required verifier invalidates prior evidence and requires explicit verifier-change review.
+    rationale: Prevent an implementation from making its own regression protection easier to satisfy.
+guidance:
+  - id: implement-intent-verification-in-phases
+    action: added
+    description: Implement canonical active intent, verification contracts, provider inventory, obligation compilation, typed evidence, reconciliation, differential controls, and health enforcement in dependency order.
+    rationale: Keep every phase independently reviewable while preserving one source of truth and a provider-neutral core.
+features: []
+proposed_prs: []

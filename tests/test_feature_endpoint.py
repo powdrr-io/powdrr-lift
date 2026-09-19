@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import subprocess
 from contextlib import redirect_stdout
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -459,6 +460,17 @@ def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> N
     )
     assert failed["passed"] is False
     assert failed["error"] == "operation produced no new worktree changes"
+
+    reused = _operation_checkpoint(
+        runner=runner,
+        worktree=tmp_path,
+        unit=unit,
+        request=replace(request, allow_existing_changes=True),
+        attempt=attempt,
+        before_paths={"src/adapter.py"},
+    )
+    assert reused["passed"] is True
+    assert reused["changed_paths"] == []
 
 
 def test_plan_acceptance_criteria_have_stable_ids() -> None:

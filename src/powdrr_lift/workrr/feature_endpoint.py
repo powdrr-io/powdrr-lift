@@ -762,16 +762,28 @@ def _operation_checkpoint(
         text=True,
         check=False,
     )
+    existing_in_scope = bool(after_paths) and all(
+        any(
+            scope == "."
+            or Path(path) == Path(scope)
+            or Path(scope) in Path(path).parents
+            for scope in request.allowed_paths
+        )
+        for path in after_paths
+    )
+    has_changes = bool(task_paths) or (
+        request.allow_existing_changes and existing_in_scope
+    )
     passed = (
         attempt.status is CodingAgentStatus.COMPLETED
-        and bool(task_paths)
+        and has_changes
         and not out_of_scope
         and diff_check.returncode == 0
     )
     reason = None
     if attempt.status is not CodingAgentStatus.COMPLETED:
         reason = f"coding-agent attempt was {attempt.status.value}"
-    elif not task_paths:
+    elif not task_paths and not has_changes:
         reason = "operation produced no new worktree changes"
     elif out_of_scope:
         reason = f"operation changed out-of-scope paths: {list(out_of_scope)}"

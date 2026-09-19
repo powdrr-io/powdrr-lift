@@ -34,6 +34,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
     _aggregate_intent_review,
+    _compile_feature_obligations,
     _create_pr_changelog,
     _ensure_current_baseline,
     _finalize_proposal_review,
@@ -194,6 +195,41 @@ def test_run_feature_in_place_reuses_core_without_git_publication(
     assert captured["branch"] == "main"
     assert captured["config"].open_pr is False
     assert captured["config"].push_changes is False
+
+
+def test_compile_feature_obligations_binds_trace_to_plan(tmp_path: Path) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "acceptance_criteria": [
+                    {"id": "feature-acceptance-1", "description": "It works."}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_root = tmp_path / "run"
+    state: dict[str, Any] = {"plan_path": plan}
+
+    result = _compile_feature_obligations(
+        {
+            "feature_description": "Add the feature.",
+            "plan": str(plan),
+            "traceability": {
+                "verdict": "complete",
+            },
+        },
+        worktree=tmp_path,
+        output_root=output_root,
+        state=state,
+    )
+
+    assert result["obligations"][0]["description"] == "It works."
+    assert state["feature_obligations"] == ("It works.",)
+    assert json.loads(
+        (output_root / "feature-obligations.json").read_text(encoding="utf-8")
+    )["plan"] == str(plan)
 
 
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:

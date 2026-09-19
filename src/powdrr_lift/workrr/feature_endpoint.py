@@ -105,6 +105,7 @@ class FeatureEndpointResult:
     review: dict[str, Any]
     pull_request_url: str | None = None
     changelog_path: Path | None = None
+    feature_obligations_path: Path | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -119,6 +120,11 @@ class FeatureEndpointResult:
             "review": self.review,
             "pull_request_url": self.pull_request_url,
             "changelog_path": str(self.changelog_path) if self.changelog_path else None,
+            "feature_obligations_path": (
+                str(self.feature_obligations_path)
+                if self.feature_obligations_path
+                else None
+            ),
         }
 
 
@@ -357,6 +363,13 @@ def _execute_procedrr_flow(
             )
             state["proposal_review_receipt_path"] = review["receipt_path"]
             return review
+        if name == "compile_feature_obligations":
+            return _compile_feature_obligations(
+                parameters,
+                worktree=worktree,
+                output_root=output_root,
+                state=state,
+            )
         if name == "run_opencode":
             return _run_opencode_phase(
                 config,
@@ -685,6 +698,116 @@ def _validate_review_evidence_sources(
             raise PowdrrExecutionError(
                 f"proposal review evidence source does not exist: {source_ref}"
             )
+def _compile_feature_obligations(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    output_root: Path,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """Turn the approved plan trace into durable worker obligations."""
+    plan = _require_flow_text(parameters, "plan")
+    if Path(plan) != state.get("plan_path"):
+        raise PowdrrExecutionError("obligations plan does not match the planned diff")
+    feature_description = _require_flow_text(parameters, "feature_description")
+    traceability = parameters.get("traceability")
+    if not isinstance(traceability, Mapping):
+        raise PowdrrExecutionError("plan traceability must be a mapping")
+    if traceability.get("verdict") != "complete":
+        raise PowdrrExecutionError(
+            "cannot compile obligations from an incomplete plan traceability review"
+        )
+    plan_document = _load_yaml_mapping(Path(plan))
+    raw_criteria = plan_document.get("acceptance_criteria")
+    if not isinstance(raw_criteria, list) or not raw_criteria:
+        raise PowdrrExecutionError("plan produced no acceptance criteria obligations")
+
+    obligations: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index, raw in enumerate(raw_criteria, start=1):
+        if isinstance(raw, Mapping):
+            identifier = raw.get("id")
+            description = raw.get("description")
+        elif isinstance(raw, str):
+            identifier = f"acceptance-{index}"
+            description = raw
+        else:
+            identifier = None
+            description = None
+        plan_refs = [f"acceptance_criteria.{identifier}"]
+        if (
+            not isinstance(identifier, str)
+            or not identifier.strip()
+            or identifier in seen_ids
+            or not isinstance(description, str)
+            or not description.strip()
+            or not _plan_reference_exists(plan_document, plan_refs[0])
+        ):
+            raise PowdrrExecutionError("plan obligation is malformed")
+        seen_ids.add(identifier)
+        obligations.append(
+            {
+                "id": identifier,
+                "description": description.strip(),
+                "plan_refs": list(dict.fromkeys(plan_refs)),
+            }
+        )
+
+    path = output_root / "feature-obligations.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "feature_description": feature_description,
+                "plan": plan,
+                "obligations": obligations,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state["feature_obligations"] = tuple(item["description"] for item in obligations)
+    state["feature_obligations_path"] = path
+    return {"path": str(path), "obligations": obligations}
+
+
+def _require_feature_obligations(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, Mapping):
+        raise PowdrrExecutionError("implementation is missing feature obligations")
+    raw_obligations = value.get("obligations")
+    if not isinstance(raw_obligations, list) or not raw_obligations:
+        raise PowdrrExecutionError("implementation has no feature obligations")
+    descriptions: list[str] = []
+    for item in raw_obligations:
+        if not isinstance(item, Mapping):
+            raise PowdrrExecutionError("implementation obligation is malformed")
+        description = item.get("description")
+        if not isinstance(description, str) or not description.strip():
+            raise PowdrrExecutionError("implementation obligation has no description")
+        descriptions.append(description.strip())
+    return tuple(dict.fromkeys(descriptions))
+
+
+def _feature_obligation_path(value: Any) -> str | None:
+    if not isinstance(value, Mapping):
+        return None
+    path = value.get("path")
+    return path if isinstance(path, str) and path.strip() else None
+
+
+def _plan_reference_exists(document: Mapping[str, Any], reference: str) -> bool:
+    section, separator, identifier = reference.partition(".")
+    if not separator or not section or not identifier:
+        return False
+    items = document.get(section)
+    if not isinstance(items, list):
+        return False
+    return any(
+        isinstance(item, Mapping) and str(item.get("id", "")) == identifier
+        for item in items
+    )
 
 
 def _run_opencode_phase(
@@ -705,6 +828,7 @@ def _run_opencode_phase(
         raise PowdrrExecutionError("implementation inputs do not match the plan state")
     feature_description = _require_flow_text(parameters, "feature_description")
     work_item_name = _require_flow_text(parameters, "work_item_name")
+    feature_obligations = _require_feature_obligations(parameters.get("obligations"))
     (
         planned_additions,
         planned_deletions,
@@ -717,11 +841,14 @@ def _run_opencode_phase(
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
-    source_refs = (
+    source_refs: tuple[str, ...] = (
         f"structrr:{baseline_path.relative_to(worktree)}",
         f"structrr-diff:{plan_path.relative_to(worktree)}",
         f"procedrr:{procedrr_path.relative_to(worktree)}",
     )
+    obligation_path = _feature_obligation_path(parameters.get("obligations"))
+    if obligation_path is not None:
+        source_refs = (*source_refs, f"obligations:{obligation_path}")
     proposal_revision = compile_proposal_revision(
         slug,
         baseline_document,
@@ -794,6 +921,7 @@ def _run_opencode_phase(
         planned_deletions=planned_deletions,
         must_preserve=must_preserve,
         non_goals=non_goals,
+        feature_obligations=feature_obligations,
         allowed_paths=config.allowed_paths,
         source_refs=source_context,
         validation_profiles=state["validation_profile_names"],
@@ -1074,8 +1202,12 @@ def _proposal_execution_units(
     allowed_paths: tuple[str, ...],
     source_refs: tuple[str, ...],
     validation_profiles: tuple[str, ...] = ("feature-validation",),
+    feature_obligations: tuple[str, ...] = (),
 ) -> tuple[ExecutionUnit, ...]:
     """Compile one worker unit per explicit Structrr operation."""
+    acceptance_criteria = tuple(
+        dict.fromkeys((*feature_obligations, *acceptance_criteria))
+    )
     if not proposal_revision.operations:
         return (
             ExecutionUnit(
@@ -1504,6 +1636,7 @@ def _feature_endpoint_result(
         state.get("review", {"passed": False}),
         state.get("pull_request_url"),
         state.get("changelog_path"),
+        state.get("feature_obligations_path"),
     )
 
 

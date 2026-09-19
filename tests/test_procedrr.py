@@ -393,6 +393,7 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
     assert [set(schema["properties"]) for schema in review_schemas] == [
         {"verdict"},
         {"verdict"},
+        {"verdict"},
     ]
 
 

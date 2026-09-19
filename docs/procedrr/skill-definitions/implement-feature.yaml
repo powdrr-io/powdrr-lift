@@ -43,6 +43,44 @@ steps:
         required: [path]
         properties: {path: {type: string, minLength: 1}}
       bind: plan
+  - judge:
+      kind: verify_plan_traceability
+      provider: opencode
+      question: Does the generated plan capture every atomic requirement in the original feature description?
+      subject: feature_description
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Treat the original feature description as the complete source of requirements.
+        - Decompose it into atomic behavioral, data, interface, compatibility, and validation requirements.
+        - For every atomic requirement, cite one or more concrete plan references by section and item id.
+        - A plan reference must be an actual acceptance criterion, feature, invariant, guidance item, or proposed operation in the generated plan.
+        - Mark complete only when every atomic requirement has a concrete plan reference and can become an implementation obligation.
+        - Mark incomplete when any requirement is absent, vague, or only implied by the prose.
+        - Do not approve a plan because its title or general feature description repeats the original prose.
+      context: [feature_description, proposal, plan]
+      output:
+        name: plan_traceability
+        schema:
+          type: object
+          required: [verdict]
+          additionalProperties: false
+          properties:
+            verdict: {type: string, enum: [complete, incomplete]}
+      validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [compile_feature_obligations]
+      parameters:
+        feature_description: {type: reference, value: feature_description}
+        plan: {type: reference, value: plan.path}
+        traceability: {type: reference, value: plan_traceability}
+      returns:
+        type: object
+        required: [path, obligations]
+        properties:
+          path: {type: string, minLength: 1}
+          obligations: {type: array, minItems: 1}
+      bind: feature_obligations
   - operation:
       tool: internal
       command: [prepare_proposal_review]
@@ -122,6 +160,7 @@ steps:
         proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
+        obligations: {type: reference, value: feature_obligations}
       returns:
         type: object
         required: [request_id, attempt]
@@ -247,9 +286,10 @@ steps:
       prompt_system: Return only the declared JSON object.
       instructions:
         - Compare the implementation and validation evidence with the complete feature specification.
+        - Check every compiled feature obligation individually and require concrete implementation and validation evidence for each one.
         - Mark complete only when every requested behavior is implemented and validated.
         - Return one verdict: satisfied or missing.
-      context: [feature_description, plan, implementation, validation, review]
+      context: [feature_description, plan, feature_obligations, implementation, validation, review]
       output:
         name: completeness_review
         schema:
@@ -278,7 +318,7 @@ steps:
         - Mark justified only when every change is required by the specification or its validation.
         - Treat unrelated refactors, cleanup, and speculative improvements as findings.
         - Return one verdict: justified or unjustified.
-      context: [feature_description, plan, implementation, validation, review, completeness_review]
+      context: [feature_description, plan, feature_obligations, implementation, validation, review, completeness_review]
       output:
         name: scope_review
         schema:
@@ -355,6 +395,7 @@ recoveries:
                         plan: {type: reference, value: plan.path}
                         work_item_name: {type: reference, value: work_item_name}
                         feature_description: {type: reference, value: feature_description}
+                        obligations: {type: reference, value: feature_obligations}
                         repair_issue: {type: reference, value: repair_issue}
                       returns: {type: object}
                       bind: implementation
@@ -415,6 +456,7 @@ recoveries:
             plan: {type: reference, value: plan.path}
             work_item_name: {type: reference, value: work_item_name}
             feature_description: {type: reference, value: feature_description}
+            obligations: {type: reference, value: feature_obligations}
             repair_request: {type: reference, value: completeness_repair.request}
             review_verdict: {type: reference, value: completeness_review.verdict}
           returns: {type: object}
@@ -468,6 +510,7 @@ recoveries:
             plan: {type: reference, value: plan.path}
             work_item_name: {type: reference, value: work_item_name}
             feature_description: {type: reference, value: feature_description}
+            obligations: {type: reference, value: feature_obligations}
             repair_request: {type: reference, value: scope_repair.request}
             review_verdict: {type: reference, value: scope_review.verdict}
           returns: {type: object}

@@ -1,0 +1,81 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 744
+title: Compile affected verification obligations before implementation
+intent:
+  problem: Procedrr does not compile the exact intent-protecting contracts required before OpenCode changes the repository.
+  goal: Compile a deterministic verification-obligation packet from read-only Structrr state and the feature proposal.
+human-decisions:
+  - id: structrr-intent-is-read-only
+    summary: Committed Structrr is accepted read-only state; proposals are the only run-time intent overlay.
+  - id: obligation-selection-is-mechanical
+    summary: Select contracts through deterministic closure and exact provider inventory.
+structured_files: []
+files:
+  - {path: docs/plans/intent-linked-verification-implementation-plan.md, type: modified, summary: Update intent ownership, rationale: Keep accepted intent in read-only Structrr., span: {start_line: 33, end_line: 33}}
+  - {path: docs/plans/intent-linked-verification-implementation-plan.md, type: modified, summary: Remove the second intent database from the plan, rationale: Preserve one source of truth., span: {start_line: 54, end_line: 54}}
+  - {path: docs/plans/intent-linked-verification-implementation-plan.md, type: modified, summary: Require Structrr-only resolution, rationale: Prevent workflow intent writes., span: {start_line: 224, end_line: 224}}
+  - {path: docs/plans/intent-linked-verification-implementation-plan.md, type: modified, summary: Update Phase 1 migration coverage, rationale: Test Structrr-only intent., span: {start_line: 228, end_line: 228}}
+  - {path: docs/plans/intent-linked-verification-implementation-plan.md, type: modified, summary: Update Phase 1 tests, rationale: Prevent mutable intent stores., span: {start_line: 242, end_line: 242}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Compile obligations before review, rationale: Establish proof requirements before implementation., span: {start_line: 135, end_line: 150}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Pass obligations to proposal review, rationale: Gate on deterministic proof., span: {start_line: 158, end_line: 158}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Pass obligations to OpenCode, rationale: Give the worker proof requirements., span: {start_line: 232, end_line: 232}}
+  - {path: src/powdrr_lift/structrr/__init__.py, type: modified, summary: Export obligation models, rationale: Expose the Structrr compiler., span: {start_line: 53, end_line: 59}}
+  - {path: src/powdrr_lift/structrr/__init__.py, type: modified, summary: Register obligation exports, rationale: Keep the public API complete., span: {start_line: 92, end_line: 96}}
+  - {path: src/powdrr_lift/structrr/active_intent.py, type: modified, summary: Remove intent-store import, rationale: Use Structrr-only state., span: {start_line: 10, end_line: 11}}
+  - {path: src/powdrr_lift/structrr/active_intent.py, type: modified, summary: Document read-only resolution, rationale: Prevent workflow-file writes., span: {start_line: 49, end_line: 49}}
+  - {path: src/powdrr_lift/structrr/active_intent.py, type: modified, summary: Resolve baseline only, rationale: Eliminate a second source of truth., span: {start_line: 51, end_line: 54}}
+  - {path: src/powdrr_lift/structrr/active_intent.py, type: modified, summary: Remove store merging, rationale: Derive state only from Structrr., span: {start_line: 57, end_line: 58}}
+  - {path: src/powdrr_lift/structrr/active_intent.py, type: modified, summary: Generate from specifications, rationale: Avoid lock files., span: {start_line: 70, end_line: 71}}
+  - {path: src/powdrr_lift/structrr/active_intent.py, type: modified, summary: Ignore workflow path, rationale: Make storage absence explicit., span: {start_line: 75, end_line: 75}}
+  - {path: src/powdrr_lift/structrr/active_intent.py, type: modified, summary: Remove captured entries, rationale: Keep reviews Structrr-only., span: {start_line: 168, end_line: 192}}
+  - {path: src/powdrr_lift/structrr/gate_compiler.py, type: modified, summary: Add obligation input, rationale: Gate on proof requirements., span: {start_line: 15, end_line: 17}}
+  - {path: src/powdrr_lift/structrr/gate_compiler.py, type: modified, summary: Extend worklist inputs, rationale: Bind decisions to fingerprints., span: {start_line: 25, end_line: 25}}
+  - {path: src/powdrr_lift/structrr/gate_compiler.py, type: modified, summary: Add inventory decisions, rationale: Surface missing proof inputs., span: {start_line: 99, end_line: 123}}
+  - {path: src/powdrr_lift/structrr/gate_compiler.py, type: modified, summary: Thread compilation through evaluation, rationale: Fail closed on diagnostics., span: {start_line: 141, end_line: 141}}
+  - {path: src/powdrr_lift/structrr/gate_compiler.py, type: modified, summary: Pass compilation to worklist, rationale: Preserve content-addressed decisions., span: {start_line: 154, end_line: 154}}
+  - {path: src/powdrr_lift/structrr/gate_compiler.py, type: modified, summary: Block compiler failures, rationale: Require complete obligations., span: {start_line: 163, end_line: 164}}
+  - {path: src/powdrr_lift/structrr/verification_obligations.py, type: added, summary: Add affected closure compiler, rationale: Produce the proof packet before implementation., span: {start_line: 1, end_line: 407}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Import verification inventory, rationale: Match exact provider selectors., span: {start_line: 56, end_line: 59}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Add provider registry, rationale: Keep adapters in Workrr., span: {start_line: 80, end_line: 82}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Store expanded inventory, rationale: Make selectors available to Structrr., span: {start_line: 250, end_line: 256}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Dispatch obligation compilation, rationale: Add the pre-implementation packet., span: {start_line: 399, end_line: 406}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Gate proposals with obligations, rationale: Block incomplete proof inputs., span: {start_line: 661, end_line: 661}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Return obligation packet, rationale: Persist fingerprints in review artifacts., span: {start_line: 682, end_line: 688}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Add endpoint compiler, rationale: Compile contracts and diagnostics before OpenCode., span: {start_line: 853, end_line: 983}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Revalidate obligation inputs, rationale: Reject stale proposal receipts., span: {start_line: 1207, end_line: 1207}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Pass obligations to OpenCode, rationale: Give proof requirements without evidence authority., span: {start_line: 1235, end_line: 1242}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Add obligation acceptance criteria, rationale: Align implementation units with contracts., span: {start_line: 1542, end_line: 1542}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Normalize contracts and inventory, rationale: Keep exact matching deterministic., span: {start_line: 1548, end_line: 1557}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Preserve required test cases, rationale: Keep executable contracts in proposals., span: {start_line: 2107, end_line: 2107}}
+  - {path: tests/test_active_intent.py, type: modified, summary: Test Structrr-only resolution, rationale: Prevent workflow intent stores., span: {start_line: 12, end_line: 40}}
+  - {path: tests/test_active_intent.py, type: modified, summary: Test baseline output, rationale: Lock down read-only ownership., span: {start_line: 42, end_line: 43}}
+  - {path: tests/test_active_intent.py, type: modified, summary: Test overlay behavior, rationale: Preserve proposal semantics., span: {start_line: 14, end_line: 14}}
+  - {path: tests/test_active_intent.py, type: modified, summary: Test baseline conflicts, rationale: Reject duplicate accepted intent., span: {start_line: 28, end_line: 28}}
+  - {path: tests/test_active_intent.py, type: modified, summary: Test overlay removal, rationale: Preserve explicit retirement., span: {start_line: 63, end_line: 63}}
+  - {path: tests/test_active_intent.py, type: modified, summary: Test section validation, rationale: Keep generated state valid., span: {start_line: 72, end_line: 72}}
+  - {path: tests/test_active_intent.py, type: modified, summary: Test conflict diagnostics, rationale: Ensure deterministic rejection., span: {start_line: 84, end_line: 91}}
+  - {path: tests/test_verification_obligations.py, type: added, summary: Test obligation closure and fingerprints, rationale: Prove fail-closed compilation., span: {start_line: 1, end_line: 182}}
+entities:
+  - id: verification-obligation-compiler
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: verification-obligations-are-content-addressed
+    action: added
+    description: Identical proof inputs produce identical obligation fingerprints.
+    rationale: Invalidate proof requirements when protected inputs change.
+  - id: missing-provider-selectors-block
+    action: added
+    description: A selected contract absent from exact provider inventory blocks implementation.
+    rationale: Prevent unverifiable implementation.
+  - id: committed-structrr-is-read-only
+    action: added
+    description: Active intent reads committed Structrr and proposal overlay without workflow intent files.
+    rationale: Preserve Structrr as the sole accepted intent source.
+guidance:
+  - id: keep-obligation-selection-mechanical
+    action: added
+    description: Do not delegate evidence selection or applicability to OpenCode.
+    rationale: Preserve forward-only development.
+proposed_prs: []

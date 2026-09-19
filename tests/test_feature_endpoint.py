@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 import pytest
+import yaml
 
 from powdrr_lift.cli import main
 from powdrr_lift.workrr.coding_agent import (
@@ -20,6 +21,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
+    _create_pr_changelog,
     _ensure_current_baseline,
     _load_implementation_plan,
     _plan_text_items,
@@ -120,6 +122,67 @@ def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None
     assert review["changed_paths"] == ["app.py"]
     assert review["validation_status"] == "failed"
     assert review["passed"] is False
+
+
+def test_create_pr_changelog_absorbs_and_removes_temporary_proposal(
+    tmp_path: Path,
+) -> None:
+    proposal = tmp_path / "docs" / "proposals" / "demo"
+    proposal.mkdir(parents=True)
+    (proposal / "structrr-diff.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema": "https://powdrr.io/schema/changelog-v2",
+                "change_id": "demo",
+                "title": "demo",
+                "intent": {"problem": "p", "goal": "g"},
+                "human-decisions": [{"id": "decision"}],
+                "entities": [{"id": "demo", "type": "Feature", "action": "added"}],
+                "entity_relationships": [],
+                "features": [{"id": "demo", "description": "g", "action": "added"}],
+                "invariants": [{"id": "invariant", "description": "i"}],
+                "guidance": [{"id": "guidance", "description": "g"}],
+                "acceptance_criteria": [{"id": "acceptance", "description": "a"}],
+                "proposed_prs": [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (proposal / "design-interview-input.json").write_text("{}\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        stdout = (
+            "src/app.py\n"
+            "docs/proposals/demo/structrr-diff.yaml\n"
+            "docs/proposals/demo/design-interview-input.json\n"
+            if command[:3] == ["git", "diff", "--name-only"]
+            else ""
+        )
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    path = _create_pr_changelog(
+        runner,
+        tmp_path,
+        "powdrr/demo",
+        "https://github.com/example/repo/pull/123",
+        FeatureEndpointConfig(
+            feature_description="g",
+            work_item_name="demo",
+            repo_root=tmp_path,
+            allowed_paths=("src/app.py",),
+            validation_command=("true",),
+        ),
+    )
+
+    assert path.exists()
+    assert not proposal.exists()
+    changelog = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert [item["path"] for item in changelog["files"]] == ["src/app.py"]
+    assert changelog["invariants"] == [{"id": "invariant", "description": "i"}]
+    assert sum(command[:2] == ["git", "push"] for command in calls) == 2
 
 
 def test_opencode_review_client_sends_prompt_to_read_only_opencode(

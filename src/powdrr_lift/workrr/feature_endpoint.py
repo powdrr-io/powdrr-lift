@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -333,7 +334,7 @@ def _execute_procedrr_flow(
             if not config.open_pr:
                 return None
             state["pull_request_url"] = _open_pull_request(
-                runner, worktree, feature_config, branch, state["plan_path"]
+                runner, worktree, feature_config, branch
             )
             return state["pull_request_url"]
         if name == "create_pr_changelog":
@@ -958,21 +959,41 @@ def _create_pr_changelog(
             f"Could not determine the pull request number from {pull_request_url!r}."
         )
     pr_number = match.group(1)
+    proposal_root = (
+        worktree / "docs" / "proposals" / slugify_workflow_id(config.work_item_name)
+    )
+    plan_path = proposal_root / "structrr-diff.yaml"
+    try:
+        plan = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PowdrrExecutionError(
+            f"could not read Structrr plan for changelog: {plan_path}: {error}"
+        ) from error
+    if not isinstance(plan, Mapping):
+        raise PowdrrExecutionError(f"Structrr plan is not a mapping: {plan_path}")
     path = worktree / "docs" / "changelogs" / f"PR-{pr_number}-changelog.yaml"
-    changed_paths = _git_output(
-        runner,
-        worktree,
-        ["git", "diff", "--name-only", f"origin/{config.base_branch}...HEAD"],
-    ).splitlines()
+    proposal_prefix = f"docs/proposals/{proposal_root.name}/"
+    changed_paths = [
+        changed_path
+        for changed_path in _git_output(
+            runner,
+            worktree,
+            ["git", "diff", "--name-only", f"origin/{config.base_branch}...HEAD"],
+        ).splitlines()
+        if not changed_path.startswith(proposal_prefix)
+    ]
     descriptor = {
         "schema": "https://powdrr.io/schema/changelog-v2",
         "change_id": f"PR-{pr_number}",
         "title": config.work_item_name,
-        "intent": {
-            "problem": "The requested product behavior is not yet available.",
-            "goal": config.feature_description,
-        },
-        "human-decisions": [],
+        "intent": plan.get(
+            "intent",
+            {
+                "problem": "The requested product behavior is not yet available.",
+                "goal": config.feature_description,
+            },
+        ),
+        "human-decisions": plan.get("human-decisions", []),
         "files": [
             {
                 "path": changed_path,
@@ -983,30 +1004,23 @@ def _create_pr_changelog(
             }
             for changed_path in changed_paths
         ],
-        "entities": [
-            {
-                "id": slugify_workflow_id(config.work_item_name),
-                "type": "Feature",
-                "action": "added",
-            }
-        ],
-        "entity_relationships": [],
-        "invariants": [],
-        "guidance": [],
-        "features": [
-            {
-                "id": slugify_workflow_id(config.work_item_name),
-                "description": config.feature_description,
-                "action": "added",
-            }
-        ],
-        "proposed_prs": [],
+        "entities": plan.get("entities", []),
+        "entity_relationships": plan.get("entity_relationships", []),
+        "invariants": plan.get("invariants", []),
+        "guidance": plan.get("guidance", []),
+        "features": plan.get("features", []),
+        "acceptance_criteria": plan.get("acceptance_criteria", []),
+        "proposed_prs": plan.get("proposed_prs", []),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(descriptor, sort_keys=False), encoding="utf-8")
     parse_change_log(path.read_text(encoding="utf-8"))
     _commit(runner, worktree, f"Add PR-{pr_number} changelog descriptor")
     _run(runner, worktree, ["git", "push", "origin", branch])
+    if proposal_root.exists():
+        shutil.rmtree(proposal_root)
+        _commit(runner, worktree, "Remove temporary feature planning artifacts")
+        _run(runner, worktree, ["git", "push", "origin", branch])
     return path
 
 
@@ -1029,8 +1043,6 @@ def _update_pull_request_description(
 ) -> None:
     body = (
         f"## Feature\n\n{config.feature_description}\n\n"
-        f"Structrr plan: `docs/proposals/{slugify_workflow_id(config.work_item_name)}"
-        "/structrr-diff.yaml`\n"
         f"PR changelog descriptor: `{changelog_relative_path}`\n"
         "Implemented by the bounded Workrr/OpenCode handoff and reviewed before commit."
     )
@@ -1046,11 +1058,9 @@ def _open_pull_request(
     worktree: Path,
     config: FeatureEndpointConfig,
     branch: str,
-    plan_path: Path,
 ) -> str:
     body = (
         f"## Feature\n\n{config.feature_description}\n\n"
-        f"Structrr plan: `{plan_path.relative_to(worktree)}`\n"
         "Implemented by the bounded Workrr/OpenCode handoff and reviewed before commit."
     )
     result = _run(

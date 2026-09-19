@@ -47,11 +47,25 @@ class PowdrrAgent(BaseInstalledAgent):
         except ImportError:
             return None
 
+        package = self._get_env("POWDRR_INSTALL_SPEC") or (
+            f"powdrr-lift=={POWDRR_VERSION}"
+        )
         return AgentInstallSpec(
             agent_name=self.name(),
             version=self.version(),
-            steps=[InstallStep(run="true")],
-            verification_command="true",
+            steps=[
+                InstallStep(
+                    run=(
+                        "python3 -m pip install --user --disable-pip-version-check "
+                        f"{shlex.quote(package)}"
+                    )
+                ),
+                InstallStep(
+                    run=f"npm install --global opencode-ai@{OPENCODE_VERSION}",
+                    user="root",
+                ),
+            ],
+            verification_command="powdrr-lift --help >/dev/null && opencode --version",
         )
 
     def network_allowlist(self) -> Any:
@@ -72,6 +86,10 @@ class PowdrrAgent(BaseInstalledAgent):
                 "pypi.org",
             ]
         )
+
+    def populate_context_post_run(self, context: AgentContext) -> None:
+        """Powdrr writes its own telemetry bundle; no extra context is needed."""
+        del context
 
     @property
     def remote_session_logs_dir(self) -> PurePosixPath:

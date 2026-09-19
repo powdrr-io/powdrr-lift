@@ -77,7 +77,7 @@ def test_append_and_replay_event_log(tmp_path: Path) -> None:
     assert replay_events(records).events[1].event_type == "message.updated"
 
 
-def test_run_opencode_resets_inactivity_timeout_on_streamed_events(
+def test_run_opencode_resets_inactivity_timeout_on_progress_events(
     tmp_path: Path,
 ) -> None:
     command = [
@@ -98,6 +98,24 @@ def test_run_opencode_resets_inactivity_timeout_on_streamed_events(
 
     assert result.returncode == 0
     assert len(result.stdout.splitlines()) == 2
+
+
+def test_run_opencode_does_not_reset_timeout_on_heartbeats(tmp_path: Path) -> None:
+    result = run_opencode(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys, time; "
+                '[print(\'{"type":"server.heartbeat"}\', flush=True) or '
+                "time.sleep(0.02) for _ in range(20)]"
+            ),
+        ],
+        log_path=tmp_path / "events.ndjson",
+        inactivity_timeout=0.05,
+    )
+
+    assert result.returncode == 124
 
 
 def test_run_opencode_times_out_when_no_activity_is_seen(tmp_path: Path) -> None:

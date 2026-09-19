@@ -193,10 +193,13 @@ def run_opencode(
     selector.register(process.stdout, selectors.EVENT_READ, process.stdout)
     output: list[bytes] = []
     pending = ""
-    last_activity = time.monotonic()
+    # Raw bytes are useful for diagnostics, but they are not proof that
+    # OpenCode is making progress.  In particular, heartbeats and other
+    # transport chatter must not keep a stalled session alive indefinitely.
+    last_progress = time.monotonic()
     timed_out = False
     while selector.get_map() or process.poll() is None:
-        remaining = inactivity_timeout - (time.monotonic() - last_activity)
+        remaining = inactivity_timeout - (time.monotonic() - last_progress)
         if remaining <= 0:
             timed_out = True
             try:
@@ -216,9 +219,6 @@ def run_opencode(
                 selector.unregister(stream)
                 continue
             output.append(chunk)
-            last_activity = time.monotonic()
-            if on_activity is not None:
-                on_activity()
             pending += chunk.decode("utf-8", errors="replace")
             lines = pending.splitlines(keepends=True)
             pending = (
@@ -228,9 +228,14 @@ def run_opencode(
                 payload = parse_event_line(line)
                 if payload is None:
                     continue
-                monitor.observe(payload, captured_at=last_activity)
+                captured_at = time.monotonic()
+                monitor.observe(payload, captured_at=captured_at)
                 if log_path is not None:
-                    append_event(log_path, payload, captured_at=last_activity)
+                    append_event(log_path, payload, captured_at=captured_at)
+                if monitor.events[-1].is_progress:
+                    last_progress = captured_at
+                    if on_activity is not None:
+                        on_activity()
                 if on_snapshot is not None:
                     on_snapshot(monitor.snapshot())
     selector.close()

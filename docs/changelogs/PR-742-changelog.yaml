@@ -1,0 +1,140 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 742
+title: Require complete executable verification contracts
+intent:
+  problem: The initial verification-contract model still accepted identifier-and-description-only required test cases, allowing unexecutable intent coverage to pass validation.
+  goal: Make every required test case an explicit executable verification contract and update affected fixtures so incomplete metadata fails immediately.
+human-decisions:
+  - id: require-complete-contracts
+    summary: Remove legacy compatibility and reject required test cases that omit executable verification metadata.
+  - id: preserve-test-intent
+    summary: Add complete contract metadata to fixtures whose tests are intended to exercise unrelated validation behavior.
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/verification_contract.py
+    type: modified
+    summary: Remove legacy detection and require all verification fields for completeness and serialization.
+    rationale: Prevent descriptive-only required test cases from being treated as valid verification requirements.
+    span: {start_line: 66, end_line: 85}
+    related:
+      entities: [verification-contract-model]
+      decisions: [require-complete-contracts]
+      invariants: [required-test-cases-are-executable]
+  - path: src/powdrr_lift/core/verification_contract.py
+    type: modified
+    summary: Make missing verification fields produce validation errors.
+    rationale: Fail closed when a contract lacks intent linkage or execution metadata.
+    span: {start_line: 68, end_line: 68}
+    related:
+      entities: [verification-contract-model]
+      invariants: [required-test-cases-are-executable]
+  - path: src/powdrr_lift/core/verification_contract.py
+    type: modified
+    summary: Serialize the complete contract field set without a legacy branch.
+    rationale: Keep fingerprints and downstream evidence based on one canonical contract shape.
+    span: {start_line: 122, end_line: 135}
+    related:
+      entities: [verification-contract-model]
+      decisions: [require-complete-contracts]
+  - path: src/powdrr_lift/core/verification_contract.py
+    type: modified
+    summary: Remove the legacy early return from contract validation.
+    rationale: Ensure metadata-free contracts report their required-field errors.
+    span: {start_line: 91, end_line: 92}
+    related:
+      entities: [verification-contract-model]
+      invariants: [required-test-cases-are-executable]
+  - path: src/powdrr_lift/execution/acceptance.py
+    type: modified
+    summary: Add complete verification metadata to the embedded final-acceptance test case.
+    rationale: Keep acceptance focused on delivery behavior while satisfying the mandatory contract schema.
+    span: {start_line: 969, end_line: 978}
+    related:
+      entities: [verification-contract-model]
+      decisions: [preserve-test-intent]
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Add complete verification metadata to PR specification fixtures.
+    rationale: Ensure each fixture reaches the validation behavior it intends to test under strict contracts.
+    span: {start_line: 185, end_line: 192}
+    related:
+      entities: [verification-contract-model]
+      decisions: [preserve-test-intent]
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Add complete verification metadata to invalid-specification fixtures.
+    rationale: Prevent missing contract fields from masking duplicate, boilerplate, description, and CLI validation assertions.
+    span: {start_line: 829, end_line: 836}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Add complete verification metadata to valid-specification fixtures.
+    rationale: Preserve successful PR specification coverage after legacy handling is removed.
+    span: {start_line: 898, end_line: 905}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Add complete verification metadata to template-boilerplate fixtures.
+    rationale: Keep the fixture failure scoped to template boilerplate.
+    span: {start_line: 1085, end_line: 1092}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Add complete verification metadata to missing-description fixtures.
+    rationale: Keep the fixture failure scoped to detail descriptions.
+    span: {start_line: 1141, end_line: 1148}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Add complete verification metadata to CLI validation fixtures.
+    rationale: Keep the CLI test focused on report rendering.
+    span: {start_line: 1200, end_line: 1207}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_verification_contract.py
+    type: modified
+    summary: Assert that a required test case without verification fields is invalid.
+    rationale: Lock down the removal of backward-compatible legacy handling.
+    span: {start_line: 27, end_line: 27}
+    related:
+      entities: [verification-contract-model]
+      decisions: [require-complete-contracts]
+      invariants: [required-test-cases-are-executable]
+  - path: tests/test_verification_contract.py
+    type: modified
+    summary: Replace the legacy compatibility test with required-field validation assertions.
+    rationale: Make incomplete contracts an explicit failure mode.
+    span: {start_line: 32, end_line: 32}
+    related:
+      entities: [verification-contract-model]
+      invariants: [required-test-cases-are-executable]
+  - path: tests/test_verification_contract.py
+    type: modified
+    summary: Remove the legacy assertion from the complete-contract test.
+    rationale: Keep the complete-contract test aligned with the strict model.
+    span: {start_line: 38, end_line: 38}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_verification_contract.py
+    type: modified
+    summary: Assert all required-field errors for a metadata-free test case.
+    rationale: Lock down fail-closed validation for incomplete contracts.
+    span: {start_line: 38, end_line: 45}
+    related:
+      entities: [verification-contract-model]
+      invariants: [required-test-cases-are-executable]
+entities:
+  - id: verification-contract-model
+    type: Module
+    action: modified
+entity_relationships: []
+invariants:
+  - id: required-test-cases-are-executable
+    action: added
+    description: Every required test case must provide intent_refs, provider, selector, profile, expectation, and status; descriptive-only entries are invalid.
+    rationale: Ensure declared intent coverage identifies an executable check.
+guidance:
+  - id: do-not-add-legacy-contract-fallbacks
+    action: added
+    description: New verification execution and evidence code must consume complete VerificationContract values and must not reintroduce a descriptive-only compatibility path.
+    rationale: Keep forward-only development strict at the verification boundary.
+features: []
+proposed_prs: []

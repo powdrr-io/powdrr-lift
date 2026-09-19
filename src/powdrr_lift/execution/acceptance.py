@@ -966,6 +966,16 @@ expected_tests:
 required_test_cases:
   - id: acceptance-case
     description: The proposed PR is validated before execution.
+    intent_refs: [acceptance-feature]
+    provider: pytest
+    selector: >-
+      tests/test_final_acceptance.py::test_final_acceptance_scenario_passes_without_an_llm
+    profile: repository-validation
+    expectation: pass
+    applicability:
+      mode: affected_closure
+    protected_inputs: [src/**, tests/**]
+    status: active
 expected_outcomes:
   - id: acceptance-outcome
     description: A typed execution plan can be compiled.

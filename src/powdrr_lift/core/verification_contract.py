@@ -64,32 +64,10 @@ class VerificationContract:
         )
 
     @property
-    def has_verification_fields(self) -> bool:
-        return any(
-            value is not None and value != ()
-            for value in (
-                self.intent_refs,
-                self.provider,
-                self.selector,
-                self.profile,
-                self.expectation,
-                self.applicability,
-                self.protected_inputs,
-                self.status,
-            )
-        )
-
-    @property
-    def is_legacy(self) -> bool:
-        return not self.has_verification_fields
-
-    @property
     def is_complete(self) -> bool:
-        return self.has_verification_fields and not self.validation_errors()
+        return not self.validation_errors()
 
     def validation_errors(self) -> tuple[str, ...]:
-        if self.is_legacy:
-            return ()
         errors: list[str] = []
         if not self.intent_refs:
             errors.append("intent_refs must contain at least one intent id")
@@ -141,21 +119,20 @@ class VerificationContract:
             "id": self.contract_id,
             "description": self.description,
         }
-        if self.has_verification_fields:
-            data.update(
-                {
-                    "intent_refs": list(self.intent_refs),
-                    "provider": self.provider,
-                    "selector": self.selector,
-                    "profile": self.profile,
-                    "expectation": self.expectation,
-                    "status": self.status,
-                }
-            )
-            if self.applicability is not None:
-                data["applicability"] = dict(self.applicability)
-            if self.protected_inputs:
-                data["protected_inputs"] = list(self.protected_inputs)
+        data.update(
+            {
+                "intent_refs": list(self.intent_refs),
+                "provider": self.provider,
+                "selector": self.selector,
+                "profile": self.profile,
+                "expectation": self.expectation,
+                "status": self.status,
+            }
+        )
+        if self.applicability is not None:
+            data["applicability"] = dict(self.applicability)
+        if self.protected_inputs:
+            data["protected_inputs"] = list(self.protected_inputs)
         return data
 
     @property

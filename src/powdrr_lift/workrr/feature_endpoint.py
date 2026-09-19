@@ -1017,7 +1017,13 @@ def review_feature_diff(
     )
     allowed = set(request.allowed_paths)
     out_of_scope = tuple(path for path in changed if path not in allowed)
-    diff_check = _run(runner, worktree, ["git", "diff", "--check"])
+    diff_check = runner(
+        ["git", "diff", "--check"],
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     passed = (
         attempt.status is CodingAgentStatus.COMPLETED
         and validation.status is ValidationReportStatus.PASSED

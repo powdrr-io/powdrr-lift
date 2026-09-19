@@ -27,6 +27,211 @@ class FakeLLM:
         }
 
 
+def test_transcript_records_ordered_step_execution_and_values() -> None:
+    calls: list[dict[str, Any]] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        calls.append(dict(parameters))
+        return parameters["value"]
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "order",
+            "steps": [
+                {
+                    "operation": {
+                        "tool": "a",
+                        "parameters": {"value": 1},
+                        "bind": "x",
+                    }
+                },
+                {
+                    "operation": {
+                        "tool": "b",
+                        "parameters": {"value": 2},
+                        "bind": "y",
+                    }
+                },
+                {"terminal": "succeeded"},
+            ],
+        }
+    )
+
+    assert [t.kind for t in result.transcript] == [
+        "operation",
+        "operation",
+        "terminal",
+    ]
+    assert [t.path for t in result.transcript] == [
+        "steps[0]",
+        "steps[1]",
+        "steps[2]",
+    ]
+    assert result.transcript[0].inputs["parameters"] == {"value": 1}
+    assert result.transcript[0].outputs["result"] == 1
+    assert result.transcript[0].outputs["bind"] == "x"
+    assert result.transcript[2].outputs["status"] == "succeeded"
+
+
+def test_transcript_captures_nested_loop_execution_in_order() -> None:
+    result = Evaluator(
+        FakeLLM(), lambda _tool, _parameters: {"ok": True}
+    ).evaluate(
+        {
+            "name": "loop",
+            "steps": [
+                {
+                    "for_each": {
+                        "snapshot": {"name": "codes", "max_items": 2},
+                        "item_binding": "code",
+                        "body": [
+                            {
+                                "operation": {
+                                    "tool": "check",
+                                    "parameters": {"code": "${code}"},
+                                    "bind": "res",
+                                }
+                            }
+                        ],
+                    }
+                },
+                {"terminal": "succeeded"},
+            ],
+        },
+        {"codes": [0, 1]},
+    )
+
+    assert [t.kind for t in result.transcript] == [
+        "operation",
+        "operation",
+        "for_each",
+        "terminal",
+    ]
+    assert [t.path for t in result.transcript] == [
+        "steps[0].for_each[0][0][0]",
+        "steps[0].for_each[0][1][0]",
+        "steps[0]",
+        "steps[1]",
+    ]
+    assert result.transcript[0].inputs["parameters"]["code"] == 0
+    assert result.transcript[1].inputs["parameters"]["code"] == 1
+
+
+def test_transcript_captures_judge_inputs_and_output() -> None:
+    llm = FakeLLM()
+    result = Evaluator(llm, lambda _tool, _parameters: None).evaluate(
+        {
+            "name": "judge-transcript",
+            "steps": [
+                {
+                    "judge": {
+                        "prompt_system": "Return JSON only.",
+                        "instructions": ["Keep it."],
+                        "question": "Edit requirements?",
+                        "context": ["feature_description"],
+                        "output": {
+                            "name": "edits",
+                            "schema": {
+                                "type": "object",
+                                "required": ["added", "deleted"],
+                            },
+                        },
+                    }
+                }
+            ],
+        },
+        {"feature_description": "Add a thing"},
+    )
+
+    entry = result.transcript[0]
+    assert entry.kind == "judge"
+    assert entry.path == "steps[0]"
+    assert entry.inputs["context"]["feature_description"] == "Add a thing"
+    assert entry.outputs["output"]["added"][0]["id"] == "req-1"
+
+
+def test_transcript_records_failed_gate_outcome() -> None:
+    result = Evaluator(FakeLLM(), lambda _tool, _parameters: True).evaluate(
+        {
+            "name": "fail",
+            "steps": [
+                {
+                    "attempt": {
+                        "id": "work",
+                        "max_attempts": 2,
+                        "body": [{"gate": {"subject": "ready", "equals": True}}],
+                        "on_failure": {"recovery": "repair", "resume": "work"},
+                    }
+                },
+                {"terminal": "succeeded"},
+            ],
+            "recoveries": {
+                "repair": {
+                    "steps": [
+                        {"operation": {"tool": "internal", "bind": "ready"}}
+                    ]
+                }
+            },
+        },
+        {"ready": False},
+    )
+
+    failed = [t for t in result.transcript if t.outcome == "failed"]
+    assert len(failed) == 1
+    assert failed[0].kind == "gate"
+    assert failed[0].path == "steps[0].attempt[1][0]"
+    assert all(t.outcome == "succeeded" for t in result.transcript if t is not failed[0])
+
+
+def test_transcript_records_nested_process_execution(tmp_path: Path) -> None:
+    (tmp_path / "inner.yaml").write_text(
+        """
+version: 1
+name: inner
+inputs: [{name: feature_description, type: string, required: true}]
+outputs: {receipt: {type: object, required: [feature]}}
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [record, "${feature_description}"]}
+      bind: receipt
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    document = {
+        "name": "outer",
+        "steps": [
+            {
+                "call": {
+                    "process": "inner",
+                    "inputs": {"feature_description": {"type": "reference", "value": "feature_description"}},
+                    "outputs": {"interview": "receipt"},
+                }
+            },
+            {"terminal": "succeeded"},
+        ],
+    }
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        return {"feature": parameters["command"][1]}
+
+    result = Evaluator(FakeLLM(), execute, process_directory=tmp_path).evaluate(
+        document, {"feature_description": "Add a greeting"}
+    )
+
+    assert [t.kind for t in result.transcript] == [
+        "operation",
+        "terminal",
+        "process",
+        "terminal",
+    ]
+    assert result.transcript[0].path == "steps[0].call[0]"
+    assert result.transcript[0].outputs["result"] == {"feature": "Add a greeting"}
+    assert result.transcript[2].kind == "process"
+    assert result.transcript[2].inputs["process"] == "inner"
+
+
 def test_evaluator_enforces_declared_operation_return_schema() -> None:
     from procedrr import parse_and_validate
 

@@ -318,13 +318,13 @@ class OpenCodeProvider:
         default_factory=OpenCodePermissionPolicy
     )
     model: str | None = None
+    diagnostics_root: Path | None = None
     provider_name: str = "opencode"
     session_id: str | None = field(default=None, init=False)
 
     def run(
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
     ) -> subprocess.CompletedProcess[str]:
-        del attempt_id
         environment = os.environ.copy()
         # Do not let a caller's activated environment point uv at another
         # checkout when the worker runs inside its own worktree.
@@ -349,7 +349,11 @@ class OpenCodeProvider:
         command.append(request.prompt)
         completed = run_opencode(
             command,
-            log_path=None,
+            log_path=(
+                self.diagnostics_root / f"{attempt_id}.ndjson"
+                if self.diagnostics_root is not None
+                else None
+            ),
             cwd=worktree_root,
             env=environment,
             inactivity_timeout=self.timeout_seconds,

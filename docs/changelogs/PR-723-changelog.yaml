@@ -1,0 +1,182 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 723
+title: Implement Structrr operations as single OpenCode tasks
+intent:
+  problem: The feature endpoint still gives OpenCode one aggregate implementation request, forcing a less capable worker to interpret the entire proposal at once and making task-level progress difficult to attribute.
+  goal: Compile one targeted OpenCode request per explicit Structrr operation, execute those requests sequentially with dependency order and shared preservation constraints, and keep repair requests separate from initial task decomposition.
+human-decisions:
+  - id: one-worker-request-per-structrr-operation
+    summary: Treat each explicit Structrr addition or removal as one independently prompted OpenCode implementation task.
+  - id: preserve-sequential-worktree-state
+    summary: Run operation tasks in deterministic order, allowing later tasks to see accepted earlier edits while retaining the original committed base.
+  - id: repair-is-not-replay
+    summary: Use one aggregate repair unit for validation or review repairs instead of replaying every original operation.
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import the proposal revision type used to compile operation-scoped worker units.
+    rationale: Connect the persisted Structrr proposal operations to the OpenCode execution boundary.
+    span:
+      start_line: 24
+      end_line: 24
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Derive operation-scoped units and proposal context before constructing the execution plan.
+    rationale: Make the worker plan reflect explicit Structrr operations instead of one undifferentiated feature task.
+    span:
+      start_line: 484
+      end_line: 497
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use the decomposed operation units in the execution plan.
+    rationale: Preserve typed plan identity while exposing individual tasks to the request compiler.
+    span:
+      start_line: 501
+      end_line: 501
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Retain the provider setup while moving request execution into the operation loop.
+    rationale: Preserve OpenCode configuration while enabling multiple bounded task requests.
+    span:
+      start_line: 503
+      end_line: 513
+    related:
+      decisions:
+        - preserve-sequential-worktree-state
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Select an aggregate repair unit or the ordered operation units for execution.
+    rationale: Keep repairs targeted without replaying initial operation requests.
+    span:
+      start_line: 526
+      end_line: 547
+    related:
+      decisions:
+        - repair-is-not-replay
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Create one persisted coding-agent runner for the operation sequence.
+    rationale: Share artifact storage while retaining one attempt record per task.
+    span:
+      start_line: 517
+      end_line: 517
+    related:
+      decisions:
+        - preserve-sequential-worktree-state
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Construct each targeted request and apply repair or prior-worktree policies.
+    rationale: Make each OpenCode invocation explicit about its selected operation and current state.
+    span:
+      start_line: 554
+      end_line: 557
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+        - repair-is-not-replay
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Run one OpenCode request per operation, persist each request, and stop on the first failed task.
+    rationale: Give weaker models smaller targeted prompts and make operation progress deterministic and auditable.
+    span:
+      start_line: 521
+      end_line: 592
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+        - preserve-sequential-worktree-state
+        - repair-is-not-replay
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Preserve the latest request and attempt in the existing Workrr state contract.
+    rationale: Keep validation and review gates compatible while exposing all operation attempts in the implementation result.
+    span:
+      start_line: 597
+      end_line: 597
+    related:
+      decisions:
+        - preserve-sequential-worktree-state
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Compile operation units and an aggregate repair unit with targeted required operations, dependencies, and source references.
+    rationale: Ensure each prompt contains only its selected operation while repairs can address the complete observed diff.
+    span:
+      start_line: 600
+      end_line: 703
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+        - repair-is-not-replay
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import the proposal compiler and operation-unit compiler for contract testing.
+    rationale: Test the decomposition at the Workrr-to-OpenCode boundary.
+    span:
+      start_line: 11
+      end_line: 11
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import the operation-unit compiler in the feature endpoint test module.
+    rationale: Verify that the production decomposition helper is directly covered.
+    span:
+      start_line: 27
+      end_line: 27
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Verify Structrr operations become sequential targeted worker units and prompts exclude sibling operations.
+    rationale: Prove the single-task prompt contract and dependency ordering.
+    span:
+      start_line: 293
+      end_line: 340
+    related:
+      decisions:
+        - one-worker-request-per-structrr-operation
+        - preserve-sequential-worktree-state
+entities:
+  - id: operation-scoped-opencode-task
+    type: Module
+    action: added
+  - id: sequential-worker-task-execution
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: worker-prompt-selects-one-operation
+    action: added
+    description: Each initial OpenCode request contains the required operation, shared preservation constraints, and explicit non-goals for exactly one Structrr operation.
+    rationale: Reduce model ambiguity and prevent sibling operations from leaking into the current task.
+  - id: operation-tasks-run-in-proposal-order
+    action: added
+    description: Operation requests run in deterministic proposal order, with each later task allowed to observe accepted earlier worktree edits.
+    rationale: Enable incremental implementation without losing a stable proposal base.
+  - id: failed-operation-stops-sequence
+    action: added
+    description: A failed or policy-denied operation prevents subsequent initial operation requests from running.
+    rationale: Do not compound an invalid intermediate state.
+  - id: repairs-do-not-replay-initial-tasks
+    action: added
+    description: Repair invocations use one aggregate repair unit rather than rerunning all initial operation prompts.
+    rationale: Target repair evidence without duplicating already completed work.
+guidance:
+  - id: prompt-opencode-with-smallest-intent-closure
+    action: added
+    description: Prefer the smallest Structrr operation-specific intent packet that fully explains the current task, while carrying shared preservation and non-goal constraints.
+    rationale: Improve instruction following for less sophisticated coding models.
+features: []
+proposed_prs: []

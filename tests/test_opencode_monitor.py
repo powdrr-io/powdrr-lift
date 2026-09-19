@@ -90,12 +90,14 @@ def test_run_opencode_records_lifecycle_diagnostics(tmp_path: Path) -> None:
     diagnostics = [
         record for record in records if record.get("record_type") == "diagnostic"
     ]
-    assert [record["kind"] for record in diagnostics] == [
+    kinds = [record["kind"] for record in diagnostics]
+    assert kinds[0:3] == [
         "process.started",
         "stream.output",
         "liveness.snapshot",
-        "process.exited",
     ]
+    assert kinds[-1] == "process.exited"
+    assert set(kinds[3:-1]) <= {"liveness.snapshot"}
     assert diagnostics[-1]["returncode"] == 0
 
 

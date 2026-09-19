@@ -36,6 +36,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointResult,
     review_feature_diff,
     run_feature_endpoint,
+    run_feature_in_place,
 )
 from powdrr_lift.workrr.loop import (
     WorkflowActionObservation,
@@ -109,6 +110,7 @@ __all__ = [
     "no_progress_feedback",
     "run_proposal_round",
     "review_feature_diff",
+    "run_feature_in_place",
     "run_feature_endpoint",
     "WorkflowExecutionController",
     "WorkflowExecutionObserver",

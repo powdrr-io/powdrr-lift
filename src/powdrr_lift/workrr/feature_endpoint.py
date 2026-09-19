@@ -71,6 +71,7 @@ class FeatureEndpointConfig:
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
     output_root: Path | None = None
     open_pr: bool = True
+    push_changes: bool = True
     planning_client: WorkflowLLMClient | None = None
 
 
@@ -148,6 +149,42 @@ def run_feature_endpoint(
         )
     except Exception:
         raise
+
+
+def run_feature_in_place(
+    config: FeatureEndpointConfig,
+    *,
+    runner: Runner = subprocess.run,
+) -> FeatureEndpointResult:
+    """Run the shared implement-feature flow in the caller's checkout.
+
+    This is the workspace policy used by sandboxed agent runners such as
+    Harbor.  The Procedrr flow remains identical to the pull-request endpoint;
+    only the Git lifecycle differs: no fetch, nested worktree, push, or PR.
+    The flow still commits the completed implementation to the current
+    checkout so the harness can collect it.
+    """
+    if not config.feature_description.strip():
+        raise ValueError("feature_description must not be empty")
+    if not config.allowed_paths:
+        raise ValueError("at least one allowed path is required")
+    root = config.repo_root.resolve()
+    slug = slugify_workflow_id(config.work_item_name)
+    output_root = (
+        config.output_root or root / ".powdrr" / "feature-runs" / slug
+    ).resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    _require_clean_root(root, runner)
+    branch = _git_output(runner, root, ["git", "branch", "--show-current"])
+    if not branch:
+        branch = "HEAD"
+    return _execute_procedrr_flow(
+        replace(config, open_pr=False, push_changes=False),
+        runner=runner,
+        worktree=root,
+        output_root=output_root,
+        branch=branch,
+    )
 
 
 def _execute_procedrr_flow(
@@ -362,7 +399,12 @@ def _execute_procedrr_flow(
                 ),
             )
             _commit(runner, worktree, f"Implement {work_item_name}")
-            _run(runner, worktree, ["git", "push", "--set-upstream", "origin", branch])
+            if config.push_changes:
+                _run(
+                    runner,
+                    worktree,
+                    ["git", "push", "--set-upstream", "origin", branch],
+                )
             if not config.open_pr:
                 return None
             state["pull_request_url"] = _open_pull_request(
@@ -370,9 +412,10 @@ def _execute_procedrr_flow(
             )
             return state["pull_request_url"]
         if name == "create_pr_changelog":
-            pull_request = _require_flow_text(parameters, "pull_request")
-            if not pull_request:
+            pull_request_value = parameters.get("pull_request")
+            if pull_request_value is None:
                 return None
+            pull_request = _require_flow_text(parameters, "pull_request")
             if Path(_require_flow_text(parameters, "plan")) != state["plan_path"]:
                 raise PowdrrExecutionError(
                     "changelog input plan does not match the planned diff"
@@ -1415,7 +1458,7 @@ def _require_clean_root(root: Path, runner: Runner) -> None:
 
 
 def _commit(runner: Runner, worktree: Path, message: str) -> None:
-    _run(runner, worktree, ["git", "add", "docs"])
+    _run(runner, worktree, ["git", "add", "-A"])
     _run(runner, worktree, ["git", "commit", "-am", message])
 
 
@@ -1576,5 +1619,6 @@ __all__ = [
     "FeatureEndpointConfig",
     "FeatureEndpointResult",
     "review_feature_diff",
+    "run_feature_in_place",
     "run_feature_endpoint",
 ]

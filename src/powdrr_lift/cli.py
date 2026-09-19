@@ -179,6 +179,7 @@ from powdrr_lift.workrr.error_analysis import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     run_feature_endpoint,
+    run_feature_in_place,
 )
 from powdrr_lift.workrr.feature_run import (
     DEFAULT_FEATURE_NAME,
@@ -1369,6 +1370,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workrr_feature_parser.add_argument("--json", action="store_true")
     workrr_feature_parser.set_defaults(func=_run_workrr_feature)
+
+    harbor_feature_parser = subparsers.add_parser(
+        "harbor-feature",
+        aliases=["harbor_feature"],
+        help=(
+            "Run the implement-feature Procedrr flow in the current sandbox "
+            "checkout and commit the result for Harbor to collect."
+        ),
+    )
+    harbor_feature_parser.add_argument("--feature-description", required=True)
+    harbor_feature_parser.add_argument("--work-item-name", required=True)
+    harbor_feature_parser.add_argument("--repo-root", type=Path)
+    harbor_feature_parser.add_argument(
+        "--allowed-path", action="append", dest="allowed_paths", default=["."]
+    )
+    harbor_feature_parser.add_argument("--validation-command")
+    harbor_feature_parser.add_argument("--opencode-executable", default="opencode")
+    harbor_feature_parser.add_argument(
+        "--opencode-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
+    harbor_feature_parser.add_argument(
+        "--planning-provider",
+        default="deepinfra-cheap",
+        choices=ALL_PROVIDERS,
+    )
+    harbor_feature_parser.add_argument("--planning-model")
+    harbor_feature_parser.add_argument("--planning-api-key")
+    harbor_feature_parser.add_argument("--planning-base-url")
+    harbor_feature_parser.add_argument("--output-root", type=Path)
+    harbor_feature_parser.add_argument("--json", action="store_true")
+    harbor_feature_parser.set_defaults(func=_run_harbor_feature)
 
     extract_responses_parser = subparsers.add_parser(
         "extract-workflow-responses",
@@ -4359,6 +4392,55 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
         if result.changelog_path:
             print(f"Changelog: {result.changelog_path}")
     return 0 if result.status in {"completed", "pr_opened"} else 1
+
+
+def _run_harbor_feature(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    planning_provider = resolve_workflow_provider(args.planning_provider)
+    planning_mapping = default_llm_mappings(planning_provider)["standard_reasoning"]
+    try:
+        planning_credentials = resolve_provider_credentials(
+            planning_mapping.provider,
+            args.planning_api_key,
+            args.planning_base_url,
+        )
+    except PowdrrExecutionError:
+        if args.planning_api_key or args.planning_base_url:
+            raise
+        planning_client = None
+    else:
+        planning_client = build_workflow_client(
+            planning_credentials,
+            model=args.planning_model or planning_mapping.model,
+            model_cache_dir=repo_root / ".powdrr" / "models",
+            progress_stream=sys.stderr,
+        )
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=args.feature_description,
+            work_item_name=args.work_item_name,
+            repo_root=repo_root,
+            allowed_paths=tuple(args.allowed_paths),
+            validation_command=(
+                tuple(shlex.split(args.validation_command))
+                if args.validation_command
+                else ()
+            ),
+            opencode_executable=args.opencode_executable,
+            opencode_model=args.opencode_model,
+            output_root=args.output_root,
+            open_pr=False,
+            push_changes=False,
+            planning_client=planning_client,
+        )
+    )
+    if args.json:
+        print(json.dumps(result.to_data(), indent=2, sort_keys=True))
+    else:
+        print(f"Harbor feature run {result.status}")
+        print(f"Worktree: {result.worktree}")
+        print(f"Review passed: {result.review['passed']}")
+    return 0 if result.status == "completed" else 1
 
 
 def _extract_workflow_responses(args: argparse.Namespace) -> int:

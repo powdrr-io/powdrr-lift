@@ -5,9 +5,11 @@ from __future__ import annotations
 import shlex
 from pathlib import PurePosixPath
 
-from harbor.agents.installed.base import BaseInstalledAgent
-from harbor.environments.base import BaseEnvironment
-from harbor.models.agent.context import AgentContext
+from harbor.agents.installed.base import (  # type: ignore[import-not-found]
+    BaseInstalledAgent,
+)
+from harbor.environments.base import BaseEnvironment  # type: ignore[import-not-found]
+from harbor.models.agent.context import AgentContext  # type: ignore[import-not-found]
 
 POWDRR_VERSION = "0.1.0"
 OPENCODE_VERSION = "1.18.31"

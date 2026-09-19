@@ -42,7 +42,9 @@ from powdrr_lift.workrr.feature_endpoint import (
     _operation_checkpoint,
     _plan_text_items,
     _proposal_execution_units,
+    _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
+    _write_structrr_plan,
     review_feature_diff,
     run_feature_in_place,
 )
@@ -231,6 +233,39 @@ def test_compile_feature_obligations_binds_sentence_trace_to_plan(
     assert json.loads(
         (output_root / "feature-obligations.json").read_text(encoding="utf-8")
     )["plan"] == str(plan)
+
+
+def test_update_plan_from_sentence_trace_adds_missing_requirement(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="traceability-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+    state: dict[str, Any] = {"plan_path": plan}
+
+    result = _update_plan_from_sentence_trace(
+        {
+            "plan": str(plan),
+            "sentences": [{"id": "sentence-1", "text": "It works."}],
+            "requirement_decisions": [{"required": True}],
+            "reflection_decisions": [{"reflected": False}],
+        },
+        state=state,
+    )
+
+    assert result == {"path": str(plan), "updated": 1}
+    document = yaml.safe_load(plan.read_text(encoding="utf-8"))
+    assert {item["id"] for item in document["acceptance_criteria"]} >= {
+        "trace-sentence-1"
+    }
 
 
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:

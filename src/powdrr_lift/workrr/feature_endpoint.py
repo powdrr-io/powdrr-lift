@@ -378,6 +378,8 @@ def _execute_procedrr_flow(
                 output_root=output_root,
                 state=state,
             )
+        if name == "update_plan_from_sentence_trace":
+            return _update_plan_from_sentence_trace(parameters, state=state)
         if name == "run_opencode":
             return _run_opencode_phase(
                 config,
@@ -744,7 +746,7 @@ def _compile_feature_obligations(
 
     obligations: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for index, (sentence, requirement, reflection) in enumerate(
+    for index, (sentence, requirement, _reflection) in enumerate(
         zip(sentences, requirement_decisions, reflection_decisions, strict=True),
         start=1,
     ):
@@ -756,10 +758,6 @@ def _compile_feature_obligations(
             raise PowdrrExecutionError("feature sentence is missing id or text")
         if not _decision_value(requirement, "required"):
             continue
-        if not _decision_value(reflection, "reflected"):
-            raise PowdrrExecutionError(
-                f"feature requirement is missing from plan: {sentence_text}"
-            )
         identifier = sentence_id or f"sentence-{index}"
         if identifier in seen_ids:
             raise PowdrrExecutionError("feature sentence identifiers are duplicated")
@@ -792,6 +790,69 @@ def _compile_feature_obligations(
     state["feature_obligations"] = tuple(item["description"] for item in obligations)
     state["feature_obligations_path"] = path
     return {"path": str(path), "obligations": obligations}
+
+
+def _update_plan_from_sentence_trace(
+    parameters: Mapping[str, Any], *, state: dict[str, Any]
+) -> dict[str, Any]:
+    """Make every required but unreflected sentence explicit in the plan."""
+    plan = _require_flow_text(parameters, "plan")
+    if Path(plan) != state.get("plan_path"):
+        raise PowdrrExecutionError("plan repair does not match the planned diff")
+    sentences = parameters.get("sentences")
+    requirement_decisions = parameters.get("requirement_decisions")
+    reflection_decisions = parameters.get("reflection_decisions")
+    if not isinstance(sentences, list):
+        raise PowdrrExecutionError("feature sentences must be a list")
+    if not isinstance(requirement_decisions, list) or not isinstance(
+        reflection_decisions, list
+    ):
+        raise PowdrrExecutionError("sentence decisions must be lists")
+    if len(sentences) != len(requirement_decisions) or len(sentences) != len(
+        reflection_decisions
+    ):
+        raise PowdrrExecutionError("sentence decision counts do not match")
+
+    path = Path(plan)
+    document = _load_yaml_mapping(path)
+    raw_criteria = document.get("acceptance_criteria")
+    criteria = list(raw_criteria) if isinstance(raw_criteria, list) else []
+    existing_ids = {
+        str(item.get("id"))
+        for item in criteria
+        if isinstance(item, Mapping) and item.get("id")
+    }
+    updated = 0
+    for sentence, requirement, reflection in zip(
+        sentences, requirement_decisions, reflection_decisions, strict=True
+    ):
+        if not _decision_value(requirement, "required") or _decision_value(
+            reflection, "reflected"
+        ):
+            continue
+        if not isinstance(sentence, Mapping):
+            raise PowdrrExecutionError("feature sentence is malformed")
+        sentence_id = sentence.get("id")
+        sentence_text = sentence.get("text")
+        if not isinstance(sentence_id, str) or not isinstance(sentence_text, str):
+            raise PowdrrExecutionError("feature sentence is missing id or text")
+        criterion_id = f"trace-{sentence_id}"
+        if criterion_id in existing_ids:
+            continue
+        criteria.append(
+            {
+                "id": criterion_id,
+                "description": sentence_text.strip(),
+            }
+        )
+        existing_ids.add(criterion_id)
+        updated += 1
+    if updated:
+        repaired = dict(document)
+        repaired["acceptance_criteria"] = criteria
+        path.write_text(yaml.safe_dump(repaired, sort_keys=False), encoding="utf-8")
+        parse_change_log(path.read_text(encoding="utf-8"))
+    return {"path": str(path), "updated": updated}
 
 
 def _decompose_feature_description(feature_description: str) -> list[dict[str, str]]:

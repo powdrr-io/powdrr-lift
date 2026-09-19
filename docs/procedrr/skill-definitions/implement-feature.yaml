@@ -103,6 +103,21 @@ steps:
             validation: {kind: json_schema}
   - operation:
       tool: internal
+      command: [update_plan_from_sentence_trace]
+      parameters:
+        plan: {type: reference, value: plan.path}
+        sentences: {type: reference, value: feature_sentences}
+        requirement_decisions: {type: reference, value: requirement_decisions}
+        reflection_decisions: {type: reference, value: reflection_decisions}
+      returns:
+        type: object
+        required: [path, updated]
+        properties:
+          path: {type: string, minLength: 1}
+          updated: {type: integer, minimum: 0}
+      bind: plan_update
+  - operation:
+      tool: internal
       command: [compile_feature_obligations]
       parameters:
         feature_description: {type: reference, value: feature_description}

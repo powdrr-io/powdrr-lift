@@ -3,12 +3,12 @@ change_id: 741
 title: Add executable verification contracts for feature intent
 intent:
   problem: Required test cases only carried identifiers and descriptions, so feature intent was not connected to a provider, executable selector, validation profile, or explicit expected result.
-  goal: Define a provider-neutral verification contract that links required checks to active intent, validates contract completeness, preserves legacy entries during migration, and teaches feature and PR planning to emit the contract shape.
+  goal: Define a provider-neutral verification contract that links required checks to active intent, validates contract completeness, and teaches feature and PR planning to emit the contract shape.
 human-decisions:
   - id: extend-required-test-cases-model
     summary: Extend required test cases with intent references, execution metadata, applicability, protected inputs, and lifecycle status.
-  - id: legacy-contracts-remain-readable
-    summary: Keep existing identifier-and-description test cases parseable while marking them incomplete until verification metadata is supplied.
+  - id: contracts-are-required
+    summary: Require every required test case to declare complete verification metadata; identifier-and-description-only entries are invalid.
   - id: contracts-fingerprint-semantic-fields
     summary: Derive a stable content fingerprint from the versioned contract schema and normalized contract data.
 structured_files: []
@@ -64,21 +64,18 @@ files:
       entities: [verification-contract-model]
       invariants:
         - executable-contracts-are-validated
-        - legacy-contracts-are-explicitly-incomplete
   - path: src/powdrr_lift/core/verification_contract.py
     type: added
     summary: Add the provider-neutral verification contract model, validation, normalization, and fingerprinting.
     rationale: Give Workrr and later verification phases a stable executable representation of feature intent checks.
-    span: {start_line: 1, end_line: 199}
+    span: {start_line: 1, end_line: 176}
     related:
       entities: [verification-contract-model]
       decisions:
         - extend-required-test-cases-model
-        - legacy-contracts-remain-readable
         - contracts-fingerprint-semantic-fields
       invariants:
         - executable-contracts-are-validated
-        - legacy-contracts-are-explicitly-incomplete
         - verification-contract-fingerprint-is-stable
   - path: tests/test_feature_planning_specification.py
     type: modified
@@ -94,23 +91,84 @@ files:
     related: {entities: [verification-contract-model]}
   - path: tests/test_pr_specification.py
     type: added
-    summary: Test complete verification contracts and incomplete contract diagnostics in PR specifications.
-    rationale: Lock down acceptance of executable contracts and fail-closed validation of partial migrations.
+    summary: Test complete verification contracts and reject incomplete contract specifications.
+    rationale: Lock down acceptance of executable contracts and fail-closed validation of missing metadata.
     span: {start_line: 44, end_line: 100}
     related:
       entities: [verification-contract-model]
-      invariants: [executable-contracts-are-validated, legacy-contracts-are-explicitly-incomplete]
+      invariants: [executable-contracts-are-validated]
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Update generated specification fixtures to provide complete verification contracts.
+    rationale: Keep repository validation tests aligned with the mandatory contract schema.
+    span: {start_line: 185, end_line: 192}
+    related:
+      entities: [verification-contract-model]
+      invariants: [executable-contracts-are-validated]
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Update invalid-specification fixtures to provide valid verification metadata before testing their intended errors.
+    rationale: Ensure each test isolates its target validation failure rather than failing on missing contract fields.
+    span: {start_line: 829, end_line: 836}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Update valid-specification fixtures with complete verification metadata.
+    rationale: Keep successful PR specification tests valid under mandatory contract validation.
+    span: {start_line: 898, end_line: 905}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Update template-boilerplate fixtures with complete verification metadata.
+    rationale: Preserve the test's intended boilerplate assertion.
+    span: {start_line: 1085, end_line: 1092}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Update missing-description fixtures with complete verification metadata.
+    rationale: Preserve the test's intended detail-description assertion.
+    span: {start_line: 1141, end_line: 1148}
+    related: {entities: [verification-contract-model]}
+  - path: tests/test_pr_specification.py
+    type: modified
+    summary: Update CLI validation fixtures with complete verification metadata.
+    rationale: Keep the CLI validation test focused on report rendering.
+    span: {start_line: 1200, end_line: 1207}
+    related: {entities: [verification-contract-model]}
   - path: tests/test_verification_contract.py
     type: added
-    summary: Test contract round-tripping, stable fingerprints, legacy compatibility, required fields, enum validation, and malformed collections.
+    summary: Test contract round-tripping, stable fingerprints, required fields, enum validation, and malformed collections.
     rationale: Protect the contract model's migration and validation behavior before execution support is added.
-    span: {start_line: 1, end_line: 75}
+    span: {start_line: 1, end_line: 80}
     related:
       entities: [verification-contract-model]
       invariants:
         - executable-contracts-are-validated
-        - legacy-contracts-are-explicitly-incomplete
         - verification-contract-fingerprint-is-stable
+  - path: src/powdrr_lift/execution/acceptance.py
+    type: modified
+    summary: Make the final acceptance scenario's embedded required test case a complete verification contract.
+    rationale: Keep the no-LLM acceptance path valid when incomplete required test cases are rejected.
+    span: {start_line: 969, end_line: 977}
+    related:
+      entities: [verification-contract-model]
+      invariants: [executable-contracts-are-validated]
+  - path: docs/proposals/PR-47/proposed-pr-specification.yaml
+    type: modified
+    summary: Add executable verification metadata to the historical required test cases.
+    rationale: Keep the checked-in proposed PR valid under mandatory contract validation.
+    span: {start_line: 24, end_line: 61}
+    related:
+      entities: [verification-contract-model]
+      invariants: [executable-contracts-are-validated]
+  - path: docs/current/required-test-cases/feature-pr-specification.yaml
+    type: modified
+    summary: Add executable verification metadata to the current required test case inventory.
+    rationale: Make the repository's canonical required test cases actionable rather than descriptive only.
+    span: {start_line: 204, end_line: 241}
+    related:
+      entities: [verification-contract-model]
+      invariants: [executable-contracts-are-validated]
 entities:
   - id: verification-contract-model
     type: Module
@@ -119,12 +177,8 @@ entity_relationships: []
 invariants:
   - id: executable-contracts-are-validated
     action: added
-    description: A non-legacy required test case must declare at least one intent reference, provider, selector, profile, supported expectation, and supported lifecycle status; malformed collection fields and unknown fields are rejected.
+    description: Every required test case must declare at least one intent reference, provider, selector, profile, supported expectation, and supported lifecycle status; malformed collection fields and unknown fields are rejected.
     rationale: Make every newly authored verification requirement structurally actionable and unambiguous.
-  - id: legacy-contracts-are-explicitly-incomplete
-    action: added
-    description: Identifier-and-description-only required test cases remain parseable for migration but are not considered complete verification contracts.
-    rationale: Preserve existing documents without allowing legacy entries to claim executable intent coverage.
   - id: verification-contract-fingerprint-is-stable
     action: added
     description: A contract fingerprint is content-addressed by the versioned schema and normalized contract data, so semantic contract changes produce a different fingerprint.
@@ -134,9 +188,9 @@ guidance:
     action: added
     description: Later execution and evidence phases should resolve required test cases through VerificationContract and use intent_refs, selector, profile, expectation, applicability, and protected_inputs rather than inventing parallel metadata.
     rationale: Keep intent-to-test traceability on one provider-neutral contract boundary.
-  - id: migrate-legacy-required-tests
+  - id: author-complete-verification-contracts
     action: added
-    description: New feature and PR specifications should emit complete verification contracts; existing legacy entries should be upgraded before they are treated as executable intent evidence.
-    rationale: Allow incremental adoption without silently weakening verification claims.
+    description: Every feature and PR specification must emit complete verification contracts; a required test case without execution metadata must be repaired before validation can succeed.
+    rationale: Prevent intent coverage from being claimed without an executable check.
 features: []
 proposed_prs: []

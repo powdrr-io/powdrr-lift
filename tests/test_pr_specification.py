@@ -182,6 +182,14 @@ def _write_proposed_pr_specification(
         required_test_cases:
           - id: rtc-{pr_number}
             description: Required test case {pr_number}.
+            intent_refs: [intent.feature]
+            provider: pytest
+            selector: tests/test_feature.py::test_feature
+            profile: feature-validation
+            expectation: pass
+            applicability: {{mode: affected_closure}}
+            protected_inputs: [src/**]
+            status: active
         expected_outcomes:
           - id: outcome-{pr_number}
             description: Expected outcome {pr_number}.
@@ -818,6 +826,14 @@ def test_validate_pr_specification_reports_errors(tmp_path: Path) -> None:
     required_test_cases:
       - id: rtc-1
         description: Required test case one.
+        intent_refs: [intent.feature]
+        provider: pytest
+        selector: tests/test_feature.py::test_feature
+        profile: feature-validation
+        expectation: pass
+        applicability: {mode: affected_closure}
+        protected_inputs: [src/**]
+        status: active
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -879,6 +895,14 @@ def test_validate_pr_specification_reports_success_for_valid_spec(
     required_test_cases:
       - id: rtc-1
         description: Required test case one.
+        intent_refs: [intent.feature]
+        provider: pytest
+        selector: tests/test_feature.py::test_feature
+        profile: feature-validation
+        expectation: pass
+        applicability: {mode: affected_closure}
+        protected_inputs: [src/**]
+        status: active
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -1058,6 +1082,14 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     required_test_cases:
       - id: rtc-1
         description: Required test case one.
+        intent_refs: [intent.feature]
+        provider: pytest
+        selector: tests/test_feature.py::test_feature
+        profile: feature-validation
+        expectation: pass
+        applicability: {mode: affected_closure}
+        protected_inputs: [src/**]
+        status: active
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -1106,6 +1138,14 @@ def test_validate_pr_specification_rejects_missing_detail_description(
     required_test_cases:
       - id: rtc-1
         description: Required test case one.
+        intent_refs: [intent.feature]
+        provider: pytest
+        selector: tests/test_feature.py::test_feature
+        profile: feature-validation
+        expectation: pass
+        applicability: {mode: affected_closure}
+        protected_inputs: [src/**]
+        status: active
     expected_outcomes:
       - id: outcome-1
         description: Expected outcome one.
@@ -1157,6 +1197,14 @@ def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
         required_test_cases:
           - id: rtc-1
             description: Required test case one.
+            intent_refs: [intent.feature]
+            provider: pytest
+            selector: tests/test_feature.py::test_feature
+            profile: feature-validation
+            expectation: pass
+            applicability: {mode: affected_closure}
+            protected_inputs: [src/**]
+            status: active
         expected_outcomes:
           - id: outcome-1
             description: Expected outcome one.

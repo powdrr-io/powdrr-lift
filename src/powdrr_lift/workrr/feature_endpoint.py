@@ -14,6 +14,11 @@ from typing import Any
 import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
+from powdrr_lift.core.decision_obligation import (
+    DecisionOutcome,
+    DecisionResult,
+    DecisionWorklist,
+)
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
@@ -24,10 +29,21 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_sections,
 )
+from powdrr_lift.structrr.gate_compiler import (
+    compile_proposal_worklist,
+    evaluate_structural_proposal_gate,
+)
+from powdrr_lift.structrr.intent import IntentStore
 from powdrr_lift.structrr.proposal import (
     ProposalRevision,
     compile_proposal_revision,
+    load_proposal_revision,
     validate_proposal_revision,
+)
+from powdrr_lift.structrr.proposal_review import (
+    ProposalReviewReceipt,
+    load_review_receipt,
+    write_review_receipt,
 )
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
@@ -50,7 +66,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationRunner,
 )
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
-from powdrr_lift.workrr.procedrr import OpenCodeReviewClient, WorkrrProcedrrClient
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
@@ -285,6 +301,24 @@ def _execute_procedrr_flow(
             )
             _commit(runner, worktree, "Record Structrr feature diff")
             return {"path": str(state["plan_path"])}
+        if name == "prepare_proposal_review":
+            return _prepare_proposal_review(
+                config,
+                runner=runner,
+                worktree=worktree,
+                output_root=output_root,
+                slug=slug,
+                state=state,
+                parameters=parameters,
+            )
+        if name == "finalize_proposal_review":
+            review = _finalize_proposal_review(
+                worktree=worktree,
+                output_root=output_root,
+                parameters=parameters,
+            )
+            state["proposal_review_receipt_path"] = review["receipt_path"]
+            return review
         if name == "run_opencode":
             return _run_opencode_phase(
                 config,
@@ -419,17 +453,6 @@ def _execute_procedrr_flow(
             ),
             execute,
             process_directory=worktree / "docs" / "procedrr" / "skill-definitions",
-            judge_clients={
-                "opencode": WorkrrProcedrrClient(
-                    OpenCodeReviewClient(
-                        executable=config.opencode_executable,
-                        model=config.opencode_model,
-                        worktree=worktree,
-                        runner=runner,
-                    ),
-                    skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
-                )
-            },
         )
         evaluator.evaluate(
             flow,
@@ -446,6 +469,156 @@ def _execute_procedrr_flow(
         worktree,
         "pr_opened" if state.get("pull_request_url") else "completed",
     )
+
+
+def _prepare_proposal_review(
+    config: FeatureEndpointConfig,
+    *,
+    runner: Runner,
+    worktree: Path,
+    output_root: Path,
+    slug: str,
+    state: dict[str, Any],
+    parameters: Mapping[str, Any],
+) -> dict[str, Any]:
+    baseline_path = Path(_require_flow_text(parameters, "baseline"))
+    plan_path = Path(_require_flow_text(parameters, "plan"))
+    if baseline_path != state["baseline_path"] or plan_path != state["plan_path"]:
+        raise PowdrrExecutionError("proposal review inputs do not match plan state")
+    feature_description = _require_flow_text(parameters, "feature_description")
+    (
+        _planned_additions,
+        _planned_deletions,
+        acceptance_criteria,
+        must_preserve,
+        non_goals,
+    ) = _load_implementation_plan(plan_path, feature_description)
+    baseline_document = _load_yaml_mapping(baseline_path)
+    plan_document = _load_yaml_mapping(plan_path)
+    procedrr_path = (
+        worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
+    )
+    source_refs = (
+        f"structrr:{baseline_path.relative_to(worktree)}",
+        f"structrr-diff:{plan_path.relative_to(worktree)}",
+        f"procedrr:{procedrr_path.relative_to(worktree)}",
+    )
+    proposal = compile_proposal_revision(
+        slug,
+        baseline_document,
+        plan_document,
+        acceptance_criteria=acceptance_criteria,
+        must_preserve=must_preserve,
+        non_goals=non_goals,
+        allowed_paths=config.allowed_paths,
+        source_refs=source_refs,
+    )
+    proposal_path = plan_path.parent / "proposal-revision.json"
+    if proposal_path.exists():
+        try:
+            validate_proposal_revision(proposal_path, proposal)
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"current Structrr inputs no longer match {proposal_path}: {error}"
+            ) from error
+    else:
+        proposal_path.write_text(
+            json.dumps(proposal.to_data(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        _commit(runner, worktree, "Record proposal revision")
+    active_intent_clauses = IntentStore(worktree).list()
+    active_intent_clause_ids = tuple(
+        clause.clause_id for clause in active_intent_clauses
+    )
+    worklist, structural_failures = evaluate_structural_proposal_gate(
+        proposal, active_intent_clause_ids=active_intent_clause_ids
+    )
+    if structural_failures:
+        raise PowdrrExecutionError(
+            "proposal failed deterministic structural review: "
+            + "; ".join(structural_failures)
+        )
+    worklist_path = output_root / "proposal-review-worklist.json"
+    worklist_path.write_text(
+        json.dumps(worklist.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    state["proposal_revision"] = proposal
+    state["proposal_worklist"] = worklist
+    state["active_intent_clause_ids"] = active_intent_clause_ids
+    return {
+        "proposal_revision_path": str(proposal_path),
+        "proposal_fingerprint": proposal.fingerprint,
+        "worklist_path": str(worklist_path),
+        "worklist": worklist.to_data(),
+        "active_intent_clauses": [clause.to_data() for clause in active_intent_clauses],
+    }
+
+
+def _finalize_proposal_review(
+    *, worktree: Path, output_root: Path, parameters: Mapping[str, Any]
+) -> dict[str, Any]:
+    proposal_path = Path(_require_flow_text(parameters, "proposal_revision_path"))
+    worklist_path = Path(_require_flow_text(parameters, "worklist_path"))
+    raw_decisions = parameters.get("decisions")
+    if not isinstance(raw_decisions, list) or not all(
+        isinstance(item, Mapping) for item in raw_decisions
+    ):
+        raise PowdrrExecutionError(
+            "proposal review decisions must be a list of objects"
+        )
+    proposal = load_proposal_revision(proposal_path)
+    worklist = DecisionWorklist.from_data(
+        json.loads(worklist_path.read_text(encoding="utf-8"))
+    )
+    _validate_review_evidence_sources(worktree, proposal, worklist)
+    decisions = tuple(DecisionResult.from_data(item) for item in raw_decisions)
+    receipt = ProposalReviewReceipt(
+        proposal_fingerprint=proposal.fingerprint,
+        worklist_fingerprint=worklist.fingerprint,
+        decision_results=decisions,
+        accepted=all(item.outcome is DecisionOutcome.PASS for item in decisions)
+        and len(decisions) == len(worklist.specifications),
+    )
+    receipt.assert_current(proposal, worklist)
+    receipt_path = output_root / "proposal-review-receipt.json"
+    write_review_receipt(receipt_path, receipt)
+    return {
+        "accepted": receipt.accepted,
+        "receipt_path": str(receipt_path),
+        "proposal_fingerprint": receipt.proposal_fingerprint,
+        "worklist_fingerprint": receipt.worklist_fingerprint,
+    }
+
+
+def _validate_review_evidence_sources(
+    worktree: Path, proposal: ProposalRevision, worklist: DecisionWorklist
+) -> None:
+    active_intent_refs = {
+        f"intent:{clause.clause_id}" for clause in IntentStore(worktree).list()
+    }
+    known_refs = {"proposal", "baseline", "plan", *proposal.source_refs}
+    known_refs.update(active_intent_refs)
+    required_refs = {
+        reference
+        for specification in worklist.specifications
+        for reference in specification.evidence_requirements
+    }
+    unknown_refs = sorted(required_refs - known_refs)
+    if unknown_refs:
+        raise PowdrrExecutionError(
+            "proposal review requires unknown evidence references: "
+            + ", ".join(unknown_refs)
+        )
+    for source_ref in proposal.source_refs:
+        prefix, separator, relative_path = source_ref.partition(":")
+        if prefix not in {"structrr", "structrr-diff", "procedrr"} or not separator:
+            continue
+        if not (worktree / relative_path).exists():
+            raise PowdrrExecutionError(
+                f"proposal review evidence source does not exist: {source_ref}"
+            )
 
 
 def _run_opencode_phase(
@@ -508,6 +681,32 @@ def _run_opencode_phase(
                 "current Structrr inputs no longer match the persisted proposal "
                 f"revision at {proposal_revision_path}: {error}"
             ) from error
+    review_path_value = parameters.get("proposal_review_receipt") or state.get(
+        "proposal_review_receipt_path"
+    )
+    if not isinstance(review_path_value, str) or not review_path_value.strip():
+        raise PowdrrExecutionError(
+            "OpenCode is blocked until proposal review produces an accepted receipt"
+        )
+    try:
+        review_receipt = load_review_receipt(Path(review_path_value))
+        active_intent_clause_ids = tuple(
+            clause.clause_id for clause in IntentStore(worktree).list()
+        )
+        review_worklist = compile_proposal_worklist(
+            proposal_revision,
+            active_intent_clause_ids=active_intent_clause_ids,
+        )
+        review_receipt.assert_current(proposal_revision, review_worklist)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        raise PowdrrExecutionError(
+            "proposal review receipt is missing, stale, or invalid: "
+            f"{review_path_value}: {error}"
+        ) from error
+    if not review_receipt.accepted:
+        raise PowdrrExecutionError(
+            "OpenCode is blocked because proposal review did not pass"
+        )
     base_commit = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
     proposal_source = f"proposal:{proposal_revision_path.relative_to(worktree)}"
     source_context = (*source_refs, proposal_source)

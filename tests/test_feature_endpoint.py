@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import subprocess
 from contextlib import redirect_stdout
 from dataclasses import replace
@@ -11,8 +12,14 @@ import pytest
 import yaml
 
 from powdrr_lift.cli import main
+from powdrr_lift.core.decision_obligation import (
+    DecisionOutcome,
+    DecisionResult,
+    evidence_fingerprint,
+)
 from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
+from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
@@ -28,6 +35,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointResult,
     _create_pr_changelog,
     _ensure_current_baseline,
+    _finalize_proposal_review,
     _load_implementation_plan,
     _operation_checkpoint,
     _plan_text_items,
@@ -494,6 +502,66 @@ def test_plan_acceptance_criteria_have_stable_ids() -> None:
             "description": "Record every step.",
         }
     ]
+
+
+def test_finalize_proposal_review_writes_only_complete_matching_receipts(
+    tmp_path: Path,
+) -> None:
+    proposal = compile_proposal_revision(
+        "adapter",
+        {"entities": []},
+        {
+            "features": [
+                {
+                    "id": "parse",
+                    "action": "added",
+                    "intent_effect": "add parser behavior",
+                }
+            ]
+        },
+        acceptance_criteria=("Parse input.",),
+        must_preserve=("Keep the API stable.",),
+        non_goals=("Do not redesign transport.",),
+        allowed_paths=("src",),
+        source_refs=("structrr:baseline.yaml",),
+    )
+    worklist = compile_proposal_worklist(proposal)
+    proposal_path = tmp_path / "proposal-revision.json"
+    worklist_path = tmp_path / "proposal-review-worklist.json"
+    (tmp_path / "baseline.yaml").write_text("entities: []\n", encoding="utf-8")
+    proposal_path.write_text(json.dumps(proposal.to_data()), encoding="utf-8")
+    worklist_path.write_text(json.dumps(worklist.to_data()), encoding="utf-8")
+    decisions = [
+        DecisionResult(
+            decision_id=specification.decision_id,
+            outcome=DecisionOutcome.PASS,
+            explanation="evidence proves the predicate",
+            predicate_version=specification.predicate_version,
+            subject=specification.subject,
+            input_fingerprint=specification.input_fingerprint,
+            evidence_fingerprint=evidence_fingerprint(
+                specification.input_fingerprint,
+                specification.evidence_requirements,
+            ),
+            evidence_refs=specification.evidence_requirements,
+        ).to_data()
+        for specification in worklist.specifications
+    ]
+
+    result = _finalize_proposal_review(
+        worktree=tmp_path,
+        output_root=tmp_path / "artifacts",
+        parameters={
+            "proposal_revision_path": str(proposal_path),
+            "worklist_path": str(worklist_path),
+            "decisions": decisions,
+        },
+    )
+
+    assert result["accepted"] is True
+    receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
+    assert receipt["proposal_fingerprint"] == proposal.fingerprint
+    assert receipt["worklist_fingerprint"] == worklist.fingerprint
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

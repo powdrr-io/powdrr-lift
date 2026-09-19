@@ -6,6 +6,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from powdrr_lift.structrr.rebase import snapshot_digest
@@ -69,6 +70,35 @@ class ProposalRevision:
         ).encode("utf-8")
         return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
+    @classmethod
+    def from_data(cls, raw: Mapping[str, Any]) -> ProposalRevision:
+        """Decode and verify a persisted proposal revision artifact."""
+        schema_version = raw.get("schema_version")
+        if schema_version != PROPOSAL_REVISION_SCHEMA_VERSION:
+            raise ValueError(
+                f"proposal revision has unsupported schema version: {schema_version!r}"
+            )
+        operations_raw = raw.get("operations")
+        if not isinstance(operations_raw, list):
+            raise ValueError("proposal revision operations must be a list")
+        operations = tuple(_operation_from_data(item) for item in operations_raw)
+        revision = cls(
+            proposal_id=_required_string(raw, "proposal_id"),
+            structrr_baseline_fingerprint=_required_string(
+                raw, "structrr_baseline_fingerprint"
+            ),
+            operations=operations,
+            acceptance_criteria=_string_tuple(raw, "acceptance_criteria"),
+            must_preserve=_string_tuple(raw, "must_preserve"),
+            non_goals=_string_tuple(raw, "non_goals"),
+            allowed_paths=_string_tuple(raw, "allowed_paths"),
+            source_refs=_string_tuple(raw, "source_refs"),
+            schema_version=schema_version,
+        )
+        if raw.get("fingerprint") != revision.fingerprint:
+            raise ValueError("proposal revision fingerprint does not match its content")
+        return revision
+
 
 def compile_proposal_revision(
     proposal_id: str,
@@ -121,6 +151,27 @@ def compile_proposal_revision(
     )
 
 
+def load_proposal_revision(path: Path) -> ProposalRevision:
+    """Load one persisted proposal revision and verify its self-hash."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"could not read proposal revision {path}: {error}") from error
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"proposal revision {path} must contain a mapping")
+    return ProposalRevision.from_data(raw)
+
+
+def validate_proposal_revision(path: Path, expected: ProposalRevision) -> None:
+    """Reject a persisted artifact that no longer represents current inputs."""
+    actual = load_proposal_revision(path)
+    if actual.fingerprint != expected.fingerprint:
+        raise ValueError(
+            "proposal revision is stale: "
+            f"expected {expected.fingerprint}, found {actual.fingerprint}"
+        )
+
+
 def _canonical(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {str(key): _canonical(item) for key, item in value.items()}
@@ -129,9 +180,40 @@ def _canonical(value: Any) -> Any:
     return value
 
 
+def _operation_from_data(raw: Any) -> ProposalOperation:
+    if not isinstance(raw, Mapping):
+        raise ValueError("proposal revision operation must contain a mapping")
+    content = raw.get("content")
+    if not isinstance(content, Mapping):
+        raise ValueError("proposal revision operation content must contain a mapping")
+    return ProposalOperation(
+        operation_id=_required_string(raw, "operation_id"),
+        section=_required_string(raw, "section"),
+        subject_id=_required_string(raw, "subject_id"),
+        action=_required_string(raw, "action"),
+        content=content,
+    )
+
+
+def _required_string(raw: Mapping[str, Any], key: str) -> str:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"proposal revision field {key!r} must be a non-empty string")
+    return value
+
+
+def _string_tuple(raw: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    value = raw.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"proposal revision field {key!r} must be a list of strings")
+    return tuple(value)
+
+
 __all__ = [
     "PROPOSAL_REVISION_SCHEMA_VERSION",
     "ProposalOperation",
     "ProposalRevision",
     "compile_proposal_revision",
+    "load_proposal_revision",
+    "validate_proposal_revision",
 ]

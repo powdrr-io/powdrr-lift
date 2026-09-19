@@ -378,6 +378,7 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
     assert validate_single_decision(document) == ()
     assert set(document["recoveries"]) == {
         "completeness-repair",
+        "intent-repair",
         "scope-repair",
         "worker-repair",
     }

@@ -18,6 +18,7 @@ from powdrr_lift.core.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
     DecisionWorklist,
+    content_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.spec_context import (
@@ -387,6 +388,16 @@ def _execute_procedrr_flow(
             )
             state["review"] = review
             return review
+        if name == "prepare_implementation_review":
+            return _prepare_implementation_review(
+                worktree=worktree,
+                output_root=output_root,
+                runner=runner,
+                state=state,
+                parameters=parameters,
+            )
+        if name == "aggregate_intent_review":
+            return _aggregate_intent_review(parameters)
         if name == "collect_repair_issues":
             validation = parameters.get("validation")
             review_value = parameters.get("review")
@@ -577,8 +588,17 @@ def _prepare_proposal_review(
     active_intent_clause_ids = tuple(
         clause.clause_id for clause in active_intent_clauses
     )
+    evidence_fingerprints = _proposal_evidence_fingerprints(
+        worktree,
+        proposal,
+        baseline_document=baseline_document,
+        plan_document=plan_document,
+        active_intent_clauses=active_intent_clauses,
+    )
     worklist, structural_failures = evaluate_structural_proposal_gate(
-        proposal, active_intent_clause_ids=active_intent_clause_ids
+        proposal,
+        active_intent_clause_ids=active_intent_clause_ids,
+        evidence_fingerprints=evidence_fingerprints,
     )
     if structural_failures:
         raise PowdrrExecutionError(
@@ -736,12 +756,21 @@ def _run_opencode_phase(
         )
     try:
         review_receipt = load_review_receipt(Path(review_path_value))
+        active_intent_clauses = IntentStore(worktree).list()
         active_intent_clause_ids = tuple(
-            clause.clause_id for clause in IntentStore(worktree).list()
+            clause.clause_id for clause in active_intent_clauses
+        )
+        evidence_fingerprints = _proposal_evidence_fingerprints(
+            worktree,
+            proposal_revision,
+            baseline_document=baseline_document,
+            plan_document=plan_document,
+            active_intent_clauses=active_intent_clauses,
         )
         review_worklist = compile_proposal_worklist(
             proposal_revision,
             active_intent_clause_ids=active_intent_clause_ids,
+            evidence_fingerprints=evidence_fingerprints,
         )
         review_receipt.assert_current(proposal_revision, review_worklist)
     except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -894,6 +923,142 @@ def _run_opencode_phase(
         "attempt": attempt.to_data(),
         "attempts": [item.to_data() for item in attempts],
     }
+
+
+def _proposal_evidence_fingerprints(
+    worktree: Path,
+    proposal: ProposalRevision,
+    *,
+    baseline_document: Mapping[str, Any],
+    plan_document: Mapping[str, Any],
+    active_intent_clauses: Sequence[Any],
+) -> dict[str, str]:
+    fingerprints = {
+        "baseline": content_fingerprint(baseline_document),
+        "plan": content_fingerprint(plan_document),
+        "proposal": proposal.fingerprint,
+    }
+    for clause in active_intent_clauses:
+        fingerprints[f"intent:{clause.clause_id}"] = content_fingerprint(
+            clause.to_data()
+        )
+    for source_ref in proposal.source_refs:
+        _prefix, separator, relative_path = source_ref.partition(":")
+        if not separator:
+            continue
+        source_path = worktree / relative_path
+        if source_path.is_file():
+            fingerprints[source_ref] = content_fingerprint(
+                {"path": relative_path, "bytes": source_path.read_bytes().hex()}
+            )
+    return fingerprints
+
+
+def _prepare_implementation_review(
+    *,
+    worktree: Path,
+    output_root: Path,
+    runner: Runner,
+    state: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+) -> dict[str, Any]:
+    implementation = parameters.get("implementation")
+    validation = parameters.get("validation")
+    review = parameters.get("review")
+    if not isinstance(implementation, Mapping):
+        raise PowdrrExecutionError(
+            "implementation review requires implementation state"
+        )
+    if not isinstance(validation, Mapping):
+        raise PowdrrExecutionError("implementation review requires validation state")
+    if not isinstance(review, Mapping):
+        raise PowdrrExecutionError("implementation review requires worker review state")
+    request = state.get("request")
+    if not isinstance(request, ImplementationRequest):
+        raise PowdrrExecutionError(
+            "implementation review requires an implementation request"
+        )
+    diff = _git_output(
+        runner, worktree, ["git", "diff", "--binary", request.base_commit, "--"]
+    )
+    changed_paths = _git_output(
+        runner, worktree, ["git", "diff", "--name-only", request.base_commit, "--"]
+    ).splitlines()
+    active_intent_clauses = IntentStore(worktree).list()
+    evidence_refs = (
+        "git-diff@"
+        + content_fingerprint(
+            {
+                "base_commit": request.base_commit,
+                "changed_paths": changed_paths,
+                "patch": diff,
+            }
+        ),
+        "validation@" + content_fingerprint(validation),
+        "worker-review@" + content_fingerprint(review),
+        "intent-state@"
+        + content_fingerprint([clause.to_data() for clause in active_intent_clauses]),
+    )
+    evidence = {
+        "base_commit": request.base_commit,
+        "changed_paths": changed_paths,
+        "git_diff": diff,
+        "validation": dict(validation),
+        "worker_review": dict(review),
+        "evidence_refs": list(evidence_refs),
+        "active_intent_clauses": [clause.to_data() for clause in active_intent_clauses],
+    }
+    evidence_path = output_root / "implementation-review-evidence.json"
+    evidence_path.write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return {
+        "evidence_path": str(evidence_path),
+        "evidence_fingerprint": content_fingerprint(evidence),
+        "evidence_refs": list(evidence_refs),
+        "active_intent_clauses": evidence["active_intent_clauses"],
+        "git_diff": diff,
+        "changed_paths": changed_paths,
+        "validation": dict(validation),
+        "worker_review": dict(review),
+    }
+
+
+def _aggregate_intent_review(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    decisions = parameters.get("decisions")
+    evidence = parameters.get("evidence")
+    if not isinstance(decisions, list) or not all(
+        isinstance(item, Mapping) for item in decisions
+    ):
+        raise PowdrrExecutionError("intent review decisions must be a list of objects")
+    if not isinstance(evidence, Mapping):
+        raise PowdrrExecutionError("intent review requires implementation evidence")
+    raw_clauses = evidence.get("active_intent_clauses")
+    raw_refs = evidence.get("evidence_refs")
+    if not isinstance(raw_clauses, list) or not isinstance(raw_refs, list):
+        raise PowdrrExecutionError("implementation evidence is incomplete")
+    clause_ids = sorted(
+        item["clause_id"]
+        for item in raw_clauses
+        if isinstance(item, Mapping) and isinstance(item.get("clause_id"), str)
+    )
+    by_clause = {
+        item.get("clause_id"): item
+        for item in decisions
+        if isinstance(item.get("clause_id"), str)
+    }
+    failures: list[str] = []
+    for clause_id in clause_ids:
+        decision = by_clause.get(clause_id)
+        if decision is None:
+            failures.append(f"missing intent review for {clause_id}")
+            continue
+        if decision.get("verdict") != "preserved":
+            failures.append(f"intent review did not preserve {clause_id}")
+        refs = decision.get("evidence_refs")
+        if not isinstance(refs, list) or set(refs) != set(raw_refs):
+            failures.append(f"intent review evidence mismatch for {clause_id}")
+    return {"passed": not failures, "failures": failures}
 
 
 def _proposal_execution_units(

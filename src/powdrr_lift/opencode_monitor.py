@@ -158,6 +158,23 @@ def append_event(
         stream.write("\n")
 
 
+def append_diagnostic(
+    log_path: Path, kind: str, *, captured_at: float, **data: Any
+) -> None:
+    """Append a monitor diagnostic to the replayable OpenCode log."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "record_type": "diagnostic",
+        "captured_at": datetime.now(tz=UTC).isoformat(),
+        "captured_monotonic": captured_at,
+        "kind": kind,
+        **data,
+    }
+    with log_path.open("a", encoding="utf-8") as stream:
+        json.dump(record, stream, separators=(",", ":"), default=str)
+        stream.write("\n")
+
+
 def run_opencode(
     command: Sequence[str],
     *,
@@ -198,11 +215,60 @@ def run_opencode(
     # transport chatter must not keep a stalled session alive indefinitely.
     last_progress = time.monotonic()
     timed_out = False
+    last_snapshot: tuple[Any, ...] | None = None
+    last_snapshot_at = last_progress
+
+    def report_snapshot(*, force: bool = False) -> None:
+        nonlocal last_snapshot, last_snapshot_at
+        snapshot = monitor.snapshot()
+        now = time.monotonic()
+        signature = (
+            snapshot.state,
+            snapshot.event_count,
+            snapshot.progress_event_count,
+            int(snapshot.seconds_since_event or 0),
+            int(snapshot.seconds_since_progress or 0),
+        )
+        if force or signature != last_snapshot or now - last_snapshot_at >= 15.0:
+            if log_path is not None:
+                append_diagnostic(
+                    log_path,
+                    "liveness.snapshot",
+                    captured_at=now,
+                    state=snapshot.state,
+                    reason=snapshot.reason,
+                    event_count=snapshot.event_count,
+                    progress_event_count=snapshot.progress_event_count,
+                    seconds_since_event=snapshot.seconds_since_event,
+                    seconds_since_progress=snapshot.seconds_since_progress,
+                )
+            if on_snapshot is not None:
+                on_snapshot(snapshot)
+            last_snapshot = signature
+            last_snapshot_at = now
+
+    if log_path is not None:
+        append_diagnostic(
+            log_path,
+            "process.started",
+            captured_at=last_progress,
+            pid=process.pid,
+            command=list(command),
+            cwd=str(cwd) if cwd is not None else None,
+            inactivity_timeout=inactivity_timeout,
+        )
     try:
         while selector.get_map() or process.poll() is None:
             remaining = inactivity_timeout - (time.monotonic() - last_progress)
             if remaining <= 0:
                 timed_out = True
+                if log_path is not None:
+                    append_diagnostic(
+                        log_path,
+                        "process.timed_out",
+                        captured_at=time.monotonic(),
+                        reason="no progress event or Procedrr activity within timeout",
+                    )
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except (PermissionError, ProcessLookupError):
@@ -210,8 +276,7 @@ def run_opencode(
                 break
             ready = selector.select(timeout=min(0.5, remaining))
             if not ready:
-                if on_snapshot is not None:
-                    on_snapshot(monitor.snapshot())
+                report_snapshot()
                 continue
             for key, _ in ready:
                 stream = cast(BinaryIO, key.data)
@@ -220,6 +285,14 @@ def run_opencode(
                     selector.unregister(stream)
                     continue
                 output.append(chunk)
+                if log_path is not None:
+                    append_diagnostic(
+                        log_path,
+                        "stream.output",
+                        captured_at=time.monotonic(),
+                        bytes=len(chunk),
+                        buffered_bytes=len(pending),
+                    )
                 pending += chunk.decode("utf-8", errors="replace")
                 lines = pending.splitlines(keepends=True)
                 pending = (
@@ -239,8 +312,7 @@ def run_opencode(
                         last_progress = captured_at
                         if on_activity is not None:
                             on_activity()
-                    if on_snapshot is not None:
-                        on_snapshot(monitor.snapshot())
+                    report_snapshot()
     finally:
         # A caller may cancel the parent while OpenCode is blocked in select.
         # Since OpenCode owns its process group, reap the whole group so a
@@ -257,8 +329,20 @@ def run_opencode(
     assert returncode is not None
     if timed_out:
         returncode = 124
+    terminal_snapshot = monitor.snapshot(process_returncode=returncode)
+    if log_path is not None:
+        append_diagnostic(
+            log_path,
+            "process.exited",
+            captured_at=time.monotonic(),
+            returncode=returncode,
+            state=terminal_snapshot.state,
+            reason=terminal_snapshot.reason,
+            event_count=terminal_snapshot.event_count,
+            progress_event_count=terminal_snapshot.progress_event_count,
+        )
     if on_snapshot is not None:
-        on_snapshot(monitor.snapshot(process_returncode=returncode))
+        on_snapshot(terminal_snapshot)
     if pending:
         output.append(pending.encode("utf-8"))
     return subprocess.CompletedProcess(

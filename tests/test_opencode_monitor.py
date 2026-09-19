@@ -77,6 +77,42 @@ def test_append_and_replay_event_log(tmp_path: Path) -> None:
     assert replay_events(records).events[1].event_type == "message.updated"
 
 
+def test_run_opencode_records_lifecycle_diagnostics(tmp_path: Path) -> None:
+    path = tmp_path / "events.ndjson"
+    result = run_opencode(
+        [sys.executable, "-c", 'print(\'{"type":"session.completed"}\', flush=True)'],
+        log_path=path,
+        inactivity_timeout=0.2,
+    )
+
+    assert result.returncode == 0
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+    diagnostics = [
+        record for record in records if record.get("record_type") == "diagnostic"
+    ]
+    assert [record["kind"] for record in diagnostics] == [
+        "process.started",
+        "stream.output",
+        "liveness.snapshot",
+        "process.exited",
+    ]
+    assert diagnostics[-1]["returncode"] == 0
+
+
+def test_run_opencode_records_timeout_diagnostic(tmp_path: Path) -> None:
+    path = tmp_path / "events.ndjson"
+    result = run_opencode(
+        [sys.executable, "-c", "import time; time.sleep(1)"],
+        log_path=path,
+        inactivity_timeout=0.05,
+    )
+
+    assert result.returncode == 124
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+    assert any(record.get("kind") == "process.timed_out" for record in records)
+    assert records[-1]["kind"] == "process.exited"
+
+
 def test_run_opencode_resets_inactivity_timeout_on_progress_events(
     tmp_path: Path,
 ) -> None:

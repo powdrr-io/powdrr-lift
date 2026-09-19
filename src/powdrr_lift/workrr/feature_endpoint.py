@@ -578,6 +578,7 @@ def _run_opencode_phase(
         provider = OpenCodeProvider(
             executable=config.opencode_executable,
             model=config.opencode_model,
+            diagnostics_root=output_root / "opencode",
             permission_policy=OpenCodePermissionPolicy(
                 _allowed_validation_commands(state["validation_profiles"])
             ),

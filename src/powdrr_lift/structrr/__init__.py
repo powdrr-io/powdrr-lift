@@ -50,6 +50,13 @@ from powdrr_lift.structrr.rebase import (
     rebase_structrr_snapshot,
     snapshot_digest,
 )
+from powdrr_lift.structrr.verification_obligations import (
+    VERIFICATION_OBLIGATION_SCHEMA_VERSION,
+    AffectedIntentClosure,
+    VerificationObligation,
+    VerificationObligationCompilation,
+    compile_verification_obligations,
+)
 
 __all__ = [
     "BootstrapIssue",
@@ -82,4 +89,9 @@ __all__ = [
     "compile_review_worklist",
     "load_review_receipt",
     "write_review_receipt",
+    "AffectedIntentClosure",
+    "VERIFICATION_OBLIGATION_SCHEMA_VERSION",
+    "VerificationObligation",
+    "VerificationObligationCompilation",
+    "compile_verification_obligations",
 ]

@@ -12,6 +12,9 @@ from powdrr_lift.core.decision_obligation import (
     DecisionWorklist,
 )
 from powdrr_lift.structrr.proposal import ProposalRevision
+from powdrr_lift.structrr.verification_obligations import (
+    VerificationObligationCompilation,
+)
 
 
 def compile_proposal_worklist(
@@ -19,6 +22,7 @@ def compile_proposal_worklist(
     *,
     active_intent_clause_ids: Sequence[str] = (),
     evidence_fingerprints: Mapping[str, str] | None = None,
+    verification_compilation: VerificationObligationCompilation | None = None,
 ) -> DecisionWorklist:
     """Create the complete ordered proposal-review worklist.
 
@@ -92,6 +96,31 @@ def compile_proposal_worklist(
                 evidence_requirements=evidence_refs(("proposal", "plan")),
             )
         )
+    if verification_compilation is not None:
+        for obligation in verification_compilation.obligations:
+            specs.append(
+                _spec(
+                    proposal,
+                    "verification-contract-inventory",
+                    obligation.contract_id,
+                    "the selected verification contract exists in provider inventory",
+                    evidence_requirements=(
+                        verification_compilation.fingerprint,
+                        obligation.provider_inventory_fingerprint,
+                    ),
+                )
+            )
+        for failure in verification_compilation.failures:
+            specs.append(
+                _spec(
+                    proposal,
+                    "verification-compiler-diagnostic",
+                    failure,
+                    "the affected verification obligation compilation has no "
+                    "blocking diagnostics",
+                    evidence_requirements=(verification_compilation.fingerprint,),
+                )
+            )
     specs.append(
         _spec(
             proposal,
@@ -109,6 +138,7 @@ def evaluate_structural_proposal_gate(
     *,
     active_intent_clause_ids: Sequence[str] = (),
     evidence_fingerprints: Mapping[str, str] | None = None,
+    verification_compilation: VerificationObligationCompilation | None = None,
 ) -> tuple[DecisionWorklist, tuple[str, ...]]:
     """Return the worklist and deterministic structural failures.
 
@@ -121,6 +151,7 @@ def evaluate_structural_proposal_gate(
         proposal,
         active_intent_clause_ids=active_intent_clause_ids,
         evidence_fingerprints=evidence_fingerprints,
+        verification_compilation=verification_compilation,
     )
     failures: list[str] = []
     if not proposal.operations:
@@ -129,6 +160,8 @@ def evaluate_structural_proposal_gate(
         failures.append("proposal must contain at least one acceptance criterion")
     if not proposal.allowed_paths:
         failures.append("proposal must contain at least one allowed path")
+    if verification_compilation is not None:
+        failures.extend(verification_compilation.failures)
     for operation in proposal.operations:
         if operation.action not in {"add", "remove"}:
             failures.append(f"unsupported operation action: {operation.action}")

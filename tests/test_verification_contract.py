@@ -24,20 +24,25 @@ def test_complete_contract_round_trips_and_fingerprints() -> None:
     contract = _contract()
 
     assert contract.is_complete
-    assert not contract.is_legacy
     assert contract.to_data()["intent_refs"] == ["intent.transcript"]
     assert contract.fingerprint.startswith("sha256:")
     assert contract.fingerprint != _contract(selector="tests/test_other.py").fingerprint
 
 
-def test_legacy_required_test_case_remains_parseable_and_incomplete() -> None:
+def test_required_test_case_without_verification_fields_is_invalid() -> None:
     contract = VerificationContract.from_mapping(
         {"id": "legacy-test", "description": "Existing required test."}
     )
 
-    assert contract.is_legacy
     assert not contract.is_complete
-    assert contract.validation_errors() == ()
+    assert contract.validation_errors() == (
+        "intent_refs must contain at least one intent id",
+        "provider is required",
+        "selector is required",
+        "profile is required",
+        "expectation is required",
+        "status is required",
+    )
 
 
 def test_partially_migrated_contract_reports_missing_fields() -> None:

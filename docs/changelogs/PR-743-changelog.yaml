@@ -1,0 +1,176 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 743
+title: Add Workrr verification provider inventory
+intent:
+  problem: Procedrr has discovered validation commands but cannot inventory the exact executable verifiers protected by a verification contract or distinguish a missing selector from a collected one.
+  goal: Add a provider-neutral Workrr protocol and registry, collect exact pytest node IDs through pytest hooks, and persist provider inventory metadata in a versioned Structrr bootstrap section.
+human-decisions:
+  - id: provider-registry-owns-framework-adapters
+    summary: Keep framework-specific discovery behind a Workrr provider registry so Structrr and Procedrr remain provider-neutral.
+  - id: pytest-collection-uses-node-ids
+    summary: Treat pytest node IDs collected through pytest hooks as the exact selector identity; do not parse decorative console output.
+  - id: bootstrap-inventory-is-provider-neutral
+    summary: Let Structrr bootstrap record discovered validation profiles and let Workrr enrich them with exact provider selectors.
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add and validate the versioned validation_inventory bootstrap section.
+    rationale: Make validation-provider discovery part of Structrr freshness and structural validation.
+    span: {start_line: 74, end_line: 74}
+    related:
+      entities: [verification-provider-registry]
+      decisions: [bootstrap-inventory-is-provider-neutral]
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Validate provider inventory identity and selector shapes.
+    rationale: Reject malformed inventory before it becomes a bootstrap baseline.
+    span: {start_line: 329, end_line: 329}
+    related:
+      entities: [verification-provider-registry]
+      invariants: [bootstrap-provider-inventory-is-typed]
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add structural validation for each validation inventory entry.
+    rationale: Require provider/profile identity and list-shaped selector data.
+    span: {start_line: 371, end_line: 411}
+    related:
+      entities: [verification-provider-registry]
+      invariants: [bootstrap-provider-inventory-is-typed]
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Build validation profiles once during bootstrap.
+    rationale: Keep tool detection and inventory generation on one discovered profile set.
+    span: {start_line: 984, end_line: 987}
+    related: {entities: [verification-provider-registry]}
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Persist the provider-neutral validation inventory in the bootstrap document.
+    rationale: Give ensure-current Structrr checks a versioned provider discovery section.
+    span: {start_line: 1066, end_line: 1067}
+    related:
+      entities: [verification-provider-registry]
+      decisions: [bootstrap-inventory-is-provider-neutral]
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add the generated validation inventory section to bootstrap output.
+    rationale: Preserve discovered profiles and their future selector inventory in Structrr state.
+    span: {start_line: 1168, end_line: 1168}
+    related: {entities: [verification-provider-registry]}
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    summary: Add the provider-inventory schema, provider namespace, and bootstrap inventory builder.
+    rationale: Keep bootstrap-side inventory provider-neutral and independent of Workrr adapters.
+    span: {start_line: 8, end_line: 8}
+    related:
+      entities: [verification-provider-registry]
+      decisions: [bootstrap-inventory-is-provider-neutral]
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    summary: Add the provider-inventory schema constant.
+    rationale: Keep the Structrr and Workrr inventory schema synchronized.
+    span: {start_line: 12, end_line: 13}
+    related: {entities: [verification-provider-registry]}
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    summary: Derive provider-neutral inventory records from discovered validation profiles.
+    rationale: Connect existing validation discovery to the versioned Structrr section without importing Workrr into Structrr.
+    span: {start_line: 23, end_line: 44}
+    related:
+      entities: [verification-provider-registry]
+      invariants: [bootstrap-provider-inventory-is-typed]
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    summary: Export provider-inventory discovery helpers.
+    rationale: Keep the bootstrap inventory API explicit and reusable.
+    span: {start_line: 234, end_line: 239}
+    related: {entities: [verification-provider-registry]}
+  - path: src/powdrr_lift/workrr/__init__.py
+    type: modified
+    summary: Export the provider protocol, registry, inventory, and selector matcher.
+    rationale: Make the Workrr verification boundary available to orchestration phases.
+    span: {start_line: 78, end_line: 89}
+    related: {entities: [verification-provider-registry]}
+  - path: src/powdrr_lift/workrr/__init__.py
+    type: modified
+    summary: Register provider verification symbols in Workrr public exports.
+    rationale: Preserve a stable package-level API for later obligation and evidence phases.
+    span: {start_line: 150, end_line: 159}
+    related: {entities: [verification-provider-registry]}
+  - path: src/powdrr_lift/workrr/verification_provider.py
+    type: added
+    summary: Add the provider protocol, typed request/result envelopes, inventory fingerprints, registry, pytest adapter, and exact selector matcher.
+    rationale: Give Workrr an extensible provider boundary that can discover exact executable verifiers without framework logic in Procedrr or Structrr.
+    span: {start_line: 1, end_line: 309}
+    related:
+      entities: [verification-provider-registry]
+      decisions:
+        - provider-registry-owns-framework-adapters
+        - pytest-collection-uses-node-ids
+      invariants:
+        - provider-inventory-is-content-addressed
+        - unmatched-selectors-are-not-collected
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update bootstrap source-model spans after adding inventory generation and validation.
+    rationale: Keep Structrr source anchors exact after the intentional implementation growth.
+    span: {start_line: 8, end_line: 8}
+    related: {entities: [verification-provider-registry]}
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the bootstrap function source span.
+    rationale: Keep the golden source model aligned with the new bootstrap wiring.
+    span: {start_line: 14, end_line: 15}
+    related: {entities: [verification-provider-registry]}
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the source-model extraction span after bootstrap growth.
+    rationale: Preserve exact source anchoring for the downstream function.
+    span: {start_line: 21, end_line: 22}
+    related: {entities: [verification-provider-registry]}
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Test bootstrap validation inventory generation and required section presence.
+    rationale: Lock down versioned provider-neutral inventory behavior.
+    span: {start_line: 259, end_line: 278}
+    related:
+      entities: [verification-provider-registry]
+      invariants: [bootstrap-provider-inventory-is-typed]
+  - path: tests/test_verification_provider.py
+    type: added
+    summary: Test exact pytest node collection, registry extensibility, typed provider results, fingerprints, and not_collected matching.
+    rationale: Prove the first provider adapter and framework-neutral dispatch boundary.
+    span: {start_line: 1, end_line: 111}
+    related:
+      entities: [verification-provider-registry]
+      decisions:
+        - provider-registry-owns-framework-adapters
+        - pytest-collection-uses-node-ids
+      invariants:
+        - provider-inventory-is-content-addressed
+        - unmatched-selectors-are-not-collected
+entities:
+  - id: verification-provider-registry
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: bootstrap-provider-inventory-is-typed
+    action: added
+    description: Structrr bootstrap validation requires every provider inventory record to identify a provider and profile and to expose selectors as a list.
+    rationale: Prevent malformed discovery data from reaching contract matching.
+  - id: provider-inventory-is-content-addressed
+    action: added
+    description: Workrr inventory fingerprints include the inventory schema, provider, profile, provider version, exact selectors, and collection errors.
+    rationale: Invalidate later evidence when the executable verifier inventory changes.
+  - id: unmatched-selectors-are-not-collected
+    action: added
+    description: A contract whose exact provider, profile, and selector identity is absent from inventory produces not_collected rather than a fuzzy match or pass.
+    rationale: Make missing verifiers explicit and fail closed.
+guidance:
+  - id: keep-framework-logic-in-workrr
+    action: added
+    description: Add future verification frameworks as Workrr providers registered through the provider registry; do not add framework-specific branches to Procedrr or Structrr.
+    rationale: Preserve the ownership boundary as provider coverage expands.
+features: []
+proposed_prs: []

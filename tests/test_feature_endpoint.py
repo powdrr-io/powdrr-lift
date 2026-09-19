@@ -144,7 +144,7 @@ def test_harbor_feature_cli_uses_in_place_endpoint(
 def test_run_feature_in_place_reuses_core_without_git_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "init", "-q", "-b", "main")
     _git(tmp_path, "config", "user.email", "test@example.com")
     _git(tmp_path, "config", "user.name", "Test")
     (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")

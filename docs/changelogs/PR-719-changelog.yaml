@@ -1,0 +1,99 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 719
+title: Compile OpenCode packets from Structrr intent
+intent:
+  problem: Operation-scoped worker packets exist, but the production feature endpoint does not yet populate their preservation constraints and exclusions from the Structrr plan that it is implementing.
+  goal: Derive must-preserve clauses from active Structrr invariants and guidance, derive explicit non-goals, and bind the Structrr baseline, plan, and Procedrr artifacts to the execution unit sent to OpenCode.
+human-decisions:
+  - id: derive-worker-context-from-structrr-plan
+    summary: Treat the current Structrr plan as the source for operation-scoped preservation constraints, non-goals, and source references.
+  - id: exclude-retired-structrr-intent
+    summary: Do not include Structrr invariants or guidance explicitly marked deleted or removed in the worker preservation packet.
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Compile preservation and exclusion context from the Structrr plan before creating the execution unit.
+    rationale: Ensure production OpenCode packets contain actual plan-derived intent rather than only fallback acceptance text.
+    span:
+      start_line: 436
+      end_line: 442
+    related:
+      decisions:
+        - derive-worker-context-from-structrr-plan
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Attach plan-derived context and source references to the execution unit.
+    rationale: Bind the worker operation to the exact Structrr and Procedrr artifacts it is allowed to implement.
+    span:
+      start_line: 459
+      end_line: 465
+    related:
+      decisions:
+        - derive-worker-context-from-structrr-plan
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Expand the implementation-plan compiler result with preservation and non-goal collections.
+    rationale: Make the new packet inputs explicit in the feature endpoint contract.
+    span:
+      start_line: 538
+      end_line: 544
+    related:
+      decisions:
+        - derive-worker-context-from-structrr-plan
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Compile active invariant and guidance subjects while excluding removed subjects.
+    rationale: Preserve current architectural intent without carrying retired constraints into the worker packet.
+    span:
+      start_line: 586
+      end_line: 631
+    related:
+      decisions:
+        - derive-worker-context-from-structrr-plan
+        - exclude-retired-structrr-intent
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Verify plan compilation returns preservation and non-goal collections.
+    rationale: Keep the existing plan compiler contract explicit as packet context expands.
+    span:
+      start_line: 225
+      end_line: 226
+    related:
+      decisions:
+        - derive-worker-context-from-structrr-plan
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Test active and retired intent handling plus non-goal normalization.
+    rationale: Prove that removed constraints are excluded and explicit non-goals reach the packet compiler.
+    span:
+      start_line: 249
+      end_line: 288
+    related:
+      decisions:
+        - derive-worker-context-from-structrr-plan
+        - exclude-retired-structrr-intent
+entities:
+  - id: structrr-derived-worker-context
+    type: Module
+    action: added
+  - id: retired-intent-exclusion
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: worker-context-follows-current-structrr-plan
+    action: added
+    description: The production execution unit sent to OpenCode carries preservation constraints and non-goals derived from the current Structrr plan, together with references to the baseline, plan, and Procedrr definition.
+    rationale: Prevent the worker prompt from silently falling back to undifferentiated feature text.
+  - id: removed-structrr-subjects-are-not-preserved
+    action: added
+    description: Structrr invariants and guidance marked deleted or removed are excluded from the must-preserve packet.
+    rationale: Avoid asking OpenCode to preserve intent that the proposal explicitly retires.
+guidance:
+  - id: derive-targeted-worker-context
+    action: added
+    description: Compile OpenCode preservation context from active Structrr invariants and guidance, then pass explicit non-goals and source references through the execution unit.
+    rationale: Make targeted prompting reflect the actual accepted planning artifact.
+features: []
+proposed_prs: []

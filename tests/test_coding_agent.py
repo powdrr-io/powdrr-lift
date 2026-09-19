@@ -273,7 +273,7 @@ def test_worker_removes_declared_ephemeral_artifacts_before_final_diff(
     assert not (worktree / "test_helper.py").exists()
 
 
-def test_worker_removes_runtime_artifacts_before_scope_check(tmp_path: Path) -> None:
+def test_worker_removes_new_untracked_files_outside_scope(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(
         FakeProvider("runtime-artifacts"),

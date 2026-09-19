@@ -163,6 +163,9 @@ class PowdrrAgent(BaseInstalledAgent):
         planning_model = self._get_env("POWDRR_PLANNING_MODEL")
         if planning_model:
             command.extend(("--planning-model", planning_model))
+        validation_command = self._get_env("POWDRR_VALIDATION_COMMAND")
+        if validation_command:
+            command.extend(("--validation-command", validation_command))
         output_root = self._get_env("POWDRR_OUTPUT_ROOT")
         if output_root:
             command.extend(("--output-root", output_root))

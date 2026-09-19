@@ -1338,8 +1338,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workrr_feature_parser.add_argument(
         "--validation-command",
-        required=True,
-        help="Validation command as one shell-style argument, e.g. 'uv run pytest'.",
+        help=(
+            "Optional feature-specific validation command as one shell-style "
+            "argument. Repository checks are discovered automatically."
+        ),
     )
     workrr_feature_parser.add_argument("--base-branch", default="main")
     workrr_feature_parser.add_argument("--opencode-executable", default="opencode")
@@ -4332,7 +4334,11 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             work_item_name=args.work_item_name,
             repo_root=repo_root,
             allowed_paths=tuple(args.allowed_paths),
-            validation_command=tuple(shlex.split(args.validation_command)),
+            validation_command=(
+                tuple(shlex.split(args.validation_command))
+                if args.validation_command
+                else ()
+            ),
             base_branch=args.base_branch,
             opencode_executable=args.opencode_executable,
             opencode_model=args.opencode_model,

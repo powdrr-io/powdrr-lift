@@ -19,6 +19,10 @@ from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
+from powdrr_lift.core.validation_discovery import (
+    DiscoveredValidationProfile,
+    discover_validation_profiles,
+)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.structrr.proposal import (
@@ -59,7 +63,7 @@ class FeatureEndpointConfig:
     work_item_name: str
     repo_root: Path
     allowed_paths: tuple[str, ...]
-    validation_command: tuple[str, ...]
+    validation_command: tuple[str, ...] = ()
     base_branch: str = "main"
     opencode_executable: str = "opencode"
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
@@ -156,6 +160,18 @@ def _execute_procedrr_flow(
     state: dict[str, Any] = {}
     flow_path = _validate_procedrr_flow(worktree)
     flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
+    validation_profiles = discover_validation_profiles(
+        worktree, explicit_command=config.validation_command
+    )
+    if not validation_profiles:
+        raise PowdrrExecutionError(
+            "Could not discover a validation command. Provide "
+            "--validation-command or declare project validation tooling."
+        )
+    state["validation_profiles"] = validation_profiles
+    state["validation_profile_names"] = tuple(
+        profile.name for profile in validation_profiles
+    )
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "gather_context":
@@ -497,6 +513,7 @@ def _run_opencode_phase(
         non_goals=non_goals,
         allowed_paths=config.allowed_paths,
         source_refs=source_context,
+        validation_profiles=state["validation_profile_names"],
     )
     plan = ExecutionPlan(
         plan_id=f"{slug}-execution",
@@ -510,7 +527,7 @@ def _run_opencode_phase(
             executable=config.opencode_executable,
             model=config.opencode_model,
             permission_policy=OpenCodePermissionPolicy(
-                (" ".join(config.validation_command) + " *",)
+                _allowed_validation_commands(state["validation_profiles"])
             ),
         )
         state["opencode_provider"] = provider
@@ -544,7 +561,7 @@ def _run_opencode_phase(
             base_commit=base_commit,
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=source_context,
-            allowed_commands=(" ".join(config.validation_command) + " *",),
+            allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):
@@ -636,6 +653,7 @@ def _proposal_execution_units(
     non_goals: tuple[str, ...],
     allowed_paths: tuple[str, ...],
     source_refs: tuple[str, ...],
+    validation_profiles: tuple[str, ...] = ("feature-validation",),
 ) -> tuple[ExecutionUnit, ...]:
     """Compile one worker unit per explicit Structrr operation."""
     if not proposal_revision.operations:
@@ -644,7 +662,7 @@ def _proposal_execution_units(
                 unit_id=f"implement-{slug}",
                 objective=feature_description,
                 paths=allowed_paths,
-                validation_profiles=("feature-validation",),
+                validation_profiles=validation_profiles,
                 acceptance_criteria=acceptance_criteria,
                 planned_additions=planned_additions,
                 planned_deletions=planned_deletions,
@@ -676,7 +694,7 @@ def _proposal_execution_units(
                 objective=objective,
                 paths=allowed_paths,
                 dependencies=(units[-1].unit_id,) if units else (),
-                validation_profiles=("feature-validation",),
+                validation_profiles=validation_profiles,
                 acceptance_criteria=operation_criteria,
                 planned_additions=(content,) if operation.action == "add" else (),
                 planned_deletions=(content,) if operation.action == "remove" else (),
@@ -924,14 +942,27 @@ def _plan_text_values(value: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
+def _allowed_validation_commands(
+    profiles: Sequence[DiscoveredValidationProfile],
+) -> tuple[str, ...]:
+    return tuple(
+        f"{' '.join(profile.command)} *" for profile in profiles if profile.command
+    )
+
+
 def _validate_implementation_phase(
     config: FeatureEndpointConfig, *, worktree: Path, state: dict[str, Any]
 ) -> dict[str, Any]:
+    del config
+    discovered = state.get("validation_profiles", ())
+    if not isinstance(discovered, tuple) or not all(
+        isinstance(profile, DiscoveredValidationProfile) for profile in discovered
+    ):
+        raise PowdrrExecutionError("validation profiles were not discovered")
     validation = ValidationRunner(
         {
-            "feature-validation": ValidationProfile(
-                "feature-validation", config.validation_command
-            )
+            profile.name: ValidationProfile(profile.name, profile.command)
+            for profile in discovered
         }
     ).run(state["request"], state["attempt"], worktree_root=worktree)
     failed_checkpoints = [

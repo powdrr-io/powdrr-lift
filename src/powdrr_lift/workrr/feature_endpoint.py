@@ -20,6 +20,7 @@ from powdrr_lift.core.spec_context import (
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
+from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -440,13 +441,37 @@ def _run_opencode_phase(
         must_preserve,
         non_goals,
     ) = _load_implementation_plan(plan_path, feature_description)
+    baseline_document = _load_yaml_mapping(baseline_path)
+    plan_document = _load_yaml_mapping(plan_path)
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
+    source_refs = (
+        f"structrr:{baseline_path.relative_to(worktree)}",
+        f"structrr-diff:{plan_path.relative_to(worktree)}",
+        f"procedrr:{procedrr_path.relative_to(worktree)}",
+    )
+    proposal_revision = compile_proposal_revision(
+        slug,
+        baseline_document,
+        plan_document,
+        acceptance_criteria=acceptance_criteria,
+        must_preserve=must_preserve,
+        non_goals=non_goals,
+        allowed_paths=config.allowed_paths,
+        source_refs=source_refs,
+    )
+    proposal_revision_path = plan_path.parent / "proposal-revision.json"
+    if not proposal_revision_path.exists():
+        proposal_revision_path.write_text(
+            json.dumps(proposal_revision.to_data(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        _commit(runner, worktree, "Record proposal revision")
     base_commit = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
     plan = ExecutionPlan(
         plan_id=f"{slug}-execution",
-        proposed_pr_fingerprint=f"{slug}-v1",
+        proposed_pr_fingerprint=proposal_revision.fingerprint,
         units=(
             ExecutionUnit(
                 unit_id=f"implement-{slug}",
@@ -458,11 +483,8 @@ def _run_opencode_phase(
                 planned_deletions=planned_deletions,
                 must_preserve=must_preserve,
                 non_goals=non_goals,
-                source_refs=(
-                    f"structrr:{baseline_path.relative_to(worktree)}",
-                    f"structrr-diff:{plan_path.relative_to(worktree)}",
-                    f"procedrr:{procedrr_path.relative_to(worktree)}",
-                ),
+                source_refs=source_refs
+                + (f"proposal:{proposal_revision_path.relative_to(worktree)}",),
             ),
         ),
         allowed_paths=config.allowed_paths,
@@ -473,9 +495,8 @@ def _run_opencode_phase(
         request_id=f"{slug}-implementation",
         base_commit=base_commit,
         context_refs=(
-            f"structrr:{baseline_path.relative_to(worktree)}",
-            f"structrr-diff:{plan_path.relative_to(worktree)}",
-            f"procedrr:{procedrr_path.relative_to(worktree)}",
+            *source_refs,
+            f"proposal:{proposal_revision_path.relative_to(worktree)}",
         ),
         allowed_commands=(" ".join(config.validation_command) + " *",),
     )
@@ -590,6 +611,18 @@ def _load_implementation_plan(
         _plan_subject_text(raw, ("invariants", "guidance")),
         _plan_text_values(raw.get("non_goals")),
     )
+
+
+def _load_yaml_mapping(path: Path) -> Mapping[str, Any]:
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PowdrrExecutionError(
+            f"could not read YAML document {path}: {error}"
+        ) from error
+    if not isinstance(raw, Mapping):
+        raise PowdrrExecutionError(f"YAML document {path} must contain a mapping")
+    return raw
 
 
 def _plan_subject_text(

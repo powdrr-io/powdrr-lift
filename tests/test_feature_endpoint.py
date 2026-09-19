@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from powdrr_lift.cli import main
+from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentStatus,
@@ -23,6 +24,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _ensure_current_baseline,
     _load_implementation_plan,
     _plan_text_items,
+    _proposal_execution_units,
     _validate_procedrr_flow,
     review_feature_diff,
 )
@@ -286,6 +288,54 @@ non_goals:
         "Do not redesign the transport.",
         "Do not add unrelated commands.",
     )
+
+
+def test_structrr_operations_compile_to_targeted_worker_units() -> None:
+    revision = compile_proposal_revision(
+        "adapter",
+        {"entities": []},
+        {
+            "features": [
+                {"id": "parse", "action": "added", "description": "Parse input."},
+                {"id": "render", "action": "added", "description": "Render output."},
+            ]
+        },
+        acceptance_criteria=("The feature works.",),
+        must_preserve=("Keep the API stable.",),
+        non_goals=("Do not redesign transport.",),
+        allowed_paths=("src", "tests"),
+        source_refs=("structrr:baseline.yaml", "proposal:revision.json"),
+    )
+
+    units = _proposal_execution_units(
+        slug="adapter",
+        feature_description="Add the adapter.",
+        proposal_revision=revision,
+        acceptance_criteria=("The feature works.",),
+        planned_additions=(),
+        planned_deletions=(),
+        must_preserve=("Keep the API stable.",),
+        non_goals=("Do not redesign transport.",),
+        allowed_paths=("src", "tests"),
+        source_refs=("structrr:baseline.yaml", "proposal:revision.json"),
+    )
+
+    assert [unit.unit_id for unit in units] == [
+        "implement-adapter-add:features:parse",
+        "implement-adapter-add:features:render",
+    ]
+    assert units[0].planned_additions[0]["id"] == "parse"
+    assert units[1].dependencies == (units[0].unit_id,)
+    request = ImplementationRequest.from_execution_unit(
+        units[0],
+        request_id="adapter-implementation-1",
+        base_commit="base",
+        plan_fingerprint=revision.fingerprint,
+    )
+    assert request.intent_packet is not None
+    assert request.intent_packet.operation_id == units[0].unit_id
+    assert request.intent_packet.required_operations[0]["change"]["id"] == "parse"
+    assert "render" not in request.prompt
 
 
 def test_plan_acceptance_criteria_have_stable_ids() -> None:

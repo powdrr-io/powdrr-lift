@@ -22,6 +22,8 @@ from powdrr_lift.structrr.proposal import (
     ProposalOperation,
     ProposalRevision,
     compile_proposal_revision,
+    load_proposal_revision,
+    validate_proposal_revision,
 )
 from powdrr_lift.structrr.rebase import (
     StructrrChange,
@@ -46,4 +48,6 @@ __all__ = [
     "ProposalOperation",
     "ProposalRevision",
     "compile_proposal_revision",
+    "load_proposal_revision",
+    "validate_proposal_revision",
 ]

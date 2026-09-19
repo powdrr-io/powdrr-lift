@@ -20,7 +20,10 @@ from powdrr_lift.core.spec_context import (
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
-from powdrr_lift.structrr.proposal import compile_proposal_revision
+from powdrr_lift.structrr.proposal import (
+    compile_proposal_revision,
+    validate_proposal_revision,
+)
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -468,6 +471,14 @@ def _run_opencode_phase(
             encoding="utf-8",
         )
         _commit(runner, worktree, "Record proposal revision")
+    else:
+        try:
+            validate_proposal_revision(proposal_revision_path, proposal_revision)
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                "current Structrr inputs no longer match the persisted proposal "
+                f"revision at {proposal_revision_path}: {error}"
+            ) from error
     base_commit = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
     plan = ExecutionPlan(
         plan_id=f"{slug}-execution",

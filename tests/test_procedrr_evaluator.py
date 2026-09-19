@@ -296,6 +296,208 @@ def test_attempt_runs_declared_recovery_and_resumes() -> None:
     assert result.bindings["ready"] is True
     assert calls == 1
     assert any(event.kind == "recovery" for event in result.events)
+    succeeded = next(
+        entry
+        for entry in result.transcript
+        if entry.kind == "attempt" and entry.outcome == "succeeded"
+    )
+    assert succeeded.path == "steps[0]"
+    assert succeeded.inputs == {"id": "work", "attempt": 2}
+
+
+def test_transcript_records_ordered_executed_steps_with_values() -> None:
+    calls: list[str] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        calls.append(tool)
+        return {"ok": True}
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "transcript-order",
+            "steps": [
+                {"operation": {"tool": "one", "bind": "a"}},
+                {"operation": {"tool": "two", "bind": "b"}},
+                {"terminal": "succeeded"},
+            ],
+        }
+    )
+
+    kinds = [entry.kind for entry in result.transcript]
+    assert kinds == ["operation", "operation", "terminal"]
+    first = result.transcript[0]
+    assert first.path == "steps[0]"
+    assert first.outcome == "succeeded"
+    assert first.inputs == {"tool": "one", "parameters": {}}
+    assert first.outputs == {"result": {"ok": True}, "bind": "a"}
+
+
+def test_transcript_captures_nested_fragment_and_process_execution(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "nested-process.yaml").write_text(
+        """
+version: 1
+name: nested-process
+inputs: [{name: value, type: string, required: true}]
+outputs: {out: {type: string}}
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [upper, "${value}"]}
+      bind: out
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    document = {
+        "name": "outer",
+        "steps": [
+            {
+                "call": {
+                    "process": "nested-process",
+                    "inputs": {"value": {"type": "literal", "value": "hi"}},
+                    "outputs": {"result": "out"},
+                }
+            },
+            {"call": {"fragment": "${inline_fragment}"}},
+            {"terminal": "succeeded"},
+        ],
+    }
+    fragment = {"name": "inline", "steps": [{"operation": {"tool": "inner"}}]}
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        return str(parameters.get("command", [tool]))
+
+    result = Evaluator(
+        FakeLLM(),
+        execute,
+        process_directory=tmp_path,
+    ).evaluate(
+        document,
+        {"inline_fragment": fragment},
+    )
+
+    kinds = [entry.kind for entry in result.transcript]
+    assert "process" in kinds
+    assert "call" in kinds
+    assert result.bindings["result"] == "['upper', 'hi']"
+    assert len([entry for entry in result.transcript if entry.kind == "call"]) == 2
+    assert result.transcript[-1].kind == "terminal"
+    assert any(
+        entry.path.endswith(".call.body[0]") for entry in result.transcript
+    )
+
+
+def test_transcript_records_failed_operation_outcome() -> None:
+    calls = 0
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise EvaluationError("boom")
+        return "recovered"
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "operation-fail",
+            "recoveries": {
+                "repair": {
+                    "steps": [{"operation": {"tool": "internal", "bind": "ok"}}]
+                }
+            },
+            "steps": [
+                {
+                    "attempt": {
+                        "id": "work",
+                        "max_attempts": 2,
+                        "body": [{"operation": {"tool": "flaky", "bind": "result"}}],
+                        "on_failure": {"recovery": "repair", "resume": "work"},
+                    }
+                }
+            ],
+        },
+        {},
+    )
+
+    failed = [
+        entry
+        for entry in result.transcript
+        if entry.outcome == "failed" and entry.kind == "operation"
+    ]
+    assert len(failed) == 1
+    assert failed[0].outcome == "failed"
+    succeeded = [
+        entry
+        for entry in result.transcript
+        if entry.outcome == "succeeded" and entry.kind == "operation"
+    ]
+    assert any(entry.path.endswith("recovery[1][0]") for entry in succeeded)
+    assert result.bindings["result"] == "recovered"
+
+
+def test_transcript_records_failed_step_inside_recovered_attempt() -> None:
+    calls = 0
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        nonlocal calls
+        calls += 1
+        return True
+
+    result = Evaluator(FakeLLM(), execute).evaluate(
+        {
+            "name": "recovery-transcript",
+            "steps": [
+                {
+                    "attempt": {
+                        "id": "work",
+                        "max_attempts": 2,
+                        "body": [
+                            {
+                                "gate": {
+                                    "subject": "ready",
+                                    "equals": True,
+                                }
+                            }
+                        ],
+                        "on_failure": {"recovery": "repair", "resume": "work"},
+                    }
+                }
+            ],
+            "recoveries": {
+                "repair": {
+                    "steps": [
+                        {
+                            "operation": {
+                                "tool": "internal",
+                                "bind": "ready",
+                            }
+                        }
+                    ]
+                }
+            },
+        },
+        {"ready": False},
+    )
+
+    failed = [
+        entry for entry in result.transcript if entry.outcome == "failed"
+    ]
+    gate_failed = next(entry for entry in failed if entry.kind == "gate")
+    assert gate_failed.path.endswith("attempt[1][0]")
+    recovery = next(
+        entry for entry in result.transcript if entry.kind == "recovery"
+    )
+    assert recovery.outcome == "failed"
+    assert any(
+        entry.kind == "operation"
+        and entry.path.endswith("recovery[1][0]")
+        and entry.outcome == "succeeded"
+        for entry in result.transcript
+    )
+    gate_succeeded = [e for e in result.transcript if e.kind == "gate" and e.outcome == "succeeded"]
+    assert len(gate_succeeded) == 1
 
 
 def test_for_each_collects_structured_results_in_order() -> None:

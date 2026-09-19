@@ -45,11 +45,23 @@ class EvaluationEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class TranscriptEntry:
+    """An ordered, durable record of a single executed step."""
+
+    kind: str
+    path: str
+    outcome: str
+    inputs: Mapping[str, Any] = field(default_factory=dict)
+    outputs: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class EvaluationResult:
     bindings: Mapping[str, Any]
     events: tuple[EvaluationEvent, ...]
     llm_activations: int
     tool_calls: int
+    transcript: tuple[TranscriptEntry, ...] = ()
 
 
 class Evaluator:
@@ -100,19 +112,29 @@ class Evaluator:
         state = dict(bindings or {})
         self._document_recoveries = document.get("recoveries", {})
         events: list[EvaluationEvent] = []
+        transcript: list[TranscriptEntry] = []
         usage = {"llm": 0, "tools": 0}
         limits = document.get("limits", {})
         try:
-            self._steps(document["steps"], state, events, usage, limits, "steps")
+            self._steps(
+                document["steps"], state, events, transcript, usage, limits, "steps"
+            )
         except (KeyError, TypeError, ValueError, JsonSchemaError) as exc:
             raise EvaluationError(str(exc)) from exc
-        return EvaluationResult(state, tuple(events), usage["llm"], usage["tools"])
+        return EvaluationResult(
+            state,
+            tuple(events),
+            usage["llm"],
+            usage["tools"],
+            tuple(transcript),
+        )
 
     def _steps(
         self,
         steps: Sequence[Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -121,49 +143,116 @@ class Evaluator:
             step_path = f"{path}[{index}]"
             if not isinstance(step, Mapping):
                 raise EvaluationError(f"{step_path} must be a mapping")
-            if "operation" in step:
-                self._operation(
-                    step["operation"], state, events, usage, limits, step_path
+            try:
+                self._dispatch(
+                    step, state, events, transcript, usage, limits, step_path
                 )
-            elif "judge" in step:
-                self._judge(step["judge"], state, events, usage, limits, step_path)
-            elif "for_each" in step or "worklist" in step:
-                key = "for_each" if "for_each" in step else "worklist"
-                self._loop(key, step[key], state, events, usage, limits, step_path)
-            elif "attempt" in step:
-                self._attempt(step["attempt"], state, events, usage, limits, step_path)
-            elif "specialize" in step:
-                self._specialize(
-                    step["specialize"], state, events, usage, limits, step_path
+            except EvaluationError:
+                _record(
+                    transcript,
+                    kind=_step_kind(step),
+                    path=step_path,
+                    outcome="failed",
+                    inputs=_step_inputs(step),
                 )
-            elif "call" in step:
-                declaration = step["call"]
-                if isinstance(declaration, Mapping) and "process" in declaration:
-                    self._call_process(
-                        declaration, state, events, usage, limits, step_path
-                    )
-                else:
-                    self._call_fragment(
-                        declaration, state, events, usage, limits, step_path
-                    )
-            elif "repeat" in step:
-                self._repeat(step["repeat"], state, events, usage, limits, step_path)
-            elif "branch" in step:
-                self._branch(step["branch"], state, events, usage, limits, step_path)
-            elif "terminal" in step:
-                events.append(
-                    EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
+                raise
+
+    def _dispatch(
+        self,
+        step: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+        step_path: str,
+    ) -> None:
+        if "operation" in step:
+            self._operation(
+                step["operation"],
+                state,
+                events,
+                transcript,
+                usage,
+                limits,
+                step_path,
+            )
+        elif "judge" in step:
+            self._judge(
+                step["judge"], state, events, transcript, usage, limits, step_path
+            )
+        elif "for_each" in step or "worklist" in step:
+            key = "for_each" if "for_each" in step else "worklist"
+            self._loop(
+                key,
+                step[key],
+                state,
+                events,
+                transcript,
+                usage,
+                limits,
+                step_path,
+            )
+        elif "attempt" in step:
+            self._attempt(
+                step["attempt"],
+                state,
+                events,
+                transcript,
+                usage,
+                limits,
+                step_path,
+            )
+        elif "specialize" in step:
+            self._specialize(
+                step["specialize"],
+                state,
+                events,
+                transcript,
+                usage,
+                limits,
+                step_path,
+            )
+        elif "call" in step:
+            declaration = step["call"]
+            if isinstance(declaration, Mapping) and "process" in declaration:
+                self._call_process(
+                    declaration, state, events, transcript, usage, limits, step_path
                 )
-            elif "gate" in step:
-                self._gate(step["gate"], state, step_path)
             else:
-                raise EvaluationError(f"{step_path} has no supported control")
+                self._call_fragment(
+                    declaration, state, events, transcript, usage, limits, step_path
+                )
+        elif "repeat" in step:
+            self._repeat(
+                step["repeat"], state, events, transcript, usage, limits, step_path
+            )
+        elif "branch" in step:
+            self._branch(
+                step["branch"], state, events, transcript, usage, limits, step_path
+            )
+        elif "terminal" in step:
+            events.append(
+                EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
+            )
+            _record(
+                transcript,
+                kind="terminal",
+                path=step_path,
+                outcome="succeeded",
+                inputs={"status": step["terminal"]},
+            )
+        elif "gate" in step:
+            self._gate(step["gate"], state, transcript, step_path)
+        else:
+            raise EvaluationError(f"{step_path} has no supported control")
 
     def _specialize(
         self,
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -202,6 +291,7 @@ class Evaluator:
             process["steps"],
             generator_state,
             events,
+            transcript,
             generator_usage,
             process.get("limits", {}),
             f"{path}.subprocess[{process_name}]",
@@ -228,6 +318,14 @@ class Evaluator:
                 {"bind": bind, "name": fragment.get("name")},
             )
         )
+        _record(
+            transcript,
+            kind="specialize",
+            path=path,
+            outcome="succeeded",
+            inputs={"bind": bind, "process": process_name},
+            outputs={"name": fragment.get("name")},
+        )
 
     def _load_process(self, name: str) -> Mapping[str, Any]:
         from procedrr import parse_and_validate
@@ -244,6 +342,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -261,8 +360,21 @@ class Evaluator:
         maximum = declaration.get("max_steps", len(fragment["steps"]))
         if not isinstance(maximum, int) or len(fragment["steps"]) > maximum:
             raise EvaluationError(f"{path}.call.fragment exceeds its step bound")
+        _record(
+            transcript,
+            kind="call",
+            path=path,
+            outcome="succeeded",
+            inputs={"fragment": reference},
+        )
         self._steps(
-            fragment["steps"], state, events, usage, limits, f"{path}.call.body"
+            fragment["steps"],
+            state,
+            events,
+            transcript,
+            usage,
+            limits,
+            f"{path}.call.body",
         )
 
     def _call_process(
@@ -270,6 +382,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -333,7 +446,16 @@ class Evaluator:
         steps = process.get("steps")
         if not isinstance(steps, list):
             raise EvaluationError(f"{path}.call process has no steps")
-        self._steps(steps, child_state, events, usage, child_limits, f"{path}.call")
+        _record(
+            transcript,
+            kind="call",
+            path=path,
+            outcome="succeeded",
+            inputs={"process": process_name},
+        )
+        self._steps(
+            steps, child_state, events, transcript, usage, child_limits, f"{path}.call"
+        )
         for parent_name, child_reference in outputs.items():
             if not isinstance(parent_name, str) or not isinstance(child_reference, str):
                 raise EvaluationError(
@@ -356,12 +478,21 @@ class Evaluator:
                 {"name": process_name, "outputs": list(outputs)},
             )
         )
+        _record(
+            transcript,
+            kind="process",
+            path=path,
+            outcome="succeeded",
+            inputs={"process": process_name},
+            outputs={"name": process_name, "outputs": list(outputs)},
+        )
 
     def _attempt(
         self,
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -390,9 +521,29 @@ class Evaluator:
         ):
             raise EvaluationError(f"{path}.attempt recovery is not declared")
         for attempt in range(1, maximum + 1):
+            _record(
+                transcript,
+                kind="attempt",
+                path=f"{path}.attempt[{attempt}]",
+                outcome="attempting",
+                inputs={"id": attempt_id, "attempt": attempt},
+            )
             try:
                 self._steps(
-                    body, state, events, usage, limits, f"{path}.attempt[{attempt}]"
+                    body,
+                    state,
+                    events,
+                    transcript,
+                    usage,
+                    limits,
+                    f"{path}.attempt[{attempt}]",
+                )
+                _record(
+                    transcript,
+                    kind="attempt",
+                    path=path,
+                    outcome="succeeded",
+                    inputs={"id": attempt_id, "attempt": attempt},
                 )
                 return
             except EvaluationError as exc:
@@ -404,11 +555,20 @@ class Evaluator:
                     failure["category"] = "execution_error"
                     failure["error"] = str(exc)
                 state["failure"] = failure
+                _record(
+                    transcript,
+                    kind="recovery",
+                    path=f"{path}.recovery[{attempt}]",
+                    outcome="failed",
+                    inputs={"id": attempt_id, "attempt": attempt},
+                    outputs=state["failure"],
+                )
                 events.append(EvaluationEvent("recovery", path, state["failure"]))
                 self._steps(
                     recovery["steps"],
                     state,
                     events,
+                    transcript,
                     usage,
                     limits,
                     f"{path}.recovery[{attempt}]",
@@ -420,6 +580,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -438,7 +599,13 @@ class Evaluator:
         collected: list[Any] = []
         for iteration in range(1, maximum + 1):
             self._steps(
-                body, state, events, usage, limits, f"{path}.repeat[{iteration}]"
+                body,
+                state,
+                events,
+                transcript,
+                usage,
+                limits,
+                f"{path}.repeat[{iteration}]",
             )
             if isinstance(collect, Mapping) and isinstance(collect.get("value"), str):
                 value = _resolve_binding(state, collect["value"])
@@ -451,20 +618,30 @@ class Evaluator:
                     collect.get("binding"), str
                 ):
                     state[collect["binding"]] = collected
-                return
+                break
+        _record(
+            transcript,
+            kind="repeat",
+            path=path,
+            outcome="succeeded",
+            inputs={"max_iterations": maximum},
+            outputs={"iterations": iteration},
+        )
         subject = str(until.get("subject"))
         root = subject.split(".", 1)[0]
         last_state = _compact_value(state.get(root), max_chars=2000)
-        raise EvaluationError(
-            f"{path}.repeat exhausted after {maximum} iterations; "
-            f"last {root}={_json_text(last_state)}"
-        )
+        if _resolve_binding(state, subject) != until.get("equals"):
+            raise EvaluationError(
+                f"{path}.repeat exhausted after {maximum} iterations; "
+                f"last {root}={_json_text(last_state)}"
+            )
 
     def _branch(
         self,
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -479,13 +656,23 @@ class Evaluator:
             raise EvaluationError(f"{path}.branch has no case for {value!r}")
         if not isinstance(body, list):
             raise EvaluationError(f"{path}.branch case must be a list")
-        self._steps(body, state, events, usage, limits, f"{path}.branch[{value!r}]")
+        _record(
+            transcript,
+            kind="branch",
+            path=path,
+            outcome="succeeded",
+            inputs={"subject": subject, "value": value},
+        )
+        self._steps(
+            body, state, events, transcript, usage, limits, f"{path}.branch[{value!r}]"
+        )
 
     def _operation(
         self,
         operation: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -518,12 +705,21 @@ class Evaluator:
         if isinstance(bind, str):
             state[bind] = result
         events.append(EvaluationEvent("operation", path, {"tool": tool, "bind": bind}))
+        _record(
+            transcript,
+            kind="operation",
+            path=path,
+            outcome="succeeded",
+            inputs={"tool": tool, "parameters": parameters},
+            outputs={"result": result, "bind": bind},
+        )
 
     def _judge(
         self,
         judge: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -592,6 +788,14 @@ class Evaluator:
                 },
             )
         )
+        _record(
+            transcript,
+            kind="judge",
+            path=path,
+            outcome="succeeded",
+            inputs={"output": judge["output"]["name"]},
+            outputs={"result": output},
+        )
 
     def _loop(
         self,
@@ -599,6 +803,7 @@ class Evaluator:
         declaration: Mapping[str, Any],
         state: dict[str, Any],
         events: list[EvaluationEvent],
+        transcript: list[TranscriptEntry],
         usage: dict[str, int],
         limits: Mapping[str, Any],
         path: str,
@@ -639,6 +844,7 @@ class Evaluator:
                     body,
                     state,
                     events,
+                    transcript,
                     usage,
                     limits,
                     f"{path}.{kind}[{epoch}][{index}]",
@@ -659,18 +865,40 @@ class Evaluator:
                             )
                         else:
                             collected[str(item)] = output
+        _record(
+            transcript,
+            kind=kind,
+            path=path,
+            outcome="succeeded",
+            inputs={"items": len(items)},
+            outputs={"epochs": epochs},
+        )
         if isinstance(collect, Mapping) and isinstance(collect.get("binding"), str):
             state[collect["binding"]] = (
                 collected_list if collect_mode == "list" else collected
             )
 
     def _gate(
-        self, gate: Mapping[str, Any], state: Mapping[str, Any], path: str
+        self,
+        gate: Mapping[str, Any],
+        state: Mapping[str, Any],
+        transcript: list[TranscriptEntry],
+        path: str,
     ) -> None:
         if _resolve_binding(state, str(gate["subject"])) != gate["equals"]:
             subject = str(gate["subject"])
             root = subject.split(".", 1)[0]
             raise ValidationGateError(_resolve_binding(state, root))
+        _record(
+            transcript,
+            kind="gate",
+            path=path,
+            outcome="succeeded",
+            inputs={
+                "subject": str(gate["subject"]),
+                "equals": gate["equals"],
+            },
+        )
 
     @staticmethod
     def _limit(
@@ -680,6 +908,52 @@ class Evaluator:
         usage_key = "llm" if key == "llm_activations" else "tools"
         if isinstance(bound, int) and usage[usage_key] > bound:
             raise EvaluationError(f"{label} budget exceeded")
+
+
+def _step_kind(step: Mapping[str, Any]) -> str:
+    for key in (
+        "operation",
+        "judge",
+        "for_each",
+        "worklist",
+        "attempt",
+        "specialize",
+        "call",
+        "repeat",
+        "branch",
+        "terminal",
+        "gate",
+    ):
+        if key in step:
+            return key
+    return "unknown"
+
+
+def _step_inputs(step: Mapping[str, Any]) -> Mapping[str, Any]:
+    declaration = step.get(_step_kind(step))
+    if isinstance(declaration, Mapping):
+        return {key: value for key, value in declaration.items() if key != "body"}
+    return {}
+
+
+def _record(
+    transcript: list[TranscriptEntry],
+    *,
+    kind: str,
+    path: str,
+    outcome: str,
+    inputs: Mapping[str, Any] | None = None,
+    outputs: Mapping[str, Any] | None = None,
+) -> None:
+    transcript.append(
+        TranscriptEntry(
+            kind=kind,
+            path=path,
+            outcome=outcome,
+            inputs=dict(inputs or {}),
+            outputs=dict(outputs or {}),
+        )
+    )
 
 
 def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:

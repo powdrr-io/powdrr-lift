@@ -1,0 +1,124 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 724
+title: Checkpoint each OpenCode operation before continuing
+intent:
+  problem: Single-task OpenCode requests run sequentially, but the workflow previously waited until the entire sequence completed before recording whether each operation produced acceptable evidence.
+  goal: Persist a checkpoint after every operation, stop before the next task when worker or scope evidence fails, and feed failed checkpoint evidence into the existing validation gate.
+human-decisions:
+  - id: checkpoint-before-next-operation
+    summary: Do not invoke the next OpenCode operation until the current operation has completed with in-scope changes and a clean diff.
+  - id: checkpoint-failure-is-validation-failure
+    summary: Treat a failed operation checkpoint as a final validation failure even if the aggregate project command happens to pass.
+  - id: repaired-checkpoint-replaces-failure
+    summary: Allow a successful repair checkpoint to supersede the failed checkpoint that caused the repair cycle.
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import validation result types used to surface operation checkpoint failures.
+    rationale: Reuse the existing validation evidence contract instead of creating a parallel final gate.
+    span:
+      start_line: 41
+      end_line: 42
+    related:
+      decisions:
+        - checkpoint-failure-is-validation-failure
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Capture the pre-operation changed-path set and write a checkpoint after each worker attempt.
+    rationale: Attribute new work and checkpoint status to the specific operation that produced it.
+    span:
+      start_line: 576
+      end_line: 576
+    related:
+      decisions:
+        - checkpoint-before-next-operation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Persist operation checkpoint evidence, supersede failed checkpoints during repair, and stop the sequence on failure.
+    rationale: Make task progression fail closed while allowing a verified repair to restore progress.
+    span:
+      start_line: 592
+      end_line: 608
+    related:
+      decisions:
+        - checkpoint-before-next-operation
+        - repaired-checkpoint-replaces-failure
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Collect changed paths, evaluate worker completion and scope, and persist checkpoint evidence for one operation.
+    rationale: Define the per-task checkpoint as small deterministic decisions rather than an LLM judgment.
+    span:
+      start_line: 725
+      end_line: 803
+    related:
+      decisions:
+        - checkpoint-before-next-operation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Convert failed operation checkpoints into explicit validation failures.
+    rationale: Prevent later review gates from accepting an implementation whose task sequence already failed.
+    span:
+      start_line: 924
+      end_line: 949
+    related:
+      decisions:
+        - checkpoint-failure-is-validation-failure
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import the operation checkpoint contract and its execution unit fixture.
+    rationale: Test the deterministic checkpoint boundary directly.
+    span:
+      start_line: 11
+      end_line: 11
+    related:
+      decisions:
+        - checkpoint-before-next-operation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import the operation checkpoint helper into the feature endpoint tests.
+    rationale: Exercise the production checkpoint contract directly.
+    span:
+      start_line: 27
+      end_line: 27
+    related:
+      decisions:
+        - checkpoint-before-next-operation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Test that checkpoints require new in-scope work and reject a no-op operation.
+    rationale: Prove the worker sequence cannot advance without operation-level evidence.
+    span:
+      start_line: 343
+      end_line: 400
+    related:
+      decisions:
+        - checkpoint-before-next-operation
+entities:
+  - id: operation-checkpoint
+    type: Module
+    action: added
+  - id: operation-checkpoint-validation-gate
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: no-next-task-after-checkpoint-failure
+    action: added
+    description: The initial OpenCode operation sequence stops when the current worker attempt fails, produces no new changes, changes out-of-scope paths, or produces a diff that fails git diff --check.
+    rationale: Prevent later tasks from building on unverified intermediate state.
+  - id: checkpoint-evidence-is-durable
+    action: added
+    description: Each operation attempt has a persisted checkpoint artifact containing its task identity, attempt identity, changed paths, scope result, diff result, and status.
+    rationale: Make task-level progress auditable and available to repair logic.
+  - id: checkpoint-failures-reach-final-validation
+    action: added
+    description: Any currently unresolved operation checkpoint failure produces an explicit failed validation result.
+    rationale: Aggregate test success cannot erase a failed task-level contract.
+guidance:
+  - id: use-checkpoints-as-task-admission
+    action: added
+    description: Treat a passed operation checkpoint as the admission condition for invoking the next targeted OpenCode task.
+    rationale: Keep multi-turn implementation deterministic and fail closed between tasks.
+features: []
+proposed_prs: []

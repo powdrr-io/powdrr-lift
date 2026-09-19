@@ -9,6 +9,8 @@ import pytest
 import yaml
 
 from powdrr_lift.cli import main
+from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentStatus,
@@ -24,7 +26,9 @@ from powdrr_lift.workrr.feature_endpoint import (
     _create_pr_changelog,
     _ensure_current_baseline,
     _load_implementation_plan,
+    _operation_checkpoint,
     _plan_text_items,
+    _proposal_execution_units,
     _validate_procedrr_flow,
     review_feature_diff,
 )
@@ -349,6 +353,112 @@ non_goals:
         "Do not redesign the transport.",
         "Do not add unrelated commands.",
     )
+
+
+def test_structrr_operations_compile_to_targeted_worker_units() -> None:
+    revision = compile_proposal_revision(
+        "adapter",
+        {"entities": []},
+        {
+            "features": [
+                {"id": "parse", "action": "added", "description": "Parse input."},
+                {"id": "render", "action": "added", "description": "Render output."},
+            ]
+        },
+        acceptance_criteria=("The feature works.",),
+        must_preserve=("Keep the API stable.",),
+        non_goals=("Do not redesign transport.",),
+        allowed_paths=("src", "tests"),
+        source_refs=("structrr:baseline.yaml", "proposal:revision.json"),
+    )
+
+    units = _proposal_execution_units(
+        slug="adapter",
+        feature_description="Add the adapter.",
+        proposal_revision=revision,
+        acceptance_criteria=("The feature works.",),
+        planned_additions=(),
+        planned_deletions=(),
+        must_preserve=("Keep the API stable.",),
+        non_goals=("Do not redesign transport.",),
+        allowed_paths=("src", "tests"),
+        source_refs=("structrr:baseline.yaml", "proposal:revision.json"),
+    )
+
+    assert [unit.unit_id for unit in units] == [
+        "implement-adapter-add:features:parse",
+        "implement-adapter-add:features:render",
+    ]
+    assert units[0].planned_additions[0]["id"] == "parse"
+    assert units[1].dependencies == (units[0].unit_id,)
+    request = ImplementationRequest.from_execution_unit(
+        units[0],
+        request_id="adapter-implementation-1",
+        base_commit="base",
+        plan_fingerprint=revision.fingerprint,
+    )
+    assert request.intent_packet is not None
+    assert request.intent_packet.operation_id == units[0].unit_id
+    assert request.intent_packet.required_operations[0]["change"]["id"] == "parse"
+    assert "render" not in request.prompt
+
+
+def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> None:
+    unit = ExecutionUnit(
+        unit_id="implement-adapter-add-features-parse",
+        objective="Parse input.",
+        paths=("src",),
+        validation_profiles=("feature-validation",),
+        acceptance_criteria=("Parse input.",),
+    )
+    request = ImplementationRequest(
+        request_id="request",
+        objective="Parse input.",
+        prompt="Parse input.",
+        base_commit="base",
+        plan_fingerprint="fingerprint",
+        allowed_paths=("src",),
+        acceptance_criteria=("Parse input.",),
+        validation_profiles=("feature-validation",),
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt",
+        request_id="request",
+        provider="opencode",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+    )
+
+    def runner(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        del kwargs
+        if command[-1] == "--check":
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return subprocess.CompletedProcess(command, 0, "src/adapter.py\n", "")
+
+    checkpoint = _operation_checkpoint(
+        runner=runner,
+        worktree=tmp_path,
+        unit=unit,
+        request=request,
+        attempt=attempt,
+        before_paths=set(),
+    )
+
+    assert checkpoint["passed"] is True
+    assert checkpoint["changed_paths"] == ["src/adapter.py"]
+
+    failed = _operation_checkpoint(
+        runner=runner,
+        worktree=tmp_path,
+        unit=unit,
+        request=request,
+        attempt=attempt,
+        before_paths={"src/adapter.py"},
+    )
+    assert failed["passed"] is False
+    assert failed["error"] == "operation produced no new worktree changes"
 
 
 def test_plan_acceptance_criteria_have_stable_ids() -> None:

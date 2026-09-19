@@ -1,0 +1,260 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 726
+title: Promote merged single-task OpenCode lineage to main
+intent:
+  problem: The reviewed Structrr proposal identity, stale-state gate, single-operation OpenCode execution, and operation checkpoints were merged into stacked branches but had not been propagated into main.
+  goal: Promote the exact reviewed implementation lineage and its validated changelog artifacts into main without introducing new behavior.
+human-decisions:
+  - id: promote-reviewed-lineage-without-reimplementation
+    summary: Bring the already-reviewed PR #720 through PR #724 commits into main unchanged.
+  - id: preserve-existing-changelog-artifacts
+    summary: Retain each prior PR changelog as part of the promoted audit trail.
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Promote the public Structrr proposal revision exports.
+    rationale: Make the reviewed proposal identity and validation contract available in main.
+    span:
+      start_line: 20
+      end_line: 27
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Promote proposal revision exports in the public symbol list.
+    rationale: Preserve the reviewed Structrr package interface.
+    span:
+      start_line: 47
+      end_line: 52
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/structrr/proposal.py
+    type: added
+    summary: Promote deterministic proposal revision compilation, persistence, and validation.
+    rationale: Establish the reviewed canonical intent artifact in main.
+    span:
+      start_line: 1
+      end_line: 219
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote proposal revision and checkpoint validation imports.
+    rationale: Bring the reviewed Workrr gates into main.
+    span:
+      start_line: 23
+      end_line: 27
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote validation result imports.
+    rationale: Preserve the reviewed validation contract.
+    span:
+      start_line: 41
+      end_line: 42
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote baseline and plan loading for canonical proposal compilation.
+    rationale: Preserve the reviewed pre-worker intent binding.
+    span:
+      start_line: 450
+      end_line: 451
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote proposal compilation and stale-state setup.
+    rationale: Preserve the reviewed fail-closed OpenCode entry point.
+    span:
+      start_line: 455
+      end_line: 484
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote operation context setup.
+    rationale: Preserve the reviewed targeted worker orchestration.
+    span:
+      start_line: 486
+      end_line: 499
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote operation request setup.
+    rationale: Preserve the reviewed single-task worker boundary.
+    span:
+      start_line: 502
+      end_line: 503
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote replacement of the aggregate execution path.
+    rationale: Bring the reviewed operation sequence into main.
+    span:
+      start_line: 470
+      end_line: 481
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote replacement of the prior request path.
+    rationale: Preserve the reviewed targeted execution flow.
+    span:
+      start_line: 494
+      end_line: 515
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote persisted operation state setup.
+    rationale: Preserve the reviewed Workrr state contract.
+    span:
+      start_line: 519
+      end_line: 519
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote operation loop replacement.
+    rationale: Preserve the reviewed sequential task boundary.
+    span:
+      start_line: 522
+      end_line: 525
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote operation request and checkpoint sequencing.
+    rationale: Preserve the reviewed single-task execution flow.
+    span:
+      start_line: 523
+      end_line: 611
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote final operation state handling.
+    rationale: Preserve the reviewed sequential state contract.
+    span:
+      start_line: 616
+      end_line: 616
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote operation unit and checkpoint helpers.
+    rationale: Bring the reviewed deterministic task gates into main.
+    span:
+      start_line: 619
+      end_line: 801
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote YAML mapping loading and checkpoint-aware validation results.
+    rationale: Preserve the reviewed deterministic validation path.
+    span:
+      start_line: 863
+      end_line: 874
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Promote unresolved operation checkpoint failures into final validation failures.
+    rationale: Ensure main retains the reviewed fail-closed task gate.
+    span:
+      start_line: 924
+      end_line: 949
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Promote operation decomposition and checkpoint contract tests.
+    rationale: Keep the reviewed Workrr behavior covered in main.
+    span:
+      start_line: 11
+      end_line: 12
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Promote operation checkpoint imports.
+    rationale: Preserve direct checkpoint coverage.
+    span:
+      start_line: 27
+      end_line: 27
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Promote targeted worker unit imports.
+    rationale: Preserve direct single-task coverage.
+    span:
+      start_line: 29
+      end_line: 29
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Promote targeted operation unit and checkpoint tests.
+    rationale: Retain the reviewed regression coverage in main.
+    span:
+      start_line: 295
+      end_line: 400
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+  - path: tests/test_structrr_proposal.py
+    type: added
+    summary: Promote deterministic proposal revision and tamper detection tests.
+    rationale: Keep the canonical intent artifact contract verified in main.
+    span:
+      start_line: 1
+      end_line: 92
+    related:
+      decisions:
+        - promote-reviewed-lineage-without-reimplementation
+entities:
+  - id: promoted-single-task-opencode-lineage
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: main-contains-reviewed-single-task-lineage
+    action: added
+    description: Main contains the reviewed proposal revision, stale-state, single-task execution, and operation checkpoint implementation from PR #720 through PR #724.
+    rationale: Eliminate the gap between merged stacked branches and the protected integration branch.
+guidance:
+  - id: promote-before-extending-lineage
+    action: added
+    description: Propagate reviewed stacked implementation lineage into main before adding further dependent slices.
+    rationale: Keep future branches anchored to one authoritative integration state.
+features: []
+proposed_prs: []

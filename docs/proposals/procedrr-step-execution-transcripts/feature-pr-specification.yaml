@@ -1,0 +1,92 @@
+schema: https://powdrr.io/schemas/specification-v1
+id: procedrr-step-execution-transcripts
+title: Add Procedrr step execution transcripts. Extend the Procedrr evaluator so EvaluationResult
+  exposes an ordered, durable transcript of every executed step, including step kind
+  and path, relevant inputs, produced outputs, and succeeded or failed outcome. Capture
+  transcripts consistently across operations, judges, loops, retries/attempts, specializations,
+  calls, repeats, branches, terminal steps, gates, nested fragments/processes, and
+  failures. Preserve existing evaluator behavior and public compatibility, and add
+  focused tests proving ordering, nested execution, captured values, and failure outcomes.
+  Keep the implementation scoped to src/procedrr_evaluator/evaluator.py and tests/test_procedrr_evaluator.py.
+requirements:
+- description: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+  id: req-step-execution-transcripts
+  state: added
+approach:
+- description: Extend the Procedrr evaluator so EvaluationResult exposes an ordered,
+    durable transcript of every executed step, including step kind and path, relevant
+    inputs, produced outputs, and succeeded or failed outcome.
+  id: app-step-transcript-model
+  state: added
+entity_relationships:
+- id: evaluator-transcript-records-step-execution
+  description: The evaluator records each executed step into an ordered transcript
+    with kind, path, inputs, outputs, and outcome.
+  rationale: Capture step execution details for the transcript feature while preserving
+    existing behavior.
+  relationship: produces
+  source: procedrr-evaluator
+  target: step-execution-transcript
+invariants:
+- id: inv-step-transcript-ordered-durable
+  description: Every executed Procedrr step must produce an ordered, durable transcript
+    entry recording step kind, path, relevant inputs, produced outputs, and succeeded
+    or failed outcome.
+  section: invariants
+  specification_type: current-state
+  work_item_name: procedrr-step-execution-transcripts
+guidance:
+- id: guide-transcript-capture-all-step-kinds
+  description: Capture ordered, durable transcripts for every executed step kind including
+    operations, judges, loops, retries, attempts, specializations, calls, repeats,
+    branches, terminal steps, gates, nested fragments, and processes, preserving existing
+    evaluator behavior and public compatibility.
+  section: guidance
+  specification_type: current-state
+  work_item_name: procedrr-step-execution-transcripts
+intent:
+  problem: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+  goal: Add Procedrr step execution transcripts so EvaluationResult exposes an ordered,
+    durable record of every executed step, including step kind and path, relevant
+    inputs, produced outputs, and succeeded or failed outcome.
+  reasoning: The feature requires a complete audit trail of step execution across
+    all evaluator operations, which is not covered by the existing intent items about
+    OpenAI proxy recording or required test cases.
+acceptance_criteria:
+- description: The evaluator exposes an ordered, durable transcript of every executed
+    step, including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome.
+  id: ac-transcript-exposed
+expected_tests:
+- description: Add tests proving the evaluator exposes an ordered, durable transcript
+    of every executed step, including step kind, path, inputs, outputs, and success/failure
+    outcome, across operations, judges, loops, retries, specializations, calls, repeats,
+    branches, terminal steps, gates, nested fragments/processes, and failures, while
+    preserving existing behavior and public compatibility.
+  id: test-step-execution-transcripts
+expected_outcomes:
+- id: outcome-durable-transcript
+  description: The evaluator exposes an ordered, durable transcript of every executed
+    step, including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome.
+risks:
+- description: The new transcript capture must not break existing evaluator behavior,
+    so regression risk from adding ordered step recording across all execution paths
+    must be tracked.
+  id: risk-transcript-regression

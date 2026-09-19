@@ -1219,8 +1219,13 @@ def _run_validation_profile(
         isinstance(item, str) and item for item in command
     ):
         raise PowdrrExecutionError("validation profile command is malformed")
+    # The Procedrr flow runs one profile per loop iteration. Narrow the
+    # request as well as the runner registry; ValidationRunner otherwise
+    # resolves every declared profile and returns a multi-result report for
+    # this single-profile operation.
+    request = replace(state["request"], validation_profiles=(name,))
     report = ValidationRunner({name: ValidationProfile(name, tuple(command))}).run(
-        state["request"], state["attempt"], worktree_root=worktree
+        request, state["attempt"], worktree_root=worktree
     )
     if len(report.results) != 1:
         raise PowdrrExecutionError(

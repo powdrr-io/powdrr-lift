@@ -606,14 +606,30 @@ def _remove_ephemeral_paths(
 ) -> None:
     """Remove worker-created ephemeral artifacts before final diff evaluation."""
     current_paths = _working_paths(worktree_root)
+    new_untracked = _untracked_paths(worktree_root) - before_status
     for relative_path in current_paths - before_status:
-        if not _path_is_allowed(relative_path, request.ephemeral_paths):
+        if _path_is_allowed(relative_path, request.ephemeral_paths):
+            should_remove = True
+        else:
+            # Validation and agent tooling may create untracked files. Keep
+            # the worker boundary structural: newly created untracked files
+            # outside the declared scopes are disposable, while tracked
+            # out-of-scope edits remain visible for policy enforcement.
+            should_remove = relative_path in new_untracked and not _path_is_allowed(
+                relative_path, request.allowed_paths
+            )
+        if not should_remove:
             continue
         target = worktree_root / relative_path
         if target.is_dir() and not target.is_symlink():
             shutil.rmtree(target)
         elif target.exists() or target.is_symlink():
             target.unlink()
+
+
+def _untracked_paths(worktree_root: Path) -> set[str]:
+    output = _git_output(worktree_root, "ls-files", "--others", "--exclude-standard")
+    return {line for line in output.splitlines() if line}
 
 
 def _worktree_fingerprint(worktree_root: Path, paths: Sequence[str]) -> str:

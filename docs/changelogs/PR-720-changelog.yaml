@@ -1,0 +1,151 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 720
+title: Persist deterministic Structrr proposal revisions
+intent:
+  problem: OpenCode execution packets have plan-derived context, but their proposal identity is still a slug-based placeholder and is not persisted as a canonical revision artifact.
+  goal: Compile and persist a deterministic proposal revision from the Structrr baseline and plan, then bind its fingerprint and source reference into the operation packet sent to OpenCode.
+human-decisions:
+  - id: persist-proposal-revision-before-execution
+    summary: Record the canonical proposal revision in the proposal directory before the coding worker starts.
+  - id: fingerprint-all-targeted-worker-context
+    summary: Derive the proposed change fingerprint from the baseline, operations, acceptance criteria, preservation constraints, exclusions, allowed paths, and source references.
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/proposal.py
+    type: added
+    summary: Define canonical proposal operations and revision fingerprints compiled from Structrr inputs.
+    rationale: Give each targeted OpenCode request a stable identity that can be compared across retries and later validation stages.
+    span:
+      start_line: 1
+      end_line: 137
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export the proposal revision compiler and schema types.
+    rationale: Make the canonical proposal artifact part of the Structrr public interface.
+    span:
+      start_line: 20
+      end_line: 25
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export the proposal revision compiler and schema types.
+    rationale: Make the canonical proposal artifact part of the Structrr public interface.
+    span:
+      start_line: 45
+      end_line: 48
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import the Structrr proposal revision compiler into the feature endpoint.
+    rationale: Make deterministic proposal compilation available at the OpenCode boundary.
+    span:
+      start_line: 23
+      end_line: 23
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Load the baseline and proposal plan before constructing the OpenCode execution request.
+    rationale: Ensure the worker receives a committed, inspectable proposal identity before it edits the worktree.
+    span:
+      start_line: 444
+      end_line: 445
+    related:
+      decisions:
+        - persist-proposal-revision-before-execution
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Compile and persist proposal-revision.json before constructing the OpenCode execution request.
+    rationale: Ensure the worker receives a committed, inspectable proposal identity before it edits the worktree.
+    span:
+      start_line: 449
+      end_line: 470
+    related:
+      decisions:
+        - persist-proposal-revision-before-execution
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use the deterministic proposal fingerprint and artifact reference in the execution unit and implementation request.
+    rationale: Bind targeted worker instructions to the exact proposal revision rather than a mutable slug convention.
+    span:
+      start_line: 474
+      end_line: 474
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use the deterministic proposal artifact reference in the execution unit.
+    rationale: Bind targeted worker instructions to the exact proposal revision rather than a mutable slug convention.
+    span:
+      start_line: 486
+      end_line: 487
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use the deterministic proposal artifact reference in the implementation request.
+    rationale: Bind targeted worker instructions to the exact proposal revision rather than a mutable slug convention.
+    span:
+      start_line: 498
+      end_line: 499
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Load baseline and plan YAML mappings with explicit execution errors for malformed inputs.
+    rationale: Prevent proposal identity compilation from silently accepting invalid Structrr documents.
+    span:
+      start_line: 616
+      end_line: 627
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+  - path: tests/test_structrr_proposal.py
+    type: added
+    summary: Verify stable fingerprints, removal operations, and deterministic context normalization.
+    rationale: Prove the proposal revision identity is reproducible and captures additions and removals.
+    span:
+      start_line: 1
+      end_line: 56
+    related:
+      decisions:
+        - fingerprint-all-targeted-worker-context
+entities:
+  - id: deterministic-proposal-revision
+    type: Module
+    action: added
+  - id: proposal-revision-artifact
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: proposal-fingerprint-is-deterministic
+    action: added
+    description: Equivalent Structrr baseline and plan content produces the same proposal revision fingerprint regardless of mapping key order.
+    rationale: Retries and validation must identify the same intent without depending on incidental serialization order.
+  - id: worker-packet-identifies-proposal-revision
+    action: added
+    description: The OpenCode execution unit and implementation request reference the persisted proposal revision and use its fingerprint as the proposed change identity.
+    rationale: Make the worker's targeted instructions auditable against a specific proposal state.
+  - id: proposal-revision-precedes-worker-edit
+    action: added
+    description: The proposal revision artifact is committed before the OpenCode worker receives the implementation request.
+    rationale: The worker must start from a clean worktree whose intent artifact is already part of the tracked state.
+guidance:
+  - id: use-proposal-revision-as-worker-anchor
+    action: added
+    description: Treat proposal-revision.json and its fingerprint as the canonical identity for the targeted OpenCode operation.
+    rationale: Keep subsequent execution and validation anchored to the exact compiled Structrr change.
+features: []
+proposed_prs: []

@@ -122,7 +122,7 @@ DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
         "deepseek-ai/DeepSeek-V4-Pro", provider="deepinfra"
     ),
     "standard_reasoning": LLMModelMapping(
-        "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
+        "deepseek-ai/DeepSeek-V4-Flash-0731", provider="deepinfra"
     ),
     "simple_task": LLMModelMapping(
         "Qwen/Qwen3-Next-80B-A3B-Instruct",
@@ -139,7 +139,7 @@ DEEPINFRA_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
         ),
     ),
     "long_context": LLMModelMapping(
-        "deepseek-ai/DeepSeek-V4-Flash", provider="deepinfra"
+        "deepseek-ai/DeepSeek-V4-Flash-0731", provider="deepinfra"
     ),
     "vision": LLMModelMapping("Qwen/Qwen2.5-VL-32B-Instruct", provider="deepinfra"),
 }

@@ -1393,7 +1393,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     harbor_feature_parser.add_argument(
         "--planning-provider",
-        default="deepinfra-cheap",
+        default="deepinfra",
         choices=ALL_PROVIDERS,
     )
     harbor_feature_parser.add_argument("--planning-model")

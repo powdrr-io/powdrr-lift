@@ -323,6 +323,14 @@ def _execute_procedrr_flow(
                     "aggregate_category_edits requires category decisions"
                 )
             return _aggregate_category_edits(decisions)
+        if name == "decompose_feature_description":
+            feature_description = parameters.get("feature_description")
+            if (
+                not isinstance(feature_description, str)
+                or not feature_description.strip()
+            ):
+                raise PowdrrExecutionError("feature description is empty")
+            return _decompose_feature_description(feature_description)
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -520,6 +528,12 @@ def _execute_procedrr_flow(
             ),
             execute,
             process_directory=worktree / "docs" / "procedrr" / "skill-definitions",
+            judge_clients={
+                "planning": WorkrrProcedrrClient(
+                    config.planning_client,
+                    skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+                )
+            },
         )
         evaluator.evaluate(
             flow,
@@ -710,48 +724,55 @@ def _compile_feature_obligations(
     if Path(plan) != state.get("plan_path"):
         raise PowdrrExecutionError("obligations plan does not match the planned diff")
     feature_description = _require_flow_text(parameters, "feature_description")
-    traceability = parameters.get("traceability")
-    if not isinstance(traceability, Mapping):
-        raise PowdrrExecutionError("plan traceability must be a mapping")
-    if traceability.get("verdict") != "complete":
-        raise PowdrrExecutionError(
-            "cannot compile obligations from an incomplete plan traceability review"
-        )
+    sentences = parameters.get("sentences")
+    requirement_decisions = parameters.get("requirement_decisions")
+    reflection_decisions = parameters.get("reflection_decisions")
+    if not isinstance(sentences, list):
+        raise PowdrrExecutionError("feature sentences must be a list")
+    if not isinstance(requirement_decisions, list) or not isinstance(
+        reflection_decisions, list
+    ):
+        raise PowdrrExecutionError("sentence decisions must be lists")
+    if len(sentences) != len(requirement_decisions) or len(sentences) != len(
+        reflection_decisions
+    ):
+        raise PowdrrExecutionError("sentence decision counts do not match")
     plan_document = _load_yaml_mapping(Path(plan))
-    raw_criteria = plan_document.get("acceptance_criteria")
-    if not isinstance(raw_criteria, list) or not raw_criteria:
+    plan_refs = _plan_acceptance_references(plan_document)
+    if not plan_refs:
         raise PowdrrExecutionError("plan produced no acceptance criteria obligations")
 
     obligations: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for index, raw in enumerate(raw_criteria, start=1):
-        if isinstance(raw, Mapping):
-            identifier = raw.get("id")
-            description = raw.get("description")
-        elif isinstance(raw, str):
-            identifier = f"acceptance-{index}"
-            description = raw
-        else:
-            identifier = None
-            description = None
-        plan_refs = [f"acceptance_criteria.{identifier}"]
-        if (
-            not isinstance(identifier, str)
-            or not identifier.strip()
-            or identifier in seen_ids
-            or not isinstance(description, str)
-            or not description.strip()
-            or not _plan_reference_exists(plan_document, plan_refs[0])
-        ):
-            raise PowdrrExecutionError("plan obligation is malformed")
+    for index, (sentence, requirement, reflection) in enumerate(
+        zip(sentences, requirement_decisions, reflection_decisions, strict=True),
+        start=1,
+    ):
+        if not isinstance(sentence, Mapping):
+            raise PowdrrExecutionError("feature sentence is malformed")
+        sentence_id = sentence.get("id")
+        sentence_text = sentence.get("text")
+        if not isinstance(sentence_id, str) or not isinstance(sentence_text, str):
+            raise PowdrrExecutionError("feature sentence is missing id or text")
+        if not _decision_value(requirement, "required"):
+            continue
+        if not _decision_value(reflection, "reflected"):
+            raise PowdrrExecutionError(
+                f"feature requirement is missing from plan: {sentence_text}"
+            )
+        identifier = sentence_id or f"sentence-{index}"
+        if identifier in seen_ids:
+            raise PowdrrExecutionError("feature sentence identifiers are duplicated")
         seen_ids.add(identifier)
         obligations.append(
             {
                 "id": identifier,
-                "description": description.strip(),
-                "plan_refs": list(dict.fromkeys(plan_refs)),
+                "description": sentence_text.strip(),
+                "plan_refs": plan_refs,
             }
         )
+    if not obligations:
+        raise PowdrrExecutionError("feature description produced no obligations")
 
     path = output_root / "feature-obligations.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -771,6 +792,37 @@ def _compile_feature_obligations(
     state["feature_obligations"] = tuple(item["description"] for item in obligations)
     state["feature_obligations_path"] = path
     return {"path": str(path), "obligations": obligations}
+
+
+def _decompose_feature_description(feature_description: str) -> list[dict[str, str]]:
+    sentences = [
+        item.strip()
+        for item in re.split(r"(?<=[.!?])\s+|\n+", feature_description)
+        if item.strip()
+    ]
+    return [
+        {"id": f"sentence-{index}", "text": sentence}
+        for index, sentence in enumerate(sentences, start=1)
+    ]
+
+
+def _decision_value(value: Any, key: str) -> bool:
+    return isinstance(value, Mapping) and value.get(key) is True
+
+
+def _plan_acceptance_references(document: Mapping[str, Any]) -> list[str]:
+    raw_criteria = document.get("acceptance_criteria")
+    if not isinstance(raw_criteria, list):
+        return []
+    references: list[str] = []
+    for index, raw in enumerate(raw_criteria, start=1):
+        identifier = raw.get("id") if isinstance(raw, Mapping) else None
+        if not isinstance(identifier, str) or not identifier.strip():
+            identifier = f"acceptance-{index}"
+        reference = f"acceptance_criteria.{identifier}"
+        if _plan_reference_exists(document, reference):
+            references.append(reference)
+    return references
 
 
 def _require_feature_obligations(value: Any) -> tuple[str, ...]:

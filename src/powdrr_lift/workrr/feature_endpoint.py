@@ -2046,6 +2046,12 @@ def _bootstrap_validation_profiles(
     explicit_command: tuple[str, ...],
 ) -> tuple[DiscoveredValidationProfile, ...]:
     """Run Structrr bootstrap and adapt its detected tools for Workrr."""
+    if explicit_command:
+        return (
+            DiscoveredValidationProfile(
+                "feature-validation", explicit_command, "feature command"
+            ),
+        )
     bootstrap = bootstrap_structrr(
         worktree, output_path=output_root / "validation-bootstrap.yaml"
     )
@@ -2055,12 +2061,6 @@ def _bootstrap_validation_profiles(
             f"tools: {bootstrap.validation.issues}"
         )
     profiles: list[DiscoveredValidationProfile] = []
-    if explicit_command:
-        profiles.append(
-            DiscoveredValidationProfile(
-                "feature-validation", explicit_command, "feature command"
-            )
-        )
     for tool in bootstrap.document.get("tools", []):
         if not isinstance(tool, Mapping):
             continue

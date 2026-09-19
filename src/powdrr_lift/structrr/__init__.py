@@ -17,6 +17,12 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_document,
 )
+from powdrr_lift.structrr.proposal import (
+    PROPOSAL_REVISION_SCHEMA_VERSION,
+    ProposalOperation,
+    ProposalRevision,
+    compile_proposal_revision,
+)
 from powdrr_lift.structrr.rebase import (
     StructrrChange,
     StructrrRebaseReport,
@@ -36,4 +42,8 @@ __all__ = [
     "StructrrRemapping",
     "rebase_structrr_snapshot",
     "snapshot_digest",
+    "PROPOSAL_REVISION_SCHEMA_VERSION",
+    "ProposalOperation",
+    "ProposalRevision",
+    "compile_proposal_revision",
 ]

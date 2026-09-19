@@ -28,7 +28,6 @@ from powdrr_lift.structrr.proposal import (
 )
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
-    discover_validation_profiles,
 )
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
@@ -160,8 +159,10 @@ def _execute_procedrr_flow(
     state: dict[str, Any] = {}
     flow_path = _validate_procedrr_flow(worktree)
     flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
-    validation_profiles = discover_validation_profiles(
-        worktree, explicit_command=config.validation_command
+    validation_profiles = _bootstrap_validation_profiles(
+        worktree,
+        output_root=output_root,
+        explicit_command=config.validation_command,
     )
     if not validation_profiles:
         raise PowdrrExecutionError(
@@ -1341,6 +1342,52 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
         ranked.append((int(timestamp or "0"), relative_path))
     _, selected = max(ranked)
     return worktree / selected
+
+
+def _bootstrap_validation_profiles(
+    worktree: Path,
+    *,
+    output_root: Path,
+    explicit_command: tuple[str, ...],
+) -> tuple[DiscoveredValidationProfile, ...]:
+    """Run Structrr bootstrap and adapt its detected tools for Workrr."""
+    bootstrap = bootstrap_structrr(
+        worktree, output_path=output_root / "validation-bootstrap.yaml"
+    )
+    if not bootstrap.validation.successful:
+        raise PowdrrExecutionError(
+            "Structrr bootstrap validation failed while discovering validation "
+            f"tools: {bootstrap.validation.issues}"
+        )
+    profiles: list[DiscoveredValidationProfile] = []
+    if explicit_command:
+        profiles.append(
+            DiscoveredValidationProfile(
+                "feature-validation", explicit_command, "feature command"
+            )
+        )
+    for tool in bootstrap.document.get("tools", []):
+        if not isinstance(tool, Mapping):
+            continue
+        tool_id = tool.get("id")
+        command = tool.get("validation_action")
+        if not isinstance(tool_id, str) or not tool_id.startswith("validation:"):
+            continue
+        if not isinstance(command, list) or not all(
+            isinstance(item, str) and item for item in command
+        ):
+            continue
+        profiles.append(
+            DiscoveredValidationProfile(
+                tool_id.removeprefix("validation:"),
+                tuple(command),
+                str(tool.get("source", "Structrr bootstrap")),
+            )
+        )
+    unique: dict[str, DiscoveredValidationProfile] = {}
+    for profile in profiles:
+        unique.setdefault(profile.name, profile)
+    return tuple(unique.values())
 
 
 def _require_clean_root(root: Path, runner: Runner) -> None:

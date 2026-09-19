@@ -33,6 +33,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
+    _aggregate_intent_review,
     _create_pr_changelog,
     _ensure_current_baseline,
     _finalize_proposal_review,
@@ -382,6 +383,10 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [discover_validation_profiles]" in flow
     assert "command: [run_validation_profile]" in flow
     assert "command: [aggregate_validation]" in flow
+    assert "command: [prepare_implementation_review]" in flow
+    assert "command: [aggregate_intent_review]" in flow
+    assert "provider: opencode" not in flow
+    assert flow.count("command: [run_opencode]") == 5
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(
@@ -658,6 +663,25 @@ def test_finalize_proposal_review_writes_only_complete_matching_receipts(
     receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
     assert receipt["proposal_fingerprint"] == proposal.fingerprint
     assert receipt["worklist_fingerprint"] == worklist.fingerprint
+
+
+def test_aggregate_intent_review_blocks_altered_intent() -> None:
+    evidence = {
+        "active_intent_clauses": [{"clause_id": "preserve-api"}],
+        "evidence_refs": ["git-diff@sha256:diff", "validation@sha256:tests"],
+    }
+    decision = {
+        "clause_id": "preserve-api",
+        "verdict": "altered",
+        "evidence_refs": evidence["evidence_refs"],
+    }
+
+    result = _aggregate_intent_review({"decisions": [decision], "evidence": evidence})
+
+    assert result == {
+        "passed": False,
+        "failures": ["intent review did not preserve preserve-api"],
+    }
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

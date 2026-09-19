@@ -233,10 +233,19 @@ def evidence_fingerprint(input_fingerprint: str, evidence_refs: tuple[str, ...])
     return f"sha256:{hashlib.sha256(payload).hexdigest()}"
 
 
+def content_fingerprint(value: Any) -> str:
+    """Return a stable fingerprint for an immutable evidence snapshot."""
+    payload = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
 __all__ = [
     "DecisionOutcome",
     "DecisionResult",
     "DecisionSpecification",
     "DecisionWorklist",
+    "content_fingerprint",
     "evidence_fingerprint",
 ]

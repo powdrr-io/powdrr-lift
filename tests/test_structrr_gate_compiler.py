@@ -62,6 +62,39 @@ def test_structural_gate_rejects_affected_intent_without_effect() -> None:
     )
 
 
+def test_worklist_addresses_evidence_content_and_invalidates_new_snapshot() -> None:
+    proposal = _proposal()
+    first = compile_proposal_worklist(
+        proposal,
+        active_intent_clause_ids=("intent-1",),
+        evidence_fingerprints={
+            "proposal": "sha256:proposal-1",
+            "plan": "sha256:plan-1",
+            "baseline": "sha256:baseline-1",
+            "intent:intent-1": "sha256:intent-1",
+            "structrr:baseline.yaml": "sha256:source-1",
+        },
+    )
+    second = compile_proposal_worklist(
+        proposal,
+        active_intent_clause_ids=("intent-1",),
+        evidence_fingerprints={
+            "proposal": "sha256:proposal-1",
+            "plan": "sha256:plan-2",
+            "baseline": "sha256:baseline-1",
+            "intent:intent-1": "sha256:intent-1",
+            "structrr:baseline.yaml": "sha256:source-1",
+        },
+    )
+
+    assert first.fingerprint != second.fingerprint
+    assert all(
+        "@sha256:" in ref
+        for specification in first.specifications
+        for ref in specification.evidence_requirements
+    )
+
+
 def test_structural_review_receipt_is_incomplete_until_semantic_review(
     tmp_path: Path,
 ) -> None:

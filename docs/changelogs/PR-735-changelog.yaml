@@ -1,0 +1,247 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 735
+title: Address implementation evidence and preserve intent after edits
+intent:
+  problem: Proposal review receipts need immutable evidence identities, and implementation completion currently lacks a per-intent post-edit gate.
+  goal: Bind proposal decisions to content-addressed evidence, review every active intent clause after implementation, and keep OpenCode behind the single edit operation.
+human-decisions:
+  - id: content-addressed-review-evidence
+    summary: Evidence references include immutable content fingerprints.
+  - id: post-implementation-intent-gate
+    summary: Every active intent clause receives an explicit post-implementation preservation decision.
+  - id: opencode-edit-boundary
+    summary: OpenCode is used only by edit-producing run_opencode operations.
+  - id: intent-review-repair-loop
+    summary: A failed post-implementation intent review triggers a targeted OpenCode repair and reruns validation before retrying the review.
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Add exhaustive post-implementation intent preservation with targeted repair on failure.
+    rationale: Every active intent clause is reviewed, and a failed intent decision produces corrective edits before acceptance is reconsidered.
+    span: {start_line: 173, end_line: 242}
+    related: {decisions: [post-implementation-intent-gate, intent-review-repair-loop]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove the proposal worklist item-count cap.
+    rationale: Every proposal specification must be evaluated without an arbitrary truncation boundary.
+    span: {start_line: 64, end_line: 64}
+    related: {decisions: [post-implementation-intent-gate]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove the primary validation-profile item-count cap.
+    rationale: Every discovered validation profile must run without an arbitrary truncation boundary.
+    span: {start_line: 133, end_line: 133}
+    related: {decisions: [intent-review-repair-loop]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove item-count caps from worker and recovery iterations.
+    rationale: Repair issues and validation profiles must be processed exhaustively.
+    span: {start_line: 346, end_line: 346}
+    related: {decisions: [intent-review-repair-loop]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove the worker-repair validation-profile item-count cap.
+    rationale: Worker repair must rerun every validation profile.
+    span: {start_line: 362, end_line: 362}
+    related: {decisions: [intent-review-repair-loop]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove the scope-repair validation-profile item-count cap.
+    rationale: Scope repair must rerun every validation profile.
+    span: {start_line: 423, end_line: 423}
+    related: {decisions: [intent-review-repair-loop]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Remove the completeness-repair validation-profile item-count cap while adding intent repair.
+    rationale: Completeness repair and intent repair must process all validation profiles.
+    span: {start_line: 476, end_line: 529}
+    related: {decisions: [intent-review-repair-loop]}
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    summary: Preserve worker-diff review after intent repair without an item-count cap.
+    rationale: Intent repair must finish with fresh worker-diff evidence.
+    span: {start_line: 549, end_line: 556}
+    related: {decisions: [intent-review-repair-loop]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Add canonical content fingerprinting for immutable evidence snapshots.
+    rationale: Give evidence identities a deterministic content-derived representation.
+    span: {start_line: 236, end_line: 243}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: modified
+    summary: Export content fingerprinting.
+    rationale: Reuse one canonical evidence identity algorithm across Workrr and Structrr.
+    span: {start_line: 249, end_line: 249}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Accept evidence fingerprints in proposal worklist compilation.
+    rationale: Put immutable evidence identities into worklist fingerprints.
+    span: {start_line: 21, end_line: 21}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Normalize the evidence fingerprint map for worklist compilation.
+    rationale: Make reference resolution deterministic.
+    span: {start_line: 30, end_line: 30}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Address evidence labels with immutable fingerprints.
+    rationale: Invalidate prior decisions when a referenced snapshot changes.
+    span: {start_line: 32, end_line: 40}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Address source coverage evidence.
+    rationale: Bind source checks to the exact source snapshot.
+    span: {start_line: 48, end_line: 48}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Address operation validity evidence.
+    rationale: Bind operation checks to exact proposal and plan snapshots.
+    span: {start_line: 60, end_line: 60}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Address architecture intent evidence.
+    rationale: Bind architecture checks to exact proposal and plan snapshots.
+    span: {start_line: 67, end_line: 67}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Address affected intent evidence.
+    rationale: Bind disposition checks to exact proposal, plan, and active intent snapshots.
+    span: {start_line: 75, end_line: 80}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Address acceptance evidence.
+    rationale: Bind acceptance checks to exact proposal and plan snapshots.
+    span: {start_line: 92, end_line: 92}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Address resulting-state evidence.
+    rationale: Bind state checks to exact baseline, proposal, and plan snapshots.
+    span: {start_line: 101, end_line: 101}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Carry evidence fingerprints through the structural gate.
+    rationale: Ensure deterministic and semantic proposal review use the same evidence identity.
+    span: {start_line: 111, end_line: 111}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: modified
+    summary: Pass evidence fingerprints into structural compilation.
+    rationale: Preserve content-addressed obligations at the deterministic gate.
+    span: {start_line: 121, end_line: 123}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import canonical content fingerprinting.
+    rationale: Use one deterministic identity for all captured evidence snapshots.
+    span: {start_line: 21, end_line: 21}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Dispatch implementation evidence capture and intent-review aggregation.
+    rationale: Make the post-edit review operations explicit Workrr transitions.
+    span: {start_line: 391, end_line: 400}
+    related: {decisions: [post-implementation-intent-gate]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Build proposal evidence fingerprints.
+    rationale: Prevent an accepted receipt from authorizing a different evidence snapshot.
+    span: {start_line: 588, end_line: 594}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Bind proposal worklists to content-addressed evidence.
+    rationale: Carry exact evidence identity into every proposal obligation.
+    span: {start_line: 596, end_line: 598}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Recompute content-addressed proposal evidence before OpenCode.
+    rationale: Revalidate the accepted receipt against current immutable inputs.
+    span: {start_line: 756, end_line: 756}
+    related: {decisions: [content-addressed-review-evidence, opencode-edit-boundary]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Recompute proposal evidence before OpenCode.
+    rationale: Revalidate the accepted receipt against current immutable inputs.
+    span: {start_line: 758, end_line: 765}
+    related: {decisions: [content-addressed-review-evidence, opencode-edit-boundary]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Pass content-addressed evidence into the OpenCode gate.
+    rationale: Prevent stale review receipts from authorizing edits.
+    span: {start_line: 770, end_line: 770}
+    related: {decisions: [content-addressed-review-evidence, opencode-edit-boundary]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Capture git diff, validation, worker review, and intent-state evidence.
+    rationale: Give post-implementation judges the exact observed repository evidence.
+    span: {start_line: 925, end_line: 1060}
+    related: {decisions: [content-addressed-review-evidence, post-implementation-intent-gate]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import the intent review aggregation test helper.
+    rationale: Exercise the deterministic post-implementation gate.
+    span: {start_line: 36, end_line: 36}
+    related: {decisions: [post-implementation-intent-gate]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Assert the feature flow has a mandatory post-intent gate and the intent-repair OpenCode operation.
+    rationale: Prevent the managed workflow from bypassing its required preservation and corrective paths.
+    span: {start_line: 386, end_line: 389}
+    related: {decisions: [post-implementation-intent-gate, intent-review-repair-loop, opencode-edit-boundary]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Test that altered intent blocks post-implementation acceptance.
+    rationale: Provide an adversarial drift regression test.
+    span: {start_line: 668, end_line: 686}
+    related: {decisions: [post-implementation-intent-gate]}
+  - path: tests/test_structrr_gate_compiler.py
+    type: modified
+    summary: Test evidence snapshots change worklist identity.
+    rationale: Prove a new plan snapshot cannot reuse an old proposal decision.
+    span: {start_line: 65, end_line: 97}
+    related: {decisions: [content-addressed-review-evidence]}
+  - path: tests/test_procedrr.py
+    type: modified
+    summary: Assert the checked-in feature flow declares intent repair.
+    rationale: Prevent the recovery from being removed without a parser-level regression.
+    span: {start_line: 381, end_line: 381}
+    related: {decisions: [intent-review-repair-loop]}
+entities: []
+entity_relationships: []
+invariants:
+  - id: review-evidence-is-content-addressed
+    action: added
+    description: Production proposal-review obligations reference content-fingerprinted evidence snapshots.
+    rationale: A receipt is valid only for the exact state and observations it reviewed.
+  - id: post-edit-intent-preservation-is-required
+    action: added
+    description: Every active intent clause must receive a preserved verdict supported by the captured implementation evidence before delivery.
+    rationale: Passing tests and scope review alone do not prove long-lived intent was honored.
+  - id: opencode-is-edit-only
+    action: added
+    description: The implement-feature flow invokes OpenCode only through run_opencode edit operations.
+    rationale: Review reasoning and code editing are separate provider boundaries.
+  - id: failed-intent-review-is-repaired
+    action: added
+    description: Failed post-implementation intent preservation enters a bounded repair loop that reruns implementation validation and worker-diff review.
+    rationale: Intent failures require corrective code edits and fresh evidence before delivery can proceed.
+guidance:
+  - id: use-observed-implementation-evidence
+    action: added
+    description: Post-implementation judges must use the captured git diff, validation results, worker review, and current intent state.
+    rationale: Make decisions reproducible from immutable artifacts.
+features: []
+proposed_prs: []

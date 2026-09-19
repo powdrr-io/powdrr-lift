@@ -18,6 +18,7 @@ def compile_proposal_worklist(
     proposal: ProposalRevision,
     *,
     active_intent_clause_ids: Sequence[str] = (),
+    evidence_fingerprints: Mapping[str, str] | None = None,
 ) -> DecisionWorklist:
     """Create the complete ordered proposal-review worklist.
 
@@ -26,7 +27,17 @@ def compile_proposal_worklist(
     it never removes a required gate because a model claimed it was covered.
     """
 
+    evidence_fingerprints = evidence_fingerprints or {}
     specs: list[DecisionSpecification] = []
+
+    def evidence_refs(labels: Sequence[str]) -> tuple[str, ...]:
+        return tuple(
+            f"{label}@{evidence_fingerprints[label]}"
+            if label in evidence_fingerprints
+            else label
+            for label in labels
+        )
+
     for source_ref in proposal.source_refs:
         specs.append(
             _spec(
@@ -34,7 +45,7 @@ def compile_proposal_worklist(
                 "source-coverage",
                 source_ref,
                 "the proposal source is present and addressable",
-                evidence_requirements=(source_ref,),
+                evidence_requirements=evidence_refs((source_ref,)),
             )
         )
     for operation in proposal.operations:
@@ -46,14 +57,14 @@ def compile_proposal_worklist(
                     "intent-operation-validity",
                     subject,
                     "the operation has one supported action and a stable subject",
-                    evidence_requirements=("proposal", "plan"),
+                    evidence_requirements=evidence_refs(("proposal", "plan")),
                 ),
                 _spec(
                     proposal,
                     "architecture-intent-effect",
                     subject,
                     "the operation explicitly declares its intent effect",
-                    evidence_requirements=("proposal", "plan"),
+                    evidence_requirements=evidence_refs(("proposal", "plan")),
                 ),
                 _spec(
                     proposal,
@@ -61,10 +72,12 @@ def compile_proposal_worklist(
                     subject,
                     "every affected active intent clause has an explicit disposition",
                     active_intent_clause_ids,
-                    evidence_requirements=(
-                        "proposal",
-                        "plan",
-                        *(f"intent:{item}" for item in active_intent_clause_ids),
+                    evidence_requirements=evidence_refs(
+                        (
+                            "proposal",
+                            "plan",
+                            *(f"intent:{item}" for item in active_intent_clause_ids),
+                        )
                     ),
                 ),
             )
@@ -76,7 +89,7 @@ def compile_proposal_worklist(
                 "acceptance-verifier-completeness",
                 f"criterion-{index}",
                 f"acceptance criterion is verifiable: {criterion}",
-                evidence_requirements=("proposal", "plan"),
+                evidence_requirements=evidence_refs(("proposal", "plan")),
             )
         )
     specs.append(
@@ -85,7 +98,7 @@ def compile_proposal_worklist(
             "resulting-state-consistency",
             proposal.proposal_id,
             "the resulting Structrr state is self-consistent",
-            evidence_requirements=("baseline", "proposal", "plan"),
+            evidence_requirements=evidence_refs(("baseline", "proposal", "plan")),
         )
     )
     return DecisionWorklist.compile(tuple(specs))
@@ -95,6 +108,7 @@ def evaluate_structural_proposal_gate(
     proposal: ProposalRevision,
     *,
     active_intent_clause_ids: Sequence[str] = (),
+    evidence_fingerprints: Mapping[str, str] | None = None,
 ) -> tuple[DecisionWorklist, tuple[str, ...]]:
     """Return the worklist and deterministic structural failures.
 
@@ -104,7 +118,9 @@ def evaluate_structural_proposal_gate(
     """
 
     worklist = compile_proposal_worklist(
-        proposal, active_intent_clause_ids=active_intent_clause_ids
+        proposal,
+        active_intent_clause_ids=active_intent_clause_ids,
+        evidence_fingerprints=evidence_fingerprints,
     )
     failures: list[str] = []
     if not proposal.operations:

@@ -2011,7 +2011,10 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
     if not relative_paths:
         baseline = bootstrap_structrr(worktree)
         if not baseline.validation.successful:
-            raise PowdrrExecutionError("Structrr bootstrap validation failed.")
+            raise PowdrrExecutionError(
+                "Structrr bootstrap validation failed: "
+                f"{baseline.validation.issues}"
+            )
         _commit(runner, worktree, "Bootstrap Structrr baseline")
         return baseline.output_path
     ranked: list[tuple[int, str]] = []

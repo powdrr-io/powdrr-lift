@@ -226,6 +226,14 @@ from powdrr_lift.core.pr_specification import (
     show_proposed_pr_specification,
     validate_pr_specification_yaml,
 )
+from powdrr_lift.core.verification_contract import (
+    REQUIRED_VERIFICATION_CONTRACT_FIELDS,
+    VERIFICATION_CONTRACT_FIELDS,
+    VERIFICATION_CONTRACT_SCHEMA_VERSION,
+    VERIFICATION_EXPECTATIONS,
+    VERIFICATION_STATUSES,
+    VerificationContract,
+)
 from powdrr_lift.core.schemas import (
     ChangeEntity,
     ChangeEntityRelationship,
@@ -270,6 +278,7 @@ _INTENT_PACKET = "powdrr_lift.core.intent_packet"
 _INDEX = "powdrr_lift.core.index"
 _PR_ANALYSIS = "powdrr_lift.core.pr_analysis"
 _PR_SPECIFICATION = "powdrr_lift.core.pr_specification"
+_VERIFICATION_CONTRACT = "powdrr_lift.core.verification_contract"
 _SCHEMAS = "powdrr_lift.core.schemas"
 _SYSTEM = "powdrr_lift.core.system_specification"
 _TEMPLATE = "powdrr_lift.core.template"
@@ -318,6 +327,12 @@ _EXPORTS: dict[str, str] = {
     "SystemSpecificationValidationReport": _SYSTEM,
     "PRSpecificationValidationIssue": _PR_SPECIFICATION,
     "PRSpecificationValidationReport": _PR_SPECIFICATION,
+    "REQUIRED_VERIFICATION_CONTRACT_FIELDS": _VERIFICATION_CONTRACT,
+    "VERIFICATION_CONTRACT_FIELDS": _VERIFICATION_CONTRACT,
+    "VERIFICATION_CONTRACT_SCHEMA_VERSION": _VERIFICATION_CONTRACT,
+    "VERIFICATION_EXPECTATIONS": _VERIFICATION_CONTRACT,
+    "VERIFICATION_STATUSES": _VERIFICATION_CONTRACT,
+    "VerificationContract": _VERIFICATION_CONTRACT,
     "ProposedPRSearchReport": _PR_SPECIFICATION,
     "ProposedPRSearchResult": _PR_SPECIFICATION,
     "proposed_pr_specification_path": _PR_SPECIFICATION,

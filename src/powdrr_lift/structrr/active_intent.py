@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.intent import IntentStore
-
 ACTIVE_INTENT_SECTION_VERSION = 1
 
 
@@ -48,16 +46,16 @@ def resolve_active_intent(
     baseline_document: Mapping[str, Any] | None = None,
     feature_document: Mapping[str, Any] | None = None,
 ) -> tuple[ActiveIntentReference, ...]:
-    """Resolve accepted, captured, and proposed intent into one ordered view.
+    """Resolve committed Structrr intent plus a proposal overlay.
 
-    The baseline and captured intent stores are independent accepted sources. A
-    proposal document is an overlay: an explicitly removed clause is removed,
-    while an added or changed clause replaces its baseline entry. Conflicting
-    duplicate clauses within one accepted source are rejected.
+    Committed Structrr is accepted, read-only state. A feature document is an
+    unaccepted overlay: an explicitly removed clause is removed, while an
+    added or changed clause replaces its baseline entry. No workflow directory
+    or runtime intent store participates in resolution.
     """
     baseline = _document_entries(baseline_document)
-    captured = _captured_entries(Path(worktree))
-    accepted = _merge_accepted((*baseline, *captured))
+    del worktree
+    accepted = _merge_accepted(baseline)
     if feature_document is not None:
         accepted = _apply_feature_overlay(
             accepted, _document_entries(feature_document, include_removed=True)
@@ -69,10 +67,10 @@ def active_intent_section(
     baseline_entries: Sequence[Mapping[str, Any]],
     worktree: str | Path,
 ) -> list[dict[str, Any]]:
-    """Build the generated bootstrap section from specs and captured intent."""
+    """Build the generated bootstrap section from Structrr specification data."""
+    del worktree
     entries = _merge_accepted(
         tuple(_entry_from_mapping(item) for item in baseline_entries)
-        + _captured_entries(Path(worktree))
     )
     return [entries[key].to_data() for key in sorted(entries)]
 
@@ -163,31 +161,6 @@ def _entry_from_mapping(raw: Mapping[str, Any]) -> ActiveIntentReference:
             else None
         ),
     )
-
-
-def _captured_entries(worktree: Path) -> tuple[ActiveIntentReference, ...]:
-    store = IntentStore(worktree)
-    sources = {source.intent_id: source for source in store.sources()}
-    entries: list[ActiveIntentReference] = []
-    for clause in store.list():
-        source = sources.get(clause.intent_id)
-        if source is None:
-            raise ActiveIntentResolutionError(
-                f"active intent clause {clause.clause_id!r} has no source"
-            )
-        entries.append(
-            ActiveIntentReference(
-                clause_id=clause.clause_id,
-                intent_id=clause.intent_id,
-                kind=clause.kind.value,
-                statement=source.exact_text,
-                source_ref=source.source_ref,
-                version=clause.version,
-                active=clause.active,
-                supersedes_clause_id=clause.supersedes_clause_id,
-            )
-        )
-    return tuple(entries)
 
 
 def _merge_accepted(

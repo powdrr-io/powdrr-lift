@@ -9,39 +9,9 @@ from powdrr_lift.structrr.active_intent import (
     resolve_active_intent,
     validate_active_intent_section,
 )
-from powdrr_lift.structrr.intent import (
-    IntentClause,
-    IntentContract,
-    IntentKind,
-    IntentStore,
-    make_intent_source,
-)
 
 
-def _capture(store: IntentStore, clause_id: str, text: str) -> None:
-    source = make_intent_source(
-        intent_id=f"captured:{clause_id}",
-        exact_text=text,
-        source_ref=f"conversation:{clause_id}",
-        supplied_by="user:test",
-    )
-    store.capture(
-        source,
-        (
-            IntentClause(
-                clause_id,
-                source.intent_id,
-                (0, len(text)),
-                IntentKind.INVARIANT,
-                IntentContract(),
-            ),
-        ),
-    )
-
-
-def test_resolver_merges_baseline_and_captured_intent(tmp_path: Path) -> None:
-    _capture(IntentStore(tmp_path), "captured-clause", "Captured intent.")
-
+def test_resolver_reads_only_committed_baseline_intent(tmp_path: Path) -> None:
     resolved = resolve_active_intent(
         tmp_path,
         baseline_document={
@@ -55,12 +25,8 @@ def test_resolver_merges_baseline_and_captured_intent(tmp_path: Path) -> None:
         },
     )
 
-    assert [item.clause_id for item in resolved] == [
-        "baseline-clause",
-        "captured-clause",
-    ]
+    assert [item.clause_id for item in resolved] == ["baseline-clause"]
     assert resolved[0].to_data()["statement"] == "Baseline intent."
-    assert resolved[1].source_ref == "conversation:captured-clause"
 
 
 def test_feature_overlay_replaces_and_removes_baseline_intent(tmp_path: Path) -> None:
@@ -103,9 +69,7 @@ def test_feature_overlay_replaces_and_removes_baseline_intent(tmp_path: Path) ->
     ]
 
 
-def test_conflicting_accepted_sources_block_resolution(tmp_path: Path) -> None:
-    _capture(IntentStore(tmp_path), "same-clause", "Captured wording.")
-
+def test_conflicting_baseline_entries_block_resolution(tmp_path: Path) -> None:
     with pytest.raises(ActiveIntentResolutionError, match="same-clause"):
         resolve_active_intent(
             tmp_path,
@@ -117,7 +81,14 @@ def test_conflicting_accepted_sources_block_resolution(tmp_path: Path) -> None:
                         "kind": "invariant",
                         "statement": "Different wording.",
                         "source_ref": "docs/spec.yaml",
-                    }
+                    },
+                    {
+                        "clause_id": "same-clause",
+                        "intent_id": "different",
+                        "kind": "invariant",
+                        "statement": "Another wording.",
+                        "source_ref": "docs/other.yaml",
+                    },
                 ]
             },
         )

@@ -12,6 +12,13 @@ steps:
         required: [path]
         properties: {path: {type: string, minLength: 1}}
       bind: baseline
+  - operation:
+      tool: internal
+      command: [discover_validation_profiles]
+      parameters:
+        baseline: {type: reference, value: baseline.path}
+      returns: {type: array}
+      bind: validation_profiles
   - call:
       process: design-interview
       inputs:
@@ -51,11 +58,25 @@ steps:
           request_id: {type: string, minLength: 1}
           attempt: {type: object}
       bind: implementation
+  - for_each:
+      snapshot: {name: validation_profiles, max_items: 32}
+      item_binding: validation_profile
+      collect: {binding: validation_results, mode: list}
+      body:
+        - operation:
+            tool: internal
+            command: [run_validation_profile]
+            parameters:
+              profile: {type: reference, value: validation_profile}
+              implementation: {type: reference, value: implementation}
+            returns: {type: object}
+            bind: validation_result
   - operation:
       tool: internal
-      command: [validate_implementation]
+      command: [aggregate_validation]
       parameters:
         implementation: {type: reference, value: implementation}
+        results: {type: reference, value: validation_results}
       returns: {type: object}
       bind: validation
   - operation:
@@ -198,11 +219,25 @@ recoveries:
                         repair_issue: {type: reference, value: repair_issue}
                       returns: {type: object}
                       bind: implementation
+            - for_each:
+                snapshot: {name: validation_profiles, max_items: 32}
+                item_binding: validation_profile
+                collect: {binding: validation_results, mode: list}
+                body:
+                  - operation:
+                      tool: internal
+                      command: [run_validation_profile]
+                      parameters:
+                        profile: {type: reference, value: validation_profile}
+                        implementation: {type: reference, value: implementation}
+                      returns: {type: object}
+                      bind: validation_result
             - operation:
                 tool: internal
-                command: [validate_implementation]
+                command: [aggregate_validation]
                 parameters:
                   implementation: {type: reference, value: implementation}
+                  results: {type: reference, value: validation_results}
                 returns: {type: object}
                 bind: validation
             - operation:
@@ -246,11 +281,25 @@ recoveries:
             review_verdict: {type: reference, value: completeness_review.verdict}
           returns: {type: object}
           bind: implementation
+      - for_each:
+          snapshot: {name: validation_profiles, max_items: 32}
+          item_binding: validation_profile
+          collect: {binding: validation_results, mode: list}
+          body:
+            - operation:
+                tool: internal
+                command: [run_validation_profile]
+                parameters:
+                  profile: {type: reference, value: validation_profile}
+                  implementation: {type: reference, value: implementation}
+                returns: {type: object}
+                bind: validation_result
       - operation:
           tool: internal
-          command: [validate_implementation]
+          command: [aggregate_validation]
           parameters:
             implementation: {type: reference, value: implementation}
+            results: {type: reference, value: validation_results}
           returns: {type: object}
           bind: validation
   scope-repair:
@@ -286,10 +335,24 @@ recoveries:
             review_verdict: {type: reference, value: scope_review.verdict}
           returns: {type: object}
           bind: implementation
+      - for_each:
+          snapshot: {name: validation_profiles, max_items: 32}
+          item_binding: validation_profile
+          collect: {binding: validation_results, mode: list}
+          body:
+            - operation:
+                tool: internal
+                command: [run_validation_profile]
+                parameters:
+                  profile: {type: reference, value: validation_profile}
+                  implementation: {type: reference, value: implementation}
+                returns: {type: object}
+                bind: validation_result
       - operation:
           tool: internal
-          command: [validate_implementation]
+          command: [aggregate_validation]
           parameters:
             implementation: {type: reference, value: implementation}
+            results: {type: reference, value: validation_results}
           returns: {type: object}
           bind: validation

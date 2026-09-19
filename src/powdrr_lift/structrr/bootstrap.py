@@ -58,6 +58,22 @@ _STATEMENT_KINDS = {
     "acceptance_criterion",
 }
 _PYTHON_SOURCE_SUFFIXES = {".py", ".pyi"}
+BOOTSTRAP_SECTION_VERSIONS: dict[str, int] = {
+    "intent": 1,
+    "human-decisions": 1,
+    "structured_files": 1,
+    "files": 1,
+    "entities": 1,
+    "entity_relationships": 1,
+    "source_subjects": 1,
+    "source_bindings": 1,
+    "invariants": 1,
+    "guidance": 1,
+    "tools": 1,
+    "statements": 1,
+    "features": 1,
+    "proposed_prs": 1,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +167,7 @@ def validate_bootstrap_document(
     """Validate a bootstrap snapshot independently of a branch diff."""
     root_path = Path(root).resolve()
     issues: list[BootstrapIssue] = []
+    issues.extend(validate_bootstrap_sections(document))
     if document.get("schema") != _SCHEMA:
         issues.append(
             BootstrapIssue("schema_invalid", "Bootstrap must use changelog-v2.")
@@ -304,6 +321,42 @@ def validate_bootstrap_document(
     _validate_statements(issues, document.get("statements"), root_path)
 
     return BootstrapValidationReport(not issues, tuple(issues))
+
+
+def validate_bootstrap_sections(
+    document: Mapping[str, Any],
+) -> tuple[BootstrapIssue, ...]:
+    """Validate the versioned section contract of a bootstrap document."""
+    issues: list[BootstrapIssue] = []
+    versions = document.get("section_versions")
+    if not isinstance(versions, Mapping):
+        return (
+            BootstrapIssue(
+                "section_versions_missing",
+                "Bootstrap must declare section_versions.",
+                "section_versions",
+            ),
+        )
+    for section, expected_version in BOOTSTRAP_SECTION_VERSIONS.items():
+        if section not in document:
+            issues.append(
+                BootstrapIssue(
+                    "bootstrap_section_missing",
+                    f"Bootstrap section {section!r} is missing.",
+                    section,
+                )
+            )
+        actual_version = versions.get(section)
+        if actual_version != expected_version:
+            issues.append(
+                BootstrapIssue(
+                    "bootstrap_section_version_invalid",
+                    f"Bootstrap section {section!r} must use version "
+                    f"{expected_version}, got {actual_version!r}.",
+                    f"section_versions.{section}",
+                )
+            )
+    return tuple(issues)
 
 
 def _validate_lifecycle_section(
@@ -877,6 +930,8 @@ def _build_document(
     change_id: str,
     title: str,
 ) -> dict[str, Any]:
+    from powdrr_lift.structrr.validation import discover_validation_profiles
+
     allowed = set(taxonomy.entity_types)
     entities: dict[str, dict[str, Any]] = {}
     relationships: dict[str, dict[str, Any]] = {}
@@ -954,6 +1009,18 @@ def _build_document(
         )
         _collect_statements(statements, "approach", spec.get("approach"), spec_path)
 
+    for profile in discover_validation_profiles(root):
+        tool_id = f"validation:{profile.name}"
+        tools.setdefault(
+            tool_id,
+            {
+                "id": tool_id,
+                "action": "added",
+                "validation_action": list(profile.command),
+                "source": _validation_tool_source(root),
+            },
+        )
+
     for item in (*invariants.values(), *guidance.values()):
         statements.setdefault(item["id"], item)
 
@@ -1001,6 +1068,7 @@ def _build_document(
     return {
         "schema": _SCHEMA,
         "structrr_schema": _BOOTSTRAP_SCHEMA,
+        "section_versions": dict(BOOTSTRAP_SECTION_VERSIONS),
         "change_id": change_id,
         "title": title,
         "intent": {
@@ -1041,6 +1109,18 @@ def _build_document(
         "features": [],
         "proposed_prs": [],
     }
+
+
+def _validation_tool_source(root: Path) -> str:
+    for relative in (
+        "pyproject.toml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/ci.yaml",
+        "Makefile",
+    ):
+        if (root / relative).exists():
+            return relative
+    return "README.md"
 
 
 def _file_entity_type(relative: str) -> str:

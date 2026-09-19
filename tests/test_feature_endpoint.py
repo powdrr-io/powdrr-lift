@@ -5,12 +5,14 @@ import subprocess
 from contextlib import redirect_stdout
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
 
 from powdrr_lift.cli import main
 from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
@@ -239,13 +241,18 @@ def test_endpoint_reuses_existing_latest_baseline_without_writing(
     current.mkdir(parents=True)
     first = current / "baseline-first.yaml"
     second = current / "baseline-second.yaml"
-    first.write_text("schema: one\n", encoding="utf-8")
+    valid_sections: dict[str, Any] = {
+        section: [] for section in BOOTSTRAP_SECTION_VERSIONS
+    }
+    valid_sections["intent"] = {}
+    valid_sections["section_versions"] = BOOTSTRAP_SECTION_VERSIONS
+    first.write_text(yaml.safe_dump(valid_sections), encoding="utf-8")
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "test@example.com")
     _git(tmp_path, "config", "user.name", "Test")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "first baseline")
-    second.write_text("schema: two\n", encoding="utf-8")
+    second.write_text(yaml.safe_dump(valid_sections), encoding="utf-8")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "second baseline")
 
@@ -268,6 +275,9 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "max_attempts: 4" in flow
     assert "recovery: worker-repair" in flow
     assert "max_iterations: 4" in flow
+    assert "command: [discover_validation_profiles]" in flow
+    assert "command: [run_validation_profile]" in flow
+    assert "command: [aggregate_validation]" in flow
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

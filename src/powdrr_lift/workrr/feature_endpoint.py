@@ -20,11 +20,17 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.bootstrap import bootstrap_structrr
+from powdrr_lift.structrr.bootstrap import (
+    bootstrap_structrr,
+    validate_bootstrap_sections,
+)
 from powdrr_lift.structrr.proposal import (
     ProposalRevision,
     compile_proposal_revision,
     validate_proposal_revision,
+)
+from powdrr_lift.structrr.validation import (
+    DiscoveredValidationProfile,
 )
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
@@ -59,7 +65,7 @@ class FeatureEndpointConfig:
     work_item_name: str
     repo_root: Path
     allowed_paths: tuple[str, ...]
-    validation_command: tuple[str, ...]
+    validation_command: tuple[str, ...] = ()
     base_branch: str = "main"
     opencode_executable: str = "opencode"
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
@@ -156,6 +162,20 @@ def _execute_procedrr_flow(
     state: dict[str, Any] = {}
     flow_path = _validate_procedrr_flow(worktree)
     flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
+    validation_profiles = _bootstrap_validation_profiles(
+        worktree,
+        output_root=output_root,
+        explicit_command=config.validation_command,
+    )
+    if not validation_profiles:
+        raise PowdrrExecutionError(
+            "Could not discover a validation command. Provide "
+            "--validation-command or declare project validation tooling."
+        )
+    state["validation_profiles"] = validation_profiles
+    state["validation_profile_names"] = tuple(
+        profile.name for profile in validation_profiles
+    )
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "gather_context":
@@ -188,6 +208,15 @@ def _execute_procedrr_flow(
         if name == "ensure_current_structrr":
             state["baseline_path"] = _ensure_current_baseline(worktree, runner)
             return {"path": str(state["baseline_path"])}
+        if name == "discover_validation_profiles":
+            return [
+                {
+                    "name": profile.name,
+                    "command": list(profile.command),
+                    "source": profile.source,
+                }
+                for profile in state["validation_profiles"]
+            ]
         if command[:2] == ["powdrr-lift", "design-interview-input"]:
             _run(runner, worktree, command)
             work_item_name = _command_option(command, "--work-item-name")
@@ -267,14 +296,10 @@ def _execute_procedrr_flow(
                 state=state,
                 parameters=parameters,
             )
-        if name == "validate_implementation":
-            if not isinstance(parameters.get("implementation"), Mapping):
-                raise PowdrrExecutionError(
-                    "validation did not receive implementation state"
-                )
-            return _validate_implementation_phase(
-                config, worktree=worktree, state=state
-            )
+        if name == "run_validation_profile":
+            return _run_validation_profile(parameters, worktree=worktree, state=state)
+        if name == "aggregate_validation":
+            return _aggregate_validation(parameters, worktree=worktree, state=state)
         if name == "review_worker_diff":
             if not isinstance(parameters.get("implementation"), Mapping):
                 raise PowdrrExecutionError(
@@ -497,6 +522,7 @@ def _run_opencode_phase(
         non_goals=non_goals,
         allowed_paths=config.allowed_paths,
         source_refs=source_context,
+        validation_profiles=state["validation_profile_names"],
     )
     plan = ExecutionPlan(
         plan_id=f"{slug}-execution",
@@ -510,7 +536,7 @@ def _run_opencode_phase(
             executable=config.opencode_executable,
             model=config.opencode_model,
             permission_policy=OpenCodePermissionPolicy(
-                (" ".join(config.validation_command) + " *",)
+                _allowed_validation_commands(state["validation_profiles"])
             ),
         )
         state["opencode_provider"] = provider
@@ -544,7 +570,7 @@ def _run_opencode_phase(
             base_commit=base_commit,
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=source_context,
-            allowed_commands=(" ".join(config.validation_command) + " *",),
+            allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):
@@ -636,6 +662,7 @@ def _proposal_execution_units(
     non_goals: tuple[str, ...],
     allowed_paths: tuple[str, ...],
     source_refs: tuple[str, ...],
+    validation_profiles: tuple[str, ...] = ("feature-validation",),
 ) -> tuple[ExecutionUnit, ...]:
     """Compile one worker unit per explicit Structrr operation."""
     if not proposal_revision.operations:
@@ -644,7 +671,7 @@ def _proposal_execution_units(
                 unit_id=f"implement-{slug}",
                 objective=feature_description,
                 paths=allowed_paths,
-                validation_profiles=("feature-validation",),
+                validation_profiles=validation_profiles,
                 acceptance_criteria=acceptance_criteria,
                 planned_additions=planned_additions,
                 planned_deletions=planned_deletions,
@@ -676,7 +703,7 @@ def _proposal_execution_units(
                 objective=objective,
                 paths=allowed_paths,
                 dependencies=(units[-1].unit_id,) if units else (),
-                validation_profiles=("feature-validation",),
+                validation_profiles=validation_profiles,
                 acceptance_criteria=operation_criteria,
                 planned_additions=(content,) if operation.action == "add" else (),
                 planned_deletions=(content,) if operation.action == "remove" else (),
@@ -924,16 +951,77 @@ def _plan_text_values(value: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def _validate_implementation_phase(
-    config: FeatureEndpointConfig, *, worktree: Path, state: dict[str, Any]
+def _allowed_validation_commands(
+    profiles: Sequence[DiscoveredValidationProfile],
+) -> tuple[str, ...]:
+    return tuple(
+        f"{' '.join(profile.command)} *" for profile in profiles if profile.command
+    )
+
+
+def _run_validation_profile(
+    parameters: Mapping[str, Any], *, worktree: Path, state: dict[str, Any]
 ) -> dict[str, Any]:
-    validation = ValidationRunner(
-        {
-            "feature-validation": ValidationProfile(
-                "feature-validation", config.validation_command
-            )
-        }
-    ).run(state["request"], state["attempt"], worktree_root=worktree)
+    profile = parameters.get("profile")
+    if not isinstance(profile, Mapping):
+        raise PowdrrExecutionError("validation profile must be a mapping")
+    name = profile.get("name")
+    command = profile.get("command")
+    if not isinstance(name, str) or not name.strip():
+        raise PowdrrExecutionError("validation profile name is malformed")
+    if not isinstance(command, list) or not all(
+        isinstance(item, str) and item for item in command
+    ):
+        raise PowdrrExecutionError("validation profile command is malformed")
+    report = ValidationRunner({name: ValidationProfile(name, tuple(command))}).run(
+        state["request"], state["attempt"], worktree_root=worktree
+    )
+    if len(report.results) != 1:
+        raise PowdrrExecutionError(
+            f"validation profile {name!r} did not produce one result"
+        )
+    return report.results[0].to_data()
+
+
+def _aggregate_validation(
+    parameters: Mapping[str, Any], *, worktree: Path, state: dict[str, Any]
+) -> dict[str, Any]:
+    del worktree
+    raw_results = parameters.get("results")
+    if not isinstance(raw_results, list) or not all(
+        isinstance(item, Mapping) for item in raw_results
+    ):
+        raise PowdrrExecutionError("validation results must be a list of mappings")
+    results = tuple(
+        ValidationResult(
+            profile=str(item["profile"]),
+            command=tuple(item.get("command", [])),
+            status=ValidationResultStatus(str(item["status"])),
+            returncode=item.get("returncode"),
+            stdout=str(item.get("stdout", "")),
+            stderr=str(item.get("stderr", "")),
+            error=item.get("error"),
+        )
+        for item in raw_results
+    )
+    failed = any(
+        result.status
+        in (ValidationResultStatus.FAILED, ValidationResultStatus.TIMED_OUT)
+        for result in results
+    )
+    blocked = any(result.status is ValidationResultStatus.BLOCKED for result in results)
+    validation = ValidationReport(
+        attempt_id=state["attempt"].attempt_id,
+        request_id=state["request"].request_id,
+        status=(
+            ValidationReportStatus.BLOCKED
+            if blocked
+            else ValidationReportStatus.FAILED
+            if failed
+            else ValidationReportStatus.PASSED
+        ),
+        results=results,
+    )
     failed_checkpoints = [
         checkpoint
         for checkpoint in state.get("operation_checkpoints", [])
@@ -1235,7 +1323,7 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
 
 
 def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
-    """Reuse the current baseline or bootstrap it once before planning."""
+    """Reuse a current baseline only when every bootstrap section is current."""
     relative_paths = _git_output(
         runner,
         worktree,
@@ -1256,7 +1344,67 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
         )
         ranked.append((int(timestamp or "0"), relative_path))
     _, selected = max(ranked)
-    return worktree / selected
+    selected_path = worktree / selected
+    try:
+        document = _load_yaml_mapping(selected_path)
+    except PowdrrExecutionError:
+        document = {}
+    section_issues = validate_bootstrap_sections(document)
+    if not section_issues:
+        return selected_path
+    baseline = bootstrap_structrr(worktree)
+    if not baseline.validation.successful:
+        raise PowdrrExecutionError(
+            f"Structrr bootstrap regeneration failed: {baseline.validation.issues}"
+        )
+    _commit(runner, worktree, "Refresh Structrr baseline sections")
+    return baseline.output_path
+
+
+def _bootstrap_validation_profiles(
+    worktree: Path,
+    *,
+    output_root: Path,
+    explicit_command: tuple[str, ...],
+) -> tuple[DiscoveredValidationProfile, ...]:
+    """Run Structrr bootstrap and adapt its detected tools for Workrr."""
+    bootstrap = bootstrap_structrr(
+        worktree, output_path=output_root / "validation-bootstrap.yaml"
+    )
+    if not bootstrap.validation.successful:
+        raise PowdrrExecutionError(
+            "Structrr bootstrap validation failed while discovering validation "
+            f"tools: {bootstrap.validation.issues}"
+        )
+    profiles: list[DiscoveredValidationProfile] = []
+    if explicit_command:
+        profiles.append(
+            DiscoveredValidationProfile(
+                "feature-validation", explicit_command, "feature command"
+            )
+        )
+    for tool in bootstrap.document.get("tools", []):
+        if not isinstance(tool, Mapping):
+            continue
+        tool_id = tool.get("id")
+        command = tool.get("validation_action")
+        if not isinstance(tool_id, str) or not tool_id.startswith("validation:"):
+            continue
+        if not isinstance(command, list) or not all(
+            isinstance(item, str) and item for item in command
+        ):
+            continue
+        profiles.append(
+            DiscoveredValidationProfile(
+                tool_id.removeprefix("validation:"),
+                tuple(command),
+                str(tool.get("source", "Structrr bootstrap")),
+            )
+        )
+    unique: dict[str, DiscoveredValidationProfile] = {}
+    for profile in profiles:
+        unique.setdefault(profile.name, profile)
+    return tuple(unique.values())
 
 
 def _require_clean_root(root: Path, runner: Runner) -> None:

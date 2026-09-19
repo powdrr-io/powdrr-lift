@@ -6,8 +6,10 @@ from pathlib import Path
 import yaml
 
 from powdrr_lift.structrr.bootstrap import (
+    BOOTSTRAP_SECTION_VERSIONS,
     bootstrap_structrr,
     validate_bootstrap_document,
+    validate_bootstrap_sections,
 )
 from powdrr_lift.structrr.rebase import rebase_structrr_snapshot, snapshot_digest
 
@@ -115,6 +117,7 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     result = bootstrap_structrr(repo)
 
     assert result.validation.successful
+    assert result.document["section_versions"] == BOOTSTRAP_SECTION_VERSIONS
     short_hash = subprocess.run(
         ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
         check=True,
@@ -205,6 +208,59 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     assert any(
         item["id"] == "run-tests-before-edit" for item in result.document["guidance"]
     )
+
+
+def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    (repo / "pyproject.toml").write_text(
+        "[tool.ruff]\nline-length = 88\n[tool.mypy]\npython_version = '3.12'\n",
+        encoding="utf-8",
+    )
+    (repo / "tests").mkdir()
+
+    result = bootstrap_structrr(repo)
+
+    tools = {item["id"]: item for item in result.document["tools"]}
+    assert tools["validation:ruff-format-check"]["validation_action"] == [
+        "uv",
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        ".",
+    ]
+    assert tools["validation:ruff-check"]["validation_action"] == [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        ".",
+    ]
+    assert tools["validation:mypy"]["validation_action"] == [
+        "uv",
+        "run",
+        "mypy",
+        "src",
+        "tests",
+    ]
+    assert tools["validation:pytest"]["validation_action"] == [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+    ]
+
+
+def test_bootstrap_section_validation_reports_missing_and_stale_sections() -> None:
+    document = {
+        "section_versions": {"intent": 0},
+        "intent": {},
+    }
+
+    issues = validate_bootstrap_sections(document)
+
+    assert any(issue.code == "bootstrap_section_version_invalid" for issue in issues)
+    assert any(issue.code == "bootstrap_section_missing" for issue in issues)
 
 
 def test_bootstrap_ignores_tracked_github_metadata(tmp_path: Path) -> None:

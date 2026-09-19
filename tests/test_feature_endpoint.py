@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from powdrr_lift.cli import main
+from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
@@ -23,6 +24,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointResult,
     _ensure_current_baseline,
     _load_implementation_plan,
+    _operation_checkpoint,
     _plan_text_items,
     _proposal_execution_units,
     _validate_procedrr_flow,
@@ -336,6 +338,64 @@ def test_structrr_operations_compile_to_targeted_worker_units() -> None:
     assert request.intent_packet.operation_id == units[0].unit_id
     assert request.intent_packet.required_operations[0]["change"]["id"] == "parse"
     assert "render" not in request.prompt
+
+
+def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> None:
+    unit = ExecutionUnit(
+        unit_id="implement-adapter-add-features-parse",
+        objective="Parse input.",
+        paths=("src",),
+        validation_profiles=("feature-validation",),
+        acceptance_criteria=("Parse input.",),
+    )
+    request = ImplementationRequest(
+        request_id="request",
+        objective="Parse input.",
+        prompt="Parse input.",
+        base_commit="base",
+        plan_fingerprint="fingerprint",
+        allowed_paths=("src",),
+        acceptance_criteria=("Parse input.",),
+        validation_profiles=("feature-validation",),
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt",
+        request_id="request",
+        provider="opencode",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+    )
+
+    def runner(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        del kwargs
+        if command[-1] == "--check":
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return subprocess.CompletedProcess(command, 0, "src/adapter.py\n", "")
+
+    checkpoint = _operation_checkpoint(
+        runner=runner,
+        worktree=tmp_path,
+        unit=unit,
+        request=request,
+        attempt=attempt,
+        before_paths=set(),
+    )
+
+    assert checkpoint["passed"] is True
+    assert checkpoint["changed_paths"] == ["src/adapter.py"]
+
+    failed = _operation_checkpoint(
+        runner=runner,
+        worktree=tmp_path,
+        unit=unit,
+        request=request,
+        attempt=attempt,
+        before_paths={"src/adapter.py"},
+    )
+    assert failed["passed"] is False
+    assert failed["error"] == "operation produced no new worktree changes"
 
 
 def test_plan_acceptance_criteria_have_stable_ids() -> None:

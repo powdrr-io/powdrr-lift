@@ -24,6 +24,7 @@ from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
+_WORKER_RUNTIME_ARTIFACTS = frozenset({"agent_error.txt", "coverage.xml"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -600,7 +601,9 @@ def _remove_ephemeral_paths(
     """Remove worker-created ephemeral artifacts before final diff evaluation."""
     current_paths = _working_paths(worktree_root)
     for relative_path in current_paths - before_status:
-        if not _path_is_allowed(relative_path, request.ephemeral_paths):
+        if relative_path not in _WORKER_RUNTIME_ARTIFACTS and not _path_is_allowed(
+            relative_path, request.ephemeral_paths
+        ):
             continue
         target = worktree_root / relative_path
         if target.is_dir() and not target.is_symlink():

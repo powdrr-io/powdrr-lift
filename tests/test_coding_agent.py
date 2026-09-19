@@ -54,6 +54,12 @@ class FakeProvider:
             (worktree_root / "src" / "change.py").write_text("value = 1\n")
             (worktree_root / "test_helper.py").write_text("print('scratch')\n")
             return subprocess.CompletedProcess(["fake"], 0, "", "")
+        if self.action == "runtime-artifacts":
+            (worktree_root / "src").mkdir()
+            (worktree_root / "src" / "change.py").write_text("value = 1\n")
+            (worktree_root / "agent_error.txt").write_text("diagnostic\n")
+            (worktree_root / "coverage.xml").write_text("<coverage/>\n")
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
         (worktree_root / "README.md").write_text("committed unexpectedly\n")
         subprocess.run(["git", "add", "README.md"], cwd=worktree_root, check=True)
         subprocess.run(
@@ -265,6 +271,21 @@ def test_worker_removes_declared_ephemeral_artifacts_before_final_diff(
     assert attempt.status is CodingAgentStatus.COMPLETED
     assert attempt.changed_paths == ("src/change.py",)
     assert not (worktree / "test_helper.py").exists()
+
+
+def test_worker_removes_runtime_artifacts_before_scope_check(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+    attempt = run_coding_agent(
+        FakeProvider("runtime-artifacts"),
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-runtime-artifacts",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.changed_paths == ("src/change.py",)
+    assert not (worktree / "agent_error.txt").exists()
+    assert not (worktree / "coverage.xml").exists()
 
 
 def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:

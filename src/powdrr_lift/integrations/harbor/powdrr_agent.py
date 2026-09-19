@@ -170,9 +170,19 @@ class PowdrrAgent(BaseInstalledAgent):
         if output_root:
             command.extend(("--output-root", output_root))
 
+        provider_env = {
+            key: value
+            for key in (
+                "DEEPINFRA_API_KEY",
+                "DEEPINFRA_API_TOKEN",
+                "DEEPINFRA_BASE_URL",
+            )
+            if (value := self._get_env(key)) is not None
+        }
         await self.exec_as_agent(
             environment,
             command=shlex.join(command),
+            env=provider_env,
             cwd=repo_root,
         )
 

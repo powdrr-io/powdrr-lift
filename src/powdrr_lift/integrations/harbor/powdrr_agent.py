@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shlex
 from pathlib import PurePosixPath
+from typing import Any
 
 from harbor.agents.installed.base import (  # type: ignore[import-not-found]
     BaseInstalledAgent,
@@ -24,6 +25,42 @@ class PowdrrAgent(BaseInstalledAgent):
 
     def version(self) -> str | None:
         return self._get_env("POWDRR_VERSION") or POWDRR_VERSION
+
+    def install_spec(self) -> Any:
+        """Provide Pier's build contract while retaining Harbor installation."""
+        try:
+            from pier.models.agent.install import (  # type: ignore[import-not-found]
+                AgentInstallSpec,
+                InstallStep,
+            )
+        except ImportError:
+            return None
+
+        return AgentInstallSpec(
+            agent_name=self.name(),
+            version=self.version(),
+            steps=[InstallStep(run="true")],
+            verification_command="true",
+        )
+
+    def network_allowlist(self) -> Any:
+        """Allow package installation and the configured DeepInfra provider."""
+        try:
+            from pier.models.agent.network import (  # type: ignore[import-not-found]
+                NetworkAllowlist,
+            )
+        except ImportError:
+            return None
+
+        return NetworkAllowlist(
+            domains=[
+                "api.deepinfra.com",
+                "files.pythonhosted.org",
+                "github.com",
+                "registry.npmjs.org",
+                "pypi.org",
+            ]
+        )
 
     @property
     def remote_session_logs_dir(self) -> PurePosixPath:

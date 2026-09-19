@@ -1,0 +1,111 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-725
+title: procedrr-step-execution-transcripts
+intent:
+  problem: The requested product behavior is not yet available.
+  goal: Add Procedrr step execution transcripts. Extend the Procedrr evaluator so
+    EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+human-decisions: []
+files:
+- path: docs/proposals/procedrr-step-execution-transcripts/design-interview-input.json
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of procedrr-step-execution-transcripts.
+  rationale: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+- path: docs/proposals/procedrr-step-execution-transcripts/feature-pr-specification.yaml
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of procedrr-step-execution-transcripts.
+  rationale: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+- path: docs/proposals/procedrr-step-execution-transcripts/structrr-diff.yaml
+  type: Configuration file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of procedrr-step-execution-transcripts.
+  rationale: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+- path: src/procedrr_evaluator/evaluator.py
+  type: Source file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of procedrr-step-execution-transcripts.
+  rationale: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+- path: tests/test_procedrr_evaluator.py
+  type: Test file
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Changed as part of procedrr-step-execution-transcripts.
+  rationale: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+entities:
+- id: procedrr-step-execution-transcripts
+  type: Feature
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features:
+- id: procedrr-step-execution-transcripts
+  description: Add Procedrr step execution transcripts. Extend the Procedrr evaluator
+    so EvaluationResult exposes an ordered, durable transcript of every executed step,
+    including step kind and path, relevant inputs, produced outputs, and succeeded
+    or failed outcome. Capture transcripts consistently across operations, judges,
+    loops, retries/attempts, specializations, calls, repeats, branches, terminal steps,
+    gates, nested fragments/processes, and failures. Preserve existing evaluator behavior
+    and public compatibility, and add focused tests proving ordering, nested execution,
+    captured values, and failure outcomes. Keep the implementation scoped to src/procedrr_evaluator/evaluator.py
+    and tests/test_procedrr_evaluator.py.
+  action: added
+proposed_prs: []

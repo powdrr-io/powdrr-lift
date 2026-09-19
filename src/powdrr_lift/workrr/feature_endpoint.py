@@ -53,6 +53,10 @@ from powdrr_lift.structrr.proposal_review import (
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
 )
+from powdrr_lift.structrr.verification_obligations import (
+    VerificationObligationCompilation,
+    compile_verification_obligations,
+)
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -73,6 +77,9 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
+from powdrr_lift.workrr.verification_provider import (
+    default_verification_provider_registry,
+)
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 from procedrr_evaluator.evaluator import ValidationGateError
@@ -240,6 +247,13 @@ def _execute_procedrr_flow(
     state["validation_profile_names"] = tuple(
         profile.name for profile in validation_profiles
     )
+    state["provider_inventory"] = tuple(
+        inventory_entry
+        for item in default_verification_provider_registry().inventory(
+            worktree, validation_profiles
+        )
+        for inventory_entry in _expand_provider_inventory(item.to_data())
+    )
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "gather_context":
@@ -381,6 +395,14 @@ def _execute_procedrr_flow(
                 worktree=worktree,
                 output_root=output_root,
                 state=state,
+            )
+        if name == "compile_verification_obligations":
+            return _compile_verification_obligations(
+                parameters,
+                worktree=worktree,
+                output_root=output_root,
+                state=state,
+                allowed_paths=config.allowed_paths,
             )
         if name == "update_plan_from_sentence_trace":
             return _update_plan_from_sentence_trace(parameters, state=state)
@@ -636,6 +658,7 @@ def _prepare_proposal_review(
         proposal,
         active_intent_clause_ids=active_intent_clause_ids,
         evidence_fingerprints=evidence_fingerprints,
+        verification_compilation=state.get("verification_obligations"),
     )
     if structural_failures:
         raise PowdrrExecutionError(
@@ -656,6 +679,13 @@ def _prepare_proposal_review(
         "worklist_path": str(worklist_path),
         "worklist": worklist.to_data(),
         "active_intent_clauses": [clause.to_data() for clause in active_intent_clauses],
+        "verification_obligations": (
+            state["verification_obligations"].to_data()
+            if isinstance(
+                state.get("verification_obligations"), VerificationObligationCompilation
+            )
+            else {"obligations": [], "failures": []}
+        ),
     }
 
 
@@ -818,6 +848,137 @@ def _compile_feature_obligations(
     state["feature_obligations"] = tuple(item["description"] for item in obligations)
     state["feature_obligations_path"] = path
     return {"path": str(path), "obligations": obligations}
+
+
+def _compile_verification_obligations(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    output_root: Path,
+    state: dict[str, Any],
+    allowed_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    """Compile the pre-implementation proof packet from current Structrr state."""
+    baseline_path = Path(_require_flow_text(parameters, "baseline"))
+    plan_path = Path(_require_flow_text(parameters, "plan"))
+    if baseline_path != state.get("baseline_path") or plan_path != state.get(
+        "plan_path"
+    ):
+        raise PowdrrExecutionError(
+            "verification obligation inputs do not match the current plan state"
+        )
+    baseline = _load_yaml_mapping(baseline_path)
+    plan = _load_yaml_mapping(plan_path)
+    active = _resolve_feature_intent(
+        worktree, baseline_document=baseline, feature_document=plan
+    )
+    candidate_contracts = _verification_contracts(
+        _merge_contract_mappings(
+            _mapping_values(baseline.get("required_test_cases")),
+            _mapping_values(plan.get("required_test_cases")),
+        )
+    )
+    previous_contracts = _verification_contracts(
+        _mapping_values(baseline.get("required_test_cases"))
+    )
+    relationships = tuple(
+        _mapping_values(baseline.get("entity_relationships"))
+        + _mapping_values(plan.get("entity_relationships"))
+    )
+    proposal = state.get("proposal_revision")
+    if not isinstance(proposal, ProposalRevision):
+        proposal = compile_proposal_revision(
+            slugify_workflow_id(_require_flow_text(parameters, "feature_description")),
+            baseline,
+            plan,
+            acceptance_criteria=(),
+            must_preserve=(),
+            non_goals=(),
+            allowed_paths=allowed_paths,
+            source_refs=(
+                f"structrr:{baseline_path.relative_to(worktree)}",
+                f"structrr-diff:{plan_path.relative_to(worktree)}",
+            ),
+        )
+    compilation = compile_verification_obligations(
+        proposal,
+        active_intents=tuple(item.to_data() for item in active),
+        contracts=candidate_contracts,
+        provider_inventory=state.get("provider_inventory", ()),
+        anticipated_paths=_planned_paths(plan),
+        relationships=relationships,
+        previous_contracts=previous_contracts,
+    )
+    state["verification_obligations"] = compilation
+    path = output_root / "verification-obligations.json"
+    path.write_text(
+        json.dumps(compilation.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "path": str(path),
+        "fingerprint": compilation.fingerprint,
+        "closure": compilation.closure.to_data(),
+        "obligations": [item.to_data() for item in compilation.obligations],
+        "excluded_contracts": list(compilation.excluded_contracts),
+        "failures": list(compilation.failures),
+    }
+
+
+def _mapping_values(value: Any) -> tuple[Mapping[str, Any], ...]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return ()
+    return tuple(item for item in value if isinstance(item, Mapping))
+
+
+def _expand_provider_inventory(value: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
+    selectors = value.get("selectors")
+    if not isinstance(selectors, list):
+        return ()
+    return tuple(
+        {
+            "provider": value.get("provider"),
+            "profile": value.get("profile"),
+            "selector": selector,
+            "fingerprint": value.get("fingerprint"),
+            "verifier_fingerprint": value.get("fingerprint"),
+        }
+        for selector in selectors
+        if isinstance(selector, str) and selector.strip()
+    )
+
+
+def _verification_contracts(
+    values: Sequence[Mapping[str, Any]],
+) -> tuple[Any, ...]:
+    from powdrr_lift.core.verification_contract import VerificationContract
+
+    return tuple(VerificationContract.from_mapping(value) for value in values)
+
+
+def _merge_contract_mappings(
+    baseline: Sequence[Mapping[str, Any]],
+    candidate: Sequence[Mapping[str, Any]],
+) -> tuple[Mapping[str, Any], ...]:
+    merged: dict[str, Mapping[str, Any]] = {
+        str(item.get("id")): item
+        for item in baseline
+        if isinstance(item.get("id"), str) and item.get("id")
+    }
+    for item in candidate:
+        contract_id = item.get("id")
+        if isinstance(contract_id, str) and contract_id:
+            merged[contract_id] = item
+    return tuple(merged[key] for key in sorted(merged))
+
+
+def _planned_paths(document: Mapping[str, Any]) -> tuple[str, ...]:
+    paths: list[str] = []
+    for item in _mapping_values(document.get("files")):
+        path = item.get("path")
+        if isinstance(path, str) and path.strip():
+            paths.append(path.strip())
+    return tuple(dict.fromkeys(paths))
 
 
 def _update_plan_from_sentence_trace(
@@ -1043,6 +1204,7 @@ def _run_opencode_phase(
             proposal_revision,
             active_intent_clause_ids=active_intent_clause_ids,
             evidence_fingerprints=evidence_fingerprints,
+            verification_compilation=state.get("verification_obligations"),
         )
         review_receipt.assert_current(proposal_revision, review_worklist)
     except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -1070,6 +1232,14 @@ def _run_opencode_phase(
         allowed_paths=config.allowed_paths,
         source_refs=source_context,
         validation_profiles=state["validation_profile_names"],
+        verification_obligations=tuple(
+            item.to_data()
+            for item in state.get("verification_obligations", ()).obligations
+        )
+        if isinstance(
+            state.get("verification_obligations"), VerificationObligationCompilation
+        )
+        else (),
     )
     plan = ExecutionPlan(
         plan_id=f"{slug}-execution",
@@ -1369,10 +1539,21 @@ def _proposal_execution_units(
     source_refs: tuple[str, ...],
     validation_profiles: tuple[str, ...] = ("feature-validation",),
     feature_obligations: tuple[str, ...] = (),
+    verification_obligations: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[ExecutionUnit, ...]:
     """Compile one worker unit per explicit Structrr operation."""
     acceptance_criteria = tuple(
         dict.fromkeys((*feature_obligations, *acceptance_criteria))
+    )
+    verification_summary = tuple(
+        "Prove contract "
+        f"{item.get('contract_id')}: {item.get('provider')}/"
+        f"{item.get('profile')}/{item.get('selector')} must {item.get('expectation')}."
+        for item in verification_obligations
+        if isinstance(item, Mapping)
+    )
+    acceptance_criteria = tuple(
+        dict.fromkeys((*acceptance_criteria, *verification_summary))
     )
     if not proposal_revision.operations:
         return (
@@ -1923,6 +2104,7 @@ def _write_structrr_plan(
             ),
             prefix=slug,
         ),
+        "required_test_cases": sections["required_test_cases"],
         "proposed_prs": sections["proposed_prs"],
     }
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")

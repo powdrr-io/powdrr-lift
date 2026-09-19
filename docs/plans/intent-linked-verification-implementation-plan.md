@@ -30,7 +30,7 @@ The implementation must build on, rather than replace, these facilities already 
 
 The current gaps are:
 
-- A normal feature worktree can have no populated `guidance/intents.json`, making an active-intent review vacuously pass.
+- A normal feature worktree can have no populated Structrr intent section, making an active-intent review vacuously pass.
 - `required_test_cases` describes cases, but does not identify an executable selector, provider, protected intent, or evidence policy.
 - Validation evidence is command-level, so Procedrr cannot prove which required test ran or distinguish passed, failed, skipped, deselected, or absent.
 - Evidence identity is content-addressed, but its semantics are not strong enough to prove a durable intent remains protected.
@@ -51,7 +51,7 @@ These decisions apply to every phase.
 
 ### Canonical sources
 
-- Do not create a second intent database. The active-intent resolver must compose the accepted Structrr baseline, feature objectives/invariants, and existing `IntentStore` records into one canonical view.
+- Do not create a second intent database. The active-intent resolver must compose the committed Structrr baseline and the current feature proposal overlay into one canonical view.
 - Extend `required_test_cases`; do not introduce a disconnected list of intent tests.
 - Store provider-neutral contracts in Structrr. Store provider-specific execution details behind Workrr adapters.
 - Generated evidence is an artifact, never accepted state.
@@ -221,11 +221,11 @@ Goal: eliminate vacuous intent reviews and expose one deterministic active-inten
 Implementation:
 
 1. Add a provider-neutral active-intent model under `powdrr_lift/structrr/`.
-2. Add a resolver that reads the accepted Structrr baseline/specification, feature objective and invariant clauses, and existing `IntentStore` records.
+2. Add a resolver that reads the committed Structrr baseline/specification and feature objective and invariant proposal clauses.
 3. Normalize each source to stable clause IDs, source pointers, status, supersession links, and fingerprints.
 4. Resolve duplicates deterministically. Identical duplicate content may coalesce; conflicting content for the same ID is a blocking error.
 5. Persist the resolved inventory as a generated Structrr artifact with a schema/section version. Regeneration must be handled by `ensure_current_structrr` when the section is absent, stale, or has the wrong version.
-6. Replace direct `IntentStore(...).list()` use in proposal and post-implementation review preparation with the canonical resolver.
+6. Ensure proposal and post-implementation review preparation use only the canonical Structrr resolver; runtime workflow stores must not be read or written.
 7. Add an explicit diagnostic for the case where accepted feature/specification content implies intent exists but resolution returns zero active clauses.
 
 Expected touchpoints:
@@ -239,7 +239,7 @@ Expected touchpoints:
 Tests:
 
 - baseline-only repository;
-- IntentStore-only repository;
+- Structrr-only repository;
 - merged sources with identical clauses;
 - conflicting duplicate IDs;
 - active, superseded, and retired clauses;

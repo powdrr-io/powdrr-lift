@@ -134,11 +134,28 @@ steps:
       bind: feature_obligations
   - operation:
       tool: internal
+      command: [compile_verification_obligations]
+      parameters:
+        baseline: {type: reference, value: baseline.path}
+        plan: {type: reference, value: plan.path}
+      returns:
+        type: object
+        required: [path, fingerprint, closure, obligations, failures]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          closure: {type: object}
+          obligations: {type: array}
+          failures: {type: array}
+      bind: verification_obligations
+  - operation:
+      tool: internal
       command: [prepare_proposal_review]
       parameters:
         baseline: {type: reference, value: baseline.path}
         plan: {type: reference, value: plan.path}
         feature_description: {type: reference, value: feature_description}
+        verification_obligations: {type: reference, value: verification_obligations}
       returns:
         type: object
         required: [proposal_revision_path, proposal_fingerprint, worklist_path, worklist, active_intent_clauses]
@@ -212,6 +229,7 @@ steps:
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
         obligations: {type: reference, value: feature_obligations}
+        verification_obligations: {type: reference, value: verification_obligations}
       returns:
         type: object
         required: [request_id, attempt]

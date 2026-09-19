@@ -34,6 +34,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _proposal_execution_units,
     _validate_procedrr_flow,
     review_feature_diff,
+    run_feature_in_place,
 )
 from powdrr_lift.workrr.procedrr import OpenCodeReviewClient
 
@@ -89,6 +90,101 @@ def test_workrr_feature_cli_builds_endpoint_config(
     assert config.allowed_paths == ("src/app.py", "tests/test_app.py")
     assert config.validation_command == ("python", "-m", "pytest")
     assert config.open_pr is False
+
+
+def test_harbor_feature_cli_uses_in_place_endpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _git(tmp_path, "init", "-q")
+    captured: dict[str, FeatureEndpointConfig] = {}
+
+    def fake_endpoint(config: FeatureEndpointConfig) -> FeatureEndpointResult:
+        captured["config"] = config
+        return FeatureEndpointResult(
+            status="completed",
+            branch="main",
+            worktree=tmp_path,
+            baseline_path=tmp_path / "baseline.yaml",
+            plan_path=tmp_path / "plan.yaml",
+            request_path=tmp_path / "request.json",
+            attempt=None,
+            validation=None,
+            review={"passed": True},
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.run_feature_in_place", fake_endpoint)
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        assert (
+            main(
+                [
+                    "harbor-feature",
+                    "--feature-description",
+                    "Fix the task behavior.",
+                    "--work-item-name",
+                    "deep-swe-task",
+                    "--repo-root",
+                    str(tmp_path),
+                    "--validation-command",
+                    "python -m pytest",
+                    "--json",
+                ]
+            )
+            == 0
+        )
+
+    config = captured["config"]
+    assert config.feature_description == "Fix the task behavior."
+    assert config.allowed_paths == (".",)
+    assert config.validation_command == ("python", "-m", "pytest")
+    assert config.open_pr is False
+    assert config.push_changes is False
+
+
+def test_run_feature_in_place_reuses_core_without_git_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-qm", "initial")
+    captured: dict[str, Any] = {}
+
+    def fake_core(
+        config: FeatureEndpointConfig, **kwargs: Any
+    ) -> FeatureEndpointResult:
+        captured["config"] = config
+        captured.update(kwargs)
+        return FeatureEndpointResult(
+            status="completed",
+            branch=kwargs["branch"],
+            worktree=kwargs["worktree"],
+            baseline_path=tmp_path / "baseline.yaml",
+            plan_path=tmp_path / "plan.yaml",
+            request_path=tmp_path / "request.json",
+            attempt=None,
+            validation=None,
+            review={"passed": True},
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._execute_procedrr_flow", fake_core
+    )
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description="Fix the task behavior.",
+            work_item_name="deep-swe-task",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        )
+    )
+
+    assert result.worktree == tmp_path
+    assert captured["branch"] == "main"
+    assert captured["config"].open_pr is False
+    assert captured["config"].push_changes is False
 
 
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:

@@ -51,7 +51,7 @@ steps:
       returns: {type: array, minItems: 1}
       bind: feature_sentences
   - for_each:
-      snapshot: {name: feature_sentences, max_items: 64}
+      snapshot: {name: feature_sentences}
       item_binding: feature_sentence
       collect: {binding: requirement_decisions, mode: list}
       body:
@@ -76,7 +76,7 @@ steps:
                   required: {type: boolean}
             validation: {kind: json_schema}
   - for_each:
-      snapshot: {name: feature_sentences, max_items: 64}
+      snapshot: {name: feature_sentences}
       item_binding: feature_sentence
       collect: {binding: reflection_decisions, mode: list}
       body:

@@ -617,7 +617,9 @@ class Evaluator:
             if isinstance(snapshot, Mapping)
             else declaration.get("max_admissions")
         )
-        if not isinstance(max_items, int) or len(items) > max_items:
+        if max_items is not None and (
+            not isinstance(max_items, int) or len(items) > max_items
+        ):
             raise EvaluationError(f"{path}.{kind}.snapshot exceeds its bound")
         epochs = declaration.get("max_epochs", 1) if kind == "worklist" else 1
         body = declaration.get("body", declaration.get("steps"))

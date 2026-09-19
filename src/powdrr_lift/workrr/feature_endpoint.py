@@ -714,6 +714,8 @@ def _validate_review_evidence_sources(
             raise PowdrrExecutionError(
                 f"proposal review evidence source does not exist: {source_ref}"
             )
+
+
 def _compile_feature_obligations(
     parameters: Mapping[str, Any],
     *,

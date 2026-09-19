@@ -25,6 +25,14 @@ from powdrr_lift.structrr.proposal import (
     load_proposal_revision,
     validate_proposal_revision,
 )
+from powdrr_lift.structrr.proposal_review import (
+    PROPOSAL_REVIEW_RECEIPT_SCHEMA_VERSION,
+    ProposalReviewReceipt,
+    build_structural_review_receipt,
+    compile_review_worklist,
+    load_review_receipt,
+    write_review_receipt,
+)
 from powdrr_lift.structrr.rebase import (
     StructrrChange,
     StructrrRebaseReport,
@@ -50,4 +58,10 @@ __all__ = [
     "compile_proposal_revision",
     "load_proposal_revision",
     "validate_proposal_revision",
+    "PROPOSAL_REVIEW_RECEIPT_SCHEMA_VERSION",
+    "ProposalReviewReceipt",
+    "build_structural_review_receipt",
+    "compile_review_worklist",
+    "load_review_receipt",
+    "write_review_receipt",
 ]

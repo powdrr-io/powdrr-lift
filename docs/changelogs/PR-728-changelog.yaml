@@ -1,0 +1,110 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 728
+title: Compile proposal decision obligations and review receipts
+intent:
+  problem: Proposal validation is not yet represented as a durable, replayable decision worklist, so semantic review can be skipped or accepted without proving every required predicate.
+  goal: Add deterministic decision-obligation compilation and fail-closed proposal review receipts for the Structrr-to-Procedrr boundary.
+human-decisions:
+  - id: compile-all-required-proposal-gates
+    summary: Compile one stable decision obligation for every required proposal-review family and operation.
+  - id: unknown-review-does-not-accept
+    summary: Treat unknown or incomplete semantic review evidence as blocking rather than silently accepting structural checks.
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/decision_obligation.py
+    type: added
+    summary: Add typed decision specifications, results, and deterministic worklists.
+    rationale: Give Procedrr a durable single-decision contract with identity-bound evidence and finite outcomes.
+    span:
+      start_line: 1
+      end_line: 138
+    related:
+      decisions:
+        - compile-all-required-proposal-gates
+        - unknown-review-does-not-accept
+  - path: src/powdrr_lift/structrr/gate_compiler.py
+    type: added
+    summary: Compile proposal operations and acceptance criteria into ordered gate obligations.
+    rationale: Ensure required source, intent-effect, affected-intent, verifier, and resulting-state decisions cannot be omitted by a model.
+    span:
+      start_line: 1
+      end_line: 151
+    related:
+      decisions:
+        - compile-all-required-proposal-gates
+  - path: src/powdrr_lift/structrr/proposal_review.py
+    type: added
+    summary: Add proposal review receipts with stale-worklist and incomplete-evidence rejection.
+    rationale: Make proposal acceptance tied to the exact proposal fingerprint, worklist fingerprint, and validated decision results.
+    span:
+      start_line: 1
+      end_line: 191
+    related:
+      decisions:
+        - unknown-review-does-not-accept
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export the decision-backed proposal review API.
+    rationale: Make the new Structrr review boundary available to Workrr and Procedrr integration code.
+    span:
+      start_line: 28
+      end_line: 35
+    related:
+      decisions:
+        - compile-all-required-proposal-gates
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export proposal review symbols in the public symbol list.
+    rationale: Preserve a stable package-level interface for the new review artifacts.
+    span:
+      start_line: 61
+      end_line: 66
+    related:
+      decisions:
+        - compile-all-required-proposal-gates
+  - path: tests/test_decision_obligation.py
+    type: added
+    summary: Test deterministic worklists and identity-bound result validation.
+    rationale: Prove replay ordering and stale evidence rejection.
+    span:
+      start_line: 1
+      end_line: 39
+    related:
+      decisions:
+        - compile-all-required-proposal-gates
+        - unknown-review-does-not-accept
+  - path: tests/test_structrr_gate_compiler.py
+    type: added
+    summary: Test gate-family completeness, structural rejection, and review receipt staleness.
+    rationale: Prove proposal review cannot silently omit affected intent or accept unknown semantic decisions.
+    span:
+      start_line: 1
+      end_line: 81
+    related:
+      decisions:
+        - compile-all-required-proposal-gates
+        - unknown-review-does-not-accept
+entities:
+  - id: decision-obligation-worklist
+    type: Module
+    action: added
+  - id: proposal-review-receipt
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: proposal-review-is-fingerprint-bound
+    action: added
+    description: A proposal review receipt is valid only for the exact proposal and exact compiled worklist that produced it.
+    rationale: Prevent stale review evidence from authorizing a changed proposal.
+  - id: unknown-decisions-block-acceptance
+    action: added
+    description: Unknown, clarification, failed, or missing required decisions cannot produce an accepted proposal review receipt.
+    rationale: Keep semantic review fail closed.
+guidance:
+  - id: use-gate-compiler-before-worker-dispatch
+    action: added
+    description: Compile and persist the proposal worklist before dispatching any implementation worker.
+    rationale: Procedrr must own the complete decision surface before Workrr invokes OpenCode.
+features: []
+proposed_prs: []

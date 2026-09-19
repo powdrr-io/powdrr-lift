@@ -43,6 +43,9 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = ["powdrr_lift", "procedrr", "procedrr_evaluator"]
 
+[tool.uv.build-backend.data]
+purelib = "docs/procedrr/skill-definitions"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

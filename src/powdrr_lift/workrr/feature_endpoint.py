@@ -1985,9 +1985,12 @@ def _apply_flow_yaml_edit(
 
 
 def _validate_procedrr_flow(worktree: Path) -> Path:
-    path = (
+    repository_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
+    path = repository_path
+    if not path.is_file():
+        path = Path(__file__).resolve().parents[2] / "implement-feature.yaml"
     try:
         parse_and_validate(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:

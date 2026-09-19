@@ -433,9 +433,13 @@ def _run_opencode_phase(
         raise PowdrrExecutionError("implementation inputs do not match the plan state")
     feature_description = _require_flow_text(parameters, "feature_description")
     work_item_name = _require_flow_text(parameters, "work_item_name")
-    planned_additions, planned_deletions, acceptance_criteria = (
-        _load_implementation_plan(plan_path, feature_description)
-    )
+    (
+        planned_additions,
+        planned_deletions,
+        acceptance_criteria,
+        must_preserve,
+        non_goals,
+    ) = _load_implementation_plan(plan_path, feature_description)
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
@@ -452,6 +456,13 @@ def _run_opencode_phase(
                 acceptance_criteria=acceptance_criteria,
                 planned_additions=planned_additions,
                 planned_deletions=planned_deletions,
+                must_preserve=must_preserve,
+                non_goals=non_goals,
+                source_refs=(
+                    f"structrr:{baseline_path.relative_to(worktree)}",
+                    f"structrr-diff:{plan_path.relative_to(worktree)}",
+                    f"procedrr:{procedrr_path.relative_to(worktree)}",
+                ),
             ),
         ),
         allowed_paths=config.allowed_paths,
@@ -524,7 +535,13 @@ def _run_opencode_phase(
 
 def _load_implementation_plan(
     path: Path, feature_description: str
-) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...], tuple[str, ...]]:
+) -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+    tuple[str, ...],
+    tuple[str, ...],
+    tuple[str, ...],
+]:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as error:
@@ -566,7 +583,52 @@ def _load_implementation_plan(
             f"The requested feature behavior is implemented: {feature_description}"
         )
     criteria.append("Only the declared implementation paths are changed.")
-    return tuple(additions), tuple(deletions), tuple(dict.fromkeys(criteria))
+    return (
+        tuple(additions),
+        tuple(deletions),
+        tuple(dict.fromkeys(criteria)),
+        _plan_subject_text(raw, ("invariants", "guidance")),
+        _plan_text_values(raw.get("non_goals")),
+    )
+
+
+def _plan_subject_text(
+    document: Mapping[str, Any], sections: tuple[str, ...]
+) -> tuple[str, ...]:
+    values: list[str] = []
+    for section in sections:
+        raw_values = document.get(section)
+        if not isinstance(raw_values, list):
+            continue
+        for item in raw_values:
+            if not isinstance(item, Mapping):
+                continue
+            if item.get("action") in {"deleted", "removed"}:
+                continue
+            identifier = item.get("id")
+            description = item.get("description", item.get("text"))
+            if isinstance(description, str) and description.strip():
+                prefix = (
+                    f"{section}.{identifier}: "
+                    if isinstance(identifier, str) and identifier.strip()
+                    else f"{section}: "
+                )
+                values.append(prefix + description.strip())
+    return tuple(dict.fromkeys(values))
+
+
+def _plan_text_values(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    values: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            values.append(item.strip())
+        elif isinstance(item, Mapping):
+            description = item.get("description", item.get("text"))
+            if isinstance(description, str) and description.strip():
+                values.append(description.strip())
+    return tuple(dict.fromkeys(values))
 
 
 def _validate_implementation_phase(

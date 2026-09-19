@@ -222,8 +222,8 @@ invariants:
         encoding="utf-8",
     )
 
-    additions, deletions, criteria = _load_implementation_plan(
-        plan, "Add step transcripts"
+    additions, deletions, criteria, must_preserve, non_goals = (
+        _load_implementation_plan(plan, "Add step transcripts")
     )
 
     assert additions == (
@@ -245,6 +245,46 @@ invariants:
     assert criteria == (
         "The transcript is ordered by execution.",
         "Only the declared implementation paths are changed.",
+    )
+    assert must_preserve == ()
+    assert non_goals == ()
+
+
+def test_implementation_plan_compiles_preservation_and_non_goals(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan.write_text(
+        """
+invariants:
+  - id: ordered-transcript
+    action: added
+    description: Preserve transcript ordering.
+  - id: retired-invariant
+    action: removed
+    description: Do not preserve this retired rule.
+guidance:
+  - id: bounded-worker
+    action: added
+    description: Keep the worker bounded to the operation.
+non_goals:
+  - Do not redesign the transport.
+  - text: Do not add unrelated commands.
+""",
+        encoding="utf-8",
+    )
+
+    _, _, _, must_preserve, non_goals = _load_implementation_plan(
+        plan, "Add bounded operations"
+    )
+
+    assert must_preserve == (
+        "invariants.ordered-transcript: Preserve transcript ordering.",
+        "guidance.bounded-worker: Keep the worker bounded to the operation.",
+    )
+    assert non_goals == (
+        "Do not redesign the transport.",
+        "Do not add unrelated commands.",
     )
 
 

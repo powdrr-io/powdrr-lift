@@ -11,11 +11,13 @@ small until each implementation has a clean ownership boundary.
 """
 
 from powdrr_lift.structrr.bootstrap import (
+    BOOTSTRAP_SECTION_VERSIONS,
     BootstrapIssue,
     BootstrapResult,
     BootstrapValidationReport,
     bootstrap_structrr,
     validate_bootstrap_document,
+    validate_bootstrap_sections,
 )
 from powdrr_lift.structrr.proposal import (
     PROPOSAL_REVISION_SCHEMA_VERSION,
@@ -37,7 +39,9 @@ __all__ = [
     "BootstrapIssue",
     "BootstrapResult",
     "BootstrapValidationReport",
+    "BOOTSTRAP_SECTION_VERSIONS",
     "bootstrap_structrr",
+    "validate_bootstrap_sections",
     "validate_bootstrap_document",
     "StructrrChange",
     "StructrrRebaseReport",

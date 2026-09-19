@@ -6,8 +6,10 @@ from pathlib import Path
 import yaml
 
 from powdrr_lift.structrr.bootstrap import (
+    BOOTSTRAP_SECTION_VERSIONS,
     bootstrap_structrr,
     validate_bootstrap_document,
+    validate_bootstrap_sections,
 )
 from powdrr_lift.structrr.rebase import rebase_structrr_snapshot, snapshot_digest
 
@@ -115,6 +117,7 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     result = bootstrap_structrr(repo)
 
     assert result.validation.successful
+    assert result.document["section_versions"] == BOOTSTRAP_SECTION_VERSIONS
     short_hash = subprocess.run(
         ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
         check=True,
@@ -246,6 +249,18 @@ def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
         "pytest",
         "-q",
     ]
+
+
+def test_bootstrap_section_validation_reports_missing_and_stale_sections() -> None:
+    document = {
+        "section_versions": {"intent": 0},
+        "intent": {},
+    }
+
+    issues = validate_bootstrap_sections(document)
+
+    assert any(issue.code == "bootstrap_section_version_invalid" for issue in issues)
+    assert any(issue.code == "bootstrap_section_missing" for issue in issues)
 
 
 def test_bootstrap_ignores_tracked_github_metadata(tmp_path: Path) -> None:

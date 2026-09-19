@@ -20,7 +20,10 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.bootstrap import bootstrap_structrr
+from powdrr_lift.structrr.bootstrap import (
+    bootstrap_structrr,
+    validate_bootstrap_sections,
+)
 from powdrr_lift.structrr.proposal import (
     ProposalRevision,
     compile_proposal_revision,
@@ -1320,7 +1323,7 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
 
 
 def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
-    """Reuse the current baseline or bootstrap it once before planning."""
+    """Reuse a current baseline only when every bootstrap section is current."""
     relative_paths = _git_output(
         runner,
         worktree,
@@ -1341,7 +1344,21 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
         )
         ranked.append((int(timestamp or "0"), relative_path))
     _, selected = max(ranked)
-    return worktree / selected
+    selected_path = worktree / selected
+    try:
+        document = _load_yaml_mapping(selected_path)
+    except PowdrrExecutionError:
+        document = {}
+    section_issues = validate_bootstrap_sections(document)
+    if not section_issues:
+        return selected_path
+    baseline = bootstrap_structrr(worktree)
+    if not baseline.validation.successful:
+        raise PowdrrExecutionError(
+            f"Structrr bootstrap regeneration failed: {baseline.validation.issues}"
+        )
+    _commit(runner, worktree, "Refresh Structrr baseline sections")
+    return baseline.output_path
 
 
 def _bootstrap_validation_profiles(

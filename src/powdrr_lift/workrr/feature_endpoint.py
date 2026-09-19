@@ -21,6 +21,7 @@ from powdrr_lift.core.spec_context import (
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.structrr.proposal import (
+    ProposalRevision,
     compile_proposal_revision,
     validate_proposal_revision,
 )
@@ -480,36 +481,25 @@ def _run_opencode_phase(
                 f"revision at {proposal_revision_path}: {error}"
             ) from error
     base_commit = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+    proposal_source = f"proposal:{proposal_revision_path.relative_to(worktree)}"
+    source_context = (*source_refs, proposal_source)
+    units = _proposal_execution_units(
+        slug=slug,
+        feature_description=feature_description,
+        proposal_revision=proposal_revision,
+        acceptance_criteria=acceptance_criteria,
+        planned_additions=planned_additions,
+        planned_deletions=planned_deletions,
+        must_preserve=must_preserve,
+        non_goals=non_goals,
+        allowed_paths=config.allowed_paths,
+        source_refs=source_context,
+    )
     plan = ExecutionPlan(
         plan_id=f"{slug}-execution",
         proposed_pr_fingerprint=proposal_revision.fingerprint,
-        units=(
-            ExecutionUnit(
-                unit_id=f"implement-{slug}",
-                objective=feature_description,
-                paths=config.allowed_paths,
-                validation_profiles=("feature-validation",),
-                acceptance_criteria=acceptance_criteria,
-                planned_additions=planned_additions,
-                planned_deletions=planned_deletions,
-                must_preserve=must_preserve,
-                non_goals=non_goals,
-                source_refs=source_refs
-                + (f"proposal:{proposal_revision_path.relative_to(worktree)}",),
-            ),
-        ),
+        units=units,
         allowed_paths=config.allowed_paths,
-    )
-    request = ImplementationRequest.from_execution_plan(
-        plan,
-        unit_id=f"implement-{slug}",
-        request_id=f"{slug}-implementation",
-        base_commit=base_commit,
-        context_refs=(
-            *source_refs,
-            f"proposal:{proposal_revision_path.relative_to(worktree)}",
-        ),
-        allowed_commands=(" ".join(config.validation_command) + " *",),
     )
     provider = state.get("opencode_provider")
     if not isinstance(provider, OpenCodeProvider):
@@ -523,46 +513,194 @@ def _run_opencode_phase(
         state["opencode_provider"] = provider
     repair_request = parameters.get("repair_request")
     repair_issue = parameters.get("repair_issue")
-    if isinstance(repair_issue, Mapping):
-        repair_request = request.repair_prompt(repair_issue)
-    if isinstance(repair_request, str) and repair_request.strip():
-        fallback_context = ""
-        if provider.session_id is None:
-            fallback_context = (
-                f"Work item: {work_item_name}\n"
-                f"Feature: {feature_description}\n"
-                "This is a new repair session; use the existing worktree and "
-                "repair only the reported issue.\n\n"
-            )
-        request = replace(
-            request,
-            prompt=(
-                fallback_context + f"{repair_request}\n"
-                "Use the current session context and current worktree state; do not "
-                "re-plan the feature or revisit unrelated changes."
-            ),
-            allow_existing_changes=True,
-        )
-    request_path = output_root / "implementation-request.json"
-    request_path.write_text(request.to_json(), encoding="utf-8")
     attempt_store = CodingAgentAttemptStore(output_root / "artifacts")
-    attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
-    state["opencode_attempt_number"] = attempt_number
-    attempt = CodingAgentRunner(
+    coding_runner = CodingAgentRunner(
         provider=provider,
         store=attempt_store,
-    ).run(
-        request,
-        worktree_root=worktree,
-        attempt_id=f"{slug}-attempt-{attempt_number}",
     )
+    attempts: list[CodingAgentAttempt] = []
+    requests: list[ImplementationRequest] = []
+    repair_mode = (
+        isinstance(repair_request, str) and bool(repair_request.strip())
+    ) or isinstance(repair_issue, Mapping)
+    request_units = (
+        (
+            _aggregate_execution_unit(
+                units, slug=slug, feature_description=feature_description
+            ),
+        )
+        if repair_mode
+        else units
+    )
+    for index, unit in enumerate(request_units, start=1):
+        request = ImplementationRequest.from_execution_unit(
+            unit,
+            request_id=(
+                f"{slug}-repair" if repair_mode else f"{slug}-implementation-{index}"
+            ),
+            base_commit=base_commit,
+            plan_fingerprint=plan.proposed_pr_fingerprint,
+            context_refs=source_context,
+            allowed_commands=(" ".join(config.validation_command) + " *",),
+        )
+        if repair_mode:
+            if isinstance(repair_issue, Mapping):
+                repair_request = request.repair_prompt(repair_issue)
+            fallback_context = ""
+            if provider.session_id is None:
+                fallback_context = (
+                    f"Work item: {work_item_name}\n"
+                    f"Feature: {feature_description}\n"
+                    "This is a new repair session; use the existing worktree and "
+                    "repair only the reported issue.\n\n"
+                )
+            request = replace(
+                request,
+                prompt=(
+                    fallback_context + f"{repair_request}\n"
+                    "Use the current session context and current worktree state; "
+                    "do not "
+                    "re-plan the feature or revisit unrelated changes."
+                ),
+                allow_existing_changes=True,
+            )
+        elif index > 1:
+            request = replace(request, allow_existing_changes=True)
+        request_path = output_root / "implementation-request.json"
+        request_path.write_text(request.to_json(), encoding="utf-8")
+        operation_request_path = output_root / "requests" / f"{unit.unit_id}.json"
+        operation_request_path.parent.mkdir(parents=True, exist_ok=True)
+        operation_request_path.write_text(request.to_json(), encoding="utf-8")
+        attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
+        state["opencode_attempt_number"] = attempt_number
+        if not repair_mode and isinstance(provider, OpenCodeProvider):
+            provider.session_id = None
+        attempt = coding_runner.run(
+            request,
+            worktree_root=worktree,
+            attempt_id=(
+                f"{slug}-repair-attempt-{attempt_number}"
+                if repair_mode
+                else f"{slug}-{unit.unit_id}-attempt-{attempt_number}"
+            ),
+        )
+        requests.append(request)
+        attempts.append(attempt)
+        if attempt.status is not CodingAgentStatus.COMPLETED:
+            break
+    request = requests[-1]
+    attempt = attempts[-1]
     state.update(
         request=request,
         request_path=request_path,
         attempt=attempt,
+        attempts=tuple(attempts),
         attempt_store=attempt_store,
     )
-    return {"request_id": request.request_id, "attempt": attempt.to_data()}
+    return {
+        "request_id": request.request_id,
+        "attempt": attempt.to_data(),
+        "attempts": [item.to_data() for item in attempts],
+    }
+
+
+def _proposal_execution_units(
+    *,
+    slug: str,
+    feature_description: str,
+    proposal_revision: ProposalRevision,
+    acceptance_criteria: tuple[str, ...],
+    planned_additions: tuple[dict[str, Any], ...],
+    planned_deletions: tuple[dict[str, Any], ...],
+    must_preserve: tuple[str, ...],
+    non_goals: tuple[str, ...],
+    allowed_paths: tuple[str, ...],
+    source_refs: tuple[str, ...],
+) -> tuple[ExecutionUnit, ...]:
+    """Compile one worker unit per explicit Structrr operation."""
+    if not proposal_revision.operations:
+        return (
+            ExecutionUnit(
+                unit_id=f"implement-{slug}",
+                objective=feature_description,
+                paths=allowed_paths,
+                validation_profiles=("feature-validation",),
+                acceptance_criteria=acceptance_criteria,
+                planned_additions=planned_additions,
+                planned_deletions=planned_deletions,
+                must_preserve=must_preserve,
+                non_goals=non_goals,
+                source_refs=source_refs,
+            ),
+        )
+    units: list[ExecutionUnit] = []
+    for operation in proposal_revision.operations:
+        content = dict(operation.content)
+        content["section"] = operation.section
+        subject = content.get("description") or content.get("summary")
+        objective = (
+            str(subject)
+            if isinstance(subject, str) and subject.strip()
+            else (
+                f"{operation.action} {operation.section} subject {operation.subject_id}"
+            )
+        )
+        operation_criteria = (
+            *acceptance_criteria,
+            f"Complete only Structrr operation {operation.operation_id}.",
+        )
+        operation_ref = f"{source_refs[-1]}#{operation.operation_id}"
+        units.append(
+            ExecutionUnit(
+                unit_id=f"implement-{slug}-{operation.operation_id}",
+                objective=objective,
+                paths=allowed_paths,
+                dependencies=(units[-1].unit_id,) if units else (),
+                validation_profiles=("feature-validation",),
+                acceptance_criteria=operation_criteria,
+                planned_additions=(content,) if operation.action == "add" else (),
+                planned_deletions=(content,) if operation.action == "remove" else (),
+                must_preserve=must_preserve,
+                non_goals=non_goals,
+                source_refs=(*source_refs, operation_ref),
+            )
+        )
+    return tuple(units)
+
+
+def _aggregate_execution_unit(
+    units: tuple[ExecutionUnit, ...],
+    *,
+    slug: str,
+    feature_description: str,
+) -> ExecutionUnit:
+    """Create one broad repair unit without changing the original plan."""
+    return ExecutionUnit(
+        unit_id=f"repair-{slug}",
+        objective=feature_description,
+        paths=units[0].paths,
+        validation_profiles=units[0].validation_profiles,
+        acceptance_criteria=tuple(
+            dict.fromkeys(
+                criterion for unit in units for criterion in unit.acceptance_criteria
+            )
+        ),
+        planned_additions=tuple(
+            change for unit in units for change in unit.planned_additions
+        ),
+        planned_deletions=tuple(
+            change for unit in units for change in unit.planned_deletions
+        ),
+        must_preserve=tuple(
+            dict.fromkeys(item for unit in units for item in unit.must_preserve)
+        ),
+        non_goals=tuple(
+            dict.fromkeys(item for unit in units for item in unit.non_goals)
+        ),
+        source_refs=tuple(
+            dict.fromkeys(item for unit in units for item in unit.source_refs)
+        ),
+    )
 
 
 def _load_implementation_plan(

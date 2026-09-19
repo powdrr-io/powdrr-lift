@@ -45,6 +45,95 @@ steps:
       bind: plan
   - operation:
       tool: internal
+      command: [decompose_feature_description]
+      parameters:
+        feature_description: {type: reference, value: feature_description}
+      returns: {type: array, minItems: 1}
+      bind: feature_sentences
+  - for_each:
+      snapshot: {name: feature_sentences}
+      item_binding: feature_sentence
+      collect: {binding: requirement_decisions, mode: list}
+      body:
+        - judge:
+            kind: classify_one
+            provider: planning
+            question: Does this sentence state a feature requirement that must be represented explicitly in the plan?
+            subject: feature_sentence
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Judge only this sentence; do not answer for any other sentence.
+              - Classify explanatory background, motivation, and constraints that do not require implementation as not_required.
+              - Classify requested behavior, data, interfaces, compatibility, limits, and validation expectations as required.
+            context: [feature_sentence, plan]
+            output:
+              name: requirement_decision
+              schema:
+                type: object
+                required: [required]
+                additionalProperties: false
+                properties:
+                  required: {type: boolean}
+            validation: {kind: json_schema}
+  - for_each:
+      snapshot: {name: feature_sentences}
+      item_binding: feature_sentence
+      collect: {binding: reflection_decisions, mode: list}
+      body:
+        - judge:
+            kind: classify_one
+            provider: planning
+            question: Is this sentence's requirement explicitly reflected in the generated plan?
+            subject: feature_sentence
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Judge only this sentence against the generated plan.
+              - Answer reflected when the plan contains a concrete acceptance criterion, feature, invariant, guidance item, or proposed operation for the sentence.
+              - Answer not reflected when the sentence is absent, vague, or only repeated as the plan title or general feature description.
+              - If the sentence is not a requirement, answer reflected because no implementation obligation is needed.
+            context: [feature_sentence, plan]
+            output:
+              name: reflection_decision
+              schema:
+                type: object
+                required: [reflected]
+                additionalProperties: false
+                properties:
+                  reflected: {type: boolean}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [update_plan_from_sentence_trace]
+      parameters:
+        plan: {type: reference, value: plan.path}
+        sentences: {type: reference, value: feature_sentences}
+        requirement_decisions: {type: reference, value: requirement_decisions}
+        reflection_decisions: {type: reference, value: reflection_decisions}
+      returns:
+        type: object
+        required: [path, updated]
+        properties:
+          path: {type: string, minLength: 1}
+          updated: {type: integer, minimum: 0}
+      bind: plan_update
+  - operation:
+      tool: internal
+      command: [compile_feature_obligations]
+      parameters:
+        feature_description: {type: reference, value: feature_description}
+        plan: {type: reference, value: plan.path}
+        sentences: {type: reference, value: feature_sentences}
+        requirement_decisions: {type: reference, value: requirement_decisions}
+        reflection_decisions: {type: reference, value: reflection_decisions}
+      returns:
+        type: object
+        required: [path, obligations]
+        properties:
+          path: {type: string, minLength: 1}
+          obligations: {type: array, minItems: 1}
+      bind: feature_obligations
+  - operation:
+      tool: internal
       command: [prepare_proposal_review]
       parameters:
         baseline: {type: reference, value: baseline.path}
@@ -122,6 +211,7 @@ steps:
         proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
+        obligations: {type: reference, value: feature_obligations}
       returns:
         type: object
         required: [request_id, attempt]
@@ -242,14 +332,16 @@ steps:
       on_failure: {recovery: intent-repair, resume: intent-preservation-review}
   - judge:
       kind: verify_completeness
+      provider: planning
       question: Does the implementation satisfy every requirement in the feature specification?
       subject: feature_description
       prompt_system: Return only the declared JSON object.
       instructions:
         - Compare the implementation and validation evidence with the complete feature specification.
+        - Check every compiled feature obligation individually and require concrete implementation and validation evidence for each one.
         - Mark complete only when every requested behavior is implemented and validated.
         - Return one verdict: satisfied or missing.
-      context: [feature_description, plan, implementation, validation, review]
+      context: [feature_description, plan, feature_obligations, implementation, validation, review]
       output:
         name: completeness_review
         schema:
@@ -270,6 +362,7 @@ steps:
       on_failure: {recovery: completeness-repair, resume: specification-completeness-review}
   - judge:
       kind: verify_scope
+      provider: planning
       question: Is every changed file and hunk justified by the feature specification?
       subject: review
       prompt_system: Return only the declared JSON object.
@@ -278,7 +371,7 @@ steps:
         - Mark justified only when every change is required by the specification or its validation.
         - Treat unrelated refactors, cleanup, and speculative improvements as findings.
         - Return one verdict: justified or unjustified.
-      context: [feature_description, plan, implementation, validation, review, completeness_review]
+      context: [feature_description, plan, feature_obligations, implementation, validation, review, completeness_review]
       output:
         name: scope_review
         schema:
@@ -355,6 +448,7 @@ recoveries:
                         plan: {type: reference, value: plan.path}
                         work_item_name: {type: reference, value: work_item_name}
                         feature_description: {type: reference, value: feature_description}
+                        obligations: {type: reference, value: feature_obligations}
                         repair_issue: {type: reference, value: repair_issue}
                       returns: {type: object}
                       bind: implementation
@@ -391,6 +485,7 @@ recoveries:
     steps:
       - judge:
           kind: construct_repair_plan
+          provider: planning
           question: What one repair request should be sent to OpenCode for the incomplete implementation?
           subject: completeness_review
           prompt_system: Return only the declared JSON object.
@@ -415,6 +510,7 @@ recoveries:
             plan: {type: reference, value: plan.path}
             work_item_name: {type: reference, value: work_item_name}
             feature_description: {type: reference, value: feature_description}
+            obligations: {type: reference, value: feature_obligations}
             repair_request: {type: reference, value: completeness_repair.request}
             review_verdict: {type: reference, value: completeness_review.verdict}
           returns: {type: object}
@@ -444,6 +540,7 @@ recoveries:
     steps:
       - judge:
           kind: construct_repair_plan
+          provider: planning
           question: What one repair request should be sent to OpenCode for the unjustified change scope?
           subject: scope_review
           prompt_system: Return only the declared JSON object.
@@ -468,6 +565,7 @@ recoveries:
             plan: {type: reference, value: plan.path}
             work_item_name: {type: reference, value: work_item_name}
             feature_description: {type: reference, value: feature_description}
+            obligations: {type: reference, value: feature_obligations}
             repair_request: {type: reference, value: scope_repair.request}
             review_verdict: {type: reference, value: scope_review.verdict}
           returns: {type: object}

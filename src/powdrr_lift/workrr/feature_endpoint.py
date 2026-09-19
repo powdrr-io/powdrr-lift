@@ -105,6 +105,7 @@ class FeatureEndpointResult:
     review: dict[str, Any]
     pull_request_url: str | None = None
     changelog_path: Path | None = None
+    feature_obligations_path: Path | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -119,6 +120,11 @@ class FeatureEndpointResult:
             "review": self.review,
             "pull_request_url": self.pull_request_url,
             "changelog_path": str(self.changelog_path) if self.changelog_path else None,
+            "feature_obligations_path": (
+                str(self.feature_obligations_path)
+                if self.feature_obligations_path
+                else None
+            ),
         }
 
 
@@ -317,6 +323,14 @@ def _execute_procedrr_flow(
                     "aggregate_category_edits requires category decisions"
                 )
             return _aggregate_category_edits(decisions)
+        if name == "decompose_feature_description":
+            feature_description = parameters.get("feature_description")
+            if (
+                not isinstance(feature_description, str)
+                or not feature_description.strip()
+            ):
+                raise PowdrrExecutionError("feature description is empty")
+            return _decompose_feature_description(feature_description)
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -357,6 +371,15 @@ def _execute_procedrr_flow(
             )
             state["proposal_review_receipt_path"] = review["receipt_path"]
             return review
+        if name == "compile_feature_obligations":
+            return _compile_feature_obligations(
+                parameters,
+                worktree=worktree,
+                output_root=output_root,
+                state=state,
+            )
+        if name == "update_plan_from_sentence_trace":
+            return _update_plan_from_sentence_trace(parameters, state=state)
         if name == "run_opencode":
             return _run_opencode_phase(
                 config,
@@ -507,6 +530,12 @@ def _execute_procedrr_flow(
             ),
             execute,
             process_directory=worktree / "docs" / "procedrr" / "skill-definitions",
+            judge_clients={
+                "planning": WorkrrProcedrrClient(
+                    config.planning_client,
+                    skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+                )
+            },
         )
         evaluator.evaluate(
             flow,
@@ -687,6 +716,215 @@ def _validate_review_evidence_sources(
             )
 
 
+def _compile_feature_obligations(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    output_root: Path,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """Turn the approved plan trace into durable worker obligations."""
+    plan = _require_flow_text(parameters, "plan")
+    if Path(plan) != state.get("plan_path"):
+        raise PowdrrExecutionError("obligations plan does not match the planned diff")
+    feature_description = _require_flow_text(parameters, "feature_description")
+    sentences = parameters.get("sentences")
+    requirement_decisions = parameters.get("requirement_decisions")
+    reflection_decisions = parameters.get("reflection_decisions")
+    if not isinstance(sentences, list):
+        raise PowdrrExecutionError("feature sentences must be a list")
+    if not isinstance(requirement_decisions, list) or not isinstance(
+        reflection_decisions, list
+    ):
+        raise PowdrrExecutionError("sentence decisions must be lists")
+    if len(sentences) != len(requirement_decisions) or len(sentences) != len(
+        reflection_decisions
+    ):
+        raise PowdrrExecutionError("sentence decision counts do not match")
+    plan_document = _load_yaml_mapping(Path(plan))
+    plan_refs = _plan_acceptance_references(plan_document)
+    if not plan_refs:
+        raise PowdrrExecutionError("plan produced no acceptance criteria obligations")
+
+    obligations: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index, (sentence, requirement, _reflection) in enumerate(
+        zip(sentences, requirement_decisions, reflection_decisions, strict=True),
+        start=1,
+    ):
+        if not isinstance(sentence, Mapping):
+            raise PowdrrExecutionError("feature sentence is malformed")
+        sentence_id = sentence.get("id")
+        sentence_text = sentence.get("text")
+        if not isinstance(sentence_id, str) or not isinstance(sentence_text, str):
+            raise PowdrrExecutionError("feature sentence is missing id or text")
+        if not _decision_value(requirement, "required"):
+            continue
+        identifier = sentence_id or f"sentence-{index}"
+        if identifier in seen_ids:
+            raise PowdrrExecutionError("feature sentence identifiers are duplicated")
+        seen_ids.add(identifier)
+        obligations.append(
+            {
+                "id": identifier,
+                "description": sentence_text.strip(),
+                "plan_refs": plan_refs,
+            }
+        )
+    if not obligations:
+        raise PowdrrExecutionError("feature description produced no obligations")
+
+    path = output_root / "feature-obligations.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "feature_description": feature_description,
+                "plan": plan,
+                "obligations": obligations,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state["feature_obligations"] = tuple(item["description"] for item in obligations)
+    state["feature_obligations_path"] = path
+    return {"path": str(path), "obligations": obligations}
+
+
+def _update_plan_from_sentence_trace(
+    parameters: Mapping[str, Any], *, state: dict[str, Any]
+) -> dict[str, Any]:
+    """Make every required but unreflected sentence explicit in the plan."""
+    plan = _require_flow_text(parameters, "plan")
+    if Path(plan) != state.get("plan_path"):
+        raise PowdrrExecutionError("plan repair does not match the planned diff")
+    sentences = parameters.get("sentences")
+    requirement_decisions = parameters.get("requirement_decisions")
+    reflection_decisions = parameters.get("reflection_decisions")
+    if not isinstance(sentences, list):
+        raise PowdrrExecutionError("feature sentences must be a list")
+    if not isinstance(requirement_decisions, list) or not isinstance(
+        reflection_decisions, list
+    ):
+        raise PowdrrExecutionError("sentence decisions must be lists")
+    if len(sentences) != len(requirement_decisions) or len(sentences) != len(
+        reflection_decisions
+    ):
+        raise PowdrrExecutionError("sentence decision counts do not match")
+
+    path = Path(plan)
+    document = _load_yaml_mapping(path)
+    raw_criteria = document.get("acceptance_criteria")
+    criteria = list(raw_criteria) if isinstance(raw_criteria, list) else []
+    existing_ids = {
+        str(item.get("id"))
+        for item in criteria
+        if isinstance(item, Mapping) and item.get("id")
+    }
+    updated = 0
+    for sentence, requirement, reflection in zip(
+        sentences, requirement_decisions, reflection_decisions, strict=True
+    ):
+        if not _decision_value(requirement, "required") or _decision_value(
+            reflection, "reflected"
+        ):
+            continue
+        if not isinstance(sentence, Mapping):
+            raise PowdrrExecutionError("feature sentence is malformed")
+        sentence_id = sentence.get("id")
+        sentence_text = sentence.get("text")
+        if not isinstance(sentence_id, str) or not isinstance(sentence_text, str):
+            raise PowdrrExecutionError("feature sentence is missing id or text")
+        criterion_id = f"trace-{sentence_id}"
+        if criterion_id in existing_ids:
+            continue
+        criteria.append(
+            {
+                "id": criterion_id,
+                "description": sentence_text.strip(),
+            }
+        )
+        existing_ids.add(criterion_id)
+        updated += 1
+    if updated:
+        repaired = dict(document)
+        repaired["acceptance_criteria"] = criteria
+        path.write_text(yaml.safe_dump(repaired, sort_keys=False), encoding="utf-8")
+        parse_change_log(path.read_text(encoding="utf-8"))
+    return {"path": str(path), "updated": updated}
+
+
+def _decompose_feature_description(feature_description: str) -> list[dict[str, str]]:
+    sentences = [
+        item.strip()
+        for item in re.split(r"(?<=[.!?])\s+|\n+", feature_description)
+        if item.strip()
+    ]
+    return [
+        {"id": f"sentence-{index}", "text": sentence}
+        for index, sentence in enumerate(sentences, start=1)
+    ]
+
+
+def _decision_value(value: Any, key: str) -> bool:
+    return isinstance(value, Mapping) and value.get(key) is True
+
+
+def _plan_acceptance_references(document: Mapping[str, Any]) -> list[str]:
+    raw_criteria = document.get("acceptance_criteria")
+    if not isinstance(raw_criteria, list):
+        return []
+    references: list[str] = []
+    for index, raw in enumerate(raw_criteria, start=1):
+        identifier = raw.get("id") if isinstance(raw, Mapping) else None
+        if not isinstance(identifier, str) or not identifier.strip():
+            identifier = f"acceptance-{index}"
+        reference = f"acceptance_criteria.{identifier}"
+        if _plan_reference_exists(document, reference):
+            references.append(reference)
+    return references
+
+
+def _require_feature_obligations(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, Mapping):
+        raise PowdrrExecutionError("implementation is missing feature obligations")
+    raw_obligations = value.get("obligations")
+    if not isinstance(raw_obligations, list) or not raw_obligations:
+        raise PowdrrExecutionError("implementation has no feature obligations")
+    descriptions: list[str] = []
+    for item in raw_obligations:
+        if not isinstance(item, Mapping):
+            raise PowdrrExecutionError("implementation obligation is malformed")
+        description = item.get("description")
+        if not isinstance(description, str) or not description.strip():
+            raise PowdrrExecutionError("implementation obligation has no description")
+        descriptions.append(description.strip())
+    return tuple(dict.fromkeys(descriptions))
+
+
+def _feature_obligation_path(value: Any) -> str | None:
+    if not isinstance(value, Mapping):
+        return None
+    path = value.get("path")
+    return path if isinstance(path, str) and path.strip() else None
+
+
+def _plan_reference_exists(document: Mapping[str, Any], reference: str) -> bool:
+    section, separator, identifier = reference.partition(".")
+    if not separator or not section or not identifier:
+        return False
+    items = document.get(section)
+    if not isinstance(items, list):
+        return False
+    return any(
+        isinstance(item, Mapping) and str(item.get("id", "")) == identifier
+        for item in items
+    )
+
+
 def _run_opencode_phase(
     config: FeatureEndpointConfig,
     *,
@@ -705,6 +943,7 @@ def _run_opencode_phase(
         raise PowdrrExecutionError("implementation inputs do not match the plan state")
     feature_description = _require_flow_text(parameters, "feature_description")
     work_item_name = _require_flow_text(parameters, "work_item_name")
+    feature_obligations = _require_feature_obligations(parameters.get("obligations"))
     (
         planned_additions,
         planned_deletions,
@@ -717,11 +956,14 @@ def _run_opencode_phase(
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
-    source_refs = (
+    source_refs: tuple[str, ...] = (
         f"structrr:{baseline_path.relative_to(worktree)}",
         f"structrr-diff:{plan_path.relative_to(worktree)}",
         f"procedrr:{procedrr_path.relative_to(worktree)}",
     )
+    obligation_path = _feature_obligation_path(parameters.get("obligations"))
+    if obligation_path is not None:
+        source_refs = (*source_refs, f"obligations:{obligation_path}")
     proposal_revision = compile_proposal_revision(
         slug,
         baseline_document,
@@ -794,6 +1036,7 @@ def _run_opencode_phase(
         planned_deletions=planned_deletions,
         must_preserve=must_preserve,
         non_goals=non_goals,
+        feature_obligations=feature_obligations,
         allowed_paths=config.allowed_paths,
         source_refs=source_context,
         validation_profiles=state["validation_profile_names"],
@@ -1074,8 +1317,12 @@ def _proposal_execution_units(
     allowed_paths: tuple[str, ...],
     source_refs: tuple[str, ...],
     validation_profiles: tuple[str, ...] = ("feature-validation",),
+    feature_obligations: tuple[str, ...] = (),
 ) -> tuple[ExecutionUnit, ...]:
     """Compile one worker unit per explicit Structrr operation."""
+    acceptance_criteria = tuple(
+        dict.fromkeys((*feature_obligations, *acceptance_criteria))
+    )
     if not proposal_revision.operations:
         return (
             ExecutionUnit(
@@ -1504,6 +1751,7 @@ def _feature_endpoint_result(
         state.get("review", {"passed": False}),
         state.get("pull_request_url"),
         state.get("changelog_path"),
+        state.get("feature_obligations_path"),
     )
 
 

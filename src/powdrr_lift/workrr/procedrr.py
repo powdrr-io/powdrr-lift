@@ -21,7 +21,7 @@ class ProcedrrResponseError(RuntimeError):
 
 
 class OpenCodeReviewClient:
-    """Send Procedrr review prompts to OpenCode in read-only JSON mode."""
+    """Legacy compatibility client; implement-feature no longer uses it."""
 
     def __init__(
         self,

@@ -385,6 +385,8 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
     step_text = str(document["steps"])
     assert "specification-completeness-review" in step_text
     assert "change-scope-review" in step_text
+    assert "Does this sentence state a feature requirement" in step_text
+    assert "Is this sentence's requirement explicitly reflected" in step_text
     review_schemas = [
         step["judge"]["output"]["schema"]
         for step in document["steps"]

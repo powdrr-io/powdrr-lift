@@ -371,6 +371,40 @@ def test_repeat_and_branch_are_bounded_and_data_driven() -> None:
     assert result.events[-1].data["status"] == "succeeded"
 
 
+def test_for_each_without_max_items_reviews_the_entire_snapshot() -> None:
+    result = Evaluator(
+        FakeLLM(), lambda _tool, parameters: parameters["sentence"]
+    ).evaluate(
+        {
+            "name": "unbounded-sentence-review",
+            "steps": [
+                {
+                    "for_each": {
+                        "snapshot": {"name": "sentences"},
+                        "item_binding": "sentence",
+                        "collect": {"binding": "reviewed", "mode": "list"},
+                        "body": [
+                            {
+                                "operation": {
+                                    "tool": "review",
+                                    "parameters": {"sentence": "${sentence}"},
+                                    "bind": "review_result",
+                                }
+                            }
+                        ],
+                    }
+                }
+            ],
+        },
+        {"sentences": [f"sentence-{index}" for index in range(65)]},
+    )
+
+    assert result.bindings["reviewed"] == [
+        {"item": f"sentence-{index}", "result": f"sentence-{index}"}
+        for index in range(65)
+    ]
+
+
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     class DesignInterviewLLM:
         def complete_json(

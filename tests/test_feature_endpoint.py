@@ -34,6 +34,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
     _aggregate_intent_review,
+    _compile_feature_obligations,
     _create_pr_changelog,
     _ensure_current_baseline,
     _finalize_proposal_review,
@@ -41,11 +42,12 @@ from powdrr_lift.workrr.feature_endpoint import (
     _operation_checkpoint,
     _plan_text_items,
     _proposal_execution_units,
+    _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
+    _write_structrr_plan,
     review_feature_diff,
     run_feature_in_place,
 )
-from powdrr_lift.workrr.procedrr import OpenCodeReviewClient
 
 
 def test_workrr_feature_cli_builds_endpoint_config(
@@ -196,6 +198,76 @@ def test_run_feature_in_place_reuses_core_without_git_publication(
     assert captured["config"].push_changes is False
 
 
+def test_compile_feature_obligations_binds_sentence_trace_to_plan(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "acceptance_criteria": [
+                    {"id": "feature-acceptance-1", "description": "It works."}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_root = tmp_path / "run"
+    state: dict[str, Any] = {"plan_path": plan}
+
+    result = _compile_feature_obligations(
+        {
+            "feature_description": "Add the feature.",
+            "plan": str(plan),
+            "sentences": [{"id": "sentence-1", "text": "It works."}],
+            "requirement_decisions": [{"required": True}],
+            "reflection_decisions": [{"reflected": True}],
+        },
+        worktree=tmp_path,
+        output_root=output_root,
+        state=state,
+    )
+
+    assert result["obligations"][0]["description"] == "It works."
+    assert state["feature_obligations"] == ("It works.",)
+    assert json.loads(
+        (output_root / "feature-obligations.json").read_text(encoding="utf-8")
+    )["plan"] == str(plan)
+
+
+def test_update_plan_from_sentence_trace_adds_missing_requirement(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="traceability-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+    state: dict[str, Any] = {"plan_path": plan}
+
+    result = _update_plan_from_sentence_trace(
+        {
+            "plan": str(plan),
+            "sentences": [{"id": "sentence-1", "text": "It works."}],
+            "requirement_decisions": [{"required": True}],
+            "reflection_decisions": [{"reflected": False}],
+        },
+        state=state,
+    )
+
+    assert result == {"path": str(plan), "updated": 1}
+    document = yaml.safe_load(plan.read_text(encoding="utf-8"))
+    assert {item["id"] for item in document["acceptance_criteria"]} >= {
+        "trace-sentence-1"
+    }
+
+
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:
     (tmp_path / "app.py").write_text("print('updated')\n", encoding="utf-8")
     _git(tmp_path, "init", "-q")
@@ -295,48 +367,6 @@ def test_create_pr_changelog_absorbs_and_removes_temporary_proposal(
     assert [item["path"] for item in changelog["files"]] == ["src/app.py"]
     assert changelog["invariants"] == [{"id": "invariant", "description": "i"}]
     assert sum(command[:2] == ["git", "push"] for command in calls) == 2
-
-
-def test_opencode_review_client_sends_prompt_to_read_only_opencode(
-    tmp_path: Path,
-) -> None:
-    calls: list[list[str]] = []
-
-    def runner(
-        command: list[str], **kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
-        calls.append(command)
-        environment = kwargs["env"]
-        assert isinstance(environment, dict)
-        assert '"edit": "deny"' in environment["OPENCODE_PERMISSION"]
-        return subprocess.CompletedProcess(command, 0, '{"verdict":"satisfied"}', "")
-
-    client = OpenCodeReviewClient(
-        executable="opencode",
-        model="review-model",
-        worktree=tmp_path,
-        runner=runner,
-    )
-
-    result = client.complete_json(
-        [{"role": "user", "content": "Review this implementation."}],
-        response_schema={
-            "type": "object",
-            "required": ["verdict"],
-            "properties": {"verdict": {"enum": ["satisfied", "missing"]}},
-        },
-    )
-
-    assert result == {"verdict": "satisfied"}
-    assert calls[0][:6] == [
-        "opencode",
-        "run",
-        "--format",
-        "default",
-        "--model",
-        "review-model",
-    ]
-    assert "Review this implementation." in calls[0][-1]
 
 
 def test_endpoint_reuses_existing_latest_baseline_without_writing(

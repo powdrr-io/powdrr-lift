@@ -198,48 +198,63 @@ def run_opencode(
     # transport chatter must not keep a stalled session alive indefinitely.
     last_progress = time.monotonic()
     timed_out = False
-    while selector.get_map() or process.poll() is None:
-        remaining = inactivity_timeout - (time.monotonic() - last_progress)
-        if remaining <= 0:
-            timed_out = True
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            break
-        ready = selector.select(timeout=min(0.5, remaining))
-        if not ready:
-            if on_snapshot is not None:
-                on_snapshot(monitor.snapshot())
-            continue
-        for key, _ in ready:
-            stream = cast(BinaryIO, key.data)
-            chunk = os.read(stream.fileno(), 65536)
-            if not chunk:
-                selector.unregister(stream)
-                continue
-            output.append(chunk)
-            pending += chunk.decode("utf-8", errors="replace")
-            lines = pending.splitlines(keepends=True)
-            pending = (
-                lines.pop() if lines and not lines[-1].endswith(("\n", "\r")) else ""
-            )
-            for line in lines:
-                payload = parse_event_line(line)
-                if payload is None:
-                    continue
-                captured_at = time.monotonic()
-                monitor.observe(payload, captured_at=captured_at)
-                if log_path is not None:
-                    append_event(log_path, payload, captured_at=captured_at)
-                if monitor.events[-1].is_progress:
-                    last_progress = captured_at
-                    if on_activity is not None:
-                        on_activity()
+    try:
+        while selector.get_map() or process.poll() is None:
+            remaining = inactivity_timeout - (time.monotonic() - last_progress)
+            if remaining <= 0:
+                timed_out = True
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except (PermissionError, ProcessLookupError):
+                    pass
+                break
+            ready = selector.select(timeout=min(0.5, remaining))
+            if not ready:
                 if on_snapshot is not None:
                     on_snapshot(monitor.snapshot())
-    selector.close()
-    returncode = process.wait()
+                continue
+            for key, _ in ready:
+                stream = cast(BinaryIO, key.data)
+                chunk = os.read(stream.fileno(), 65536)
+                if not chunk:
+                    selector.unregister(stream)
+                    continue
+                output.append(chunk)
+                pending += chunk.decode("utf-8", errors="replace")
+                lines = pending.splitlines(keepends=True)
+                pending = (
+                    lines.pop()
+                    if lines and not lines[-1].endswith(("\n", "\r"))
+                    else ""
+                )
+                for line in lines:
+                    payload = parse_event_line(line)
+                    if payload is None:
+                        continue
+                    captured_at = time.monotonic()
+                    monitor.observe(payload, captured_at=captured_at)
+                    if log_path is not None:
+                        append_event(log_path, payload, captured_at=captured_at)
+                    if monitor.events[-1].is_progress:
+                        last_progress = captured_at
+                        if on_activity is not None:
+                            on_activity()
+                    if on_snapshot is not None:
+                        on_snapshot(monitor.snapshot())
+    finally:
+        # A caller may cancel the parent while OpenCode is blocked in select.
+        # Since OpenCode owns its process group, reap the whole group so a
+        # cancelled Workrr attempt cannot leak an orphaned agent session.
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (PermissionError, ProcessLookupError):
+                pass
+        selector.close()
+        process.wait()
+
+    returncode = process.returncode
+    assert returncode is not None
     if timed_out:
         returncode = 124
     if on_snapshot is not None:

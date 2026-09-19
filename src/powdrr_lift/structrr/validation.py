@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import re
 import tomllib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION = "verification-provider-inventory-v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +19,28 @@ class DiscoveredValidationProfile:
     name: str
     command: tuple[str, ...]
     source: str
+
+    @property
+    def provider(self) -> str:
+        """Return the provider namespace represented by this profile."""
+        return self.name.split("-", 1)[0]
+
+
+def validation_inventory(
+    profiles: Sequence[DiscoveredValidationProfile],
+) -> tuple[dict[str, object], ...]:
+    """Build the provider-neutral bootstrap inventory before Workrr collection."""
+    return tuple(
+        {
+            "schema_version": VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
+            "provider": profile.provider,
+            "profile": profile.name,
+            "command": list(profile.command),
+            "selectors": [],
+            "source": profile.source,
+        }
+        for profile in profiles
+    )
 
 
 def discover_validation_profiles(
@@ -206,4 +231,9 @@ def _contains_marker(command: tuple[str, ...], marker: tuple[str, ...]) -> bool:
     return False
 
 
-__all__ = ["DiscoveredValidationProfile", "discover_validation_profiles"]
+__all__ = [
+    "DiscoveredValidationProfile",
+    "VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION",
+    "discover_validation_profiles",
+    "validation_inventory",
+]

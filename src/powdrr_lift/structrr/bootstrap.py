@@ -71,6 +71,7 @@ BOOTSTRAP_SECTION_VERSIONS: dict[str, int] = {
     "invariants": 1,
     "guidance": 1,
     "tools": 1,
+    "validation_inventory": 1,
     "statements": 1,
     "features": 1,
     "proposed_prs": 1,
@@ -325,6 +326,7 @@ def validate_bootstrap_document(
             BootstrapIssue("active_intent_invalid", diagnostic, "active_intent")
         )
     _validate_tools(issues, document.get("tools"), root_path)
+    _validate_validation_inventory(issues, document.get("validation_inventory"))
     _validate_statements(issues, document.get("statements"), root_path)
 
     return BootstrapValidationReport(not issues, tuple(issues))
@@ -364,6 +366,47 @@ def validate_bootstrap_sections(
                 )
             )
     return tuple(issues)
+
+
+def _validate_validation_inventory(issues: list[BootstrapIssue], value: object) -> None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        issues.append(
+            BootstrapIssue(
+                "validation_inventory_invalid",
+                "validation_inventory must be a list.",
+                "validation_inventory",
+            )
+        )
+        return
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            issues.append(
+                BootstrapIssue(
+                    "validation_inventory_entry_invalid",
+                    "Validation inventory entries must be mappings.",
+                    f"validation_inventory[{index}]",
+                )
+            )
+            continue
+        provider = _text(item.get("provider"))
+        profile = _text(item.get("profile"))
+        selectors = item.get("selectors")
+        if not provider or not profile:
+            issues.append(
+                BootstrapIssue(
+                    "validation_inventory_identity_missing",
+                    "Validation inventory entries need provider and profile.",
+                    f"validation_inventory[{index}]",
+                )
+            )
+        if not isinstance(selectors, Sequence) or isinstance(selectors, (str, bytes)):
+            issues.append(
+                BootstrapIssue(
+                    "validation_inventory_selectors_invalid",
+                    "Validation inventory selectors must be a list.",
+                    f"validation_inventory[{index}].selectors",
+                )
+            )
 
 
 def _validate_lifecycle_section(
@@ -938,7 +981,10 @@ def _build_document(
     title: str,
 ) -> dict[str, Any]:
     from powdrr_lift.structrr.active_intent import active_intent_section
-    from powdrr_lift.structrr.validation import discover_validation_profiles
+    from powdrr_lift.structrr.validation import (
+        discover_validation_profiles,
+        validation_inventory,
+    )
 
     allowed = set(taxonomy.entity_types)
     entities: dict[str, dict[str, Any]] = {}
@@ -1017,7 +1063,8 @@ def _build_document(
         )
         _collect_statements(statements, "approach", spec.get("approach"), spec_path)
 
-    for profile in discover_validation_profiles(root):
+    validation_profiles = discover_validation_profiles(root)
+    for profile in validation_profiles:
         tool_id = f"validation:{profile.name}"
         tools.setdefault(
             tool_id,
@@ -1118,6 +1165,7 @@ def _build_document(
             }
         ],
         "tools": [tools[key] for key in sorted(tools)],
+        "validation_inventory": list(validation_inventory(validation_profiles)),
         "statements": [statements[key] for key in sorted(statements)],
         "features": [],
         "proposed_prs": [],

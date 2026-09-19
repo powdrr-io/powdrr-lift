@@ -2001,6 +2001,15 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     return path
 
 
+def _structrr_taxonomy_path(worktree: Path) -> Path:
+    repository_path = worktree / "software_development_entity_taxonomy.md"
+    if repository_path.is_file():
+        return repository_path
+    return (
+        Path(__file__).resolve().parents[2] / "software_development_entity_taxonomy.md"
+    )  # noqa: E501
+
+
 def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
     """Reuse a current baseline only when every bootstrap section is current."""
     relative_paths = _git_output(
@@ -2009,11 +2018,12 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
         ["git", "ls-files", "docs/structrr/current/baseline-*.yaml"],
     ).splitlines()
     if not relative_paths:
-        baseline = bootstrap_structrr(worktree)
+        baseline = bootstrap_structrr(
+            worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
+        )
         if not baseline.validation.successful:
             raise PowdrrExecutionError(
-                "Structrr bootstrap validation failed: "
-                f"{baseline.validation.issues}"
+                f"Structrr bootstrap validation failed: {baseline.validation.issues}"
             )
         _commit(runner, worktree, "Bootstrap Structrr baseline")
         return baseline.output_path
@@ -2034,7 +2044,9 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
     section_issues = validate_bootstrap_sections(document)
     if not section_issues:
         return selected_path
-    baseline = bootstrap_structrr(worktree)
+    baseline = bootstrap_structrr(
+        worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
+    )
     if not baseline.validation.successful:
         raise PowdrrExecutionError(
             f"Structrr bootstrap regeneration failed: {baseline.validation.issues}"
@@ -2057,7 +2069,9 @@ def _bootstrap_validation_profiles(
             ),
         )
     bootstrap = bootstrap_structrr(
-        worktree, output_path=output_root / "validation-bootstrap.yaml"
+        worktree,
+        output_path=output_root / "validation-bootstrap.yaml",
+        taxonomy_path=_structrr_taxonomy_path(worktree),
     )
     if not bootstrap.validation.successful:
         raise PowdrrExecutionError(

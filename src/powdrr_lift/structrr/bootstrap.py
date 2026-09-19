@@ -113,13 +113,7 @@ def bootstrap_structrr(
     repository structure and file-level provenance anchors.
     """
     root = Path(repo_root).resolve()
-    resolved_taxonomy_path = Path(taxonomy_path)
-    if not resolved_taxonomy_path.is_absolute():
-        repository_taxonomy = root / resolved_taxonomy_path
-        packaged_taxonomy = Path(__file__).resolve().parents[2] / resolved_taxonomy_path
-        if not repository_taxonomy.is_file() and packaged_taxonomy.is_file():
-            resolved_taxonomy_path = packaged_taxonomy
-    taxonomy = load_entity_taxonomy(root, resolved_taxonomy_path)
+    taxonomy = load_entity_taxonomy(root, taxonomy_path)
     tracked_files = _tracked_files(root)
     spec_paths = tuple(path for path in tracked_files if is_specification_path(path))
     spec_documents = _load_spec_documents(root, spec_paths)
@@ -1232,7 +1226,7 @@ def _extract_python_source_model(
                     "evidence": "identifier and qualified-name match",
                 }
             )
-    subjects.sort(key=lambda subject: str(subject["id"]))
+    subjects[:] = sorted({str(subject["stable_key"]): subject for subject in subjects}.values(), key=lambda subject: str(subject["id"]))  # noqa: E501  # fmt: skip
     bindings.sort(key=lambda binding: str(binding["id"]))
     return subjects, bindings
 

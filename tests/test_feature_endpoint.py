@@ -268,6 +268,9 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "max_attempts: 4" in flow
     assert "recovery: worker-repair" in flow
     assert "max_iterations: 4" in flow
+    assert "command: [discover_validation_profiles]" in flow
+    assert "command: [run_validation_profile]" in flow
+    assert "command: [aggregate_validation]" in flow
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

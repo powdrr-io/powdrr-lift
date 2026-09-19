@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from powdrr_lift.core.validation_discovery import discover_validation_profiles
+from powdrr_lift.structrr.validation import discover_validation_profiles
 
 
 def test_discovers_project_checks_from_configuration_and_ci(tmp_path: Path) -> None:

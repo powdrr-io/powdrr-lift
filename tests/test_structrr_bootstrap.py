@@ -207,6 +207,47 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     )
 
 
+def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    (repo / "pyproject.toml").write_text(
+        "[tool.ruff]\nline-length = 88\n[tool.mypy]\npython_version = '3.12'\n",
+        encoding="utf-8",
+    )
+    (repo / "tests").mkdir()
+
+    result = bootstrap_structrr(repo)
+
+    tools = {item["id"]: item for item in result.document["tools"]}
+    assert tools["validation:ruff-format-check"]["validation_action"] == [
+        "uv",
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        ".",
+    ]
+    assert tools["validation:ruff-check"]["validation_action"] == [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        ".",
+    ]
+    assert tools["validation:mypy"]["validation_action"] == [
+        "uv",
+        "run",
+        "mypy",
+        "src",
+        "tests",
+    ]
+    assert tools["validation:pytest"]["validation_action"] == [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+    ]
+
+
 def test_bootstrap_ignores_tracked_github_metadata(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     github_workflow = repo / ".github" / "workflows" / "ci.yml"

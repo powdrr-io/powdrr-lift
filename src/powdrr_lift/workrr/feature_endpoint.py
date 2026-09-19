@@ -19,16 +19,16 @@ from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
-from powdrr_lift.core.validation_discovery import (
-    DiscoveredValidationProfile,
-    discover_validation_profiles,
-)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.structrr.proposal import (
     ProposalRevision,
     compile_proposal_revision,
     validate_proposal_revision,
+)
+from powdrr_lift.structrr.validation import (
+    DiscoveredValidationProfile,
+    discover_validation_profiles,
 )
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
@@ -204,6 +204,15 @@ def _execute_procedrr_flow(
         if name == "ensure_current_structrr":
             state["baseline_path"] = _ensure_current_baseline(worktree, runner)
             return {"path": str(state["baseline_path"])}
+        if name == "discover_validation_profiles":
+            return [
+                {
+                    "name": profile.name,
+                    "command": list(profile.command),
+                    "source": profile.source,
+                }
+                for profile in state["validation_profiles"]
+            ]
         if command[:2] == ["powdrr-lift", "design-interview-input"]:
             _run(runner, worktree, command)
             work_item_name = _command_option(command, "--work-item-name")
@@ -283,14 +292,10 @@ def _execute_procedrr_flow(
                 state=state,
                 parameters=parameters,
             )
-        if name == "validate_implementation":
-            if not isinstance(parameters.get("implementation"), Mapping):
-                raise PowdrrExecutionError(
-                    "validation did not receive implementation state"
-                )
-            return _validate_implementation_phase(
-                config, worktree=worktree, state=state
-            )
+        if name == "run_validation_profile":
+            return _run_validation_profile(parameters, worktree=worktree, state=state)
+        if name == "aggregate_validation":
+            return _aggregate_validation(parameters, worktree=worktree, state=state)
         if name == "review_worker_diff":
             if not isinstance(parameters.get("implementation"), Mapping):
                 raise PowdrrExecutionError(
@@ -950,21 +955,69 @@ def _allowed_validation_commands(
     )
 
 
-def _validate_implementation_phase(
-    config: FeatureEndpointConfig, *, worktree: Path, state: dict[str, Any]
+def _run_validation_profile(
+    parameters: Mapping[str, Any], *, worktree: Path, state: dict[str, Any]
 ) -> dict[str, Any]:
-    del config
-    discovered = state.get("validation_profiles", ())
-    if not isinstance(discovered, tuple) or not all(
-        isinstance(profile, DiscoveredValidationProfile) for profile in discovered
+    profile = parameters.get("profile")
+    if not isinstance(profile, Mapping):
+        raise PowdrrExecutionError("validation profile must be a mapping")
+    name = profile.get("name")
+    command = profile.get("command")
+    if not isinstance(name, str) or not name.strip():
+        raise PowdrrExecutionError("validation profile name is malformed")
+    if not isinstance(command, list) or not all(
+        isinstance(item, str) and item for item in command
     ):
-        raise PowdrrExecutionError("validation profiles were not discovered")
-    validation = ValidationRunner(
-        {
-            profile.name: ValidationProfile(profile.name, profile.command)
-            for profile in discovered
-        }
-    ).run(state["request"], state["attempt"], worktree_root=worktree)
+        raise PowdrrExecutionError("validation profile command is malformed")
+    report = ValidationRunner({name: ValidationProfile(name, tuple(command))}).run(
+        state["request"], state["attempt"], worktree_root=worktree
+    )
+    if len(report.results) != 1:
+        raise PowdrrExecutionError(
+            f"validation profile {name!r} did not produce one result"
+        )
+    return report.results[0].to_data()
+
+
+def _aggregate_validation(
+    parameters: Mapping[str, Any], *, worktree: Path, state: dict[str, Any]
+) -> dict[str, Any]:
+    del worktree
+    raw_results = parameters.get("results")
+    if not isinstance(raw_results, list) or not all(
+        isinstance(item, Mapping) for item in raw_results
+    ):
+        raise PowdrrExecutionError("validation results must be a list of mappings")
+    results = tuple(
+        ValidationResult(
+            profile=str(item["profile"]),
+            command=tuple(item.get("command", [])),
+            status=ValidationResultStatus(str(item["status"])),
+            returncode=item.get("returncode"),
+            stdout=str(item.get("stdout", "")),
+            stderr=str(item.get("stderr", "")),
+            error=item.get("error"),
+        )
+        for item in raw_results
+    )
+    failed = any(
+        result.status
+        in (ValidationResultStatus.FAILED, ValidationResultStatus.TIMED_OUT)
+        for result in results
+    )
+    blocked = any(result.status is ValidationResultStatus.BLOCKED for result in results)
+    validation = ValidationReport(
+        attempt_id=state["attempt"].attempt_id,
+        request_id=state["request"].request_id,
+        status=(
+            ValidationReportStatus.BLOCKED
+            if blocked
+            else ValidationReportStatus.FAILED
+            if failed
+            else ValidationReportStatus.PASSED
+        ),
+        results=results,
+    )
     failed_checkpoints = [
         checkpoint
         for checkpoint in state.get("operation_checkpoints", [])

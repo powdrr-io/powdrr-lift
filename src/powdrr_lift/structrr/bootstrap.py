@@ -877,6 +877,8 @@ def _build_document(
     change_id: str,
     title: str,
 ) -> dict[str, Any]:
+    from powdrr_lift.structrr.validation import discover_validation_profiles
+
     allowed = set(taxonomy.entity_types)
     entities: dict[str, dict[str, Any]] = {}
     relationships: dict[str, dict[str, Any]] = {}
@@ -953,6 +955,18 @@ def _build_document(
             statements, "requirement", spec.get("requirements"), spec_path
         )
         _collect_statements(statements, "approach", spec.get("approach"), spec_path)
+
+    for profile in discover_validation_profiles(root):
+        tool_id = f"validation:{profile.name}"
+        tools.setdefault(
+            tool_id,
+            {
+                "id": tool_id,
+                "action": "added",
+                "validation_action": list(profile.command),
+                "source": _validation_tool_source(root),
+            },
+        )
 
     for item in (*invariants.values(), *guidance.values()):
         statements.setdefault(item["id"], item)
@@ -1041,6 +1055,18 @@ def _build_document(
         "features": [],
         "proposed_prs": [],
     }
+
+
+def _validation_tool_source(root: Path) -> str:
+    for relative in (
+        "pyproject.toml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/ci.yaml",
+        "Makefile",
+    ):
+        if (root / relative).exists():
+            return relative
+    return "README.md"
 
 
 def _file_entity_type(relative: str) -> str:

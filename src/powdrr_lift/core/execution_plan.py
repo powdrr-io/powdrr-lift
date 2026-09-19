@@ -21,6 +21,9 @@ class ExecutionUnit:
     ephemeral_paths: tuple[str, ...] = ()
     planned_additions: tuple[dict[str, Any], ...] = ()
     planned_deletions: tuple[dict[str, Any], ...] = ()
+    must_preserve: tuple[str, ...] = ()
+    non_goals: tuple[str, ...] = ()
+    source_refs: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -33,6 +36,9 @@ class ExecutionUnit:
             "ephemeral_paths": list(self.ephemeral_paths),
             "planned_additions": list(self.planned_additions),
             "planned_deletions": list(self.planned_deletions),
+            "must_preserve": list(self.must_preserve),
+            "non_goals": list(self.non_goals),
+            "source_refs": list(self.source_refs),
         }
 
 
@@ -73,6 +79,9 @@ class ExecutionPlan:
                 tuple(item.get("ephemeral_paths", ())),
                 tuple(item.get("planned_additions", ())),
                 tuple(item.get("planned_deletions", ())),
+                tuple(item.get("must_preserve", ())),
+                tuple(item.get("non_goals", ())),
+                tuple(item.get("source_refs", ())),
             )
             for item in data["units"]
         )

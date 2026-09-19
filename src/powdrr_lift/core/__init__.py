@@ -32,6 +32,10 @@ from powdrr_lift.core.execution_plan import (
     PlanEvaluation,
     evaluate_execution_plan,
 )
+from powdrr_lift.core.intent_packet import (
+    INTENT_PACKET_SCHEMA_VERSION,
+    IntentPacket,
+)
 from powdrr_lift.core.behavior_rule import (
     BEHAVIOR_RULE_SCHEMA_VERSION,
     BehaviorRule,
@@ -262,6 +266,7 @@ _EDIT_CONTEXT = "powdrr_lift.core.edit_context"
 _ENTITY_CONTEXT = "powdrr_lift.core.entity_context"
 _FEATURE_PLANNING = "powdrr_lift.core.feature_planning_specification"
 _IMPLEMENTATION = "powdrr_lift.core.implementation_specification"
+_INTENT_PACKET = "powdrr_lift.core.intent_packet"
 _INDEX = "powdrr_lift.core.index"
 _PR_ANALYSIS = "powdrr_lift.core.pr_analysis"
 _PR_SPECIFICATION = "powdrr_lift.core.pr_specification"
@@ -282,6 +287,8 @@ _EXPORTS: dict[str, str] = {
     "ExecutionMode": _EXECUTION_STATE,
     "ExecutionObligation": _EXECUTION_STATE,
     "ExecutionState": _EXECUTION_STATE,
+    "INTENT_PACKET_SCHEMA_VERSION": _INTENT_PACKET,
+    "IntentPacket": _INTENT_PACKET,
     "FindingStatus": _EXECUTION_STATE,
     "ObligationStatus": _EXECUTION_STATE,
     "DELIVERY_PROFILE_SCHEMA_VERSION": _DELIVERY_PROFILE,

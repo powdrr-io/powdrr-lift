@@ -144,13 +144,12 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     assert request.context_refs == ("entity:worker-adapter",)
     assert "unit-1" in request.prompt
     assert "Acceptance criteria:\n- the adapter is bounded" in request.prompt
-    assert "Planned Structrr additions" in request.prompt
+    assert "Required operations" in request.prompt
     assert '"id": "worker-adapter"' in request.prompt
-    assert "Planned Structrr deletions" in request.prompt
     assert '"id": "old-adapter"' in request.prompt
     assert "Validation profiles Workrr will run: unit-tests" in request.prompt
     assert (
-        json.loads(request.to_json())["schema_version"] == "implementation-request-v1"
+        json.loads(request.to_json())["schema_version"] == "implementation-request-v2"
     )
 
 

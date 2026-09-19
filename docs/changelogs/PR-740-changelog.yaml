@@ -1,0 +1,189 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 740
+title: Implement Phase 1 canonical active-intent resolution
+intent:
+  problem: Proposal and post-implementation reviews only consulted captured IntentStore clauses, so a normal feature worktree could have accepted Structrr invariants but an empty review inventory.
+  goal: Resolve one canonical active-intent inventory from the Structrr baseline, feature proposal overlays, and captured intent, then bind both review paths and bootstrap freshness checks to it.
+human-decisions:
+  - id: baseline-and-captured-intent-are-merged
+    summary: Treat the accepted Structrr baseline and captured IntentStore clauses as independent inputs to one canonical active-intent resolver.
+  - id: feature-intent-is-an-overlay
+    summary: Treat added, changed, and removed feature clauses as an explicit proposal overlay on accepted intent.
+  - id: conflicting-accepted-intent-blocks
+    summary: Reject conflicting active clauses from accepted sources instead of choosing one implicitly.
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/active_intent.py
+    type: added
+    summary: Add the canonical active-intent reference model, resolver, bootstrap-section generator, and structural validation.
+    rationale: Give Structrr and Workrr one deterministic, content-bearing inventory for review and evidence fingerprints.
+    span: {start_line: 1, end_line: 267}
+    related:
+      entities: [canonical-active-intent-resolver]
+      decisions:
+        - baseline-and-captured-intent-are-merged
+        - feature-intent-is-an-overlay
+        - conflicting-accepted-intent-blocks
+      invariants:
+        - canonical-active-intent-is-non-vacuous
+        - conflicting-accepted-intent-fails-closed
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Add the versioned active_intent bootstrap section.
+    rationale: Make active intent a required bootstrap section so older snapshots become stale.
+    span: {start_line: 63, end_line: 63}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Validate the generated active_intent section.
+    rationale: Reject malformed canonical inventory data before it reaches review.
+    span: {start_line: 321, end_line: 326}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Import active-intent section generation during bootstrap document construction.
+    rationale: Keep generation owned by Structrr bootstrap.
+    span: {start_line: 940, end_line: 940}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Build active intent from declared invariants and guidance plus captured intent.
+    rationale: Include repository intent in the generated baseline.
+    span: {start_line: 1035, end_line: 1038}
+    related:
+      entities: [canonical-active-intent-resolver]
+      decisions: [baseline-and-captured-intent-are-merged]
+      invariants: [canonical-active-intent-is-non-vacuous]
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    summary: Persist the active_intent section in the bootstrap document.
+    rationale: Give ensure_current_structrr a versioned canonical inventory to validate.
+    span: {start_line: 1096, end_line: 1096}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export active-intent resolver types through the Structrr package boundary.
+    rationale: Keep the canonical intent API discoverable to later verification-contract phases.
+    span: {start_line: 13, end_line: 20}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export active-intent symbols in the Structrr public exports.
+    rationale: Preserve one package-level API for downstream phases.
+    span: {start_line: 62, end_line: 67}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import the canonical active-intent resolver and remove the direct IntentStore dependency.
+    rationale: Route review evidence through the shared resolver.
+    span: {start_line: 29, end_line: 33}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Remove the direct IntentStore import from feature orchestration.
+    rationale: Prevent a second source-of-truth lookup path.
+    span: {start_line: 37, end_line: 37}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Resolve proposal-review intent from baseline and feature documents.
+    rationale: Include accepted Structrr intent and proposal overlays in structural review.
+    span: {start_line: 620, end_line: 624}
+    related:
+      entities: [canonical-active-intent-resolver]
+      decisions: [baseline-and-captured-intent-are-merged, feature-intent-is-an-overlay]
+      invariants: [canonical-active-intent-is-non-vacuous]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Re-resolve the baseline inventory when validating proposal evidence sources.
+    rationale: Validate intent evidence against current canonical state.
+    span: {start_line: 678, end_line: 689}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Pass the canonical baseline inventory into evidence-source validation.
+    rationale: Keep evidence-reference validation aligned with proposal review inputs.
+    span: {start_line: 710, end_line: 714}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Validate intent evidence references through the canonical resolver.
+    rationale: Reject references to clauses outside the active inventory.
+    span: {start_line: 717, end_line: 720}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Recompute canonical active intent when revalidating the proposal receipt before OpenCode.
+    rationale: Prevent a stale receipt from bypassing current intent state.
+    span: {start_line: 1027, end_line: 1031}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Add the feature-endpoint adapter that converts resolver conflicts into execution errors.
+    rationale: Fail the feature flow closed when accepted intent sources conflict.
+    span: {start_line: 1230, end_line: 1247}
+    related:
+      entities: [canonical-active-intent-resolver]
+      invariants: [conflicting-accepted-intent-fails-closed]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use the canonical baseline inventory for post-implementation evidence.
+    rationale: Ensure the final intent review fingerprints the same active clauses as proposal review.
+    span: {start_line: 1278, end_line: 1281}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: tests/test_active_intent.py
+    type: added
+    summary: Test source merging, feature overlays, conflict rejection, and section validation.
+    rationale: Lock down the resolver behavior and fail-closed accepted-source rules.
+    span: {start_line: 1, end_line: 150}
+    related:
+      entities: [canonical-active-intent-resolver]
+      invariants:
+        - canonical-active-intent-is-non-vacuous
+        - conflicting-accepted-intent-fails-closed
+  - path: tests/test_structrr_bootstrap.py
+    type: modified
+    summary: Verify bootstrap emits active invariant and guidance entries.
+    rationale: Prove the generated section contains durable intent used by feature review.
+    span: {start_line: 197, end_line: 203}
+    related:
+      entities: [canonical-active-intent-resolver]
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the bootstrap module end span.
+    rationale: Keep the source-model golden fixture aligned with the intentional code movement.
+    span: {start_line: 8, end_line: 8}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the bootstrap function span.
+    rationale: Keep source-model validation aligned with the new import and section logic.
+    span: {start_line: 14, end_line: 15}
+    related: {entities: [canonical-active-intent-resolver]}
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    summary: Update the source-model extraction function span.
+    rationale: Keep the golden source anchor exact after the implementation grew.
+    span: {start_line: 21, end_line: 22}
+    related: {entities: [canonical-active-intent-resolver]}
+entities:
+  - id: canonical-active-intent-resolver
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: canonical-active-intent-is-non-vacuous
+    action: added
+    description: Proposal and post-implementation review consume the canonical active-intent inventory, including baseline invariants and guidance when they exist, rather than silently passing with only captured intent or no clauses.
+    rationale: Prevent accepted repository intent from disappearing from review evidence.
+  - id: conflicting-accepted-intent-fails-closed
+    action: added
+    description: Conflicting active clauses from accepted intent sources block canonical resolution.
+    rationale: Avoid silently selecting one contradictory durable intent statement.
+guidance:
+  - id: use-canonical-active-intent
+    action: added
+    description: Later verification phases must consume the canonical active-intent resolver instead of reading IntentStore directly.
+    rationale: Preserve one source-of-truth boundary as contracts and evidence are added.
+features: []
+proposed_prs: []

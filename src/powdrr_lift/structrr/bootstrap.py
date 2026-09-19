@@ -60,6 +60,7 @@ _STATEMENT_KINDS = {
 _PYTHON_SOURCE_SUFFIXES = {".py", ".pyi"}
 BOOTSTRAP_SECTION_VERSIONS: dict[str, int] = {
     "intent": 1,
+    "active_intent": 1,
     "human-decisions": 1,
     "structured_files": 1,
     "files": 1,
@@ -317,6 +318,12 @@ def validate_bootstrap_document(
         issues, document.get("invariants"), "invariant", root_path
     )
     _validate_lifecycle_section(issues, document.get("guidance"), "guidance", root_path)
+    from powdrr_lift.structrr.active_intent import validate_active_intent_section
+
+    for diagnostic in validate_active_intent_section(document.get("active_intent")):
+        issues.append(
+            BootstrapIssue("active_intent_invalid", diagnostic, "active_intent")
+        )
     _validate_tools(issues, document.get("tools"), root_path)
     _validate_statements(issues, document.get("statements"), root_path)
 
@@ -930,6 +937,7 @@ def _build_document(
     change_id: str,
     title: str,
 ) -> dict[str, Any]:
+    from powdrr_lift.structrr.active_intent import active_intent_section
     from powdrr_lift.structrr.validation import discover_validation_profiles
 
     allowed = set(taxonomy.entity_types)
@@ -1024,6 +1032,10 @@ def _build_document(
     for item in (*invariants.values(), *guidance.values()):
         statements.setdefault(item["id"], item)
 
+    active_intent = active_intent_section(
+        (*invariants.values(), *guidance.values()), root
+    )
+
     for tool_id in tools:
         entities.setdefault(
             tool_id,
@@ -1081,6 +1093,7 @@ def _build_document(
                 "for subsequent intentional changes."
             ),
         },
+        "active_intent": active_intent,
         "human-decisions": [],
         "structured_files": structured_files,
         "files": files,

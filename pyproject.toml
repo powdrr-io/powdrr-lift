@@ -40,6 +40,9 @@ powdrr-lift-mcp = "powdrr_lift.mcp_server:main"
 requires = ["uv_build>=0.11.3,<0.12.0"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+module-name = ["powdrr_lift", "procedrr", "procedrr_evaluator"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

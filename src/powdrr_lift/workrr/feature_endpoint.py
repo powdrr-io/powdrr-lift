@@ -523,17 +523,18 @@ def _execute_procedrr_flow(
             "design-interview subprocess"
         )
     try:
+        flow_directory = flow_path.parent
         evaluator = Evaluator(
             WorkrrProcedrrClient(
                 config.planning_client,
-                skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+                skills_dir=flow_directory,
             ),
             execute,
-            process_directory=worktree / "docs" / "procedrr" / "skill-definitions",
+            process_directory=flow_directory,
             judge_clients={
                 "planning": WorkrrProcedrrClient(
                     config.planning_client,
-                    skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+                    skills_dir=flow_directory,
                 )
             },
         )

@@ -56,7 +56,8 @@ class PowdrrAgent(BaseInstalledAgent):
             steps=[
                 InstallStep(
                     run=(
-                        "python3 -m pip install --user --disable-pip-version-check "
+                        "python3 -m pip install --user --upgrade --force-reinstall "
+                        "--no-cache-dir --disable-pip-version-check "
                         f"{shlex.quote(package)}"
                     )
                 ),
@@ -108,7 +109,8 @@ class PowdrrAgent(BaseInstalledAgent):
         await self.exec_as_agent(
             environment,
             command=(
-                "python3 -m pip install --user --disable-pip-version-check "
+                "python3 -m pip install --user --upgrade --force-reinstall "
+                "--no-cache-dir --disable-pip-version-check "
                 f"{shlex.quote(package)}"
             ),
         )

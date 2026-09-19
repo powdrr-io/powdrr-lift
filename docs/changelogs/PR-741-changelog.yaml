@@ -149,23 +149,7 @@ files:
     type: modified
     summary: Make the final acceptance scenario's embedded required test case a complete verification contract.
     rationale: Keep the no-LLM acceptance path valid when incomplete required test cases are rejected.
-    span: {start_line: 969, end_line: 977}
-    related:
-      entities: [verification-contract-model]
-      invariants: [executable-contracts-are-validated]
-  - path: docs/proposals/PR-47/proposed-pr-specification.yaml
-    type: modified
-    summary: Add executable verification metadata to the historical required test cases.
-    rationale: Keep the checked-in proposed PR valid under mandatory contract validation.
-    span: {start_line: 24, end_line: 61}
-    related:
-      entities: [verification-contract-model]
-      invariants: [executable-contracts-are-validated]
-  - path: docs/current/required-test-cases/feature-pr-specification.yaml
-    type: modified
-    summary: Add executable verification metadata to the current required test case inventory.
-    rationale: Make the repository's canonical required test cases actionable rather than descriptive only.
-    span: {start_line: 204, end_line: 241}
+    span: {start_line: 969, end_line: 978}
     related:
       entities: [verification-contract-model]
       invariants: [executable-contracts-are-validated]

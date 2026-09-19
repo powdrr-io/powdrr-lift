@@ -329,6 +329,13 @@ class OpenCodeProvider:
         # Do not let a caller's activated environment point uv at another
         # checkout when the worker runs inside its own worktree.
         environment.pop("VIRTUAL_ENV", None)
+        # Powdrr accepts both DeepInfra spellings; OpenCode's built-in
+        # provider uses the API_KEY spelling. Normalize the Harbor/Powdrr
+        # environment once before starting implementation or review.
+        if environment.get("DEEPINFRA_API_KEY") is None:
+            token = environment.get("DEEPINFRA_API_TOKEN")
+            if token:
+                environment["DEEPINFRA_API_KEY"] = token
         # Some OpenCode integrations resolve the project root from PWD rather
         # than the subprocess cwd. Keep both locations aligned so a worker
         # cannot accidentally inspect or edit the caller's repository.

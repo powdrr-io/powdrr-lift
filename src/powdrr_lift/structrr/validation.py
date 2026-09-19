@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from dataclasses import dataclass
@@ -78,6 +79,38 @@ def discover_validation_profiles(
             )
         )
 
+    package_json = _load_package_json(root_path)
+    if package_json and _has_script(package_json, ("test", "check", "lint")):
+        profiles.append(
+            _profile(
+                "npm-test",
+                _find_command(ci_commands, ("npm", "test")) or ("npm", "test"),
+                "package.json scripts/CI",
+            )
+        )
+    if (root_path / "go.mod").exists():
+        profiles.append(
+            _profile(
+                "go-test",
+                _find_command(ci_commands, ("go", "test")) or ("go", "test", "./..."),
+                "go.mod/CI",
+            )
+        )
+    if (root_path / "Cargo.toml").exists():
+        profiles.append(
+            _profile(
+                "cargo-test",
+                _find_command(ci_commands, ("cargo", "test")) or ("cargo", "test"),
+                "Cargo.toml/CI",
+            )
+        )
+    if (root_path / "pom.xml").exists() or (root_path / "mvnw").exists():
+        executable = "./mvnw" if (root_path / "mvnw").exists() else "mvn"
+        profiles.append(_profile("maven-test", (executable, "test"), "Maven project"))
+    if (root_path / "gradlew").exists() or (root_path / "build.gradle").exists():
+        executable = "./gradlew" if (root_path / "gradlew").exists() else "gradle"
+        profiles.append(_profile("gradle-test", (executable, "test"), "Gradle project"))
+
     unique: dict[str, DiscoveredValidationProfile] = {}
     for profile in profiles:
         unique.setdefault(profile.name, profile)
@@ -99,6 +132,22 @@ def _load_pyproject(root: Path) -> dict[str, object]:
     except (OSError, tomllib.TOMLDecodeError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _load_package_json(root: Path) -> dict[str, object]:
+    path = root / "package.json"
+    if not path.exists():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _has_script(package_json: dict[str, object], names: tuple[str, ...]) -> bool:
+    scripts = package_json.get("scripts")
+    return isinstance(scripts, dict) and any(name in scripts for name in names)
 
 
 def _repository_text(root: Path) -> str:

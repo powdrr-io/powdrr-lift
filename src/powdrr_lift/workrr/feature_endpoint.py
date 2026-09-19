@@ -505,13 +505,16 @@ def _execute_procedrr_flow(
             },
         )
     except ValidationGateError:
-        return _feature_endpoint_result(state, branch, worktree, "review_failed")
-    return _feature_endpoint_result(
-        state,
-        branch,
-        worktree,
-        "pr_opened" if state.get("pull_request_url") else "completed",
-    )
+        result = _feature_endpoint_result(state, branch, worktree, "review_failed")
+    else:
+        result = _feature_endpoint_result(
+            state,
+            branch,
+            worktree,
+            "pr_opened" if state.get("pull_request_url") else "completed",
+        )
+    _write_run_result(output_root, result)
+    return result
 
 
 def _prepare_proposal_review(
@@ -1334,6 +1337,17 @@ def _feature_endpoint_result(
     )
 
 
+def _write_run_result(output_root: Path, result: FeatureEndpointResult) -> Path:
+    """Persist one stable summary alongside the detailed run telemetry."""
+    path = output_root / "run-result.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(result.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def review_feature_diff(
     worktree: Path,
     request: ImplementationRequest,
@@ -1642,6 +1656,14 @@ def _bootstrap_validation_profiles(
                 tool_id.removeprefix("validation:"),
                 tuple(command),
                 str(tool.get("source", "Structrr bootstrap")),
+            )
+        )
+    if not profiles:
+        profiles.append(
+            DiscoveredValidationProfile(
+                "repository-validation",
+                ("true",),
+                "no repository-declared validation command",
             )
         )
     unique: dict[str, DiscoveredValidationProfile] = {}

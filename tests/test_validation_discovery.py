@@ -61,3 +61,26 @@ def test_explicit_validation_command_is_used_when_no_tooling_is_detected(
 
     assert profiles[0].name == "feature-validation"
     assert profiles[0].command == ("python", "-m", "pytest")
+
+
+def test_discovers_polyglot_project_validation(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        '{"scripts": {"test": "vitest", "lint": "eslint ."}}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "go.mod").write_text("module example.test\n", encoding="utf-8")
+
+    profiles = discover_validation_profiles(tmp_path)
+
+    assert [(profile.name, profile.command) for profile in profiles] == [
+        ("npm-test", ("npm", "test")),
+        ("go-test", ("go", "test", "./...")),
+    ]
+
+
+def test_returns_no_profiles_when_repository_declares_no_validator(
+    tmp_path: Path,
+) -> None:
+    profiles = discover_validation_profiles(tmp_path)
+
+    assert profiles == ()

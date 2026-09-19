@@ -41,6 +41,63 @@ def test_empty_specification_is_invalid(tmp_path: Path) -> None:
     assert any(issue.code == "empty_specification" for issue in report.issues)
 
 
+def test_required_test_case_accepts_verification_contract_fields(
+    tmp_path: Path,
+) -> None:
+    _write_implementation_specification(tmp_path)
+    report = build_pr_specification_validation_report(
+        """
+        schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+        id: verified
+        feature_ids: [feature-a]
+        intent:
+          problem: Add verification.
+          goal: Add verification.
+          reasoning: Protect intent.
+        required_test_cases:
+          - id: verify.feature
+            description: Verify the feature.
+            intent_refs: [intent.feature]
+            provider: pytest
+            selector: tests/test_feature.py::test_feature
+            profile: feature-validation
+            expectation: pass
+            applicability:
+              mode: affected_closure
+            protected_inputs: [src/**]
+            status: active
+        """,
+        work_item_name="verified",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is True
+
+
+def test_partial_required_test_case_contract_is_reported(tmp_path: Path) -> None:
+    _write_implementation_specification(tmp_path)
+    report = build_pr_specification_validation_report(
+        """
+        schema: https://powdrr.io/schemas/proposed-pr-specification-v1
+        id: partial
+        feature_ids: [feature-a]
+        intent:
+          problem: Add verification.
+          goal: Add verification.
+          reasoning: Protect intent.
+        required_test_cases:
+          - id: verify.feature
+            description: Verify the feature.
+            provider: pytest
+        """,
+        work_item_name="partial",
+        repo_root=tmp_path,
+    )
+
+    assert not report.validation_successful
+    assert any(issue.code == "verification_contract_invalid" for issue in report.issues)
+
+
 def _write_implementation_specification(repo_root: Path) -> Path:
     implementation_specification_path = (
         repo_root

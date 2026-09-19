@@ -18,6 +18,10 @@ from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
 )
+from powdrr_lift.core.verification_contract import (
+    VERIFICATION_CONTRACT_FIELDS,
+    VerificationContract,
+)
 
 _DEFAULT_OUTPUT_PATH = PROPOSALS_ROOT
 _IMPLEMENTATION_SPECIFICATION_DIRS = (
@@ -198,6 +202,18 @@ def render_pr_specification_template(
         "    requirements: []",
         "    acceptance_criteria: []",
         "    expected_tests: []",
+        "    required_test_cases:",
+        "      - id: null",
+        "        description: null",
+        "        intent_refs: []",
+        "        provider: null",
+        "        selector: null",
+        "        profile: null",
+        "        expectation: pass",
+        "        applicability:",
+        "          mode: affected_closure",
+        "        protected_inputs: []",
+        "        status: active",
         *[
             line
             for section in _EFFECT_SECTIONS
@@ -2016,6 +2032,38 @@ def _collect_detail_items(
         )
         if item_id is None:
             continue
+
+        if section_name == "required_test_cases":
+            contract = VerificationContract.from_mapping(item)
+            unknown_fields = (
+                set(item) - {"id", "description"} - set(VERIFICATION_CONTRACT_FIELDS)
+            )
+            for field_name in sorted(unknown_fields):
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        code="verification_contract_field_unknown",
+                        message=(
+                            f"Unknown verification contract field {field_name!r}."
+                        ),
+                        path=f"{section_name}[{index}].{field_name}",
+                    )
+                )
+            for error in VerificationContract.mapping_validation_errors(item):
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        code="verification_contract_invalid",
+                        message=error,
+                        path=f"{section_name}[{index}]",
+                    )
+                )
+            for error in contract.validation_errors():
+                issues.append(
+                    PRSpecificationValidationIssue(
+                        code="verification_contract_invalid",
+                        message=error,
+                        path=f"{section_name}[{index}]",
+                    )
+                )
 
         if item_id in seen_ids:
             issues.append(

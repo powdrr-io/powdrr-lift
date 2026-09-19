@@ -202,6 +202,9 @@ def test_create_feature_pr_specification_template_writes_default_file(
     assert "intent:" in template_text
     assert "acceptance_criteria:" in template_text
     assert "expected_tests:" in template_text
+    assert "required_test_cases:" in template_text
+    assert "intent_refs: []" in template_text
+    assert "selector: null" in template_text
     assert "expected_outcomes:" in template_text
     assert "non_goals:" in template_text
     assert "risks:" in template_text
@@ -225,6 +228,7 @@ def test_create_feature_pr_specification_template_writes_default_file(
         "intent",
         "acceptance_criteria",
         "expected_tests",
+        "required_test_cases",
         "expected_outcomes",
         "non_goals",
         "risks",

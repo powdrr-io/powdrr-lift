@@ -194,6 +194,13 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     assert result.document["invariants"][0]["id"] == "app-entry-point"
     assert result.document["invariants"][0]["kind"] == "invariant"
     assert result.document["invariants"][0]["classification"] == "declared"
+    active_intent = {
+        item["clause_id"]: item for item in result.document["active_intent"]
+    }
+    assert active_intent["app-entry-point"]["statement"] == (
+        "The application entry point remains callable."
+    )
+    assert active_intent["run-tests-before-edit"]["kind"] == "guidance"
     validation_invariant = next(
         item
         for item in result.document["invariants"]

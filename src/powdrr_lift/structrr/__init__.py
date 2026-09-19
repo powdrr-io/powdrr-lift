@@ -10,6 +10,14 @@ New product-language APIs belong in this package; this marker is intentionally
 small until each implementation has a clean ownership boundary.
 """
 
+from powdrr_lift.structrr.active_intent import (
+    ACTIVE_INTENT_SECTION_VERSION,
+    ActiveIntentReference,
+    ActiveIntentResolutionError,
+    active_intent_section,
+    resolve_active_intent,
+    validate_active_intent_section,
+)
 from powdrr_lift.structrr.bootstrap import (
     BOOTSTRAP_SECTION_VERSIONS,
     BootstrapIssue,
@@ -51,6 +59,12 @@ __all__ = [
     "bootstrap_structrr",
     "validate_bootstrap_sections",
     "validate_bootstrap_document",
+    "ACTIVE_INTENT_SECTION_VERSION",
+    "ActiveIntentReference",
+    "ActiveIntentResolutionError",
+    "active_intent_section",
+    "resolve_active_intent",
+    "validate_active_intent_section",
     "StructrrChange",
     "StructrrRebaseReport",
     "StructrrRemapping",

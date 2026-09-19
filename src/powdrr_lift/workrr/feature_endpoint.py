@@ -26,6 +26,11 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.structrr.active_intent import (
+    ActiveIntentReference,
+    ActiveIntentResolutionError,
+    resolve_active_intent,
+)
 from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_sections,
@@ -34,7 +39,6 @@ from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
 )
-from powdrr_lift.structrr.intent import IntentStore
 from powdrr_lift.structrr.proposal import (
     ProposalRevision,
     compile_proposal_revision,
@@ -613,7 +617,11 @@ def _prepare_proposal_review(
             encoding="utf-8",
         )
         _commit(runner, worktree, "Record proposal revision")
-    active_intent_clauses = IntentStore(worktree).list()
+    active_intent_clauses = _resolve_feature_intent(
+        worktree,
+        baseline_document=baseline_document,
+        feature_document=plan_document,
+    )
     active_intent_clause_ids = tuple(
         clause.clause_id for clause in active_intent_clauses
     )
@@ -667,7 +675,18 @@ def _finalize_proposal_review(
     worklist = DecisionWorklist.from_data(
         json.loads(worklist_path.read_text(encoding="utf-8"))
     )
-    _validate_review_evidence_sources(worktree, proposal, worklist)
+    _validate_review_evidence_sources(
+        worktree,
+        proposal,
+        worklist,
+        baseline_document=_load_yaml_mapping(
+            next(
+                worktree / ref.partition(":")[2]
+                for ref in proposal.source_refs
+                if ref.startswith("structrr:")
+            )
+        ),
+    )
     decisions = tuple(DecisionResult.from_data(item) for item in raw_decisions)
     receipt = ProposalReviewReceipt(
         proposal_fingerprint=proposal.fingerprint,
@@ -688,10 +707,17 @@ def _finalize_proposal_review(
 
 
 def _validate_review_evidence_sources(
-    worktree: Path, proposal: ProposalRevision, worklist: DecisionWorklist
+    worktree: Path,
+    proposal: ProposalRevision,
+    worklist: DecisionWorklist,
+    *,
+    baseline_document: Mapping[str, Any],
 ) -> None:
     active_intent_refs = {
-        f"intent:{clause.clause_id}" for clause in IntentStore(worktree).list()
+        f"intent:{clause.clause_id}"
+        for clause in _resolve_feature_intent(
+            worktree, baseline_document=baseline_document
+        )
     }
     known_refs = {"proposal", "baseline", "plan", *proposal.source_refs}
     known_refs.update(active_intent_refs)
@@ -998,7 +1024,11 @@ def _run_opencode_phase(
         )
     try:
         review_receipt = load_review_receipt(Path(review_path_value))
-        active_intent_clauses = IntentStore(worktree).list()
+        active_intent_clauses = _resolve_feature_intent(
+            worktree,
+            baseline_document=baseline_document,
+            feature_document=plan_document,
+        )
         active_intent_clause_ids = tuple(
             clause.clause_id for clause in active_intent_clauses
         )
@@ -1197,6 +1227,24 @@ def _proposal_evidence_fingerprints(
     return fingerprints
 
 
+def _resolve_feature_intent(
+    worktree: Path,
+    *,
+    baseline_document: Mapping[str, Any] | None = None,
+    feature_document: Mapping[str, Any] | None = None,
+) -> tuple[ActiveIntentReference, ...]:
+    try:
+        return resolve_active_intent(
+            worktree,
+            baseline_document=baseline_document,
+            feature_document=feature_document,
+        )
+    except ActiveIntentResolutionError as error:
+        raise PowdrrExecutionError(
+            f"canonical active-intent resolution failed: {error}"
+        ) from error
+
+
 def _prepare_implementation_review(
     *,
     worktree: Path,
@@ -1227,7 +1275,10 @@ def _prepare_implementation_review(
     changed_paths = _git_output(
         runner, worktree, ["git", "diff", "--name-only", request.base_commit, "--"]
     ).splitlines()
-    active_intent_clauses = IntentStore(worktree).list()
+    baseline_document = _load_yaml_mapping(Path(state["baseline_path"]))
+    active_intent_clauses = _resolve_feature_intent(
+        worktree, baseline_document=baseline_document
+    )
     evidence_refs = (
         "git-diff@"
         + content_fingerprint(

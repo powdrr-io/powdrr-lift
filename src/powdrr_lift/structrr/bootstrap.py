@@ -113,7 +113,13 @@ def bootstrap_structrr(
     repository structure and file-level provenance anchors.
     """
     root = Path(repo_root).resolve()
-    taxonomy = load_entity_taxonomy(root, taxonomy_path)
+    resolved_taxonomy_path = Path(taxonomy_path)
+    if not resolved_taxonomy_path.is_absolute():
+        repository_taxonomy = root / resolved_taxonomy_path
+        packaged_taxonomy = Path(__file__).resolve().parents[2] / resolved_taxonomy_path
+        if not repository_taxonomy.is_file() and packaged_taxonomy.is_file():
+            resolved_taxonomy_path = packaged_taxonomy
+    taxonomy = load_entity_taxonomy(root, resolved_taxonomy_path)
     tracked_files = _tracked_files(root)
     spec_paths = tuple(path for path in tracked_files if is_specification_path(path))
     spec_documents = _load_spec_documents(root, spec_paths)

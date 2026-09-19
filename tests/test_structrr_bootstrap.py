@@ -256,6 +256,26 @@ def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
         "pytest",
         "-q",
     ]
+    inventory = next(
+        item
+        for item in result.document["validation_inventory"]
+        if item["profile"] == "pytest"
+    )
+    assert inventory["provider"] == "pytest"
+    assert inventory["selectors"] == []
+    assert inventory["schema_version"] == "verification-provider-inventory-v1"
+
+
+def test_bootstrap_sections_require_validation_inventory() -> None:
+    document = {"section_versions": BOOTSTRAP_SECTION_VERSIONS}
+
+    issues = validate_bootstrap_sections(document)
+
+    assert any(
+        issue.code == "bootstrap_section_missing"
+        and issue.path == "validation_inventory"
+        for issue in issues
+    )
 
 
 def test_bootstrap_section_validation_reports_missing_and_stale_sections() -> None:

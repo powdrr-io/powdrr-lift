@@ -179,9 +179,17 @@ class PowdrrAgent(BaseInstalledAgent):
             )
             if (value := self._get_env(key)) is not None
         }
+        command_text = shlex.join(command)
+        command_log = self._get_env("POWDRR_COMMAND_LOG")
+        if command_log:
+            quoted_log = shlex.quote(command_log)
+            command_text = (
+                f"{command_text} > {quoted_log} 2>&1; "
+                f"status=$?; tail -300 {quoted_log}; exit $status"
+            )
         await self.exec_as_agent(
             environment,
-            command=shlex.join(command),
+            command=command_text,
             env=provider_env,
             cwd=repo_root,
         )

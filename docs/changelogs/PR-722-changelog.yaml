@@ -1,0 +1,148 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 722
+title: Revalidate Structrr proposals before OpenCode
+intent:
+  problem: Persisting a proposal revision gives OpenCode a stable identity, but an existing artifact could still be stale, malformed, or tampered with when a later implementation attempt starts.
+  goal: Recompile current Structrr intent at execution time and block OpenCode unless the persisted proposal revision is authentic and matches the current baseline, plan, and targeted worker context.
+human-decisions:
+  - id: reject-stale-proposal-before-worker
+    summary: Treat a mismatch between current compiled intent and the persisted proposal revision as a hard execution failure before OpenCode is invoked.
+  - id: verify-persisted-proposal-self-hash
+    summary: Require the persisted proposal artifact to have a supported schema and a fingerprint matching its canonical content.
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/proposal.py
+    type: modified
+    summary: Add strict decoding and self-fingerprint verification for persisted proposal revisions.
+    rationale: Prevent malformed or tampered artifacts from being accepted as worker intent.
+    span:
+      start_line: 9
+      end_line: 9
+    related:
+      decisions:
+        - verify-persisted-proposal-self-hash
+  - path: src/powdrr_lift/structrr/proposal.py
+    type: modified
+    summary: Decode proposal revisions and reject unsupported schemas, malformed operations, and mismatched fingerprints.
+    rationale: Make artifact authenticity a deterministic gate independent of model behavior.
+    span:
+      start_line: 73
+      end_line: 101
+    related:
+      decisions:
+        - verify-persisted-proposal-self-hash
+  - path: src/powdrr_lift/structrr/proposal.py
+    type: modified
+    summary: Load and compare a persisted proposal revision against current compiled intent.
+    rationale: Detect drift between a prior accepted proposal and the current Structrr state before execution.
+    span:
+      start_line: 154
+      end_line: 174
+    related:
+      decisions:
+        - reject-stale-proposal-before-worker
+  - path: src/powdrr_lift/structrr/proposal.py
+    type: modified
+    summary: Validate operation and context field types while decoding persisted revisions.
+    rationale: Ensure comparison operates on the complete canonical proposal schema.
+    span:
+      start_line: 183
+      end_line: 211
+    related:
+      decisions:
+        - verify-persisted-proposal-self-hash
+  - path: src/powdrr_lift/structrr/proposal.py
+    type: modified
+    summary: Export proposal loading and validation functions.
+    rationale: Make the revalidation gate available to Workrr and future validation stages.
+    span:
+      start_line: 217
+      end_line: 218
+    related:
+      decisions:
+        - reject-stale-proposal-before-worker
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Export persisted proposal revision validation functions through Structrr.
+    rationale: Keep the canonical artifact contract visible at the Structrr package boundary.
+    span:
+      start_line: 25
+      end_line: 26
+    related:
+      decisions:
+        - reject-stale-proposal-before-worker
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    summary: Include persisted proposal revision validation functions in the public export list.
+    rationale: Allow downstream gates to use the same deterministic validator.
+    span:
+      start_line: 51
+      end_line: 52
+    related:
+      decisions:
+        - reject-stale-proposal-before-worker
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Import proposal revision validation at the OpenCode boundary.
+    rationale: Apply the stale-intent check in the production implementation path.
+    span:
+      start_line: 23
+      end_line: 26
+    related:
+      decisions:
+        - reject-stale-proposal-before-worker
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Revalidate an existing proposal revision before constructing the worker request.
+    rationale: Stop stale or altered intent before OpenCode can modify the worktree.
+    span:
+      start_line: 474
+      end_line: 481
+    related:
+      decisions:
+        - reject-stale-proposal-before-worker
+  - path: tests/test_structrr_proposal.py
+    type: modified
+    summary: Verify persisted proposal round trips and tampering is rejected.
+    rationale: Prove artifact authenticity and canonical comparison behavior.
+    span:
+      start_line: 3
+      end_line: 12
+    related:
+      decisions:
+        - verify-persisted-proposal-self-hash
+  - path: tests/test_structrr_proposal.py
+    type: modified
+    summary: Test persisted proposal loading, validation, and fingerprint mismatch rejection.
+    rationale: Protect the execution gate against stale and tampered proposal state.
+    span:
+      start_line: 66
+      end_line: 92
+    related:
+      decisions:
+        - reject-stale-proposal-before-worker
+        - verify-persisted-proposal-self-hash
+entities:
+  - id: stale-proposal-execution-gate
+    type: Module
+    action: added
+  - id: proposal-artifact-authentication
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: current-intent-must-match-persisted-proposal
+    action: added
+    description: An OpenCode implementation attempt cannot start when the current Structrr-derived proposal fingerprint differs from the persisted proposal revision.
+    rationale: Prevent implementation from proceeding against stale architecture state.
+  - id: persisted-proposal-must-self-verify
+    action: added
+    description: A persisted proposal revision must use the supported schema and contain a fingerprint matching its canonical content.
+    rationale: Ensure the execution anchor has not been malformed or tampered with.
+guidance:
+  - id: fail-closed-on-proposal-drift
+    action: added
+    description: Surface proposal revision mismatches as explicit Workrr execution errors and do not invoke OpenCode.
+    rationale: Drift requires proposal reconciliation before implementation, not model-level improvisation.
+features: []
+proposed_prs: []

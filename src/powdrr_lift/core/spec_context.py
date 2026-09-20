@@ -296,7 +296,7 @@ def _iter_context_specification_paths(
     project_structure_root = repo_root / "docs" / "project_structure"
     paths.extend(yaml_files(project_structure_root))
 
-    current_state_path = repo_root / ".powdrr-lift" / "state" / "current-state.yaml"
+    current_state_path = repo_root / ".powdrr" / "state" / "current-state.yaml"
     if current_state_path.is_file():
         paths.append(current_state_path)
 
@@ -352,7 +352,7 @@ def _describe_specification_path(
         )
         return work_item_name, specification_type
 
-    if path_parts == (".powdrr-lift", "state", "current-state.yaml"):
+    if path_parts == (".powdrr", "state", "current-state.yaml"):
         return "current-state", "current-state"
 
     if len(path_parts) >= 3 and path_parts[:2] == ("docs", "project_structure"):

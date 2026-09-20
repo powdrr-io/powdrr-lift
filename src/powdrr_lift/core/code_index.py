@@ -88,7 +88,7 @@ class _DecisionState:
 
 def code_index_db_path(repo_root: str | Path | None = None) -> Path:
     repo_root_path = _resolve_repo_root(repo_root)
-    return repo_root_path / ".powdrr-lift" / "state" / "code_index.db"
+    return repo_root_path / ".powdrr" / "state" / "code_index.db"
 
 
 def _collect_decision_states(

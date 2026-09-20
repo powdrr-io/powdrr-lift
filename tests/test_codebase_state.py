@@ -101,6 +101,10 @@ def test_cli_codebase_state_writes_default_file(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert expected_output_path.exists()
+    assert (
+        expected_output_path == repo_root / ".powdrr" / "state" / "codebase-state.yaml"
+    )
+    assert not (repo_root / ".powdrr-lift").exists()
     assert str(expected_output_path) in stdout.getvalue()
 
     report = yaml.safe_load(expected_output_path.read_text(encoding="utf-8"))

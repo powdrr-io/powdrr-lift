@@ -19,8 +19,8 @@ from powdrr_lift.core.spec_paths import (
 )
 from powdrr_lift.errors import PowdrrExecutionError
 
-_DEFAULT_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "codebase-state.yaml"
-_CURRENT_STATE_OUTPUT_PATH = Path(".powdrr-lift") / "state" / "current-state.yaml"
+_DEFAULT_OUTPUT_PATH = Path(".powdrr") / "state" / "codebase-state.yaml"
+_CURRENT_STATE_OUTPUT_PATH = Path(".powdrr") / "state" / "current-state.yaml"
 
 
 @dataclass(frozen=True, slots=True)

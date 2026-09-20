@@ -570,7 +570,7 @@ def _build_pr_description_document(
 
 
 def _description_changelog_path(repo_root: Path, pr_number: int) -> Path:
-    return repo_root / ".powdrr-lift" / "state" / f"PR-{pr_number}-description.md"
+    return repo_root / ".powdrr" / "state" / f"PR-{pr_number}-description.md"
 
 
 def _fetch_pr_metadata(
@@ -912,7 +912,7 @@ def _build_implicit_provenance(
 
 
 def _commit_comment_path(commit_sha: str) -> Path:
-    return Path(".powdrr-lift") / "state" / f"commit-{commit_sha[:12]}-comment.md"
+    return Path(".powdrr") / "state" / f"commit-{commit_sha[:12]}-comment.md"
 
 
 def _group_declared_changes(

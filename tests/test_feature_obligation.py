@@ -57,6 +57,27 @@ def test_feature_design_compiler_rejects_missing_clause_projection() -> None:
         compile_feature_design(ledger, "feature", _semantic(1))
 
 
+def test_feature_design_compiler_allows_non_required_clauses() -> None:
+    ledger = compile_instruction_ledger(
+        "feature", "First behavior. Second behavior. Third behavior."
+    )
+
+    design = compile_feature_design(
+        ledger,
+        "feature",
+        _semantic(3),
+        required_clause_ids=("instruction-002",),
+    )
+
+    assert len(design.projections) == 3
+    assert [item.obligation_id for item in design.obligations] == [
+        "obligation:instruction-002"
+    ]
+    assert [item.obligation_id for item in design.test_contracts] == [
+        "obligation:instruction-002"
+    ]
+
+
 def test_feature_design_compiler_rejects_model_authored_structural_fields() -> None:
     ledger = compile_instruction_ledger("feature", "One behavior.")
     semantic = _semantic(1)

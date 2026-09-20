@@ -1046,6 +1046,9 @@ def _materialize_feature_intents(
                 "makes this feature obligation an explicit active intent clause"
             ),
         }
+        verification = design.get("verification")
+        if isinstance(verification, Mapping):
+            clause["verification"] = dict(verification)
         intent_clauses.append(clause)
         if clause_id not in existing_ids:
             active_intent.append(clause)

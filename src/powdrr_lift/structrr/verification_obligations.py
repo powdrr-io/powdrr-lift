@@ -294,6 +294,7 @@ def compile_verification_obligations(
                 "explicit required_test_cases proposal operation"
             )
     failures.extend(_new_intent_contract_failures(proposal, contracts))
+    failures.extend(_materialized_intent_contract_failures(active_intents, contracts))
     failures.extend(_required_test_intent_failures(proposal, active_by_id))
     return VerificationObligationCompilation(
         closure=closure,
@@ -400,6 +401,42 @@ def _new_intent_contract_failures(
         if candidate and candidate not in protected:
             failures.append(
                 f"new or altered intent {candidate} has no verification contract"
+            )
+    return failures
+
+
+def _materialized_intent_contract_failures(
+    active_intents: Sequence[Mapping[str, Any]],
+    contracts: Sequence[VerificationContract],
+) -> list[str]:
+    """Require sentence-derived intent clauses to have explicit coverage."""
+    contract_refs = {
+        reference for contract in contracts for reference in contract.intent_refs
+    }
+    failures: list[str] = []
+    for clause in active_intents:
+        clause_id = _text(clause.get("clause_id") or clause.get("intent_id"))
+        source_ref = _text(clause.get("source_ref"))
+        if not clause_id or not source_ref.startswith("feature-obligation:"):
+            continue
+        verification = clause.get("verification")
+        if (
+            isinstance(verification, Mapping)
+            and verification.get("mode") == "non_obligating"
+        ):
+            rationale = verification.get("rationale")
+            if isinstance(rationale, str) and rationale.strip():
+                continue
+            failures.append(
+                f"materialized intent {clause_id} declares non_obligating "
+                "without a rationale"
+            )
+            continue
+        if clause_id not in contract_refs:
+            failures.append(
+                f"materialized intent {clause_id} has no verification contract; "
+                "add its exact clause_id to required_test_cases.intent_refs or "
+                "declare verification.mode=non_obligating with a rationale"
             )
     return failures
 

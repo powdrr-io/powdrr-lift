@@ -530,4 +530,4 @@ def test_implement_feature_blocks_untraceable_required_test_obligation(
         ).read_text(encoding="utf-8")
     )
     assert verification["complete"] is False
-    assert "no active intent reference" in verification["failures"][0]
+    assert "has no verification contract" in verification["failures"][0]

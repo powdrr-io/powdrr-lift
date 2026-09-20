@@ -442,9 +442,36 @@ def _execute_procedrr_flow(
             obligations = raw_obligations.get("obligations")
             if not isinstance(obligations, list):
                 raise PowdrrExecutionError("canonical design obligations are malformed")
+            raw_design_decisions = _collected_results(
+                parameters.get("design_decisions")
+            )
+            if raw_design_decisions is None:
+                raise PowdrrExecutionError(
+                    "canonical design decisions are missing or malformed"
+                )
+            required_clause_ids = []
+            for obligation in obligations:
+                if not isinstance(obligation, Mapping):
+                    raise PowdrrExecutionError("canonical obligation is malformed")
+                sentence_id = obligation.get("id")
+                if not isinstance(sentence_id, str):
+                    raise PowdrrExecutionError(
+                        "canonical obligation is missing its compiler-owned sentence id"
+                    )
+                match = re.fullmatch(r"sentence-(\d+)", sentence_id)
+                if match is None:
+                    raise PowdrrExecutionError(
+                        "canonical obligation has an invalid sentence id"
+                    )
+                required_clause_ids.append(f"instruction-{int(match.group(1)):03d}")
             work_item_name = _require_flow_text(parameters, "work_item_name")
             try:
-                design = compile_feature_design(ledger, work_item_name, obligations)
+                design = compile_feature_design(
+                    ledger,
+                    work_item_name,
+                    raw_design_decisions,
+                    required_clause_ids=required_clause_ids,
+                )
             except FeatureObligationError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
             path = output_root / "canonical-feature-design.json"

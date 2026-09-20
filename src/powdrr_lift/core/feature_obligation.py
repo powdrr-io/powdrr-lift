@@ -160,14 +160,19 @@ class CanonicalFeatureDesign:
         if self.ledger_fingerprint != ledger.fingerprint:
             raise FeatureObligationError("canonical design uses a stale ledger")
         clause_ids = tuple(item.clause_id for item in ledger.clauses)
-        obligation_ids = tuple(item.clause_id for item in self.obligations)
-        if obligation_ids != clause_ids:
+        projection_ids = tuple(item.clause_id for item in self.projections)
+        if projection_ids != clause_ids:
             raise FeatureObligationError(
-                "every instruction clause must have exactly one obligation"
+                "every instruction clause must have exactly one design projection"
             )
-        if len(self.projections) != len(self.obligations):
+        obligation_ids = tuple(item.clause_id for item in self.obligations)
+        if any(item not in clause_ids for item in obligation_ids):
             raise FeatureObligationError(
-                "every obligation must have exactly one design projection"
+                "every obligation must reference an instruction clause"
+            )
+        if tuple(sorted(obligation_ids, key=clause_ids.index)) != obligation_ids:
+            raise FeatureObligationError(
+                "obligations must preserve instruction ledger order"
             )
         if len(self.test_contracts) != len(self.obligations):
             raise FeatureObligationError(
@@ -186,19 +191,24 @@ def compile_feature_design(
     ledger: InstructionLedger,
     work_item_name: str,
     semantic_obligations: Sequence[Mapping[str, Any]],
+    *,
+    required_clause_ids: Sequence[str] | None = None,
 ) -> CanonicalFeatureDesign:
     """Compile semantic model output against the compiler-owned ledger order."""
     if not work_item_name.strip():
         raise FeatureObligationError("work_item_name must not be empty")
     if len(semantic_obligations) != len(ledger.clauses):
         raise FeatureObligationError(
-            "semantic obligation count must match the instruction ledger"
+            "semantic design count must match the instruction ledger"
         )
     projections: list[DesignProjection] = []
-    obligations: list[FeatureObligation] = []
+    semantic_projections: dict[str, DesignProjection] = {}
+    ledger_clause_ids = tuple(item.clause_id for item in ledger.clauses)
     slug = _slug(work_item_name)
     for clause, semantic in zip(ledger.clauses, semantic_obligations, strict=True):
         design = semantic.get("design")
+        if design is None:
+            design = semantic
         if not isinstance(design, Mapping):
             raise FeatureObligationError(
                 f"missing semantic design for {clause.clause_id}"
@@ -211,9 +221,20 @@ def compile_feature_design(
             expected_test=_required_text(design, "expected_test"),
         )
         projections.append(projection)
-        obligations.append(
-            FeatureObligation(clause_id=clause.clause_id, projection=projection)
+        semantic_projections[clause.clause_id] = projection
+    selected_clause_ids = (
+        ledger_clause_ids if required_clause_ids is None else tuple(required_clause_ids)
+    )
+    if len(set(selected_clause_ids)) != len(selected_clause_ids):
+        raise FeatureObligationError("required instruction clauses are duplicated")
+    if any(clause_id not in semantic_projections for clause_id in selected_clause_ids):
+        raise FeatureObligationError(
+            "required instruction clause is missing a design projection"
         )
+    obligations = [
+        FeatureObligation(clause_id, semantic_projections[clause_id])
+        for clause_id in selected_clause_ids
+    ]
     result = CanonicalFeatureDesign(
         work_item_name=work_item_name,
         ledger_fingerprint=ledger.fingerprint,

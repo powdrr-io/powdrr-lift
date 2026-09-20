@@ -237,6 +237,7 @@ steps:
         work_item_name: {type: reference, value: work_item_name}
         instruction_ledger: {type: reference, value: instruction_ledger}
         obligations: {type: reference, value: feature_obligations}
+        design_decisions: {type: reference, value: repaired_design_decisions}
       returns:
         type: object
         required: [path, fingerprint, obligations, required_test_cases]

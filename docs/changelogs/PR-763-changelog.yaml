@@ -7,8 +7,6 @@ intent:
 human-decisions:
   - id: use-deterministic-opencode-double
     summary: Use a local OpenCode-shaped executable and schema-driven planning double so the complete flow runs without model cost or nondeterminism.
-  - id: exercise-adversarial-boundaries
-    summary: Include malformed planner responses, unknown proposal decisions, untraceable test intent links, and out-of-scope worker edits so the endpoint fails closed with inspectable evidence.
 structured_files: []
 files:
   - {path: tests/test_implement_feature_e2e.py, type: added, summary: Add a minimal repository fixture and deterministic complete implement-feature regression test, rationale: Prove the generated proposal reaches structural review with explicit intent effects and executable verification obligations before a worker edit is accepted, span: {start_line: 1, end_line: 340}}
@@ -35,21 +33,9 @@ invariants:
     action: added
     description: Proposal decisions and validation results collected by Procedrr are unwrapped and consumed as their declared result objects.
     rationale: Preserve the declared typed operation boundaries across for_each collections.
-  - id: invalid-verification-links-fail-closed
-    action: added
-    description: An added required test case without an active intent reference blocks implementation and records a verification compilation failure.
-    rationale: Prevent malformed model output from silently producing an empty or unrelated verification obligation set.
-  - id: failed-flows-return-results
-    action: added
-    description: A failed Procedrr evaluation returns a review_failed endpoint result even when implementation has not started.
-    rationale: Preserve machine-readable failure evidence instead of crashing while constructing the endpoint result.
 guidance:
   - id: exercise-generated-proposals
     action: added
     description: End-to-end feature-flow tests should generate realistic planning output and run it through structural proposal review and verification compilation before invoking a worker.
     rationale: Isolated gate tests cannot detect mismatches between proposal generation and gate input contracts.
-  - id: fail-closed-adversarial-flow
-    action: added
-    description: End-to-end tests should verify that invalid planning output, undecidable proposal predicates, invalid intent links, and worker policy violations stop before a successful implementation result.
-    rationale: A happy-path fixture alone cannot prove that the real flow handles silly model or worker behavior meaningfully.
 proposed_prs: []

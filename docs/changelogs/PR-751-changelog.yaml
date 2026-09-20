@@ -1,0 +1,34 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 751
+title: Add intent verification acceptance scenarios
+intent:
+  problem: The intent-linked verification path lacks an executable acceptance fixture proving that a failed contract is repaired in the same coding session and revalidated with fresh evidence.
+  goal: Exercise the complete deterministic failure, repair, and fresh-pass story while proving deleted, skipped, weakened, and stale verification remains blocked.
+human-decisions:
+  - id: deterministic-acceptance-fixture
+    summary: Use the real pytest Workrr provider with a deterministic OpenCode-session stand-in so CI remains reliable and model-independent.
+  - id: verifier-weakening-blocks
+    summary: Treat changed verifier identity and reused candidate evidence as stale until freshly proven.
+structured_files: []
+files:
+  - {path: tests/test_intent_verification_acceptance.py, type: added, summary: Add transcript regression repair scenario, rationale: Prove failed evidence drives one same-session repair and fresh passing revalidation, span: {start_line: 1, end_line: 213}}
+entities:
+  - id: intent-verification-acceptance-fixture
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: failed-contract-requires-fresh-repair-proof
+    action: added
+    description: A failed transcript contract remains blocked until the same repair session produces fresh passing evidence.
+    rationale: Validate forward-only repair behavior.
+  - id: verifier-weakening-is-not-acceptance
+    action: added
+    description: Deleted, skipped, weakened, or stale verification cannot satisfy an active contract.
+    rationale: Prevent apparent progress through weaker proof.
+guidance:
+  - id: keep-acceptance-model-independent
+    action: added
+    description: Keep the acceptance fixture deterministic while exercising the production provider and evidence/reconciliation boundaries.
+    rationale: Make regressions reproducible in CI.
+proposed_prs: []

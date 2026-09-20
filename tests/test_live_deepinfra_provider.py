@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
 
+from powdrr_lift.workrr.protocol import SchemaAwareWorkflowLLMClient
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,
@@ -30,7 +32,7 @@ def test_live_deepinfra_planning_provider_smoke(tmp_path: Path) -> None:
         model="deepseek-ai/DeepSeek-V4-Flash-0731",
         model_cache_dir=tmp_path / "models",
     )
-    response = client.complete_json(
+    response = cast(SchemaAwareWorkflowLLMClient, client).complete_json(
         [{"role": "user", "content": "Return the JSON object requested."}],
         response_schema={
             "type": "object",

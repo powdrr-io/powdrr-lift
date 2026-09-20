@@ -91,8 +91,11 @@ The agent writes its run bundle under:
 
 Important artifacts include:
 
+- `run-metadata.json`: task ID and detected Powdrr/OpenCode runtime data;
 - `run-result.json`: stable summary of the final status, commit/worktree,
   validation, review, and pull-request fields;
+- `failure.json`: typed failure stage and references to preserved telemetry
+  when a run cannot complete;
 - `validation-bootstrap.yaml`: Structrr's repository inspection result;
 - `implementation-request.json` and `requests/`: bounded worker requests;
 - `artifacts/attempts/`: OpenCode attempt receipts and lifecycle events;

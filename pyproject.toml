@@ -50,6 +50,7 @@ purelib = "docs/procedrr/skill-definitions"
 testpaths = ["tests"]
 markers = [
     "real_coding_loop: opt-in live-LLM coding-loop integration test",
+    "live_provider: opt-in live provider smoke test",
 ]
 
 [tool.ruff]

@@ -328,14 +328,16 @@ def _execute_procedrr_flow(
             }
         if command[:2] == ["powdrr-lift", "evaluate"]:
             return _evaluate_proposal_command(runner, worktree, command)
-        if name == "extract_proposal_issues":
+
+        def extract_proposal_issues() -> Any:
             evaluation = parameters.get("evaluation")
             return (
                 list(evaluation.get("issues", []))
                 if isinstance(evaluation, Mapping)
                 else []
             )
-        if name == "aggregate_category_edits":
+
+        def aggregate_category_edits() -> Any:
             decisions = parameters.get("decisions")
             if not isinstance(decisions, Mapping):
                 raise PowdrrExecutionError(
@@ -344,7 +346,8 @@ def _execute_procedrr_flow(
             return _aggregate_category_edits(
                 decisions, inventory=state.get("provider_inventory", ())
             )
-        if name == "decompose_feature_description":
+
+        def decompose_feature_description() -> Any:
             feature_description = parameters.get("feature_description")
             if (
                 not isinstance(feature_description, str)
@@ -352,8 +355,49 @@ def _execute_procedrr_flow(
             ):
                 raise PowdrrExecutionError("feature description is empty")
             return _decompose_feature_description(feature_description)
-        if name == "apply_sentence_design_trace":
+
+        def apply_sentence_design_trace() -> Any:
             return _apply_sentence_design_trace(parameters, state=state)
+
+        def materialize_feature_intents() -> Any:
+            return _materialize_feature_intents(parameters, state=state)
+
+        def compile_verification_obligations() -> Any:
+            return _compile_verification_obligations(
+                parameters,
+                worktree=worktree,
+                output_root=output_root,
+                state=state,
+                allowed_paths=config.allowed_paths,
+            )
+
+        def assert_verification_obligations_complete() -> Any:
+            compilation = parameters.get("verification_obligations")
+            if not isinstance(compilation, Mapping):
+                raise PowdrrExecutionError(
+                    "verification obligation assertion requires compiler output"
+                )
+            failures = compilation.get("failures")
+            if not isinstance(failures, list):
+                raise PowdrrExecutionError(
+                    "verification obligation compiler output has no failure list"
+                )
+            return {"passed": not failures, "failure_count": len(failures)}
+
+        handlers: dict[str, Callable[[], Any]] = {
+            "extract_proposal_issues": extract_proposal_issues,
+            "aggregate_category_edits": aggregate_category_edits,
+            "decompose_feature_description": decompose_feature_description,
+            "apply_sentence_design_trace": apply_sentence_design_trace,
+            "materialize_feature_intents": materialize_feature_intents,
+            "compile_verification_obligations": compile_verification_obligations,
+            "assert_verification_obligations_complete": (
+                assert_verification_obligations_complete
+            ),
+        }
+        handler = handlers.get(name)
+        if handler is not None:
+            return handler()
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -401,28 +445,6 @@ def _execute_procedrr_flow(
                 output_root=output_root,
                 state=state,
             )
-        if name == "materialize_feature_intents":
-            return _materialize_feature_intents(parameters, state=state)
-        if name == "compile_verification_obligations":
-            return _compile_verification_obligations(
-                parameters,
-                worktree=worktree,
-                output_root=output_root,
-                state=state,
-                allowed_paths=config.allowed_paths,
-            )
-        if name == "assert_verification_obligations_complete":
-            compilation = parameters.get("verification_obligations")
-            if not isinstance(compilation, Mapping):
-                raise PowdrrExecutionError(
-                    "verification obligation assertion requires compiler output"
-                )
-            failures = compilation.get("failures")
-            if not isinstance(failures, list):
-                raise PowdrrExecutionError(
-                    "verification obligation compiler output has no failure list"
-                )
-            return {"passed": not failures, "failure_count": len(failures)}
         if name == "update_plan_from_sentence_trace":
             return _update_plan_from_sentence_trace(parameters, state=state)
         if name == "run_opencode":

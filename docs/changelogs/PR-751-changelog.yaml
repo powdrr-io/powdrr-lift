@@ -1,0 +1,55 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 751
+title: Add intent verification acceptance and health controls
+intent:
+  problem: The intent-linked verification path lacks an executable acceptance fixture proving that a failed contract is repaired in the same coding session and revalidated with fresh evidence.
+  goal: Exercise the complete deterministic failure, repair, and fresh-pass story while proving deleted, skipped, weakened, and stale verification remains blocked.
+human-decisions:
+  - id: deterministic-acceptance-fixture
+    summary: Use the real pytest Workrr provider with a deterministic OpenCode-session stand-in so CI remains reliable and model-independent.
+  - id: verifier-weakening-blocks
+    summary: Treat changed verifier identity and reused candidate evidence as stale until freshly proven.
+  - id: differential-regression-control
+    summary: Classify base/candidate outcomes and require explicit verifier-change decisions.
+  - id: verification-health-policy
+    summary: Report verification debt under observe, required_for_new, and enforce modes.
+structured_files: []
+files:
+  - {path: tests/test_intent_verification_acceptance.py, type: added, summary: Add transcript regression repair scenario, rationale: Prove failed evidence drives one same-session repair and fresh passing revalidation, span: {start_line: 1, end_line: 213}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Add verification health and differential commands, rationale: Make verification debt and base/candidate controls directly runnable, span: {start_line: 141, end_line: 144}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Register differential verification imports, rationale: Expose deterministic comparison through the CLI, span: {start_line: 176, end_line: 179}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Register verification control commands, rationale: Provide repository health and differential entry points, span: {start_line: 367, end_line: 401}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Run health and differential reports, rationale: Return machine-readable blocking results, span: {start_line: 3001, end_line: 3056}}
+  - {path: src/powdrr_lift/structrr/verification_health.py, type: added, summary: Add verification health audit, rationale: Detect coverage gaps, stale evidence, verifier changes, and expired waivers under explicit policy modes, span: {start_line: 1, end_line: 213}}
+  - {path: src/powdrr_lift/workrr/differential_verification.py, type: added, summary: Add base/candidate classification, rationale: Distinguish regressions from existing failures and identify verifier identity changes, span: {start_line: 1, end_line: 130}}
+  - {path: tests/test_differential_verification.py, type: added, summary: Test differential classifications and verifier changes, rationale: Protect regression and verifier-change controls, span: {start_line: 1, end_line: 60}}
+  - {path: tests/test_verification_health.py, type: added, summary: Test health findings and policy modes, rationale: Protect migration debt and freshness enforcement, span: {start_line: 1, end_line: 68}}
+  - {path: tests/test_verification_health_cli.py, type: added, summary: Test health and differential CLI commands, rationale: Prove controls are directly usable, span: {start_line: 1, end_line: 71}}
+entities:
+  - id: intent-verification-acceptance-fixture
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: failed-contract-requires-fresh-repair-proof
+    action: added
+    description: A failed transcript contract remains blocked until the same repair session produces fresh passing evidence.
+    rationale: Validate forward-only repair behavior.
+  - id: verifier-weakening-is-not-acceptance
+    action: added
+    description: Deleted, skipped, weakened, or stale verification cannot satisfy an active contract.
+    rationale: Prevent apparent progress through weaker proof.
+  - id: base-candidate-regressions-are-classified
+    action: added
+    description: Base and candidate verifier outcomes are classified as preserved, fixed, regressed, persistent, or not comparable.
+    rationale: Prevent pre-existing failures and new regressions from being conflated.
+  - id: verification-debt-policy-is-explicit
+    action: added
+    description: Verification health findings are evaluated under an explicit repository policy mode.
+    rationale: Make migration and enforcement behavior predictable.
+guidance:
+  - id: keep-acceptance-model-independent
+    action: added
+    description: Keep the acceptance fixture deterministic while exercising the production provider and evidence/reconciliation boundaries.
+    rationale: Make regressions reproducible in CI.
+proposed_prs: []

@@ -22,9 +22,11 @@ from procedrr import (
     apply_json_edits,
     compile_workflow,
     parse_and_validate,
+    parse_document,
     render_document,
     set_value,
     start_fragment,
+    validate_document,
     validate_single_decision,
 )
 
@@ -123,6 +125,56 @@ def test_parser_requires_explicit_collection_for_loop_outputs() -> None:
             "      context: [x]\n      output: {name: y, schema: {type: string}}\n"
             "      validator: imaginary\n"
         )
+
+
+def test_parser_validates_loop_snapshots_and_dataflow_references() -> None:
+    source = """name: invalid-loop
+inputs: [{name: ready}]
+steps:
+  - for_each:
+      snapshot: {name: missing_items, max_items: 0}
+      body: []
+  - branch:
+      subject: missing_branch
+      cases: {true: []}
+  - repeat:
+      max_iterations: 1
+      until: {subject: missing_repeat, equals: true}
+      body: []
+"""
+    diagnostics = validate_document(parse_document(source))
+    paths = {diagnostic.path for diagnostic in diagnostics}
+
+    assert "steps[0].for_each.item_binding" in paths
+    assert "steps[0].for_each.snapshot.name" in paths
+    assert "steps[0].for_each.snapshot.max_items" in paths
+    assert "steps[1].branch.subject" in paths
+    assert "steps[2].repeat.until.subject" in paths
+
+
+def test_parser_allows_dotted_bindings_and_validates_limits() -> None:
+    source = """name: valid-references
+inputs: [{name: context}]
+limits: {llm_activations: 2, tool_calls: 4}
+steps:
+  - judge:
+      question: Choose.
+      subject: context.value
+      prompt_system: Return JSON.
+      instructions: [Use the context.]
+      context: [context.value]
+      output:
+        name: result
+        schema: {type: object}
+      validation: {kind: json_schema}
+"""
+
+    assert validate_document(parse_document(source)) == ()
+    invalid_limits = parse_document(source.replace("tool_calls: 4", "tool_calls: 0"))
+    assert any(
+        diagnostic.path == "limits.tool_calls"
+        for diagnostic in validate_document(invalid_limits)
+    )
 
 
 def test_parser_validates_attempt_recovery_references_and_body() -> None:

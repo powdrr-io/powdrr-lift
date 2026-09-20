@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 774
+title: Validate Procedrr control-flow contracts statically
+intent:
+  problem: Procedrr definitions can reach runtime with malformed loop declarations or unresolved control-flow bindings.
+  goal: Reject mechanically invalid workflow shapes during static validation so flow changes fail before execution.
+human-decisions:
+  - id: static-procedrr-contract-validation
+    summary: Validate binding dataflow and bounded control declarations before any Procedrr execution.
+structured_files: []
+files:
+  - {path: src/procedrr/parser.py, type: modified, summary: Add binding-path and workflow-limit validation, rationale: Reject invalid global contracts before step traversal, span: {start_line: 30, end_line: 30}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate document limits, rationale: Prevent invalid resource limits from reaching runtime, span: {start_line: 99, end_line: 116}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Track document bindings, rationale: Make later control-flow reference checks dataflow-aware, span: {start_line: 174, end_line: 174}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Preserve binding state through validation, rationale: Keep sequential binding analysis accurate, span: {start_line: 180, end_line: 180}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Reuse tracked bindings for recovery validation, rationale: Validate recovery references against the established workflow state, span: {start_line: 185, end_line: 185}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate recovery inputs, rationale: Reject malformed recovery input declarations, span: {start_line: 205, end_line: 215}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Include recovery bindings, rationale: Validate recovery steps with their declared inputs, span: {start_line: 217, end_line: 217}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate inherited recovery state, rationale: Allow recoveries to use established workflow bindings, span: {start_line: 223, end_line: 223}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate repeat termination, rationale: Prevent repeat loops from waiting on missing state, span: {start_line: 548, end_line: 554}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate repeat collection shape, rationale: Reject malformed repeat collection declarations, span: {start_line: 556, end_line: 566}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate repeat bindings, rationale: Preserve outputs created by repeat bodies for later steps, span: {start_line: 587, end_line: 594}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate branch subjects, rationale: Detect unresolved branch state before execution, span: {start_line: 605, end_line: 611}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate branch bindings, rationale: Preserve outputs created in branch cases, span: {start_line: 630, end_line: 630}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Analyze branch case bindings, rationale: Validate dataflow through each branch case, span: {start_line: 635, end_line: 635}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Merge branch case bindings, rationale: Make branch outputs available to subsequent validation, span: {start_line: 638, end_line: 638}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Analyze default branch bindings, rationale: Validate dataflow through the default case, span: {start_line: 648, end_line: 648}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Merge default branch bindings, rationale: Make default-case outputs available later, span: {start_line: 653, end_line: 653}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Preserve attempt-body bindings, rationale: Validate outputs created inside attempts, span: {start_line: 656, end_line: 656}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Track attempt recovery state, rationale: Allow recovery handlers to consume attempt outputs, span: {start_line: 712, end_line: 712}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate attempt bindings, rationale: Allow later recovery and workflow references to resolve, span: {start_line: 717, end_line: 717}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate loop declarations, rationale: Reject malformed snapshots and item bindings before iteration, span: {start_line: 720, end_line: 720}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Invoke loop contract validation, rationale: Apply static checks to data-driven loops, span: {start_line: 725, end_line: 728}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate collection mappings, rationale: Reject malformed loop collection declarations, span: {start_line: 754, end_line: 760}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate collected values, rationale: Ensure loop outputs resolve to known body bindings, span: {start_line: 785, end_line: 791}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge contexts, rationale: Resolve dotted context paths against known bindings, span: {start_line: 967, end_line: 969}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge subjects, rationale: Catch unresolved judge state references consistently, span: {start_line: 976, end_line: 985}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Add reusable static contract helpers, rationale: Centralize binding, snapshot, and collection validation rules, span: {start_line: 1101, end_line: 1211}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Import static validation helpers, rationale: Exercise parser diagnostics directly, span: {start_line: 25, end_line: 25}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Import document validation, rationale: Exercise parser diagnostics directly, span: {start_line: 29, end_line: 29}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test malformed loop and control references, rationale: Ensure runtime-only shape errors become parser diagnostics, span: {start_line: 130, end_line: 179}}
+entities: []
+entity_relationships: []
+invariants:
+  - id: procedrr-references-resolve-before-execution
+    action: added
+    description: Control-flow subjects, judge contexts, snapshots, and collection values must resolve against statically known bindings before a workflow can execute.
+    rationale: Move mechanical reference failures from runtime into deterministic validation.
+  - id: procedrr-control-contracts-are-bounded
+    action: added
+    description: Loop, recovery, and resource-limit declarations must have valid bounded shapes before execution.
+    rationale: Prevent malformed control structures from creating unpredictable runtime behavior.
+guidance:
+  - id: validate-procedrr-before-flow-edits
+    action: added
+    description: Run Procedrr static validation against every checked-in skill definition before changing or executing a flow.
+    rationale: Make flow refactoring safe by detecting structural errors at authoring time.
+proposed_prs: []

@@ -232,6 +232,7 @@ steps:
       parameters:
         baseline: {type: reference, value: baseline.path}
         plan: {type: reference, value: plan.path}
+        feature_description: {type: reference, value: feature_description}
       returns:
         type: object
         required: [path, fingerprint, closure, obligations, failures]
@@ -263,7 +264,7 @@ steps:
   - for_each:
       snapshot: {name: proposal_review.worklist.specifications}
       item_binding: proposal_decision
-      collect: {binding: proposal_decisions, mode: list}
+      collect: {binding: proposal_decisions, mode: list, value: proposal_decision_result}
       body:
         - judge:
             kind: verify_proposal_decision
@@ -276,7 +277,7 @@ steps:
               - Return the decision identity fields exactly as supplied.
               - Use pass only when the evidence proves the predicate; otherwise use fail, unknown, or clarification.
               - An unknown or clarification outcome blocks proposal acceptance.
-            context: [feature_description, baseline, plan, proposal, proposal_evaluation, proposal_review, proposal_decision]
+            context: [proposal_decision, feature_description, baseline, plan, proposal]
             output:
               name: proposal_decision_result
               schema:
@@ -334,7 +335,7 @@ steps:
   - for_each:
       snapshot: {name: validation_profiles}
       item_binding: validation_profile
-      collect: {binding: validation_results, mode: list}
+      collect: {binding: validation_results, mode: list, value: validation_result}
       body:
         - operation:
             tool: internal
@@ -439,7 +440,7 @@ steps:
         - for_each:
             snapshot: {name: implementation_review.active_intent_clauses}
             item_binding: intent_clause
-            collect: {binding: intent_reviews, mode: list}
+            collect: {binding: intent_reviews, mode: list, value: intent_review}
             body:
               - judge:
                   kind: verify_implemented_intent
@@ -451,7 +452,7 @@ steps:
                     - Compare the clause with the proposal, implementation diff, validation results, and worker review.
                     - Return preserved only when the clause remains honored; otherwise return altered or unknown.
                     - Copy every evidence reference from implementation_review.evidence_refs exactly.
-                  context: [feature_description, proposal_review, proposal_review_result, implementation_review, implementation, validation, review, intent_clause]
+                  context: [intent_clause, feature_description, proposal_review, proposal_review_result, implementation_review, implementation, validation, review]
                   output:
                     name: intent_review
                     schema:
@@ -608,7 +609,7 @@ recoveries:
             - for_each:
                 snapshot: {name: validation_profiles}
                 item_binding: validation_profile
-                collect: {binding: validation_results, mode: list}
+                collect: {binding: validation_results, mode: list, value: validation_result}
                 body:
                   - operation:
                       tool: internal
@@ -698,7 +699,7 @@ recoveries:
       - for_each:
           snapshot: {name: validation_profiles}
           item_binding: validation_profile
-          collect: {binding: validation_results, mode: list}
+          collect: {binding: validation_results, mode: list, value: validation_result}
           body:
             - operation:
                 tool: internal
@@ -780,7 +781,7 @@ recoveries:
       - for_each:
           snapshot: {name: validation_profiles}
           item_binding: validation_profile
-          collect: {binding: validation_results, mode: list}
+          collect: {binding: validation_results, mode: list, value: validation_result}
           body:
             - operation:
                 tool: internal
@@ -860,7 +861,7 @@ recoveries:
       - for_each:
           snapshot: {name: validation_profiles}
           item_binding: validation_profile
-          collect: {binding: validation_results, mode: list}
+          collect: {binding: validation_results, mode: list, value: validation_result}
           body:
             - operation:
                 tool: internal

@@ -25,6 +25,7 @@ from powdrr_lift.core.feature_obligation import (
     FeatureObligationError,
     compile_feature_design,
 )
+from powdrr_lift.core.implementation_packet import compile_implementation_packet
 from powdrr_lift.core.instruction_ledger import (
     InstructionLedger,
     InstructionLedgerError,
@@ -1973,6 +1974,25 @@ def _run_opencode_phase(
         )
         else (),
     )
+    try:
+        implementation_packet = compile_implementation_packet(
+            objective=feature_description,
+            obligations=feature_obligations,
+            required_tests=required_test_cases,
+            allowed_paths=config.allowed_paths,
+            validation_profiles=state["validation_profile_names"],
+            existing_tests=state.get("provider_inventory", ()),
+        )
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            f"implementation packet compilation failed: {error}"
+        ) from error
+    implementation_packet_path = output_root / "implementation-packet.json"
+    implementation_packet_path.write_text(
+        json.dumps(implementation_packet.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    state["implementation_packet_path"] = implementation_packet_path
     plan = ExecutionPlan(
         plan_id=f"{slug}-execution",
         proposed_pr_fingerprint=proposal_revision.fingerprint,
@@ -2021,6 +2041,11 @@ def _run_opencode_phase(
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=source_context,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
+        )
+        request = replace(
+            request,
+            prompt=implementation_packet.render(),
+            implementation_packet=implementation_packet,
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):

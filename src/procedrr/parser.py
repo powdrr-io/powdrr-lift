@@ -28,6 +28,9 @@ KNOWN_TOOLS = frozenset(
 KNOWN_VALIDATORS = frozenset({"json_schema"})
 _BINDING = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
 _BINDING_PATH = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*")
+_MODEL_OWNED_METADATA = re.compile(
+    r"(?:^|_)(?:id|uuid|identifier|hash|digest|checksum|fingerprint|version|ref|refs)$"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1096,6 +1099,14 @@ def _validate_steps(
                     )
                 if isinstance(output, Mapping) and isinstance(output.get("name"), str):
                     bindings.add(output["name"])
+                if isinstance(output, Mapping) and isinstance(
+                    output.get("schema"), Mapping
+                ):
+                    _validate_model_output_schema(
+                        output["schema"],
+                        f"{step_path}.judge.output.schema",
+                        diagnostics,
+                    )
 
 
 def _binding_path_is_known(path: Any, bindings: set[str]) -> bool:
@@ -1207,6 +1218,60 @@ def _validate_collect(
         diagnostics.append(
             DocumentDiagnostic(f"{path}.value", f"unknown binding: {value}")
         )
+
+
+def _validate_model_output_schema(
+    schema: Mapping[str, Any],
+    path: str,
+    diagnostics: list[DocumentDiagnostic],
+) -> None:
+    """Reject model output fields that must be compiler/runtime-owned.
+
+    Judges may explain and classify facts, but identity, provenance, and
+    integrity metadata must be derived from trusted inputs. Walk the complete
+    JSON Schema so nested model output cannot smuggle those fields through an
+    otherwise valid top-level response.
+    """
+
+    def walk(value: Any, schema_path: str) -> None:
+        if not isinstance(value, Mapping):
+            return
+        properties = value.get("properties")
+        if isinstance(properties, Mapping):
+            for name, child in properties.items():
+                if isinstance(name, str) and _MODEL_OWNED_METADATA.search(name):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{schema_path}.properties.{name}",
+                            "LLM output must not generate identity, provenance, "
+                            "version, reference, hash, or fingerprint metadata",
+                            code="model_owned_metadata",
+                        )
+                    )
+                walk(child, f"{schema_path}.properties.{name}")
+        for keyword in (
+            "additionalProperties",
+            "items",
+            "contains",
+            "propertyNames",
+            "not",
+            "if",
+            "then",
+            "else",
+        ):
+            child = value.get(keyword)
+            if isinstance(child, Mapping):
+                walk(child, f"{schema_path}.{keyword}")
+            elif isinstance(child, list):
+                for index, item in enumerate(child):
+                    walk(item, f"{schema_path}.{keyword}[{index}]")
+        for keyword in ("allOf", "anyOf", "oneOf"):
+            alternatives = value.get(keyword)
+            if isinstance(alternatives, list):
+                for index, item in enumerate(alternatives):
+                    walk(item, f"{schema_path}.{keyword}[{index}]")
+
+    walk(schema, path)
 
 
 def _template_references(value: Any) -> Iterator[str]:

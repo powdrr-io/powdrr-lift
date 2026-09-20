@@ -256,7 +256,7 @@ recoveries:
             - Use the failure, review findings, and repository evidence to identify the smallest correction.
             - Return exactly one concrete semantic line edit with one-based inclusive start and end positions.
             - Include a verification_command that runs the failing test or validation, not only a syntax check.
-            - Include the exact structured failure record and a failure_id on every action.
+            - Use the supplied failure record as evidence; Powdrr owns failure identity and provenance.
             - Preserve unrelated content; the replacement must implement the missing behavior and must not be a no-op.
             - Do not broaden the proposed PR or change unrelated behavior.
           context: [failure, feature_description, implementation_plan, completeness_review, invariant_review, security_review, final_repository_context]
@@ -264,12 +264,9 @@ recoveries:
             name: final_repair_action
             schema:
               type: object
-              required: [id, failure_id, failure, file_path, start, end, new_text, verification_command]
+              required: [file_path, start, end, new_text, verification_command]
               additionalProperties: false
               properties:
-                id: {type: string, minLength: 1}
-                failure_id: {type: string, minLength: 1}
-                failure: {type: object}
                 file_path: {type: string, minLength: 1}
                 start: {type: integer, minimum: 1}
                 end: {type: integer, minimum: 1}

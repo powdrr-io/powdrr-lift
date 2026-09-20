@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 774
-title: Validate Procedrr control-flow contracts statically
+title: Validate Procedrr control-flow and model-output contracts statically
 intent:
-  problem: Procedrr definitions can reach runtime with malformed loop declarations or unresolved control-flow bindings.
-  goal: Reject mechanically invalid workflow shapes during static validation so flow changes fail before execution.
+  problem: Procedrr definitions can reach runtime with malformed loop declarations, unresolved control-flow bindings, or LLM-owned identity metadata.
+  goal: Reject mechanically invalid workflow shapes and model output contracts during static validation so flow changes fail before execution.
 human-decisions:
   - id: static-procedrr-contract-validation
     summary: Validate binding dataflow and bounded control declarations before any Procedrr execution.
@@ -36,6 +36,13 @@ files:
   - {path: src/procedrr/parser.py, type: modified, summary: Validate judge contexts, rationale: Resolve dotted context paths against known bindings, span: {start_line: 967, end_line: 969}}
   - {path: src/procedrr/parser.py, type: modified, summary: Validate judge subjects, rationale: Catch unresolved judge state references consistently, span: {start_line: 976, end_line: 985}}
   - {path: src/procedrr/parser.py, type: modified, summary: Add reusable static contract helpers, rationale: Centralize binding, snapshot, and collection validation rules, span: {start_line: 1101, end_line: 1211}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Reject model-owned metadata fields, rationale: Prevent judges from generating identity, provenance, version, reference, hash, and fingerprint values, span: {start_line: 1223, end_line: 1282}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Bind proposal decision metadata deterministically, rationale: Keep decision identity and evidence provenance outside LLM output, span: {start_line: 941, end_line: 985}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Restrict proposal judges to semantic decisions, rationale: Move proposal identity and evidence fields to deterministic binding, span: {start_line: 324, end_line: 365}}
+  - {path: docs/procedrr/skill-definitions/execute-proposed-pr.yaml, type: modified, summary: Remove repair identity fields from judge output, rationale: Keep repair identity and provenance runtime-owned, span: {start_line: 256, end_line: 277}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Prohibit generated identifiers in interview guidance, rationale: Ensure semantic interview responses do not author identity or integrity metadata, span: {start_line: 58, end_line: 64}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test recursive model metadata rejection, rationale: Ensure nested identity and reference fields are rejected statically, span: {start_line: 180, end_line: 220}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Update proposal judge test double, rationale: Exercise the semantic-only proposal decision contract, span: {start_line: 132, end_line: 137}}
   - {path: tests/test_procedrr.py, type: modified, summary: Import static validation helpers, rationale: Exercise parser diagnostics directly, span: {start_line: 25, end_line: 25}}
   - {path: tests/test_procedrr.py, type: modified, summary: Import document validation, rationale: Exercise parser diagnostics directly, span: {start_line: 29, end_line: 29}}
   - {path: tests/test_procedrr.py, type: modified, summary: Test malformed loop and control references, rationale: Ensure runtime-only shape errors become parser diagnostics, span: {start_line: 130, end_line: 179}}
@@ -50,6 +57,10 @@ invariants:
     action: added
     description: Loop, recovery, and resource-limit declarations must have valid bounded shapes before execution.
     rationale: Prevent malformed control structures from creating unpredictable runtime behavior.
+  - id: procedrr-model-output-has-no-runtime-identity
+    action: added
+    description: LLM judge outputs must contain semantic decisions only; identity, provenance, references, versions, hashes, and fingerprints are derived by trusted runtime operations.
+    rationale: Prevent model-generated metadata from becoming authoritative workflow identity or evidence.
 guidance:
   - id: validate-procedrr-before-flow-edits
     action: added

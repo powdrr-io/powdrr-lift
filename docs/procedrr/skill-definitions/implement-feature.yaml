@@ -324,7 +324,7 @@ steps:
             instructions:
               - Evaluate exactly the one predicate in proposal_decision.
               - Do not evaluate sibling decisions or provide an aggregate verdict.
-              - Return the decision identity fields exactly as supplied.
+              - Return only the semantic outcome and explanation; Powdrr binds all decision identity and evidence fields.
               - Use pass only when the evidence proves the predicate; otherwise use fail, unknown, or clarification.
               - An unknown or clarification outcome blocks proposal acceptance.
             context: [proposal_decision, feature_description, baseline, plan, proposal]
@@ -332,25 +332,27 @@ steps:
               name: proposal_decision_result
               schema:
                 type: object
-                required: [decision_id, outcome, explanation, predicate_version, subject, input_fingerprint, evidence_fingerprint, evidence_refs]
+                required: [outcome, explanation]
                 additionalProperties: false
                 properties:
-                  decision_id: {type: string, minLength: 1}
                   outcome: {type: string, enum: [pass, fail, unknown, clarification]}
                   explanation: {type: string, minLength: 1}
-                  predicate_version: {type: string, minLength: 1}
-                  subject: {type: string, minLength: 1}
-                  input_fingerprint: {type: string, minLength: 1}
-                  evidence_fingerprint: {type: string, minLength: 1}
-                  evidence_refs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
             validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [bind_proposal_decision_results]
+      parameters:
+        worklist: {type: reference, value: proposal_review.worklist}
+        decisions: {type: reference, value: proposal_decisions}
+      returns: {type: object}
+      bind: proposal_decision_results
   - operation:
       tool: internal
       command: [finalize_proposal_review]
       parameters:
         proposal_revision_path: {type: reference, value: proposal_review.proposal_revision_path}
         worklist_path: {type: reference, value: proposal_review.worklist_path}
-        decisions: {type: reference, value: proposal_decisions}
+        decisions: {type: reference, value: proposal_decision_results.decisions}
       returns:
         type: object
         required: [accepted, receipt_path, proposal_fingerprint, worklist_fingerprint]

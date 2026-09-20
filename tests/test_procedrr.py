@@ -177,6 +177,45 @@ steps:
     )
 
 
+def test_parser_rejects_model_owned_identity_and_integrity_fields() -> None:
+    source = """
+name: metadata
+steps:
+  - judge:
+      question: Decide
+      subject: input
+      prompt_system: Return JSON
+      instructions: [Decide]
+      context: [input]
+      output:
+        name: decision
+        schema:
+          type: object
+          properties:
+            outcome: {type: string}
+            nested:
+              type: object
+              properties:
+                evidence_fingerprint: {type: string}
+                explanation: {type: string}
+            decision_ref: {type: string}
+      validation: {kind: json_schema}
+inputs: [{name: input}]
+"""
+
+    diagnostics = validate_document(parse_document(source))
+
+    metadata_diagnostics = [
+        diagnostic
+        for diagnostic in diagnostics
+        if diagnostic.code == "model_owned_metadata"
+    ]
+    assert {diagnostic.path for diagnostic in metadata_diagnostics} == {
+        "steps[0].judge.output.schema.properties.nested.properties.evidence_fingerprint",
+        "steps[0].judge.output.schema.properties.decision_ref",
+    }
+
+
 def test_parser_validates_attempt_recovery_references_and_body() -> None:
     source = """name: recovery
 inputs: [{name: ready}]

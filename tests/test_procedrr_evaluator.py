@@ -152,6 +152,42 @@ def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     assert metrics["serialized_chars"] <= 24000
 
 
+def test_evaluator_applies_prompt_rules_deterministically() -> None:
+    llm = FakeLLM()
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(
+        """
+name: conditional-prompt
+inputs: [{name: category, type: string, required: true}]
+steps:
+  - judge:
+      prompt_system: Return JSON only.
+      instructions: [Use only the supplied context.]
+      prompt_rules:
+        - when: {binding: category, equals: tests}
+          instructions: [Describe the semantic obligation only.]
+        - when: {binding: category, equals: other}
+          mode: replace
+          instructions: [Use the alternate contract.]
+      question: What follows?
+      subject: category
+      context: [category]
+      output: {name: answer, schema: {type: object}}
+      validation: {kind: json_schema}
+"""
+    )
+
+    Evaluator(llm, lambda _tool, _parameters: None).evaluate(
+        document, {"category": "tests"}
+    )
+
+    prompt = llm.messages[1]["content"]
+    assert "Use only the supplied context." in prompt
+    assert "Describe the semantic obligation only." in prompt
+    assert "Use the alternate contract." not in prompt
+
+
 def test_evaluator_bounds_large_judge_context() -> None:
     llm = FakeLLM()
     Evaluator(FakeLLM(), lambda _tool, _parameters: None).evaluate(

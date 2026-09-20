@@ -890,6 +890,87 @@ def _validate_steps(
                                     f"unknown binding: {binding}",
                                 )
                             )
+                prompt_rules = judge.get("prompt_rules", [])
+                if not isinstance(prompt_rules, list):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.prompt_rules",
+                            "prompt_rules must be a list",
+                        )
+                    )
+                else:
+                    for rule_index, rule in enumerate(prompt_rules):
+                        rule_path = f"{step_path}.judge.prompt_rules[{rule_index}]"
+                        if not isinstance(rule, Mapping):
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    rule_path, "prompt rule must be a mapping"
+                                )
+                            )
+                            continue
+                        condition = rule.get("when")
+                        if not isinstance(condition, Mapping):
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{rule_path}.when",
+                                    "prompt rule condition must be a mapping",
+                                )
+                            )
+                            continue
+                        binding = condition.get("binding")
+                        if not isinstance(binding, str) or not binding.strip():
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{rule_path}.when.binding",
+                                    "prompt rule binding must be a non-empty string",
+                                )
+                            )
+                        elif (
+                            isinstance(context, list)
+                            and binding.split(".", 1)[0] not in context
+                        ):
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{rule_path}.when.binding",
+                                    "prompt rule binding must be declared in "
+                                    "judge.context",
+                                )
+                            )
+                        operators = set(condition) - {"binding"}
+                        if len(operators) != 1 or not operators.issubset(
+                            {"equals", "not_equals", "in", "contains"}
+                        ):
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{rule_path}.when",
+                                    "prompt rule needs exactly one supported "
+                                    "comparison",
+                                )
+                            )
+                        instructions = rule.get("instructions")
+                        if (
+                            not isinstance(instructions, list)
+                            or not instructions
+                            or not all(
+                                isinstance(item, str) and item.strip()
+                                for item in instructions
+                            )
+                        ):
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{rule_path}.instructions",
+                                    "prompt rule instructions must be a non-empty "
+                                    "string list",
+                                )
+                            )
+                        mode = rule.get("mode", "append")
+                        if mode not in {"append", "replace"}:
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{rule_path}.mode",
+                                    "prompt rule mode must be append or replace",
+                                )
+                            )
                 if "validation" not in judge and "validator" not in judge:
                     diagnostics.append(
                         DocumentDiagnostic(

@@ -548,13 +548,19 @@ class Evaluator:
             context_data,
             context_limit,
         )
+        instructions = _resolve_prompt_instructions(
+            judge.get("instructions", []),
+            judge.get("prompt_rules", []),
+            state,
+            path,
+        )
         messages = [
             {"role": "system", "content": str(judge["prompt_system"])},
             {
                 "role": "user",
                 "content": (
                     "Instructions:\n- "
-                    + "\n- ".join(str(item) for item in judge["instructions"])
+                    + "\n- ".join(instructions)
                     + "\n\nQuestion:\n"
                     + str(judge["question"])
                     + "\n\nContext:\n"
@@ -734,6 +740,70 @@ def _resolve_value(value: Any, state: Mapping[str, Any]) -> Any:
     if isinstance(value, list):
         return [_resolve_value(item, state) for item in value]
     return value
+
+
+def _resolve_prompt_instructions(
+    base: Any,
+    rules: Any,
+    state: Mapping[str, Any],
+    path: str,
+) -> list[str]:
+    if not isinstance(base, list):
+        raise EvaluationError(f"{path}.judge.instructions must be a list")
+    instructions = [str(item) for item in base]
+    if rules in (None, []):
+        return instructions
+    if not isinstance(rules, list):
+        raise EvaluationError(f"{path}.judge.prompt_rules must be a list")
+    for index, rule in enumerate(rules):
+        if not isinstance(rule, Mapping):
+            raise EvaluationError(f"{path}.judge.prompt_rules[{index}] is malformed")
+        condition = rule.get("when")
+        if not isinstance(condition, Mapping):
+            raise EvaluationError(
+                f"{path}.judge.prompt_rules[{index}].when is malformed"
+            )
+        binding = condition.get("binding")
+        if not isinstance(binding, str):
+            raise EvaluationError(
+                f"{path}.judge.prompt_rules[{index}].when.binding is required"
+            )
+        operators = [key for key in condition if key != "binding"]
+        if len(operators) != 1:
+            raise EvaluationError(
+                f"{path}.judge.prompt_rules[{index}].when needs one comparison"
+            )
+        operator = operators[0]
+        if operator not in {"equals", "not_equals", "in", "contains"}:
+            raise EvaluationError(
+                f"{path}.judge.prompt_rules[{index}] has unsupported comparison"
+            )
+        actual = _resolve_binding(state, binding)
+        expected = condition[operator]
+        matched = {
+            "equals": actual == expected,
+            "not_equals": actual != expected,
+            "in": isinstance(expected, list) and actual in expected,
+            "contains": (
+                expected in actual
+                if isinstance(actual, (str, list, tuple, set, Mapping))
+                else False
+            ),
+        }[operator]
+        if not matched:
+            continue
+        rule_instructions = rule.get("instructions")
+        if not isinstance(rule_instructions, list) or not all(
+            isinstance(item, str) for item in rule_instructions
+        ):
+            raise EvaluationError(
+                f"{path}.judge.prompt_rules[{index}].instructions is malformed"
+            )
+        if rule.get("mode", "append") == "replace":
+            instructions = list(rule_instructions)
+        else:
+            instructions.extend(rule_instructions)
+    return instructions
 
 
 def _json_text(value: Any) -> str:

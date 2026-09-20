@@ -115,6 +115,34 @@ class ResourceLimits:
 
 
 @dataclass(frozen=True, slots=True)
+class PromptRule:
+    """A deterministic instruction change selected from declared context."""
+
+    binding: str
+    operator: str
+    value: Any
+    instructions: tuple[str, ...]
+    mode: str = "append"
+
+    def __post_init__(self) -> None:
+        if not self.binding.strip():
+            raise ValueError("prompt rule binding cannot be empty")
+        if self.operator not in {"equals", "not_equals", "in", "contains"}:
+            raise ValueError("prompt rule operator is unsupported")
+        if not self.instructions or any(not item.strip() for item in self.instructions):
+            raise ValueError("prompt rule instructions must be non-empty")
+        if self.mode not in {"append", "replace"}:
+            raise ValueError("prompt rule mode must be append or replace")
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "when": {"binding": self.binding, self.operator: self.value},
+            "mode": self.mode,
+            "instructions": list(self.instructions),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class DecisionContract:
     """One model question with one typed output and no model authority."""
 
@@ -129,6 +157,7 @@ class DecisionContract:
     prompt_system: str = ""
     instructions: tuple[str, ...] = ()
     context_bindings: tuple[str, ...] = ()
+    prompt_rules: tuple[PromptRule, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.kind, DecisionKind):
@@ -168,6 +197,7 @@ class DecisionContract:
             "prompt_system": self.prompt_system,
             "instructions": list(self.instructions),
             "context_bindings": list(self.context_bindings),
+            "prompt_rules": [rule.to_data() for rule in self.prompt_rules],
         }
 
 
@@ -455,6 +485,7 @@ __all__ = [
     "MatchCase",
     "MatchNode",
     "OperationNode",
+    "PromptRule",
     "ParallelNode",
     "ProofStatus",
     "RepeatNode",

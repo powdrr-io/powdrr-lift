@@ -144,6 +144,10 @@ steps:
               - Judge only this sentence; do not answer for any other sentence.
               - Classify explanatory background, motivation, and constraints that do not require implementation as not_required.
               - Classify requested behavior, data, interfaces, compatibility, limits, and validation expectations as required.
+            prompt_rules:
+              - when: {binding: feature_sentence, contains: test}
+                instructions:
+                  - When this sentence explicitly mentions a test, treat that testing expectation as a required feature obligation unless the sentence explicitly prohibits it.
             context: [feature_sentence, plan]
             output:
               name: requirement_decision

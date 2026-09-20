@@ -1,0 +1,46 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 761
+title: Add deterministic contextual prompt rules
+intent:
+  problem: Procedrr judge prompts have fixed instructions even when declared input context requires different guidance.
+  goal: Allow workflow authors to declare deterministic conditional prompt instructions that append or replace the base instructions based on typed context values.
+human-decisions:
+  - id: deterministic-prompt-selection
+    summary: Evaluate prompt rules in the runtime from declared bindings; the model cannot select the prompt variant.
+structured_files: []
+files:
+  - {path: src/procedrr/__init__.py, type: modified, summary: Export PromptRule, rationale: Make the contextual prompt contract available to Procedrr users, span: {start_line: 22, end_line: 22}}
+  - {path: src/procedrr/__init__.py, type: modified, summary: Export PromptRule in the public symbol list, rationale: Keep the public API complete, span: {start_line: 58, end_line: 58}}
+  - {path: src/procedrr/model.py, type: modified, summary: Define deterministic prompt rules, rationale: Represent conditional instruction changes in the typed workflow model, span: {start_line: 117, end_line: 144}}
+  - {path: src/procedrr/model.py, type: modified, summary: Attach prompt rules to decision contracts, rationale: Include contextual prompt behavior in workflow fingerprints and serialization, span: {start_line: 160, end_line: 160}}
+  - {path: src/procedrr/model.py, type: modified, summary: Serialize prompt rules, rationale: Preserve prompt behavior in the declarative model, span: {start_line: 200, end_line: 200}}
+  - {path: src/procedrr/model.py, type: modified, summary: Export PromptRule from the model, rationale: Keep the model API discoverable, span: {start_line: 488, end_line: 488}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate prompt rule declarations, rationale: Require declared context bindings and bounded comparison forms before execution, span: {start_line: 893, end_line: 973}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Resolve conditional prompt instructions, rationale: Apply prompt changes deterministically before invoking the model, span: {start_line: 551, end_line: 556}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Use resolved instructions in the model prompt, rationale: Send the selected instruction set to the model, span: {start_line: 563, end_line: 563}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Evaluate prompt rule comparisons, rationale: Support deterministic equals, inequality, membership, and containment conditions, span: {start_line: 745, end_line: 808}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Export the prompt rule test type, rationale: Exercise the public contextual prompt API, span: {start_line: 14, end_line: 14}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test the typed prompt rule model, rationale: Protect prompt rule serialization and mode validation, span: {start_line: 73, end_line: 101}}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, summary: Test runtime prompt rule selection, rationale: Verify matching rules alter the actual model prompt, span: {start_line: 155, end_line: 190}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Apply a contextual rule to requirement classification, rationale: Treat explicit test language as a required obligation deterministically, span: {start_line: 147, end_line: 150}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Verify implement-feature uses prompt rules, rationale: Protect the checked-in workflow from losing contextual guidance, span: {start_line: 413, end_line: 423}}
+  - {path: docs/procedrr/skill-definitions/generate-fragment.yaml, type: modified, summary: Apply contextual rules to fragment repair guidance, rationale: Make rejected and repeated fragment-step handling deterministic, span: {start_line: 84, end_line: 90}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Verify fragment prompt rules, rationale: Protect checked-in generate-fragment contextual guidance, span: {start_line: 390, end_line: 394}}
+  - {path: tests/fixtures/structrr/golden-python-symbols.yaml, type: modified, summary: Update WorkflowDefinition symbol span, rationale: Keep the Structrr golden fixture aligned with the current model source after the prompt-rule additions, span: {start_line: 56, end_line: 57}}
+  - {path: tests/fixtures/structrr/golden-python-symbols.yaml, type: modified, summary: Update WorkflowDefinition fingerprint span, rationale: Keep the Structrr golden fixture aligned with the current model source after the prompt-rule additions, span: {start_line: 63, end_line: 64}}
+entities:
+  - id: procedrr-contextual-prompt-rules
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: prompt-rule-selection-is-deterministic
+    action: added
+    description: Prompt rules are evaluated from declared workflow context before a judge request is sent, with no model authority over rule selection.
+    rationale: Make context-sensitive instructions reproducible and auditable.
+guidance:
+  - id: declare-prompt-rules-with-judge-context
+    action: added
+    description: Declare each prompt rule binding in the judge context and use append or replace mode for the selected instructions.
+    rationale: Keep conditional prompt behavior explicit and structurally validated.
+proposed_prs: []

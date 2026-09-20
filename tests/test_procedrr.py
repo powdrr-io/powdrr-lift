@@ -11,6 +11,7 @@ from procedrr import (
     MatchCase,
     MatchNode,
     OperationNode,
+    PromptRule,
     SequenceNode,
     SnapshotSpec,
     TerminalNode,
@@ -67,6 +68,35 @@ def test_decision_contract_requires_prompt_context_rules() -> None:
             "string",
             "decision_result",
         )
+
+
+def test_prompt_rule_requires_declared_context_and_supports_replacement() -> None:
+    contract = decision()
+    replaced = DecisionContract(
+        contract.kind,
+        contract.question,
+        contract.subject,
+        contract.output_name,
+        contract.output_schema,
+        contract.validator,
+        contract.transport_action_const,
+        prompt_system=contract.prompt_system,
+        instructions=contract.instructions,
+        context_bindings=contract.context_bindings,
+        prompt_rules=(
+            PromptRule(
+                "context",
+                "equals",
+                "special",
+                ("Use the special contract.",),
+                mode="replace",
+            ),
+        ),
+    )
+
+    assert replaced.to_data()["prompt_rules"][0]["mode"] == "replace"
+    with pytest.raises(ValueError, match="unsupported"):
+        PromptRule("context", "greater_than", 2, ("Never used.",))
 
 
 def test_parser_rejects_unknown_tool_and_validator_references() -> None:
@@ -357,6 +387,11 @@ def test_checked_in_generate_fragment_definition_is_single_decision() -> None:
 
     assert document["name"] == "generate-fragment"
     assert validate_single_decision(document) == ()
+    fragment_judge = document["steps"][1]["repeat"]["body"][0]["judge"]
+    assert [rule["when"]["binding"] for rule in fragment_judge["prompt_rules"]] == [
+        "fragment_state.accepted",
+        "fragment_state.diagnostic.code",
+    ]
 
 
 def test_checked_in_design_interview_definition_parses() -> None:
@@ -375,6 +410,17 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
 
     assert document["name"] == "implement-feature"
     assert validate_single_decision(document) == ()
+    requirement_judge = document["steps"][8]["for_each"]["body"][0]["judge"]
+    assert requirement_judge["prompt_rules"] == [
+        {
+            "when": {"binding": "feature_sentence", "contains": "test"},
+            "instructions": [
+                "When this sentence explicitly mentions a test, treat that testing "
+                "expectation as a required feature obligation unless the sentence "
+                "explicitly prohibits it."
+            ],
+        }
+    ]
     assert set(document["recoveries"]) == {
         "completeness-repair",
         "intent-repair",

@@ -173,6 +173,12 @@ def compile_verification_obligations(
     excluded: list[dict[str, Any]] = []
     failures: list[str] = []
     selected_ids: set[str] = set()
+    previous_contract_ids = {item.contract_id for item in previous_contracts}
+    planned_contract_ids = {
+        operation.subject_id
+        for operation in proposal.operations
+        if operation.section == "required_test_cases" and operation.action == "add"
+    }
     for contract in contracts:
         errors = contract.validation_errors()
         if errors:
@@ -213,11 +219,21 @@ def compile_verification_obligations(
             (contract.provider or "", contract.profile or "", contract.selector or "")
         )
         if inventory_entry is None:
-            failures.append(
-                f"contract {contract.contract_id} selector is missing from provider "
-                f"inventory: {contract.provider}/{contract.profile}/{contract.selector}"
-            )
-            continue
+            if contract.contract_id in planned_contract_ids and (
+                contract.contract_id not in previous_contract_ids
+            ):
+                planned_fingerprint = "planned:" + contract.fingerprint
+                inventory_entry = {
+                    "fingerprint": planned_fingerprint,
+                    "verifier_fingerprint": planned_fingerprint,
+                }
+            else:
+                failures.append(
+                    f"contract {contract.contract_id} selector is missing from "
+                    f"provider inventory: {contract.provider}/{contract.profile}/"
+                    f"{contract.selector}"
+                )
+                continue
         inventory_fingerprint = _text(inventory_entry.get("fingerprint"))
         if not inventory_fingerprint:
             failures.append(

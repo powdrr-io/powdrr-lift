@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -195,17 +196,7 @@ def render_feature_pr_specification_template(
         "  - id: null",
         "    description: null",
         "required_test_cases:",
-        "  - id: null",
-        "    description: null",
-        "    intent_refs: []",
-        "    provider: null",
-        "    selector: null",
-        "    profile: null",
-        "    expectation: pass",
-        "    applicability:",
-        "      mode: affected_closure",
-        "    protected_inputs: []",
-        "    status: active",
+        "  []",
         "expected_outcomes:",
         "  - id: null",
         "    description: null",
@@ -245,6 +236,7 @@ def render_feature_pr_specification_template(
         "intent",
         "acceptance_criteria",
         "expected_tests",
+        "required_test_cases",
         "expected_outcomes",
         "non_goals",
         "risks",
@@ -294,8 +286,43 @@ def render_feature_pr_specification_template(
                 ),
             }
         else:
+            if key == "required_test_cases":
+                for item in items:
+                    if item.get("action") == "deleted":
+                        continue
+                    _validate_required_test_case_item(item)
             document[key] = items
     return yaml.safe_dump(document, sort_keys=False)
+
+
+def _validate_required_test_case_item(item: Mapping[str, Any]) -> None:
+    required = (
+        "id",
+        "description",
+        "intent_refs",
+        "provider",
+        "selector",
+        "profile",
+        "expectation",
+        "applicability",
+        "status",
+    )
+    missing = [
+        field
+        for field in required
+        if field not in item or item[field] in (None, "", [])
+    ]
+    if missing:
+        identifier = item.get("id", "<unnamed>")
+        raise ValueError(
+            f"required test case {identifier!r} is incomplete: " + ", ".join(missing)
+        )
+    if not isinstance(item["intent_refs"], list) or not all(
+        isinstance(value, str) and value.strip() for value in item["intent_refs"]
+    ):
+        raise ValueError(f"required test case {item['id']!r} has invalid intent_refs")
+    if not isinstance(item["applicability"], Mapping):
+        raise ValueError(f"required test case {item['id']!r} has invalid applicability")
 
 
 def create_design_interview_input_template(

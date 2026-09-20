@@ -68,10 +68,13 @@ class DeterministicPlanningClient:
         invalid_responses: int = 0,
         proposal_outcome: str = "pass",
         invalid_intent_refs: bool = False,
+        not_required_sentence_ids: set[int] | None = None,
     ) -> None:
         self.invalid_responses = invalid_responses
         self.proposal_outcome = proposal_outcome
         self.invalid_intent_refs = invalid_intent_refs
+        self.not_required_sentence_ids = not_required_sentence_ids or set()
+        self.requirement_decision_index = 0
         self.calls = 0
         self.proposal_decision_ids: list[str] = []
 
@@ -116,7 +119,11 @@ class DeterministicPlanningClient:
                 }
             return {"action": "no_change"}
         if required == {"required"}:
-            return {"required": True}
+            self.requirement_decision_index += 1
+            return {
+                "required": self.requirement_decision_index
+                not in self.not_required_sentence_ids
+            }
         if required == {"reflected"}:
             return {"reflected": True}
         if required == {"kind", "description", "acceptance_criterion", "expected_test"}:
@@ -128,6 +135,11 @@ class DeterministicPlanningClient:
                 ),
                 "acceptance_criterion": "The program prints both greetings in order.",
                 "expected_test": "Run the hello_world test.",
+            }
+        if required == {"outcome", "explanation"}:
+            return {
+                "outcome": self.proposal_outcome,
+                "explanation": "The supplied evidence proves this predicate.",
             }
         if required == {
             "decision_id",
@@ -497,6 +509,11 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
         result.worktree / ".powdrr" / "feature-runs" / "hello-world-second-greeting"
     )
     assert (run_root / "proposal-review-receipt.json").is_file()
+    canonical_design = json.loads(
+        (run_root / "canonical-feature-design.json").read_text(encoding="utf-8")
+    )
+    assert len(canonical_design["projections"]) == 4
+    assert len(canonical_design["obligations"]) == 4
     packet = json.loads(
         (run_root / "implementation-packet.json").read_text(encoding="utf-8")
     )
@@ -538,6 +555,55 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             text=True,
         ).stdout
     )
+
+
+def test_implement_feature_reconciles_non_required_sentence_with_design(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=(
+                "Add a second greeting to hello_world.py. Keep the existing "
+                "Hello, world! output first and print Hello from Powdrr! second."
+            ),
+            work_item_name="hello-world-optional-sentence",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            opencode_executable=str(fake_opencode),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=DeterministicPlanningClient(not_required_sentence_ids={2}),
+        )
+    )
+
+    assert result.status == "completed"
+    run_root = (
+        result.worktree / ".powdrr" / "feature-runs" / "hello-world-optional-sentence"
+    )
+    canonical_design = json.loads(
+        (run_root / "canonical-feature-design.json").read_text(encoding="utf-8")
+    )
+    assert [item["clause_id"] for item in canonical_design["projections"]] == [
+        "instruction-001",
+        "instruction-002",
+        "instruction-003",
+        "instruction-004",
+    ]
+    assert [item["clause_id"] for item in canonical_design["obligations"]] == [
+        "instruction-001",
+        "instruction-003",
+        "instruction-004",
+    ]
 
 
 def test_deepswe_state_data_instructions_produce_valid_test_contracts(

@@ -443,9 +443,36 @@ def _execute_procedrr_flow(
             obligations = raw_obligations.get("obligations")
             if not isinstance(obligations, list):
                 raise PowdrrExecutionError("canonical design obligations are malformed")
+            raw_design_decisions = _collected_results(
+                parameters.get("design_decisions")
+            )
+            if raw_design_decisions is None:
+                raise PowdrrExecutionError(
+                    "canonical design decisions are missing or malformed"
+                )
+            required_clause_ids = []
+            for obligation in obligations:
+                if not isinstance(obligation, Mapping):
+                    raise PowdrrExecutionError("canonical obligation is malformed")
+                sentence_id = obligation.get("id")
+                if not isinstance(sentence_id, str):
+                    raise PowdrrExecutionError(
+                        "canonical obligation is missing its compiler-owned sentence id"
+                    )
+                match = re.fullmatch(r"sentence-(\d+)", sentence_id)
+                if match is None:
+                    raise PowdrrExecutionError(
+                        "canonical obligation has an invalid sentence id"
+                    )
+                required_clause_ids.append(f"instruction-{int(match.group(1)):03d}")
             work_item_name = _require_flow_text(parameters, "work_item_name")
             try:
-                design = compile_feature_design(ledger, work_item_name, obligations)
+                design = compile_feature_design(
+                    ledger,
+                    work_item_name,
+                    raw_design_decisions,
+                    required_clause_ids=required_clause_ids,
+                )
             except FeatureObligationError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
             path = output_root / "canonical-feature-design.json"
@@ -549,6 +576,8 @@ def _execute_procedrr_flow(
             )
             state["proposal_review_receipt_path"] = review["receipt_path"]
             return review
+        if name == "bind_proposal_decision_results":
+            return _bind_proposal_decision_results(parameters)
         if name == "compile_feature_obligations":
             return _compile_feature_obligations(
                 parameters,
@@ -1025,6 +1054,52 @@ def _normalize_decision_result(
             result.input_fingerprint, result.evidence_refs
         ),
     )
+
+
+def _bind_proposal_decision_results(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    """Attach proposal decision identity and evidence metadata deterministically."""
+    raw_worklist = parameters.get("worklist")
+    raw_decisions = parameters.get("decisions")
+    if not isinstance(raw_worklist, Mapping) or not isinstance(raw_decisions, list):
+        raise PowdrrExecutionError(
+            "proposal decision binding requires a worklist and decisions"
+        )
+    try:
+        worklist = DecisionWorklist.from_data(raw_worklist)
+    except (TypeError, ValueError) as error:
+        raise PowdrrExecutionError("proposal decision worklist is malformed") from error
+    decisions = _collected_results(raw_decisions)
+    if decisions is None or len(decisions) != len(worklist.specifications):
+        raise PowdrrExecutionError("proposal decision count does not match worklist")
+    results: list[dict[str, Any]] = []
+    for specification, decision in zip(worklist.specifications, decisions, strict=True):
+        if not isinstance(decision, Mapping):
+            raise PowdrrExecutionError("proposal decision is malformed")
+        try:
+            outcome = DecisionOutcome(str(decision["outcome"]))
+            explanation = str(decision["explanation"])
+        except (KeyError, ValueError) as error:
+            raise PowdrrExecutionError(
+                "proposal decision must contain a valid outcome and explanation"
+            ) from error
+        if not explanation.strip():
+            raise PowdrrExecutionError("proposal decision explanation is empty")
+        references = tuple(specification.evidence_requirements)
+        results.append(
+            DecisionResult(
+                decision_id=specification.decision_id,
+                outcome=outcome,
+                explanation=explanation,
+                predicate_version=specification.predicate_version,
+                subject=specification.subject,
+                input_fingerprint=specification.input_fingerprint,
+                evidence_fingerprint=evidence_fingerprint(
+                    specification.input_fingerprint, references
+                ),
+                evidence_refs=references,
+            ).to_data()
+        )
+    return {"decisions": results}
 
 
 def _validate_review_evidence_sources(

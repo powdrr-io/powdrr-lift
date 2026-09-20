@@ -1287,7 +1287,7 @@ def _extract_python_source_model(
                     "evidence": "identifier and qualified-name match",
                 }
             )
-    subjects.sort(key=lambda subject: str(subject["id"]))
+    subjects[:] = sorted({str(subject["stable_key"]): subject for subject in subjects}.values(), key=lambda subject: str(subject["id"]))  # noqa: E501  # fmt: skip
     bindings.sort(key=lambda binding: str(binding["id"]))
     return subjects, bindings
 

@@ -558,17 +558,18 @@ def _execute_procedrr_flow(
             "design-interview subprocess"
         )
     try:
+        flow_directory = flow_path.parent
         evaluator = Evaluator(
             WorkrrProcedrrClient(
                 config.planning_client,
-                skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+                skills_dir=flow_directory,
             ),
             execute,
-            process_directory=worktree / "docs" / "procedrr" / "skill-definitions",
+            process_directory=flow_directory,
             judge_clients={
                 "planning": WorkrrProcedrrClient(
                     config.planning_client,
-                    skills_dir=worktree / "docs" / "procedrr" / "skill-definitions",
+                    skills_dir=flow_directory,
                 )
             },
         )
@@ -2270,9 +2271,12 @@ def _apply_flow_yaml_edit(
 
 
 def _validate_procedrr_flow(worktree: Path) -> Path:
-    path = (
+    repository_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
+    path = repository_path
+    if not path.is_file():
+        path = Path(__file__).resolve().parents[2] / "implement-feature.yaml"
     try:
         parse_and_validate(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -2280,6 +2284,15 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
             f"Shared feature Procedrr definition is invalid: {path}: {error}"
         ) from error
     return path
+
+
+def _structrr_taxonomy_path(worktree: Path) -> Path:
+    repository_path = worktree / "software_development_entity_taxonomy.md"
+    if repository_path.is_file():
+        return repository_path
+    return (
+        Path(__file__).resolve().parents[2] / "software_development_entity_taxonomy.md"
+    )  # noqa: E501
 
 
 def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
@@ -2290,9 +2303,13 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
         ["git", "ls-files", "docs/structrr/current/baseline-*.yaml"],
     ).splitlines()
     if not relative_paths:
-        baseline = bootstrap_structrr(worktree)
+        baseline = bootstrap_structrr(
+            worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
+        )
         if not baseline.validation.successful:
-            raise PowdrrExecutionError("Structrr bootstrap validation failed.")
+            raise PowdrrExecutionError(
+                f"Structrr bootstrap validation failed: {baseline.validation.issues}"
+            )
         _commit(runner, worktree, "Bootstrap Structrr baseline")
         return baseline.output_path
     ranked: list[tuple[int, str]] = []
@@ -2312,7 +2329,9 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
     section_issues = validate_bootstrap_sections(document)
     if not section_issues:
         return selected_path
-    baseline = bootstrap_structrr(worktree)
+    baseline = bootstrap_structrr(
+        worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
+    )
     if not baseline.validation.successful:
         raise PowdrrExecutionError(
             f"Structrr bootstrap regeneration failed: {baseline.validation.issues}"
@@ -2328,8 +2347,16 @@ def _bootstrap_validation_profiles(
     explicit_command: tuple[str, ...],
 ) -> tuple[DiscoveredValidationProfile, ...]:
     """Run Structrr bootstrap and adapt its detected tools for Workrr."""
+    if explicit_command:
+        return (
+            DiscoveredValidationProfile(
+                "feature-validation", explicit_command, "feature command"
+            ),
+        )
     bootstrap = bootstrap_structrr(
-        worktree, output_path=output_root / "validation-bootstrap.yaml"
+        worktree,
+        output_path=output_root / "validation-bootstrap.yaml",
+        taxonomy_path=_structrr_taxonomy_path(worktree),
     )
     if not bootstrap.validation.successful:
         raise PowdrrExecutionError(
@@ -2337,12 +2364,6 @@ def _bootstrap_validation_profiles(
             f"tools: {bootstrap.validation.issues}"
         )
     profiles: list[DiscoveredValidationProfile] = []
-    if explicit_command:
-        profiles.append(
-            DiscoveredValidationProfile(
-                "feature-validation", explicit_command, "feature command"
-            )
-        )
     for tool in bootstrap.document.get("tools", []):
         if not isinstance(tool, Mapping):
             continue

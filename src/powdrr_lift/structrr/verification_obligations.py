@@ -58,6 +58,28 @@ class VerificationObligation:
     verifier_fingerprint: str
     provider_inventory_fingerprint: str
 
+    @classmethod
+    def from_data(cls, value: Mapping[str, Any]) -> VerificationObligation:
+        return cls(
+            obligation_id=str(value["obligation_id"]),
+            contract_id=str(value["contract_id"]),
+            contract_fingerprint=str(value["contract_fingerprint"]),
+            intent_refs=tuple(str(item) for item in value.get("intent_refs", [])),
+            provider=str(value["provider"]),
+            selector=str(value["selector"]),
+            profile=str(value["profile"]),
+            expectation=str(value["expectation"]),
+            applicability=dict(value.get("applicability", {})),
+            applicability_explanation=str(value.get("applicability_explanation", "")),
+            protected_inputs=tuple(
+                str(item) for item in value.get("protected_inputs", [])
+            ),
+            verifier_fingerprint=str(value["verifier_fingerprint"]),
+            provider_inventory_fingerprint=str(
+                value["provider_inventory_fingerprint"]
+            ),
+        )
+
     def to_data(self) -> dict[str, Any]:
         return {
             "obligation_id": self.obligation_id,

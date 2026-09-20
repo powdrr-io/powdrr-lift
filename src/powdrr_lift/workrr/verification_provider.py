@@ -5,6 +5,10 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import os
+import subprocess
+import tempfile
+import time
+import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +52,8 @@ class VerificationProviderRequest:
     selector: str
     profile: str
     root: Path
+    command: tuple[str, ...] = ()
+    timeout_seconds: float = 600.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +63,7 @@ class ProviderInventory:
     selectors: tuple[str, ...]
     provider_version: str | None = None
     collection_error: str | None = None
+    command: tuple[str, ...] = ()
 
     @property
     def fingerprint(self) -> str:
@@ -79,6 +86,7 @@ class ProviderInventory:
             "selectors": list(self.selectors),
             "provider_version": self.provider_version,
             "collection_error": self.collection_error,
+            "command": list(self.command),
             "fingerprint": self.fingerprint,
         }
 
@@ -91,6 +99,10 @@ class ProviderExecutionResult:
     status: str
     returncode: int | None = None
     error: str | None = None
+    stdout: str = ""
+    stderr: str = ""
+    duration_ms: int | None = None
+    provider_version: str | None = None
 
 
 class VerificationProviderRegistry:
@@ -164,6 +176,7 @@ class PytestVerificationProvider:
                 profile.name,
                 (),
                 collection_error="pytest is not installed",
+                command=tuple(profile.command),
             )
 
         selectors: list[str] = []
@@ -186,6 +199,7 @@ class PytestVerificationProvider:
                 tuple(sorted(set(selectors))),
                 _package_version("pytest"),
                 str(error),
+                tuple(profile.command),
             )
         finally:
             os.chdir(previous_directory)
@@ -195,15 +209,69 @@ class PytestVerificationProvider:
             tuple(sorted(set(selectors))),
             _package_version("pytest"),
             None if exit_code == 0 else f"pytest collection exited with {exit_code}",
+            tuple(profile.command),
         )
 
     def execute(self, request: VerificationProviderRequest) -> ProviderExecutionResult:
+        command = request.command or ("python", "-m", "pytest")
+        command = (*command, request.selector)
+        junit_path: str | None = None
+        started = time.monotonic()
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix="powdrr-pytest-", suffix=".xml", dir=request.root, delete=False
+            ) as artifact:
+                junit_path = artifact.name
+            completed = subprocess.run(
+                [*command, f"--junitxml={junit_path}"],
+                cwd=request.root,
+                capture_output=True,
+                text=True,
+                timeout=request.timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return ProviderExecutionResult(
+                self.name,
+                request.selector,
+                request.profile,
+                "timed_out",
+                returncode=124,
+                error="pytest execution timed out",
+                stdout=_output_text(error.stdout),
+                stderr=_output_text(error.stderr),
+                duration_ms=_duration_ms(started),
+                provider_version=_package_version("pytest"),
+            )
+        except OSError as error:
+            return ProviderExecutionResult(
+                self.name,
+                request.selector,
+                request.profile,
+                "errored",
+                error=f"could not start pytest: {error}",
+                duration_ms=_duration_ms(started),
+                provider_version=_package_version("pytest"),
+            )
+        status = _pytest_junit_status(junit_path, completed.returncode)
+        if junit_path is not None:
+            try:
+                os.unlink(junit_path)
+            except OSError:
+                pass
         return ProviderExecutionResult(
             self.name,
             request.selector,
             request.profile,
-            "not_implemented",
-            error="pytest execution is provided by the Phase 5 evidence runner",
+            status,
+            returncode=completed.returncode,
+            error=None
+            if status == "passed"
+            else f"pytest exited with {completed.returncode}",
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            duration_ms=_duration_ms(started),
+            provider_version=_package_version("pytest"),
         )
 
     def normalize(self, result: ProviderExecutionResult) -> dict[str, Any]:
@@ -214,6 +282,8 @@ class PytestVerificationProvider:
             "status": result.status,
             "returncode": result.returncode,
             "error": result.error,
+            "duration_ms": result.duration_ms,
+            "provider_version": result.provider_version,
         }
 
 
@@ -293,6 +363,38 @@ def _package_version(name: str) -> str | None:
         return importlib.metadata.version(name)
     except importlib.metadata.PackageNotFoundError:
         return None
+
+
+def _duration_ms(started: float) -> int:
+    return max(0, round((time.monotonic() - started) * 1000))
+
+
+def _output_text(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return str(value or "")
+
+
+def _pytest_junit_status(path: str | None, returncode: int) -> str:
+    if path is None:
+        return "errored"
+    try:
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError):
+        return "errored" if returncode else "passed"
+    cases = list(root.iter("testcase"))
+    if not cases:
+        return "not_collected" if returncode == 5 else "errored"
+    case = cases[0]
+    if case.find("failure") is not None:
+        return "failed"
+    if case.find("error") is not None:
+        return "errored"
+    skipped = case.find("skipped")
+    if skipped is not None:
+        message = str(skipped.attrib.get("message", "")).lower()
+        return "xfailed" if "xfail" in message else "skipped"
+    return "passed" if returncode == 0 else "failed"
 
 
 __all__ = [

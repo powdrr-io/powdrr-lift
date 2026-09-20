@@ -38,6 +38,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _compile_feature_obligations,
     _create_pr_changelog,
     _ensure_current_baseline,
+    _evaluate_proposal_command,
     _finalize_proposal_review,
     _load_implementation_plan,
     _materialize_feature_intents,
@@ -851,6 +852,23 @@ def test_required_test_case_validation_requires_discovered_selector(
     )
     assert result["passed"] is False
     assert "was not discovered" in result["failures"][0]
+
+
+def test_proposal_evaluation_preserves_nonzero_diagnostics(tmp_path: Path) -> None:
+    def runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            "validation_successful: false\nissues:\n  - code: bad_shape\n",
+            "",
+        )
+
+    result = _evaluate_proposal_command(
+        runner, tmp_path, ["powdrr-lift", "evaluate", "proposal.yaml"]
+    )
+
+    assert result["returncode"] == 1
+    assert result["issues"] == [{"code": "bad_shape"}]
 
 
 def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> None:

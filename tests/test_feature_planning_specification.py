@@ -363,6 +363,60 @@ def test_feature_pr_template_canonicalizes_scalar_required_test_case_fields(
     }
 
 
+def test_generated_required_test_case_document_passes_real_evaluator(
+    tmp_path: Path,
+) -> None:
+    interview_path = tmp_path / "design-interview-input.json"
+    interview_path.write_text(
+        json.dumps(
+            {
+                "feature_description": "Add example behavior.",
+                "required_test_cases_edits": {
+                    "added": [
+                        {
+                            "id": "example-test",
+                            "description": "The example behavior passes.",
+                            "intent_refs": "feature:example",
+                            "provider": "pytest",
+                            "selector": "tests/test_example.py::test_example",
+                            "profile": "pytest",
+                            "expectation": "pass",
+                            "applicability": "affected_closure",
+                            "status": "active",
+                        }
+                    ],
+                    "deleted": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    proposal = (
+        tmp_path / "docs" / "proposals" / "example" / "feature-pr-specification.yaml"
+    )
+    proposal.parent.mkdir(parents=True)
+    proposal.write_text(
+        feature_planning.render_feature_pr_specification_template(
+            work_item_name="example", interview_input=interview_path
+        ),
+        encoding="utf-8",
+    )
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        exit_code = main(["evaluate", str(proposal), "--repo-root", str(tmp_path)])
+
+    assert exit_code == 0
+    report = yaml.safe_load(stdout.getvalue())
+    assert report["validation_successful"] is True
+    assert report["issues"] == []
+    case = yaml.safe_load(proposal.read_text(encoding="utf-8"))["required_test_cases"][
+        0
+    ]
+    assert case["intent_refs"] == ["feature:example"]
+    assert case["applicability"] == {"mode": "affected_closure"}
+
+
 def _create_repo_with_structured_specs_and_changelogs(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

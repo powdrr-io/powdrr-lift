@@ -322,13 +322,7 @@ def _execute_procedrr_flow(
                 )
             }
         if command[:2] == ["powdrr-lift", "evaluate"]:
-            result = _run(runner, worktree, command)
-            return {
-                "returncode": result.returncode,
-                "issues": [],
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-            }
+            return _evaluate_proposal_command(runner, worktree, command)
         if name == "extract_proposal_issues":
             evaluation = parameters.get("evaluation")
             return (
@@ -1203,6 +1197,27 @@ def _require_required_test_cases(
     if not cases:
         raise PowdrrExecutionError("plan contains no active required test cases")
     return tuple(cases)
+
+
+def _evaluate_proposal_command(
+    runner: Runner, worktree: Path, command: list[str]
+) -> dict[str, Any]:
+    """Run proposal evaluation while preserving diagnostics for repair."""
+    result = runner(command, cwd=worktree, capture_output=True, text=True, check=False)
+    issues: list[Any] = []
+    for output in (result.stdout, result.stderr):
+        try:
+            report = yaml.safe_load(output)
+        except yaml.YAMLError:
+            continue
+        if isinstance(report, Mapping) and isinstance(report.get("issues"), list):
+            issues.extend(report["issues"])
+    return {
+        "returncode": result.returncode,
+        "issues": issues,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }
 
 
 def _validate_required_test_cases(

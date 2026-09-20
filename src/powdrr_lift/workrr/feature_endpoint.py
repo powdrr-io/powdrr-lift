@@ -807,6 +807,22 @@ def _compile_feature_obligations(
         reflection_decisions
     ):
         raise PowdrrExecutionError("sentence decision counts do not match")
+    trace_path = output_root / "feature-sentence-trace.json"
+    trace_path.parent.mkdir(parents=True, exist_ok=True)
+    trace_path.write_text(
+        json.dumps(
+            {
+                "feature_description": feature_description,
+                "sentences": sentences,
+                "requirement_decisions": requirement_decisions,
+                "reflection_decisions": reflection_decisions,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     plan_document = _load_yaml_mapping(Path(plan))
     plan_refs = _plan_acceptance_references(plan_document)
     if not plan_refs:
@@ -838,7 +854,17 @@ def _compile_feature_obligations(
             }
         )
     if not obligations:
-        raise PowdrrExecutionError("feature description produced no obligations")
+        required_count = sum(
+            _decision_value(item, "required") for item in requirement_decisions
+        )
+        reflected_count = sum(
+            _decision_value(item, "reflected") for item in reflection_decisions
+        )
+        raise PowdrrExecutionError(
+            "feature description produced no obligations; "
+            f"sentences={len(sentences)}, required={required_count}, "
+            f"reflected={reflected_count}, trace={trace_path}"
+        )
 
     path = output_root / "feature-obligations.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -2126,6 +2152,22 @@ def _write_structrr_plan(
             "tools",
         )
     }
+    acceptance_criteria = _plan_text_items(
+        sections["acceptance_criteria"],
+        fallback=(
+            f"The requested feature behavior is implemented: "
+            f"{config.feature_description}"
+        ),
+        prefix=slug,
+    )
+    acceptance_criteria = _append_sentence_plan_items(
+        acceptance_criteria, config.feature_description
+    )
+    features = _append_sentence_design_items(
+        sections["features"]
+        or [{"id": slug, "description": config.feature_description, "action": "added"}],
+        config.feature_description,
+    )
     document = {
         "schema": "https://powdrr.io/schema/changelog-v2",
         "change_id": slug,
@@ -2139,24 +2181,10 @@ def _write_structrr_plan(
         "entities": sections["entities"]
         or [{"id": slug, "type": "Feature", "action": "added"}],
         "entity_relationships": sections["entity_relationships"],
-        "features": sections["features"]
-        or [
-            {
-                "id": slug,
-                "description": config.feature_description,
-                "action": "added",
-            }
-        ],
+        "features": features,
         "invariants": sections["invariants"],
         "guidance": sections["guidance"],
-        "acceptance_criteria": _plan_text_items(
-            sections["acceptance_criteria"],
-            fallback=(
-                f"The requested feature behavior is implemented: "
-                f"{config.feature_description}"
-            ),
-            prefix=slug,
-        ),
+        "acceptance_criteria": acceptance_criteria,
         "required_test_cases": sections["required_test_cases"],
         "proposed_prs": sections["proposed_prs"],
     }
@@ -2208,6 +2236,53 @@ def _plan_text_items(
                 }
             )
     return values or [{"id": f"{prefix}-acceptance-1", "description": fallback}]
+
+
+def _append_sentence_plan_items(
+    items: Sequence[Mapping[str, Any]], feature_description: str
+) -> list[dict[str, Any]]:
+    """Keep every instruction sentence visible as a plan-level criterion."""
+    result = [dict(item) for item in items]
+    existing_ids = {
+        str(item.get("id")) for item in result if isinstance(item.get("id"), str)
+    }
+    for sentence in _decompose_feature_description(feature_description):
+        sentence_id = str(sentence["id"])
+        criterion_id = f"trace-{sentence_id}"
+        if criterion_id in existing_ids:
+            continue
+        result.append(
+            {
+                "id": criterion_id,
+                "description": f"The implementation must satisfy: {sentence['text']}",
+            }
+        )
+        existing_ids.add(criterion_id)
+    return result
+
+
+def _append_sentence_design_items(
+    items: Sequence[Mapping[str, Any]], feature_description: str
+) -> list[dict[str, Any]]:
+    """Represent each instruction sentence as a traceable design element."""
+    result = [dict(item) for item in items]
+    existing_ids = {
+        str(item.get("id")) for item in result if isinstance(item.get("id"), str)
+    }
+    for sentence in _decompose_feature_description(feature_description):
+        sentence_id = str(sentence["id"])
+        design_id = f"trace-{sentence_id}"
+        if design_id in existing_ids:
+            continue
+        result.append(
+            {
+                "id": design_id,
+                "description": sentence["text"],
+                "action": "added",
+            }
+        )
+        existing_ids.add(design_id)
+    return result
 
 
 def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:

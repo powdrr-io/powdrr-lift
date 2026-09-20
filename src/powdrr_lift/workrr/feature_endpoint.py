@@ -842,6 +842,7 @@ def _validate_review_evidence_sources(
         reference
         for reference in required_refs
         if reference.split("@", 1)[0] not in known_refs
+        and not reference.startswith("planned:")
         and not reference.startswith("sha256:")
     )
     if unknown_refs:
@@ -906,7 +907,7 @@ def _compile_feature_obligations(
         + "\n",
         encoding="utf-8",
     )
-    plan_document = _load_yaml_mapping(Path(plan))
+    plan_document = dict(_load_yaml_mapping(Path(plan)))
     plan_refs = _plan_acceptance_references(plan_document)
     if not plan_refs:
         raise PowdrrExecutionError("plan produced no acceptance criteria obligations")
@@ -958,6 +959,16 @@ def _compile_feature_obligations(
             f"reflected={reflected_count}, trace={trace_path}"
         )
 
+    plan_document["required_test_cases"] = _derive_feature_test_contracts(
+        plan_document,
+        obligations,
+        inventory=tuple(state.get("provider_inventory", ())),
+    )
+    Path(plan).write_text(
+        yaml.safe_dump(plan_document, sort_keys=False), encoding="utf-8"
+    )
+    parse_change_log(Path(plan).read_text(encoding="utf-8"))
+
     path = output_root / "feature-obligations.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -976,6 +987,83 @@ def _compile_feature_obligations(
     state["feature_obligations"] = tuple(item["description"] for item in obligations)
     state["feature_obligations_path"] = path
     return {"path": str(path), "obligations": obligations}
+
+
+def _derive_feature_test_contracts(
+    plan: Mapping[str, Any],
+    obligations: Sequence[Mapping[str, Any]],
+    *,
+    inventory: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Create one executable test contract for every sentence obligation.
+
+    The interview may propose semantic test obligations, but it cannot be the
+    source of the final intent IDs: those IDs are created when obligations are
+    materialized.  Compile the contract set here so every contract names the
+    exact materialized clause that OpenCode must implement and validate.
+    """
+    materialized_ids = {
+        f"feature-obligation-{item['id']}"
+        for item in obligations
+        if isinstance(item.get("id"), str) and item["id"].strip()
+    }
+    existing = plan.get("required_test_cases")
+    retained: list[dict[str, Any]] = []
+    covered: set[str] = set()
+    if isinstance(existing, list):
+        for raw in existing:
+            if not isinstance(raw, Mapping):
+                continue
+            refs = raw.get("intent_refs")
+            if not isinstance(refs, list):
+                continue
+            exact_refs = [ref for ref in refs if ref in materialized_ids]
+            if not exact_refs:
+                continue
+            item = dict(raw)
+            item["intent_refs"] = exact_refs
+            retained.append(item)
+            covered.update(exact_refs)
+
+    semantic_cases: list[dict[str, Any]] = []
+    for obligation in obligations:
+        obligation_id = obligation.get("id")
+        design = obligation.get("design")
+        if not isinstance(obligation_id, str) or not isinstance(design, Mapping):
+            continue
+        clause_id = f"feature-obligation-{obligation_id}"
+        if clause_id in covered:
+            continue
+        expected_test = design.get("expected_test")
+        acceptance = design.get("acceptance_criterion")
+        semantic_cases.append(
+            {
+                "id": f"{clause_id}-test",
+                "description": (
+                    expected_test.strip()
+                    if isinstance(expected_test, str) and expected_test.strip()
+                    else f"Verify: {obligation.get('description', clause_id)}"
+                ),
+                "intent_refs": [clause_id],
+                "expected_outcome": (
+                    acceptance.strip()
+                    if isinstance(acceptance, str) and acceptance.strip()
+                    else "The sentence obligation is satisfied."
+                ),
+                "test_selection": "new",
+            }
+        )
+    compiled = _compile_required_test_case_edits(semantic_cases, inventory)
+    for item in compiled:
+        item.update(
+            {
+                "action": "added",
+                "intent_effect": (
+                    "defines the executable test contract for this feature obligation"
+                ),
+            }
+        )
+    return [*retained, *compiled]
 
 
 def _materialize_feature_intents(
@@ -1599,9 +1687,10 @@ def _apply_sentence_design_trace(
 
 
 def _decompose_feature_description(feature_description: str) -> list[dict[str, str]]:
+    normalized_description = re.sub(r"\s+", " ", feature_description).strip()
     sentences = [
         item.strip()
-        for item in re.split(r"(?<=[.!?])\s+|\n+", feature_description)
+        for item in re.split(r"(?<=[.!?])\s+", normalized_description)
         if item.strip()
     ]
     return [

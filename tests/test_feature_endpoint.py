@@ -40,6 +40,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _ensure_current_baseline,
     _finalize_proposal_review,
     _load_implementation_plan,
+    _materialize_feature_intents,
     _operation_checkpoint,
     _plan_text_items,
     _proposal_execution_units,
@@ -421,6 +422,54 @@ def test_sentence_design_trace_maps_consequences_to_plan_sections(
         item["id"] == "design-sentence-1-acceptance"
         for item in document["acceptance_criteria"]
     )
+
+
+def test_feature_obligations_become_active_intents(tmp_path: Path) -> None:
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add state data.",
+            work_item_name="intent-materialization-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+    state: dict[str, Any] = {"plan_path": plan}
+
+    result = _materialize_feature_intents(
+        {
+            "plan": str(plan),
+            "obligations": {
+                "obligations": [
+                    {
+                        "id": "sentence-1",
+                        "design": {
+                            "kind": "interface",
+                            "description": "State exposes get_state_data().",
+                        },
+                    },
+                    {
+                        "id": "sentence-2",
+                        "design": {
+                            "kind": "invariant",
+                            "description": "State data is isolated per instance.",
+                        },
+                    },
+                ]
+            },
+        },
+        state=state,
+    )
+
+    assert result["updated"] == 2
+    document = yaml.safe_load(plan.read_text(encoding="utf-8"))
+    assert [item["clause_id"] for item in document["active_intent"]] == [
+        "feature-obligation-sentence-1",
+        "feature-obligation-sentence-2",
+    ]
+    assert document["active_intent"][0]["kind"] == "decision"
+    assert document["active_intent"][1]["kind"] == "invariant"
 
 
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:

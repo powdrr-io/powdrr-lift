@@ -1114,6 +1114,40 @@ def test_required_test_case_validation_requires_discovered_selector(
     assert "was not discovered" in result["failures"][0]
 
 
+def test_required_test_case_validation_rejects_non_executable_expectation(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "plan.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "required_test_cases": [
+                    {
+                        "id": "garbage-contract",
+                        "description": "The focused test passes.",
+                        "intent_refs": ["feature:example"],
+                        "provider": "pytest",
+                        "selector": "tests/test_example.py::test_example",
+                        "profile": "pytest",
+                        "expectation": "assert the feature works",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="invalid expectation"):
+        _validate_required_test_cases(
+            {"plan": str(plan)},
+            worktree=tmp_path,
+            state={"plan_path": plan, "validation_profiles": ()},
+        )
+
+
 def test_proposal_evaluation_preserves_nonzero_diagnostics(tmp_path: Path) -> None:
     def runner(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(

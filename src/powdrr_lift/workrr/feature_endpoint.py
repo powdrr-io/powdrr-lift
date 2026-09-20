@@ -1227,9 +1227,29 @@ def _require_required_test_cases(
             raise PowdrrExecutionError(
                 f"required test case {item['id']!r} has invalid intent_refs"
             )
+        for field in ("id", "description", "provider", "selector", "profile"):
+            if not isinstance(item[field], str) or not item[field].strip():
+                raise PowdrrExecutionError(
+                    f"required test case {item['id']!r} has invalid {field}"
+                )
+        if item["expectation"] not in {"pass", "absent"}:
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid expectation; "
+                "expected pass or absent"
+            )
+        if item["status"] not in {"active", "superseded"}:
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid status; "
+                "expected active or superseded"
+            )
         if not isinstance(item["applicability"], Mapping):
             raise PowdrrExecutionError(
                 f"required test case {item['id']!r} has invalid applicability"
+            )
+        mode = item["applicability"].get("mode")
+        if not isinstance(mode, str) or not mode.strip():
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid applicability mode"
             )
         cases.append(item)
     if not cases:

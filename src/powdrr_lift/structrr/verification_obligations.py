@@ -75,9 +75,7 @@ class VerificationObligation:
                 str(item) for item in value.get("protected_inputs", [])
             ),
             verifier_fingerprint=str(value["verifier_fingerprint"]),
-            provider_inventory_fingerprint=str(
-                value["provider_inventory_fingerprint"]
-            ),
+            provider_inventory_fingerprint=str(value["provider_inventory_fingerprint"]),
         )
 
     def to_data(self) -> dict[str, Any]:

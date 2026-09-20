@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 753
+title: Persist OpenCode prompts for every coding-agent attempt
+intent:
+  problem: Harbor and DeepSWE feature runs retain execution results and OpenCode events but do not provide a durable, attempt-scoped record of the exact prompts sent to the coding agent.
+  goal: Persist every implementation and repair prompt beside the existing run artifacts so completed runs can be inspected and replayed after the execution environment exits.
+human-decisions:
+  - id: prompt-capture-at-workrr-boundary
+    summary: Capture prompts in the shared CodingAgentRunner used by both Harbor and DeepSWE flows.
+  - id: immutable-attempt-prompt-history
+    summary: Index prompts by attempt ID so repair prompts cannot overwrite earlier prompts for the same request.
+structured_files: []
+files:
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Add prompt artifact storage, rationale: Preserve exact prompts and metadata after a run, span: {start_line: 381, end_line: 381}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Persist indexed prompt records, rationale: Keep implementation and repair prompts available as an immutable attempt history, span: {start_line: 389, end_line: 430}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Support text prompt artifact paths, rationale: Store the exact prompt in a directly readable file, span: {start_line: 496, end_line: 496}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Support metadata prompt artifact paths, rationale: Keep prompt metadata beside the readable prompt, span: {start_line: 499, end_line: 499}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Persist prompts before execution, rationale: Capture prompts even when an attempt is denied or fails to start, span: {start_line: 517, end_line: 519}}
+  - {path: tests/test_coding_agent.py, type: modified, summary: Prepare persisted request fixture, rationale: Assert prompt capture uses the exact request prompt, span: {start_line: 440, end_line: 440}}
+  - {path: tests/test_coding_agent.py, type: modified, summary: Run persisted prompt fixture, rationale: Exercise the shared attempt artifact path, span: {start_line: 443, end_line: 443}}
+  - {path: tests/test_coding_agent.py, type: modified, summary: Verify prompt artifacts and index, rationale: Protect prompt availability after execution, span: {start_line: 453, end_line: 468}}
+entities:
+  - id: coding-agent-prompt-artifacts
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: every-coding-attempt-retains-prompt
+    action: added
+    description: Every CodingAgentRunner attempt writes the exact prompt, metadata, and an indexed record beneath the run artifact root.
+    rationale: Make Harbor and DeepSWE runs diagnosable after completion.
+  - id: repair-prompts-are-not-overwritten
+    action: added
+    description: Prompt artifacts are keyed by attempt ID rather than request ID, preserving every repair prompt.
+    rationale: Retain the full coding-agent interaction history.
+guidance:
+  - id: inspect-prompts-with-run-artifacts
+    action: added
+    description: Use the prompts directory and index alongside OpenCode event logs when diagnosing a run.
+    rationale: Correlate exact instructions with agent behavior.
+proposed_prs: []

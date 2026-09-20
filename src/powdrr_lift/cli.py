@@ -201,6 +201,10 @@ from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
+from powdrr_lift.workrr.instruction_analysis import (
+    InstructionAnalysisError,
+    analyze_instruction_file,
+)
 from powdrr_lift.workrr.prompt_probe import (
     WorkflowPromptProbeError,
     build_probe_client,
@@ -1370,6 +1374,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workrr_feature_parser.add_argument("--json", action="store_true")
     workrr_feature_parser.set_defaults(func=_run_workrr_feature)
+
+    analyze_instruction_parser = subparsers.add_parser(
+        "analyze-instruction",
+        aliases=["analyze_instruction"],
+        help=(
+            "Analyze an instruction file into candidate intent, obligations, "
+            "proposal, and verification artifacts without editing the repository."
+        ),
+    )
+    analyze_instruction_parser.add_argument(
+        "--instruction-file",
+        type=Path,
+        required=True,
+        help="UTF-8 instruction file to analyze.",
+    )
+    analyze_instruction_parser.add_argument(
+        "--work-item-name",
+        required=True,
+        help="Stable name used for the candidate proposal identity.",
+    )
+    analyze_instruction_parser.add_argument("--repo-root", type=Path)
+    analyze_instruction_parser.add_argument(
+        "--allowed-path",
+        action="append",
+        default=["."],
+        dest="allowed_paths",
+        help="Path OpenCode could eventually change; repeat for multiple paths.",
+    )
+    analyze_instruction_parser.add_argument(
+        "--planning-provider",
+        default="deepinfra-cheap",
+        choices=ALL_PROVIDERS,
+    )
+    analyze_instruction_parser.add_argument("--planning-model")
+    analyze_instruction_parser.add_argument("--planning-api-key")
+    analyze_instruction_parser.add_argument("--planning-base-url")
+    analyze_instruction_parser.add_argument(
+        "--output",
+        type=Path,
+        help="Optional path for the JSON report; stdout is always emitted.",
+    )
+    analyze_instruction_parser.set_defaults(func=_run_analyze_instruction)
 
     harbor_feature_parser = subparsers.add_parser(
         "harbor-feature",
@@ -4392,6 +4438,41 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
         if result.changelog_path:
             print(f"Changelog: {result.changelog_path}")
     return 0 if result.status in {"completed", "pr_opened"} else 1
+
+
+def _run_analyze_instruction(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    planning_provider = resolve_workflow_provider(args.planning_provider)
+    planning_mapping = default_llm_mappings(planning_provider)["standard_reasoning"]
+    try:
+        credentials = resolve_provider_credentials(
+            planning_mapping.provider,
+            args.planning_api_key,
+            args.planning_base_url,
+        )
+        planning_client = build_workflow_client(
+            credentials,
+            model=args.planning_model or planning_mapping.model,
+            model_cache_dir=repo_root / ".powdrr" / "models",
+            progress_stream=sys.stderr,
+        )
+        report = analyze_instruction_file(
+            args.instruction_file,
+            repo_root=repo_root,
+            work_item_name=args.work_item_name,
+            planning_client=planning_client,
+            allowed_paths=tuple(args.allowed_paths),
+        )
+    except InstructionAnalysisError as error:
+        raise PowdrrExecutionError(str(error)) from error
+    if args.output:
+        output = args.output if args.output.is_absolute() else repo_root / args.output
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    return 0
 
 
 def _run_harbor_feature(args: argparse.Namespace) -> int:

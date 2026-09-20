@@ -1,0 +1,47 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 750
+title: Add read-only instruction analysis CLI endpoint
+intent:
+  problem: User instruction files cannot yet be converted into the deterministic Powdrr planning artifacts without starting implementation.
+  goal: Return a reviewable candidate intent and obligation packet without editing the repository or invoking OpenCode.
+human-decisions:
+  - id: analysis-is-preview-only
+    summary: Treat generated analysis as a proposal packet that requires review and does not authorize implementation.
+  - id: compile-locally
+    summary: Let the planning model propose only the candidate plan while Powdrr compiles intent, obligations, verification, and review artifacts.
+structured_files: []
+files:
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Import instruction analysis support, rationale: Connect the CLI to the read-only planning endpoint, span: {start_line: 204, end_line: 207}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Register analyze-instruction, rationale: Expose the read-only planning endpoint through the CLI, span: {start_line: 1378, end_line: 1419}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Configure planning and emit the analysis report, rationale: Connect the endpoint to the configured planning provider while preserving the no-edit boundary, span: {start_line: 4443, end_line: 4477}}
+  - {path: src/powdrr_lift/workrr/instruction_analysis.py, type: added, summary: Compile an instruction into intent, obligations, proposal, verification, and review artifacts, rationale: Make the planning packet deterministic and reusable by later implementation gates, span: {start_line: 1, end_line: 383}}
+  - {path: docs/workrr/instruction-analysis.md, type: added, summary: Document endpoint usage and read-only guarantees, rationale: Define the command contract for agents and operators, span: {start_line: 1, end_line: 53}}
+  - {path: tests/test_instruction_analysis.py, type: added, summary: Verify packet compilation and repository immutability, rationale: Protect the endpoint contract and its preview-only boundary, span: {start_line: 1, end_line: 82}}
+entities:
+  - id: analyze-instruction-command
+    type: Command
+    action: added
+  - id: instruction-analysis-module
+    type: Module
+    action: added
+entity_relationships:
+  - {id: command-compiles-analysis, source: analyze-instruction-command, target: instruction-analysis-module, relationship: invokes}
+invariants:
+  - id: instruction-analysis-is-read-only
+    action: added
+    description: Instruction analysis does not edit Structrr state, source files, Git state, or invoke OpenCode.
+    rationale: Keep proposal generation separate from implementation authorization.
+  - id: model-proposes-only-plan
+    action: added
+    description: The planning model supplies a candidate plan while Powdrr locally compiles active intent, obligations, verification selection, worklist, and fingerprints.
+    rationale: Keep deterministic gates outside model judgment.
+  - id: analysis-requires-review
+    action: added
+    description: Every report is marked proposal-only and implementation is unauthorized until a later proposal review accepts it.
+    rationale: Prevent generated intent from being mistaken for accepted intent.
+guidance:
+  - id: preserve-analysis-boundary
+    action: added
+    description: Keep OpenCode out of analyze-instruction; invoke it only after the accepted proposal enters the implementation flow.
+    rationale: OpenCode is reserved for code-editing work.
+proposed_prs: []

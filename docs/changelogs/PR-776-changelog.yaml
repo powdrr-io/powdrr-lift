@@ -1,0 +1,78 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 776
+title: Unify feature instructions and obligations
+intent:
+  problem: The feature flow derives design decisions, requirements, reflections, and obligations through redundant passes over the same feature description.
+  goal: Compile one deterministic instruction ledger into one semantic obligation stream that drives Structrr planning, active intents, required tests, and implementation verification.
+human-decisions:
+  - id: instruction-ledger-is-the-feature-source
+    summary: Use compiler-owned instruction clauses as the single source for semantic feature obligations.
+structured_files: []
+files:
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Define structured design flow, rationale: Make instruction clauses the design input, span: {start_line: 3, end_line: 6}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 11, end_line: 13}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 17, end_line: 28}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 30, end_line: 32}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 47, end_line: 50}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 36, end_line: 39}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 41, end_line: 48}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 50, end_line: 50}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 53, end_line: 53}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Update design flow, rationale: Unify instruction processing, span: {start_line: 56, end_line: 61}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Remove category blocks, rationale: Eliminate obsolete interview duplication, span: {start_line: 76, end_line: 120}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Compile semantic design, rationale: Preserve structured obligations, span: {start_line: 65, end_line: 65}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Compile semantic design, rationale: Preserve structured obligations, span: {start_line: 67, end_line: 77}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Consume canonical design, rationale: Use structured feature obligations, span: {start_line: 28, end_line: 30}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Consume canonical design, rationale: Use structured feature obligations, span: {start_line: 38, end_line: 38}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Remove redundant passes, rationale: Avoid repeated sentence analysis, span: {start_line: 46, end_line: 249}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Review structured design, rationale: Preserve semantic review evidence, span: {start_line: 125, end_line: 125}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove obsolete flow bindings, rationale: Match the unified flow, span: {start_line: 440, end_line: 445}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove obsolete operation handling, rationale: Match the unified flow, span: {start_line: 453, end_line: 467}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Normalize canonical obligations, rationale: Expose compiler-owned obligations downstream, span: {start_line: 474, end_line: 474}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Normalize canonical obligations, rationale: Expose compiler-owned obligations downstream, span: {start_line: 3314, end_line: 3314}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Normalize canonical obligations, rationale: Expose compiler-owned obligations downstream, span: {start_line: 3321, end_line: 3328}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Normalize canonical obligations, rationale: Expose compiler-owned obligations downstream, span: {start_line: 462, end_line: 487}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Track canonical obligation artifact, rationale: Keep proposal evidence current, span: {start_line: 491, end_line: 492}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Pass validation inventory, rationale: Compile required tests against discovered providers, span: {start_line: 559, end_line: 562}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Render obligation plan, rationale: Drive Structrr from canonical obligations, span: {start_line: 3403, end_line: 3515}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Match tests to inventory, rationale: Select existing tests deterministically, span: {start_line: 3756, end_line: 3781}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Remove obsolete imports, rationale: Keep tests aligned with the new flow, span: {start_line: 3, end_line: 3}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Remove obsolete imports, rationale: Keep tests aligned with the new flow, span: {start_line: 23, end_line: 26}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Remove obsolete imports, rationale: Keep tests aligned with the new flow, span: {start_line: 31, end_line: 31}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Remove obsolete imports, rationale: Keep tests aligned with the new flow, span: {start_line: 64, end_line: 66}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 826, end_line: 826}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 835, end_line: 840}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 882, end_line: 895}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 844, end_line: 844}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 846, end_line: 870}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 925, end_line: 959}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 874, end_line: 874}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test structured design, rationale: Verify clause compilation, span: {start_line: 878, end_line: 878}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Preserve all clause obligations, rationale: Test instruction coverage, span: {start_line: 837, end_line: 837}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Preserve all clause obligations, rationale: Test instruction coverage, span: {start_line: 604, end_line: 604}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Verify compiler-owned references, rationale: Reject model-owned intent identity, span: {start_line: 847, end_line: 854}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test simplified flow, rationale: Lock in removal of redundant passes, span: {start_line: 600, end_line: 607}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test simplified flow, rationale: Lock in removal of redundant passes, span: {start_line: 614, end_line: 614}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test simplified flow, rationale: Lock in removal of redundant passes, span: {start_line: 620, end_line: 627}}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, summary: Test new design contract, rationale: Exercise ledger compilation, span: {start_line: 449, end_line: 454}}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, summary: Test new design contract, rationale: Exercise canonical design compilation, span: {start_line: 463, end_line: 471}}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, summary: Test new design contract, rationale: Exercise canonical design compilation, span: {start_line: 473, end_line: 489}}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, summary: Test new design contract, rationale: Exercise canonical design compilation, span: {start_line: 480, end_line: 480}}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, summary: Test new design contract, rationale: Exercise canonical design compilation, span: {start_line: 504, end_line: 505}}
+entities: []
+entity_relationships: []
+invariants:
+  - id: instruction-clause-obligation-completeness
+    action: added
+    description: Every instruction clause receives exactly one semantic design projection, compiler-owned obligation, acceptance criterion, and required test contract.
+    rationale: Prevent feature intent from being dropped between request capture and implementation.
+  - id: compiler-owned-obligation-identity
+    action: added
+    description: Models provide semantic prose only; clause IDs, obligation IDs, intent references, test identities, and selectors are compiler-owned.
+    rationale: Preserve deterministic traceability and prevent model-authored identity metadata.
+guidance:
+  - id: consume-canonical-obligations
+    action: added
+    description: Downstream planning and implementation stages must consume canonical feature obligations rather than reinterpreting the original feature description.
+    rationale: Keep the forward-only feature pipeline coherent and non-redundant.
+proposed_prs: []

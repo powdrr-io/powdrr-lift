@@ -177,6 +177,102 @@ steps:
     )
 
 
+def test_parser_rejects_unknown_fields_and_limits() -> None:
+    source = """name: invalid-shape
+limits: {llm_activations: 2, mystery: 1}
+inputs: [{name: request}]
+steps:
+  - operation:
+      tool: internal
+      command: [echo]
+      bind: result
+      unexpected: true
+"""
+
+    paths = {
+        diagnostic.path for diagnostic in validate_document(parse_document(source))
+    }
+    assert "limits.mystery" in paths
+    assert "steps[0].operation.unexpected" in paths
+
+
+def test_parser_rejects_invalid_terminal_and_binding_names() -> None:
+    source = """name: invalid-values
+inputs: [{name: request}]
+steps:
+  - operation: {tool: internal, command: [echo], bind: bad.name}
+  - terminal: complete
+"""
+
+    paths = {
+        diagnostic.path for diagnostic in validate_document(parse_document(source))
+    }
+    assert "steps[0].operation.bind" in paths
+    assert "steps[1].terminal" in paths
+
+
+def test_parser_requires_valid_judge_schema_and_unique_context() -> None:
+    source = """name: invalid-judge
+inputs: [{name: request}]
+steps:
+  - judge:
+      question: Decide
+      subject: request
+      prompt_system: Return JSON
+      instructions: [Decide]
+      context: [request, request]
+      output:
+        name: decision
+        schema: {type: definitely-not-a-json-schema-type}
+      validation: {kind: json_schema}
+"""
+
+    paths = {
+        diagnostic.path for diagnostic in validate_document(parse_document(source))
+    }
+    assert "steps[0].judge.context" in paths
+    assert "steps[0].judge.output.schema" in paths
+
+
+def test_parser_does_not_expose_branch_local_bindings_after_branch() -> None:
+    source = """name: branch-scope
+inputs: [{name: request}]
+steps:
+  - branch:
+      subject: request
+      cases:
+        ready:
+          - operation: {tool: internal, command: [echo], bind: only_ready}
+        waiting: []
+  - gate:
+      subject: only_ready
+      equals: true
+      on_failure: {terminal: failed}
+"""
+
+    paths = {
+        diagnostic.path for diagnostic in validate_document(parse_document(source))
+    }
+    assert "steps[1].gate.subject" in paths
+
+
+def test_parser_requires_positive_worklist_admission_limit() -> None:
+    source = """name: invalid-worklist
+inputs: [{name: request}]
+steps:
+  - worklist:
+      snapshot: {name: request, max_items: 1}
+      item_binding: item
+      max_admissions: 0
+      body: []
+"""
+
+    paths = {
+        diagnostic.path for diagnostic in validate_document(parse_document(source))
+    }
+    assert "steps[0].worklist.max_admissions" in paths
+
+
 def test_parser_rejects_model_owned_identity_and_integrity_fields() -> None:
     source = """
 name: metadata

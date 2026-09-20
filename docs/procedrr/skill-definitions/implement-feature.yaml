@@ -568,7 +568,8 @@ steps:
         - Compare the implementation and validation evidence with the complete feature specification.
         - Check every compiled feature obligation individually and require concrete implementation and validation evidence for each one.
         - Mark complete only when every requested behavior is implemented and validated.
-        - Return one verdict: satisfied or missing.
+        - >-
+          Return one verdict: satisfied or missing.
       context: [feature_description, plan, feature_obligations, implementation, validation, review]
       output:
         name: completeness_review
@@ -603,7 +604,8 @@ steps:
           review.out_of_scope_paths is empty, return justified. Required test
           files and generated test artifacts under an allowed validation path
           are justified by the feature's validation obligations.
-        - Return one verdict: justified or unjustified.
+        - >-
+          Return one verdict: justified or unjustified.
       context: [feature_description, plan, feature_obligations, implementation, validation, review, completeness_review]
       output:
         name: scope_review

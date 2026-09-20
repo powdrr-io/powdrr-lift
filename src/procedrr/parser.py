@@ -26,6 +26,16 @@ KNOWN_TOOLS = frozenset(
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})
+KNOWN_LIMITS = frozenset(
+    {
+        "llm_activations",
+        "tool_calls",
+        "max_epochs",
+        "context_chars",
+        "context_value_chars",
+    }
+)
+_BINDING_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
 _BINDING = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
 _BINDING_PATH = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*")
 _MODEL_OWNED_METADATA = re.compile(
@@ -117,6 +127,10 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
                             f"limits.{name}", "limit values must be positive integers"
                         )
                     )
+                elif name not in KNOWN_LIMITS:
+                    diagnostics.append(
+                        DocumentDiagnostic(f"limits.{name}", f"unknown limit: {name}")
+                    )
     outputs = document.get("outputs")
     if outputs is not None:
         if not isinstance(outputs, Mapping) or not outputs:
@@ -125,9 +139,7 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
             )
         else:
             for name, schema in outputs.items():
-                if not isinstance(name, str) or not re.fullmatch(
-                    r"[A-Za-z_][A-Za-z0-9_.-]*", name
-                ):
+                if not isinstance(name, str) or not _BINDING_NAME.fullmatch(name):
                     diagnostics.append(
                         DocumentDiagnostic(
                             "outputs", "output names must be valid binding names"
@@ -161,9 +173,7 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
                 diagnostics.append(DocumentDiagnostic(path, "input must be a mapping"))
                 continue
             name = item.get("name")
-            if not isinstance(name, str) or not re.fullmatch(
-                r"[A-Za-z_][A-Za-z0-9_.-]*", name
-            ):
+            if not isinstance(name, str) or not _BINDING_NAME.fullmatch(name):
                 diagnostics.append(
                     DocumentDiagnostic(f"{path}.name", "input name is invalid")
                 )
@@ -338,6 +348,12 @@ def _validate_steps(
             )
             continue
         control = next(iter(controls))
+        _validate_unknown_fields(
+            step,
+            {control, "id"},
+            step_path,
+            diagnostics,
+        )
         if control == "specialize":
             value = step[control]
             if not isinstance(value, Mapping):
@@ -347,6 +363,19 @@ def _validate_steps(
                     )
                 )
                 continue
+            _validate_unknown_fields(
+                value,
+                {
+                    "question",
+                    "context",
+                    "bind",
+                    "process",
+                    "max_steps",
+                    "allowed_tools",
+                },
+                f"{step_path}.specialize",
+                diagnostics,
+            )
             for key in ("question", "context", "bind"):
                 if key not in value:
                     diagnostics.append(
@@ -430,6 +459,12 @@ def _validate_steps(
             and "fragment" in step[control]
         ):
             value = step[control]
+            _validate_unknown_fields(
+                value,
+                {"fragment", "max_steps"},
+                f"{step_path}.call",
+                diagnostics,
+            )
             fragment = value.get("fragment")
             if not isinstance(fragment, str):
                 diagnostics.append(
@@ -462,6 +497,12 @@ def _validate_steps(
             and "process" in step[control]
         ):
             value = step[control]
+            _validate_unknown_fields(
+                value,
+                {"process", "inputs", "outputs"},
+                f"{step_path}.call",
+                diagnostics,
+            )
             process = value.get("process")
             if not isinstance(process, str) or not re.fullmatch(
                 r"[a-z][a-z0-9-]*", process
@@ -517,6 +558,13 @@ def _validate_steps(
                         bindings.add(name)
         elif control == "repeat":
             value = step[control]
+            if isinstance(value, Mapping):
+                _validate_unknown_fields(
+                    value,
+                    {"body", "max_iterations", "until", "collect"},
+                    f"{step_path}.repeat",
+                    diagnostics,
+                )
             if not isinstance(value, Mapping) or not isinstance(
                 value.get("body"), list
             ):
@@ -597,6 +645,13 @@ def _validate_steps(
                     )
         elif control == "branch":
             value = step[control]
+            if isinstance(value, Mapping):
+                _validate_unknown_fields(
+                    value,
+                    {"subject", "cases", "default"},
+                    f"{step_path}.branch",
+                    diagnostics,
+                )
             if not isinstance(value, Mapping) or not isinstance(
                 value.get("subject"), str
             ):
@@ -621,6 +676,7 @@ def _validate_steps(
                     )
                 )
             else:
+                branch_results: list[set[str]] = []
                 for case, nested in cases.items():
                     if not isinstance(nested, list):
                         diagnostics.append(
@@ -638,7 +694,7 @@ def _validate_steps(
                             branch_bindings,
                             recovery_names,
                         )
-                        bindings.update(branch_bindings)
+                        branch_results.append(branch_bindings)
             default = value.get("default") if isinstance(value, Mapping) else None
             if default is not None and not isinstance(default, list):
                 diagnostics.append(
@@ -647,6 +703,9 @@ def _validate_steps(
                         "branch default steps must be a list",
                     )
                 )
+            elif default is None:
+                # An unmatched branch path produces no new bindings.
+                branch_results.append(set())
             elif isinstance(default, list):
                 default_bindings = set(bindings)
                 _validate_steps(
@@ -656,9 +715,19 @@ def _validate_steps(
                     default_bindings,
                     recovery_names,
                 )
-                bindings.update(default_bindings)
+                branch_results.append(default_bindings)
+            if branch_results:
+                definite = set.intersection(*branch_results)
+                bindings.update(definite)
         elif control == "attempt":
             value = step[control]
+            if isinstance(value, Mapping):
+                _validate_unknown_fields(
+                    value,
+                    {"id", "max_attempts", "body", "on_failure"},
+                    f"{step_path}.attempt",
+                    diagnostics,
+                )
             if not isinstance(value, Mapping) or not isinstance(
                 value.get("body"), list
             ):
@@ -726,6 +795,21 @@ def _validate_steps(
             if control == "call" and isinstance(value, Mapping) and "fragment" in value:
                 continue
             if control in {"for_each", "worklist"} and isinstance(value, Mapping):
+                _validate_unknown_fields(
+                    value,
+                    {
+                        "snapshot",
+                        "item_binding",
+                        "item",
+                        "collect",
+                        "body",
+                        "steps",
+                        "max_admissions",
+                        "max_epochs",
+                    },
+                    f"{step_path}.{control}",
+                    diagnostics,
+                )
                 _validate_loop_declaration(
                     value, control, step_path, bindings, diagnostics
                 )
@@ -791,10 +875,31 @@ def _validate_steps(
                         f"{step_path}.{control}.collect",
                         local,
                         diagnostics,
+                        # A for_each body may intentionally emit a collected
+                        # value only from one branch (for example, repair
+                        # actions for failed validations). The binding name
+                        # and shape are still checked above; branch-sensitive
+                        # presence is not a required value for collection.
+                        check_value=False,
                     )
                 bindings.update(local)
         elif control == "operation":
             operation = step[control]
+            if isinstance(operation, Mapping):
+                _validate_unknown_fields(
+                    operation,
+                    {
+                        "name",
+                        "tool",
+                        "parameters",
+                        "command",
+                        "bind",
+                        "returns",
+                        "source",
+                    },
+                    f"{step_path}.operation",
+                    diagnostics,
+                )
             if not isinstance(operation, Mapping) or not isinstance(
                 operation.get("name", operation.get("tool")), str
             ):
@@ -895,7 +1000,15 @@ def _validate_steps(
             if isinstance(operation, Mapping) and isinstance(
                 operation.get("bind"), str
             ):
-                bindings.add(operation["bind"])
+                if not _BINDING_NAME.fullmatch(operation["bind"]):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.operation.bind",
+                            "operation bind must be a valid binding name",
+                        )
+                    )
+                else:
+                    bindings.add(operation["bind"])
         elif control == "gate":
             gate = step[control]
             if not isinstance(gate, Mapping):
@@ -903,6 +1016,12 @@ def _validate_steps(
                     DocumentDiagnostic(f"{step_path}.gate", "gate must be a mapping")
                 )
             else:
+                _validate_unknown_fields(
+                    gate,
+                    {"subject", "equals", "on_failure"},
+                    f"{step_path}.gate",
+                    diagnostics,
+                )
                 subject = gate.get("subject")
                 gate_root: str | None = (
                     subject.split(".", 1)[0] if isinstance(subject, str) else None
@@ -950,6 +1069,24 @@ def _validate_steps(
                     DocumentDiagnostic(f"{step_path}.judge", "judge must be a mapping")
                 )
             else:
+                _validate_unknown_fields(
+                    judge,
+                    {
+                        "kind",
+                        "provider",
+                        "question",
+                        "subject",
+                        "prompt_system",
+                        "instructions",
+                        "context",
+                        "output",
+                        "validation",
+                        "validator",
+                        "prompt_rules",
+                    },
+                    f"{step_path}.judge",
+                    diagnostics,
+                )
                 for key in (
                     "question",
                     "subject",
@@ -966,6 +1103,13 @@ def _validate_steps(
                         )
                 context = judge.get("context")
                 if isinstance(context, list):
+                    if len(context) != len(set(context)):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.judge.context",
+                                "judge context bindings must be unique",
+                            )
+                        )
                     for binding in context:
                         if not isinstance(binding, str) or not _binding_path_is_known(
                             binding, bindings
@@ -1084,6 +1228,68 @@ def _validate_steps(
                             "an inline output schema is required",
                         )
                     )
+                elif isinstance(output, Mapping):
+                    schema = output["schema"]
+                    try:
+                        Draft7Validator.check_schema(dict(schema))
+                    except SchemaError as error:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.judge.output.schema",
+                                f"invalid output schema: {error.message}",
+                            )
+                        )
+                    output_name = output.get("name")
+                    if not isinstance(output_name, str) or not _BINDING_NAME.fullmatch(
+                        output_name
+                    ):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.judge.output.name",
+                                "output name must be a valid binding name",
+                            )
+                        )
+                if (
+                    not isinstance(judge.get("question"), str)
+                    or not str(judge.get("question", "")).strip()
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.question",
+                            "question must be a non-empty string",
+                        )
+                    )
+                for field in ("prompt_system",):
+                    if (
+                        not isinstance(judge.get(field), str)
+                        or not judge[field].strip()
+                    ):
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.judge.{field}",
+                                f"{field} must be a non-empty string",
+                            )
+                        )
+                if not isinstance(judge.get("instructions"), list) or not all(
+                    isinstance(item, str) and item.strip()
+                    for item in judge.get("instructions", [])
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.instructions",
+                            "instructions must be a non-empty string list",
+                        )
+                    )
+                if not isinstance(context, list) or not all(
+                    isinstance(item, str) and _BINDING_PATH.fullmatch(item)
+                    for item in context
+                ):
+                    diagnostics.append(
+                        DocumentDiagnostic(
+                            f"{step_path}.judge.context",
+                            "context must be a list of binding paths",
+                        )
+                    )
                 validation = judge.get("validation", judge.get("validator"))
                 kind = (
                     validation.get("kind")
@@ -1097,8 +1303,12 @@ def _validate_steps(
                             f"unknown validator: {kind}",
                         )
                     )
-                if isinstance(output, Mapping) and isinstance(output.get("name"), str):
-                    bindings.add(output["name"])
+            if (
+                isinstance(output, Mapping)
+                and isinstance(output.get("name"), str)
+                and _BINDING_NAME.fullmatch(output["name"])
+            ):
+                bindings.add(output["name"])
                 if isinstance(output, Mapping) and isinstance(
                     output.get("schema"), Mapping
                 ):
@@ -1107,6 +1317,20 @@ def _validate_steps(
                         f"{step_path}.judge.output.schema",
                         diagnostics,
                     )
+        elif control == "terminal":
+            if step[control] not in {
+                "succeeded",
+                "failed",
+                "blocked",
+                "cancelled",
+                "suspended",
+            }:
+                diagnostics.append(
+                    DocumentDiagnostic(
+                        f"{step_path}.terminal",
+                        "terminal status is unsupported",
+                    )
+                )
 
 
 def _binding_path_is_known(path: Any, bindings: set[str]) -> bool:
@@ -1125,7 +1349,7 @@ def _validate_loop_declaration(
     item_binding = declaration.get("item_binding", declaration.get("item"))
     if (
         not isinstance(item_binding, str)
-        or _BINDING_PATH.fullmatch(item_binding) is None
+        or _BINDING_NAME.fullmatch(item_binding) is None
     ):
         diagnostics.append(
             DocumentDiagnostic(
@@ -1169,6 +1393,32 @@ def _validate_loop_declaration(
                 "max_items must be a positive integer",
             )
         )
+
+    if kind == "worklist":
+        max_epochs = declaration.get("max_epochs", 1)
+        if (
+            not isinstance(max_epochs, int)
+            or isinstance(max_epochs, bool)
+            or max_epochs <= 0
+        ):
+            diagnostics.append(
+                DocumentDiagnostic(
+                    f"{path}.{kind}.max_epochs",
+                    "max_epochs must be a positive integer",
+                )
+            )
+    max_admissions = declaration.get("max_admissions")
+    if max_admissions is not None and (
+        not isinstance(max_admissions, int)
+        or isinstance(max_admissions, bool)
+        or max_admissions <= 0
+    ):
+        diagnostics.append(
+            DocumentDiagnostic(
+                f"{path}.{kind}.max_admissions",
+                "max_admissions must be a positive integer",
+            )
+        )
     elif (
         isinstance(values, list)
         and isinstance(max_items, int)
@@ -1191,7 +1441,7 @@ def _validate_collect(
     check_value: bool = True,
 ) -> None:
     binding = collect.get("binding")
-    if not isinstance(binding, str) or _BINDING_PATH.fullmatch(binding) is None:
+    if not isinstance(binding, str) or _BINDING_NAME.fullmatch(binding) is None:
         diagnostics.append(
             DocumentDiagnostic(
                 f"{path}.binding", "collect binding must be a valid binding name"
@@ -1290,6 +1540,22 @@ def _template_references(value: Any) -> Iterator[str]:
     elif isinstance(value, list):
         for child in value:
             yield from _template_references(child)
+
+
+def _validate_unknown_fields(
+    value: Mapping[str, Any],
+    allowed: set[str],
+    path: str,
+    diagnostics: list[DocumentDiagnostic],
+) -> None:
+    for name in sorted(set(value) - allowed):
+        diagnostics.append(
+            DocumentDiagnostic(
+                f"{path}.{name}",
+                f"unknown field: {name}",
+                code="unknown_field",
+            )
+        )
 
 
 def _decision_complexity(schema: Any) -> tuple[str, ...]:

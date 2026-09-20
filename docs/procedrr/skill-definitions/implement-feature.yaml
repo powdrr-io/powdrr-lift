@@ -218,6 +218,20 @@ steps:
       bind: feature_obligations
   - operation:
       tool: internal
+      command: [compile_instruction_ledger]
+      parameters:
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
+      returns:
+        type: object
+        required: [path, fingerprint, clauses]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          clauses: {type: array, minItems: 1}
+      bind: instruction_ledger
+  - operation:
+      tool: internal
       command: [materialize_feature_intents]
       parameters:
         plan: {type: reference, value: plan.path}

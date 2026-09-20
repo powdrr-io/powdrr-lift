@@ -539,6 +539,20 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
 
     assert result.status == "completed", planner.proposal_decision_ids
     assert result.plan_path.is_file()
+    ledger_path = (
+        repo
+        / ".powdrr"
+        / "feature-runs"
+        / "python-statemachine-state-data-scoping"
+        / "instruction-ledger.json"
+    )
+    assert ledger_path.is_file()
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert ledger["schema_version"] == "instruction-ledger-v1"
+    assert ledger["source"]["text"] == DEEPSWE_STATE_DATA_DESCRIPTION
+    assert [item["clause_id"] for item in ledger["clauses"]] == [
+        f"instruction-{index:03d}" for index in range(1, len(ledger["clauses"]) + 1)
+    ]
     document = yaml.safe_load(result.plan_path.read_text(encoding="utf-8"))
     clauses = {
         item["clause_id"]

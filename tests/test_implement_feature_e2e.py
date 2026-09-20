@@ -254,6 +254,10 @@ def _fixture_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=repo, check=True
+    )
     (repo / ".gitignore").write_text(".powdrr/\n", encoding="utf-8")
     (repo / "hello_world.py").write_text('print("Hello, world!")\n', encoding="utf-8")
     tests = repo / "tests"

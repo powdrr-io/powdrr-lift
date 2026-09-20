@@ -323,6 +323,47 @@ def test_feature_pr_template_rejects_incomplete_required_test_case(
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("expectation", "assert the feature works", "invalid expectation"),
+        ("status", "maybe", "invalid status"),
+    ],
+)
+def test_feature_pr_template_rejects_semantically_garbage_test_contracts(
+    tmp_path: Path, field: str, value: str, message: str
+) -> None:
+    interview_path = tmp_path / f"design-interview-input-{field}.json"
+    item = {
+        "id": "garbage-contract",
+        "description": "The focused test passes.",
+        "intent_refs": ["feature:example"],
+        "provider": "pytest",
+        "selector": "tests/test_example.py::test_example",
+        "profile": "pytest",
+        "expectation": "pass",
+        "applicability": {"mode": "affected_closure"},
+        "status": "active",
+    }
+    item[field] = value
+    interview_path.write_text(
+        json.dumps(
+            {
+                "required_test_cases_edits": {
+                    "added": [item],
+                    "deleted": [],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        feature_planning.render_feature_pr_specification_template(
+            work_item_name="garbage-contract", interview_input=interview_path
+        )
+
+
 def test_feature_pr_template_canonicalizes_scalar_required_test_case_fields(
     tmp_path: Path,
 ) -> None:

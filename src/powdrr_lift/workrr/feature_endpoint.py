@@ -31,6 +31,14 @@ from powdrr_lift.core.instruction_ledger import (
     InstructionLedgerError,
     compile_instruction_ledger,
 )
+from powdrr_lift.core.obligation_review import (
+    ObligationEvidencePacket,
+    ObligationReviewError,
+    ObligationReviewResult,
+    aggregate_obligation_reviews,
+    bind_obligation_review,
+    compile_obligation_evidence_packets,
+)
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -577,6 +585,14 @@ def _execute_procedrr_flow(
                 state=state,
                 parameters=parameters,
             )
+        if name == "compile_obligation_review_packets":
+            return _compile_obligation_review_packets(
+                parameters, output_root=output_root
+            )
+        if name == "bind_obligation_reviews":
+            return _bind_obligation_reviews(parameters)
+        if name == "aggregate_obligation_reviews":
+            return _aggregate_obligation_reviews(parameters)
         if name == "aggregate_intent_review":
             return _aggregate_intent_review(parameters)
         if name == "collect_repair_issues":
@@ -2280,6 +2296,100 @@ def _aggregate_intent_review(parameters: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(refs, list) or set(refs) != set(raw_refs):
             failures.append(f"intent review evidence mismatch for {clause_id}")
     return {"passed": not failures, "failures": failures}
+
+
+def _compile_obligation_review_packets(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    raw_obligations = parameters.get("obligations")
+    evidence = parameters.get("evidence")
+    if not isinstance(raw_obligations, Mapping):
+        raise PowdrrExecutionError("obligation review requires feature obligations")
+    obligations = raw_obligations.get("obligations")
+    if not isinstance(obligations, list):
+        raise PowdrrExecutionError("obligation review obligations are malformed")
+    if not isinstance(evidence, Mapping):
+        raise PowdrrExecutionError("obligation review requires implementation evidence")
+    refs = evidence.get("evidence_refs")
+    paths = evidence.get("changed_paths")
+    diff = evidence.get("git_diff")
+    if (
+        not isinstance(refs, list)
+        or not isinstance(paths, list)
+        or not isinstance(diff, str)
+    ):
+        raise PowdrrExecutionError("implementation evidence is incomplete")
+    try:
+        packets = compile_obligation_evidence_packets(
+            obligations,
+            evidence_refs=refs,
+            changed_paths=paths,
+            diff_fingerprint=content_fingerprint(diff),
+        )
+    except ObligationReviewError as error:
+        raise PowdrrExecutionError(str(error)) from error
+    path = output_root / "obligation-review-packets.json"
+    path.write_text(
+        json.dumps(
+            {"packets": [item.to_data() for item in packets]},
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return {"path": str(path), "packets": [item.to_data() for item in packets]}
+
+
+def _bind_obligation_reviews(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    raw_packets = parameters.get("packets")
+    decisions = parameters.get("decisions")
+    if not isinstance(raw_packets, list) or not isinstance(decisions, list):
+        raise PowdrrExecutionError("obligation reviews require packets and decisions")
+    if len(raw_packets) != len(decisions):
+        raise PowdrrExecutionError("obligation review counts do not match")
+    results: list[dict[str, Any]] = []
+    try:
+        for raw_packet, raw_decision in zip(raw_packets, decisions, strict=True):
+            packet = ObligationEvidencePacket.from_data(raw_packet)
+            decision = (
+                raw_decision.get("result")
+                if isinstance(raw_decision, Mapping)
+                and isinstance(raw_decision.get("result"), Mapping)
+                else raw_decision
+            )
+            if not isinstance(decision, Mapping):
+                raise ObligationReviewError("obligation review decision is malformed")
+            results.append(bind_obligation_review(packet, decision).to_data())
+    except (ObligationReviewError, TypeError) as error:
+        raise PowdrrExecutionError(str(error)) from error
+    return {"reviews": results}
+
+
+def _aggregate_obligation_reviews(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    raw_packets = parameters.get("packets")
+    raw_reviews = parameters.get("reviews")
+    if not isinstance(raw_packets, list) or not isinstance(raw_reviews, list):
+        raise PowdrrExecutionError("obligation review aggregation inputs are malformed")
+    try:
+        packets = tuple(
+            ObligationEvidencePacket.from_data(item) for item in raw_packets
+        )
+        reviews = tuple(
+            ObligationReviewResult(
+                obligation_id=str(item["obligation_id"]),
+                verdict=str(item["verdict"]),
+                explanation=str(item["explanation"]),
+                evidence_refs=tuple(str(ref) for ref in item["evidence_refs"]),
+            )
+            for item in raw_reviews
+            if isinstance(item, Mapping)
+        )
+        for packet, review in zip(packets, reviews, strict=True):
+            review.validate_against(packet)
+        return aggregate_obligation_reviews(packets, reviews)
+    except (KeyError, TypeError, ObligationReviewError, ValueError) as error:
+        raise PowdrrExecutionError(str(error)) from error
 
 
 def _proposal_execution_units(

@@ -545,6 +545,7 @@ steps:
             parameters:
               packets: {type: reference, value: obligation_review_packets.packets}
               reviews: {type: reference, value: bound_obligation_reviews.reviews}
+              verification_reconciliation: {type: reference, value: verification_reconciliation}
             returns:
               type: object
               required: [passed, failures]
@@ -597,6 +598,11 @@ steps:
         - Inspect the complete implementation diff, not only the worker summary.
         - Mark justified only when every change is required by the specification or its validation.
         - Treat unrelated refactors, cleanup, and speculative improvements as findings.
+        - The review.changed_paths and review.out_of_scope_paths are the
+          authoritative mechanical scope result. If review.passed is true and
+          review.out_of_scope_paths is empty, return justified. Required test
+          files and generated test artifacts under an allowed validation path
+          are justified by the feature's validation obligations.
         - Return one verdict: justified or unjustified.
       context: [feature_description, plan, feature_obligations, implementation, validation, review, completeness_review]
       output:

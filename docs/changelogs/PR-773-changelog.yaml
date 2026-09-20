@@ -1,0 +1,70 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 773
+title: Add and harden live implement-feature smoke harness
+intent:
+  problem: The implement-feature flow has an end-to-end test double but no fast, repeatable command that proves the production CLI can complete a real feature run with live planning and OpenCode.
+  goal: Provide an opt-in disposable-repository smoke run that invokes the production workrr-feature path and validates its complete result without opening an external pull request.
+human-decisions:
+  - id: use-disposable-local-origin
+    summary: Create a temporary repository and local bare origin so the smoke run exercises the real branch and worktree setup without changing a developer checkout or requiring a remote repository.
+  - id: preserve-failed-run-artifacts
+    summary: Retain the disposable repository and Powdrr run artifacts on failure so live failures can be diagnosed from the exact proposal, requests, validation, and review evidence.
+structured_files: []
+files:
+  - {path: scripts/live-implement-feature-smoke.py, type: added, summary: Create a disposable repository, invoke the production workrr-feature CLI with live providers, and assert the completed implementation state, rationale: Make one real implement-feature acceptance run reproducible and inspectable without PR publication, span: {start_line: 1, end_line: 273}}
+  - {path: bin/test-live-implement-feature, type: added, summary: Provide a short developer command for the live smoke harness, rationale: Make the real flow fast to invoke after changing implement-feature, span: {start_line: 1, end_line: 5}}
+  - {path: docs/current/real-implement-feature-smoke.md, type: added, summary: Document live smoke usage, artifacts, and acceptance conditions, rationale: Define how developers validate the production flow after changing it, span: {start_line: 1, end_line: 42}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Bind feature traces, rationale: Preserve verification coverage, span: {start_line: 845, end_line: 845}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Filter and persist structural worklists, rationale: Keep deterministic proposal evidence auditable, span: {start_line: 897, end_line: 902}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Add deterministic proposal review families, rationale: Keep structural checks mechanical, span: {start_line: 927, end_line: 958}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Normalize proposal decision identity, rationale: Bind review results to their specification, span: {start_line: 990, end_line: 994}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Canonicalize structural decision outcomes, rationale: Avoid redundant model rejection of deterministic checks, span: {start_line: 1013, end_line: 1058}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Attach planner trace references, rationale: Preserve feature test contract coverage, span: {start_line: 1359, end_line: 1359}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Implement feature trace alias matching, rationale: Keep generated obligations connected to their source intent, span: {start_line: 1363, end_line: 1427}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Isolate repair sessions, rationale: Prevent repair drift, span: {start_line: 2167, end_line: 2167}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Reset OpenCode repair sessions, rationale: Prevent stale repair context, span: {start_line: 2224, end_line: 2224}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Add fresh repair prompt context, rationale: Target only reported failures, span: {start_line: 2318, end_line: 2322}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Tighten repair prompt handling, rationale: Keep implementation packets authoritative, span: {start_line: 2343, end_line: 2349}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Narrow repair prompt suffix, rationale: Prevent unrelated replanning, span: {start_line: 2354, end_line: 2355}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Preserve external evidence references, rationale: Keep evidence paths valid outside the worktree, span: {start_line: 2445, end_line: 2453}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Bind reconciliation evidence, rationale: Let executable evidence authorize obligation preservation, span: {start_line: 2653, end_line: 2653}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Make reconciliation authoritative, rationale: Prevent redundant repair loops, span: {start_line: 2672, end_line: 2683}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Make directory scopes recursive, rationale: Accept allowed validation directories, span: {start_line: 3267, end_line: 3276}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Complete fallback entities, rationale: Keep generated Structrr plans valid, span: {start_line: 3361, end_line: 3364}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Complete fallback entity effects, rationale: Keep generated Structrr plans self-consistent, span: {start_line: 3375, end_line: 3375}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Isolate OpenCode state, rationale: Prevent provider state from contaminating implementation diffs, span: {start_line: 355, end_line: 369}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Bind reconciliation to obligation review, rationale: Make executable evidence authoritative, span: {start_line: 548, end_line: 548}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Clarify mechanical scope outcomes, rationale: Preserve required validation tests, span: {start_line: 601, end_line: 605}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Update proposal receipt fixture, rationale: Exercise canonicalized decision fields, span: {start_line: 1377, end_line: 1377}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Add canonicalization assertions, rationale: Lock evidence normalization, span: {start_line: 1382, end_line: 1386}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Add deterministic outcome assertions, rationale: Lock structural review behavior, span: {start_line: 1402, end_line: 1406}}
+  - {path: tests/test_coding_agent.py, type: modified, summary: Verify isolated provider paths, rationale: Keep OpenCode state out of diffs, span: {start_line: 374, end_line: 376}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Align proposal gate test, rationale: Cover deterministic structural review, span: {start_line: 746, end_line: 746}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Assert deterministic proposal completion, rationale: Keep end-to-end behavior aligned with the mechanical gate, span: {start_line: 771, end_line: 773}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Remove obsolete worker-blocking assertions, rationale: Structural proposal checks no longer depend on the old model decision loop, span: {start_line: 773, end_line: 782}}
+entities:
+  - {id: live-implement-feature-smoke, type: Test harness, action: added, description: An opt-in command that runs the production implement-feature CLI against a disposable repository with live planning and OpenCode providers.}
+  - {id: live-implement-feature-command, type: Command, action: added, description: The bin/test-live-implement-feature developer entry point for the live smoke harness.}
+  - {id: live-implement-feature-runbook, type: Runbook, action: added, description: The documented procedure and acceptance contract for a live implement-feature smoke run.}
+entity_relationships:
+  - {id: command-runs-live-harness, type: invokes, source: live-implement-feature-command, target: live-implement-feature-smoke, action: added, description: The short command delegates to the Python smoke harness.}
+  - {id: runbook-describes-harness, type: documents, source: live-implement-feature-runbook, target: live-implement-feature-smoke, action: added, description: The runbook defines invocation, isolation, artifacts, and pass conditions.}
+invariants:
+  - id: live-smoke-uses-production-cli
+    action: added
+    description: The live smoke run invokes the production workrr-feature CLI with the configured planning provider and OpenCode executable.
+    rationale: A real acceptance run must exercise the same orchestration boundary used outside the test suite.
+  - id: live-smoke-fails-closed
+    action: added
+    description: The live smoke command fails unless proposal evidence, verification obligations, validation, post-implementation review, expected source output, commit state, and clean worktrees all pass.
+    rationale: A provider process exiting successfully is not sufficient evidence that implement-feature completed correctly.
+  - id: live-smoke-isolation
+    action: added
+    description: The live smoke run operates on a disposable repository with a local bare origin and does not require PR publication.
+    rationale: Developers must be able to run the acceptance check without mutating their working checkout or external GitHub state.
+guidance:
+  - id: run-live-smoke-after-flow-changes
+    action: added
+    description: Run bin/test-live-implement-feature after changing the production implement-feature flow; inspect the retained run directory whenever it fails.
+    rationale: This is the fast real-flow validation gate, distinct from the deterministic regression suite.
+proposed_prs: []

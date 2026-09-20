@@ -352,6 +352,21 @@ class OpenCodeProvider:
         # than the subprocess cwd. Keep both locations aligned so a worker
         # cannot accidentally inspect or edit the caller's repository.
         environment["PWD"] = str(worktree_root.resolve())
+        # OpenCode writes its own application log under the XDG data
+        # directory. Keep that state inside the disposable worktree so
+        # headless runs do not depend on (or mutate) the invoking home.
+        opencode_state = (
+            self.diagnostics_root.parent / "opencode-data"
+            if self.diagnostics_root is not None
+            else worktree_root / ".opencode-data"
+        )
+        environment["XDG_DATA_HOME"] = str(opencode_state)
+        environment["XDG_STATE_HOME"] = str(opencode_state)
+        environment["XDG_CACHE_HOME"] = str(
+            self.diagnostics_root.parent / "opencode-cache"
+            if self.diagnostics_root is not None
+            else worktree_root / ".opencode-cache"
+        )
         environment["OPENCODE_PERMISSION"] = self.permission_policy.to_json()
         command = [
             self.executable,

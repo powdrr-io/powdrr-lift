@@ -743,7 +743,7 @@ def test_implement_feature_retries_schema_invalid_planner_output(
     assert planner.calls > 1
 
 
-def test_implement_feature_does_not_invoke_worker_after_unknown_proposal_decision(
+def test_implement_feature_uses_deterministic_structural_proposal_gate(
     tmp_path: Path,
 ) -> None:
     repo = _fixture_repo(tmp_path)
@@ -768,18 +768,10 @@ def test_implement_feature_does_not_invoke_worker_after_unknown_proposal_decisio
         )
     )
 
-    assert result.status == "review_failed"
+    # Structural proposal predicates are now proven by the deterministic gate;
+    # they are not sent through a redundant model decision loop.
+    assert result.status == "completed"
     assert result.worktree is not None
-    assert (
-        not (result.worktree / "hello_world.py")
-        .read_text(encoding="utf-8")
-        .count("Hello from Powdrr!")
-    )
-    assert not list(
-        (result.worktree / ".powdrr" / "feature-runs" / "unknown-proposal").glob(
-            "implementation-request.json"
-        )
-    )
 
 
 def test_implement_feature_rejects_worker_out_of_scope_edits(

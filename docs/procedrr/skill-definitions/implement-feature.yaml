@@ -232,6 +232,18 @@ steps:
       bind: feature_intents
   - operation:
       tool: internal
+      command: [validate_materialized_intent_contracts]
+      parameters:
+        plan: {type: reference, value: plan.path}
+      returns:
+        type: object
+        required: [checked, contract_refs]
+        properties:
+          checked: {type: array}
+          contract_refs: {type: array}
+      bind: intent_contract_validation
+  - operation:
+      tool: internal
       command: [compile_verification_obligations]
       parameters:
         baseline: {type: reference, value: baseline.path}

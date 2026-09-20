@@ -403,6 +403,8 @@ def _execute_procedrr_flow(
             )
         if name == "materialize_feature_intents":
             return _materialize_feature_intents(parameters, state=state)
+        if name == "validate_materialized_intent_contracts":
+            return _validate_materialized_intent_contracts(parameters, state=state)
         if name == "compile_verification_obligations":
             return _compile_verification_obligations(
                 parameters,
@@ -1012,6 +1014,9 @@ def _materialize_feature_intents(
                 "makes this feature obligation an explicit active intent clause"
             ),
         }
+        verification = design.get("verification")
+        if isinstance(verification, Mapping):
+            clause["verification"] = dict(verification)
         intent_clauses.append(clause)
         if clause_id not in existing_ids:
             active_intent.append(clause)
@@ -1034,6 +1039,76 @@ def _intent_kind_for_design(kind: str) -> str:
     if kind in {"guidance", "non_goal"}:
         return "guidance"
     return "decision"
+
+
+def _validate_materialized_intent_contracts(
+    parameters: Mapping[str, Any], *, state: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Require every materialized intent to be explicitly verifiable.
+
+    Feature obligations become active intent clauses before proposal review.  A
+    required test case must name each such clause in ``intent_refs`` unless the
+    clause explicitly declares a non-obligating verification classification and
+    rationale.  This keeps sentence-derived design from silently becoming an
+    unverified implementation obligation.
+    """
+    plan = _require_flow_text(parameters, "plan")
+    if Path(plan) != state.get("plan_path"):
+        raise PowdrrExecutionError(
+            "intent contract validation plan does not match the plan"
+        )
+    document = _load_yaml_mapping(Path(plan))
+    clauses = document.get("active_intent")
+    if not isinstance(clauses, list):
+        raise PowdrrExecutionError(
+            "plan active_intent must contain materialized clauses"
+        )
+    contracts = _require_required_test_cases(document)
+    contract_refs = {
+        reference
+        for contract in contracts
+        for reference in contract.get("intent_refs", [])
+        if isinstance(reference, str)
+    }
+    failures: list[str] = []
+    checked: list[str] = []
+    for clause in clauses:
+        if not isinstance(clause, Mapping):
+            continue
+        source_ref = clause.get("source_ref")
+        clause_id = clause.get("clause_id")
+        if not (
+            isinstance(source_ref, str)
+            and source_ref.startswith("feature-obligation:")
+            and isinstance(clause_id, str)
+            and clause_id.strip()
+        ):
+            continue
+        checked.append(clause_id)
+        verification = clause.get("verification")
+        if (
+            isinstance(verification, Mapping)
+            and verification.get("mode") == "non_obligating"
+        ):
+            rationale = verification.get("rationale")
+            if isinstance(rationale, str) and rationale.strip():
+                continue
+            failures.append(
+                f"materialized intent {clause_id} declares non_obligating "
+                "without a rationale"
+            )
+            continue
+        if clause_id not in contract_refs:
+            failures.append(
+                f"materialized intent {clause_id} has no verification contract; "
+                "add its exact clause_id to required_test_cases.intent_refs or "
+                "declare verification.mode=non_obligating with a rationale"
+            )
+    if failures:
+        raise PowdrrExecutionError(
+            "intent verification coverage failed: " + "; ".join(failures)
+        )
+    return {"checked": checked, "contract_refs": sorted(contract_refs)}
 
 
 def _compile_verification_obligations(

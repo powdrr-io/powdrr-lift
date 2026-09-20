@@ -55,6 +55,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _plan_text_items,
     _proposal_execution_units,
     _update_plan_from_sentence_trace,
+    _validate_materialized_intent_contracts,
     _validate_procedrr_flow,
     _validate_required_test_cases,
     _write_structrr_plan,
@@ -485,6 +486,93 @@ def test_feature_obligations_become_active_intents(tmp_path: Path) -> None:
     ]
     assert document["active_intent"][0]["kind"] == "decision"
     assert document["active_intent"][1]["kind"] == "invariant"
+
+
+def test_materialized_intents_require_exact_verification_contract_refs(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "required_test_cases": [
+                    {
+                        "id": "test-data",
+                        "description": "Verify data ownership.",
+                        "intent_refs": ["feature-obligation-sentence-1"],
+                        "provider": "pytest",
+                        "selector": "tests/test_data.py::test_ownership",
+                        "profile": "pytest",
+                        "expectation": "pass",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ],
+                "active_intent": [
+                    {
+                        "clause_id": "feature-obligation-sentence-1",
+                        "source_ref": "feature-obligation:sentence-1",
+                    },
+                    {
+                        "clause_id": "feature-obligation-sentence-2",
+                        "source_ref": "feature-obligation:sentence-2",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="sentence-2"):
+        _validate_materialized_intent_contracts(
+            {"plan": str(plan)}, state={"plan_path": plan}
+        )
+
+
+def test_materialized_intent_can_be_explicitly_non_obligating(tmp_path: Path) -> None:
+    plan = tmp_path / "structrr-diff.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "required_test_cases": [
+                    {
+                        "id": "test-data",
+                        "description": "Verify data ownership.",
+                        "intent_refs": ["feature-obligation-sentence-1"],
+                        "provider": "pytest",
+                        "selector": "tests/test_data.py::test_ownership",
+                        "profile": "pytest",
+                        "expectation": "pass",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ],
+                "active_intent": [
+                    {
+                        "clause_id": "feature-obligation-sentence-1",
+                        "source_ref": "feature-obligation:sentence-1",
+                    },
+                    {
+                        "clause_id": "feature-obligation-sentence-2",
+                        "source_ref": "feature-obligation:sentence-2",
+                        "verification": {
+                            "mode": "non_obligating",
+                            "rationale": "This sentence is explanatory context only.",
+                        },
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _validate_materialized_intent_contracts(
+        {"plan": str(plan)}, state={"plan_path": plan}
+    )
+    assert result["checked"] == [
+        "feature-obligation-sentence-1",
+        "feature-obligation-sentence-2",
+    ]
 
 
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:

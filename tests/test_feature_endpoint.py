@@ -223,15 +223,28 @@ def test_compile_feature_obligations_binds_sentence_trace_to_plan(
     plan.write_text(
         yaml.safe_dump(
             {
+                "schema": "https://powdrr.io/schemas/changelog-v2",
+                "change_id": "feature",
+                "title": "feature",
                 "acceptance_criteria": [
                     {"id": "feature-acceptance-1", "description": "It works."}
-                ]
+                ],
             }
         ),
         encoding="utf-8",
     )
     output_root = tmp_path / "run"
-    state: dict[str, Any] = {"plan_path": plan}
+    state: dict[str, Any] = {
+        "plan_path": plan,
+        "provider_inventory": (
+            {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_existing.py::test_existing",
+                "fingerprint": "sha256:existing",
+            },
+        ),
+    }
 
     result = _compile_feature_obligations(
         {
@@ -269,6 +282,14 @@ def test_compile_feature_obligations_binds_sentence_trace_to_plan(
     assert json.loads(
         (output_root / "feature-obligations.json").read_text(encoding="utf-8")
     )["plan"] == str(plan)
+    compiled_plan = yaml.safe_load(plan.read_text(encoding="utf-8"))
+    assert [case["intent_refs"] for case in compiled_plan["required_test_cases"]] == [
+        ["feature-obligation-sentence-1"],
+    ]
+    assert compiled_plan["required_test_cases"][0]["selector"] == (
+        "tests/test_feature_obligation_sentence_1_test.py::"
+        "test_feature_obligation_sentence_1_test"
+    )
 
 
 def test_update_plan_from_sentence_trace_adds_missing_requirement(

@@ -59,6 +59,7 @@ steps:
               - Read the exact gathered context; do not invent repository facts.
               - Preserve existing items unless an explicit deletion is required.
               - New identifiers must be globally unique across all categories.
+              - When category is required_test_cases, return an executable test detail item with id, description, intent_refs, provider, selector, profile, expectation, applicability, and status fields.
               - Return exactly one action and, for add or delete, one item.
             context: [work_item_name, feature_description, category_context]
             output:

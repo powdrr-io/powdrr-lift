@@ -134,6 +134,42 @@ def test_missing_selector_blocks_compilation() -> None:
     assert "missing from provider inventory" in result.failures[0]
 
 
+def test_new_required_test_case_can_be_planned_before_collection() -> None:
+    contract = _contract(id="verify.new", selector="tests/test_new.py::test_new")
+    result = compile_verification_obligations(
+        _proposal(
+            {
+                "features": [
+                    {
+                        "id": "transcript",
+                        "action": "added",
+                        "intent_refs": ["intent.transcript"],
+                    }
+                ],
+                "required_test_cases": [
+                    {
+                        "id": "verify.new",
+                        "action": "added",
+                        "intent_refs": ["intent.transcript"],
+                        "provider": "pytest",
+                        "selector": "tests/test_new.py::test_new",
+                        "profile": "pytest",
+                        "expectation": "pass",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ],
+            }
+        ),
+        active_intents=({"clause_id": "intent.transcript"},),
+        contracts=(contract,),
+        provider_inventory=(),
+    )
+
+    assert result.complete
+    assert result.obligations[0].provider_inventory_fingerprint.startswith("planned:")
+
+
 def test_new_intent_without_contract_blocks() -> None:
     result = compile_verification_obligations(
         _proposal({"invariants": [{"id": "intent.new", "action": "added"}]}),

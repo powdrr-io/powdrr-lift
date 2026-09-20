@@ -354,6 +354,23 @@ steps:
       bind: validation
   - operation:
       tool: internal
+      command: [validate_required_test_cases]
+      parameters:
+        plan: {type: reference, value: plan.path}
+      returns:
+        type: object
+        required: [passed, failures, cases]
+        properties:
+          passed: {type: boolean}
+          failures: {type: array}
+          cases: {type: array}
+      bind: required_test_case_validation
+  - gate:
+      subject: required_test_case_validation.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - operation:
+      tool: internal
       command: [run_verification_evidence]
       parameters:
         obligations: {type: reference, value: verification_obligations.obligations}
@@ -611,6 +628,17 @@ recoveries:
                 bind: validation
             - operation:
                 tool: internal
+                command: [validate_required_test_cases]
+                parameters:
+                  plan: {type: reference, value: plan.path}
+                returns: {type: object}
+                bind: required_test_case_validation
+            - gate:
+                subject: required_test_case_validation.passed
+                equals: true
+                on_failure: {terminal: failed}
+            - operation:
+                tool: internal
                 command: [run_verification_evidence]
                 parameters:
                   obligations: {type: reference, value: verification_obligations.obligations}
@@ -690,6 +718,17 @@ recoveries:
           bind: validation
       - operation:
           tool: internal
+          command: [validate_required_test_cases]
+          parameters:
+            plan: {type: reference, value: plan.path}
+          returns: {type: object}
+          bind: required_test_case_validation
+      - gate:
+          subject: required_test_case_validation.passed
+          equals: true
+          on_failure: {terminal: failed}
+      - operation:
+          tool: internal
           command: [run_verification_evidence]
           parameters:
             obligations: {type: reference, value: verification_obligations.obligations}
@@ -761,6 +800,17 @@ recoveries:
           bind: validation
       - operation:
           tool: internal
+          command: [validate_required_test_cases]
+          parameters:
+            plan: {type: reference, value: plan.path}
+          returns: {type: object}
+          bind: required_test_case_validation
+      - gate:
+          subject: required_test_case_validation.passed
+          equals: true
+          on_failure: {terminal: failed}
+      - operation:
+          tool: internal
           command: [run_verification_evidence]
           parameters:
             obligations: {type: reference, value: verification_obligations.obligations}
@@ -828,6 +878,17 @@ recoveries:
             results: {type: reference, value: validation_results}
           returns: {type: object}
           bind: validation
+      - operation:
+          tool: internal
+          command: [validate_required_test_cases]
+          parameters:
+            plan: {type: reference, value: plan.path}
+          returns: {type: object}
+          bind: required_test_case_validation
+      - gate:
+          subject: required_test_case_validation.passed
+          equals: true
+          on_failure: {terminal: failed}
       - operation:
           tool: internal
           command: [run_verification_evidence]

@@ -46,6 +46,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _proposal_execution_units,
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
+    _validate_required_test_cases,
     _write_structrr_plan,
     review_feature_diff,
     run_feature_in_place,
@@ -415,8 +416,7 @@ def test_sentence_design_trace_maps_consequences_to_plan_sections(
     assert any(item["id"] == "design-sentence-1" for item in document["features"])
     assert any(item["id"] == "design-sentence-2" for item in document["invariants"])
     assert any(
-        item["id"] == "design-sentence-3-test"
-        for item in document["required_test_cases"]
+        item["id"] == "design-sentence-3-test" for item in document["expected_tests"]
     )
     assert any(
         item["id"] == "design-sentence-1-acceptance"
@@ -755,6 +755,102 @@ def test_structrr_operations_compile_to_targeted_worker_units() -> None:
     assert request.intent_packet.operation_id == units[0].unit_id
     assert request.intent_packet.required_operations[0]["change"]["id"] == "parse"
     assert "render" not in request.prompt
+
+
+def test_required_test_cases_are_passed_to_worker_prompt() -> None:
+    revision = compile_proposal_revision(
+        "adapter",
+        {"entities": []},
+        {
+            "features": [
+                {"id": "parse", "action": "added", "description": "Parse input."}
+            ]
+        },
+        acceptance_criteria=(),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src", "tests"),
+        source_refs=("structrr:baseline.yaml",),
+    )
+    case = {
+        "id": "parse-test",
+        "description": "The parser accepts valid input.",
+        "intent_refs": ["feature:adapter"],
+        "provider": "pytest",
+        "selector": "tests/test_adapter.py::test_parse",
+        "profile": "pytest",
+        "expectation": "pass",
+        "applicability": {"mode": "affected_closure"},
+        "status": "active",
+    }
+    units = _proposal_execution_units(
+        slug="adapter",
+        feature_description="Add the adapter.",
+        proposal_revision=revision,
+        acceptance_criteria=(),
+        planned_additions=(),
+        planned_deletions=(),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src", "tests"),
+        source_refs=("structrr:baseline.yaml",),
+        required_test_cases=(case,),
+    )
+    request = ImplementationRequest.from_execution_unit(
+        units[0], request_id="request", base_commit="base", plan_fingerprint="plan"
+    )
+    assert "parse-test" in request.prompt
+    assert "tests/test_adapter.py::test_parse" in request.prompt
+
+
+def test_required_test_case_validation_requires_discovered_selector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = tmp_path / "plan.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "required_test_cases": [
+                    {
+                        "id": "parse-test",
+                        "description": "The parser accepts valid input.",
+                        "intent_refs": ["feature:adapter"],
+                        "provider": "pytest",
+                        "selector": "tests/test_adapter.py::test_parse",
+                        "profile": "pytest",
+                        "expectation": "pass",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    profile = type(
+        "Profile",
+        (),
+        {"name": "pytest", "command": ("python", "-m", "pytest"), "source": "test"},
+    )()
+    state: dict[str, Any] = {"plan_path": plan, "validation_profiles": (profile,)}
+
+    class EmptyRegistry:
+        def inventory(
+            self, root: Path, profiles: tuple[object, ...]
+        ) -> tuple[object, ...]:
+            del root, profiles
+            return ()
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.default_verification_provider_registry",
+        lambda: EmptyRegistry(),
+    )
+    result = _validate_required_test_cases(
+        {"plan": str(plan)}, worktree=tmp_path, state=state
+    )
+    assert result["passed"] is False
+    assert "was not discovered" in result["failures"][0]
 
 
 def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> None:

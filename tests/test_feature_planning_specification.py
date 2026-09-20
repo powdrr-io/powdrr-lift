@@ -203,8 +203,6 @@ def test_create_feature_pr_specification_template_writes_default_file(
     assert "acceptance_criteria:" in template_text
     assert "expected_tests:" in template_text
     assert "required_test_cases:" in template_text
-    assert "intent_refs: []" in template_text
-    assert "selector: null" in template_text
     assert "expected_outcomes:" in template_text
     assert "non_goals:" in template_text
     assert "risks:" in template_text
@@ -252,6 +250,22 @@ def test_feature_pr_template_consumes_design_interview_input(tmp_path: Path) -> 
                     ],
                     "deleted": [],
                 },
+                "required_test_cases_edits": {
+                    "added": [
+                        {
+                            "id": "example-test",
+                            "description": "Example workflows pass their focused test.",
+                            "intent_refs": ["feature:example-feature"],
+                            "provider": "pytest",
+                            "selector": "tests/test_example.py::test_workflows",
+                            "profile": "pytest",
+                            "expectation": "pass",
+                            "applicability": {"mode": "affected_closure"},
+                            "status": "active",
+                        }
+                    ],
+                    "deleted": [],
+                },
             }
         ),
         encoding="utf-8",
@@ -272,6 +286,41 @@ def test_feature_pr_template_consumes_design_interview_input(tmp_path: Path) -> 
             "state": "added",
         }
     ]
+    assert document["required_test_cases"] == [
+        {
+            "id": "example-test",
+            "description": "Example workflows pass their focused test.",
+            "intent_refs": ["feature:example-feature"],
+            "provider": "pytest",
+            "selector": "tests/test_example.py::test_workflows",
+            "profile": "pytest",
+            "expectation": "pass",
+            "applicability": {"mode": "affected_closure"},
+            "status": "active",
+        }
+    ]
+
+
+def test_feature_pr_template_rejects_incomplete_required_test_case(
+    tmp_path: Path,
+) -> None:
+    interview_path = tmp_path / "design-interview-input.json"
+    interview_path.write_text(
+        json.dumps(
+            {
+                "required_test_cases_edits": {
+                    "added": [{"id": "missing-selector", "description": "Run it."}],
+                    "deleted": [],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="required test case"):
+        feature_planning.render_feature_pr_specification_template(
+            work_item_name="incomplete-feature", interview_input=interview_path
+        )
 
 
 def _create_repo_with_structured_specs_and_changelogs(tmp_path: Path) -> Path:

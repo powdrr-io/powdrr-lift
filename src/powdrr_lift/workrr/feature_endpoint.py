@@ -427,6 +427,10 @@ def _execute_procedrr_flow(
             return _run_validation_profile(parameters, worktree=worktree, state=state)
         if name == "aggregate_validation":
             return _aggregate_validation(parameters, worktree=worktree, state=state)
+        if name == "validate_required_test_cases":
+            return _validate_required_test_cases(
+                parameters, worktree=worktree, state=state
+            )
         if name == "run_verification_evidence":
             return _run_verification_evidence(
                 parameters,
@@ -1146,6 +1150,105 @@ def _run_verification_evidence(
     }
 
 
+def _require_required_test_cases(
+    document: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], ...]:
+    """Load executable required-test contracts from the generated plan."""
+    raw_cases = document.get("required_test_cases")
+    if not isinstance(raw_cases, list) or not raw_cases:
+        raise PowdrrExecutionError(
+            "plan must contain a non-empty required_test_cases list"
+        )
+    cases: list[Mapping[str, Any]] = []
+    for item in raw_cases:
+        if not isinstance(item, Mapping):
+            raise PowdrrExecutionError(
+                "required_test_cases must contain detail mappings"
+            )
+        if item.get("status") == "superseded":
+            continue
+        required = (
+            "id",
+            "description",
+            "intent_refs",
+            "provider",
+            "selector",
+            "profile",
+            "expectation",
+            "applicability",
+            "status",
+        )
+        missing = [
+            field
+            for field in required
+            if field not in item or item[field] in (None, "", [])
+        ]
+        if missing:
+            identifier = item.get("id", "<unnamed>")
+            raise PowdrrExecutionError(
+                f"required test case {identifier!r} is incomplete: "
+                + ", ".join(missing)
+            )
+        if not isinstance(item["intent_refs"], list) or not all(
+            isinstance(value, str) and value.strip() for value in item["intent_refs"]
+        ):
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid intent_refs"
+            )
+        if not isinstance(item["applicability"], Mapping):
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid applicability"
+            )
+        cases.append(item)
+    if not cases:
+        raise PowdrrExecutionError("plan contains no active required test cases")
+    return tuple(cases)
+
+
+def _validate_required_test_cases(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """Confirm every active plan contract names a test discovered post-edit."""
+    plan_path = Path(_require_flow_text(parameters, "plan"))
+    if plan_path != state.get("plan_path"):
+        raise PowdrrExecutionError(
+            "required test case validation plan does not match the plan state"
+        )
+    cases = _require_required_test_cases(_load_yaml_mapping(plan_path))
+    profiles = state.get("validation_profiles")
+    if not isinstance(profiles, tuple):
+        raise PowdrrExecutionError("validation profiles are unavailable")
+    inventory = tuple(
+        entry
+        for item in default_verification_provider_registry().inventory(
+            worktree, profiles
+        )
+        for entry in _expand_provider_inventory(item.to_data())
+    )
+    state["provider_inventory"] = inventory
+    available = {
+        (item.get("provider"), item.get("profile"), item.get("selector"))
+        for item in inventory
+    }
+    failures: list[str] = []
+    checked: list[dict[str, Any]] = []
+    for case in cases:
+        key = (case["provider"], case["profile"], case["selector"])
+        present = key in available
+        checked.append(
+            {"id": case["id"], "selector": case["selector"], "present": present}
+        )
+        if not present:
+            failures.append(
+                f"required test case {case['id']} was not discovered: "
+                f"{case['provider']}/{case['profile']}/{case['selector']}"
+            )
+    return {"passed": not failures, "failures": failures, "cases": checked}
+
+
 def _reconcile_verification_evidence(
     parameters: Mapping[str, Any], *, state: dict[str, Any]
 ) -> dict[str, Any]:
@@ -1282,7 +1385,7 @@ def _apply_sentence_design_trace(
         "invariant": "invariants",
         "guidance": "guidance",
         "acceptance_criterion": "acceptance_criteria",
-        "expected_test": "required_test_cases",
+        "expected_test": "expected_tests",
         "intent": "features",
         "non_goal": "guidance",
     }
@@ -1348,7 +1451,7 @@ def _apply_sentence_design_trace(
                 )
                 updated += 1
             updated_document["acceptance_criteria"] = acceptance_section
-        test_section = list(updated_document.get("required_test_cases", []))
+        test_section = list(updated_document.get("expected_tests", []))
         test_id = f"{design_id}-test"
         test_ids = {
             str(item.get("id"))
@@ -1359,7 +1462,7 @@ def _apply_sentence_design_trace(
             test_section.append({"id": test_id, "description": expected_test.strip()})
             updated += 1
         updated_document[section_name] = section
-        updated_document["required_test_cases"] = test_section
+        updated_document["expected_tests"] = test_section
 
     if updated:
         path = Path(plan)
@@ -1475,6 +1578,7 @@ def _run_opencode_phase(
     ) = _load_implementation_plan(plan_path, feature_description)
     baseline_document = _load_yaml_mapping(baseline_path)
     plan_document = _load_yaml_mapping(plan_path)
+    required_test_cases = _require_required_test_cases(plan_document)
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
@@ -1564,6 +1668,7 @@ def _run_opencode_phase(
         must_preserve=must_preserve,
         non_goals=non_goals,
         feature_obligations=feature_obligations,
+        required_test_cases=required_test_cases,
         allowed_paths=config.allowed_paths,
         source_refs=source_context,
         validation_profiles=state["validation_profile_names"],
@@ -1874,6 +1979,7 @@ def _proposal_execution_units(
     source_refs: tuple[str, ...],
     validation_profiles: tuple[str, ...] = ("feature-validation",),
     feature_obligations: tuple[str, ...] = (),
+    required_test_cases: Sequence[Mapping[str, Any]] = (),
     verification_obligations: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[ExecutionUnit, ...]:
     """Compile one worker unit per explicit Structrr operation."""
@@ -1887,8 +1993,18 @@ def _proposal_execution_units(
         for item in verification_obligations
         if isinstance(item, Mapping)
     )
+    required_test_summary = tuple(
+        "Implement and preserve required test case "
+        f"{item.get('id')}: {item.get('description')} "
+        f"(provider={item.get('provider')}, profile={item.get('profile')}, "
+        f"selector={item.get('selector')}, expectation={item.get('expectation')})."
+        for item in required_test_cases
+        if isinstance(item, Mapping)
+    )
     acceptance_criteria = tuple(
-        dict.fromkeys((*acceptance_criteria, *verification_summary))
+        dict.fromkeys(
+            (*acceptance_criteria, *required_test_summary, *verification_summary)
+        )
     )
     if not proposal_revision.operations:
         return (

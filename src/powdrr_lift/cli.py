@@ -203,7 +203,7 @@ from powdrr_lift.workrr.human_task import (
 )
 from powdrr_lift.workrr.instruction_analysis import (
     InstructionAnalysisError,
-    analyze_instruction_file,
+    run_instruction_analysis_flow,
 )
 from powdrr_lift.workrr.prompt_probe import (
     WorkflowPromptProbeError,
@@ -4456,7 +4456,7 @@ def _run_analyze_instruction(args: argparse.Namespace) -> int:
             model_cache_dir=repo_root / ".powdrr" / "models",
             progress_stream=sys.stderr,
         )
-        report = analyze_instruction_file(
+        report = run_instruction_analysis_flow(
             args.instruction_file,
             repo_root=repo_root,
             work_item_name=args.work_item_name,

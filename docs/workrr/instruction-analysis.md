@@ -4,6 +4,10 @@
 read-only Powdrr planning packet. It is the proposal-side boundary between a
 user instruction and the later `implement-feature` flow.
 
+The command runs the `analyze-instruction` Procedrr skill. Procedrr owns the
+sequence and the single planning-model activation; deterministic internal
+operations load evidence and compile the resulting packet.
+
 ```sh
 powdrr-lift analyze-instruction \
   --instruction-file request.txt \

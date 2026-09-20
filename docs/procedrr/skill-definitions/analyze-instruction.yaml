@@ -1,0 +1,72 @@
+version: 1
+name: analyze-instruction
+inputs:
+  - {name: instruction_file, type: string, required: true}
+  - {name: repo_root, type: string, required: true}
+  - {name: work_item_name, type: string, required: true}
+  - {name: allowed_paths, type: array, required: true}
+outputs:
+  analysis: {type: object, required: [status, proposal_review, fingerprint]}
+limits: {llm_activations: 1, tool_calls: 2}
+steps:
+  - operation:
+      tool: internal
+      command: [load_instruction_analysis_context]
+      parameters:
+        instruction_file: {type: reference, value: instruction_file}
+        repo_root: {type: reference, value: repo_root}
+        work_item_name: {type: reference, value: work_item_name}
+      returns:
+        type: object
+        required: [instruction_file, repo_root, work_item_name, instruction, baseline, active_intent]
+        properties:
+          instruction_file: {type: string, minLength: 1}
+          repo_root: {type: string, minLength: 1}
+          work_item_name: {type: string, minLength: 1}
+          instruction: {type: string, minLength: 1}
+          baseline: {type: object}
+          active_intent: {type: array}
+      bind: analysis_context
+  - judge:
+      kind: propose_candidate_plan
+      provider: planning
+      question: What candidate Structrr plan represents this instruction while preserving the supplied active intent?
+      subject: analysis_context.instruction
+      prompt_system: Return only the declared JSON object. Do not write code.
+      instructions:
+        - Return a plan object using the repository's Structrr/changelog-v2 sections.
+        - Use added, deleted, or removed actions for changed items.
+        - Include intent_effect on every changed item that affects intent.
+        - Preserve existing active intent unless the instruction explicitly changes it.
+        - Include acceptance criteria and required test cases when inferable.
+      context: [analysis_context]
+      output:
+        name: candidate_plan
+        schema:
+          type: object
+          required: [plan]
+          additionalProperties: false
+          properties:
+            plan: {type: object}
+      validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [compile_instruction_analysis]
+      parameters:
+        context: {type: reference, value: analysis_context}
+        planning_response: {type: reference, value: candidate_plan}
+        allowed_paths: {type: reference, value: allowed_paths}
+      returns:
+        type: object
+        required: [status, review_required, implementation_authorized, proposal_revision, feature_obligations, verification_obligations, proposal_review, fingerprint]
+        properties:
+          status: {type: string, minLength: 1}
+          review_required: {type: boolean}
+          implementation_authorized: {type: boolean}
+          proposal_revision: {type: object}
+          feature_obligations: {type: array}
+          verification_obligations: {type: object}
+          proposal_review: {type: object}
+          fingerprint: {type: string, minLength: 1}
+      bind: analysis
+  - terminal: succeeded

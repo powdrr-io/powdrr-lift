@@ -6,12 +6,15 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.workrr.instruction_analysis import analyze_instruction_file
+from powdrr_lift.workrr.instruction_analysis import (
+    analyze_instruction_file,
+    run_instruction_analysis_flow,
+)
 
 
 class FakePlanningClient:
     def complete_json(self, messages: list[dict[str, str]], **_: Any) -> dict[str, Any]:
-        assert "current_active_intent" in messages[-1]["content"]
+        assert "instruction" in messages[-1]["content"]
         return {
             "plan": {
                 "features": [
@@ -80,3 +83,25 @@ def test_analyze_instruction_compiles_packet_without_writing_repo(
     ]
     assert report["proposal_review"]["passed"] is True
     json.dumps(report)
+
+
+def test_analyze_instruction_runs_through_procedrr(
+    tmp_path: Path,
+) -> None:
+    current = tmp_path / "docs" / "structrr" / "current"
+    current.mkdir(parents=True)
+    (current / "baseline-001.yaml").write_text(
+        yaml.safe_dump({"entities": [], "active_intent": []}), encoding="utf-8"
+    )
+    instruction = tmp_path / "request.txt"
+    instruction.write_text("Add the endpoint.", encoding="utf-8")
+
+    report = run_instruction_analysis_flow(
+        instruction,
+        repo_root=tmp_path,
+        work_item_name="Procedrr Analysis",
+        planning_client=FakePlanningClient(),
+    )
+
+    assert report["status"] == "proposal_only"
+    assert report["implementation_authorized"] is False

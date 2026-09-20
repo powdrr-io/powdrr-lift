@@ -175,6 +175,144 @@ def analyze_instruction_file(
     return report
 
 
+def prepare_instruction_context(
+    instruction_file: str | Path,
+    *,
+    repo_root: str | Path,
+    work_item_name: str,
+) -> dict[str, Any]:
+    """Load the immutable context supplied to the Procedrr planning step."""
+    root = Path(repo_root).resolve()
+    source = Path(instruction_file).resolve()
+    try:
+        instruction = source.read_text(encoding="utf-8")
+    except OSError as error:
+        raise InstructionAnalysisError(f"could not read {source}: {error}") from error
+    if not instruction.strip():
+        raise InstructionAnalysisError("instruction file must not be empty")
+    baseline, baseline_ref = _load_baseline(root)
+    active_intent = resolve_active_intent(root, baseline_document=baseline)
+    return {
+        "repo_root": str(root),
+        "instruction_file": str(source),
+        "instruction": instruction,
+        "work_item_name": work_item_name,
+        "baseline": baseline,
+        "baseline_ref": baseline_ref,
+        "active_intent": [item.to_data() for item in active_intent],
+    }
+
+
+def compile_instruction_analysis(
+    context: Mapping[str, Any],
+    planning_response: Mapping[str, Any],
+    *,
+    allowed_paths: Sequence[str] = (".",),
+) -> dict[str, Any]:
+    """Compile a Procedrr planning response without another model call."""
+    required = ("instruction_file", "repo_root", "work_item_name")
+    if not all(isinstance(context.get(key), str) for key in required):
+        raise InstructionAnalysisError("analysis context is incomplete")
+    return analyze_instruction_file(
+        context["instruction_file"],
+        repo_root=context["repo_root"],
+        work_item_name=context["work_item_name"],
+        planning_client=_StaticPlanningClient(planning_response),
+        allowed_paths=allowed_paths,
+    )
+
+
+def run_instruction_analysis_flow(
+    instruction_file: str | Path,
+    *,
+    repo_root: str | Path,
+    work_item_name: str,
+    planning_client: WorkflowLLMClient,
+    allowed_paths: Sequence[str] = (".",),
+) -> dict[str, Any]:
+    """Run the read-only analysis as a bounded Procedrr process."""
+    from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+    from procedrr import parse_and_validate
+    from procedrr_evaluator import Evaluator
+
+    root = Path(repo_root).resolve()
+    skills_dir = root / "docs" / "procedrr" / "skill-definitions"
+    flow_path = skills_dir / "analyze-instruction.yaml"
+    if not flow_path.is_file():
+        flow_path = (
+            Path(__file__).resolve().parents[3]
+            / "docs"
+            / "procedrr"
+            / "skill-definitions"
+            / "analyze-instruction.yaml"
+        )
+    flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool != "internal":
+            raise InstructionAnalysisError(
+                f"analyze-instruction requested unsupported tool {tool!r}"
+            )
+        command = parameters.get("command")
+        if command == ["load_instruction_analysis_context"]:
+            return prepare_instruction_context(
+                str(parameters["instruction_file"]),
+                repo_root=str(parameters["repo_root"]),
+                work_item_name=str(parameters["work_item_name"]),
+            )
+        if command == ["compile_instruction_analysis"]:
+            context = parameters.get("context")
+            response = parameters.get("planning_response")
+            paths = parameters.get("allowed_paths")
+            if not isinstance(context, Mapping) or not isinstance(response, Mapping):
+                raise InstructionAnalysisError(
+                    "compile_instruction_analysis inputs are malformed"
+                )
+            if not isinstance(paths, list) or not all(
+                isinstance(item, str) for item in paths
+            ):
+                raise InstructionAnalysisError(
+                    "allowed_paths must be a list of strings"
+                )
+            return compile_instruction_analysis(
+                context, response, allowed_paths=tuple(paths)
+            )
+        raise InstructionAnalysisError(
+            f"unknown analyze-instruction operation: {command}"
+        )
+
+    client = WorkrrProcedrrClient(planning_client, skills_dir=skills_dir)
+    result = Evaluator(
+        client,
+        execute,
+        process_directory=skills_dir,
+        judge_clients={"planning": client},
+    ).evaluate(
+        flow,
+        {
+            "instruction_file": str(Path(instruction_file).resolve()),
+            "repo_root": str(root),
+            "work_item_name": work_item_name,
+            "allowed_paths": list(allowed_paths),
+        },
+    )
+    analysis = result.bindings.get("analysis")
+    if not isinstance(analysis, Mapping):
+        raise InstructionAnalysisError("analyze-instruction flow produced no analysis")
+    return dict(analysis)
+
+
+class _StaticPlanningClient:
+    """Adapter that lets the Procedrr result enter the deterministic compiler."""
+
+    def __init__(self, response: Mapping[str, Any]) -> None:
+        self.response = dict(response)
+
+    def complete_json(self, messages: list[dict[str, str]], **_: Any) -> dict[str, Any]:
+        del messages
+        return self.response
+
+
 def _planning_messages(
     *,
     instruction: str,
@@ -380,4 +518,7 @@ __all__ = [
     "ANALYSIS_SCHEMA_VERSION",
     "InstructionAnalysisError",
     "analyze_instruction_file",
+    "compile_instruction_analysis",
+    "prepare_instruction_context",
+    "run_instruction_analysis_flow",
 ]

@@ -14,9 +14,10 @@ files:
   - {path: src/powdrr_lift/cli.py, type: modified, summary: Import instruction analysis support, rationale: Connect the CLI to the read-only planning endpoint, span: {start_line: 204, end_line: 207}}
   - {path: src/powdrr_lift/cli.py, type: modified, summary: Register analyze-instruction, rationale: Expose the read-only planning endpoint through the CLI, span: {start_line: 1378, end_line: 1419}}
   - {path: src/powdrr_lift/cli.py, type: modified, summary: Configure planning and emit the analysis report, rationale: Connect the endpoint to the configured planning provider while preserving the no-edit boundary, span: {start_line: 4443, end_line: 4477}}
-  - {path: src/powdrr_lift/workrr/instruction_analysis.py, type: added, summary: Compile an instruction into intent, obligations, proposal, verification, and review artifacts, rationale: Make the planning packet deterministic and reusable by later implementation gates, span: {start_line: 1, end_line: 383}}
-  - {path: docs/workrr/instruction-analysis.md, type: added, summary: Document endpoint usage and read-only guarantees, rationale: Define the command contract for agents and operators, span: {start_line: 1, end_line: 53}}
-  - {path: tests/test_instruction_analysis.py, type: added, summary: Verify packet compilation and repository immutability, rationale: Protect the endpoint contract and its preview-only boundary, span: {start_line: 1, end_line: 82}}
+  - {path: src/powdrr_lift/workrr/instruction_analysis.py, type: added, summary: Compile an instruction into intent, obligations, proposal, verification, and review artifacts, rationale: Make the planning packet deterministic and reusable by later implementation gates, span: {start_line: 1, end_line: 524}}
+  - {path: docs/procedrr/skill-definitions/analyze-instruction.yaml, type: added, summary: Orchestrate read-only instruction analysis, rationale: Put sequencing and the bounded planning decision under Procedrr control, span: {start_line: 1, end_line: 72}}
+  - {path: docs/workrr/instruction-analysis.md, type: added, summary: Document endpoint usage and read-only guarantees, rationale: Define the command contract for agents and operators, span: {start_line: 1, end_line: 57}}
+  - {path: tests/test_instruction_analysis.py, type: added, summary: Verify packet compilation and repository immutability, rationale: Protect the endpoint contract and its preview-only boundary, span: {start_line: 1, end_line: 107}}
 entities:
   - id: analyze-instruction-command
     type: Command

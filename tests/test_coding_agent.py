@@ -371,6 +371,9 @@ def test_opencode_provider_uses_json_events_and_inline_policy(
     environment = captured["environment"]
     assert isinstance(environment, dict)
     assert environment["PWD"] == str(tmp_path.resolve())
+    assert environment["XDG_DATA_HOME"] == str(tmp_path / ".opencode-data")
+    assert environment["XDG_STATE_HOME"] == str(tmp_path / ".opencode-data")
+    assert environment["XDG_CACHE_HOME"] == str(tmp_path / ".opencode-cache")
     assert json.loads(str(environment["OPENCODE_PERMISSION"]))["question"] == "deny"
 
 

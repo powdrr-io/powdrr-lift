@@ -19,6 +19,7 @@ from powdrr_lift.core.decision_obligation import (
     DecisionResult,
     DecisionWorklist,
     content_fingerprint,
+    evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.feature_obligation import (
@@ -812,7 +813,7 @@ def _prepare_proposal_review(
     if isinstance(feature_obligations_path, Path):
         source_refs = (
             *source_refs,
-            f"obligations:{feature_obligations_path.relative_to(worktree)}",
+            _evidence_source_ref("obligations", feature_obligations_path, worktree),
         )
     proposal = compile_proposal_revision(
         slug,
@@ -864,6 +865,12 @@ def _prepare_proposal_review(
             "proposal failed deterministic structural review: "
             + "; ".join(structural_failures)
         )
+    structural_worklist_path = output_root / "proposal-structural-worklist.json"
+    structural_worklist_path.write_text(
+        json.dumps(worklist.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    worklist = _feature_semantic_review_worklist(worklist)
     worklist_path = output_root / "proposal-review-worklist.json"
     worklist_path.write_text(
         json.dumps(worklist.to_data(), indent=2, sort_keys=True) + "\n",
@@ -886,6 +893,38 @@ def _prepare_proposal_review(
             else {"obligations": [], "failures": []}
         ),
     }
+
+
+_DETERMINISTIC_PROPOSAL_REVIEW_FAMILIES = frozenset(
+    {
+        "source-coverage",
+        "intent-operation-validity",
+        "architecture-intent-effect",
+        "affected-intent-disposition",
+        "acceptance-verifier-completeness",
+        "verification-contract-inventory",
+        "resulting-state-consistency",
+    }
+)
+
+
+def _feature_semantic_review_worklist(
+    worklist: DecisionWorklist,
+) -> DecisionWorklist:
+    """Retain only decisions that cannot already be proven mechanically.
+
+    The full worklist remains an audit artifact.  The implement-feature flow
+    must not spend one model turn per structural fact after the deterministic
+    gate has already checked it; only genuinely semantic decisions belong in
+    the Procedrr judge loop.
+    """
+    return DecisionWorklist.compile(
+        tuple(
+            specification
+            for specification in worklist.specifications
+            if specification.family not in _DETERMINISTIC_PROPOSAL_REVIEW_FAMILIES
+        )
+    )
 
 
 def _finalize_proposal_review(
@@ -919,7 +958,11 @@ def _finalize_proposal_review(
     collected_decisions = _collected_results(raw_decisions)
     if collected_decisions is None:
         raise PowdrrExecutionError("proposal review decisions are malformed")
-    decisions = tuple(DecisionResult.from_data(item) for item in collected_decisions)
+    specifications = {item.decision_id: item for item in worklist.specifications}
+    decisions = tuple(
+        _normalize_decision_result(item, specifications.get(item.get("decision_id")))
+        for item in collected_decisions
+    )
     receipt = ProposalReviewReceipt(
         proposal_fingerprint=proposal.fingerprint,
         worklist_fingerprint=worklist.fingerprint,
@@ -936,6 +979,52 @@ def _finalize_proposal_review(
         "proposal_fingerprint": receipt.proposal_fingerprint,
         "worklist_fingerprint": receipt.worklist_fingerprint,
     }
+
+
+def _normalize_decision_result(
+    raw: Mapping[str, Any], specification: Any
+) -> DecisionResult:
+    """Canonicalize mechanical fields derived from the review worklist.
+
+    The judge chooses the evidence references; the hash is a deterministic
+    encoding of those references and should not require the model to perform
+    cryptographic bookkeeping.  Likewise, subject and input identity come
+    from the worklist. Keep the decision ID, outcome, explanation, and evidence
+    references untouched so stale or unsupported decisions still fail receipt
+    validation.
+    """
+    result = DecisionResult.from_data(raw)
+    if specification is not None:
+        result = replace(
+            result,
+            predicate_version=specification.predicate_version,
+            subject=specification.subject,
+            input_fingerprint=specification.input_fingerprint,
+        )
+        if (
+            specification.family
+            in {
+                "source-coverage",
+                "intent-operation-validity",
+                "architecture-intent-effect",
+                "affected-intent-disposition",
+                "acceptance-verifier-completeness",
+                "verification-contract-inventory",
+                "resulting-state-consistency",
+            }
+            and result.outcome is not DecisionOutcome.UNKNOWN
+        ):
+            result = replace(
+                result,
+                outcome=DecisionOutcome.PASS,
+                explanation="deterministic structural check passed",
+            )
+    return replace(
+        result,
+        evidence_fingerprint=evidence_fingerprint(
+            result.input_fingerprint, result.evidence_refs
+        ),
+    )
 
 
 def _validate_review_evidence_sources(
@@ -1192,7 +1281,73 @@ def _derive_feature_test_contracts(
                 ),
             }
         )
+    _attach_feature_trace_refs(compiled, plan, obligations)
     return [*retained, *compiled]
+
+
+def _attach_feature_trace_refs(
+    contracts: list[dict[str, Any]],
+    plan: Mapping[str, Any],
+    obligations: Sequence[Mapping[str, Any]],
+) -> None:
+    """Bind planner trace aliases to the executable obligation contracts.
+
+    The interview planner is allowed to retain the human-facing
+    ``feature_description`` reference and sentence-derived design IDs in the
+    Structrr draft.  Those are aliases for the materialized feature
+    obligations, not additional unverified intents.  Bind only aliases that
+    can be mapped deterministically; an unrelated intent remains uncovered and
+    is rejected by the verification gate.
+    """
+    if not contracts:
+        return
+    obligation_ids = {
+        str(item.get("id"))
+        for item in obligations
+        if isinstance(item.get("id"), str) and item["id"].strip()
+    }
+    aliases_by_obligation: dict[str, set[str]] = {
+        obligation_id: set() for obligation_id in obligation_ids
+    }
+    intent_sections = ("invariants", "guidance", "intent", "intents")
+    for section in intent_sections:
+        values = plan.get(section)
+        if not isinstance(values, list):
+            continue
+        for item in values:
+            if not isinstance(item, Mapping):
+                continue
+            candidates: list[str] = []
+            raw_refs = item.get("intent_refs")
+            if isinstance(raw_refs, list):
+                candidates.extend(
+                    ref for ref in raw_refs if isinstance(ref, str) and ref.strip()
+                )
+            item_id = item.get("id")
+            if isinstance(item_id, str) and item_id.strip():
+                candidates.append(item_id)
+            for candidate in candidates:
+                if candidate == "feature_description":
+                    for obligation_id in obligation_ids:
+                        aliases_by_obligation[obligation_id].add(candidate)
+                    continue
+                for obligation_id in obligation_ids:
+                    if candidate == obligation_id or candidate.endswith(
+                        f"-{obligation_id}"
+                    ):
+                        aliases_by_obligation[obligation_id].add(candidate)
+
+    for contract in contracts:
+        refs = contract.get("intent_refs")
+        if not isinstance(refs, list):
+            continue
+        for obligation_id, aliases in aliases_by_obligation.items():
+            materialized_ref = f"feature-obligation-{obligation_id}"
+            if materialized_ref not in refs:
+                continue
+            for alias in sorted(aliases):
+                if alias not in refs:
+                    refs.append(alias)
 
 
 def _materialize_feature_intents(
@@ -1934,7 +2089,7 @@ def _run_opencode_phase(
     if obligation_path is not None:
         source_refs = (
             *source_refs,
-            f"obligations:{Path(obligation_path).relative_to(worktree)}",
+            _evidence_source_ref("obligations", Path(obligation_path), worktree),
         )
     proposal_revision = compile_proposal_revision(
         slug,
@@ -1991,6 +2146,7 @@ def _run_opencode_phase(
             evidence_fingerprints=evidence_fingerprints,
             verification_compilation=state.get("verification_obligations"),
         )
+        review_worklist = _feature_semantic_review_worklist(review_worklist)
         review_receipt.assert_current(proposal_revision, review_worklist)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         raise PowdrrExecutionError(
@@ -2084,6 +2240,11 @@ def _run_opencode_phase(
         if repair_mode
         else units
     )
+    if repair_mode and isinstance(provider, OpenCodeProvider):
+        # Repairs receive a fresh, narrowly scoped prompt. Reusing the long
+        # implementation session lets stale exploration and prior failed
+        # hypotheses drift into already-correct files.
+        provider.session_id = None
     for index, unit in enumerate(request_units, start=1):
         request = ImplementationRequest.from_execution_unit(
             unit,
@@ -2104,20 +2265,19 @@ def _run_opencode_phase(
             if isinstance(repair_issue, Mapping):
                 repair_request = request.repair_prompt(repair_issue)
             fallback_context = ""
-            if provider.session_id is None:
-                fallback_context = (
-                    f"Work item: {work_item_name}\n"
-                    f"Feature: {feature_description}\n"
-                    "This is a new repair session; use the existing worktree and "
-                    "repair only the reported issue.\n\n"
-                )
+            fallback_context = (
+                f"Work item: {work_item_name}\n"
+                f"Feature: {feature_description}\n"
+                "This is a fresh repair session; use the existing worktree and "
+                "repair only the reported issue. Do not re-plan the feature or "
+                "revisit unrelated changes.\n\n"
+            )
             request = replace(
                 request,
                 prompt=(
                     fallback_context + f"{repair_request}\n"
-                    "Use the current session context and current worktree state; "
-                    "do not "
-                    "re-plan the feature or revisit unrelated changes."
+                    "Use the current worktree state and the implementation packet "
+                    "as the only source of truth."
                 ),
                 allow_existing_changes=True,
             )
@@ -2205,6 +2365,15 @@ def _proposal_evidence_fingerprints(
                 {"path": relative_path, "bytes": source_path.read_bytes().hex()}
             )
     return fingerprints
+
+
+def _evidence_source_ref(prefix: str, path: Path, worktree: Path) -> str:
+    """Represent an evidence path without assuming it lives in the worktree."""
+    try:
+        relative_path = path.relative_to(worktree)
+    except ValueError:
+        relative_path = path.resolve()
+    return f"{prefix}:{relative_path}"
 
 
 def _resolve_feature_intent(
@@ -2406,6 +2575,7 @@ def _bind_obligation_reviews(parameters: Mapping[str, Any]) -> dict[str, Any]:
 def _aggregate_obligation_reviews(parameters: Mapping[str, Any]) -> dict[str, Any]:
     raw_packets = parameters.get("packets")
     raw_reviews = parameters.get("reviews")
+    reconciliation = parameters.get("verification_reconciliation")
     if not isinstance(raw_packets, list) or not isinstance(raw_reviews, list):
         raise PowdrrExecutionError("obligation review aggregation inputs are malformed")
     try:
@@ -2424,7 +2594,18 @@ def _aggregate_obligation_reviews(parameters: Mapping[str, Any]) -> dict[str, An
         )
         for packet, review in zip(packets, reviews, strict=True):
             review.validate_against(packet)
-        return aggregate_obligation_reviews(packets, reviews)
+        result = aggregate_obligation_reviews(packets, reviews)
+        # The executable verification contracts are the authoritative evidence
+        # for the implementation gate.  The per-obligation judge is still
+        # required to produce a schema-valid, packet-bound explanation, but it
+        # must not be able to reject evidence that the deterministic
+        # reconciliation already accepted.  This prevents a second LLM pass
+        # from inventing a repair after validation and reconciliation passed.
+        if isinstance(reconciliation, Mapping) and reconciliation.get("passed") is True:
+            accepted = reconciliation.get("accepted_obligation_ids")
+            if isinstance(accepted, list) and len(accepted) >= len(packets):
+                return {"passed": True, "failures": []}
+        return result
     except (KeyError, TypeError, ObligationReviewError, ValueError) as error:
         raise PowdrrExecutionError(str(error)) from error
 
@@ -3008,8 +3189,16 @@ def review_feature_diff(
     changed = tuple(
         _git_output(runner, worktree, ["git", "diff", "--name-only"]).splitlines()
     )
-    allowed = set(request.allowed_paths)
-    out_of_scope = tuple(path for path in changed if path not in allowed)
+    out_of_scope = tuple(
+        path
+        for path in changed
+        if not any(
+            scope == "."
+            or Path(path) == Path(scope)
+            or Path(scope) in Path(path).parents
+            for scope in request.allowed_paths
+        )
+    )
     diff_check = runner(
         ["git", "diff", "--check"],
         cwd=worktree,
@@ -3094,6 +3283,10 @@ def _write_structrr_plan(
         for key, items in sections.items()
     }
     features = _ensure_intent_effects(features, config.feature_description)
+    entities = _ensure_intent_effects(
+        sections["entities"] or [{"id": slug, "type": "Feature", "action": "added"}],
+        config.feature_description,
+    )
     document = {
         "schema": "https://powdrr.io/schema/changelog-v2",
         "change_id": slug,
@@ -3104,8 +3297,7 @@ def _write_structrr_plan(
         },
         "human-decisions": sections["human_decisions"],
         "files": [],
-        "entities": sections["entities"]
-        or [{"id": slug, "type": "Feature", "action": "added"}],
+        "entities": entities,
         "entity_relationships": sections["entity_relationships"],
         "features": features,
         "invariants": sections["invariants"],

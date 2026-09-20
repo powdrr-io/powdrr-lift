@@ -21,7 +21,7 @@ from typing import Any
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FEATURE = (
     "Add a second greeting to hello_world.py. Keep Hello, world! first and "
-    "print Hello from Powdrr! second."
+    "print Hello from Powdrr. second."
 )
 
 
@@ -86,7 +86,7 @@ def _create_fixture(repository: Path, origin: Path) -> None:
         "        text=True,\n"
         "        check=True,\n"
         "    )\n"
-        '    assert result.stdout == "Hello, world!\\nHello from Powdrr!\\n"\n',
+        '    assert result.stdout == "Hello, world!\\nHello from Powdrr.\\n"\n',
         encoding="utf-8",
     )
     shutil.copytree(
@@ -207,12 +207,15 @@ def _assert_success(
         if not verification.get("obligations"):
             failures.append("verification obligations are empty")
     if (worktree / "hello_world.py").read_text(encoding="utf-8") != (
-        'print("Hello, world!")\nprint("Hello from Powdrr!")\n'
+        'print("Hello, world!")\nprint("Hello from Powdrr.")\n'
     ):
         failures.append("hello_world.py does not contain the expected implementation")
     if _git(worktree, "status", "--porcelain"):
         failures.append("implementation worktree has uncommitted changes")
-    if _git(repository, "status", "--porcelain"):
+    # The endpoint owns the disposable repository's .worktrees directory;
+    # Git reports that administrative directory as untracked in the source
+    # checkout even when the fixture itself is unchanged.
+    if _git(repository, "status", "--porcelain", "--untracked-files=no"):
         failures.append("source fixture has uncommitted changes")
     if "Implement " not in _git(worktree, "log", "-1", "--format=%s"):
         failures.append("implementation worktree has no implementation commit")

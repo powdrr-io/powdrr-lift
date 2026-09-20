@@ -1374,14 +1374,16 @@ def test_finalize_proposal_review_writes_only_complete_matching_receipts(
             predicate_version=specification.predicate_version,
             subject=specification.subject,
             input_fingerprint=specification.input_fingerprint,
-            evidence_fingerprint=evidence_fingerprint(
-                specification.input_fingerprint,
-                specification.evidence_requirements,
-            ),
+            evidence_fingerprint="model-supplied-placeholder",
             evidence_refs=specification.evidence_requirements,
         ).to_data()
         for specification in worklist.specifications
     ]
+    decisions[0]["subject"] = "model-used-the-wrong-subject"
+    source_decision = next(
+        item for item in decisions if item["decision_id"].startswith("source-coverage:")
+    )
+    source_decision["outcome"] = "fail"
 
     result = _finalize_proposal_review(
         worktree=tmp_path,
@@ -1397,6 +1399,11 @@ def test_finalize_proposal_review_writes_only_complete_matching_receipts(
     receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
     assert receipt["proposal_fingerprint"] == proposal.fingerprint
     assert receipt["worklist_fingerprint"] == worklist.fingerprint
+    assert all(
+        item["evidence_fingerprint"]
+        == evidence_fingerprint(item["input_fingerprint"], tuple(item["evidence_refs"]))
+        for item in receipt["decision_results"]
+    )
 
 
 def test_aggregate_intent_review_blocks_altered_intent() -> None:

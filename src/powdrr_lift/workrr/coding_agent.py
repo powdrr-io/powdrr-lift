@@ -378,12 +378,55 @@ class CodingAgentAttemptStore:
         self.root = root
         self.requests_root = root / "requests"
         self.attempts_root = root / "attempts"
+        self.prompts_root = root / "prompts"
 
     def save_request(self, request: ImplementationRequest) -> Path:
         path = self._path(self.requests_root, request.request_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(request.to_json(), encoding="utf-8")
         return path
+
+    def save_prompt(
+        self, request: ImplementationRequest, *, attempt_id: str, provider: str
+    ) -> Path:
+        """Persist the exact prompt sent for one attempt without overwriting history."""
+        prompt_path = self._path(self.prompts_root, attempt_id, suffix=".txt")
+        prompt_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt_path.write_text(request.prompt, encoding="utf-8")
+        metadata_path = self._path(self.prompts_root, attempt_id)
+        metadata_path.write_text(
+            json.dumps(
+                {
+                    "attempt_id": attempt_id,
+                    "request_id": request.request_id,
+                    "provider": provider,
+                    "prompt_path": str(prompt_path.relative_to(self.root)),
+                    "prompt_sha256": hashlib.sha256(
+                        request.prompt.encode("utf-8")
+                    ).hexdigest(),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        index_path = self.prompts_root / "index.json"
+        records: list[dict[str, Any]] = []
+        if index_path.exists():
+            existing = json.loads(index_path.read_text(encoding="utf-8"))
+            if isinstance(existing, list):
+                records = [dict(item) for item in existing if isinstance(item, Mapping)]
+        records = [item for item in records if item.get("attempt_id") != attempt_id]
+        records.append(json.loads(metadata_path.read_text(encoding="utf-8")))
+        index_path.write_text(
+            json.dumps(
+                sorted(records, key=lambda item: str(item["attempt_id"])), indent=2
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return prompt_path
 
     def save_attempt(self, attempt: CodingAgentAttempt) -> Path:
         path = self._path(self.attempts_root, attempt.attempt_id)
@@ -450,10 +493,10 @@ class CodingAgentAttemptStore:
         )
 
     @staticmethod
-    def _path(root: Path, artifact_id: str) -> Path:
+    def _path(root: Path, artifact_id: str, *, suffix: str = ".json") -> Path:
         if not artifact_id or Path(artifact_id).name != artifact_id:
             raise ValueError("artifact ids must be simple file names")
-        return root / f"{artifact_id}.json"
+        return root / f"{artifact_id}{suffix}"
 
 
 @dataclass(slots=True)
@@ -471,6 +514,9 @@ class CodingAgentRunner:
         attempt_id: str,
     ) -> CodingAgentAttempt:
         self.store.save_request(request)
+        self.store.save_prompt(
+            request, attempt_id=attempt_id, provider=self.provider.provider_name
+        )
         attempt = run_coding_agent(
             self.provider,
             request,

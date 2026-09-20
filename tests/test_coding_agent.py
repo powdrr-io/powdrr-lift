@@ -437,9 +437,10 @@ def test_runner_persists_request_and_attempt_artifacts(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path / "repo")
     store = CodingAgentAttemptStore(tmp_path / "artifacts")
     runner = CodingAgentRunner(FakeProvider("allowed"), store)
+    request = _request(_head(worktree))
 
     attempt = runner.run(
-        _request(_head(worktree)),
+        request,
         worktree_root=worktree,
         attempt_id="attempt-persisted",
     )
@@ -449,6 +450,22 @@ def test_runner_persists_request_and_attempt_artifacts(tmp_path: Path) -> None:
     assert store.load_attempt("attempt-persisted") == attempt
     assert (tmp_path / "artifacts" / "requests" / "request-1.json").exists()
     assert (tmp_path / "artifacts" / "attempts" / "attempt-persisted.json").exists()
+    prompt_path = tmp_path / "artifacts" / "prompts" / "attempt-persisted.txt"
+    assert prompt_path.read_text(encoding="utf-8") == request.prompt
+    prompt_metadata = json.loads(
+        (tmp_path / "artifacts" / "prompts" / "attempt-persisted.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert prompt_metadata["provider"] == "fake"
+    assert (
+        json.loads(
+            (tmp_path / "artifacts" / "prompts" / "index.json").read_text(
+                encoding="utf-8"
+            )
+        )[0]["attempt_id"]
+        == "attempt-persisted"
+    )
 
 
 def test_runner_persists_policy_denial_for_dirty_worktree(tmp_path: Path) -> None:

@@ -1,7 +1,6 @@
 """A small, total control plane for bounded LLM-assisted procedures."""
 
 from procedrr.compiler import CompilationError, CompilationReport, compile_workflow
-from procedrr.design_interview import design_interview
 from procedrr.editor import append_step, apply_json_edits, set_value
 from procedrr.fragments import (
     apply_fragment_edit,
@@ -81,5 +80,4 @@ __all__ = [
     "start_fragment",
     "validate_document",
     "validate_single_decision",
-    "design_interview",
 ]

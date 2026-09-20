@@ -1,0 +1,29 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 757
+title: Remove obsolete Python design-interview generator
+intent:
+  problem: Procedrr contains a Python-generated design-interview workflow that is no longer used while the checked-in YAML definition is authoritative.
+  goal: Remove the unreachable implementation and its obsolete direct test without changing the active YAML Procedrr flow.
+human-decisions:
+  - id: retain-yaml-definition
+    summary: Keep the checked-in docs/procedrr/skill-definitions/design-interview.yaml definition and its evaluator coverage.
+structured_files: []
+files:
+  - {path: src/procedrr/design_interview.py, type: deleted, summary: Remove the unused Python-generated design-interview workflow, rationale: Eliminate a duplicate implementation that has no production callers, span: {start_line: 1, end_line: 251}}
+  - {path: src/procedrr/__init__.py, type: modified, summary: Remove the obsolete design_interview package export, rationale: Keep the public Procedrr surface aligned with supported implementations, span: {start_line: 4, end_line: 4}}
+  - {path: src/procedrr/__init__.py, type: modified, summary: Remove the obsolete design_interview export name, rationale: Prevent callers from depending on deleted code, span: {start_line: 84, end_line: 84}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Remove the obsolete generator import, rationale: Retain coverage for the active YAML definition while eliminating obsolete-only coverage, span: {start_line: 23, end_line: 23}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Remove obsolete generator compilation assertions, rationale: Keep tests focused on supported Procedrr behavior, span: {start_line: 405, end_line: 419}}
+entities: []
+entity_relationships: []
+invariants:
+  - id: yaml-design-interview-remains-authoritative
+    action: added
+    description: The checked-in YAML design-interview definition remains available and tested after the Python duplicate is removed.
+    rationale: Preserve the active Procedrr flow while removing only unreachable code.
+guidance:
+  - id: avoid-duplicate-procedrr-representations
+    action: added
+    description: Add future Procedrr workflows in the supported checked-in definition format instead of maintaining parallel generated implementations.
+    rationale: Prevent format drift and duplicate orchestration behavior.
+proposed_prs: []

@@ -411,6 +411,18 @@ def _execute_procedrr_flow(
                 state=state,
                 allowed_paths=config.allowed_paths,
             )
+        if name == "assert_verification_obligations_complete":
+            compilation = parameters.get("verification_obligations")
+            if not isinstance(compilation, Mapping):
+                raise PowdrrExecutionError(
+                    "verification obligation assertion requires compiler output"
+                )
+            failures = compilation.get("failures")
+            if not isinstance(failures, list):
+                raise PowdrrExecutionError(
+                    "verification obligation compiler output has no failure list"
+                )
+            return {"passed": not failures, "failure_count": len(failures)}
         if name == "update_plan_from_sentence_trace":
             return _update_plan_from_sentence_trace(parameters, state=state)
         if name == "run_opencode":
@@ -1108,7 +1120,6 @@ def _compile_verification_obligations(
         "obligations": [item.to_data() for item in compilation.obligations],
         "excluded_contracts": list(compilation.excluded_contracts),
         "failures": list(compilation.failures),
-        "complete": compilation.complete,
     }
 
 

@@ -235,17 +235,28 @@ steps:
         feature_description: {type: reference, value: feature_description}
       returns:
         type: object
-        required: [path, fingerprint, closure, obligations, failures, complete]
+        required: [path, fingerprint, closure, obligations, failures]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
           closure: {type: object}
           obligations: {type: array}
           failures: {type: array}
-          complete: {type: boolean}
       bind: verification_obligations
+  - operation:
+      tool: internal
+      command: [assert_verification_obligations_complete]
+      parameters:
+        verification_obligations: {type: reference, value: verification_obligations}
+      returns:
+        type: object
+        required: [passed, failure_count]
+        properties:
+          passed: {type: boolean}
+          failure_count: {type: integer, minimum: 0}
+      bind: verification_obligations_gate
   - gate:
-      subject: verification_obligations.complete
+      subject: verification_obligations_gate.passed
       equals: true
       on_failure: {terminal: failed}
   - operation:

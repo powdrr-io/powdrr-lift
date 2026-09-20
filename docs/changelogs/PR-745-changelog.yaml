@@ -1,0 +1,61 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 745
+title: Record per-contract verification evidence during feature flows
+intent:
+  problem: Compiled verification obligations are not yet executed as independently auditable proof during implementation and repair.
+  goal: Execute each exact provider selector and persist typed, identity-bound evidence and progress events before review can declare the feature complete.
+human-decisions:
+  - id: exact-provider-command
+    summary: Execute selectors with the validation command discovered during Structrr bootstrap.
+  - id: evidence-is-artifact-backed
+    summary: Persist structured evidence plus bounded verifier output for every obligation.
+structured_files: []
+files:
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Run evidence after validation and repair passes, rationale: Revalidate exact obligations before review, span: {start_line: 261, end_line: 274}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Run evidence in recovery flows, rationale: Keep repaired candidates subject to the same proof packet, span: {start_line: 508, end_line: 514}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Run evidence in recovery flows, rationale: Keep repaired candidates subject to the same proof packet, span: {start_line: 578, end_line: 584}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Run evidence in recovery flows, rationale: Keep repaired candidates subject to the same proof packet, span: {start_line: 640, end_line: 646}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Run evidence in recovery flows, rationale: Keep repaired candidates subject to the same proof packet, span: {start_line: 700, end_line: 706}}
+  - {path: src/powdrr_lift/structrr/verification_obligations.py, type: modified, summary: Rehydrate compiled obligations, rationale: Execute the immutable Structrr proof packet without reconstructing it heuristically, span: {start_line: 61, end_line: 80}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Dispatch evidence execution, rationale: Keep verification execution in Workrr, span: {start_line: 80, end_line: 80}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Dispatch evidence execution, rationale: Keep verification execution in Workrr, span: {start_line: 425, end_line: 432}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Carry discovered commands into inventory, rationale: Execute the exact bootstrap-selected command, span: {start_line: 954, end_line: 954}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Compute candidate identity and run evidence, rationale: Bind each result to the candidate tree and provider inventory, span: {start_line: 961, end_line: 1002}}
+  - {path: src/powdrr_lift/workrr/verification_evidence.py, type: added, summary: Add typed evidence runner, rationale: Persist per-contract proof identity, status, artifacts, and progress events, span: {start_line: 1, end_line: 273}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Execute exact pytest selectors, rationale: Replace placeholder execution with real provider evidence, span: {start_line: 8, end_line: 11}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Add execution metadata, rationale: Preserve command and runtime identity in evidence, span: {start_line: 55, end_line: 56}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Add inventory command, rationale: Preserve the discovered validation command, span: {start_line: 66, end_line: 66}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Add inventory command output, rationale: Make provider execution reproducible, span: {start_line: 89, end_line: 89}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Add result evidence fields, rationale: Capture output and timing for diagnosis, span: {start_line: 102, end_line: 105}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Preserve command in collection error inventory, rationale: Keep failed discovery reproducible, span: {start_line: 179, end_line: 179}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Preserve command in collection exception inventory, rationale: Keep failed discovery reproducible, span: {start_line: 202, end_line: 202}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Preserve command in collected inventory, rationale: Keep exact execution reproducible, span: {start_line: 212, end_line: 212}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Execute pytest with timeout and JUnit status, rationale: Distinguish pass, failure, collection, error, and timeout outcomes, span: {start_line: 216, end_line: 261}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Return execution evidence, rationale: Capture provider output and timing, span: {start_line: 266, end_line: 274}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Normalize execution metadata, rationale: Expose typed runtime evidence, span: {start_line: 285, end_line: 286}}
+  - {path: src/powdrr_lift/workrr/verification_provider.py, type: modified, summary: Parse pytest execution status, rationale: Convert provider output to stable evidence statuses, span: {start_line: 368, end_line: 399}}
+  - {path: tests/test_verification_evidence.py, type: added, summary: Test persisted evidence identity and artifacts, rationale: Protect the evidence contract, span: {start_line: 1, end_line: 107}}
+  - {path: tests/test_verification_provider.py, type: modified, summary: Update execution test name, rationale: Describe real provider execution, span: {start_line: 76, end_line: 76}}
+  - {path: tests/test_verification_provider.py, type: modified, summary: Create exact selector fixture, rationale: Ensure provider execution is real and targeted, span: {start_line: 79, end_line: 83}}
+  - {path: tests/test_verification_provider.py, type: modified, summary: Execute exact selector, rationale: Ensure provider execution is real and targeted, span: {start_line: 86, end_line: 90}}
+  - {path: tests/test_verification_provider.py, type: modified, summary: Assert successful execution, rationale: Ensure provider execution is real and targeted, span: {start_line: 94, end_line: 95}}
+entities:
+  - id: verification-evidence-runner
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: every-obligation-produces-evidence
+    action: added
+    description: Each compiled verification obligation produces a typed evidence record, including non-collected and execution-error outcomes.
+    rationale: Prevent silent gaps in intent verification.
+  - id: evidence-is-candidate-bound
+    action: added
+    description: Evidence records include candidate, contract, verifier, protected-input, and command fingerprints.
+    rationale: Prevent stale proof from being accepted for a different candidate.
+guidance:
+  - id: preserve-provider-neutral-boundary
+    action: added
+    description: Add provider-specific execution only behind the Workrr verification provider boundary.
+    rationale: Keep Procedrr orchestration and Structrr obligations framework-neutral.
+proposed_prs: []

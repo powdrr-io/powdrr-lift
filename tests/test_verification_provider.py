@@ -73,17 +73,26 @@ def test_registry_is_framework_neutral_and_dispatches_fake_provider(
     assert default_verification_provider_registry().provider("pytest") is not None
 
 
-def test_pytest_provider_returns_typed_not_implemented_execution_result(
+def test_pytest_provider_executes_exact_selector(
     tmp_path: Path,
 ) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_sample.py").write_text(
+        "def test_exact():\n    assert True\n", encoding="utf-8"
+    )
     result = PytestVerificationProvider().execute(
         VerificationProviderRequest(
-            "pytest", "tests/test_missing.py::test_x", "pytest", tmp_path
+            "pytest",
+            "tests/test_sample.py::test_exact",
+            "pytest",
+            tmp_path,
+            command=("python", "-m", "pytest", "-q"),
         )
     )
 
-    assert result.status == "not_implemented"
-    assert result.error is not None
+    assert result.status == "passed"
+    assert result.returncode == 0
 
 
 def test_match_selector_requires_exact_provider_profile_and_node_id() -> None:

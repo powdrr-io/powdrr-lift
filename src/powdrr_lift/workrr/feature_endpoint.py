@@ -77,6 +77,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
+from powdrr_lift.workrr.verification_evidence import VerificationEvidenceRunner
 from powdrr_lift.workrr.verification_provider import (
     default_verification_provider_registry,
 )
@@ -421,6 +422,14 @@ def _execute_procedrr_flow(
             return _run_validation_profile(parameters, worktree=worktree, state=state)
         if name == "aggregate_validation":
             return _aggregate_validation(parameters, worktree=worktree, state=state)
+        if name == "run_verification_evidence":
+            return _run_verification_evidence(
+                parameters,
+                worktree=worktree,
+                output_root=output_root,
+                state=state,
+                runner=runner,
+            )
         if name == "review_worker_diff":
             if not isinstance(parameters.get("implementation"), Mapping):
                 raise PowdrrExecutionError(
@@ -942,10 +951,53 @@ def _expand_provider_inventory(value: Mapping[str, Any]) -> tuple[dict[str, Any]
             "selector": selector,
             "fingerprint": value.get("fingerprint"),
             "verifier_fingerprint": value.get("fingerprint"),
+            "command": value.get("command", []),
         }
         for selector in selectors
         if isinstance(selector, str) and selector.strip()
     )
+
+
+def _run_verification_evidence(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    output_root: Path,
+    state: dict[str, Any],
+    runner: Runner,
+) -> dict[str, Any]:
+    raw_obligations = parameters.get("obligations")
+    if not isinstance(raw_obligations, list) or not all(
+        isinstance(item, Mapping) for item in raw_obligations
+    ):
+        raise PowdrrExecutionError("verification obligations must be a list")
+    from powdrr_lift.structrr.verification_obligations import VerificationObligation
+
+    obligations = tuple(
+        VerificationObligation.from_data(item) for item in raw_obligations
+    )
+    head = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+    diff = _git_output(runner, worktree, ["git", "diff", "--binary"])
+    status = _git_output(runner, worktree, ["git", "status", "--porcelain"])
+    candidate_tree = content_fingerprint({"head": head, "diff": diff, "status": status})
+    progress_events = state.setdefault("verification_progress", [])
+    evidence = VerificationEvidenceRunner(
+        default_verification_provider_registry(),
+        progress=lambda event: progress_events.append(dict(event)),
+    ).run(
+        obligations,
+        root=worktree,
+        artifact_root=output_root / "verification-evidence",
+        candidate_tree=candidate_tree,
+        inventory=state.get("provider_inventory", ()),
+    )
+    state["verification_evidence"] = evidence
+    return {
+        "candidate_tree": candidate_tree,
+        "evidence": [item.to_data() for item in evidence],
+        "progress_events": list(progress_events),
+        "passed": all(item.status.value == "passed" for item in evidence),
+    }
 
 
 def _verification_contracts(

@@ -260,6 +260,20 @@ steps:
       bind: validation
   - operation:
       tool: internal
+      command: [run_verification_evidence]
+      parameters:
+        obligations: {type: reference, value: verification_obligations.obligations}
+      returns:
+        type: object
+        required: [candidate_tree, evidence, progress_events, passed]
+        properties:
+          candidate_tree: {type: string, minLength: 1}
+          evidence: {type: array}
+          progress_events: {type: array}
+          passed: {type: boolean}
+      bind: verification_evidence
+  - operation:
+      tool: internal
       command: [review_worker_diff]
       parameters:
         implementation: {type: reference, value: implementation}
@@ -493,6 +507,13 @@ recoveries:
                 bind: validation
             - operation:
                 tool: internal
+                command: [run_verification_evidence]
+                parameters:
+                  obligations: {type: reference, value: verification_obligations.obligations}
+                returns: {type: object}
+                bind: verification_evidence
+            - operation:
+                tool: internal
                 command: [review_worker_diff]
                 parameters:
                   implementation: {type: reference, value: implementation}
@@ -554,6 +575,13 @@ recoveries:
             results: {type: reference, value: validation_results}
           returns: {type: object}
           bind: validation
+      - operation:
+          tool: internal
+          command: [run_verification_evidence]
+          parameters:
+            obligations: {type: reference, value: verification_obligations.obligations}
+          returns: {type: object}
+          bind: verification_evidence
   scope-repair:
     steps:
       - judge:
@@ -609,6 +637,13 @@ recoveries:
             results: {type: reference, value: validation_results}
           returns: {type: object}
           bind: validation
+      - operation:
+          tool: internal
+          command: [run_verification_evidence]
+          parameters:
+            obligations: {type: reference, value: verification_obligations.obligations}
+          returns: {type: object}
+          bind: verification_evidence
   intent-repair:
     steps:
       - judge:
@@ -662,6 +697,13 @@ recoveries:
             results: {type: reference, value: validation_results}
           returns: {type: object}
           bind: validation
+      - operation:
+          tool: internal
+          command: [run_verification_evidence]
+          parameters:
+            obligations: {type: reference, value: verification_obligations.obligations}
+          returns: {type: object}
+          bind: verification_evidence
       - operation:
           tool: internal
           command: [review_worker_diff]

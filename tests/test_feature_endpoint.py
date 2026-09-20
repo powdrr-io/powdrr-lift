@@ -634,6 +634,10 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [aggregate_validation]" in flow
     assert "command: [prepare_implementation_review]" in flow
     assert "command: [aggregate_intent_review]" in flow
+    assert (
+        "command: [compile_verification_obligations]" in flow
+        and "feature_description: {type: reference, value: feature_description}" in flow
+    )
     assert "provider: opencode" not in flow
     assert flow.count("command: [run_opencode]") == 5
 

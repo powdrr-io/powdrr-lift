@@ -232,6 +232,7 @@ steps:
       parameters:
         baseline: {type: reference, value: baseline.path}
         plan: {type: reference, value: plan.path}
+        feature_description: {type: reference, value: feature_description}
       returns:
         type: object
         required: [path, fingerprint, closure, obligations, failures]

@@ -553,6 +553,24 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
     assert [item["clause_id"] for item in ledger["clauses"]] == [
         f"instruction-{index:03d}" for index in range(1, len(ledger["clauses"]) + 1)
     ]
+    canonical_design_path = (
+        repo
+        / ".powdrr"
+        / "feature-runs"
+        / "python-statemachine-state-data-scoping"
+        / "canonical-feature-design.json"
+    )
+    assert canonical_design_path.is_file()
+    canonical_design = json.loads(canonical_design_path.read_text(encoding="utf-8"))
+    assert canonical_design["schema_version"] == "feature-design-v2"
+    assert [item["obligation_id"] for item in canonical_design["obligations"]] == [
+        f"obligation:instruction-{index:03d}"
+        for index in range(1, len(canonical_design["obligations"]) + 1)
+    ]
+    assert all(
+        item["selector_status"] == "planned"
+        for item in canonical_design["required_test_cases"]
+    )
     document = yaml.safe_load(result.plan_path.read_text(encoding="utf-8"))
     clauses = {
         item["clause_id"]

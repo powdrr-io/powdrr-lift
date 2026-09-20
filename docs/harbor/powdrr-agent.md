@@ -63,7 +63,11 @@ available as an override, but is not required for Harbor runs.
 
 Every run writes a summary to `.powdrr/feature-runs/<task>/run-result.json` and
 detailed requests, attempts, validation reports, checkpoints, and OpenCode
-JSONL diagnostics under the same directory. Harbor synchronizes that directory
-as the agent session log bundle.
+JSONL diagnostics under the same directory. `run-metadata.json` records the
+task ID and detected Powdrr/OpenCode versions. Failures also write
+`failure.json` with a typed stage, validation command, and the complete list of
+sibling artifacts available for debugging. The telemetry directory is
+Git-excluded, so it remains available to Harbor without entering the candidate
+patch. Harbor synchronizes that directory as the agent session log bundle.
 
 The selected model API must be included in Harbor/Pier's network allowlist.

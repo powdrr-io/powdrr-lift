@@ -150,6 +150,8 @@ class PowdrrAgent(BaseInstalledAgent):
             instruction,
             "--work-item-name",
             task_name,
+            "--task-id",
+            task_name,
             "--repo-root",
             repo_root,
             "--planning-provider",
@@ -179,6 +181,9 @@ class PowdrrAgent(BaseInstalledAgent):
             )
             if (value := self._get_env(key)) is not None
         }
+        for key in ("POWDRR_INSTALL_SPEC", "POWDRR_VERSION", "POWDRR_REVISION"):
+            if (value := self._get_env(key)) is not None:
+                provider_env[key] = value
         provider_env.update(
             {
                 "GIT_AUTHOR_NAME": self._get_env("GIT_AUTHOR_NAME") or "Powdrr Agent",

@@ -170,6 +170,73 @@ def test_harbor_feature_cli_uses_in_place_endpoint(
     assert config.push_changes is False
 
 
+def test_harbor_feature_cli_propagates_task_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _git(tmp_path, "init", "-q")
+    captured: dict[str, FeatureEndpointConfig] = {}
+
+    def fake_endpoint(config: FeatureEndpointConfig) -> FeatureEndpointResult:
+        captured["config"] = config
+        return FeatureEndpointResult(
+            status="completed",
+            branch="main",
+            worktree=tmp_path,
+            baseline_path=tmp_path / "baseline.yaml",
+            plan_path=tmp_path / "plan.yaml",
+            request_path=None,
+            attempt=None,
+            validation=None,
+            review={"passed": True},
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.run_feature_in_place", fake_endpoint)
+    assert (
+        main(
+            [
+                "harbor-feature",
+                "--feature-description",
+                "Fix the task behavior.",
+                "--work-item-name",
+                "display-name",
+                "--task-id",
+                "benchmark/task-123",
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    assert captured["config"].task_id == "benchmark/task-123"
+
+
+def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    (repo / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "initial")
+    output_root = repo / ".powdrr" / "feature-runs" / "failure-artifact"
+    with pytest.raises(PowdrrExecutionError):
+        run_feature_in_place(
+            FeatureEndpointConfig(
+                feature_description="Add the second greeting.",
+                work_item_name="failure-artifact",
+                repo_root=repo,
+                allowed_paths=("hello_world.py",),
+                output_root=output_root,
+            )
+        )
+    metadata = json.loads((output_root / "run-metadata.json").read_text())
+    failure = json.loads((output_root / "failure.json").read_text())
+    assert metadata["task_id"] == "failure-artifact"
+    assert failure["schema_version"] == "powdrr-run-failure-v1"
+    assert failure["error_type"] == "PowdrrExecutionError"
+
+
 def test_run_feature_in_place_reuses_core_without_git_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

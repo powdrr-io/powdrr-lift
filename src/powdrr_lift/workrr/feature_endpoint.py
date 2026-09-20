@@ -96,6 +96,12 @@ from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_ev
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
+from powdrr_lift.workrr.run_artifacts import (
+    RunFailure,
+    RunFailureStage,
+    collect_run_metadata,
+    write_json_artifact,
+)
 from powdrr_lift.workrr.verification_evidence import VerificationEvidenceRunner
 from powdrr_lift.workrr.verification_provider import (
     default_verification_provider_registry,
@@ -121,6 +127,7 @@ class FeatureEndpointConfig:
     open_pr: bool = True
     push_changes: bool = True
     planning_client: WorkflowLLMClient | None = None
+    task_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +144,8 @@ class FeatureEndpointResult:
     pull_request_url: str | None = None
     changelog_path: Path | None = None
     feature_obligations_path: Path | None = None
+    task_id: str | None = None
+    failure: RunFailure | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -156,6 +165,8 @@ class FeatureEndpointResult:
                 if self.feature_obligations_path
                 else None
             ),
+            "task_id": self.task_id,
+            "failure": self.failure.to_data() if self.failure else None,
         }
 
 
@@ -177,23 +188,25 @@ def run_feature_endpoint(
         config.output_root or root / ".powdrr" / "feature-runs" / slug
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    _write_run_metadata(config, root, output_root)
+    _exclude_telemetry_from_patch(root, output_root)
 
-    _require_clean_root(root, runner)
-    _run(runner, root, ["git", "fetch", "origin", config.base_branch])
-    _run(
-        runner,
-        root,
-        [
-            "git",
-            "worktree",
-            "add",
-            "-b",
-            branch,
-            str(worktree),
-            f"origin/{config.base_branch}",
-        ],
-    )
     try:
+        _require_clean_root(root, runner)
+        _run(runner, root, ["git", "fetch", "origin", config.base_branch])
+        _run(
+            runner,
+            root,
+            [
+                "git",
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                str(worktree),
+                f"origin/{config.base_branch}",
+            ],
+        )
         return _execute_procedrr_flow(
             config,
             runner=runner,
@@ -201,7 +214,11 @@ def run_feature_endpoint(
             output_root=output_root,
             branch=branch,
         )
-    except Exception:
+    except Exception as error:
+        _write_failure_artifact(
+            output_root,
+            _failure_for_exception(error, output_root, config),
+        )
         raise
 
 
@@ -228,17 +245,26 @@ def run_feature_in_place(
         config.output_root or root / ".powdrr" / "feature-runs" / slug
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
-    _require_clean_root(root, runner)
-    branch = _git_output(runner, root, ["git", "branch", "--show-current"])
-    if not branch:
-        branch = "HEAD"
-    return _execute_procedrr_flow(
-        replace(config, open_pr=False, push_changes=False),
-        runner=runner,
-        worktree=root,
-        output_root=output_root,
-        branch=branch,
-    )
+    _write_run_metadata(config, root, output_root)
+    _exclude_telemetry_from_patch(root, output_root)
+    try:
+        _require_clean_root(root, runner)
+        branch = _git_output(runner, root, ["git", "branch", "--show-current"])
+        if not branch:
+            branch = "HEAD"
+        return _execute_procedrr_flow(
+            replace(config, open_pr=False, push_changes=False),
+            runner=runner,
+            worktree=root,
+            output_root=output_root,
+            branch=branch,
+        )
+    except Exception as error:
+        _write_failure_artifact(
+            output_root,
+            _failure_for_exception(error, output_root, config),
+        )
+        raise
 
 
 def _execute_procedrr_flow(
@@ -250,7 +276,7 @@ def _execute_procedrr_flow(
     branch: str,
 ) -> FeatureEndpointResult:
     slug = slugify_workflow_id(config.work_item_name)
-    state: dict[str, Any] = {}
+    state: dict[str, Any] = {"task_id": config.task_id or config.work_item_name}
     flow_path = _validate_procedrr_flow(worktree)
     flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
     validation_profiles = _bootstrap_validation_profiles(
@@ -726,8 +752,19 @@ def _execute_procedrr_flow(
                 "work_item_name": config.work_item_name,
             },
         )
-    except EvaluationError:
-        result = _feature_endpoint_result(state, branch, worktree, "review_failed")
+    except EvaluationError as error:
+        failure = RunFailure(
+            RunFailureStage.REVIEW,
+            type(error).__name__,
+            str(error),
+            model_response_path=_latest_model_response_path(state),
+            validation_command=config.validation_command,
+            artifact_paths=_artifact_paths(output_root),
+        )
+        _write_failure_artifact(output_root, failure)
+        result = _feature_endpoint_result(
+            state, branch, worktree, "review_failed", failure=failure
+        )
     else:
         result = _feature_endpoint_result(
             state,
@@ -2850,7 +2887,12 @@ def _command_option(command: list[Any], option: str) -> str:
 
 
 def _feature_endpoint_result(
-    state: dict[str, Any], branch: str, worktree: Path, status: str
+    state: dict[str, Any],
+    branch: str,
+    worktree: Path,
+    status: str,
+    *,
+    failure: RunFailure | None = None,
 ) -> FeatureEndpointResult:
     return FeatureEndpointResult(
         status,
@@ -2865,6 +2907,8 @@ def _feature_endpoint_result(
         state.get("pull_request_url"),
         state.get("changelog_path"),
         state.get("feature_obligations_path"),
+        state.get("task_id"),
+        failure,
     )
 
 
@@ -2877,6 +2921,78 @@ def _write_run_result(output_root: Path, result: FeatureEndpointResult) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def _write_run_metadata(
+    config: FeatureEndpointConfig, repo_root: Path, output_root: Path
+) -> Path:
+    task_id = config.task_id or config.work_item_name
+    return write_json_artifact(
+        output_root,
+        "run-metadata.json",
+        collect_run_metadata(
+            task_id=task_id, repo_root=repo_root, output_root=output_root
+        ),
+    )
+
+
+def _write_failure_artifact(output_root: Path, failure: RunFailure) -> Path:
+    return write_json_artifact(output_root, "failure.json", failure.to_data())
+
+
+def _failure_for_exception(
+    error: Exception, output_root: Path, config: FeatureEndpointConfig
+) -> RunFailure:
+    return RunFailure(
+        RunFailureStage.UNKNOWN,
+        type(error).__name__,
+        str(error),
+        validation_command=config.validation_command,
+        artifact_paths=_artifact_paths(output_root),
+    )
+
+
+def _artifact_paths(output_root: Path) -> tuple[str, ...]:
+    return tuple(
+        str(path.relative_to(output_root))
+        for path in sorted(output_root.rglob("*"))
+        if path.is_file() and path.name != "failure.json"
+    )
+
+
+def _exclude_telemetry_from_patch(repo_root: Path, output_root: Path) -> None:
+    """Keep detailed run telemetry available without staging it in the patch."""
+    try:
+        relative = output_root.relative_to(repo_root)
+    except ValueError:
+        return
+    git_path = repo_root / ".git"
+    if git_path.is_dir():
+        exclude_path = git_path / "info" / "exclude"
+    else:
+        try:
+            gitdir = git_path.read_text(encoding="utf-8").split("gitdir:", 1)[1].strip()
+        except (OSError, IndexError):
+            return
+        exclude_path = Path(gitdir).resolve().parents[1] / "info" / "exclude"
+    try:
+        current = exclude_path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    pattern = f"/{relative.as_posix()}/"
+    if pattern not in current.splitlines():
+        exclude_path.write_text(
+            current.rstrip() + "\n" + pattern + "\n", encoding="utf-8"
+        )
+
+
+def _latest_model_response_path(state: Mapping[str, Any]) -> str | None:
+    response_path = state.get("model_response_path")
+    if isinstance(response_path, Path):
+        return str(response_path)
+    if isinstance(response_path, str):
+        return response_path
+    return None
 
 
 def review_feature_diff(

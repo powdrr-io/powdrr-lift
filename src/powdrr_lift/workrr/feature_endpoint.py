@@ -74,6 +74,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationResultStatus,
     ValidationRunner,
 )
+from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
@@ -430,6 +431,8 @@ def _execute_procedrr_flow(
                 state=state,
                 runner=runner,
             )
+        if name == "reconcile_verification_evidence":
+            return _reconcile_verification_evidence(parameters, state=state)
         if name == "review_worker_diff":
             if not isinstance(parameters.get("implementation"), Mapping):
                 raise PowdrrExecutionError(
@@ -442,6 +445,7 @@ def _execute_procedrr_flow(
                 state["request"],
                 state["attempt"],
                 validation=state["validation"],
+                reconciliation=state.get("verification_reconciliation"),
                 runner=runner,
             )
             state["review"] = review
@@ -476,6 +480,13 @@ def _execute_procedrr_flow(
                     issues.append(
                         {"kind": "validation_report", "issue": validation["error"]}
                     )
+            reconciliation = parameters.get("reconciliation")
+            if isinstance(reconciliation, Mapping):
+                issues.extend(
+                    {"kind": "verification", "issue": issue}
+                    for issue in reconciliation.get("issues", [])
+                    if isinstance(issue, Mapping)
+                )
             if (
                 isinstance(review_value, Mapping)
                 and review_value.get("passed") is not True
@@ -998,6 +1009,25 @@ def _run_verification_evidence(
         "progress_events": list(progress_events),
         "passed": all(item.status.value == "passed" for item in evidence),
     }
+
+
+def _reconcile_verification_evidence(
+    parameters: Mapping[str, Any], *, state: dict[str, Any]
+) -> dict[str, Any]:
+    obligations = parameters.get("obligations")
+    evidence = parameters.get("evidence")
+    candidate_tree = parameters.get("candidate_tree")
+    if not isinstance(obligations, list) or not isinstance(evidence, list):
+        raise PowdrrExecutionError("reconciliation inputs must be lists")
+    if not isinstance(candidate_tree, str) or not candidate_tree:
+        raise PowdrrExecutionError("reconciliation candidate tree is missing")
+    result = reconcile_verification_evidence(
+        tuple(item for item in obligations if isinstance(item, Mapping)),
+        tuple(item for item in evidence if isinstance(item, Mapping)),
+        candidate_tree=candidate_tree,
+    )
+    state["verification_reconciliation"] = result
+    return result
 
 
 def _verification_contracts(
@@ -2056,6 +2086,7 @@ def review_feature_diff(
     attempt: CodingAgentAttempt,
     validation: ValidationReport,
     *,
+    reconciliation: Mapping[str, Any] | None = None,
     runner: Runner = subprocess.run,
 ) -> dict[str, Any]:
     """Review the worker result before any commit or PR operation."""
@@ -2074,6 +2105,7 @@ def review_feature_diff(
     passed = (
         attempt.status is CodingAgentStatus.COMPLETED
         and validation.status is ValidationReportStatus.PASSED
+        and (reconciliation is None or reconciliation.get("passed") is True)
         and bool(changed)
         and not out_of_scope
         and diff_check.returncode == 0
@@ -2086,6 +2118,7 @@ def review_feature_diff(
         "worker_status": attempt.status.value,
         "validation_status": validation.status.value,
         "validation_error": validation.error,
+        "verification_reconciliation": dict(reconciliation or {}),
     }
 
 

@@ -274,6 +274,15 @@ steps:
       bind: verification_evidence
   - operation:
       tool: internal
+      command: [reconcile_verification_evidence]
+      parameters:
+        obligations: {type: reference, value: verification_obligations.obligations}
+        evidence: {type: reference, value: verification_evidence.evidence}
+        candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
+      returns: {type: object}
+      bind: verification_reconciliation
+  - operation:
+      tool: internal
       command: [review_worker_diff]
       parameters:
         implementation: {type: reference, value: implementation}
@@ -465,6 +474,7 @@ recoveries:
                 parameters:
                   validation: {type: reference, value: validation}
                   review: {type: reference, value: review}
+                  reconciliation: {type: reference, value: verification_reconciliation}
                 returns: {type: array}
                 bind: repair_issues
             - for_each:
@@ -512,6 +522,15 @@ recoveries:
                   obligations: {type: reference, value: verification_obligations.obligations}
                 returns: {type: object}
                 bind: verification_evidence
+            - operation:
+                tool: internal
+                command: [reconcile_verification_evidence]
+                parameters:
+                  obligations: {type: reference, value: verification_obligations.obligations}
+                  evidence: {type: reference, value: verification_evidence.evidence}
+                  candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
+                returns: {type: object}
+                bind: verification_reconciliation
             - operation:
                 tool: internal
                 command: [review_worker_diff]
@@ -582,6 +601,15 @@ recoveries:
             obligations: {type: reference, value: verification_obligations.obligations}
           returns: {type: object}
           bind: verification_evidence
+      - operation:
+          tool: internal
+          command: [reconcile_verification_evidence]
+          parameters:
+            obligations: {type: reference, value: verification_obligations.obligations}
+            evidence: {type: reference, value: verification_evidence.evidence}
+            candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
+          returns: {type: object}
+          bind: verification_reconciliation
   scope-repair:
     steps:
       - judge:
@@ -644,6 +672,15 @@ recoveries:
             obligations: {type: reference, value: verification_obligations.obligations}
           returns: {type: object}
           bind: verification_evidence
+      - operation:
+          tool: internal
+          command: [reconcile_verification_evidence]
+          parameters:
+            obligations: {type: reference, value: verification_obligations.obligations}
+            evidence: {type: reference, value: verification_evidence.evidence}
+            candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
+          returns: {type: object}
+          bind: verification_reconciliation
   intent-repair:
     steps:
       - judge:
@@ -704,6 +741,15 @@ recoveries:
             obligations: {type: reference, value: verification_obligations.obligations}
           returns: {type: object}
           bind: verification_evidence
+      - operation:
+          tool: internal
+          command: [reconcile_verification_evidence]
+          parameters:
+            obligations: {type: reference, value: verification_obligations.obligations}
+            evidence: {type: reference, value: verification_evidence.evidence}
+            candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
+          returns: {type: object}
+          bind: verification_reconciliation
       - operation:
           tool: internal
           command: [review_worker_diff]

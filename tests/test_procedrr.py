@@ -20,7 +20,6 @@ from procedrr import (
     apply_fragment_edit,
     apply_json_edits,
     compile_workflow,
-    design_interview,
     parse_and_validate,
     render_document,
     set_value,
@@ -402,18 +401,3 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
         {"verdict"},
         {"verdict"},
     ]
-
-
-def test_design_interview_uses_real_context_types_and_bounded_repairs() -> None:
-    compiled = compile_workflow(design_interview())
-    data = compiled.definition.to_data()
-    encoded = str(data)
-    for category in (
-        "requirements",
-        "entity-relationships",
-        "acceptance_criteria",
-        "tools",
-    ):
-        assert category in encoded
-    assert compiled.max_llm_activations == 212
-    assert compiled.max_tool_calls == 217

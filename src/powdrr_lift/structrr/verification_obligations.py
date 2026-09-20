@@ -120,6 +120,7 @@ class VerificationObligationCompilation:
             "obligations": [item.to_data() for item in self.obligations],
             "excluded_contracts": list(self.excluded_contracts),
             "failures": list(self.failures),
+            "complete": self.complete,
         }
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
@@ -293,6 +294,7 @@ def compile_verification_obligations(
                 "explicit required_test_cases proposal operation"
             )
     failures.extend(_new_intent_contract_failures(proposal, contracts))
+    failures.extend(_required_test_intent_failures(proposal, active_by_id))
     return VerificationObligationCompilation(
         closure=closure,
         obligations=tuple(sorted(obligations, key=lambda item: item.contract_id)),
@@ -399,6 +401,27 @@ def _new_intent_contract_failures(
             failures.append(
                 f"new or altered intent {candidate} has no verification contract"
             )
+    return failures
+
+
+def _required_test_intent_failures(
+    proposal: ProposalRevision, active_by_id: Mapping[str, Mapping[str, Any]]
+) -> list[str]:
+    """Reject added test obligations that do not trace to current intent."""
+    failures: list[str] = []
+    for operation in proposal.operations:
+        if operation.section != "required_test_cases" or operation.action != "add":
+            continue
+        refs = _values(
+            operation.content, "intent_refs", "intent_ids", "intent_id", "clause_id"
+        )
+        if any(
+            ref in active_by_id or ref.startswith(("intent.", "spec:")) for ref in refs
+        ):
+            continue
+        failures.append(
+            f"required test case {operation.subject_id} has no active intent reference"
+        )
     return failures
 
 

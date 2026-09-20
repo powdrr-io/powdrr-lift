@@ -339,8 +339,26 @@ def _validate_required_test_case_item(item: Mapping[str, Any]) -> None:
         isinstance(value, str) and value.strip() for value in item["intent_refs"]
     ):
         raise ValueError(f"required test case {item['id']!r} has invalid intent_refs")
+    for field in ("id", "description", "provider", "selector", "profile"):
+        if not isinstance(item[field], str) or not item[field].strip():
+            raise ValueError(f"required test case {item['id']!r} has invalid {field}")
+    if item["expectation"] not in {"pass", "absent"}:
+        raise ValueError(
+            f"required test case {item['id']!r} has invalid expectation; "
+            "expected pass or absent"
+        )
+    if item["status"] not in {"active", "superseded"}:
+        raise ValueError(
+            f"required test case {item['id']!r} has invalid status; "
+            "expected active or superseded"
+        )
     if not isinstance(item["applicability"], Mapping):
         raise ValueError(f"required test case {item['id']!r} has invalid applicability")
+    mode = item["applicability"].get("mode")
+    if not isinstance(mode, str) or not mode.strip():
+        raise ValueError(
+            f"required test case {item['id']!r} has invalid applicability mode"
+        )
 
 
 def create_design_interview_input_template(

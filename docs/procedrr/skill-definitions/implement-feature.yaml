@@ -232,18 +232,6 @@ steps:
       bind: feature_intents
   - operation:
       tool: internal
-      command: [validate_materialized_intent_contracts]
-      parameters:
-        plan: {type: reference, value: plan.path}
-      returns:
-        type: object
-        required: [checked, contract_refs]
-        properties:
-          checked: {type: array}
-          contract_refs: {type: array}
-      bind: intent_contract_validation
-  - operation:
-      tool: internal
       command: [compile_verification_obligations]
       parameters:
         baseline: {type: reference, value: baseline.path}
@@ -259,6 +247,22 @@ steps:
           obligations: {type: array}
           failures: {type: array}
       bind: verification_obligations
+  - operation:
+      tool: internal
+      command: [assert_verification_obligations_complete]
+      parameters:
+        verification_obligations: {type: reference, value: verification_obligations}
+      returns:
+        type: object
+        required: [passed, failure_count]
+        properties:
+          passed: {type: boolean}
+          failure_count: {type: integer, minimum: 0}
+      bind: verification_obligations_gate
+  - gate:
+      subject: verification_obligations_gate.passed
+      equals: true
+      on_failure: {terminal: failed}
   - operation:
       tool: internal
       command: [prepare_proposal_review]

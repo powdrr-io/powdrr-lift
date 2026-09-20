@@ -120,6 +120,7 @@ class VerificationObligationCompilation:
             "obligations": [item.to_data() for item in self.obligations],
             "excluded_contracts": list(self.excluded_contracts),
             "failures": list(self.failures),
+            "complete": self.complete,
         }
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
@@ -293,6 +294,8 @@ def compile_verification_obligations(
                 "explicit required_test_cases proposal operation"
             )
     failures.extend(_new_intent_contract_failures(proposal, contracts))
+    failures.extend(_materialized_intent_contract_failures(active_intents, contracts))
+    failures.extend(_required_test_intent_failures(proposal, active_by_id))
     return VerificationObligationCompilation(
         closure=closure,
         obligations=tuple(sorted(obligations, key=lambda item: item.contract_id)),
@@ -399,6 +402,63 @@ def _new_intent_contract_failures(
             failures.append(
                 f"new or altered intent {candidate} has no verification contract"
             )
+    return failures
+
+
+def _materialized_intent_contract_failures(
+    active_intents: Sequence[Mapping[str, Any]],
+    contracts: Sequence[VerificationContract],
+) -> list[str]:
+    """Require sentence-derived intent clauses to have explicit coverage."""
+    contract_refs = {
+        reference for contract in contracts for reference in contract.intent_refs
+    }
+    failures: list[str] = []
+    for clause in active_intents:
+        clause_id = _text(clause.get("clause_id") or clause.get("intent_id"))
+        source_ref = _text(clause.get("source_ref"))
+        if not clause_id or not source_ref.startswith("feature-obligation:"):
+            continue
+        verification = clause.get("verification")
+        if (
+            isinstance(verification, Mapping)
+            and verification.get("mode") == "non_obligating"
+        ):
+            rationale = verification.get("rationale")
+            if isinstance(rationale, str) and rationale.strip():
+                continue
+            failures.append(
+                f"materialized intent {clause_id} declares non_obligating "
+                "without a rationale"
+            )
+            continue
+        if clause_id not in contract_refs:
+            failures.append(
+                f"materialized intent {clause_id} has no verification contract; "
+                "add its exact clause_id to required_test_cases.intent_refs or "
+                "declare verification.mode=non_obligating with a rationale"
+            )
+    return failures
+
+
+def _required_test_intent_failures(
+    proposal: ProposalRevision, active_by_id: Mapping[str, Mapping[str, Any]]
+) -> list[str]:
+    """Reject added test obligations that do not trace to current intent."""
+    failures: list[str] = []
+    for operation in proposal.operations:
+        if operation.section != "required_test_cases" or operation.action != "add":
+            continue
+        refs = _values(
+            operation.content, "intent_refs", "intent_ids", "intent_id", "clause_id"
+        )
+        if any(
+            ref in active_by_id or ref.startswith(("intent.", "spec:")) for ref in refs
+        ):
+            continue
+        failures.append(
+            f"required test case {operation.subject_id} has no active intent reference"
+        )
     return failures
 
 

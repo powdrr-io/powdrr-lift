@@ -84,7 +84,7 @@ from powdrr_lift.workrr.verification_provider import (
 )
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
-from procedrr_evaluator.evaluator import ValidationGateError
+from procedrr_evaluator.evaluator import EvaluationError
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -112,7 +112,7 @@ class FeatureEndpointResult:
     worktree: Path
     baseline_path: Path
     plan_path: Path
-    request_path: Path
+    request_path: Path | None
     attempt: CodingAgentAttempt | None
     validation: ValidationReport | None
     review: dict[str, Any]
@@ -127,7 +127,7 @@ class FeatureEndpointResult:
             "worktree": str(self.worktree),
             "baseline_path": str(self.baseline_path),
             "plan_path": str(self.plan_path),
-            "request_path": str(self.request_path),
+            "request_path": str(self.request_path) if self.request_path else None,
             "attempt": self.attempt.to_data() if self.attempt else None,
             "validation": self.validation.to_data() if self.validation else None,
             "review": self.review,
@@ -328,14 +328,16 @@ def _execute_procedrr_flow(
             }
         if command[:2] == ["powdrr-lift", "evaluate"]:
             return _evaluate_proposal_command(runner, worktree, command)
-        if name == "extract_proposal_issues":
+
+        def extract_proposal_issues() -> Any:
             evaluation = parameters.get("evaluation")
             return (
                 list(evaluation.get("issues", []))
                 if isinstance(evaluation, Mapping)
                 else []
             )
-        if name == "aggregate_category_edits":
+
+        def aggregate_category_edits() -> Any:
             decisions = parameters.get("decisions")
             if not isinstance(decisions, Mapping):
                 raise PowdrrExecutionError(
@@ -344,7 +346,8 @@ def _execute_procedrr_flow(
             return _aggregate_category_edits(
                 decisions, inventory=state.get("provider_inventory", ())
             )
-        if name == "decompose_feature_description":
+
+        def decompose_feature_description() -> Any:
             feature_description = parameters.get("feature_description")
             if (
                 not isinstance(feature_description, str)
@@ -352,8 +355,49 @@ def _execute_procedrr_flow(
             ):
                 raise PowdrrExecutionError("feature description is empty")
             return _decompose_feature_description(feature_description)
-        if name == "apply_sentence_design_trace":
+
+        def apply_sentence_design_trace() -> Any:
             return _apply_sentence_design_trace(parameters, state=state)
+
+        def materialize_feature_intents() -> Any:
+            return _materialize_feature_intents(parameters, state=state)
+
+        def compile_verification_obligations() -> Any:
+            return _compile_verification_obligations(
+                parameters,
+                worktree=worktree,
+                output_root=output_root,
+                state=state,
+                allowed_paths=config.allowed_paths,
+            )
+
+        def assert_verification_obligations_complete() -> Any:
+            compilation = parameters.get("verification_obligations")
+            if not isinstance(compilation, Mapping):
+                raise PowdrrExecutionError(
+                    "verification obligation assertion requires compiler output"
+                )
+            failures = compilation.get("failures")
+            if not isinstance(failures, list):
+                raise PowdrrExecutionError(
+                    "verification obligation compiler output has no failure list"
+                )
+            return {"passed": not failures, "failure_count": len(failures)}
+
+        handlers: dict[str, Callable[[], Any]] = {
+            "extract_proposal_issues": extract_proposal_issues,
+            "aggregate_category_edits": aggregate_category_edits,
+            "decompose_feature_description": decompose_feature_description,
+            "apply_sentence_design_trace": apply_sentence_design_trace,
+            "materialize_feature_intents": materialize_feature_intents,
+            "compile_verification_obligations": compile_verification_obligations,
+            "assert_verification_obligations_complete": (
+                assert_verification_obligations_complete
+            ),
+        }
+        handler = handlers.get(name)
+        if handler is not None:
+            return handler()
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -400,18 +444,6 @@ def _execute_procedrr_flow(
                 worktree=worktree,
                 output_root=output_root,
                 state=state,
-            )
-        if name == "materialize_feature_intents":
-            return _materialize_feature_intents(parameters, state=state)
-        if name == "validate_materialized_intent_contracts":
-            return _validate_materialized_intent_contracts(parameters, state=state)
-        if name == "compile_verification_obligations":
-            return _compile_verification_obligations(
-                parameters,
-                worktree=worktree,
-                output_root=output_root,
-                state=state,
-                allowed_paths=config.allowed_paths,
             )
         if name == "update_plan_from_sentence_trace":
             return _update_plan_from_sentence_trace(parameters, state=state)
@@ -602,7 +634,7 @@ def _execute_procedrr_flow(
                 "work_item_name": config.work_item_name,
             },
         )
-    except ValidationGateError:
+    except EvaluationError:
         result = _feature_endpoint_result(state, branch, worktree, "review_failed")
     else:
         result = _feature_endpoint_result(
@@ -1041,76 +1073,6 @@ def _intent_kind_for_design(kind: str) -> str:
     return "decision"
 
 
-def _validate_materialized_intent_contracts(
-    parameters: Mapping[str, Any], *, state: Mapping[str, Any]
-) -> dict[str, Any]:
-    """Require every materialized intent to be explicitly verifiable.
-
-    Feature obligations become active intent clauses before proposal review.  A
-    required test case must name each such clause in ``intent_refs`` unless the
-    clause explicitly declares a non-obligating verification classification and
-    rationale.  This keeps sentence-derived design from silently becoming an
-    unverified implementation obligation.
-    """
-    plan = _require_flow_text(parameters, "plan")
-    if Path(plan) != state.get("plan_path"):
-        raise PowdrrExecutionError(
-            "intent contract validation plan does not match the plan"
-        )
-    document = _load_yaml_mapping(Path(plan))
-    clauses = document.get("active_intent")
-    if not isinstance(clauses, list):
-        raise PowdrrExecutionError(
-            "plan active_intent must contain materialized clauses"
-        )
-    contracts = _require_required_test_cases(document)
-    contract_refs = {
-        reference
-        for contract in contracts
-        for reference in contract.get("intent_refs", [])
-        if isinstance(reference, str)
-    }
-    failures: list[str] = []
-    checked: list[str] = []
-    for clause in clauses:
-        if not isinstance(clause, Mapping):
-            continue
-        source_ref = clause.get("source_ref")
-        clause_id = clause.get("clause_id")
-        if not (
-            isinstance(source_ref, str)
-            and source_ref.startswith("feature-obligation:")
-            and isinstance(clause_id, str)
-            and clause_id.strip()
-        ):
-            continue
-        checked.append(clause_id)
-        verification = clause.get("verification")
-        if (
-            isinstance(verification, Mapping)
-            and verification.get("mode") == "non_obligating"
-        ):
-            rationale = verification.get("rationale")
-            if isinstance(rationale, str) and rationale.strip():
-                continue
-            failures.append(
-                f"materialized intent {clause_id} declares non_obligating "
-                "without a rationale"
-            )
-            continue
-        if clause_id not in contract_refs:
-            failures.append(
-                f"materialized intent {clause_id} has no verification contract; "
-                "add its exact clause_id to required_test_cases.intent_refs or "
-                "declare verification.mode=non_obligating with a rationale"
-            )
-    if failures:
-        raise PowdrrExecutionError(
-            "intent verification coverage failed: " + "; ".join(failures)
-        )
-    return {"checked": checked, "contract_refs": sorted(contract_refs)}
-
-
 def _compile_verification_obligations(
     parameters: Mapping[str, Any],
     *,
@@ -1302,9 +1264,29 @@ def _require_required_test_cases(
             raise PowdrrExecutionError(
                 f"required test case {item['id']!r} has invalid intent_refs"
             )
+        for field in ("id", "description", "provider", "selector", "profile"):
+            if not isinstance(item[field], str) or not item[field].strip():
+                raise PowdrrExecutionError(
+                    f"required test case {item['id']!r} has invalid {field}"
+                )
+        if item["expectation"] not in {"pass", "absent"}:
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid expectation; "
+                "expected pass or absent"
+            )
+        if item["status"] not in {"active", "superseded"}:
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid status; "
+                "expected active or superseded"
+            )
         if not isinstance(item["applicability"], Mapping):
             raise PowdrrExecutionError(
                 f"required test case {item['id']!r} has invalid applicability"
+            )
+        mode = item["applicability"].get("mode")
+        if not isinstance(mode, str) or not mode.strip():
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has invalid applicability mode"
             )
         cases.append(item)
     if not cases:
@@ -2577,7 +2559,7 @@ def _feature_endpoint_result(
         worktree,
         state["baseline_path"],
         state["plan_path"],
-        state["request_path"],
+        state.get("request_path"),
         state.get("attempt"),
         state.get("validation"),
         state.get("review", {"passed": False}),

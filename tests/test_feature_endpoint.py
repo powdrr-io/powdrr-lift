@@ -55,7 +55,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     _plan_text_items,
     _proposal_execution_units,
     _update_plan_from_sentence_trace,
-    _validate_materialized_intent_contracts,
     _validate_procedrr_flow,
     _validate_required_test_cases,
     _write_structrr_plan,
@@ -488,93 +487,6 @@ def test_feature_obligations_become_active_intents(tmp_path: Path) -> None:
     assert document["active_intent"][1]["kind"] == "invariant"
 
 
-def test_materialized_intents_require_exact_verification_contract_refs(
-    tmp_path: Path,
-) -> None:
-    plan = tmp_path / "structrr-diff.yaml"
-    plan.write_text(
-        yaml.safe_dump(
-            {
-                "required_test_cases": [
-                    {
-                        "id": "test-data",
-                        "description": "Verify data ownership.",
-                        "intent_refs": ["feature-obligation-sentence-1"],
-                        "provider": "pytest",
-                        "selector": "tests/test_data.py::test_ownership",
-                        "profile": "pytest",
-                        "expectation": "pass",
-                        "applicability": {"mode": "affected_closure"},
-                        "status": "active",
-                    }
-                ],
-                "active_intent": [
-                    {
-                        "clause_id": "feature-obligation-sentence-1",
-                        "source_ref": "feature-obligation:sentence-1",
-                    },
-                    {
-                        "clause_id": "feature-obligation-sentence-2",
-                        "source_ref": "feature-obligation:sentence-2",
-                    },
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(PowdrrExecutionError, match="sentence-2"):
-        _validate_materialized_intent_contracts(
-            {"plan": str(plan)}, state={"plan_path": plan}
-        )
-
-
-def test_materialized_intent_can_be_explicitly_non_obligating(tmp_path: Path) -> None:
-    plan = tmp_path / "structrr-diff.yaml"
-    plan.write_text(
-        yaml.safe_dump(
-            {
-                "required_test_cases": [
-                    {
-                        "id": "test-data",
-                        "description": "Verify data ownership.",
-                        "intent_refs": ["feature-obligation-sentence-1"],
-                        "provider": "pytest",
-                        "selector": "tests/test_data.py::test_ownership",
-                        "profile": "pytest",
-                        "expectation": "pass",
-                        "applicability": {"mode": "affected_closure"},
-                        "status": "active",
-                    }
-                ],
-                "active_intent": [
-                    {
-                        "clause_id": "feature-obligation-sentence-1",
-                        "source_ref": "feature-obligation:sentence-1",
-                    },
-                    {
-                        "clause_id": "feature-obligation-sentence-2",
-                        "source_ref": "feature-obligation:sentence-2",
-                        "verification": {
-                            "mode": "non_obligating",
-                            "rationale": "This sentence is explanatory context only.",
-                        },
-                    },
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    result = _validate_materialized_intent_contracts(
-        {"plan": str(plan)}, state={"plan_path": plan}
-    )
-    assert result["checked"] == [
-        "feature-obligation-sentence-1",
-        "feature-obligation-sentence-2",
-    ]
-
-
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:
     (tmp_path / "app.py").write_text("print('updated')\n", encoding="utf-8")
     _git(tmp_path, "init", "-q")
@@ -722,6 +634,10 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [aggregate_validation]" in flow
     assert "command: [prepare_implementation_review]" in flow
     assert "command: [aggregate_intent_review]" in flow
+    assert (
+        "command: [compile_verification_obligations]" in flow
+        and "feature_description: {type: reference, value: feature_description}" in flow
+    )
     assert "provider: opencode" not in flow
     assert flow.count("command: [run_opencode]") == 5
 
@@ -1200,6 +1116,40 @@ def test_required_test_case_validation_requires_discovered_selector(
     )
     assert result["passed"] is False
     assert "was not discovered" in result["failures"][0]
+
+
+def test_required_test_case_validation_rejects_non_executable_expectation(
+    tmp_path: Path,
+) -> None:
+    plan = tmp_path / "plan.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "required_test_cases": [
+                    {
+                        "id": "garbage-contract",
+                        "description": "The focused test passes.",
+                        "intent_refs": ["feature:example"],
+                        "provider": "pytest",
+                        "selector": "tests/test_example.py::test_example",
+                        "profile": "pytest",
+                        "expectation": "assert the feature works",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="invalid expectation"):
+        _validate_required_test_cases(
+            {"plan": str(plan)},
+            worktree=tmp_path,
+            state={"plan_path": plan, "validation_profiles": ()},
+        )
 
 
 def test_proposal_evaluation_preserves_nonzero_diagnostics(tmp_path: Path) -> None:

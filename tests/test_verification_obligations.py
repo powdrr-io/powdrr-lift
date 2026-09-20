@@ -180,6 +180,41 @@ def test_new_intent_without_contract_blocks() -> None:
     assert "intent.new" in result.failures[0]
 
 
+def test_materialized_feature_intent_requires_exact_contract_reference() -> None:
+    result = compile_verification_obligations(
+        _proposal({"features": [{"id": "feature", "action": "added"}]}),
+        active_intents=(
+            {
+                "clause_id": "feature-obligation-sentence-1",
+                "source_ref": "feature-obligation:sentence-1",
+            },
+        ),
+        contracts=(),
+    )
+
+    assert not result.complete
+    assert "feature-obligation-sentence-1" in result.failures[0]
+
+
+def test_materialized_feature_intent_can_be_non_obligating() -> None:
+    result = compile_verification_obligations(
+        _proposal({"features": [{"id": "feature", "action": "added"}]}),
+        active_intents=(
+            {
+                "clause_id": "feature-obligation-sentence-1",
+                "source_ref": "feature-obligation:sentence-1",
+                "verification": {
+                    "mode": "non_obligating",
+                    "rationale": "This sentence is explanatory context only.",
+                },
+            },
+        ),
+        contracts=(),
+    )
+
+    assert result.complete
+
+
 def test_obligation_fingerprint_is_stable() -> None:
     first = compile_verification_obligations(
         _proposal(

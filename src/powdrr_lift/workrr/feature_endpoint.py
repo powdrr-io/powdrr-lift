@@ -19,6 +19,7 @@ from powdrr_lift.core.decision_obligation import (
     DecisionResult,
     DecisionWorklist,
     content_fingerprint,
+    evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.feature_obligation import (
@@ -575,6 +576,8 @@ def _execute_procedrr_flow(
             )
             state["proposal_review_receipt_path"] = review["receipt_path"]
             return review
+        if name == "bind_proposal_decision_results":
+            return _bind_proposal_decision_results(parameters)
         if name == "compile_feature_obligations":
             return _compile_feature_obligations(
                 parameters,
@@ -963,6 +966,52 @@ def _finalize_proposal_review(
         "proposal_fingerprint": receipt.proposal_fingerprint,
         "worklist_fingerprint": receipt.worklist_fingerprint,
     }
+
+
+def _bind_proposal_decision_results(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    """Attach proposal decision identity and evidence metadata deterministically."""
+    raw_worklist = parameters.get("worklist")
+    raw_decisions = parameters.get("decisions")
+    if not isinstance(raw_worklist, Mapping) or not isinstance(raw_decisions, list):
+        raise PowdrrExecutionError(
+            "proposal decision binding requires a worklist and decisions"
+        )
+    try:
+        worklist = DecisionWorklist.from_data(raw_worklist)
+    except (TypeError, ValueError) as error:
+        raise PowdrrExecutionError("proposal decision worklist is malformed") from error
+    decisions = _collected_results(raw_decisions)
+    if decisions is None or len(decisions) != len(worklist.specifications):
+        raise PowdrrExecutionError("proposal decision count does not match worklist")
+    results: list[dict[str, Any]] = []
+    for specification, decision in zip(worklist.specifications, decisions, strict=True):
+        if not isinstance(decision, Mapping):
+            raise PowdrrExecutionError("proposal decision is malformed")
+        try:
+            outcome = DecisionOutcome(str(decision["outcome"]))
+            explanation = str(decision["explanation"])
+        except (KeyError, ValueError) as error:
+            raise PowdrrExecutionError(
+                "proposal decision must contain a valid outcome and explanation"
+            ) from error
+        if not explanation.strip():
+            raise PowdrrExecutionError("proposal decision explanation is empty")
+        references = tuple(specification.evidence_requirements)
+        results.append(
+            DecisionResult(
+                decision_id=specification.decision_id,
+                outcome=outcome,
+                explanation=explanation,
+                predicate_version=specification.predicate_version,
+                subject=specification.subject,
+                input_fingerprint=specification.input_fingerprint,
+                evidence_fingerprint=evidence_fingerprint(
+                    specification.input_fingerprint, references
+                ),
+                evidence_refs=references,
+            ).to_data()
+        )
+    return {"decisions": results}
 
 
 def _validate_review_evidence_sources(

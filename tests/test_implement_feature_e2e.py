@@ -136,6 +136,11 @@ class DeterministicPlanningClient:
                 "acceptance_criterion": "The program prints both greetings in order.",
                 "expected_test": "Run the hello_world test.",
             }
+        if required == {"outcome", "explanation"}:
+            return {
+                "outcome": self.proposal_outcome,
+                "explanation": "The supplied evidence proves this predicate.",
+            }
         if required == {
             "decision_id",
             "outcome",

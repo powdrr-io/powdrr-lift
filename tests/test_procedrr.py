@@ -387,6 +387,12 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
     assert "change-scope-review" in step_text
     assert "Does this sentence state a feature requirement" in step_text
     assert "Is this sentence's requirement explicitly reflected" in step_text
+    assert (
+        "Repair this design consequence so it preserves the instruction's intent"
+        in step_text
+    )
+    assert "Treat statements that something is missing" in step_text
+    assert "repaired_design_decisions" in step_text
     review_schemas = [
         step["judge"]["output"]["schema"]
         for step in document["steps"]

@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 763
+title: Add a complete implement-feature end-to-end regression test
+intent:
+  problem: The implement-feature flow was only covered at isolated boundaries, allowing generated proposal and verification contract mismatches to reach real execution.
+  goal: Exercise proposal generation, deterministic structural review, verification compilation, OpenCode handoff, validation evidence, and post-implementation review as one deterministic end-to-end test.
+human-decisions:
+  - id: use-deterministic-opencode-double
+    summary: Use a local OpenCode-shaped executable and schema-driven planning double so the complete flow runs without model cost or nondeterminism.
+structured_files: []
+files:
+  - {path: tests/test_implement_feature_e2e.py, type: added, summary: Add a minimal repository fixture and deterministic complete implement-feature regression test, rationale: Prove the generated proposal reaches structural review with explicit intent effects and executable verification obligations before a worker edit is accepted, span: {start_line: 1, end_line: 340}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Pass required flow inputs and collect judge and validation results explicitly, rationale: Keep the declared Procedrr bindings aligned with the operation contracts exercised by the end-to-end test, span: {start_line: 230, end_line: 470}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Preserve intent effects, evidence fingerprints, proposal sources, and collected results across flow boundaries, rationale: Make generated proposal review and verification artifacts self-consistent throughout the real implement-feature execution, span: {start_line: 630, end_line: 820}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Normalize generated intent operations and validation result collections, rationale: Ensure automatically generated Structrr operations satisfy deterministic review and Workrr consumes Procedrr list collections correctly, span: {start_line: 990, end_line: 1020}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Add explicit intent effects to sentence-trace additions, rationale: Prevent generated design consequences and their evidence operations from bypassing the affected-intent gate, span: {start_line: 1469, end_line: 1530}}
+entities:
+  - {id: implement-feature-e2e-regression, type: End-to-end test, action: added, description: A deterministic regression test that executes the complete implement-feature Procedrr flow against a temporary repository.}
+  - {id: deterministic-planning-client, type: Fake, action: added, description: A schema-driven planning double that returns stable judge decisions while preserving per-decision identities and evidence references.}
+  - {id: implement-feature-flow-contract, type: Code quality gate, action: added, description: The complete feature flow must produce a structurally valid proposal and non-empty verification obligations before implementation.}
+entity_relationships:
+  - {id: e2e-covers-flow-contract, type: verifies, source: implement-feature-e2e-regression, target: implement-feature-flow-contract, action: added, description: The end-to-end test verifies proposal intent effects and verification obligations before accepting the worker result.}
+invariants:
+  - id: generated-operations-have-intent-effects
+    action: added
+    description: Every generated Structrr operation entering proposal review has an explicit intent_effect.
+    rationale: The deterministic affected-intent gate must evaluate the actual generated proposal rather than a hand-crafted valid fixture.
+  - id: verification-contracts-remain-in-closure
+    action: added
+    description: A required test contract linked to generated feature-obligation intents is retained in the affected verification closure with no compiler failures.
+    rationale: Prevent new intents from silently reaching implementation without executable evidence.
+  - id: collected-flow-results-are-consumed
+    action: added
+    description: Proposal decisions and validation results collected by Procedrr are unwrapped and consumed as their declared result objects.
+    rationale: Preserve the declared typed operation boundaries across for_each collections.
+guidance:
+  - id: exercise-generated-proposals
+    action: added
+    description: End-to-end feature-flow tests should generate realistic planning output and run it through structural proposal review and verification compilation before invoking a worker.
+    rationale: Isolated gate tests cannot detect mismatches between proposal generation and gate input contracts.
+proposed_prs: []

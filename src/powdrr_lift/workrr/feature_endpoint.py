@@ -640,11 +640,17 @@ def _prepare_proposal_review(
     procedrr_path = (
         worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
     )
-    source_refs = (
+    source_refs: tuple[str, ...] = (
         f"structrr:{baseline_path.relative_to(worktree)}",
         f"structrr-diff:{plan_path.relative_to(worktree)}",
         f"procedrr:{procedrr_path.relative_to(worktree)}",
     )
+    feature_obligations_path = state.get("feature_obligations_path")
+    if isinstance(feature_obligations_path, Path):
+        source_refs = (
+            *source_refs,
+            f"obligations:{feature_obligations_path.relative_to(worktree)}",
+        )
     proposal = compile_proposal_revision(
         slug,
         baseline_document,
@@ -747,7 +753,10 @@ def _finalize_proposal_review(
             )
         ),
     )
-    decisions = tuple(DecisionResult.from_data(item) for item in raw_decisions)
+    collected_decisions = _collected_results(raw_decisions)
+    if collected_decisions is None:
+        raise PowdrrExecutionError("proposal review decisions are malformed")
+    decisions = tuple(DecisionResult.from_data(item) for item in collected_decisions)
     receipt = ProposalReviewReceipt(
         proposal_fingerprint=proposal.fingerprint,
         worklist_fingerprint=worklist.fingerprint,
@@ -773,10 +782,19 @@ def _validate_review_evidence_sources(
     *,
     baseline_document: Mapping[str, Any],
 ) -> None:
+    feature_document: Mapping[str, Any] | None = None
+    for source_ref in proposal.source_refs:
+        if source_ref.startswith("structrr-diff:"):
+            feature_document = _load_yaml_mapping(
+                worktree / source_ref.partition(":")[2]
+            )
+            break
     active_intent_refs = {
         f"intent:{clause.clause_id}"
         for clause in _resolve_feature_intent(
-            worktree, baseline_document=baseline_document
+            worktree,
+            baseline_document=baseline_document,
+            feature_document=feature_document,
         )
     }
     known_refs = {"proposal", "baseline", "plan", *proposal.source_refs}
@@ -786,7 +804,12 @@ def _validate_review_evidence_sources(
         for specification in worklist.specifications
         for reference in specification.evidence_requirements
     }
-    unknown_refs = sorted(required_refs - known_refs)
+    unknown_refs = sorted(
+        reference
+        for reference in required_refs
+        if reference.split("@", 1)[0] not in known_refs
+        and not reference.startswith("sha256:")
+    )
     if unknown_refs:
         raise PowdrrExecutionError(
             "proposal review requires unknown evidence references: "
@@ -985,6 +1008,9 @@ def _materialize_feature_intents(
             "version": 1,
             "active": True,
             "action": "added",
+            "intent_effect": (
+                "makes this feature obligation an explicit active intent clause"
+            ),
         }
         intent_clauses.append(clause)
         if clause_id not in existing_ids:
@@ -1458,6 +1484,10 @@ def _apply_sentence_design_trace(
                         else description.strip()
                     ),
                     "action": "added",
+                    "intent_effect": (
+                        "records the concrete design consequence of the requested "
+                        "feature sentence"
+                    ),
                 }
             )
             updated += 1
@@ -1474,6 +1504,9 @@ def _apply_sentence_design_trace(
                     {
                         "id": acceptance_id,
                         "description": acceptance.strip(),
+                        "intent_effect": (
+                            "defines how the requested feature intent is verified"
+                        ),
                     }
                 )
                 updated += 1
@@ -1486,7 +1519,15 @@ def _apply_sentence_design_trace(
             if isinstance(item, Mapping) and isinstance(item.get("id"), str)
         }
         if test_id not in test_ids:
-            test_section.append({"id": test_id, "description": expected_test.strip()})
+            test_section.append(
+                {
+                    "id": test_id,
+                    "description": expected_test.strip(),
+                    "intent_effect": (
+                        "defines the test evidence for the requested feature intent"
+                    ),
+                }
+            )
             updated += 1
         updated_document[section_name] = section
         updated_document["expected_tests"] = test_section
@@ -1616,7 +1657,10 @@ def _run_opencode_phase(
     )
     obligation_path = _feature_obligation_path(parameters.get("obligations"))
     if obligation_path is not None:
-        source_refs = (*source_refs, f"obligations:{obligation_path}")
+        source_refs = (
+            *source_refs,
+            f"obligations:{Path(obligation_path).relative_to(worktree)}",
+        )
     proposal_revision = compile_proposal_revision(
         slug,
         baseline_document,
@@ -2365,6 +2409,9 @@ def _aggregate_validation(
         isinstance(item, Mapping) for item in raw_results
     ):
         raise PowdrrExecutionError("validation results must be a list of mappings")
+    collected_results = _collected_results(raw_results)
+    if collected_results is None:
+        raise PowdrrExecutionError("validation results are malformed")
     results = tuple(
         ValidationResult(
             profile=str(item["profile"]),
@@ -2375,7 +2422,7 @@ def _aggregate_validation(
             stderr=str(item.get("stderr", "")),
             error=item.get("error"),
         )
-        for item in raw_results
+        for item in collected_results
     )
     failed = any(
         result.status
@@ -2570,6 +2617,11 @@ def _write_structrr_plan(
         or [{"id": slug, "description": config.feature_description, "action": "added"}],
         config.feature_description,
     )
+    sections = {
+        key: _ensure_intent_effects(items, config.feature_description)
+        for key, items in sections.items()
+    }
+    features = _ensure_intent_effects(features, config.feature_description)
     document = {
         "schema": "https://powdrr.io/schema/changelog-v2",
         "change_id": slug,
@@ -2609,6 +2661,30 @@ def _interview_edits(value: Any) -> list[dict[str, Any]]:
             if isinstance(item, Mapping):
                 edits.append({**item, "action": action})
     return edits
+
+
+def _ensure_intent_effects(
+    items: Sequence[Mapping[str, Any]], feature_description: str
+) -> list[dict[str, Any]]:
+    """Make the intent effect explicit on every generated Structrr operation."""
+    result: list[dict[str, Any]] = []
+    for item in items:
+        updated = dict(item)
+        if (
+            not isinstance(updated.get("intent_effect"), str)
+            or not updated["intent_effect"].strip()
+        ):
+            action = str(updated.get("action", "added"))
+            verb = (
+                "preserves and adds to"
+                if action in {"add", "added"}
+                else "removes from"
+            )
+            updated["intent_effect"] = (
+                f"{verb} the requested feature intent: {feature_description}"
+            )
+        result.append(updated)
+    return result
 
 
 def _plan_text_items(

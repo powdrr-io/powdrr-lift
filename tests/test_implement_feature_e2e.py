@@ -1,0 +1,355 @@
+from __future__ import annotations
+
+import json
+import shutil
+import stat
+import subprocess
+import sys
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
+from powdrr_lift.core.decision_obligation import evidence_fingerprint
+from powdrr_lift.workrr.feature_endpoint import (
+    FeatureEndpointConfig,
+    run_feature_in_place,
+)
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+class DeterministicPlanningClient:
+    """Schema-driven planning double for the complete implement-feature flow."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if response_schema is None:
+            raise AssertionError("the feature flow must provide a response schema")
+        text = "\n".join(message.get("content", "") for message in messages)
+        required = set(response_schema.get("required", ()))
+        properties = response_schema.get("properties", {})
+
+        if required == {"action"}:
+            if "required_test_cases" in text:
+                return {
+                    "action": "add",
+                    "item": {
+                        "id": "hello_world",
+                        "description": "The greeting program has the requested output.",
+                        "intent_refs": [
+                            "feature-obligation-sentence-1",
+                            "feature-obligation-sentence-2",
+                            "feature-obligation-sentence-3",
+                            "feature-obligation-sentence-4",
+                        ],
+                        "expected_outcome": "The feature test passes.",
+                        "test_selection": "new",
+                    },
+                }
+            return {"action": "no_change"}
+        if required == {"required"}:
+            return {"required": True}
+        if required == {"reflected"}:
+            return {"reflected": True}
+        if required == {"kind", "description", "acceptance_criterion", "expected_test"}:
+            return {
+                "kind": "feature",
+                "description": (
+                    "Add the requested greeting output while preserving the "
+                    "existing output."
+                ),
+                "acceptance_criterion": "The program prints both greetings in order.",
+                "expected_test": "Run the hello_world test.",
+            }
+        if required == {
+            "decision_id",
+            "outcome",
+            "explanation",
+            "predicate_version",
+            "subject",
+            "input_fingerprint",
+            "evidence_fingerprint",
+            "evidence_refs",
+        }:
+            specification = (
+                _named_mapping(text, "proposal_decision")
+                or _find_mapping(
+                    text, {"decision_id", "subject", "predicate", "input_fingerprint"}
+                )
+                or {}
+            )
+            evidence_refs = specification.get(
+                "evidence_requirements", ["feature-validation"]
+            )
+            if not isinstance(evidence_refs, list):
+                evidence_refs = (
+                    list(evidence_refs)
+                    if isinstance(evidence_refs, tuple)
+                    else ["feature-validation"]
+                )
+            input_fingerprint = specification.get("input_fingerprint", "input")
+            return {
+                "decision_id": specification.get("decision_id", "decision"),
+                "outcome": "pass",
+                "explanation": "The supplied evidence proves this predicate.",
+                "predicate_version": specification.get("predicate_version", "v1"),
+                "subject": specification.get("subject", "proposal"),
+                "input_fingerprint": input_fingerprint,
+                "evidence_fingerprint": evidence_fingerprint(
+                    input_fingerprint, tuple(str(item) for item in evidence_refs)
+                ),
+                "evidence_refs": evidence_refs,
+            }
+        if required == {"clause_id", "verdict", "explanation", "evidence_refs"}:
+            return {
+                "clause_id": _find_json_value(text, "clause_id")
+                or "intent-hello-world",
+                "verdict": "preserved",
+                "explanation": "The implementation preserves this intent clause.",
+                "evidence_refs": _find_json_value(text, "evidence_refs")
+                or ["feature-validation"],
+            }
+        if required == {"request"}:
+            return {
+                "request": (
+                    "Preserve the requested greeting behavior and repair only the "
+                    "reported issue."
+                )
+            }
+        if required == {"path", "edits"}:
+            return {"path": "required_test_cases", "edits": []}
+        if "verdict" in required:
+            enum = properties.get("verdict", {}).get("enum", [])
+            return {
+                "verdict": next(
+                    (
+                        value
+                        for value in ("satisfied", "justified", "passed")
+                        if value in enum
+                    ),
+                    enum[0] if enum else "satisfied",
+                )
+            }
+        if "passed" in required:
+            return {"passed": True}
+        if "action" in required:
+            return {"action": "no_change"}
+        raise AssertionError(f"unhandled planning schema: {sorted(required)}")
+
+
+def _find_json_value(text: str, key: str) -> Any:
+    values: list[Any] = []
+    decoder = json.JSONDecoder()
+    for index, character in enumerate(text):
+        if character != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, Mapping):
+            _collect_json_values(value, key, values)
+    return values[-1] if values else None
+
+
+def _find_mapping(text: str, keys: set[str]) -> Mapping[str, Any] | None:
+    decoder = json.JSONDecoder()
+    candidates: list[Mapping[str, Any]] = []
+    for index, character in enumerate(text):
+        if character != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, Mapping):
+            _collect_mappings(value, keys, candidates)
+    return candidates[-1] if candidates else None
+
+
+def _named_mapping(text: str, name: str) -> Mapping[str, Any] | None:
+    marker = json.dumps(name) + ":"
+    decoder = json.JSONDecoder()
+    candidates: list[Mapping[str, Any]] = []
+    offset = 0
+    while True:
+        index = text.find(marker, offset)
+        if index < 0:
+            break
+        try:
+            value, _ = decoder.raw_decode(text[index + len(marker) :])
+        except json.JSONDecodeError:
+            offset = index + len(marker)
+            continue
+        if isinstance(value, Mapping):
+            candidates.append(value)
+        offset = index + len(marker)
+    return candidates[-1] if candidates else None
+
+
+def _collect_mappings(
+    value: Any, keys: set[str], result: list[Mapping[str, Any]]
+) -> None:
+    if isinstance(value, Mapping):
+        if keys.issubset(value):
+            result.append(value)
+        for child in value.values():
+            _collect_mappings(child, keys, result)
+    elif isinstance(value, list):
+        for child in value:
+            _collect_mappings(child, keys, result)
+
+
+def _collect_json_values(value: Any, key: str, values: list[Any]) -> None:
+    if isinstance(value, Mapping):
+        if key in value:
+            values.append(value[key])
+        for child in value.values():
+            _collect_json_values(child, key, values)
+    elif isinstance(value, list):
+        for child in value:
+            _collect_json_values(child, key, values)
+
+
+def _fake_opencode(path: Path) -> Path:
+    path.write_text(
+        f"""#!{sys.executable}
+from pathlib import Path
+Path("hello_world.py").write_text(
+    'print("Hello, world!")\\nprint("Hello from Powdrr!")\\n',
+    encoding="utf-8",
+)
+print('{{"type":"session.completed"}}')
+""",
+        encoding="utf-8",
+    )
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+    return path
+
+
+def _git_commit(path: Path, message: str) -> None:
+    subprocess.run(["git", "add", "."], cwd=path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            message,
+        ],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+
+
+def _fixture_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=repo, check=True
+    )
+    (repo / ".gitignore").write_text(".powdrr/\n", encoding="utf-8")
+    (repo / "hello_world.py").write_text('print("Hello, world!")\n', encoding="utf-8")
+    tests = repo / "tests"
+    tests.mkdir()
+    (tests / "test_hello_world.py").write_text(
+        "def test_hello_world() -> None:\n"
+        "    import subprocess\n"
+        "    result = subprocess.run("
+        '["python", "hello_world.py"], capture_output=True, text=True, check=True)\n'
+        '    assert result.stdout == "Hello, world!\\nHello from Powdrr!\\n"\n',
+        encoding="utf-8",
+    )
+    shutil.copytree(
+        REPOSITORY_ROOT / "docs" / "procedrr" / "skill-definitions",
+        repo / "docs" / "procedrr" / "skill-definitions",
+    )
+    shutil.copy2(
+        REPOSITORY_ROOT / "software_development_entity_taxonomy.md",
+        repo / "software_development_entity_taxonomy.md",
+    )
+    shutil.copy2(REPOSITORY_ROOT / "pyproject.toml", repo / "pyproject.toml")
+    _git_commit(repo, "initial hello world fixture")
+    return repo
+
+
+def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=(
+                "Add a second greeting to hello_world.py. Keep the existing "
+                "Hello, world! output first and print Hello from Powdrr! second."
+            ),
+            work_item_name="hello-world-second-greeting",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(sys.executable, "-m", "pytest", "-q"),
+            opencode_executable=str(fake_opencode),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=DeterministicPlanningClient(),
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.validation is not None
+    assert result.validation.status.value == "passed"
+    assert result.review["passed"] is True
+    assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
+        'print("Hello, world!")\nprint("Hello from Powdrr!")\n'
+    )
+    assert (result.plan_path).is_file()
+    assert result.feature_obligations_path is not None
+    assert result.feature_obligations_path.is_file()
+    run_root = (
+        result.worktree / ".powdrr" / "feature-runs" / "hello-world-second-greeting"
+    )
+    assert (run_root / "proposal-review-receipt.json").is_file()
+    proposal = json.loads(
+        (result.plan_path.parent / "proposal-revision.json").read_text(encoding="utf-8")
+    )
+    assert proposal["operations"]
+    assert all(
+        operation["content"].get("intent_effect")
+        for operation in proposal["operations"]
+    )
+    verification = json.loads(
+        (run_root / "verification-obligations.json").read_text(encoding="utf-8")
+    )
+    assert verification["obligations"]
+    assert verification["failures"] == []
+    assert (
+        subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        == ""
+    )
+    assert (
+        "Implement hello-world-second-greeting"
+        in subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )

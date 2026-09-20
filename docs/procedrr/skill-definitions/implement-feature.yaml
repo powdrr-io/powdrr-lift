@@ -81,13 +81,47 @@ steps:
                   acceptance_criterion: {type: string, minLength: 1}
                   expected_test: {type: string, minLength: 1}
             validation: {kind: json_schema}
+  - for_each:
+      snapshot: {name: design_decisions}
+      item_binding: design_decision
+      collect: {binding: repaired_design_decisions, mode: list, value: repaired_design_decision}
+      body:
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: Repair this design consequence so it preserves the instruction's intent.
+            subject: design_decision
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Read both the original sentence and the proposed consequence inside design_decision.
+              - Preserve the sentence's direction and requested behavior exactly.
+              - Treat statements that something is missing, lacks support, or forces manual work as problems to solve; do not turn them into non-goals or prohibitions.
+              - Only treat explicit words such as must not, do not, avoid, or not supported as prohibitions.
+              - Keep concrete API names, lifecycle rules, error behavior, integrations, and testable details.
+              - Return the original consequence unchanged when it already preserves the sentence's intent.
+              - Always provide one acceptance criterion and one expected test.
+            context: [design_decision, plan]
+            output:
+              name: repaired_design_decision
+              schema:
+                type: object
+                required: [kind, description, acceptance_criterion, expected_test]
+                additionalProperties: false
+                properties:
+                  kind:
+                    type: string
+                    enum: [entity, feature, interface, invariant, guidance, acceptance_criterion, expected_test, intent, non_goal]
+                  description: {type: string, minLength: 1}
+                  acceptance_criterion: {type: string, minLength: 1}
+                  expected_test: {type: string, minLength: 1}
+            validation: {kind: json_schema}
   - operation:
       tool: internal
       command: [apply_sentence_design_trace]
       parameters:
         plan: {type: reference, value: plan.path}
         sentences: {type: reference, value: feature_sentences}
-        design_decisions: {type: reference, value: design_decisions}
+        design_decisions: {type: reference, value: repaired_design_decisions}
       returns:
         type: object
         required: [path, updated]
@@ -168,7 +202,7 @@ steps:
         feature_description: {type: reference, value: feature_description}
         plan: {type: reference, value: plan.path}
         sentences: {type: reference, value: feature_sentences}
-        design_decisions: {type: reference, value: design_decisions}
+        design_decisions: {type: reference, value: repaired_design_decisions}
         requirement_decisions: {type: reference, value: requirement_decisions}
         reflection_decisions: {type: reference, value: reflection_decisions}
       returns:

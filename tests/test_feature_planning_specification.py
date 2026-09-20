@@ -323,6 +323,46 @@ def test_feature_pr_template_rejects_incomplete_required_test_case(
         )
 
 
+def test_feature_pr_template_canonicalizes_scalar_required_test_case_fields(
+    tmp_path: Path,
+) -> None:
+    interview_path = tmp_path / "design-interview-input.json"
+    interview_path.write_text(
+        json.dumps(
+            {
+                "required_test_cases_edits": {
+                    "added": [
+                        {
+                            "id": "scalar-fields",
+                            "description": "The focused test passes.",
+                            "intent_refs": "feature:example",
+                            "provider": "pytest",
+                            "selector": "tests/test_example.py::test_example",
+                            "profile": "pytest",
+                            "expectation": "pass",
+                            "applicability": "affected_closure",
+                            "status": "active",
+                        }
+                    ],
+                    "deleted": [],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    document = yaml.safe_load(
+        feature_planning.render_feature_pr_specification_template(
+            work_item_name="canonicalized-feature", interview_input=interview_path
+        )
+    )
+
+    assert document["required_test_cases"][0]["intent_refs"] == ["feature:example"]
+    assert document["required_test_cases"][0]["applicability"] == {
+        "mode": "affected_closure"
+    }
+
+
 def _create_repo_with_structured_specs_and_changelogs(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

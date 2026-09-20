@@ -287,12 +287,30 @@ def render_feature_pr_specification_template(
             }
         else:
             if key == "required_test_cases":
+                canonical_items = []
                 for item in items:
                     if item.get("action") == "deleted":
+                        canonical_items.append(item)
                         continue
-                    _validate_required_test_case_item(item)
+                    canonical = _canonicalize_required_test_case_item(item)
+                    _validate_required_test_case_item(canonical)
+                    canonical_items.append(canonical)
+                items = canonical_items
             document[key] = items
     return yaml.safe_dump(document, sort_keys=False)
+
+
+def _canonicalize_required_test_case_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    canonical = dict(item)
+    if isinstance(intent_refs := canonical.get("intent_refs"), str):
+        canonical["intent_refs"] = [intent_refs]
+    if isinstance(protected_inputs := canonical.get("protected_inputs"), str):
+        canonical["protected_inputs"] = [protected_inputs]
+    if isinstance(applicability := canonical.get("applicability"), str):
+        canonical["applicability"] = {"mode": applicability}
+    if applicability is None:
+        canonical["applicability"] = {"mode": "affected_closure"}
+    return canonical
 
 
 def _validate_required_test_case_item(item: Mapping[str, Any]) -> None:

@@ -11,13 +11,13 @@ human-decisions:
     summary: Retain the disposable repository and Powdrr run artifacts on failure so live failures can be diagnosed from the exact proposal, requests, validation, and review evidence.
 structured_files: []
 files:
-  - {path: scripts/live-implement-feature-smoke.py, type: added, summary: Create a disposable repository, invoke the production workrr-feature CLI with live providers, and assert the completed implementation state, rationale: Make one real implement-feature acceptance run reproducible and inspectable without PR publication, span: {start_line: 1, end_line: 285}}
+  - {path: scripts/live-implement-feature-smoke.py, type: added, summary: Create a disposable repository, invoke the production workrr-feature CLI with live providers, and assert the completed implementation state, rationale: Make one real implement-feature acceptance run reproducible and inspectable without PR publication, span: {start_line: 1, end_line: 270}}
   - {path: bin/test-live-implement-feature, type: added, summary: Provide a short developer command for the live smoke harness, rationale: Make the real flow fast to invoke after changing implement-feature, span: {start_line: 1, end_line: 5}}
-  - {path: docs/current/real-implement-feature-smoke.md, type: added, summary: Document live smoke usage, artifacts, and acceptance conditions, rationale: Define how developers validate the production flow after changing it, span: {start_line: 1, end_line: 45}}
+  - {path: docs/current/real-implement-feature-smoke.md, type: added, summary: Document live smoke usage, artifacts, and acceptance conditions, rationale: Define how developers validate the production flow after changing it, span: {start_line: 1, end_line: 42}}
 entities:
   - {id: live-implement-feature-smoke, type: Test harness, action: added, description: An opt-in command that runs the production implement-feature CLI against a disposable repository with live planning and OpenCode providers.}
   - {id: live-implement-feature-command, type: Command, action: added, description: The bin/test-live-implement-feature developer entry point for the live smoke harness.}
-  - {id: live-implement-feature-runbook, type: Document, action: added, description: The documented procedure and acceptance contract for a live implement-feature smoke run.}
+  - {id: live-implement-feature-runbook, type: Runbook, action: added, description: The documented procedure and acceptance contract for a live implement-feature smoke run.}
 entity_relationships:
   - {id: command-runs-live-harness, type: invokes, source: live-implement-feature-command, target: live-implement-feature-smoke, action: added, description: The short command delegates to the Python smoke harness.}
   - {id: runbook-describes-harness, type: documents, source: live-implement-feature-runbook, target: live-implement-feature-smoke, action: added, description: The runbook defines invocation, isolation, artifacts, and pass conditions.}

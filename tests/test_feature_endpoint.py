@@ -223,14 +223,24 @@ def test_compile_feature_obligations_binds_sentence_trace_to_plan(
             "sentences": [{"id": "sentence-1", "text": "It works."}],
             "design_decisions": [
                 {
-                    "kind": "feature",
-                    "description": "Implement the feature.",
-                    "acceptance_criterion": "It works.",
-                    "expected_test": "Test that it works.",
+                    "item": {"id": "sentence-1"},
+                    "result": {
+                        "kind": "feature",
+                        "description": "Implement the feature.",
+                        "acceptance_criterion": "It works.",
+                        "expected_test": "Test that it works.",
+                    },
                 }
             ],
-            "requirement_decisions": [{"required": True}],
-            "reflection_decisions": [{"reflected": True}],
+            "requirement_decisions": [
+                {"item": {"id": "sentence-1"}, "result": {"required": True}}
+            ],
+            "reflection_decisions": [
+                {
+                    "item": {"id": "sentence-1"},
+                    "result": {"reflected": True},
+                }
+            ],
         },
         worktree=tmp_path,
         output_root=output_root,

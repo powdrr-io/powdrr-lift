@@ -797,12 +797,12 @@ def _compile_feature_obligations(
         raise PowdrrExecutionError("obligations plan does not match the planned diff")
     feature_description = _require_flow_text(parameters, "feature_description")
     sentences = parameters.get("sentences")
-    design_decisions = parameters.get("design_decisions")
-    requirement_decisions = parameters.get("requirement_decisions")
-    reflection_decisions = parameters.get("reflection_decisions")
+    design_decisions = _collected_results(parameters.get("design_decisions"))
+    requirement_decisions = _collected_results(parameters.get("requirement_decisions"))
+    reflection_decisions = _collected_results(parameters.get("reflection_decisions"))
     if not isinstance(sentences, list):
         raise PowdrrExecutionError("feature sentences must be a list")
-    if not isinstance(design_decisions, list):
+    if design_decisions is None:
         raise PowdrrExecutionError("sentence design decisions must be a list")
     if not isinstance(requirement_decisions, list) or not isinstance(
         reflection_decisions, list
@@ -1085,8 +1085,8 @@ def _update_plan_from_sentence_trace(
     if Path(plan) != state.get("plan_path"):
         raise PowdrrExecutionError("plan repair does not match the planned diff")
     sentences = parameters.get("sentences")
-    requirement_decisions = parameters.get("requirement_decisions")
-    reflection_decisions = parameters.get("reflection_decisions")
+    requirement_decisions = _collected_results(parameters.get("requirement_decisions"))
+    reflection_decisions = _collected_results(parameters.get("reflection_decisions"))
     if not isinstance(sentences, list):
         raise PowdrrExecutionError("feature sentences must be a list")
     if not isinstance(requirement_decisions, list) or not isinstance(
@@ -1148,8 +1148,8 @@ def _apply_sentence_design_trace(
     if Path(plan) != state.get("plan_path"):
         raise PowdrrExecutionError("sentence design plan does not match the plan")
     sentences = parameters.get("sentences")
-    decisions = parameters.get("design_decisions")
-    if not isinstance(sentences, list) or not isinstance(decisions, list):
+    decisions = _collected_results(parameters.get("design_decisions"))
+    if not isinstance(sentences, list) or decisions is None:
         raise PowdrrExecutionError("sentence design inputs must be lists")
     if len(sentences) != len(decisions):
         raise PowdrrExecutionError("sentence design counts do not match")
@@ -1263,6 +1263,15 @@ def _decompose_feature_description(feature_description: str) -> list[dict[str, s
 
 def _decision_value(value: Any, key: str) -> bool:
     return isinstance(value, Mapping) and value.get(key) is True
+
+
+def _collected_results(value: Any) -> list[Any] | None:
+    if not isinstance(value, list):
+        return None
+    return [
+        item["result"] if isinstance(item, Mapping) and "result" in item else item
+        for item in value
+    ]
 
 
 def _plan_acceptance_references(document: Mapping[str, Any]) -> list[str]:

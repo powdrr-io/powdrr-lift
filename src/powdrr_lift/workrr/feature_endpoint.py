@@ -21,7 +21,15 @@ from powdrr_lift.core.decision_obligation import (
     content_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
-from powdrr_lift.core.instruction_ledger import compile_instruction_ledger
+from powdrr_lift.core.feature_obligation import (
+    FeatureObligationError,
+    compile_feature_design,
+)
+from powdrr_lift.core.instruction_ledger import (
+    InstructionLedger,
+    InstructionLedgerError,
+    compile_instruction_ledger,
+)
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -381,6 +389,44 @@ def _execute_procedrr_flow(
                 "clauses": [item.to_data() for item in ledger.clauses],
             }
 
+        def compile_canonical_feature_design_operation() -> Any:
+            ledger_path = state.get("instruction_ledger_path")
+            if not isinstance(ledger_path, Path):
+                raise PowdrrExecutionError("instruction ledger is unavailable")
+            try:
+                ledger = InstructionLedger.from_data(
+                    json.loads(ledger_path.read_text(encoding="utf-8"))
+                )
+            except (OSError, json.JSONDecodeError, InstructionLedgerError) as exc:
+                raise PowdrrExecutionError(
+                    f"instruction ledger cannot be loaded: {exc}"
+                ) from exc
+            raw_obligations = parameters.get("obligations")
+            if not isinstance(raw_obligations, Mapping):
+                raise PowdrrExecutionError("canonical design obligations are missing")
+            obligations = raw_obligations.get("obligations")
+            if not isinstance(obligations, list):
+                raise PowdrrExecutionError("canonical design obligations are malformed")
+            work_item_name = _require_flow_text(parameters, "work_item_name")
+            try:
+                design = compile_feature_design(ledger, work_item_name, obligations)
+            except FeatureObligationError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            path = output_root / "canonical-feature-design.json"
+            path.write_text(
+                json.dumps(design.to_data(), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            state["canonical_feature_design_path"] = path
+            return {
+                "path": str(path),
+                "fingerprint": content_fingerprint(design.to_data()),
+                "obligations": [item.to_data() for item in design.obligations],
+                "required_test_cases": [
+                    item.to_data() for item in design.test_contracts
+                ],
+            }
+
         def apply_sentence_design_trace() -> Any:
             return _apply_sentence_design_trace(parameters, state=state)
 
@@ -414,6 +460,9 @@ def _execute_procedrr_flow(
             "aggregate_category_edits": aggregate_category_edits,
             "decompose_feature_description": decompose_feature_description,
             "compile_instruction_ledger": compile_instruction_ledger_operation,
+            "compile_canonical_feature_design": (
+                compile_canonical_feature_design_operation
+            ),
             "apply_sentence_design_trace": apply_sentence_design_trace,
             "materialize_feature_intents": materialize_feature_intents,
             "compile_verification_obligations": compile_verification_obligations,

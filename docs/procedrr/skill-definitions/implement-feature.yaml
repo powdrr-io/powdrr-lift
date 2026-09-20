@@ -232,6 +232,22 @@ steps:
       bind: instruction_ledger
   - operation:
       tool: internal
+      command: [compile_canonical_feature_design]
+      parameters:
+        work_item_name: {type: reference, value: work_item_name}
+        instruction_ledger: {type: reference, value: instruction_ledger}
+        obligations: {type: reference, value: feature_obligations}
+      returns:
+        type: object
+        required: [path, fingerprint, obligations, required_test_cases]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          obligations: {type: array, minItems: 1}
+          required_test_cases: {type: array, minItems: 1}
+      bind: canonical_feature_design
+  - operation:
+      tool: internal
       command: [materialize_feature_intents]
       parameters:
         plan: {type: reference, value: plan.path}

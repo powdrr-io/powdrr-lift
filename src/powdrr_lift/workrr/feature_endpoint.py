@@ -21,6 +21,7 @@ from powdrr_lift.core.decision_obligation import (
     content_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+from powdrr_lift.core.instruction_ledger import compile_instruction_ledger
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -356,6 +357,30 @@ def _execute_procedrr_flow(
                 raise PowdrrExecutionError("feature description is empty")
             return _decompose_feature_description(feature_description)
 
+        def compile_instruction_ledger_operation() -> Any:
+            feature_description = parameters.get("feature_description")
+            work_item_name = parameters.get("work_item_name")
+            if (
+                not isinstance(feature_description, str)
+                or not feature_description.strip()
+            ):
+                raise PowdrrExecutionError("feature description is empty")
+            if not isinstance(work_item_name, str) or not work_item_name.strip():
+                raise PowdrrExecutionError("work item name is empty")
+            ledger = compile_instruction_ledger(work_item_name, feature_description)
+            path = output_root / "instruction-ledger.json"
+            path.write_text(
+                json.dumps(ledger.to_data(), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            state["instruction_ledger_path"] = path
+            state["instruction_ledger_fingerprint"] = ledger.fingerprint
+            return {
+                "path": str(path),
+                "fingerprint": ledger.fingerprint,
+                "clauses": [item.to_data() for item in ledger.clauses],
+            }
+
         def apply_sentence_design_trace() -> Any:
             return _apply_sentence_design_trace(parameters, state=state)
 
@@ -388,6 +413,7 @@ def _execute_procedrr_flow(
             "extract_proposal_issues": extract_proposal_issues,
             "aggregate_category_edits": aggregate_category_edits,
             "decompose_feature_description": decompose_feature_description,
+            "compile_instruction_ledger": compile_instruction_ledger_operation,
             "apply_sentence_design_trace": apply_sentence_design_trace,
             "materialize_feature_intents": materialize_feature_intents,
             "compile_verification_obligations": compile_verification_obligations,

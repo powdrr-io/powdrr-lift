@@ -9,43 +9,50 @@ human-decisions:
     summary: Validate binding dataflow and bounded control declarations before any Procedrr execution.
 structured_files: []
 files:
-  - {path: src/procedrr/parser.py, type: modified, summary: Add binding-path and workflow-limit validation, rationale: Reject invalid global contracts before step traversal, span: {start_line: 30, end_line: 30}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate document limits, rationale: Prevent invalid resource limits from reaching runtime, span: {start_line: 99, end_line: 116}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Track document bindings, rationale: Make later control-flow reference checks dataflow-aware, span: {start_line: 174, end_line: 174}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Preserve binding state through validation, rationale: Keep sequential binding analysis accurate, span: {start_line: 180, end_line: 180}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Reuse tracked bindings for recovery validation, rationale: Validate recovery references against the established workflow state, span: {start_line: 185, end_line: 185}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate recovery inputs, rationale: Reject malformed recovery input declarations, span: {start_line: 205, end_line: 215}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Include recovery bindings, rationale: Validate recovery steps with their declared inputs, span: {start_line: 217, end_line: 217}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate inherited recovery state, rationale: Allow recoveries to use established workflow bindings, span: {start_line: 223, end_line: 223}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate repeat termination, rationale: Prevent repeat loops from waiting on missing state, span: {start_line: 548, end_line: 554}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate repeat collection shape, rationale: Reject malformed repeat collection declarations, span: {start_line: 556, end_line: 566}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Propagate repeat bindings, rationale: Preserve outputs created by repeat bodies for later steps, span: {start_line: 587, end_line: 594}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate branch subjects, rationale: Detect unresolved branch state before execution, span: {start_line: 605, end_line: 611}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Propagate branch bindings, rationale: Preserve outputs created in branch cases, span: {start_line: 630, end_line: 630}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Analyze branch case bindings, rationale: Validate dataflow through each branch case, span: {start_line: 635, end_line: 635}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Merge branch case bindings, rationale: Make branch outputs available to subsequent validation, span: {start_line: 638, end_line: 638}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Analyze default branch bindings, rationale: Validate dataflow through the default case, span: {start_line: 648, end_line: 648}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Merge default branch bindings, rationale: Make default-case outputs available later, span: {start_line: 653, end_line: 653}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Preserve attempt-body bindings, rationale: Validate outputs created inside attempts, span: {start_line: 656, end_line: 656}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Track attempt recovery state, rationale: Allow recovery handlers to consume attempt outputs, span: {start_line: 712, end_line: 712}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Propagate attempt bindings, rationale: Allow later recovery and workflow references to resolve, span: {start_line: 717, end_line: 717}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate loop declarations, rationale: Reject malformed snapshots and item bindings before iteration, span: {start_line: 720, end_line: 720}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Invoke loop contract validation, rationale: Apply static checks to data-driven loops, span: {start_line: 725, end_line: 728}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate collection mappings, rationale: Reject malformed loop collection declarations, span: {start_line: 754, end_line: 760}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate collected values, rationale: Ensure loop outputs resolve to known body bindings, span: {start_line: 785, end_line: 791}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge contexts, rationale: Resolve dotted context paths against known bindings, span: {start_line: 967, end_line: 969}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge subjects, rationale: Catch unresolved judge state references consistently, span: {start_line: 976, end_line: 985}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Add reusable static contract helpers, rationale: Centralize binding, snapshot, and collection validation rules, span: {start_line: 1101, end_line: 1211}}
-  - {path: src/procedrr/parser.py, type: modified, summary: Reject model-owned metadata fields, rationale: Prevent judges from generating identity, provenance, version, reference, hash, and fingerprint values, span: {start_line: 1223, end_line: 1282}}
-  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Bind proposal decision metadata deterministically, rationale: Keep decision identity and evidence provenance outside LLM output, span: {start_line: 941, end_line: 985}}
-  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Restrict proposal judges to semantic decisions, rationale: Move proposal identity and evidence fields to deterministic binding, span: {start_line: 324, end_line: 365}}
-  - {path: docs/procedrr/skill-definitions/execute-proposed-pr.yaml, type: modified, summary: Remove repair identity fields from judge output, rationale: Keep repair identity and provenance runtime-owned, span: {start_line: 256, end_line: 277}}
-  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Prohibit generated identifiers in interview guidance, rationale: Ensure semantic interview responses do not author identity or integrity metadata, span: {start_line: 58, end_line: 64}}
-  - {path: tests/test_procedrr.py, type: modified, summary: Test recursive model metadata rejection, rationale: Ensure nested identity and reference fields are rejected statically, span: {start_line: 180, end_line: 220}}
-  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Update proposal judge test double, rationale: Exercise the semantic-only proposal decision contract, span: {start_line: 132, end_line: 137}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Prohibit generated identifiers in interview guidance, rationale: Keep semantic interview responses free of runtime-owned metadata, span: {start_line: 61, end_line: 62}}
+  - {path: docs/procedrr/skill-definitions/execute-proposed-pr.yaml, type: modified, summary: Update repair guidance, rationale: Keep repair identity and provenance runtime-owned, span: {start_line: 259, end_line: 259}}
+  - {path: docs/procedrr/skill-definitions/execute-proposed-pr.yaml, type: modified, summary: Restrict repair output fields, rationale: Permit only semantic edit instructions from the judge, span: {start_line: 267, end_line: 267}}
+  - {path: docs/procedrr/skill-definitions/execute-proposed-pr.yaml, type: modified, summary: Delete model-owned repair metadata, rationale: Prevent generated identifiers from entering repair state, span: {start_line: 270, end_line: 272}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Restrict proposal judge guidance, rationale: Require semantic decisions without copied identity fields, span: {start_line: 327, end_line: 327}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Restrict proposal decision schema, rationale: Move identity and evidence metadata to deterministic binding, span: {start_line: 335, end_line: 335}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Delete proposal identity property, rationale: Prevent judges from authoring decision identity, span: {start_line: 338, end_line: 338}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Delete proposal provenance properties, rationale: Prevent judges from authoring evidence metadata, span: {start_line: 341, end_line: 345}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Add deterministic proposal binding, rationale: Attach trusted decision identity and evidence fields, span: {start_line: 341, end_line: 348}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Route finalized decisions through binding, rationale: Ensure receipt validation consumes compiler-owned records, span: {start_line: 355, end_line: 355}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Import evidence fingerprinting, rationale: Derive evidence identity inside trusted runtime code, span: {start_line: 22, end_line: 22}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Dispatch proposal binding, rationale: Make metadata binding an explicit flow operation, span: {start_line: 552, end_line: 553}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Bind proposal metadata deterministically, rationale: Keep decision identity and evidence provenance outside LLM output, span: {start_line: 944, end_line: 989}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Define model metadata policy, rationale: Centralize prohibited identity and integrity field detection, span: {start_line: 30, end_line: 33}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate limits, rationale: Prevent invalid global contracts from reaching runtime, span: {start_line: 102, end_line: 119}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Track document bindings, rationale: Make reference checks dataflow-aware, span: {start_line: 177, end_line: 177}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Preserve binding state, rationale: Keep sequential binding analysis accurate, span: {start_line: 183, end_line: 183}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Reuse bindings for recovery validation, rationale: Validate recovery references against workflow state, span: {start_line: 188, end_line: 188}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate recovery inputs, rationale: Reject malformed recovery input declarations, span: {start_line: 208, end_line: 218}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Include recovery bindings, rationale: Validate recovery steps with declared inputs, span: {start_line: 220, end_line: 220}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate inherited recovery state, rationale: Allow recoveries to use established workflow bindings, span: {start_line: 226, end_line: 226}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate repeat termination, rationale: Prevent repeat loops from waiting on missing state, span: {start_line: 551, end_line: 557}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate repeat collection, rationale: Reject malformed repeat collection declarations, span: {start_line: 559, end_line: 569}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate repeat bindings, rationale: Preserve outputs created by repeat bodies, span: {start_line: 590, end_line: 597}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate repeat collection binding, rationale: Preserve collected outputs for later steps, span: {start_line: 651, end_line: 651}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate branch subjects, rationale: Detect unresolved branch state before execution, span: {start_line: 608, end_line: 614}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate branch bindings, rationale: Preserve outputs created in branch cases, span: {start_line: 633, end_line: 633}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Analyze branch cases, rationale: Validate dataflow through each branch case, span: {start_line: 638, end_line: 638}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Merge branch bindings, rationale: Make branch outputs available later, span: {start_line: 641, end_line: 641}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Analyze default branch, rationale: Validate dataflow through the default case, span: {start_line: 656, end_line: 656}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Merge default bindings, rationale: Make default outputs available later, span: {start_line: 659, end_line: 659}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Preserve attempt bindings, rationale: Validate outputs created inside attempts, span: {start_line: 715, end_line: 715}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Track attempt recovery state, rationale: Allow recovery handlers to consume attempt outputs, span: {start_line: 720, end_line: 720}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate attempt bindings, rationale: Resolve later workflow references, span: {start_line: 723, end_line: 723}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate loop declarations, rationale: Reject malformed snapshots and item bindings, span: {start_line: 728, end_line: 731}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate collection mappings, rationale: Reject malformed loop collections, span: {start_line: 757, end_line: 763}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate collected values, rationale: Ensure loop outputs resolve to body bindings, span: {start_line: 788, end_line: 794}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge contexts, rationale: Resolve dotted context paths against known bindings, span: {start_line: 970, end_line: 972}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge subjects, rationale: Catch unresolved judge references, span: {start_line: 979, end_line: 988}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Reject model-owned output metadata recursively, rationale: Prevent judges from generating trusted identity or provenance, span: {start_line: 1102, end_line: 1274}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Update proposal judge test double, rationale: Exercise the semantic-only proposal decision contract, span: {start_line: 132, end_line: 136}}
   - {path: tests/test_procedrr.py, type: modified, summary: Import static validation helpers, rationale: Exercise parser diagnostics directly, span: {start_line: 25, end_line: 25}}
   - {path: tests/test_procedrr.py, type: modified, summary: Import document validation, rationale: Exercise parser diagnostics directly, span: {start_line: 29, end_line: 29}}
-  - {path: tests/test_procedrr.py, type: modified, summary: Test malformed loop and control references, rationale: Ensure runtime-only shape errors become parser diagnostics, span: {start_line: 130, end_line: 179}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test malformed loop and metadata references, rationale: Ensure runtime-only shape errors become parser diagnostics, span: {start_line: 130, end_line: 218}}
 entities: []
 entity_relationships: []
 invariants:

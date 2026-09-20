@@ -34,6 +34,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
     _aggregate_intent_review,
+    _apply_sentence_design_trace,
     _compile_feature_obligations,
     _create_pr_changelog,
     _ensure_current_baseline,
@@ -220,6 +221,14 @@ def test_compile_feature_obligations_binds_sentence_trace_to_plan(
             "feature_description": "Add the feature.",
             "plan": str(plan),
             "sentences": [{"id": "sentence-1", "text": "It works."}],
+            "design_decisions": [
+                {
+                    "kind": "feature",
+                    "description": "Implement the feature.",
+                    "acceptance_criterion": "It works.",
+                    "expected_test": "Test that it works.",
+                }
+            ],
             "requirement_decisions": [{"required": True}],
             "reflection_decisions": [{"reflected": True}],
         },
@@ -341,6 +350,67 @@ def test_state_data_deepswe_description_becomes_structured_plan_criteria(
     ):
         assert required_text in criterion_text
         assert required_text in design_text
+
+
+def test_sentence_design_trace_maps_consequences_to_plan_sections(
+    tmp_path: Path,
+) -> None:
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="semantic-trace-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+    state: dict[str, Any] = {"plan_path": plan}
+
+    result = _apply_sentence_design_trace(
+        {
+            "plan": str(plan),
+            "sentences": [
+                {"id": "sentence-1", "text": "State exposes get_data()."},
+                {"id": "sentence-2", "text": "Data is reset on re-entry."},
+                {"id": "sentence-3", "text": "The API has focused tests."},
+            ],
+            "design_decisions": [
+                {
+                    "kind": "interface",
+                    "description": "Expose get_data() on StateChart.",
+                    "acceptance_criterion": "get_data() returns the active data.",
+                    "expected_test": "Test get_data() for an active state.",
+                },
+                {
+                    "kind": "invariant",
+                    "description": "Re-entry restores the declared defaults.",
+                    "acceptance_criterion": "Re-entry resets state data.",
+                    "expected_test": "Test data reset across re-entry.",
+                },
+                {
+                    "kind": "expected_test",
+                    "description": "The API has focused tests.",
+                    "acceptance_criterion": "The focused API tests pass.",
+                    "expected_test": "Run the focused API test module.",
+                },
+            ],
+        },
+        state=state,
+    )
+
+    assert result["updated"] == 9
+    document = yaml.safe_load(plan.read_text(encoding="utf-8"))
+    assert any(item["id"] == "design-sentence-1" for item in document["features"])
+    assert any(item["id"] == "design-sentence-2" for item in document["invariants"])
+    assert any(
+        item["id"] == "design-sentence-3-test"
+        for item in document["required_test_cases"]
+    )
+    assert any(
+        item["id"] == "design-sentence-1-acceptance"
+        for item in document["acceptance_criteria"]
+    )
 
 
 def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None:

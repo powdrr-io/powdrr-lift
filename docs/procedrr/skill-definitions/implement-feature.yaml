@@ -53,6 +53,51 @@ steps:
   - for_each:
       snapshot: {name: feature_sentences}
       item_binding: feature_sentence
+      collect: {binding: design_decisions, mode: list}
+      body:
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: What one concrete design consequence follows from this sentence?
+            subject: feature_sentence
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Translate only this sentence into one concrete, testable design consequence.
+              - Choose the narrowest applicable kind; do not summarize the entire feature.
+              - Name the affected API, lifecycle rule, invariant, integration, or user-visible behavior when present.
+              - Always provide an acceptance criterion and an expected test, even for guidance or non-goal sentences.
+            context: [feature_sentence, plan]
+            output:
+              name: design_decision
+              schema:
+                type: object
+                required: [kind, description, acceptance_criterion, expected_test]
+                additionalProperties: false
+                properties:
+                  kind:
+                    type: string
+                    enum: [entity, feature, interface, invariant, guidance, acceptance_criterion, expected_test, intent, non_goal]
+                  description: {type: string, minLength: 1}
+                  acceptance_criterion: {type: string, minLength: 1}
+                  expected_test: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [apply_sentence_design_trace]
+      parameters:
+        plan: {type: reference, value: plan.path}
+        sentences: {type: reference, value: feature_sentences}
+        design_decisions: {type: reference, value: design_decisions}
+      returns:
+        type: object
+        required: [path, updated]
+        properties:
+          path: {type: string, minLength: 1}
+          updated: {type: integer, minimum: 0}
+      bind: design_update
+  - for_each:
+      snapshot: {name: feature_sentences}
+      item_binding: feature_sentence
       collect: {binding: requirement_decisions, mode: list}
       body:
         - judge:
@@ -123,6 +168,7 @@ steps:
         feature_description: {type: reference, value: feature_description}
         plan: {type: reference, value: plan.path}
         sentences: {type: reference, value: feature_sentences}
+        design_decisions: {type: reference, value: design_decisions}
         requirement_decisions: {type: reference, value: requirement_decisions}
         reflection_decisions: {type: reference, value: reflection_decisions}
       returns:

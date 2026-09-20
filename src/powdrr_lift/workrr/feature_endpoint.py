@@ -350,6 +350,8 @@ def _execute_procedrr_flow(
             ):
                 raise PowdrrExecutionError("feature description is empty")
             return _decompose_feature_description(feature_description)
+        if name == "apply_sentence_design_trace":
+            return _apply_sentence_design_trace(parameters, state=state)
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -795,16 +797,21 @@ def _compile_feature_obligations(
         raise PowdrrExecutionError("obligations plan does not match the planned diff")
     feature_description = _require_flow_text(parameters, "feature_description")
     sentences = parameters.get("sentences")
+    design_decisions = parameters.get("design_decisions")
     requirement_decisions = parameters.get("requirement_decisions")
     reflection_decisions = parameters.get("reflection_decisions")
     if not isinstance(sentences, list):
         raise PowdrrExecutionError("feature sentences must be a list")
+    if not isinstance(design_decisions, list):
+        raise PowdrrExecutionError("sentence design decisions must be a list")
     if not isinstance(requirement_decisions, list) or not isinstance(
         reflection_decisions, list
     ):
         raise PowdrrExecutionError("sentence decisions must be lists")
-    if len(sentences) != len(requirement_decisions) or len(sentences) != len(
-        reflection_decisions
+    if (
+        len(sentences) != len(design_decisions)
+        or len(sentences) != len(requirement_decisions)
+        or len(sentences) != len(reflection_decisions)
     ):
         raise PowdrrExecutionError("sentence decision counts do not match")
     trace_path = output_root / "feature-sentence-trace.json"
@@ -814,6 +821,7 @@ def _compile_feature_obligations(
             {
                 "feature_description": feature_description,
                 "sentences": sentences,
+                "design_decisions": design_decisions,
                 "requirement_decisions": requirement_decisions,
                 "reflection_decisions": reflection_decisions,
             },
@@ -830,8 +838,14 @@ def _compile_feature_obligations(
 
     obligations: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for index, (sentence, requirement, _reflection) in enumerate(
-        zip(sentences, requirement_decisions, reflection_decisions, strict=True),
+    for index, (sentence, design, requirement, _reflection) in enumerate(
+        zip(
+            sentences,
+            design_decisions,
+            requirement_decisions,
+            reflection_decisions,
+            strict=True,
+        ),
         start=1,
     ):
         if not isinstance(sentence, Mapping):
@@ -840,6 +854,8 @@ def _compile_feature_obligations(
         sentence_text = sentence.get("text")
         if not isinstance(sentence_id, str) or not isinstance(sentence_text, str):
             raise PowdrrExecutionError("feature sentence is missing id or text")
+        if not isinstance(design, Mapping):
+            raise PowdrrExecutionError("sentence design decision is malformed")
         if not _decision_value(requirement, "required"):
             continue
         identifier = sentence_id or f"sentence-{index}"
@@ -851,6 +867,7 @@ def _compile_feature_obligations(
                 "id": identifier,
                 "description": sentence_text.strip(),
                 "plan_refs": plan_refs,
+                "design": dict(design),
             }
         )
     if not obligations:
@@ -1121,6 +1138,115 @@ def _update_plan_from_sentence_trace(
         path.write_text(yaml.safe_dump(repaired, sort_keys=False), encoding="utf-8")
         parse_change_log(path.read_text(encoding="utf-8"))
     return {"path": str(path), "updated": updated}
+
+
+def _apply_sentence_design_trace(
+    parameters: Mapping[str, Any], *, state: dict[str, Any]
+) -> dict[str, Any]:
+    """Translate each instruction sentence into one typed plan consequence."""
+    plan = _require_flow_text(parameters, "plan")
+    if Path(plan) != state.get("plan_path"):
+        raise PowdrrExecutionError("sentence design plan does not match the plan")
+    sentences = parameters.get("sentences")
+    decisions = parameters.get("design_decisions")
+    if not isinstance(sentences, list) or not isinstance(decisions, list):
+        raise PowdrrExecutionError("sentence design inputs must be lists")
+    if len(sentences) != len(decisions):
+        raise PowdrrExecutionError("sentence design counts do not match")
+
+    section_by_kind = {
+        "entity": "entities",
+        "feature": "features",
+        "interface": "features",
+        "invariant": "invariants",
+        "guidance": "guidance",
+        "acceptance_criterion": "acceptance_criteria",
+        "expected_test": "required_test_cases",
+        "intent": "features",
+        "non_goal": "guidance",
+    }
+    document = _load_yaml_mapping(Path(plan))
+    updated_document = {key: value for key, value in document.items()}
+    updated = 0
+    for sentence, decision in zip(sentences, decisions, strict=True):
+        if not isinstance(sentence, Mapping) or not isinstance(decision, Mapping):
+            raise PowdrrExecutionError("sentence design item is malformed")
+        sentence_id = sentence.get("id")
+        kind = decision.get("kind")
+        description = decision.get("description")
+        acceptance = decision.get("acceptance_criterion")
+        expected_test = decision.get("expected_test")
+        if not isinstance(sentence_id, str) or not isinstance(kind, str):
+            raise PowdrrExecutionError("sentence design item is missing id or kind")
+        if kind not in section_by_kind:
+            raise PowdrrExecutionError(f"unknown sentence design kind: {kind}")
+        if not isinstance(description, str) or not description.strip():
+            raise PowdrrExecutionError("sentence design item is missing description")
+        if not isinstance(acceptance, str) or not acceptance.strip():
+            raise PowdrrExecutionError(
+                "sentence design item is missing acceptance criterion"
+            )
+        if not isinstance(expected_test, str) or not expected_test.strip():
+            raise PowdrrExecutionError("sentence design item is missing expected test")
+
+        design_id = f"design-{sentence_id}"
+        section_name = section_by_kind[kind]
+        section = list(updated_document.get(section_name, []))
+        existing_ids = {
+            str(item.get("id"))
+            for item in section
+            if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+        }
+        if design_id not in existing_ids:
+            section.append(
+                {
+                    "id": design_id,
+                    "description": (
+                        acceptance.strip()
+                        if kind == "acceptance_criterion"
+                        else description.strip()
+                    ),
+                    "action": "added",
+                }
+            )
+            updated += 1
+        if kind != "acceptance_criterion":
+            acceptance_section = list(updated_document.get("acceptance_criteria", []))
+            acceptance_id = f"{design_id}-acceptance"
+            acceptance_ids = {
+                str(item.get("id"))
+                for item in acceptance_section
+                if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+            }
+            if acceptance_id not in acceptance_ids:
+                acceptance_section.append(
+                    {
+                        "id": acceptance_id,
+                        "description": acceptance.strip(),
+                    }
+                )
+                updated += 1
+            updated_document["acceptance_criteria"] = acceptance_section
+        test_section = list(updated_document.get("required_test_cases", []))
+        test_id = f"{design_id}-test"
+        test_ids = {
+            str(item.get("id"))
+            for item in test_section
+            if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+        }
+        if test_id not in test_ids:
+            test_section.append({"id": test_id, "description": expected_test.strip()})
+            updated += 1
+        updated_document[section_name] = section
+        updated_document["required_test_cases"] = test_section
+
+    if updated:
+        path = Path(plan)
+        path.write_text(
+            yaml.safe_dump(updated_document, sort_keys=False), encoding="utf-8"
+        )
+        parse_change_log(path.read_text(encoding="utf-8"))
+    return {"path": plan, "updated": updated}
 
 
 def _decompose_feature_description(feature_description: str) -> list[dict[str, str]]:

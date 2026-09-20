@@ -1,0 +1,62 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 775
+title: Strengthen Procedrr static validation
+intent:
+  problem: Procedrr flow definitions can still contain malformed fields, invalid model contracts, and branch-dependent bindings that only fail during execution.
+  goal: Reject mechanically invalid flow definitions before execution so future flow changes remain safe to evolve.
+human-decisions:
+  - id: validate-procedrr-contracts-before-execution
+    summary: Enforce static shape, dataflow, schema, and resource contracts for every checked-in Procedrr definition.
+structured_files: []
+files:
+  - {path: docs/procedrr/skill-definitions/generate-fragment.yaml, type: modified, summary: Preserve a colon-containing instruction as a scalar, rationale: Keep the prompt definition parseable, span: {start_line: 44, end_line: 47}}
+  - {path: docs/procedrr/skill-definitions/generate-fragment.yaml, type: modified, summary: Preserve the edit range instruction as a scalar, rationale: Keep the prompt definition parseable, span: {start_line: 60, end_line: 63}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Preserve the completeness verdict instruction as a scalar, rationale: Keep the prompt definition parseable, span: {start_line: 571, end_line: 572}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Preserve the scope verdict instruction as a scalar, rationale: Keep the prompt definition parseable, span: {start_line: 607, end_line: 608}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Add known resource limits and binding names, rationale: Validate global limits and deterministic binding identifiers, span: {start_line: 29, end_line: 38}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Reject unknown resource limits, rationale: Prevent unsupported limits from being silently ignored, span: {start_line: 130, end_line: 133}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Restrict output names, rationale: Keep output bindings unambiguous, span: {start_line: 142, end_line: 142}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Restrict input names, rationale: Keep input bindings unambiguous, span: {start_line: 176, end_line: 176}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Reject unknown step fields, rationale: Catch misspelled controls before execution, span: {start_line: 351, end_line: 356}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate specialize fields, rationale: Reject malformed specialization declarations, span: {start_line: 366, end_line: 378}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate fragment call fields, rationale: Reject malformed dynamic fragment calls, span: {start_line: 462, end_line: 467}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate process call fields, rationale: Reject malformed process calls, span: {start_line: 500, end_line: 505}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate repeat fields, rationale: Reject unknown repeat declarations, span: {start_line: 561, end_line: 567}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate branch fields, rationale: Reject unknown branch declarations, span: {start_line: 648, end_line: 654}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Track definite branch bindings, rationale: Prevent branch-local references after control flow, span: {start_line: 679, end_line: 679}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Merge case bindings by intersection, rationale: Require bindings on every branch path, span: {start_line: 697, end_line: 697}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Model unmatched branch paths, rationale: Prevent bindings from being treated as definite without a default, span: {start_line: 706, end_line: 708}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Merge default bindings by intersection, rationale: Require bindings on every branch path, span: {start_line: 718, end_line: 721}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate attempt fields, rationale: Reject unknown recovery declarations, span: {start_line: 724, end_line: 730}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate loop fields, rationale: Reject unknown loop declarations, span: {start_line: 798, end_line: 812}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Allow conditional collection values, rationale: Support sparse repair collections while retaining declaration checks, span: {start_line: 878, end_line: 883}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate operation fields, rationale: Reject unknown operation declarations, span: {start_line: 888, end_line: 902}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate operation binding names, rationale: Keep operation outputs deterministic, span: {start_line: 1003, end_line: 1011}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate gate fields, rationale: Reject unknown gate declarations, span: {start_line: 1019, end_line: 1024}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge fields, rationale: Reject unknown judge declarations, span: {start_line: 1072, end_line: 1089}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Require unique judge context, rationale: Prevent duplicate prompt inputs, span: {start_line: 1106, end_line: 1112}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate judge schemas and prompt contracts, rationale: Reject malformed model interfaces before execution, span: {start_line: 1231, end_line: 1292}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Bind only valid judge outputs, rationale: Keep invalid output names out of dataflow, span: {start_line: 1306, end_line: 1311}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate terminal statuses, rationale: Reject unsupported terminal states, span: {start_line: 1320, end_line: 1333}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Restrict loop item bindings, rationale: Keep loop state addressable, span: {start_line: 1352, end_line: 1352}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate worklist bounds, rationale: Require positive admission and epoch limits, span: {start_line: 1396, end_line: 1421}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Restrict collection bindings, rationale: Keep collected state addressable, span: {start_line: 1444, end_line: 1444}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Add unknown-field diagnostics, rationale: Report unsupported declarations precisely, span: {start_line: 1545, end_line: 1560}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Add static validation regression tests, rationale: Keep parser contracts executable and regression-tested, span: {start_line: 180, end_line: 275}}
+entities: []
+entity_relationships: []
+invariants:
+  - id: procedrr-definitions-are-statically-valid
+    action: added
+    description: Procedrr definitions must use known fields, valid bindings, valid schemas, valid terminal statuses, and positive bounded loop limits before execution.
+    rationale: Move mechanical flow failures from runtime into deterministic authoring-time diagnostics.
+  - id: procedrr-branch-bindings-are-definite
+    action: added
+    description: A binding produced in only some branch paths cannot be referenced as unconditionally available after the branch.
+    rationale: Prevent path-dependent runtime reference failures.
+guidance:
+  - id: run-static-definition-validation
+    action: added
+    description: Parse and validate every checked-in Procedrr definition after changing flow structure or prompt contracts.
+    rationale: Make flow evolution safe by detecting structural errors before execution.
+proposed_prs: []

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import subprocess
+from collections.abc import Mapping
 from contextlib import redirect_stdout
 from dataclasses import replace
 from pathlib import Path
@@ -18,9 +20,15 @@ from powdrr_lift.core.decision_obligation import (
     evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.core.spec_context import (
+    gather_specification_context,
+    render_gather_context_report,
+)
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_lift.structrr.proposal import compile_proposal_revision
+from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentStatus,
@@ -33,6 +41,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
+    _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
     _compile_feature_obligations,
@@ -52,6 +61,11 @@ from powdrr_lift.workrr.feature_endpoint import (
     review_feature_diff,
     run_feature_in_place,
 )
+from powdrr_lift.workrr.verification_provider import (
+    default_verification_provider_registry,
+)
+from procedrr import parse_and_validate
+from procedrr_evaluator import Evaluator
 
 
 def test_workrr_feature_cli_builds_endpoint_config(
@@ -622,6 +636,252 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [aggregate_intent_review]" in flow
     assert "provider: opencode" not in flow
     assert flow.count("command: [run_opencode]") == 5
+
+
+def test_required_test_obligation_compiles_against_discovered_inventory() -> None:
+    result = _aggregate_category_edits(
+        {
+            "required_test_cases": {
+                "action": "add",
+                "item": {
+                    "id": "verify-existing",
+                    "description": "The existing state test proves isolation.",
+                    "intent_refs": ["state-data-scoping"],
+                    "expected_outcome": "The test passes.",
+                    "test_selection": (
+                        "pytest:pytest:tests/test_state.py::test_isolated"
+                    ),
+                },
+            }
+        },
+        inventory=(
+            {
+                "inventory_id": "pytest:pytest:tests/test_state.py::test_isolated",
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_state.py::test_isolated",
+            },
+        ),
+    )
+
+    assert result["required_test_cases"]["added"] == [
+        {
+            "id": "verify-existing",
+            "description": (
+                "The existing state test proves isolation. Expected outcome: "
+                "The test passes."
+            ),
+            "intent_refs": ["state-data-scoping"],
+            "provider": "pytest",
+            "profile": "pytest",
+            "selector": "tests/test_state.py::test_isolated",
+            "expectation": "pass",
+            "applicability": {"mode": "affected_closure"},
+            "status": "active",
+        }
+    ]
+
+
+def test_required_test_obligation_generates_new_selector_deterministically() -> None:
+    result = _aggregate_category_edits(
+        {
+            "required_test_cases": {
+                "action": "add",
+                "item": {
+                    "id": "verify-state-data-scoping",
+                    "description": (
+                        "State data is isolated. Expected outcome: "
+                        "Instances do not share "
+                        "data."
+                    ),
+                    "intent_refs": ["state-data-scoping"],
+                    "expected_outcome": "Instances do not share data.",
+                    "test_selection": "new",
+                },
+            }
+        },
+        inventory=(
+            {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_existing.py::test_existing",
+            },
+        ),
+    )
+
+    case = result["required_test_cases"]["added"][0]
+    assert case["selector"] == (
+        "tests/test_verify_state_data_scoping.py::test_verify_state_data_scoping"
+    )
+    assert case["provider"] == "pytest"
+    assert case["profile"] == "pytest"
+    assert case["expectation"] == "pass"
+
+
+def test_required_test_obligation_rejects_llm_executable_fields() -> None:
+    with pytest.raises(PowdrrExecutionError, match="executable fields"):
+        _aggregate_category_edits(
+            {
+                "required_test_cases": {
+                    "action": "add",
+                    "item": {
+                        "id": "bad",
+                        "description": "Bad contract.",
+                        "intent_refs": ["intent"],
+                        "test_selection": "new",
+                        "provider": "pytest",
+                    },
+                }
+            },
+            inventory=(),
+        )
+
+
+def test_design_flow_compiles_real_collected_test_into_proposal(
+    tmp_path: Path,
+) -> None:
+    """Exercise Procedrr, collection, proposal rendering, and evaluation together."""
+    tests_root = tmp_path / "tests"
+    tests_root.mkdir()
+    (tests_root / "test_existing.py").write_text(
+        "def test_existing():\n    assert True\n", encoding="utf-8"
+    )
+    profile = DiscoveredValidationProfile(
+        "pytest", ("python", "-m", "pytest", "-q"), "fixture"
+    )
+    inventory = tuple(
+        entry
+        for item in default_verification_provider_registry().inventory(
+            tmp_path, (profile,)
+        )
+        for entry in (
+            {
+                "inventory_id": ":".join((item.provider, item.profile, selector)),
+                "provider": item.provider,
+                "profile": item.profile,
+                "selector": selector,
+            }
+            for selector in item.selectors
+        )
+    )
+    assert inventory
+    flow = parse_and_validate(
+        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    )
+
+    class PlanningLLM:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            if "required_test_cases" in messages[-1]["content"]:
+                return {
+                    "action": "add",
+                    "item": {
+                        "id": "verify-existing",
+                        "description": "The existing test proves the behavior.",
+                        "intent_refs": ["intent.feature"],
+                        "expected_outcome": "The test passes.",
+                        "test_selection": inventory[0]["inventory_id"],
+                    },
+                }
+            return {"action": "no_change"}
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool == "gather_context":
+            report = json.loads(
+                render_gather_context_report(
+                    gather_specification_context(tmp_path, types=parameters["types"])
+                )
+            )
+            if "required_test_cases" in parameters["types"]:
+                report["verification_inventory"] = list(inventory)
+            return report
+        if tool == "edit":
+            target = tmp_path / parameters["file_path"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(parameters["document"]) + "\n")
+            return parameters["document"]
+        command = parameters["command"]
+        if command[0] == "aggregate_category_edits":
+            return _aggregate_category_edits(
+                parameters["decisions"], inventory=inventory
+            )
+        if command[0] == "extract_proposal_issues":
+            return []
+        if command[:2] == ["powdrr-lift", "design-interview-input"]:
+            assert (
+                main(
+                    [
+                        "design-interview-input",
+                        "--work-item-name",
+                        "demo",
+                        "--repo-root",
+                        str(tmp_path),
+                    ]
+                )
+                == 0
+            )
+            return {
+                "path": str(
+                    tmp_path
+                    / "docs"
+                    / "proposals"
+                    / "demo"
+                    / "design-interview-input.json"
+                )
+            }
+        if command[:2] == ["powdrr-lift", "feature-pr-specification"]:
+            interview = (
+                tmp_path / "docs" / "proposals" / "demo" / "design-interview-input.json"
+            )
+            assert (
+                main(
+                    [
+                        "feature-pr-specification",
+                        "--work-item-name",
+                        "demo",
+                        "--repo-root",
+                        str(tmp_path),
+                        "--interview-input",
+                        str(interview),
+                    ]
+                )
+                == 0
+            )
+            return {"path": str(interview.with_name("feature-pr-specification.yaml"))}
+        if command[:2] == ["powdrr-lift", "evaluate"]:
+            proposal = (
+                tmp_path
+                / "docs"
+                / "proposals"
+                / "demo"
+                / "feature-pr-specification.yaml"
+            )
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                returncode = main(
+                    ["evaluate", str(proposal), "--repo-root", str(tmp_path)]
+                )
+            report = yaml.safe_load(output.getvalue())
+            report["returncode"] = returncode
+            return report
+        raise AssertionError((tool, parameters))
+
+    Evaluator(PlanningLLM(), execute).evaluate(
+        flow,
+        {"work_item_name": "demo", "feature_description": "Add the feature."},
+    )
+    case = yaml.safe_load(
+        (
+            tmp_path / "docs" / "proposals" / "demo" / "feature-pr-specification.yaml"
+        ).read_text()
+    )["required_test_cases"][0]
+
+    assert case["provider"] == "pytest"
+    assert case["profile"] == "pytest"
+    assert case["selector"] == "tests/test_existing.py::test_existing"
+    assert case["expectation"] == "pass"
+    assert case["applicability"] == {"mode": "affected_closure"}
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

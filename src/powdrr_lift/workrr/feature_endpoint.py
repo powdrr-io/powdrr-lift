@@ -265,7 +265,12 @@ def _execute_procedrr_flow(
             ):
                 raise PowdrrExecutionError("gather_context types are malformed")
             report = gather_specification_context(worktree, types=types)
-            return json.loads(render_gather_context_report(report))
+            rendered = json.loads(render_gather_context_report(report))
+            if "required_test_cases" in types:
+                rendered["verification_inventory"] = list(
+                    state.get("provider_inventory", ())
+                )
+            return rendered
         if tool == "edit":
             file_path = parameters.get("file_path")
             document = parameters.get("document")
@@ -336,7 +341,9 @@ def _execute_procedrr_flow(
                 raise PowdrrExecutionError(
                     "aggregate_category_edits requires category decisions"
                 )
-            return _aggregate_category_edits(decisions)
+            return _aggregate_category_edits(
+                decisions, inventory=state.get("provider_inventory", ())
+            )
         if name == "decompose_feature_description":
             feature_description = parameters.get("feature_description")
             if (
@@ -1090,6 +1097,11 @@ def _expand_provider_inventory(value: Mapping[str, Any]) -> tuple[dict[str, Any]
         return ()
     return tuple(
         {
+            "inventory_id": ":".join(
+                str(value.get(field, "")) for field in ("provider", "profile")
+            )
+            + ":"
+            + str(selector),
             "provider": value.get("provider"),
             "profile": value.get("profile"),
             "selector": selector,
@@ -2675,7 +2687,11 @@ def _append_sentence_design_items(
     return result
 
 
-def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:
+def _aggregate_category_edits(
+    decisions: Mapping[str, Any],
+    *,
+    inventory: Sequence[Any] = (),
+) -> dict[str, Any]:
     aggregated: dict[str, Any] = {}
     for category, decision in decisions.items():
         added: list[dict[str, Any]] = []
@@ -2688,7 +2704,119 @@ def _aggregate_category_edits(decisions: Mapping[str, Any]) -> dict[str, Any]:
             elif action == "delete" and isinstance(item, Mapping):
                 deleted.append(dict(item))
         aggregated[str(category)] = {"added": added, "deleted": deleted}
+    if "required_test_cases" in aggregated:
+        aggregated["required_test_cases"] = {
+            "added": _compile_required_test_case_edits(
+                aggregated["required_test_cases"]["added"], inventory
+            ),
+            "deleted": aggregated["required_test_cases"]["deleted"],
+        }
     return aggregated
+
+
+def _compile_required_test_case_edits(
+    items: Sequence[Any], inventory: Sequence[Any]
+) -> list[dict[str, Any]]:
+    """Compile semantic test obligations against discovered executable tests."""
+    candidates = [item for item in inventory if isinstance(item, Mapping)]
+    candidate_by_id = {_verification_inventory_id(item): item for item in candidates}
+    pytest_profiles = [
+        item
+        for item in candidates
+        if item.get("provider") == "pytest"
+        and isinstance(item.get("profile"), str)
+        and str(item.get("profile")).strip()
+    ]
+    compiled: list[dict[str, Any]] = []
+    for raw in items:
+        if not isinstance(raw, Mapping):
+            continue
+        item = dict(raw)
+        unknown = set(item) - {
+            "id",
+            "description",
+            "intent_refs",
+            "expected_outcome",
+            "test_selection",
+            "existing_test",
+        }
+        if unknown:
+            raise PowdrrExecutionError(
+                "required test obligation contains executable fields that Powdrr "
+                "must compile: " + ", ".join(sorted(unknown))
+            )
+        for field in ("id", "description"):
+            if not isinstance(item.get(field), str) or not item[field].strip():
+                raise PowdrrExecutionError(
+                    f"required test obligation requires non-empty {field}"
+                )
+        if not isinstance(item.get("intent_refs"), list) or not all(
+            isinstance(value, str) and value.strip() for value in item["intent_refs"]
+        ):
+            raise PowdrrExecutionError(
+                f"required test obligation {item['id']!r} has invalid intent_refs"
+            )
+        selection = item.pop("test_selection", item.pop("existing_test", "new"))
+        expected_outcome = item.pop("expected_outcome", None)
+        if isinstance(expected_outcome, str) and expected_outcome.strip():
+            item["description"] = (
+                f"{item['description'].strip()} "
+                f"Expected outcome: {expected_outcome.strip()}"
+            )
+        if not isinstance(selection, str) or not selection.strip():
+            raise PowdrrExecutionError(
+                "required test case test_selection must be a candidate id or 'new'"
+            )
+        selection = selection.strip()
+        if selection != "new":
+            candidate = candidate_by_id.get(selection)
+            if candidate is None:
+                raise PowdrrExecutionError(
+                    f"required test case selected unknown inventory entry {selection!r}"
+                )
+            item.update(
+                {
+                    "provider": candidate.get("provider"),
+                    "profile": candidate.get("profile"),
+                    "selector": candidate.get("selector"),
+                }
+            )
+        else:
+            if not pytest_profiles:
+                raise PowdrrExecutionError(
+                    "new required test cases need a discovered pytest profile"
+                )
+            profile = pytest_profiles[0]
+            identifier = str(item.get("id", "required-test")).strip()
+            test_slug = re.sub(r"[^a-z0-9]+", "_", identifier.lower()).strip("_")
+            if not test_slug:
+                raise PowdrrExecutionError(
+                    "new required test case id must produce a test selector"
+                )
+            item.update(
+                {
+                    "provider": "pytest",
+                    "profile": profile.get("profile"),
+                    "selector": (f"tests/test_{test_slug}.py::test_{test_slug}"),
+                }
+            )
+        item.update(
+            {
+                "expectation": "pass",
+                "applicability": {"mode": "affected_closure"},
+                "status": "active",
+            }
+        )
+        compiled.append(item)
+    return compiled
+
+
+def _verification_inventory_id(item: Mapping[str, Any]) -> str:
+    if isinstance(item.get("inventory_id"), str) and item["inventory_id"].strip():
+        return item["inventory_id"].strip()
+    return ":".join(
+        str(item.get(field, "")) for field in ("provider", "profile", "selector")
+    )
 
 
 def _resolve_flow_path(worktree: Path, relative_path: str) -> Path:

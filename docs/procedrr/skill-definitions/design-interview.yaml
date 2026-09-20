@@ -59,7 +59,8 @@ steps:
               - Read the exact gathered context; do not invent repository facts.
               - Preserve existing items unless an explicit deletion is required.
               - New identifiers must be globally unique across all categories.
-              - When category is required_test_cases, return an executable test detail item with id, description, intent_refs, provider, selector, profile, expectation, applicability, and status fields; set applicability to {mode: affected_closure}.
+              - When category is required_test_cases, return a semantic test obligation with id, description, intent_refs, expected_outcome, and test_selection.
+              - For test_selection, choose exactly one discovered inventory id from category_context.verification_inventory, or return new when no existing test proves the obligation. Never invent a provider, profile, or selector.
               - Return exactly one action and, for add or delete, one item.
             context: [work_item_name, feature_description, category_context]
             output:

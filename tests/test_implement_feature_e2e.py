@@ -21,14 +21,30 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 class DeterministicPlanningClient:
     """Schema-driven planning double for the complete implement-feature flow."""
 
+    def __init__(
+        self,
+        *,
+        invalid_responses: int = 0,
+        proposal_outcome: str = "pass",
+        invalid_intent_refs: bool = False,
+    ) -> None:
+        self.invalid_responses = invalid_responses
+        self.proposal_outcome = proposal_outcome
+        self.invalid_intent_refs = invalid_intent_refs
+        self.calls = 0
+
     def complete_json(
         self,
         messages: list[dict[str, str]],
         *,
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        self.calls += 1
         if response_schema is None:
             raise AssertionError("the feature flow must provide a response schema")
+        if self.invalid_responses:
+            self.invalid_responses -= 1
+            return {}
         text = "\n".join(message.get("content", "") for message in messages)
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
@@ -41,10 +57,16 @@ class DeterministicPlanningClient:
                         "id": "hello_world",
                         "description": "The greeting program has the requested output.",
                         "intent_refs": [
-                            "feature-obligation-sentence-1",
-                            "feature-obligation-sentence-2",
-                            "feature-obligation-sentence-3",
-                            "feature-obligation-sentence-4",
+                            *(
+                                ["does-not-exist"]
+                                if self.invalid_intent_refs
+                                else [
+                                    "feature-obligation-sentence-1",
+                                    "feature-obligation-sentence-2",
+                                    "feature-obligation-sentence-3",
+                                    "feature-obligation-sentence-4",
+                                ]
+                            ),
                         ],
                         "expected_outcome": "The feature test passes.",
                         "test_selection": "new",
@@ -94,7 +116,7 @@ class DeterministicPlanningClient:
             input_fingerprint = specification.get("input_fingerprint", "input")
             return {
                 "decision_id": specification.get("decision_id", "decision"),
-                "outcome": "pass",
+                "outcome": self.proposal_outcome,
                 "explanation": "The supplied evidence proves this predicate.",
                 "predicate_version": specification.get("predicate_version", "v1"),
                 "subject": specification.get("subject", "proposal"),
@@ -215,7 +237,12 @@ def _collect_json_values(value: Any, key: str, values: list[Any]) -> None:
             _collect_json_values(child, key, values)
 
 
-def _fake_opencode(path: Path) -> Path:
+def _fake_opencode(path: Path, *, out_of_scope: bool = False) -> Path:
+    unexpected_edit = (
+        'Path("unexpected.py").write_text("changed\\n", encoding="utf-8")'
+        if out_of_scope
+        else ""
+    )
     path.write_text(
         f"""#!{sys.executable}
 from pathlib import Path
@@ -223,6 +250,7 @@ Path("hello_world.py").write_text(
     'print("Hello, world!")\\nprint("Hello from Powdrr!")\\n',
     encoding="utf-8",
 )
+{unexpected_edit}
 print('{{"type":"session.completed"}}')
 """,
         encoding="utf-8",
@@ -260,6 +288,7 @@ def _fixture_repo(tmp_path: Path) -> Path:
     )
     (repo / ".gitignore").write_text(".powdrr/\n", encoding="utf-8")
     (repo / "hello_world.py").write_text('print("Hello, world!")\n', encoding="utf-8")
+    (repo / "unexpected.py").write_text("initial\n", encoding="utf-8")
     tests = repo / "tests"
     tests.mkdir()
     (tests / "test_hello_world.py").write_text(
@@ -297,7 +326,13 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             work_item_name="hello-world-second-greeting",
             repo_root=repo,
             allowed_paths=("hello_world.py",),
-            validation_command=(sys.executable, "-m", "pytest", "-q"),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
             opencode_executable=str(fake_opencode),
             opencode_model="deterministic-test-model",
             open_pr=False,
@@ -353,3 +388,146 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             text=True,
         ).stdout
     )
+
+
+def test_implement_feature_retries_schema_invalid_planner_output(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    planner = DeterministicPlanningClient(invalid_responses=1)
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description="Add the second greeting.",
+            work_item_name="schema-retry",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            opencode_executable=str(_fake_opencode(tmp_path / "fake-opencode")),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=planner,
+        )
+    )
+
+    assert result.status == "completed"
+    assert planner.calls > 1
+
+
+def test_implement_feature_does_not_invoke_worker_after_unknown_proposal_decision(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description="Add the second greeting.",
+            work_item_name="unknown-proposal",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            opencode_executable=str(_fake_opencode(tmp_path / "fake-opencode")),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=DeterministicPlanningClient(proposal_outcome="unknown"),
+        )
+    )
+
+    assert result.status == "review_failed"
+    assert result.worktree is not None
+    assert (
+        not (result.worktree / "hello_world.py")
+        .read_text(encoding="utf-8")
+        .count("Hello from Powdrr!")
+    )
+    assert not list(
+        (result.worktree / ".powdrr" / "feature-runs" / "unknown-proposal").glob(
+            "implementation-request.json"
+        )
+    )
+
+
+def test_implement_feature_rejects_worker_out_of_scope_edits(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description="Add the second greeting.",
+            work_item_name="out-of-scope-worker",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            opencode_executable=str(
+                _fake_opencode(tmp_path / "fake-opencode", out_of_scope=True)
+            ),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=DeterministicPlanningClient(),
+        )
+    )
+
+    assert result.status == "review_failed"
+    assert result.worktree is not None
+    assert (result.worktree / "unexpected.py").read_text(
+        encoding="utf-8"
+    ) == "changed\n"
+
+
+def test_implement_feature_blocks_untraceable_required_test_obligation(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description="Add the second greeting.",
+            work_item_name="untraceable-test-obligation",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            opencode_executable=str(_fake_opencode(tmp_path / "fake-opencode")),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=DeterministicPlanningClient(invalid_intent_refs=True),
+        )
+    )
+
+    assert result.status == "review_failed"
+    assert result.request_path is None
+    verification = json.loads(
+        (
+            repo
+            / ".powdrr"
+            / "feature-runs"
+            / "untraceable-test-obligation"
+            / "verification-obligations.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert verification["complete"] is False
+    assert "no active intent reference" in verification["failures"][0]

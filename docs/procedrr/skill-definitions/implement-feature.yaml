@@ -235,14 +235,19 @@ steps:
         feature_description: {type: reference, value: feature_description}
       returns:
         type: object
-        required: [path, fingerprint, closure, obligations, failures]
+        required: [path, fingerprint, closure, obligations, failures, complete]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
           closure: {type: object}
           obligations: {type: array}
           failures: {type: array}
+          complete: {type: boolean}
       bind: verification_obligations
+  - gate:
+      subject: verification_obligations.complete
+      equals: true
+      on_failure: {terminal: failed}
   - operation:
       tool: internal
       command: [prepare_proposal_review]

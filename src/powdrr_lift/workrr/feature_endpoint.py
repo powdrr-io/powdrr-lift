@@ -84,7 +84,7 @@ from powdrr_lift.workrr.verification_provider import (
 )
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
-from procedrr_evaluator.evaluator import ValidationGateError
+from procedrr_evaluator.evaluator import EvaluationError
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -112,7 +112,7 @@ class FeatureEndpointResult:
     worktree: Path
     baseline_path: Path
     plan_path: Path
-    request_path: Path
+    request_path: Path | None
     attempt: CodingAgentAttempt | None
     validation: ValidationReport | None
     review: dict[str, Any]
@@ -127,7 +127,7 @@ class FeatureEndpointResult:
             "worktree": str(self.worktree),
             "baseline_path": str(self.baseline_path),
             "plan_path": str(self.plan_path),
-            "request_path": str(self.request_path),
+            "request_path": str(self.request_path) if self.request_path else None,
             "attempt": self.attempt.to_data() if self.attempt else None,
             "validation": self.validation.to_data() if self.validation else None,
             "review": self.review,
@@ -600,7 +600,7 @@ def _execute_procedrr_flow(
                 "work_item_name": config.work_item_name,
             },
         )
-    except ValidationGateError:
+    except EvaluationError:
         result = _feature_endpoint_result(state, branch, worktree, "review_failed")
     else:
         result = _feature_endpoint_result(
@@ -1108,6 +1108,7 @@ def _compile_verification_obligations(
         "obligations": [item.to_data() for item in compilation.obligations],
         "excluded_contracts": list(compilation.excluded_contracts),
         "failures": list(compilation.failures),
+        "complete": compilation.complete,
     }
 
 
@@ -2502,7 +2503,7 @@ def _feature_endpoint_result(
         worktree,
         state["baseline_path"],
         state["plan_path"],
-        state["request_path"],
+        state.get("request_path"),
         state.get("attempt"),
         state.get("validation"),
         state.get("review", {"passed": False}),

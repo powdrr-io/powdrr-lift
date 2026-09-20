@@ -731,7 +731,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Write the snapshot to this path instead of "
-            ".powdrr-lift/state/codebase-state.yaml."
+            ".powdrr/state/codebase-state.yaml."
         ),
     )
     codebase_state_parser.add_argument(
@@ -760,7 +760,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Write the synthesized state to this path instead of "
-            ".powdrr-lift/state/current-state.yaml."
+            ".powdrr/state/current-state.yaml."
         ),
     )
     current_state_parser.add_argument(

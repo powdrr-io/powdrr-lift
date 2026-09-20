@@ -58314,7 +58314,7 @@ invariants:
   id: default-output-path
   declared_kind: invariant
   action: added
-  description: Write the snapshot to `.powdrr-lift/state/codebase-state.yaml` when
+  description: Write the snapshot to `.powdrr/state/codebase-state.yaml` when
     no output path is supplied.
   source: docs/current/deterministic-proposed-pr-planning/system-map-specification.yaml
   kind: invariant

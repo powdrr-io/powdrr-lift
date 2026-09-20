@@ -71,6 +71,8 @@ def test_refresh_code_index_persists_branch_snapshot_and_updates_on_new_commits(
     db_path = code_index_db_path(repo_root)
 
     assert db_path.exists()
+    assert db_path == repo_root / ".powdrr" / "state" / "code_index.db"
+    assert not (repo_root / ".powdrr-lift").exists()
     assert index.provenance_for("src/app.py", 1).pr_number == 1
     assert index.provenance_for("src/app.py", 2).rationale == "Bootstrap the app file."
 

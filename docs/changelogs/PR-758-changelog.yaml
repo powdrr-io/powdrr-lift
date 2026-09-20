@@ -1,0 +1,42 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 758
+title: Consolidate runtime state under .powdrr
+intent:
+  problem: Runtime state is split between .powdrr and the obsolete .powdrr-lift directory, making generated artifacts harder to find and manage.
+  goal: Store all Powdrr runtime state under .powdrr and update current documentation and tests to enforce the single directory convention.
+human-decisions:
+  - id: single-runtime-state-directory
+    summary: Use .powdrr as the only runtime state directory.
+structured_files: []
+files:
+  - {path: .gitignore, type: modified, summary: Ignore only the canonical runtime directory, rationale: Prevent obsolete directory names from being treated as runtime state, span: {start_line: 21, end_line: 21}}
+  - {path: src/powdrr_lift/core/code_index.py, type: modified, summary: Store the code index under .powdrr, rationale: Consolidate generated state, span: {start_line: 91, end_line: 91}}
+  - {path: src/powdrr_lift/core/codebase_state.py, type: modified, summary: Store state reports under .powdrr, rationale: Consolidate generated state, span: {start_line: 22, end_line: 23}}
+  - {path: src/powdrr_lift/core/index.py, type: modified, summary: Store fetched metadata under .powdrr, rationale: Consolidate generated state, span: {start_line: 573, end_line: 573}}
+  - {path: src/powdrr_lift/core/index.py, type: modified, summary: Store commit comments under .powdrr, rationale: Consolidate generated state, span: {start_line: 915, end_line: 915}}
+  - {path: src/powdrr_lift/core/spec_context.py, type: modified, summary: Discover current state from .powdrr, rationale: Keep state discovery aligned with storage, span: {start_line: 299, end_line: 299}}
+  - {path: src/powdrr_lift/core/spec_context.py, type: modified, summary: Describe canonical current-state paths, rationale: Keep state metadata aligned with storage, span: {start_line: 355, end_line: 355}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Document canonical state output paths, rationale: Make CLI help accurate, span: {start_line: 734, end_line: 734}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Document canonical current-state paths, rationale: Make CLI help accurate, span: {start_line: 763, end_line: 763}}
+  - {path: tests/test_code_index.py, type: modified, summary: Verify code index location, rationale: Prevent regression to the obsolete directory, span: {start_line: 74, end_line: 75}}
+  - {path: tests/test_codebase_state.py, type: modified, summary: Verify state report location, rationale: Prevent regression to the obsolete directory, span: {start_line: 104, end_line: 107}}
+  - {path: docs/harbor/deepswe-python-statemachine-state-data-scoping.md, type: modified, summary: Update runtime state examples, rationale: Keep Harbor and DeepSWE guidance accurate, span: {start_line: 21, end_line: 21}}
+  - {path: docs/harbor/deepswe-python-statemachine-state-data-scoping.md, type: modified, summary: Update runtime state obligation, rationale: Keep Harbor and DeepSWE guidance accurate, span: {start_line: 108, end_line: 108}}
+  - {path: docs/structrr/current/baseline-1e2f24d.yaml, type: modified, summary: Update current state path, rationale: Keep Structrr current state accurate, span: {start_line: 58317, end_line: 58317}}
+  - {path: docs/structrr/current/baseline-5f4747b.yaml, type: modified, summary: Update current state path, rationale: Keep Structrr current state accurate, span: {start_line: 58490, end_line: 58490}}
+entities:
+  - id: canonical-powdrr-runtime-directory
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: runtime-state-uses-powdrr
+    action: added
+    description: Powdrr-generated runtime state is stored under .powdrr and does not create .powdrr-lift.
+    rationale: Provide one predictable location for local and remote run artifacts.
+guidance:
+  - id: inspect-powdrr-state
+    action: added
+    description: Inspect .powdrr for generated state, reports, indexes, and run artifacts.
+    rationale: Make runtime diagnostics discoverable.
+proposed_prs: []

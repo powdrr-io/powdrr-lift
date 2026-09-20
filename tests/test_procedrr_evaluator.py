@@ -446,7 +446,12 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
-            return {"action": "no_change"}
+            return {
+                "kind": "feature",
+                "description": "The feature is implemented.",
+                "acceptance_criterion": "The feature behavior is observable.",
+                "expected_test": "Run the feature test.",
+            }
 
     llm = DesignInterviewLLM()
 
@@ -455,16 +460,33 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             return [{"id": "existing", "description": "Existing evidence"}]
         if tool == "internal":
             command = parameters.get("command", [])
-            if len(command) > 1 and command[1] == "evaluate":
-                return {"returncode": 0}
-            if len(command) > 1 and command[1] == "feature-pr-specification":
-                return {"path": "docs/proposals/demo/feature-pr-specification.yaml"}
-            if command and command[0] == "extract_proposal_issues":
-                return []
-            if command and command[0] == "aggregate_category_edits":
-                decisions = parameters.get("decisions", {})
+            if command[0] == "compile_instruction_ledger":
                 return {
-                    category: {"added": [], "deleted": []} for category in decisions
+                    "path": "instruction-ledger.json",
+                    "fingerprint": "sha256:ledger",
+                    "clauses": [
+                        {"clause_id": "instruction-001", "text": "Add a thing"}
+                    ],
+                }
+            if command[0] == "compile_canonical_feature_design":
+                return {
+                    "path": "canonical-feature-design.json",
+                    "fingerprint": "sha256:design",
+                    "obligations": [
+                        {
+                            "id": "sentence-1",
+                            "description": "The feature is implemented.",
+                            "design": {
+                                "kind": "feature",
+                                "description": "The feature is implemented.",
+                                "acceptance_criterion": (
+                                    "The feature behavior is observable."
+                                ),
+                                "expected_test": "Run the feature test.",
+                            },
+                        }
+                    ],
+                    "required_test_cases": [{"id": "test-sentence-1"}],
                 }
         return {"ok": True}
 
@@ -477,11 +499,10 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         {
             "work_item_name": "demo",
             "feature_description": "Add a thing",
-            "proposal_issues": [],
         },
     )
-    assert result.bindings["final_proposal_evaluation"]["returncode"] == 0
-    assert result.llm_activations == 20
+    assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
+    assert result.llm_activations == 1
 
 
 class HelloWorldLLM:

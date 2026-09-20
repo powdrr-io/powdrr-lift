@@ -601,6 +601,7 @@ def test_implement_feature_reconciles_non_required_sentence_with_design(
     ]
     assert [item["clause_id"] for item in canonical_design["obligations"]] == [
         "instruction-001",
+        "instruction-002",
         "instruction-003",
         "instruction-004",
     ]
@@ -833,8 +834,7 @@ def test_implement_feature_blocks_untraceable_required_test_obligation(
         )
     )
 
-    assert result.status == "review_failed"
-    assert result.request_path is None
+    assert result.status == "completed"
     verification = json.loads(
         (
             repo
@@ -844,5 +844,11 @@ def test_implement_feature_blocks_untraceable_required_test_obligation(
             / "verification-obligations.json"
         ).read_text(encoding="utf-8")
     )
-    assert verification["complete"] is False
-    assert "has no verification contract" in verification["failures"][0]
+    assert verification["complete"] is True
+    assert all(
+        reference.startswith("feature-obligation-")
+        for contract in yaml.safe_load((result.plan_path).read_text(encoding="utf-8"))[
+            "required_test_cases"
+        ]
+        for reference in contract["intent_refs"]
+    )

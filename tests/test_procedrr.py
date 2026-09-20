@@ -597,34 +597,23 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
 
     assert document["name"] == "implement-feature"
     assert validate_single_decision(document) == ()
-    requirement_judge = document["steps"][8]["for_each"]["body"][0]["judge"]
-    assert requirement_judge["prompt_rules"] == [
-        {
-            "when": {"binding": "feature_sentence", "contains": "test"},
-            "instructions": [
-                "When this sentence explicitly mentions a test, treat that testing "
-                "expectation as a required feature obligation unless the sentence "
-                "explicitly prohibits it."
-            ],
-        }
-    ]
+    flow_text = str(document["steps"])
+    assert "'process': 'design-interview'" in flow_text
+    assert "feature_design" in flow_text
+    assert "feature_obligations" in flow_text
+    assert "decompose_feature_description" not in flow_text
+    assert "design_decisions" not in flow_text
+    assert "requirement_decisions" not in flow_text
+    assert "reflection_decisions" not in flow_text
     assert set(document["recoveries"]) == {
         "completeness-repair",
         "intent-repair",
         "scope-repair",
         "worker-repair",
     }
-    step_text = str(document["steps"])
+    step_text = flow_text
     assert "specification-completeness-review" in step_text
     assert "change-scope-review" in step_text
-    assert "Does this sentence state a feature requirement" in step_text
-    assert "Is this sentence's requirement explicitly reflected" in step_text
-    assert (
-        "Repair this design consequence so it preserves the instruction's intent"
-        in step_text
-    )
-    assert "Treat statements that something is missing" in step_text
-    assert "repaired_design_decisions" in step_text
     review_schemas = [
         step["judge"]["output"]["schema"]
         for step in document["steps"]

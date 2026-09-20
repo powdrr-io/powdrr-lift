@@ -1,0 +1,59 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 746
+title: Plan polyglot repository management and Go support
+intent:
+  problem: Powdrr has language-neutral execution boundaries but models source structure as Python-only, represents validation without component scope, and cannot provide complete intent-preservation evidence across mixed-language repositories.
+  goal: Define an implementation-ready sequence that introduces deterministic repository components and language capabilities, migrates Python behind adapter boundaries, adds Go structure and verification, and proves cross-language feature execution end to end.
+human-decisions:
+  - id: component-first-polyglot-model
+    summary: Model a repository as a graph of independently buildable components without selecting a primary language.
+  - id: explicit-language-capability-coverage
+    summary: Record structural, validation, and verification support per component and block affected work when required coverage is unavailable.
+  - id: python-first-go-second-adapters
+    summary: Migrate Python onto general adapter contracts before adding Go as the second language implementation.
+  - id: separate-edit-and-validation-commands
+    summary: Restrict mutation-producing formatters and generators to OpenCode edit operations while independently enforcing read-only validation.
+structured_files: []
+files:
+  - path: docs/plans/polyglot-repository-and-go-support.md
+    type: added
+    summary: Define the polyglot component model, capability contracts, eight implementation phases, Go adapter details, validation gates, failure policy, migration, and agent handoff checklist.
+    rationale: Give another agent a deterministic implementation path from Python-specific source modeling to complete mixed-language and Go feature execution without weakening intent-preservation guarantees.
+    span: {start_line: 1, end_line: 766}
+    related:
+      entities: [polyglot-repository-and-go-support-plan]
+      decisions:
+        - component-first-polyglot-model
+        - explicit-language-capability-coverage
+        - python-first-go-second-adapters
+        - separate-edit-and-validation-commands
+      invariants:
+        - no-primary-language
+        - affected-unsupported-components-block
+        - validation-does-not-mutate
+      guidance: [implement-polyglot-support-in-dependency-order]
+entities:
+  - id: polyglot-repository-and-go-support-plan
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: no-primary-language
+    action: added
+    description: Powdrr composes repository guarantees from every affected component and never uses a primary language to select analysis, context, or validation.
+    rationale: Mixed-language repositories require complete coverage across component boundaries rather than one privileged implementation stack.
+  - id: affected-unsupported-components-block
+    action: added
+    description: A proposal cannot invoke OpenCode when an affected component lacks the structural, validation, or verification capability required by that proposal.
+    rationale: File-only or unavailable language support must not silently satisfy an intent-preservation gate.
+  - id: validation-does-not-mutate
+    action: added
+    description: Commands classified as validation must leave repository contents unchanged, while formatters, generators, and dependency updates remain explicit edit operations.
+    rationale: Validation is evidence about an implementation diff and must not secretly become part of that diff.
+guidance:
+  - id: implement-polyglot-support-in-dependency-order
+    action: added
+    description: Implement component inventory, extractor abstraction, validation v2, impact closure, Go structure, Go verification, targeted worker packets, and polyglot end-to-end proof in that dependency order.
+    rationale: Each phase consumes fingerprinted schemas and guarantees established by its predecessor.
+features: []
+proposed_prs: []

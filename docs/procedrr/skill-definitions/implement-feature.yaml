@@ -214,6 +214,20 @@ steps:
       bind: feature_obligations
   - operation:
       tool: internal
+      command: [materialize_feature_intents]
+      parameters:
+        plan: {type: reference, value: plan.path}
+        obligations: {type: reference, value: feature_obligations}
+      returns:
+        type: object
+        required: [path, updated, intent_clauses]
+        properties:
+          path: {type: string, minLength: 1}
+          updated: {type: integer, minimum: 0}
+          intent_clauses: {type: array, minItems: 1}
+      bind: feature_intents
+  - operation:
+      tool: internal
       command: [compile_verification_obligations]
       parameters:
         baseline: {type: reference, value: baseline.path}

@@ -400,6 +400,8 @@ def _execute_procedrr_flow(
                 output_root=output_root,
                 state=state,
             )
+        if name == "materialize_feature_intents":
+            return _materialize_feature_intents(parameters, state=state)
         if name == "compile_verification_obligations":
             return _compile_verification_obligations(
                 parameters,
@@ -912,6 +914,95 @@ def _compile_feature_obligations(
     state["feature_obligations"] = tuple(item["description"] for item in obligations)
     state["feature_obligations_path"] = path
     return {"path": str(path), "obligations": obligations}
+
+
+def _materialize_feature_intents(
+    parameters: Mapping[str, Any], *, state: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Persist each repaired feature obligation as an active intent clause."""
+    plan = _require_flow_text(parameters, "plan")
+    if Path(plan) != state.get("plan_path"):
+        raise PowdrrExecutionError(
+            "intent materialization plan does not match the plan"
+        )
+    raw_obligations = parameters.get("obligations")
+    if not isinstance(raw_obligations, Mapping):
+        raise PowdrrExecutionError(
+            "intent materialization requires feature obligations"
+        )
+    obligations = raw_obligations.get("obligations")
+    if not isinstance(obligations, list) or not obligations:
+        raise PowdrrExecutionError("feature obligations must be a non-empty list")
+
+    document = dict(_load_yaml_mapping(Path(plan)))
+    change_id = document.get("change_id")
+    if not isinstance(change_id, str) or not change_id.strip():
+        raise PowdrrExecutionError(
+            "plan is missing change_id for intent materialization"
+        )
+    active_intent = list(document.get("active_intent", []))
+    if any(not isinstance(item, Mapping) for item in active_intent):
+        raise PowdrrExecutionError("plan active_intent must contain objects")
+    existing_ids = {
+        item.get("clause_id")
+        for item in active_intent
+        if isinstance(item.get("clause_id"), str)
+    }
+    intent_clauses: list[dict[str, Any]] = []
+    for obligation in obligations:
+        if not isinstance(obligation, Mapping):
+            raise PowdrrExecutionError("feature obligation is malformed")
+        obligation_id = obligation.get("id")
+        design = obligation.get("design")
+        if not isinstance(obligation_id, str) or not obligation_id.strip():
+            raise PowdrrExecutionError("feature obligation is missing id")
+        if not isinstance(design, Mapping):
+            raise PowdrrExecutionError(
+                f"feature obligation {obligation_id!r} is missing design"
+            )
+        description = design.get("description")
+        kind = design.get("kind")
+        if not isinstance(description, str) or not description.strip():
+            raise PowdrrExecutionError(
+                f"feature obligation {obligation_id!r} is missing design description"
+            )
+        if not isinstance(kind, str) or not kind.strip():
+            raise PowdrrExecutionError(
+                f"feature obligation {obligation_id!r} is missing design kind"
+            )
+        clause_id = f"feature-obligation-{obligation_id}"
+        clause = {
+            "clause_id": clause_id,
+            "intent_id": f"feature:{change_id}",
+            "kind": _intent_kind_for_design(kind),
+            "statement": description.strip(),
+            "source_ref": f"feature-obligation:{obligation_id}",
+            "version": 1,
+            "active": True,
+            "action": "added",
+        }
+        intent_clauses.append(clause)
+        if clause_id not in existing_ids:
+            active_intent.append(clause)
+
+    document["active_intent"] = active_intent
+    Path(plan).write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    parse_change_log(Path(plan).read_text(encoding="utf-8"))
+    return {
+        "path": plan,
+        "updated": sum(
+            clause["clause_id"] not in existing_ids for clause in intent_clauses
+        ),
+        "intent_clauses": intent_clauses,
+    }
+
+
+def _intent_kind_for_design(kind: str) -> str:
+    if kind == "invariant":
+        return "invariant"
+    if kind in {"guidance", "non_goal"}:
+        return "guidance"
+    return "decision"
 
 
 def _compile_verification_obligations(

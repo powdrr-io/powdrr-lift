@@ -138,6 +138,10 @@ from powdrr_lift.structrr.intent import (
     make_intent_source,
 )
 from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
+from powdrr_lift.structrr.verification_health import (
+    VerificationPolicyMode,
+    audit_verification_health,
+)
 from powdrr_lift.workrr.ambiguity_review import (
     WorkflowAmbiguityReviewError,
     review_workflow_definition,
@@ -169,6 +173,10 @@ from powdrr_lift.workrr.definition_comparison import (
     compare_workflow_definitions,
 )
 from powdrr_lift.workrr.definition_prompts import render_skill_prompt_snapshots
+from powdrr_lift.workrr.differential_verification import (
+    classify_differential_result,
+    detect_verifier_changes,
+)
 from powdrr_lift.workrr.error_analysis import (
     WorkflowErrorAnalysisError,
     cluster_workflow_errors,
@@ -355,6 +363,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the validated bootstrap summary as JSON.",
     )
     bootstrap_structrr_parser.set_defaults(func=_run_bootstrap_structrr)
+
+    verification_health_parser = subparsers.add_parser(
+        "verification-health",
+        aliases=["verification_health"],
+        help="Audit intent-linked verification coverage and evidence freshness.",
+    )
+    verification_health_parser.add_argument(
+        "--input",
+        type=Path,
+        required=True,
+        help=(
+            "JSON or YAML object containing intents, contracts, inventory, "
+            "and evidence."
+        ),
+    )
+    verification_health_parser.add_argument(
+        "--mode",
+        choices=[mode.value for mode in VerificationPolicyMode],
+        default=VerificationPolicyMode.REQUIRED_FOR_NEW.value,
+    )
+    verification_health_parser.add_argument("--candidate-tree")
+    verification_health_parser.add_argument("--today")
+    verification_health_parser.add_argument("--output", type=Path)
+    verification_health_parser.set_defaults(func=_run_verification_health)
+
+    differential_parser = subparsers.add_parser(
+        "verification-diff",
+        aliases=["verification_diff"],
+        help="Classify base/candidate evidence and identify verifier changes.",
+    )
+    differential_parser.add_argument("--base", type=Path, required=True)
+    differential_parser.add_argument("--candidate", type=Path, required=True)
+    differential_parser.add_argument("--not-comparable", action="store_true")
+    differential_parser.add_argument("--output", type=Path)
+    differential_parser.set_defaults(func=_run_verification_diff)
 
     rebase_structrr_parser = subparsers.add_parser(
         "rebase-structrr",
@@ -2953,6 +2996,62 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
             f"{summary['source_anchor_count']} source anchors.",
         )
     return 0
+
+
+def _run_verification_health(args: argparse.Namespace) -> int:
+    document = _read_yaml_mapping(args.input)
+    report = audit_verification_health(
+        intents=tuple(_mapping_list(document.get("intents"))),
+        contracts=tuple(_mapping_list(document.get("contracts"))),
+        inventory=tuple(_mapping_list(document.get("inventory"))),
+        evidence=tuple(_mapping_list(document.get("evidence"))),
+        verifier_changes=tuple(_mapping_list(document.get("verifier_changes"))),
+        waivers=tuple(_mapping_list(document.get("waivers"))),
+        candidate_tree=args.candidate_tree,
+        today=args.today,
+        mode=VerificationPolicyMode(args.mode),
+    )
+    rendered = json.dumps(report.to_data(), indent=2, sort_keys=True) + "\n"
+    if args.output is None:
+        sys.stdout.write(rendered)
+    else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+        print(args.output)
+    return 0 if report.passed else 1
+
+
+def _run_verification_diff(args: argparse.Namespace) -> int:
+    base = _read_yaml_mapping(args.base)
+    candidate = _read_yaml_mapping(args.candidate)
+    result = classify_differential_result(
+        str(candidate.get("obligation_id") or base.get("obligation_id")),
+        base,
+        candidate,
+        comparable=not args.not_comparable,
+    )
+    report = {
+        "result": result.to_data(),
+        "verifier_changes": [
+            change.to_data() for change in detect_verifier_changes(base, candidate)
+        ],
+    }
+    rendered = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.output is None:
+        sys.stdout.write(rendered)
+    else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+        print(args.output)
+    return (
+        0 if result.status.value in {"preserved_pass", "fixed_existing_failure"} else 1
+    )
+
+
+def _mapping_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
 
 
 def _run_rebase_structrr(args: argparse.Namespace) -> int:

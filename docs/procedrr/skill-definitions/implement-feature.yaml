@@ -487,40 +487,61 @@ steps:
                 validation: {type: object}
                 worker_review: {type: object}
             bind: implementation_review
+        - operation:
+            tool: internal
+            command: [compile_obligation_review_packets]
+            parameters:
+              obligations: {type: reference, value: feature_obligations}
+              evidence: {type: reference, value: implementation_review}
+            returns:
+              type: object
+              required: [packets]
+              properties:
+                path: {type: string, minLength: 1}
+                packets: {type: array, minItems: 1}
+            bind: obligation_review_packets
         - for_each:
-            snapshot: {name: implementation_review.active_intent_clauses}
-            item_binding: intent_clause
+            snapshot: {name: obligation_review_packets.packets}
+            item_binding: obligation_packet
             collect: {binding: intent_reviews, mode: list, value: intent_review}
             body:
               - judge:
                   kind: verify_implemented_intent
-                  question: Is this one intent clause preserved by the implementation and its explicit diff?
-                  subject: intent_clause.clause_id
+                  question: Is this one obligation preserved by the implementation and its bounded evidence?
+                  subject: obligation_packet.obligation_id
                   prompt_system: Return only the declared JSON object.
                   instructions:
-                    - Evaluate exactly this one intent clause.
-                    - Compare the clause with the proposal, implementation diff, validation results, and worker review.
-                    - Return preserved only when the clause remains honored; otherwise return altered or unknown.
-                    - Copy every evidence reference from implementation_review.evidence_refs exactly.
-                  context: [intent_clause, feature_description, proposal_review, proposal_review_result, implementation_review, implementation, validation, review]
+                    - Evaluate exactly this one obligation.
+                    - Compare only the obligation with its evidence packet.
+                    - Return preserved only when the obligation remains honored; otherwise return altered or unknown.
+                    - Do not return obligation IDs or evidence references; Powdrr binds both from the packet.
+                  context: [obligation_packet, feature_description, proposal_review, proposal_review_result, implementation_review, implementation, validation, review]
                   output:
                     name: intent_review
                     schema:
                       type: object
-                      required: [clause_id, verdict, explanation, evidence_refs]
+                      required: [verdict, explanation]
                       additionalProperties: false
                       properties:
-                        clause_id: {type: string, minLength: 1}
                         verdict: {type: string, enum: [preserved, altered, unknown]}
                         explanation: {type: string, minLength: 1}
-                        evidence_refs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
                   validation: {kind: json_schema}
         - operation:
             tool: internal
-            command: [aggregate_intent_review]
+            command: [bind_obligation_reviews]
             parameters:
+              packets: {type: reference, value: obligation_review_packets.packets}
               decisions: {type: reference, value: intent_reviews}
-              evidence: {type: reference, value: implementation_review}
+            returns: {type: object}
+            bind: bound_obligation_reviews
+        - operation:
+            tool: internal
+            # Migration marker for consumers that still recognize the old command:
+            # command: [aggregate_intent_review]
+            command: [aggregate_obligation_reviews]
+            parameters:
+              packets: {type: reference, value: obligation_review_packets.packets}
+              reviews: {type: reference, value: bound_obligation_reviews.reviews}
             returns:
               type: object
               required: [passed, failures]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import stat
 import subprocess
@@ -212,6 +213,35 @@ class DeterministicPlanningClient:
                 "evidence_refs": evidence_refs,
             }
             return payload
+        if required == {"verdict", "explanation", "evidence_refs"}:
+            evidence_values = _find_json_values(text, "evidence_refs")
+            evidence_refs = next(
+                (
+                    value
+                    for value in reversed(evidence_values)
+                    if isinstance(value, list)
+                    and all(
+                        isinstance(item, str) and "@sha256:" in item for item in value
+                    )
+                ),
+                None,
+            )
+            if not isinstance(evidence_refs, list):
+                evidence_refs = re.findall(
+                    r'"((?:git-diff|validation|worker-review|intent-state)@sha256:[^"]+)"',
+                    text,
+                )
+            evidence_refs = list(dict.fromkeys(evidence_refs)) or ["feature-validation"]
+            return {
+                "verdict": "preserved",
+                "explanation": "The implementation preserves this obligation.",
+                "evidence_refs": evidence_refs,
+            }
+        if required == {"verdict", "explanation"}:
+            return {
+                "verdict": "preserved",
+                "explanation": "The implementation preserves this obligation.",
+            }
         if required == {"clause_id", "verdict", "explanation", "evidence_refs"}:
             return {
                 "clause_id": _find_json_value(text, "clause_id")
@@ -579,6 +609,20 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
         item["selector_status"] == "planned"
         for item in canonical_design["required_test_cases"]
     )
+    review_packets_path = (
+        repo
+        / ".powdrr"
+        / "feature-runs"
+        / "python-statemachine-state-data-scoping"
+        / "obligation-review-packets.json"
+    )
+    assert review_packets_path.is_file()
+    review_packets = json.loads(review_packets_path.read_text(encoding="utf-8"))[
+        "packets"
+    ]
+    assert [item["obligation_id"] for item in review_packets] == [
+        f"obligation:{index:03d}" for index in range(1, len(review_packets) + 1)
+    ]
     document = yaml.safe_load(result.plan_path.read_text(encoding="utf-8"))
     clauses = {
         item["clause_id"]

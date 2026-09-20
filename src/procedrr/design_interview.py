@@ -46,8 +46,31 @@ _CATEGORY_FIELDS = {
 
 
 def _edit_schema(category: str) -> dict:
-    fields = _CATEGORY_FIELDS.get(category, ("id", "description"))
-    item_properties = {field: {"type": "string", "minLength": 1} for field in fields}
+    fields: tuple[str, ...]
+    if category == "required_test_cases":
+        fields = (
+            "id",
+            "description",
+            "intent_refs",
+            "expected_outcome",
+            "test_selection",
+        )
+        item_properties: dict[str, dict[str, object]] = {
+            "id": {"type": "string", "minLength": 1},
+            "description": {"type": "string", "minLength": 1},
+            "intent_refs": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+                "minItems": 1,
+            },
+            "expected_outcome": {"type": "string", "minLength": 1},
+            "test_selection": {"type": "string", "minLength": 1},
+        }
+    else:
+        fields = _CATEGORY_FIELDS.get(category, ("id", "description"))
+        item_properties = {
+            field: {"type": "string", "minLength": 1} for field in fields
+        }
     return {
         "oneOf": [
             {
@@ -119,8 +142,23 @@ def _gather(category: str) -> SequenceNode:
                         "categories.",
                         "Return exactly one action and, for add or delete, "
                         "one item matching the output schema.",
+                        *(
+                            (
+                                "For required_test_cases, describe the semantic "
+                                "obligation only. Select an existing test using "
+                                "its exact inventory id, or use test_selection "
+                                "'new'. Never invent provider, profile, or selector "
+                                "values.",
+                            )
+                            if category == "required_test_cases"
+                            else ()
+                        ),
                     ),
-                    context_bindings=("work_item_name", "feature_description", context),
+                    context_bindings=(
+                        "work_item_name",
+                        "feature_description",
+                        context,
+                    ),
                 )
             ),
         )

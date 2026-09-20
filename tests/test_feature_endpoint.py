@@ -18,6 +18,7 @@ from powdrr_lift.core.decision_obligation import (
     evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_lift.structrr.proposal import compile_proposal_revision
@@ -33,6 +34,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
+    _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
     _compile_feature_obligations,
@@ -622,6 +624,105 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [aggregate_intent_review]" in flow
     assert "provider: opencode" not in flow
     assert flow.count("command: [run_opencode]") == 5
+
+
+def test_required_test_obligation_compiles_against_discovered_inventory() -> None:
+    result = _aggregate_category_edits(
+        {
+            "required_test_cases": {
+                "action": "add",
+                "item": {
+                    "id": "verify-existing",
+                    "description": "The existing state test proves isolation.",
+                    "intent_refs": ["state-data-scoping"],
+                    "expected_outcome": "The test passes.",
+                    "test_selection": (
+                        "pytest:pytest:tests/test_state.py::test_isolated"
+                    ),
+                },
+            }
+        },
+        inventory=(
+            {
+                "inventory_id": "pytest:pytest:tests/test_state.py::test_isolated",
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_state.py::test_isolated",
+            },
+        ),
+    )
+
+    assert result["required_test_cases"]["added"] == [
+        {
+            "id": "verify-existing",
+            "description": (
+                "The existing state test proves isolation. Expected outcome: "
+                "The test passes."
+            ),
+            "intent_refs": ["state-data-scoping"],
+            "provider": "pytest",
+            "profile": "pytest",
+            "selector": "tests/test_state.py::test_isolated",
+            "expectation": "pass",
+            "applicability": {"mode": "affected_closure"},
+            "status": "active",
+        }
+    ]
+
+
+def test_required_test_obligation_generates_new_selector_deterministically() -> None:
+    result = _aggregate_category_edits(
+        {
+            "required_test_cases": {
+                "action": "add",
+                "item": {
+                    "id": "verify-state-data-scoping",
+                    "description": (
+                        "State data is isolated. Expected outcome: "
+                        "Instances do not share "
+                        "data."
+                    ),
+                    "intent_refs": ["state-data-scoping"],
+                    "expected_outcome": "Instances do not share data.",
+                    "test_selection": "new",
+                },
+            }
+        },
+        inventory=(
+            {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_existing.py::test_existing",
+            },
+        ),
+    )
+
+    case = result["required_test_cases"]["added"][0]
+    assert case["selector"] == (
+        "tests/test_verify_state_data_scoping.py::test_verify_state_data_scoping"
+    )
+    assert case["provider"] == "pytest"
+    assert case["profile"] == "pytest"
+    assert case["expectation"] == "pass"
+
+
+def test_required_test_obligation_rejects_llm_executable_fields() -> None:
+    with pytest.raises(PowdrrExecutionError, match="executable fields"):
+        _aggregate_category_edits(
+            {
+                "required_test_cases": {
+                    "action": "add",
+                    "item": {
+                        "id": "bad",
+                        "description": "Bad contract.",
+                        "intent_refs": ["intent"],
+                        "test_selection": "new",
+                        "provider": "pytest",
+                    },
+                }
+            },
+            inventory=(),
+        )
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

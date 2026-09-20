@@ -1,0 +1,49 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 748
+title: Reconcile verification evidence before repair and review
+intent:
+  problem: Verification evidence can exist without a deterministic gate that proves every obligation is fresh, unique, and acceptable before review or repair decisions.
+  goal: Reconcile current evidence mechanically and drive repair rounds only from the issues that remain after the latest execution.
+human-decisions:
+  - id: evidence-gates-review
+    summary: A feature review cannot pass while any verification obligation lacks one fresh passing evidence record.
+  - id: repair-from-current-state
+    summary: Each repair iteration derives its issue list from the latest validation and reconciliation results.
+structured_files: []
+files:
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Reconcile initial evidence before review, rationale: Make deterministic evidence acceptance a flow gate, span: {start_line: 275, end_line: 283}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Pass reconciliation into repair collection, rationale: Repair only currently unsatisfied obligations, span: {start_line: 477, end_line: 477}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Reconcile worker repairs, rationale: Rebuild evidence and gate each repair round, span: {start_line: 525, end_line: 533}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Reconcile recovery repairs, rationale: Apply the same evidence gate to every recovery path, span: {start_line: 604, end_line: 612}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Reconcile recovery repairs, rationale: Apply the same evidence gate to every recovery path, span: {start_line: 675, end_line: 683}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Reconcile recovery repairs, rationale: Apply the same evidence gate to every recovery path, span: {start_line: 744, end_line: 752}}
+  - {path: src/powdrr_lift/workrr/evidence_reconciliation.py, type: added, summary: Add deterministic evidence reconciler, rationale: Require one fresh passing record per obligation, span: {start_line: 1, end_line: 113}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Register reconciliation operation, rationale: Keep acceptance logic in Workrr and out of OpenCode, span: {start_line: 77, end_line: 77}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Dispatch reconciliation and current issues, rationale: Feed only current evidence failures into repair, span: {start_line: 434, end_line: 435}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Store reconciliation state, rationale: Make the latest deterministic result available to repair collection, span: {start_line: 448, end_line: 448}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Include reconciliation issues, rationale: Classify evidence failures as typed repair inputs, span: {start_line: 483, end_line: 489}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Store reconciliation state, rationale: Make the latest deterministic result available to review, span: {start_line: 1014, end_line: 1032}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Gate diff review on reconciliation, rationale: Prevent deterministic failures from being overridden by review output, span: {start_line: 2089, end_line: 2089}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Report reconciliation in review output, rationale: Preserve evidence-gate diagnostics, span: {start_line: 2108, end_line: 2108}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Require reconciliation for review pass, rationale: Tie acceptance to current evidence, span: {start_line: 2121, end_line: 2121}}
+  - {path: tests/test_evidence_reconciliation.py, type: added, summary: Test fresh passing evidence, stale evidence, and remaining failures, rationale: Protect deterministic repair convergence, span: {start_line: 1, end_line: 61}}
+entities:
+  - id: verification-evidence-reconciliation
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: one-fresh-evidence-record-per-obligation
+    action: added
+    description: Every compiled obligation must map to exactly one current evidence record before acceptance.
+    rationale: Prevent missing, duplicated, or stale proof from passing.
+  - id: repair-issues-come-from-current-results
+    action: added
+    description: Repair rounds use only issues produced by the latest validation and evidence reconciliation.
+    rationale: Ensure resolved issues do not persist into later rounds.
+guidance:
+  - id: deterministic-evidence-gate
+    action: added
+    description: Model review output cannot turn stale or non-passing deterministic evidence into acceptance.
+    rationale: Preserve forward-only development guarantees.
+proposed_prs: []

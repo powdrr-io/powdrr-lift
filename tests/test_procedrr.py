@@ -668,7 +668,7 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
         assert len(example_lines) >= 2, judge["question"]
 
 
-def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
+def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
     from pathlib import Path
 
     source = Path("docs/procedrr/skill-definitions/implement-feature.yaml").read_text()
@@ -684,21 +684,20 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
     assert "design_decisions" not in flow_text
     assert "requirement_decisions" not in flow_text
     assert "reflection_decisions" not in flow_text
-    assert set(document["recoveries"]) == {
-        "completeness-repair",
-        "intent-repair",
-        "scope-repair",
-        "worker-repair",
-    }
     step_text = flow_text
-    assert "specification-completeness-review" in step_text
-    assert "change-scope-review" in step_text
+    assert "compile_obligation_verification_plans" in step_text
+    assert "resolve_obligation_populations" in step_text
+    assert "compile_code_task_plan" in step_text
+    assert "run_code_task_agent" in step_text
+    assert "finalize_code_task_receipt" in step_text
+    assert "finalize_obligation_closure" in step_text
     review_schemas = [
         step["judge"]["output"]["schema"]
         for step in document["steps"]
         if isinstance(step, dict) and "judge" in step
     ]
     assert [set(schema["properties"]) for schema in review_schemas] == [
-        {"verdict"},
-        {"verdict"},
+        {"outcome", "explanation"},
+        {"outcome", "explanation"},
+        {"outcome", "explanation"},
     ]

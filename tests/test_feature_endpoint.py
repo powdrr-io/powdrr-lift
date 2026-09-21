@@ -971,18 +971,18 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                     {"clause_id": "instruction-001", "text": "Add the feature."}
                 ],
             }
-            if command[0] == "merge_semantic_design":
-                return {
-                    "kind": "feature",
-                    "description": "The requested feature is implemented.",
-                    "acceptance_criterion": (
-                        "The requested feature behavior is observable."
-                    ),
-                    "population": "all requested feature instances",
-                    "operation": "invoke the requested feature",
-                    "oracle": "the requested feature result is observable",
-                    "evidence_case": "invoke one representative feature instance",
-                }
+        if command[0] == "merge_semantic_design":
+            return {
+                "kind": "feature",
+                "description": "The requested feature is implemented.",
+                "acceptance_criterion": (
+                    "The requested feature behavior is observable."
+                ),
+                "population": "all requested feature instances",
+                "operation": "invoke the requested feature",
+                "oracle": "the requested feature result is observable",
+                "evidence_case": "invoke one representative feature instance",
+            }
         if command[0] == "compile_canonical_feature_design":
             return {
                 "path": str(tmp_path / "canonical-feature-design.json"),

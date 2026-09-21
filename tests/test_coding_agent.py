@@ -339,7 +339,7 @@ def test_opencode_policy_is_noninteractive_and_denies_publication() -> None:
 
 
 def test_opencode_provider_defaults_to_five_minutes_of_inactivity() -> None:
-    assert OpenCodeProvider().timeout_seconds == 600.0
+    assert OpenCodeProvider().timeout_seconds == 300.0
 
 
 def test_opencode_provider_uses_json_events_and_inline_policy(

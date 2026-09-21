@@ -116,7 +116,7 @@ def test_real_opencode_adds_a_specified_hello_world_feature(
     capsys.readouterr()
 
     artifacts = tmp_path / "artifacts"
-    timeout = os.environ.get("POWDRR_LIVE_CODING_AGENT_TIMEOUT", "600")
+    timeout = os.environ.get("POWDRR_LIVE_CODING_AGENT_TIMEOUT", "300")
     result = main(
         [
             "run-coding-agent",

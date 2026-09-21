@@ -2348,7 +2348,6 @@ def _run_opencode_phase(
             fallback_context = ""
             fallback_context = (
                 f"Work item: {work_item_name}\n"
-                f"Feature: {feature_description}\n"
                 "This is a fresh repair session; use the existing worktree and "
                 "repair only the reported issue. Do not re-plan the feature or "
                 "revisit unrelated changes.\n\n"

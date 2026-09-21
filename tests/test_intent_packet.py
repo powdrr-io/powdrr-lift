@@ -102,6 +102,7 @@ def test_repair_prompt_keeps_targeted_repair_contract() -> None:
 
     assert "F-1" in prompt
     assert "Feature objective:\nAdd the bounded adapter." in prompt
+    assert prompt.count("Add the bounded adapter.") == 1
     assert "Do not re-plan the feature" in prompt
 
 

@@ -587,6 +587,12 @@ def test_checked_in_design_interview_definition_parses() -> None:
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     document = parse_and_validate(source)
     assert document["name"] == "design-interview"
+    assert (
+        "What must be true in the implemented system for this clause to be "
+        "satisfied, what must remain unchanged, and what must not be introduced?"
+        in source
+    )
+    assert "Make the acceptance criterion an observable proof" in source
 
 
 def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:

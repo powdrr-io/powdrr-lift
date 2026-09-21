@@ -2,8 +2,9 @@ version: 1
 name: design-interview
 description: >-
   Compile the feature request into one deterministic instruction ledger, then
-  ask one bounded semantic question per instruction clause. The compiler owns
-  clause identity, obligations, acceptance criteria, and test contracts.
+  ask bounded semantic questions per instruction clause. The model must describe
+  the required implementation outcome and its proof; the compiler owns clause
+  identity, obligations, acceptance criteria, and test contracts.
 inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
@@ -94,18 +95,20 @@ steps:
         - judge:
             kind: construct_one
             provider: planning
-            question: What concrete obligation and acceptance criterion follow from this classified instruction clause?
+            question: What must be true in the implemented system for this clause to be satisfied, what must remain unchanged, and what must not be introduced?
             subject: instruction_clause.text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Use the supplied kind classification and translate only this clause into one concrete semantic obligation.
-              - Preserve the clause's requested behavior, constraints, and prohibitions.
-              - For non_goal, state what is explicitly outside scope and make the acceptance criterion prove it is not required.
+              - State the one required implementation outcome for this clause, including the subject or target when one is named.
+              - State every existing behavior or state that must remain unchanged.
+              - State every behavior or scope that is explicitly forbidden or outside the clause.
+              - Make the acceptance criterion an observable proof of the required outcome, preservation constraints, and prohibitions.
+              - For non_goal, state what is explicitly outside scope and make the acceptance criterion prove it is not introduced.
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions:
-                  - The description must be an explicit non-goal, not an implementation task.
+                  - The description must be an explicit non-goal and forbidden behavior, not an implementation task.
             context: [feature_description, instruction_clause, semantic_kind]
             output:
               name: semantic_obligation

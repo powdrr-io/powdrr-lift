@@ -98,6 +98,22 @@ steps:
               - A statement that a capability is missing, manual, unsafe, or currently absent is not nonactionable; it is feature context when the surrounding request asks for that capability.
               - Use non_goal only for an explicit product prohibition or scope exclusion, such as "do not change the transport" or "this feature must not add retries". Do not infer a non-goal from words such as "lacks", "without", or "manual".
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+              - >-
+                Examples: "A saved report has an owner and a timestamp" → entity.
+              - >-
+                Examples: "Users can export a report as CSV" → feature.
+              - >-
+                Examples: "The export endpoint accepts a report ID and returns CSV" → interface.
+              - >-
+                Examples: "A report can always be loaded after it is saved" → invariant.
+              - >-
+                Examples: "Prefer the existing repository serialization helper" → guidance.
+              - >-
+                Examples: "Do not add retries to report exports" → non_goal.
+              - >-
+                Examples: "Open a PR after the implementation" → nonactionable.
+              - >-
+                Counterexample: "The exporter currently has no retry handling" is feature context when the request asks to add retry handling; it is not nonactionable or automatically a non_goal.
             context: [feature_description, instruction_clause]
             output:
               name: semantic_kind
@@ -122,6 +138,14 @@ steps:
               - For a normal clause, write description as one short imperative sentence naming one behavior, API, invariant, or constraint to implement.
               - Preserve concrete names, values, conditions, and prohibitions from the clause, but do not explain, summarize, enumerate scenarios, or add design choices not present in the clause.
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+              - >-
+                Examples: "Users can export reports" → "Allow users to export reports."
+              - >-
+                Examples: "All data should pickle" → "Make every applicable data entity support pickle round-tripping."
+              - >-
+                Examples: "Do not change the transport" → "Do not implement transport changes."
+              - >-
+                Counterexample: do not turn one clause into a list of implementation tasks such as "add a class, add a route, add tests".
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions:
@@ -151,6 +175,14 @@ steps:
               - State the required result, not the operation used to produce it and not implementation mechanics.
               - Preserve concrete names, values, conditions, and prohibitions from the clause.
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+              - >-
+                Examples: obligation "users can export reports" → "The requested report is returned in the requested export format."
+              - >-
+                Examples: obligation "all data supports pickle round-tripping" → "The restored value has the same semantic state as the original value."
+              - >-
+                Examples: obligation "do not add retries" → "A failed export produces no retry attempt."
+              - >-
+                Counterexample: do not write "the implementation is correct"; that is not an observable result.
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions: ["State one observable result proving the excluded behavior was not introduced."]
@@ -178,6 +210,16 @@ steps:
               - For a universal obligation such as "all data should pickle", identify the category whose current and future members must be enumerated.
               - Do not choose repository files, symbols, fixtures, commands, selectors, or implementation tasks.
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+              - >-
+                Examples: "all data should pickle" → "every persisted domain-data entity registered by Structrr."
+              - >-
+                Examples: "users can export reports" → "each supported report export request."
+              - >-
+                Examples: "the export endpoint accepts report IDs" → "all requests handled by the report export interface."
+              - >-
+                Examples: "do not add retries to exports" → "all failed report export attempts."
+              - >-
+                Counterexample: "the Report class in reports.py" is an implementation location, not a subject population.
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions:
@@ -204,6 +246,14 @@ steps:
               - Name one externally observable operation applied to one member of the supplied population.
               - Describe the stimulus or action, not the expected result and not implementation mechanics.
               - Do not provide test code, repository paths, commands, selectors, IDs, hashes, or fingerprints.
+              - >-
+                Examples: population "persisted domain-data entities" → "pickle.dumps followed by pickle.loads on one valid entity instance."
+              - >-
+                Examples: population "supported report export requests" → "submit one export request for a supported report and format."
+              - >-
+                Examples: population "failed export attempts" → "cause one export attempt to fail and observe the resulting request behavior."
+              - >-
+                Counterexample: "edit reports.py" is an implementation action, not an observable operation.
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions: ["Name the one operation during which the excluded behavior could otherwise appear."]
@@ -230,6 +280,14 @@ steps:
               - Include the required equivalence or comparison semantics when success means preserving state.
               - Do not add another behavior, operation, scenario, or implementation choice.
               - Do not provide test code, repository paths, commands, selectors, IDs, hashes, or fingerprints.
+              - >-
+                Examples: pickle round-trip → "loads(dumps(value)) is semantically equivalent to value."
+              - >-
+                Examples: report export → "The response status is successful and its body contains the requested report in the requested format."
+              - >-
+                Examples: no-retry invariant → "The count of retry attempts remains zero after the initial failure."
+              - >-
+                Counterexample: "the test passes" is not an oracle because it does not state what the test must prove.
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions: ["State the one predicate proving the excluded behavior is absent."]
@@ -255,6 +313,14 @@ steps:
               - Describe one representative input or setup, the supplied operation, and the supplied predicate.
               - This is an evidence example from which Powdrr compiles executable contracts; it is not the complete population and does not prove universal coverage by itself.
               - Do not provide test code, a multi-step test plan, repository paths, commands, selectors, IDs, hashes, or fingerprints.
+              - >-
+                Examples: pickle → "Construct one UserRecord with representative fields, round-trip it, and compare its semantic fields."
+              - >-
+                Examples: report export → "Submit an export request for a report containing two rows and verify the returned CSV contains both rows."
+              - >-
+                Examples: no retries → "Use a transport that fails once, invoke one export, and verify only one transport call occurred."
+              - >-
+                Counterexample: "run the full test suite" is not an evidence case; it does not identify a subject, operation, or oracle.
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions: ["Describe one evidence case that would detect introduction of the excluded behavior."]

@@ -449,12 +449,19 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             question = messages[1]["content"]
             if "kind of obligation" in question:
                 return {"kind": "feature"}
-            if "test contract" in question:
-                return {"expected_test": "Run the feature test."}
-            return {
-                "description": "The feature is implemented.",
-                "acceptance_criterion": "The feature behavior is observable.",
-            }
+            if "one concrete semantic obligation" in question:
+                return {"description": "The feature is implemented."}
+            if "observable result" in question:
+                return {"acceptance_criterion": "The feature behavior is observable."}
+            if "exact population" in question:
+                return {"population": "all feature instances"}
+            if "observable operation" in question:
+                return {"operation": "invoke the feature"}
+            if "observable predicate" in question:
+                return {"oracle": "the feature result matches the requirement"}
+            if "evidence case" in question:
+                return {"evidence_case": "invoke one representative feature instance"}
+            raise AssertionError(question)
 
     llm = DesignInterviewLLM()
 
@@ -476,7 +483,10 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "kind": "feature",
                     "description": "The feature is implemented.",
                     "acceptance_criterion": "The feature behavior is observable.",
-                    "expected_test": "Run the feature test.",
+                    "population": "all feature instances",
+                    "operation": "invoke the feature",
+                    "oracle": "the feature result matches the requirement",
+                    "evidence_case": "invoke one representative feature instance",
                 }
             if command[0] == "compile_canonical_feature_design":
                 return {
@@ -492,8 +502,25 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                                 "acceptance_criterion": (
                                     "The feature behavior is observable."
                                 ),
-                                "expected_test": "Run the feature test.",
+                                "population": "all feature instances",
+                                "operation": "invoke the feature",
+                                "oracle": "the feature result matches the requirement",
+                                "evidence_case": (
+                                    "invoke one representative feature instance"
+                                ),
                             },
+                        }
+                    ],
+                    "verification_contracts": [
+                        {
+                            "id": "contract-sentence-1",
+                            "obligation_ref": "sentence-1",
+                            "population": "all feature instances",
+                            "operation": "invoke the feature",
+                            "oracle": "the feature result matches the requirement",
+                            "evidence_case": (
+                                "invoke one representative feature instance"
+                            ),
                         }
                     ],
                     "required_test_cases": [{"id": "test-sentence-1"}],
@@ -512,7 +539,136 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 3
+    assert result.llm_activations == 7
+    judge_values = {
+        event.data["output"]: event.data["value"]
+        for event in result.events
+        if event.kind == "judge" and "value" in event.data
+    }
+    assert judge_values["semantic_kind"] == {"kind": "feature"}
+    assert judge_values["semantic_obligation"] == {
+        "description": "The feature is implemented."
+    }
+    assert judge_values["semantic_population"] == {
+        "population": "all feature instances"
+    }
+    assert judge_values["semantic_operation"] == {"operation": "invoke the feature"}
+    assert judge_values["semantic_oracle"] == {
+        "oracle": "the feature result matches the requirement"
+    }
+
+
+@pytest.mark.live_provider
+def test_live_design_interview_inspects_intermediate_contract_outputs(
+    tmp_path: Path,
+) -> None:
+    """Require a live planning model to produce usable intermediate contracts."""
+    if os.environ.get("POWDRR_LIVE_LLM") != "1":
+        pytest.skip("set POWDRR_LIVE_LLM=1 to run the paid live-provider test")
+
+    from importlib import import_module
+
+    from procedrr import parse_and_validate
+
+    build_probe_client = import_module(
+        "powdrr_lift.workrr.prompt_probe"
+    ).build_probe_client
+    llm = build_probe_client(
+        provider="deepinfra-cheap",
+        model=DEEPINFRA_CHEAP_MODEL,
+        api_key=None,
+        base_url=None,
+        repo_root=tmp_path,
+        progress_stream=sys.stderr,
+    )
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        assert tool == "internal"
+        command = parameters["command"]
+        if command[0] == "compile_instruction_ledger":
+            return {
+                "path": str(tmp_path / "instruction-ledger.json"),
+                "fingerprint": "sha256:ledger",
+                "clauses": [
+                    {
+                        "clause_id": "pickle-001",
+                        "text": (
+                            "All persisted data entities should support "
+                            "pickle round-tripping."
+                        ),
+                    }
+                ],
+            }
+        if command[0] == "merge_semantic_design":
+            return {
+                "kind": parameters["kind"],
+                "description": parameters["description"],
+                "acceptance_criterion": parameters["acceptance_criterion"],
+                "population": parameters["population"],
+                "operation": parameters["operation"],
+                "oracle": parameters["oracle"],
+                "evidence_case": parameters["evidence_case"],
+            }
+        if command[0] == "compile_canonical_feature_design":
+            design = parameters["design_decisions"][0]["result"]
+            return {
+                "path": str(tmp_path / "canonical-feature-design.json"),
+                "fingerprint": "sha256:design",
+                "obligations": [
+                    {
+                        "id": "pickle-001",
+                        "description": design["description"],
+                        "design": design,
+                    }
+                ],
+                "verification_contracts": [
+                    {
+                        "id": "contract-pickle-001",
+                        "obligation_ref": "pickle-001",
+                        "population": design["population"],
+                        "operation": design["operation"],
+                        "oracle": design["oracle"],
+                        "evidence_case": design["evidence_case"],
+                    }
+                ],
+                "required_test_cases": [{"id": "test-pickle-001"}],
+            }
+        raise AssertionError((tool, parameters))
+
+    document = parse_and_validate(
+        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    )
+    result = Evaluator(llm, execute).evaluate(
+        document,
+        {
+            "work_item_name": "live-pickle-contract",
+            "feature_description": (
+                "All persisted data entities should support pickle round-tripping."
+            ),
+        },
+    )
+
+    judge_values = {
+        event.data["output"]: event.data["value"]
+        for event in result.events
+        if event.kind == "judge" and "value" in event.data
+    }
+    assert result.llm_activations == 7
+    assert judge_values["semantic_kind"]["kind"] == "invariant"
+    assert "pickle" in judge_values["semantic_obligation"]["description"].lower()
+    assert any(
+        word in judge_values["semantic_population"]["population"].lower()
+        for word in ("data", "entity", "persist")
+    )
+    assert any(
+        word in judge_values["semantic_operation"]["operation"].lower()
+        for word in ("pickle", "serialize", "round-trip")
+    )
+    assert any(
+        word in judge_values["semantic_oracle"]["oracle"].lower()
+        for word in ("same", "equivalent", "equal", "preserv")
+    )
+    assert judge_values["semantic_evidence_case"]["evidence_case"].strip()
 
 
 def test_evaluator_tracks_operation_output_schema_on_binding() -> None:

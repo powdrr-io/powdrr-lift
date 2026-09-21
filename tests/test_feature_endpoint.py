@@ -943,12 +943,23 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             question = messages[1]["content"]
             if "kind of obligation" in question:
                 return {"kind": "feature"}
-            if "test contract" in question:
-                return {"expected_test": "Run the feature test."}
-            return {
-                "description": "The requested feature is implemented.",
-                "acceptance_criterion": "The requested feature behavior is observable.",
-            }
+            if "one concrete semantic obligation" in question:
+                return {"description": "The requested feature is implemented."}
+            if "observable result" in question:
+                return {
+                    "acceptance_criterion": (
+                        "The requested feature behavior is observable."
+                    )
+                }
+            if "exact population" in question:
+                return {"population": "all requested feature instances"}
+            if "observable operation" in question:
+                return {"operation": "invoke the requested feature"}
+            if "observable predicate" in question:
+                return {"oracle": "the requested feature result is observable"}
+            if "evidence case" in question:
+                return {"evidence_case": "invoke one representative feature instance"}
+            raise AssertionError(question)
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         command = parameters["command"]
@@ -960,13 +971,18 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                     {"clause_id": "instruction-001", "text": "Add the feature."}
                 ],
             }
-        if command[0] == "merge_semantic_design":
-            return {
-                "kind": "feature",
-                "description": "The requested feature is implemented.",
-                "acceptance_criterion": "The requested feature behavior is observable.",
-                "expected_test": "Run the feature test.",
-            }
+            if command[0] == "merge_semantic_design":
+                return {
+                    "kind": "feature",
+                    "description": "The requested feature is implemented.",
+                    "acceptance_criterion": (
+                        "The requested feature behavior is observable."
+                    ),
+                    "population": "all requested feature instances",
+                    "operation": "invoke the requested feature",
+                    "oracle": "the requested feature result is observable",
+                    "evidence_case": "invoke one representative feature instance",
+                }
         if command[0] == "compile_canonical_feature_design":
             return {
                 "path": str(tmp_path / "canonical-feature-design.json"),
@@ -981,8 +997,23 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                             "acceptance_criterion": (
                                 "The requested feature behavior is observable."
                             ),
-                            "expected_test": "Run the feature test.",
+                            "population": "all requested feature instances",
+                            "operation": "invoke the requested feature",
+                            "oracle": "the requested feature result is observable",
+                            "evidence_case": (
+                                "invoke one representative feature instance"
+                            ),
                         },
+                    }
+                ],
+                "verification_contracts": [
+                    {
+                        "id": "contract-sentence-1",
+                        "obligation_ref": "sentence-1",
+                        "population": "all requested feature instances",
+                        "operation": "invoke the requested feature",
+                        "oracle": "the requested feature result is observable",
+                        "evidence_case": "invoke one representative feature instance",
                     }
                 ],
                 "required_test_cases": [{"id": "test-sentence-1"}],

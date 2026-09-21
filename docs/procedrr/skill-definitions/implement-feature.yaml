@@ -132,6 +132,14 @@ steps:
               - Use pass only when the supplied evidence proves this predicate.
               - Return fail, unknown, or clarification when the evidence does not prove it.
               - Do not return IDs, references, or fingerprints; Powdrr binds them.
+              - >-
+                Examples: predicate "the proposed obligation names a concrete behavior" with evidence containing a nonempty behavior description → pass.
+              - >-
+                Examples: predicate "the required test has a provider, profile, and selector" with evidence missing the selector → fail.
+              - >-
+                Examples: predicate "the proposal preserves the existing transport invariant" with no transport evidence → unknown, not pass.
+              - >-
+                Counterexample: do not pass because the overall feature sounds reasonable; evaluate only the named predicate.
             context: [proposal_decision, feature_description, baseline, plan, feature_design]
             output:
               name: proposal_decision_result
@@ -363,6 +371,16 @@ steps:
               - Use pass only when the supplied evidence proves this predicate.
               - Treat unrelated cleanup, speculative scope, and an unexecutable validator as failures.
               - Do not propose edits or return IDs, references, paths, selectors, or fingerprints.
+              - >-
+                Examples: predicate "the task changes only the declared report exporter symbol" with a diff limited to that symbol → pass.
+              - >-
+                Examples: predicate "the task has an executable focused validator" with only a prose acceptance criterion → fail.
+              - >-
+                Examples: predicate "the task's failing baseline case is assigned to exactly one task" with two assignments → fail.
+              - >-
+                Examples: predicate "the task preserves the approved contract test" with no before/after evidence → unknown.
+              - >-
+                Counterexample: do not pass because the task objective is well written; the repository evidence must prove the predicate.
             context: [code_task_semantic_decision, feature_description, plan, obligation_baseline, code_task_plan]
             output:
               name: code_task_semantic_result
@@ -671,6 +689,16 @@ steps:
               - Use pass only when the supplied evidence proves this predicate in the final candidate tree.
               - Return fail or unknown when evidence is missing, stale, or contradictory.
               - Do not propose repairs or return IDs, references, paths, selectors, or fingerprints.
+              - >-
+                Examples: predicate "every member of the pickle population has a passing contract result" with complete current case evidence → pass.
+              - >-
+                Examples: predicate "the implementation satisfies the export obligation" with only a changed source file and no passing validator → unknown.
+              - >-
+                Examples: predicate "no protected contract file changed" with a diff showing that file changed → fail.
+              - >-
+                Examples: predicate "all changed paths are within the accepted task scopes" with one unrelated path → fail.
+              - >-
+                Counterexample: do not pass because the full repository suite is green if this predicate's own evidence is absent.
             context: [final_semantic_decision, feature_description, plan, final_obligation_evidence, validation, final_implementation_review]
             output:
               name: final_semantic_result

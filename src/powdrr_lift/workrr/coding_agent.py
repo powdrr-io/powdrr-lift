@@ -80,21 +80,31 @@ class ImplementationRequest:
         return json.dumps(self.to_data(), indent=2, sort_keys=True) + "\n"
 
     def repair_prompt(self, issue: Mapping[str, Any]) -> str:
-        """Render a finding-specific repair prompt with preserved intent."""
-        packet = (
-            self.intent_packet.render()
-            if self.intent_packet is not None
-            else "No operation-scoped intent packet was supplied."
-        )
+        """Render a finding-specific prompt without replaying the full packet.
+
+        The original implementation handoff intentionally contains the full
+        operation contract.  Reusing that packet for repair is harmful: the
+        packet's preservation criteria are already expanded from the feature
+        obligations, tests, and active intents, so rendering it again makes a
+        repair request substantially larger and gives the coding agent several
+        competing representations of the same requirements.  Repair is a
+        targeted operation; the durable request and evidence artifacts remain
+        available to Workrr, while the model sees only the failed finding and
+        the boundaries needed to fix it.
+        """
+        observed_issue = json.dumps(dict(issue), indent=2, sort_keys=True, default=str)
+        paths = ", ".join(self.allowed_paths) or "none declared"
         return (
             "Repair only the reported issue in the existing worktree, then stop.\n"
             "Do not re-plan the feature or revisit unrelated changes.\n\n"
+            f"Feature objective:\n{self.objective}\n\n"
             "Observed issue:\n"
-            f"{json.dumps(dict(issue), indent=2, sort_keys=True, default=str)}\n\n"
-            f"The original operation contract remains in force:\n{packet}\n\n"
-            "Preserve every requirement that is not contradicted by the observed "
-            "issue. Workrr will rerun the affected validators and invalidate "
-            "evidence affected by your diff."
+            f"{observed_issue}\n\n"
+            f"Allowed durable paths: {paths}\n"
+            "Change only what is necessary to resolve this finding. Do not add "
+            "new product behavior, tests, dependencies, or files unless the "
+            "finding explicitly requires them. Workrr will rerun the affected "
+            "validators and invalidate evidence affected by your diff."
         )
 
     @classmethod

@@ -81,7 +81,7 @@ def test_packet_compiles_one_execution_unit_with_explainable_context() -> None:
     assert "the adapter rejects unknown inputs" in request.prompt
 
 
-def test_repair_prompt_keeps_original_packet_contract() -> None:
+def test_repair_prompt_keeps_targeted_repair_contract() -> None:
     from powdrr_lift.workrr.coding_agent import ImplementationRequest
 
     request = ImplementationRequest.from_execution_unit(
@@ -101,5 +101,40 @@ def test_repair_prompt_keeps_original_packet_contract() -> None:
     )
 
     assert "F-1" in prompt
-    assert "the adapter rejects unknown inputs" in prompt
+    assert "Feature objective:\nAdd the bounded adapter." in prompt
     assert "Do not re-plan the feature" in prompt
+
+
+def test_repair_prompt_does_not_replay_the_full_intent_packet() -> None:
+    from powdrr_lift.workrr.coding_agent import ImplementationRequest
+
+    request = ImplementationRequest.from_execution_unit(
+        ExecutionUnit(
+            unit_id="operation-1",
+            objective="Add the bounded adapter.",
+            paths=("src/adapter.py",),
+            acceptance_criteria=tuple(f"criterion {index}" for index in range(40)),
+            planned_additions=(
+                {"section": "features", "id": "adapter", "action": "added"},
+            ),
+            must_preserve=tuple(f"preservation {index}" for index in range(40)),
+        ),
+        request_id="request-1",
+        base_commit="abc",
+        plan_fingerprint="plan-1",
+    )
+
+    prompt = request.repair_prompt(
+        {
+            "kind": "validation",
+            "issue": {"profile": "pytest", "status": "failed"},
+        }
+    )
+
+    assert "Feature objective:\nAdd the bounded adapter." in prompt
+    assert "Allowed durable paths: src/adapter.py" in prompt
+    assert "Operation-scoped intent packet" not in prompt
+    assert "Required operations" not in prompt
+    assert "Must preserve" not in prompt
+    assert "criterion 39" not in prompt
+    assert len(prompt) < 2_000

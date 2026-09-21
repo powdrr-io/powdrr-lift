@@ -66,6 +66,22 @@ def test_process_exit_is_terminal_even_when_last_event_is_old() -> None:
     assert monitor.snapshot(process_returncode=7).state == "failed"
 
 
+def test_active_snapshot_does_not_claim_stale_progress_is_recent() -> None:
+    now = [100.0]
+    monitor = OpenCodeLiveness(
+        slow_after=300,
+        stalled_after=600,
+        clock=lambda: now[0],
+    )
+    monitor.observe({"type": "message.updated"}, captured_at=90)
+
+    now[0] = 200
+    snapshot = monitor.snapshot()
+
+    assert snapshot.state == "active"
+    assert "110.0s ago" in snapshot.reason
+
+
 def test_append_and_replay_event_log(tmp_path: Path) -> None:
     path = tmp_path / "events.ndjson"
     append_event(path, {"type": "server.connected"}, captured_at=12.5)

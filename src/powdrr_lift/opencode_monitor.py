@@ -119,7 +119,9 @@ class OpenCodeLiveness:
             reason = "transport is alive, but no progress event arrived recently"
         else:
             state = "active"
-            reason = "recent progress event observed"
+            reason = (
+                f"process active; last progress event was {since_progress:.1f}s ago"
+            )
 
         return LivenessSnapshot(
             state=state,
@@ -255,7 +257,7 @@ def run_opencode(
             "process.started",
             captured_at=last_progress,
             pid=process.pid,
-            command=list(command),
+            command=_diagnostic_command(command),
             cwd=str(cwd) if cwd is not None else None,
             inactivity_timeout=inactivity_timeout,
         )
@@ -384,7 +386,7 @@ def _process_tree(root_pid: int) -> list[dict[str, Any]]:
             continue
         closing = stat.rfind(")")
         state = stat[closing + 2 : closing + 3] if closing >= 0 else "?"
-        result.append({"pid": pid, "state": state, "command": command[:500]})
+        result.append({"pid": pid, "state": state, "command": _bounded_text(command)})
         try:
             children = (proc_dir / "task" / str(pid) / "children").read_text(
                 encoding="utf-8"
@@ -393,6 +395,18 @@ def _process_tree(root_pid: int) -> list[dict[str, Any]]:
             children = ""
         pending.extend(int(value) for value in children.split() if value.isdigit())
     return sorted(result, key=lambda item: int(item["pid"]))
+
+
+def _bounded_text(value: str, limit: int = 500) -> str:
+    """Keep diagnostic text readable without cutting it off ambiguously."""
+    if len(value) <= limit:
+        return value
+    return value[:limit] + "…<truncated>"
+
+
+def _diagnostic_command(command: Sequence[str]) -> list[str]:
+    """Bound command arguments before writing them to the diagnostic log."""
+    return [_bounded_text(str(argument), 240) for argument in command]
 
 
 def replay_events(records: Iterable[dict[str, Any]]) -> OpenCodeLiveness:

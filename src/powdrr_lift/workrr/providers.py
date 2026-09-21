@@ -49,6 +49,7 @@ _MAX_STREAM_CONTENT_CHARS = 524288
 _MAX_STRUCTURED_COMPLETION_TOKENS = 2048
 _MAX_STRUCTURED_STREAM_CONTENT_CHARS = 65536
 _STREAM_EXCERPT_CHARS = 512
+_STREAM_PROGRESS_INTERVAL_SECONDS = 10.0
 _STREAM_CAPTURE_COUNTER = itertools.count(1)
 
 
@@ -528,6 +529,7 @@ def _read_openai_response(
     event_data: list[str] = []
     chunk_count = 0
     stream_complete = False
+    last_progress_report = float("-inf")
     while True:
         line = response.readline()
         if not line:
@@ -582,12 +584,17 @@ def _read_openai_response(
                     f"limit={max_content_chars} characters); "
                     f"partial content prefix: {excerpt!r}"
                 )
-            if progress_stream is not None:
+            now = time.monotonic()
+            if (
+                progress_stream is not None
+                and now - last_progress_report >= _STREAM_PROGRESS_INTERVAL_SECONDS
+            ):
                 print(
                     f"received streamed LLM data ({chunk_count} chunks)...",
                     file=progress_stream,
                     flush=True,
                 )
+                last_progress_report = now
 
     if response_metadata is None:
         raise PowdrrExecutionError(

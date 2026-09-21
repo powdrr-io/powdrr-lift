@@ -7657,6 +7657,8 @@ def test_openai_chat_client_consumes_sse_content_and_reports_progress(
                 b"\n",
                 b'data: {"choices":[{"delta":{"content":"true}"}}]}\n',
                 b"\n",
+                b'data: {"choices":[{"delta":{"content":" "}}]}\n',
+                b"\n",
                 b"data: [DONE]\n",
                 b"\n",
             ]
@@ -7668,6 +7670,11 @@ def test_openai_chat_client_consumes_sse_content_and_reports_progress(
         return _FakeResponse()
 
     monkeypatch.setattr("powdrr_lift.workrr.providers.urlopen", _fake_urlopen)
+    monotonic_values = iter((0.0, 1.0, 11.0, 12.0))
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.providers.time.monotonic",
+        lambda: next(monotonic_values),
+    )
     progress = io.StringIO()
     client = OpenAIChatClient(
         model="test-model",
@@ -7677,7 +7684,7 @@ def test_openai_chat_client_consumes_sse_content_and_reports_progress(
     )
 
     assert client.complete_json([{"role": "user", "content": "hello"}]) == {"ok": True}
-    assert "received streamed LLM data" in progress.getvalue()
+    assert progress.getvalue().count("received streamed LLM data") == 2
 
 
 def test_openai_streaming_response_is_bounded_before_json_parse(

@@ -126,6 +126,18 @@ class DeterministicPlanningClient:
             }
         if required == {"reflected"}:
             return {"reflected": True}
+        if required == {"kind"}:
+            return {"kind": "feature"}
+        if required == {"description", "acceptance_criterion"}:
+            return {
+                "description": (
+                    "Add the requested greeting output while preserving the "
+                    "existing output."
+                ),
+                "acceptance_criterion": "The program prints both greetings in order.",
+            }
+        if required == {"expected_test"}:
+            return {"expected_test": "Run the hello_world test."}
         if required == {"kind", "description", "acceptance_criterion", "expected_test"}:
             return {
                 "kind": "feature",

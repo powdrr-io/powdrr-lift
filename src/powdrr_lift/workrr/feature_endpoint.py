@@ -1647,9 +1647,32 @@ def _run_verification_evidence(
         raise PowdrrExecutionError("verification obligations must be a list")
     from powdrr_lift.structrr.verification_obligations import VerificationObligation
 
-    obligations = tuple(
-        VerificationObligation.from_data(item) for item in raw_obligations
-    )
+    plan_cases = {
+        str(item.get("id")): item
+        for item in _mapping_values(
+            _load_yaml_mapping(state["plan_path"]).get("required_test_cases")
+        )
+    }
+    inventory = tuple(state.get("provider_inventory", ()))
+    resolved_obligations: list[VerificationObligation] = []
+    for raw in raw_obligations:
+        resolved = dict(raw)
+        case = plan_cases.get(str(raw.get("contract_id")))
+        name_hint = case.get("name_hint") if case else None
+        if isinstance(name_hint, str) and name_hint.strip():
+            matches = sorted(
+                str(item.get("selector"))
+                for item in inventory
+                if item.get("provider") == raw.get("provider")
+                and item.get("profile") == raw.get("profile")
+                and _selector_matches_test_name_hint(
+                    str(item.get("selector", "")), name_hint
+                )
+            )
+            if matches:
+                resolved["selector"] = matches[0]
+        resolved_obligations.append(VerificationObligation.from_data(resolved))
+    obligations = tuple(resolved_obligations)
     head = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
     diff = _git_output(runner, worktree, ["git", "diff", "--binary"])
     status = _git_output(runner, worktree, ["git", "status", "--porcelain"])

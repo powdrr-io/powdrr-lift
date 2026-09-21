@@ -1200,6 +1200,71 @@ def test_required_test_case_validation_requires_discovered_selector(
     assert "was not discovered" in result["failures"][0]
 
 
+def test_required_test_case_validation_matches_new_test_name_hint_suffix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = tmp_path / "plan.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "required_test_cases": [
+                    {
+                        "id": "state-data-test",
+                        "description": "State data is isolated.",
+                        "intent_refs": ["feature:state-data"],
+                        "provider": "pytest",
+                        "profile": "pytest",
+                        "name_hint": "test_state_data_is_isolated",
+                        "selector": "tests/test_state_data.py::test_planned",
+                        "expectation": "pass",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    profile = type(
+        "Profile",
+        (),
+        {"name": "pytest", "command": ("python", "-m", "pytest"), "source": "test"},
+    )()
+
+    class InventoryEntry:
+        def to_data(self) -> dict[str, object]:
+            return {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selectors": [
+                    "tests/test_state_data.py::test_state_data_is_isolated_sync"
+                ],
+            }
+
+    class Registry:
+        def inventory(
+            self, root: Path, profiles: tuple[object, ...]
+        ) -> tuple[InventoryEntry, ...]:
+            del root, profiles
+            return (InventoryEntry(),)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.default_verification_provider_registry",
+        lambda: Registry(),
+    )
+    result = _validate_required_test_cases(
+        {"plan": str(plan)},
+        worktree=tmp_path,
+        state={"plan_path": plan, "validation_profiles": (profile,)},
+    )
+
+    assert result["passed"] is True
+    assert result["cases"][0]["matching_selectors"] == [
+        "tests/test_state_data.py::test_state_data_is_isolated_sync"
+    ]
+
+
 def test_required_test_case_validation_rejects_non_executable_expectation(
     tmp_path: Path,
 ) -> None:

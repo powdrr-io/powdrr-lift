@@ -9,7 +9,7 @@ human-decisions:
     summary: Represent every deterministic feature-flow command as a cataloged Python object with explicit input and output contracts.
 structured_files: []
 files:
-  - {path: src/powdrr_lift/workrr/command_catalog.py, type: added, summary: Define feature command contracts and implementations, rationale: Centralize command names, parameter contracts, and dispatch logic, span: {start_line: 1, end_line: 686}}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: added, summary: Define complete command objects and implementations in one catalog, rationale: Keep each command name, input schema, output schema, and logic together, span: {start_line: 1, end_line: 901}}
   - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove command implementation imports, rationale: Move command implementations into the catalog runtime, span: {start_line: 25, end_line: 28}}
   - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove command implementation imports, rationale: Move command implementations into the catalog runtime, span: {start_line: 30, end_line: 34}}
   - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Import the catalog runtime, rationale: Let the catalog own internal command execution, span: {start_line: 87, end_line: 90}}

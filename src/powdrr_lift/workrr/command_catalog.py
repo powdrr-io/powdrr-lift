@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
@@ -11,7 +11,11 @@ _OUTPUT: dict[str, Any] = {}
 
 
 def _spec(
-    name: str, parameters: Iterable[str], *, required: bool = True
+    name: str,
+    parameters: Iterable[str],
+    *,
+    required: bool = True,
+    logic: Callable[[Mapping[str, Any]], Any] | None = None,
 ) -> CommandSpec:
     names = tuple(parameters)
     return CommandSpec(
@@ -22,11 +26,21 @@ def _spec(
             additional_properties=False,
         ),
         output_schema=_OUTPUT,
+        logic=logic,
     )
 
 
-def feature_command_catalog() -> CommandCatalog:
-    """Return contracts for every deterministic command in implement-feature."""
+def feature_command_catalog(
+    implementations: Mapping[str, Callable[[Mapping[str, Any]], Any]] | None = None,
+) -> CommandCatalog:
+    """Return the implement-feature commands and their implementations.
+
+    Static callers omit ``implementations`` and receive the same catalog with
+    dispatch slots intentionally empty. Runtime callers provide the bound
+    implementations, making each returned ``CommandSpec`` the complete command
+    object used for validation and dispatch.
+    """
+    implementations = implementations or {}
     commands = {
         "ensure_current_structrr": (),
         "discover_validation_profiles": ("baseline",),
@@ -110,7 +124,12 @@ def feature_command_catalog() -> CommandCatalog:
     }
     return CommandCatalog(
         tuple(
-            _spec(name, parameters, required=name != "run_opencode")
+            _spec(
+                name,
+                parameters,
+                required=name != "run_opencode",
+                logic=implementations.get(name),
+            )
             for name, parameters in commands.items()
         )
     )

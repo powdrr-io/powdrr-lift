@@ -589,11 +589,13 @@ def _execute_procedrr_flow(
 
             return dispatch
 
-        runtime_catalog = command_catalog.with_logic(
-            {name: bind_handler(handler) for name, handler in handlers.items()}
+        runtime_catalog = feature_command_catalog(
+            implementations={
+                name: bind_handler(handler) for name, handler in handlers.items()
+            }
         )
-        handler = handlers.get(name)
-        if handler is not None:
+        spec = runtime_catalog.get(name)
+        if spec is not None and spec.logic is not None:
             return runtime_catalog.dispatch(
                 name,
                 {key: value for key, value in parameters.items() if key != "command"},

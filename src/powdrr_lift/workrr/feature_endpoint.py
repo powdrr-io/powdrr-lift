@@ -425,6 +425,33 @@ def _execute_procedrr_flow(
                 "clauses": [item.to_data() for item in ledger.clauses],
             }
 
+        def merge_semantic_design_operation() -> Any:
+            """Join the independently elicited semantic fields for one clause."""
+            required = (
+                "kind",
+                "description",
+                "acceptance_criterion",
+                "expected_test",
+            )
+            values = {name: parameters.get(name) for name in required}
+            if any(
+                not isinstance(value, str) or not value.strip()
+                for value in values.values()
+            ):
+                raise PowdrrExecutionError(
+                    "merge_semantic_design requires non-empty semantic fields"
+                )
+            if values["kind"] not in {
+                "entity",
+                "feature",
+                "interface",
+                "invariant",
+                "guidance",
+                "non_goal",
+            }:
+                raise PowdrrExecutionError("merge_semantic_design kind is invalid")
+            return values
+
         def compile_canonical_feature_design_operation() -> Any:
             ledger_path = state.get("instruction_ledger_path")
             if not isinstance(ledger_path, Path):
@@ -437,12 +464,6 @@ def _execute_procedrr_flow(
                 raise PowdrrExecutionError(
                     f"instruction ledger cannot be loaded: {exc}"
                 ) from exc
-            raw_obligations = parameters.get("obligations")
-            if not isinstance(raw_obligations, Mapping):
-                raise PowdrrExecutionError("canonical design obligations are missing")
-            obligations = raw_obligations.get("obligations")
-            if not isinstance(obligations, list):
-                raise PowdrrExecutionError("canonical design obligations are malformed")
             raw_design_decisions = _collected_results(
                 parameters.get("design_decisions")
             )
@@ -450,28 +471,12 @@ def _execute_procedrr_flow(
                 raise PowdrrExecutionError(
                     "canonical design decisions are missing or malformed"
                 )
-            required_clause_ids = []
-            for obligation in obligations:
-                if not isinstance(obligation, Mapping):
-                    raise PowdrrExecutionError("canonical obligation is malformed")
-                sentence_id = obligation.get("id")
-                if not isinstance(sentence_id, str):
-                    raise PowdrrExecutionError(
-                        "canonical obligation is missing its compiler-owned sentence id"
-                    )
-                match = re.fullmatch(r"sentence-(\d+)", sentence_id)
-                if match is None:
-                    raise PowdrrExecutionError(
-                        "canonical obligation has an invalid sentence id"
-                    )
-                required_clause_ids.append(f"instruction-{int(match.group(1)):03d}")
             work_item_name = _require_flow_text(parameters, "work_item_name")
             try:
                 design = compile_feature_design(
                     ledger,
                     work_item_name,
                     raw_design_decisions,
-                    required_clause_ids=required_clause_ids,
                 )
             except FeatureObligationError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
@@ -481,13 +486,37 @@ def _execute_procedrr_flow(
                 encoding="utf-8",
             )
             state["canonical_feature_design_path"] = path
+            state["feature_obligations_path"] = path
+            obligations = [
+                {
+                    "id": f"sentence-{index}",
+                    "description": item.projection.description,
+                    "design": item.projection.to_data(),
+                }
+                for index, item in enumerate(design.obligations, start=1)
+            ]
+            semantic_cases = [
+                {
+                    "id": f"test-sentence-{index}",
+                    "description": item.projection.expected_test,
+                    "intent_refs": [f"feature-obligation-sentence-{index}"],
+                    "expected_outcome": item.projection.acceptance_criterion,
+                    "test_selection": _select_matching_test_inventory(
+                        item.projection.expected_test,
+                        state.get("provider_inventory", ()),
+                    ),
+                }
+                for index, item in enumerate(design.obligations, start=1)
+            ]
+            required_test_cases = _compile_required_test_case_edits(
+                semantic_cases,
+                tuple(state.get("provider_inventory", ())),
+            )
             return {
                 "path": str(path),
                 "fingerprint": content_fingerprint(design.to_data()),
-                "obligations": [item.to_data() for item in design.obligations],
-                "required_test_cases": [
-                    item.to_data() for item in design.test_contracts
-                ],
+                "obligations": obligations,
+                "required_test_cases": required_test_cases,
             }
 
         def apply_sentence_design_trace() -> Any:
@@ -523,6 +552,7 @@ def _execute_procedrr_flow(
             "aggregate_category_edits": aggregate_category_edits,
             "decompose_feature_description": decompose_feature_description,
             "compile_instruction_ledger": compile_instruction_ledger_operation,
+            "merge_semantic_design": merge_semantic_design_operation,
             "compile_canonical_feature_design": (
                 compile_canonical_feature_design_operation
             ),
@@ -554,7 +584,10 @@ def _execute_procedrr_flow(
             state["plan_path"] = _write_structrr_plan(
                 worktree,
                 plan_config,
-                interview_input=parameters.get("interview_input"),
+                interview_input=parameters.get(
+                    "feature_design", parameters.get("interview_input")
+                ),
+                inventory=tuple(state.get("provider_inventory", ())),
             )
             _commit(runner, worktree, "Record Structrr feature diff")
             return {"path": str(state["plan_path"])}
@@ -3306,12 +3339,21 @@ def _write_structrr_plan(
     config: FeatureEndpointConfig,
     *,
     interview_input: Any,
+    inventory: Sequence[Any] = (),
 ) -> Path:
     slug = slugify_workflow_id(config.work_item_name)
     proposal = worktree / "docs" / "proposals" / slug
     proposal.mkdir(parents=True, exist_ok=True)
     path = proposal / "structrr-diff.yaml"
     interview = dict(interview_input) if isinstance(interview_input, Mapping) else {}
+    structured_obligations = interview.get("obligations")
+    if isinstance(structured_obligations, list):
+        return _write_structrr_plan_from_obligations(
+            path,
+            config,
+            structured_obligations,
+            inventory,
+        )
     sections = {
         key: _interview_edits(interview.get(f"{key}_edits"))
         for key in (
@@ -3380,6 +3422,119 @@ def _write_structrr_plan(
         "acceptance_criteria": acceptance_criteria,
         "required_test_cases": sections["required_test_cases"],
         "proposed_prs": sections["proposed_prs"],
+    }
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    parse_change_log(path.read_text(encoding="utf-8"))
+    return path
+
+
+def _write_structrr_plan_from_obligations(
+    path: Path,
+    config: FeatureEndpointConfig,
+    obligations: list[Any],
+    inventory: Sequence[Any],
+) -> Path:
+    """Render the Structrr diff directly from canonical feature obligations."""
+    sections: dict[str, list[dict[str, Any]]] = {
+        "features": [],
+        "invariants": [],
+        "guidance": [],
+        "acceptance_criteria": [],
+        "expected_tests": [],
+    }
+    for item in obligations:
+        if not isinstance(item, Mapping):
+            raise PowdrrExecutionError("structured feature obligation is malformed")
+        obligation_id = item.get("id")
+        design = item.get("design")
+        if not isinstance(obligation_id, str) or not obligation_id.strip():
+            raise PowdrrExecutionError("structured feature obligation has no id")
+        if not isinstance(design, Mapping):
+            raise PowdrrExecutionError(
+                f"structured feature obligation {obligation_id!r} has no design"
+            )
+        kind = design.get("kind")
+        description = design.get("description")
+        acceptance = design.get("acceptance_criterion")
+        expected_test = design.get("expected_test")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (kind, description, acceptance, expected_test)
+        ):
+            raise PowdrrExecutionError(
+                f"structured feature obligation {obligation_id!r} is incomplete"
+            )
+        kind_text = str(kind)
+        description_text = str(description).strip()
+        acceptance_text = str(acceptance).strip()
+        expected_test_text = str(expected_test).strip()
+        section = (
+            "invariants"
+            if kind_text == "invariant"
+            else "guidance"
+            if kind_text in {"guidance", "non_goal"}
+            else "features"
+        )
+        sections[section].append(
+            {
+                "id": f"design-{obligation_id}",
+                "description": description_text,
+                "action": "added",
+                "intent_effect": (
+                    "records the compiler-owned design consequence of one "
+                    "instruction obligation"
+                ),
+            }
+        )
+        sections["acceptance_criteria"].append(
+            {
+                "id": f"acceptance-{obligation_id}",
+                "description": acceptance_text,
+                "intent_effect": "defines proof of one instruction obligation",
+            }
+        )
+        sections["expected_tests"].append(
+            {
+                "id": f"test-{obligation_id}",
+                "description": expected_test_text,
+                "intent_effect": "defines evidence for one instruction obligation",
+            }
+        )
+    if not sections["acceptance_criteria"]:
+        raise PowdrrExecutionError("structured feature design has no obligations")
+    semantic_cases = [
+        {
+            "id": f"test-{item['id']}",
+            "description": item["design"]["expected_test"],
+            "intent_refs": [f"feature-obligation-{item['id']}"],
+            "expected_outcome": item["design"]["acceptance_criterion"],
+            "test_selection": _select_matching_test_inventory(
+                item["design"]["expected_test"], inventory
+            ),
+        }
+        for item in obligations
+    ]
+    document = {
+        "schema": "https://powdrr.io/schema/changelog-v2",
+        "change_id": slugify_workflow_id(config.work_item_name),
+        "title": config.work_item_name,
+        "intent": {
+            "problem": "The requested product behavior is not yet available.",
+            "goal": config.feature_description,
+        },
+        "files": [],
+        "features": sections["features"],
+        "invariants": sections["invariants"],
+        "guidance": sections["guidance"],
+        "acceptance_criteria": sections["acceptance_criteria"],
+        "expected_tests": sections["expected_tests"],
+        "required_test_cases": _compile_required_test_case_edits(
+            semantic_cases, inventory
+        ),
+        "entities": [],
+        "entity_relationships": [],
+        "human-decisions": [],
+        "proposed_prs": [],
     }
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     parse_change_log(path.read_text(encoding="utf-8"))
@@ -3624,6 +3779,32 @@ def _compile_required_test_case_edits(
         )
         compiled.append(item)
     return compiled
+
+
+def _select_matching_test_inventory(
+    expected_test: str, inventory: Sequence[Any]
+) -> str:
+    """Select an existing test only when its selector is named by the prose."""
+    words = {
+        token
+        for token in re.findall(r"[a-z0-9]+", expected_test.lower().replace("_", " "))
+        if len(token) > 2
+    }
+    best: tuple[int, str] | None = None
+    for item in inventory:
+        if not isinstance(item, Mapping) or item.get("provider") != "pytest":
+            continue
+        inventory_id = item.get("inventory_id") or _verification_inventory_id(item)
+        selector = item.get("selector")
+        if not isinstance(inventory_id, str) or not isinstance(selector, str):
+            continue
+        selector_words = set(
+            re.findall(r"[a-z0-9]+", selector.lower().replace("_", " "))
+        )
+        score = len(words & selector_words)
+        if score and (best is None or score > best[0]):
+            best = (score, inventory_id)
+    return best[1] if best is not None else "new"
 
 
 def _verification_inventory_id(item: Mapping[str, Any]) -> str:

@@ -2702,6 +2702,8 @@ def _output_schema_declaration_error(schema: Mapping[str, Any]) -> str | None:
         "minItems",
         "minLength",
         "enum",
+        "x-powdrr-type",
+        "x-powdrr-schema",
     }
     unknown = sorted(str(key) for key in set(schema) - allowed)
     if unknown:
@@ -2717,6 +2719,15 @@ def _output_schema_declaration_error(schema: Mapping[str, Any]) -> str | None:
         "null",
     }:
         return "Skill step output schema must declare a supported type."
+    if schema.get("x-powdrr-type") == "SchematizedPath":
+        if schema_type != "string":
+            return "SchematizedPath schemas must contain a string path."
+        path_schema = schema.get("x-powdrr-schema")
+        if not isinstance(path_schema, Mapping):
+            return "SchematizedPath schemas must declare x-powdrr-schema."
+        nested_error = _output_schema_declaration_error(path_schema)
+        if nested_error is not None:
+            return "Invalid SchematizedPath file schema: " + nested_error
     properties = schema.get("properties")
     if properties is not None:
         if schema_type != "object" or not isinstance(properties, Mapping):

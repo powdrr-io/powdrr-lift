@@ -1,172 +1,172 @@
 version: 1
 name: design-interview
+description: >-
+  Compile the feature request into one deterministic instruction ledger, then
+  ask one bounded semantic question per instruction clause. The compiler owns
+  clause identity, obligations, acceptance criteria, and test contracts.
 inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
 outputs:
-  interview_input: {type: object}
-  proposal: {type: object, required: [path]}
-  proposal_evaluation: {type: object, required: [returncode]}
-description: >-
-  Gather the repository's design-interview categories one at a time, ask one
-  typed question per category, persist the resulting edits, generate the
-  specification-v1 proposal, and repair evaluator findings with bounded edits.
-limits: {llm_activations: 1024, tool_calls: 2048, max_epochs: 3}
-decision_contract:
-  transport_action_const: decision_result
-  output_schema:
+  feature_design:
     type: object
-    required: [action]
+    required: [path, fingerprint, obligations, required_test_cases]
     additionalProperties: false
     properties:
-      action: {type: string, enum: [add, delete, no_change]}
-      item: {type: object}
-
+      path:
+        type: string
+        x-powdrr-type: SchematizedPath
+        minLength: 1
+        x-powdrr-schema:
+          type: object
+          required: [schema_version, fingerprint, obligations, required_test_cases]
+          additionalProperties: false
+      fingerprint: {type: string, minLength: 1}
+      obligations:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          required: [id, description, design]
+          additionalProperties: false
+          properties:
+            id: {type: string, minLength: 1}
+            description: {type: string, minLength: 1}
+            design: {type: object}
+      required_test_cases:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          required: [id, description, intent_refs, provider, profile, selector, expectation, applicability, status]
+          additionalProperties: false
+          properties:
+            id: {type: string, minLength: 1}
+            description: {type: string, minLength: 1}
+            intent_refs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+            provider: {type: string, minLength: 1}
+            profile: {type: string, minLength: 1}
+            selector: {type: string, minLength: 1}
+            expectation: {type: string, enum: [pass]}
+            applicability: {type: object}
+            status: {type: string, enum: [active]}
 steps:
   - operation:
       tool: internal
-      command: [powdrr-lift, design-interview-input, --work-item-name, "${work_item_name}"]
-      bind: interview_input_template
-
-  # Each category has its own exact gather_context call and output binding.
+      command: [compile_instruction_ledger]
+      parameters:
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
+      returns:
+        type: object
+        required: [path, fingerprint, clauses]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          clauses: {type: array, minItems: 1}
+      bind: instruction_ledger
   - for_each:
-      snapshot:
-        name: interview_categories
-        max_items: 20
-        values:
-          [requirements, approach, entities, entity-relationships, invariants,
-           guidance, features, human-decisions, intent, intents,
-           acceptance_criteria, expected_tests, required_test_cases,
-           expected_outcomes, non_goals, risks, decisions, proposed_prs,
-           modules, tools]
-      item_binding: category
-      collect:
-        binding: category_edits_by_category
-        key: category
-      body:
-        - operation:
-            tool: gather_context
-            parameters: {types: ["${category}"]}
-            bind: category_context
-        - judge:
-            kind: construct_one
-            question: "What proposed edits follow from this exact gathered category context?"
-            subject: category_context
-            prompt_system: >-
-              You are preparing one design-interview proposal edit. Do not edit
-              files and return only the declared JSON output.
-            instructions:
-              - Read the exact gathered context; do not invent repository facts.
-              - Preserve existing items unless an explicit deletion is required.
-              - Do not generate identifiers, references, selectors, hashes, or fingerprints; Powdrr assigns those deterministically.
-              - When category is required_test_cases, return a semantic test obligation with description, intent_refs, expected_outcome, and test_selection; Powdrr assigns its id.
-              - For test_selection, choose exactly one discovered inventory id from category_context.verification_inventory, or return new when no existing test proves the obligation. Never invent a provider, profile, or selector.
-              - Return exactly one action and, for add or delete, one item.
-            context: [work_item_name, feature_description, category_context]
-            output:
-              name: category_edits
-              schema:
-                type: object
-                required: [action]
-                additionalProperties: false
-                properties:
-                  action: {type: string, enum: [add, delete, no_change]}
-                  item: {type: object}
-            validation: {kind: json_schema}
-
-  - operation:
-      tool: internal
-      command: [aggregate_category_edits]
-      parameters:
-        decisions: {type: reference, value: category_edits_by_category}
-      bind: category_edits
-  - operation:
-      tool: edit
-      parameters:
-        file_path: docs/proposals/${work_item_name}/design-interview-input.json
-        document:
-          work_item_name: "${work_item_name}"
-          feature_description: "${feature_description}"
-          requirements_edits: "${category_edits.requirements}"
-          approach_edits: "${category_edits.approach}"
-          entities_edits: "${category_edits.entities}"
-          entity_relationships_edits: "${category_edits.entity-relationships}"
-          invariants_edits: "${category_edits.invariants}"
-          guidance_edits: "${category_edits.guidance}"
-          features_edits: "${category_edits.features}"
-          human_decisions_edits: "${category_edits.human-decisions}"
-          intent_edits: "${category_edits.intent}"
-          intents_edits: "${category_edits.intents}"
-          acceptance_criteria_edits: "${category_edits.acceptance_criteria}"
-          expected_tests_edits: "${category_edits.expected_tests}"
-          required_test_cases_edits: "${category_edits.required_test_cases}"
-          expected_outcomes_edits: "${category_edits.expected_outcomes}"
-          non_goals_edits: "${category_edits.non_goals}"
-          risks_edits: "${category_edits.risks}"
-          decisions_edits: "${category_edits.decisions}"
-          proposed_prs_edits: "${category_edits.proposed_prs}"
-          modules_edits: "${category_edits.modules}"
-          tools_edits: "${category_edits.tools}"
-      bind: interview_input
-  - operation:
-      tool: internal
-      command:
-        [powdrr-lift, feature-pr-specification, --work-item-name, "${work_item_name}",
-         --interview-input, "docs/proposals/${work_item_name}/design-interview-input.json"]
-      bind: proposal
-  - operation:
-      tool: internal
-      command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
-      bind: proposal_evaluation
-  - operation:
-      tool: internal
-      command: [extract_proposal_issues, proposal_issues]
-      parameters:
-        evaluation: {type: reference, value: proposal_evaluation}
-      bind: proposal_issues
-  - id: repair-proposal
-    worklist:
-      snapshot: {name: proposal_issues, max_items: 64}
-      item_binding: proposal_issue
-      max_admissions: 64
-      max_epochs: 3
+      snapshot: {name: instruction_ledger.clauses, max_items: 128}
+      item_binding: instruction_clause
+      collect: {binding: semantic_designs, mode: list, value: semantic_design}
       body:
         - judge:
-            kind: construct_one
-            question: What one YAML edit repairs this exact evaluator issue?
-            subject: proposal_issue
-            prompt_system: >-
-              You are repairing one validated proposal. Return only one YAML
-              edit and do not change scope.
+            kind: classify_one
+            provider: planning
+            question: What kind of obligation does this instruction clause express?
+            subject: instruction_clause.text
+            prompt_system: Return only the declared JSON object.
             instructions:
-              - Use only the exact evaluator issue as evidence.
-              - Return one edit for the cited issue; do not repair unrelated issues.
-            context: [work_item_name, proposal_issue]
+              - Classify only this clause as entity, feature, interface, invariant, guidance, or non_goal.
+              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+            context: [feature_description, instruction_clause]
             output:
-              name: repair_edit
+              name: semantic_kind
               schema:
                 type: object
-                required: [path, edits]
+                required: [kind]
                 additionalProperties: false
                 properties:
-                  path: {type: string, minLength: 1}
-                  edits: {type: array, minItems: 1}
+                  kind:
+                    type: string
+                    enum: [entity, feature, interface, invariant, guidance, non_goal]
+            validation: {kind: json_schema}
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: What concrete obligation and acceptance criterion follow from this classified instruction clause?
+            subject: instruction_clause.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Use the supplied kind classification and translate only this clause into one concrete semantic obligation.
+              - Preserve the clause's requested behavior, constraints, and prohibitions.
+              - For non_goal, state what is explicitly outside scope and make the acceptance criterion prove it is not required.
+              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+            prompt_rules:
+              - when: {binding: semantic_kind.kind, equals: non_goal}
+                instructions:
+                  - The description must be an explicit non-goal, not an implementation task.
+            context: [feature_description, instruction_clause, semantic_kind]
+            output:
+              name: semantic_obligation
+              schema:
+                type: object
+                required: [description, acceptance_criterion]
+                additionalProperties: false
+                properties:
+                  description: {type: string, minLength: 1}
+                  acceptance_criterion: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: What one test contract proves this classified obligation and acceptance criterion?
+            subject: instruction_clause.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - State one concrete expected test that proves the supplied obligation and acceptance criterion.
+              - For non_goal, state the test or guard that proves the excluded behavior is not introduced.
+              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+            context: [feature_description, instruction_clause, semantic_kind, semantic_obligation]
+            output:
+              name: semantic_test_contract
+              schema:
+                type: object
+                required: [expected_test]
+                additionalProperties: false
+                properties:
+                  expected_test: {type: string, minLength: 1}
             validation: {kind: json_schema}
         - operation:
-            tool: yaml_edit
+            tool: internal
+            command: [merge_semantic_design]
             parameters:
-              file_path: docs/proposals/${work_item_name}/feature-pr-specification.yaml
-              edit: repair_edit
+              kind: {type: reference, value: semantic_kind.kind}
+              description: {type: reference, value: semantic_obligation.description}
+              acceptance_criterion: {type: reference, value: semantic_obligation.acceptance_criterion}
+              expected_test: {type: reference, value: semantic_test_contract.expected_test}
+            returns:
+              type: object
+              required: [kind, description, acceptance_criterion, expected_test]
+              properties:
+                kind: {type: string}
+                description: {type: string}
+                acceptance_criterion: {type: string}
+                expected_test: {type: string}
+            bind: semantic_design
   - operation:
       tool: internal
-      command: [powdrr-lift, evaluate, "docs/proposals/${work_item_name}/feature-pr-specification.yaml"]
-      bind: final_proposal_evaluation
-  - gate:
-      subject: final_proposal_evaluation.returncode
-      equals: 0
-      on_failure:
-        retry:
-          target: repair-proposal
-          max_attempts: 3
-          on_exhausted: failed
+      command: [compile_canonical_feature_design]
+      parameters:
+        work_item_name: {type: reference, value: work_item_name}
+        design_decisions: {type: reference, value: semantic_designs}
+      returns:
+        type: object
+        required: [path, fingerprint, obligations, required_test_cases]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          obligations: {type: array, minItems: 1}
+          required_test_cases: {type: array, minItems: 1}
+      bind: feature_design
   - terminal: succeeded

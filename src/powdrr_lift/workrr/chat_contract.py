@@ -700,6 +700,16 @@ def _json_schema_for_declared_type(type_name: str) -> dict[str, Any]:
     normalized = type_name.strip().casefold()
     if normalized in {"string", "array", "object", "integer", "number", "boolean"}:
         return {"type": normalized}
+    if normalized == "schematized_path":
+        return {
+            "type": "object",
+            "required": ["path", "schema"],
+            "additionalProperties": False,
+            "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "schema": {"type": "object"},
+            },
+        }
     return {}
 
 

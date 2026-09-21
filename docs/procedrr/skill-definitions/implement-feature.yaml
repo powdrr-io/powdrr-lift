@@ -25,9 +25,8 @@ steps:
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
       outputs:
-        interview_input: interview_input
-        proposal: proposal
-        proposal_evaluation: proposal_evaluation
+        feature_design: feature_design
+        feature_obligations: feature_design
   - operation:
       tool: internal
       command: [plan_structrr_diff]
@@ -35,218 +34,12 @@ steps:
         baseline: {type: reference, value: baseline.path}
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
-        interview_input: {type: reference, value: interview_input}
-        proposal: {type: reference, value: proposal}
-        proposal_evaluation: {type: reference, value: proposal_evaluation}
+        feature_design: {type: reference, value: feature_design}
       returns:
         type: object
         required: [path]
         properties: {path: {type: string, minLength: 1}}
       bind: plan
-  - operation:
-      tool: internal
-      command: [decompose_feature_description]
-      parameters:
-        feature_description: {type: reference, value: feature_description}
-      returns: {type: array, minItems: 1}
-      bind: feature_sentences
-  - for_each:
-      snapshot: {name: feature_sentences}
-      item_binding: feature_sentence
-      collect: {binding: design_decisions, mode: list, value: design_decision}
-      body:
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: What one concrete design consequence follows from this sentence?
-            subject: feature_sentence
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Translate only this sentence into one concrete, testable design consequence.
-              - Choose the narrowest applicable kind; do not summarize the entire feature.
-              - Name the affected API, lifecycle rule, invariant, integration, or user-visible behavior when present.
-              - Always provide an acceptance criterion and an expected test, even for guidance or non-goal sentences.
-            context: [feature_sentence, plan]
-            output:
-              name: design_decision
-              schema:
-                type: object
-                required: [kind, description, acceptance_criterion, expected_test]
-                additionalProperties: false
-                properties:
-                  kind:
-                    type: string
-                    enum: [entity, feature, interface, invariant, guidance, acceptance_criterion, expected_test, intent, non_goal]
-                  description: {type: string, minLength: 1}
-                  acceptance_criterion: {type: string, minLength: 1}
-                  expected_test: {type: string, minLength: 1}
-            validation: {kind: json_schema}
-  - for_each:
-      snapshot: {name: design_decisions}
-      item_binding: design_decision
-      collect: {binding: repaired_design_decisions, mode: list, value: repaired_design_decision}
-      body:
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: Repair this design consequence so it preserves the instruction's intent.
-            subject: design_decision
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Read both the original sentence and the proposed consequence inside design_decision.
-              - Preserve the sentence's direction and requested behavior exactly.
-              - Treat statements that something is missing, lacks support, or forces manual work as problems to solve; do not turn them into non-goals or prohibitions.
-              - Only treat explicit words such as must not, do not, avoid, or not supported as prohibitions.
-              - Keep concrete API names, lifecycle rules, error behavior, integrations, and testable details.
-              - Return the original consequence unchanged when it already preserves the sentence's intent.
-              - Always provide one acceptance criterion and one expected test.
-            context: [design_decision, plan]
-            output:
-              name: repaired_design_decision
-              schema:
-                type: object
-                required: [kind, description, acceptance_criterion, expected_test]
-                additionalProperties: false
-                properties:
-                  kind:
-                    type: string
-                    enum: [entity, feature, interface, invariant, guidance, acceptance_criterion, expected_test, intent, non_goal]
-                  description: {type: string, minLength: 1}
-                  acceptance_criterion: {type: string, minLength: 1}
-                  expected_test: {type: string, minLength: 1}
-            validation: {kind: json_schema}
-  - operation:
-      tool: internal
-      command: [apply_sentence_design_trace]
-      parameters:
-        plan: {type: reference, value: plan.path}
-        sentences: {type: reference, value: feature_sentences}
-        design_decisions: {type: reference, value: repaired_design_decisions}
-      returns:
-        type: object
-        required: [path, updated]
-        properties:
-          path: {type: string, minLength: 1}
-          updated: {type: integer, minimum: 0}
-      bind: design_update
-  - for_each:
-      snapshot: {name: feature_sentences}
-      item_binding: feature_sentence
-      collect: {binding: requirement_decisions, mode: list, value: requirement_decision}
-      body:
-        - judge:
-            kind: classify_one
-            provider: planning
-            question: Does this sentence state a feature requirement that must be represented explicitly in the plan?
-            subject: feature_sentence
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Judge only this sentence; do not answer for any other sentence.
-              - Classify explanatory background, motivation, and constraints that do not require implementation as not_required.
-              - Classify requested behavior, data, interfaces, compatibility, limits, and validation expectations as required.
-            prompt_rules:
-              - when: {binding: feature_sentence, contains: test}
-                instructions:
-                  - When this sentence explicitly mentions a test, treat that testing expectation as a required feature obligation unless the sentence explicitly prohibits it.
-            context: [feature_sentence, plan]
-            output:
-              name: requirement_decision
-              schema:
-                type: object
-                required: [required]
-                additionalProperties: false
-                properties:
-                  required: {type: boolean}
-            validation: {kind: json_schema}
-  - for_each:
-      snapshot: {name: feature_sentences}
-      item_binding: feature_sentence
-      collect: {binding: reflection_decisions, mode: list, value: reflection_decision}
-      body:
-        - judge:
-            kind: classify_one
-            provider: planning
-            question: Is this sentence's requirement explicitly reflected in the generated plan?
-            subject: feature_sentence
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Judge only this sentence against the generated plan.
-              - Answer reflected when the plan contains a concrete acceptance criterion, feature, invariant, guidance item, or proposed operation for the sentence.
-              - Answer not reflected when the sentence is absent, vague, or only repeated as the plan title or general feature description.
-              - If the sentence is not a requirement, answer reflected because no implementation obligation is needed.
-            context: [feature_sentence, plan]
-            output:
-              name: reflection_decision
-              schema:
-                type: object
-                required: [reflected]
-                additionalProperties: false
-                properties:
-                  reflected: {type: boolean}
-            validation: {kind: json_schema}
-  - operation:
-      tool: internal
-      command: [update_plan_from_sentence_trace]
-      parameters:
-        plan: {type: reference, value: plan.path}
-        sentences: {type: reference, value: feature_sentences}
-        requirement_decisions: {type: reference, value: requirement_decisions}
-        reflection_decisions: {type: reference, value: reflection_decisions}
-      returns:
-        type: object
-        required: [path, updated]
-        properties:
-          path: {type: string, minLength: 1}
-          updated: {type: integer, minimum: 0}
-      bind: plan_update
-  - operation:
-      tool: internal
-      command: [compile_feature_obligations]
-      parameters:
-        feature_description: {type: reference, value: feature_description}
-        plan: {type: reference, value: plan.path}
-        sentences: {type: reference, value: feature_sentences}
-        design_decisions: {type: reference, value: repaired_design_decisions}
-        requirement_decisions: {type: reference, value: requirement_decisions}
-        reflection_decisions: {type: reference, value: reflection_decisions}
-      returns:
-        type: object
-        required: [path, obligations]
-        properties:
-          path: {type: string, minLength: 1}
-          obligations: {type: array, minItems: 1}
-      bind: feature_obligations
-  - operation:
-      tool: internal
-      command: [compile_instruction_ledger]
-      parameters:
-        work_item_name: {type: reference, value: work_item_name}
-        feature_description: {type: reference, value: feature_description}
-      returns:
-        type: object
-        required: [path, fingerprint, clauses]
-        properties:
-          path: {type: string, minLength: 1}
-          fingerprint: {type: string, minLength: 1}
-          clauses: {type: array, minItems: 1}
-      bind: instruction_ledger
-  - operation:
-      tool: internal
-      command: [compile_canonical_feature_design]
-      parameters:
-        work_item_name: {type: reference, value: work_item_name}
-        instruction_ledger: {type: reference, value: instruction_ledger}
-        obligations: {type: reference, value: feature_obligations}
-        design_decisions: {type: reference, value: repaired_design_decisions}
-      returns:
-        type: object
-        required: [path, fingerprint, obligations, required_test_cases]
-        properties:
-          path: {type: string, minLength: 1}
-          fingerprint: {type: string, minLength: 1}
-          obligations: {type: array, minItems: 1}
-          required_test_cases: {type: array, minItems: 1}
-      bind: canonical_feature_design
   - operation:
       tool: internal
       command: [materialize_feature_intents]
@@ -328,7 +121,7 @@ steps:
               - Return only the semantic outcome and explanation; Powdrr binds all decision identity and evidence fields.
               - Use pass only when the evidence proves the predicate; otherwise use fail, unknown, or clarification.
               - An unknown or clarification outcome blocks proposal acceptance.
-            context: [proposal_decision, feature_description, baseline, plan, proposal]
+            context: [proposal_decision, feature_description, baseline, plan, feature_design]
             output:
               name: proposal_decision_result
               schema:

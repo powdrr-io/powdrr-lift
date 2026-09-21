@@ -665,6 +665,16 @@ def _execute_procedrr_flow(
                 reconciliation=state.get("verification_reconciliation"),
                 runner=runner,
             )
+            required_tests = state.get("required_test_case_validation")
+            if (
+                isinstance(required_tests, Mapping)
+                and required_tests.get("passed") is not True
+            ):
+                review = {
+                    **review,
+                    "passed": False,
+                    "required_test_case_validation": dict(required_tests),
+                }
             state["review"] = review
             return review
         if name == "prepare_implementation_review":
@@ -711,6 +721,14 @@ def _execute_procedrr_flow(
                     {"kind": "verification", "issue": issue}
                     for issue in reconciliation.get("issues", [])
                     if isinstance(issue, Mapping)
+                )
+            required_tests = parameters.get("required_test_validation")
+            if (
+                isinstance(required_tests, Mapping)
+                and required_tests.get("passed") is not True
+            ):
+                issues.append(
+                    {"kind": "required_test_case", "issue": dict(required_tests)}
                 )
             if (
                 isinstance(review_value, Mapping)
@@ -1855,7 +1873,9 @@ def _validate_required_test_cases(
                 f"{case['provider']}/{case['profile']}/"
                 f"{name_hint or case['selector']}"
             )
-    return {"passed": not failures, "failures": failures, "cases": checked}
+    result = {"passed": not failures, "failures": failures, "cases": checked}
+    state["required_test_case_validation"] = result
+    return result
 
 
 def _reconcile_verification_evidence(

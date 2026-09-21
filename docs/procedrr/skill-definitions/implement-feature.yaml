@@ -212,10 +212,6 @@ steps:
           failures: {type: array}
           cases: {type: array}
       bind: required_test_case_validation
-  - gate:
-      subject: required_test_case_validation.passed
-      equals: true
-      on_failure: {terminal: failed}
   - operation:
       tool: internal
       command: [run_verification_evidence]
@@ -462,6 +458,7 @@ recoveries:
                   validation: {type: reference, value: validation}
                   review: {type: reference, value: review}
                   reconciliation: {type: reference, value: verification_reconciliation}
+                  required_test_validation: {type: reference, value: required_test_case_validation}
                 returns: {type: array}
                 bind: repair_issues
             - for_each:
@@ -509,10 +506,6 @@ recoveries:
                   plan: {type: reference, value: plan.path}
                 returns: {type: object}
                 bind: required_test_case_validation
-            - gate:
-                subject: required_test_case_validation.passed
-                equals: true
-                on_failure: {terminal: failed}
             - operation:
                 tool: internal
                 command: [run_verification_evidence]
@@ -599,10 +592,6 @@ recoveries:
             plan: {type: reference, value: plan.path}
           returns: {type: object}
           bind: required_test_case_validation
-      - gate:
-          subject: required_test_case_validation.passed
-          equals: true
-          on_failure: {terminal: failed}
       - operation:
           tool: internal
           command: [run_verification_evidence]
@@ -681,10 +670,6 @@ recoveries:
             plan: {type: reference, value: plan.path}
           returns: {type: object}
           bind: required_test_case_validation
-      - gate:
-          subject: required_test_case_validation.passed
-          equals: true
-          on_failure: {terminal: failed}
       - operation:
           tool: internal
           command: [run_verification_evidence]
@@ -761,10 +746,6 @@ recoveries:
             plan: {type: reference, value: plan.path}
           returns: {type: object}
           bind: required_test_case_validation
-      - gate:
-          subject: required_test_case_validation.passed
-          equals: true
-          on_failure: {terminal: failed}
       - operation:
           tool: internal
           command: [run_verification_evidence]

@@ -22,6 +22,11 @@ class FeatureObligationError(ValueError):
     """Raised when a canonical design projection cannot be compiled."""
 
 
+ACTIONABLE_KINDS = frozenset(
+    {"entity", "feature", "interface", "invariant", "guidance", "non_goal"}
+)
+
+
 @dataclass(frozen=True, slots=True)
 class DesignProjection:
     clause_id: str
@@ -83,6 +88,7 @@ class FeatureObligation:
 class RequiredTestContract:
     obligation_id: str
     work_item_slug: str
+    description: str = ""
 
     @property
     def test_id(self) -> str:
@@ -99,6 +105,18 @@ class RequiredTestContract:
             f"::test_instruction_{self.ordinal:03d}"
         )
 
+    @property
+    def name_hint(self) -> str:
+        slug = re.sub(
+            r"[^a-z0-9]+",
+            "_",
+            (
+                self.description
+                or f"{self.work_item_slug}_instruction_{self.ordinal:03d}"
+            ).casefold(),
+        ).strip("_")
+        return f"test_{slug[:100].rstrip('_')}"
+
     def to_data(self) -> dict[str, Any]:
         return {
             "id": self.test_id,
@@ -109,6 +127,7 @@ class RequiredTestContract:
             "profile": "pytest",
             "selector": self.selector,
             "selector_status": "planned",
+            "name_hint": self.name_hint,
             "description": f"Verify {self.obligation_id}.",
             "expectation": "pass",
             "applicability": {"mode": "required"},
@@ -231,21 +250,51 @@ def compile_feature_design(
         raise FeatureObligationError(
             "required instruction clause is missing a design projection"
         )
-    obligations = [
-        FeatureObligation(clause_id, semantic_projections[clause_id])
-        for clause_id in selected_clause_ids
-    ]
+    obligations = []
+    for clause_id in selected_clause_ids:
+        projection = semantic_projections[clause_id]
+        if projection.kind not in ACTIONABLE_KINDS:
+            continue
+        if projection.kind == "non_goal":
+            clause = next(
+                item for item in ledger.clauses if item.clause_id == clause_id
+            )
+            if not _is_explicit_product_prohibition(clause.text):
+                raise FeatureObligationError(
+                    f"non_goal classification for {clause_id} is not supported by "
+                    "an explicit product prohibition"
+                )
+        obligations.append(FeatureObligation(clause_id, projection))
+    if not obligations:
+        raise FeatureObligationError(
+            "instruction clauses contain no actionable feature obligations"
+        )
     result = CanonicalFeatureDesign(
         work_item_name=work_item_name,
         ledger_fingerprint=ledger.fingerprint,
         projections=tuple(projections),
         obligations=tuple(obligations),
         test_contracts=tuple(
-            RequiredTestContract(item.obligation_id, slug) for item in obligations
+            RequiredTestContract(item.obligation_id, slug, item.projection.description)
+            for item in obligations
         ),
     )
     result.validate(ledger)
     return result
+
+
+def _is_explicit_product_prohibition(text: str) -> bool:
+    lowered = text.casefold()
+    markers = (
+        "do not ",
+        "don't ",
+        "must not ",
+        "should not ",
+        "out of scope",
+        "not required",
+        "exclude ",
+    )
+    return any(marker in lowered for marker in markers)
 
 
 def _required_text(raw: Mapping[str, Any], key: str) -> str:

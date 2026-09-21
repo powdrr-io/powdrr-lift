@@ -302,7 +302,12 @@ def feature_command_catalog(
         "collect_repair_issues": CommandSpec(
             name="collect_repair_issues",
             input_schema=object_schema(
-                {"validation": {}, "review": {}, "reconciliation": {}},
+                {
+                    "validation": {},
+                    "review": {},
+                    "reconciliation": {},
+                    "required_test_validation": {},
+                },
                 required=("validation", "review", "reconciliation"),
                 additional_properties=False,
             ),
@@ -572,6 +577,7 @@ class FeatureCommandRuntime:
             required_test_cases = feature_endpoint._compile_required_test_case_edits(
                 semantic_cases,
                 tuple(state.get("provider_inventory", ())),
+                include_existing_name_hint=True,
             )
             return {
                 "path": str(path),
@@ -762,6 +768,16 @@ class FeatureCommandRuntime:
                 reconciliation=state.get("verification_reconciliation"),
                 runner=runner,
             )
+            required_tests = state.get("required_test_case_validation")
+            if (
+                isinstance(required_tests, Mapping)
+                and required_tests.get("passed") is not True
+            ):
+                review = {
+                    **review,
+                    "passed": False,
+                    "required_test_case_validation": dict(required_tests),
+                }
             state["review"] = review
             return review
         if name == "prepare_implementation_review":

@@ -40,8 +40,10 @@ from powdrr_lift.workrr.feature_endpoint import (
     _apply_sentence_design_trace,
     _compile_feature_obligations,
     _create_pr_changelog,
+    _derive_feature_test_contracts,
     _ensure_current_baseline,
     _evaluate_proposal_command,
+    _feature_endpoint_result,
     _finalize_proposal_review,
     _load_implementation_plan,
     _materialize_feature_intents,
@@ -227,6 +229,17 @@ def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
     assert metadata["task_id"] == "failure-artifact"
     assert failure["schema_version"] == "powdrr-run-failure-v1"
     assert failure["error_type"] == "PowdrrExecutionError"
+
+
+def test_feature_endpoint_result_preserves_early_failure_without_checkpoints(
+    tmp_path: Path,
+) -> None:
+    result = _feature_endpoint_result({}, "main", tmp_path, "review_failed")
+
+    assert result.status == "review_failed"
+    assert result.baseline_path == tmp_path
+    assert result.plan_path == tmp_path
+    assert result.review == {"passed": False}
 
 
 def test_run_feature_in_place_reuses_core_without_git_publication(
@@ -556,6 +569,48 @@ def test_structured_obligation_contracts_cover_generated_design_intents(
         }
 
 
+def test_feature_test_contracts_do_not_retain_unrelated_inventory_selectors() -> None:
+    contracts = _derive_feature_test_contracts(
+        {
+            "required_test_cases": [
+                {
+                    "id": "unrelated-existing",
+                    "description": "An unrelated existing test.",
+                    "intent_refs": ["feature-obligation-sentence-1"],
+                    "provider": "pytest",
+                    "profile": "pytest",
+                    "selector": "tests/test_unrelated.py::test_existing",
+                    "expectation": "pass",
+                    "status": "active",
+                }
+            ]
+        },
+        [
+            {
+                "id": "sentence-1",
+                "description": "Implement the behavior.",
+                "design": {
+                    "expected_test": "Verify the behavior.",
+                    "acceptance_criterion": "The behavior is observable.",
+                },
+            }
+        ],
+        inventory=(
+            {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_unrelated.py::test_existing",
+            },
+        ),
+    )
+
+    assert len(contracts) == 1
+    assert contracts[0]["selector"] != "tests/test_unrelated.py::test_existing"
+    assert contracts[0]["selector"].startswith(
+        "tests/test_feature_obligation_sentence_1_test"
+    )
+
+
 def test_feature_obligations_become_active_intents(tmp_path: Path) -> None:
     plan = _write_structrr_plan(
         tmp_path,
@@ -831,6 +886,7 @@ def test_required_test_obligation_generates_new_selector_deterministically() -> 
     )
 
     case = result["required_test_cases"]["added"][0]
+    assert case["name_hint"].startswith("test_state_data_is_isolated")
     assert case["selector"] == (
         "tests/test_verify_state_data_scoping.py::test_verify_state_data_scoping"
     )
@@ -1154,6 +1210,71 @@ def test_required_test_case_validation_requires_discovered_selector(
     )
     assert result["passed"] is False
     assert "was not discovered" in result["failures"][0]
+
+
+def test_required_test_case_validation_matches_new_test_name_hint_suffix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = tmp_path / "plan.yaml"
+    plan.write_text(
+        yaml.safe_dump(
+            {
+                "required_test_cases": [
+                    {
+                        "id": "state-data-test",
+                        "description": "State data is isolated.",
+                        "intent_refs": ["feature:state-data"],
+                        "provider": "pytest",
+                        "profile": "pytest",
+                        "name_hint": "test_state_data_is_isolated",
+                        "selector": "tests/test_state_data.py::test_planned",
+                        "expectation": "pass",
+                        "applicability": {"mode": "affected_closure"},
+                        "status": "active",
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    profile = type(
+        "Profile",
+        (),
+        {"name": "pytest", "command": ("python", "-m", "pytest"), "source": "test"},
+    )()
+
+    class InventoryEntry:
+        def to_data(self) -> dict[str, object]:
+            return {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selectors": [
+                    "tests/test_state_data.py::test_state_data_is_isolated_sync"
+                ],
+            }
+
+    class Registry:
+        def inventory(
+            self, root: Path, profiles: tuple[object, ...]
+        ) -> tuple[InventoryEntry, ...]:
+            del root, profiles
+            return (InventoryEntry(),)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.default_verification_provider_registry",
+        lambda: Registry(),
+    )
+    result = _validate_required_test_cases(
+        {"plan": str(plan)},
+        worktree=tmp_path,
+        state={"plan_path": plan, "validation_profiles": (profile,)},
+    )
+
+    assert result["passed"] is True
+    assert result["cases"][0]["matching_selectors"] == [
+        "tests/test_state_data.py::test_state_data_is_isolated_sync"
+    ]
 
 
 def test_required_test_case_validation_rejects_non_executable_expectation(

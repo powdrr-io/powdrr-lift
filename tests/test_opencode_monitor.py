@@ -8,10 +8,38 @@ from pathlib import Path
 from powdrr_lift.opencode_monitor import (
     OpenCodeLiveness,
     append_event,
+    classify_event,
     parse_event_line,
     replay_events,
     run_opencode,
 )
+
+
+def test_classify_event_distinguishes_model_text_and_tool_calls() -> None:
+    assert classify_event(
+        {"type": "text", "part": {"type": "text", "text": "thinking"}}
+    ) == {
+        "kind": "model_text",
+        "event_type": "text",
+        "text_chars": 8,
+    }
+    assert classify_event(
+        {
+            "type": "tool_use",
+            "part": {
+                "type": "tool",
+                "tool": "read",
+                "state": "completed",
+                "callID": "call-1",
+            },
+        }
+    ) == {
+        "kind": "tool_call",
+        "event_type": "tool_use",
+        "tool": "read",
+        "status": "completed",
+        "callID": "call-1",
+    }
 
 
 def test_parse_event_line_accepts_json_objects_only() -> None:
@@ -66,6 +94,22 @@ def test_process_exit_is_terminal_even_when_last_event_is_old() -> None:
     assert monitor.snapshot(process_returncode=7).state == "failed"
 
 
+def test_active_snapshot_does_not_claim_stale_progress_is_recent() -> None:
+    now = [100.0]
+    monitor = OpenCodeLiveness(
+        slow_after=300,
+        stalled_after=600,
+        clock=lambda: now[0],
+    )
+    monitor.observe({"type": "message.updated"}, captured_at=90)
+
+    now[0] = 200
+    snapshot = monitor.snapshot()
+
+    assert snapshot.state == "active"
+    assert "110.0s ago" in snapshot.reason
+
+
 def test_append_and_replay_event_log(tmp_path: Path) -> None:
     path = tmp_path / "events.ndjson"
     append_event(path, {"type": "server.connected"}, captured_at=12.5)
@@ -73,6 +117,7 @@ def test_append_and_replay_event_log(tmp_path: Path) -> None:
 
     records = [json.loads(line) for line in path.read_text().splitlines()]
     assert records[0]["event"]["type"] == "server.connected"
+    assert records[0]["activity"]["kind"] == "other"
     assert records[1]["captured_monotonic"] == 13.5
     assert replay_events(records).events[1].event_type == "message.updated"
 

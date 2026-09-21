@@ -640,7 +640,8 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
         for instruction in obligation_judge["instructions"]
     )
     assert [rule["when"] for rule in obligation_judge["prompt_rules"]] == [
-        {"binding": "semantic_kind.kind", "equals": "non_goal"}
+        {"binding": "semantic_kind.kind", "equals": "non_goal"},
+        {"binding": "semantic_kind.kind", "equals": "nonactionable"},
     ]
     assert (
         obligation_judge["output"]["schema"]["properties"]["description"]["maxLength"]

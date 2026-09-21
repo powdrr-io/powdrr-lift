@@ -929,6 +929,23 @@ def _derive_feature_test_contracts(
                 continue
             item = dict(raw)
             item["intent_refs"] = exact_refs
+            name_hint = item.get("name_hint")
+            selector = item.get("selector")
+            if not (
+                isinstance(name_hint, str)
+                and name_hint.strip()
+                and isinstance(selector, str)
+                and any(
+                    _selector_matches_test_name_hint(
+                        str(candidate.get("selector", "")), name_hint
+                    )
+                    for candidate in inventory
+                    if isinstance(candidate, Mapping)
+                    and candidate.get("provider") == item.get("provider")
+                    and candidate.get("profile") == item.get("profile")
+                )
+            ):
+                continue
             retained.append(item)
             covered.update(exact_refs)
 
@@ -1409,8 +1426,26 @@ def _validate_required_test_cases(
     for case in cases:
         key = (case["provider"], case["profile"], case["selector"])
         present = key in available
+        name_hint = case.get("name_hint")
+        matching_selectors = []
+        if isinstance(name_hint, str) and name_hint.strip():
+            matching_selectors = [
+                str(item.get("selector"))
+                for item in inventory
+                if item.get("provider") == case["provider"]
+                and item.get("profile") == case["profile"]
+                and _selector_matches_test_name_hint(
+                    str(item.get("selector", "")), name_hint
+                )
+            ]
+            present = bool(matching_selectors)
         checked.append(
-            {"id": case["id"], "selector": case["selector"], "present": present}
+            {
+                "id": case["id"],
+                "selector": case["selector"],
+                "matching_selectors": matching_selectors,
+                "present": present,
+            }
         )
         if not present:
             failures.append(
@@ -2775,8 +2810,8 @@ def _feature_endpoint_result(
         status,
         branch,
         worktree,
-        state["baseline_path"],
-        state["plan_path"],
+        state.get("baseline_path", worktree),
+        state.get("plan_path", worktree),
         state.get("request_path"),
         state.get("attempt"),
         state.get("validation"),
@@ -3125,7 +3160,7 @@ def _write_structrr_plan_from_obligations(
         "acceptance_criteria": sections["acceptance_criteria"],
         "expected_tests": sections["expected_tests"],
         "required_test_cases": _compile_required_test_case_edits(
-            semantic_cases, inventory
+            semantic_cases, inventory, include_existing_name_hint=True
         ),
         "entities": [],
         "entity_relationships": [],
@@ -3281,7 +3316,10 @@ def _aggregate_category_edits(
 
 
 def _compile_required_test_case_edits(
-    items: Sequence[Any], inventory: Sequence[Any]
+    items: Sequence[Any],
+    inventory: Sequence[Any],
+    *,
+    include_existing_name_hint: bool = False,
 ) -> list[dict[str, Any]]:
     """Compile semantic test obligations against discovered executable tests."""
     candidates = [item for item in inventory if isinstance(item, Mapping)]
@@ -3340,13 +3378,14 @@ def _compile_required_test_case_edits(
                 raise PowdrrExecutionError(
                     f"required test case selected unknown inventory entry {selection!r}"
                 )
-            item.update(
-                {
-                    "provider": candidate.get("provider"),
-                    "profile": candidate.get("profile"),
-                    "selector": candidate.get("selector"),
-                }
-            )
+            selected = {
+                "provider": candidate.get("provider"),
+                "profile": candidate.get("profile"),
+                "selector": candidate.get("selector"),
+            }
+            if include_existing_name_hint:
+                selected["name_hint"] = _test_name_hint(str(item["description"]))
+            item.update(selected)
         else:
             if not pytest_profiles:
                 raise PowdrrExecutionError(
@@ -3363,6 +3402,7 @@ def _compile_required_test_case_edits(
                 {
                     "provider": "pytest",
                     "profile": profile.get("profile"),
+                    "name_hint": _test_name_hint(str(item["description"])),
                     "selector": (f"tests/test_{test_slug}.py::test_{test_slug}"),
                 }
             )
@@ -3375,6 +3415,20 @@ def _compile_required_test_case_edits(
         )
         compiled.append(item)
     return compiled
+
+
+def _test_name_hint(description: str) -> str:
+    """Create a stable test-function prefix from one feature obligation."""
+    slug = re.sub(r"[^a-z0-9]+", "_", description.casefold()).strip("_")
+    return f"test_{slug[:100].rstrip('_')}"
+
+
+def _selector_matches_test_name_hint(selector: str, name_hint: str) -> bool:
+    """Match a pytest node whose function name has the required prefix."""
+    if not selector or not name_hint:
+        return False
+    test_name = selector.rsplit("::", 1)[-1]
+    return test_name == name_hint or test_name.startswith(name_hint + "_")
 
 
 def _select_matching_test_inventory(

@@ -1,0 +1,66 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 779
+title: Add typed Procedrr command catalog
+intent:
+  problem: Procedrr internal commands are dispatched through loosely typed name and parameter maps, making invalid calls and missing output contracts difficult to detect before runtime.
+  goal: Define one structured command catalog that supplies command identity, input and output schemas, dispatch logic, and schema tracking for static and runtime validation.
+human-decisions:
+  - id: catalog-owns-command-contracts
+    summary: Represent every deterministic feature-flow command as a cataloged Python object with explicit input and output contracts.
+structured_files: []
+files:
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: added, summary: Define feature command contracts, rationale: Centralize command names and parameter contracts, span: {start_line: 1, end_line: 119}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Use the command catalog in feature execution, rationale: Apply the same contracts to parsing and dispatch, span: {start_line: 96, end_line: 96}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate the feature flow with the catalog, rationale: Reject invalid internal calls before execution, span: {start_line: 283, end_line: 286}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate runtime command parameters, rationale: Enforce command contracts at dispatch time, span: {start_line: 342, end_line: 354}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Attach handlers to catalog specs, rationale: Keep dispatch and command definitions aligned, span: {start_line: 583, end_line: 594}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Dispatch through the catalog, rationale: Use one runtime dispatch path, span: {start_line: 597, end_line: 600}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Pass the catalog to evaluation, rationale: Preserve contracts through flow evaluation, span: {start_line: 842, end_line: 842}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate checked-in flows with the catalog, rationale: Catch command contract errors during validation, span: {start_line: 3911, end_line: 3914}}
+  - {path: src/procedrr/__init__.py, type: modified, summary: Export catalog types, rationale: Make command contracts part of the Procedrr API, span: {start_line: 3, end_line: 7}}
+  - {path: src/procedrr/__init__.py, type: modified, summary: Export catalog types, rationale: Make command contracts part of the Procedrr API, span: {start_line: 55, end_line: 57}}
+  - {path: src/procedrr/command_catalog.py, type: added, summary: Define typed command specifications, rationale: Provide shared validation and dispatch primitives, span: {start_line: 1, end_line: 154}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Accept an optional command catalog, rationale: Enable static command validation, span: {start_line: 104, end_line: 106}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Thread the catalog through document validation, rationale: Validate nested flow operations consistently, span: {start_line: 203, end_line: 210}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Thread the catalog through nested validation, rationale: Preserve validation context, span: {start_line: 250, end_line: 250}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Thread the catalog through parsing, rationale: Apply catalog validation from the public parser, span: {start_line: 255, end_line: 260}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Thread the catalog through parsing, rationale: Apply catalog validation from the public parser, span: {start_line: 262, end_line: 262}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Accept the catalog in step validation, rationale: Make command contracts available at operation sites, span: {start_line: 368, end_line: 368}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate catalog context, rationale: Validate commands in nested structures, span: {start_line: 684, end_line: 684}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate catalog context, rationale: Validate commands in nested structures, span: {start_line: 744, end_line: 744}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate catalog context, rationale: Validate commands in nested structures, span: {start_line: 766, end_line: 766}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate catalog context, rationale: Validate commands in nested structures, span: {start_line: 841, end_line: 841}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Propagate catalog context, rationale: Validate commands in nested structures, span: {start_line: 922, end_line: 922}}
+  - {path: src/procedrr/parser.py, type: modified, summary: Validate internal command contracts statically, rationale: Reject unknown commands and invalid literal parameters before runtime, span: {start_line: 1016, end_line: 1040}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Expose binding schemas, rationale: Preserve output contracts for downstream validation, span: {start_line: 53, end_line: 53}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Accept a command catalog, rationale: Share command contracts with evaluation, span: {start_line: 66, end_line: 66}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Track schemas per state, rationale: Carry output contracts through subflows, span: {start_line: 74, end_line: 75}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Initialize schema tracking, rationale: Record bindings for each evaluation, span: {start_line: 105, end_line: 105}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Return binding schemas, rationale: Expose tracked contracts to callers, span: {start_line: 114, end_line: 123}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Pass the catalog while loading flows, rationale: Apply static command validation during evaluation, span: {start_line: 254, end_line: 257}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Carry schemas into subflows, rationale: Preserve output contracts across process boundaries, span: {start_line: 328, end_line: 333}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Record operation output schemas, rationale: Make later bindings statically inspectable, span: {start_line: 375, end_line: 376}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Validate cataloged internal operations, rationale: Enforce command contracts at runtime, span: {start_line: 538, end_line: 561}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Validate and record operation returns, rationale: Track explicit output schemas, span: {start_line: 564, end_line: 566}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Store operation output schemas, rationale: Enable downstream schema validation, span: {start_line: 570, end_line: 571}}
+  - {path: src/procedrr_evaluator/evaluator.py, type: modified, summary: Store judge output schemas, rationale: Preserve schemas for judged results, span: {start_line: 633, end_line: 633}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test catalog validation, rationale: Lock in static rejection of invalid commands, span: {start_line: 5, end_line: 6}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Test catalog validation, rationale: Lock in static rejection of invalid commands, span: {start_line: 113, end_line: 143}}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, summary: Test binding schema tracking, rationale: Lock in output-contract propagation, span: {start_line: 518, end_line: 541}}
+entities: []
+entity_relationships: []
+invariants:
+  - id: cataloged-command-contract
+    action: added
+    description: Every cataloged command has a name, input schema, output schema, and dispatch logic contract.
+    rationale: Keep deterministic command behavior explicit and inspectable.
+  - id: output-schema-propagation
+    action: added
+    description: Explicit operation and subflow output schemas are retained on bindings for later validation.
+    rationale: Prevent downstream steps from losing the shape of produced data.
+guidance:
+  - id: validate-before-dispatch
+    action: added
+    description: Feature flows should validate cataloged internal command names and parameters before dispatch.
+    rationale: Catch mechanical flow errors before invoking runtime logic.
+proposed_prs: []

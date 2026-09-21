@@ -279,9 +279,9 @@ def _powdrr_schema_error(schema: Mapping[str, Any]) -> str | None:
     if isinstance(properties, Mapping):
         for child in properties.values():
             if isinstance(child, Mapping):
-                error = _powdrr_schema_error(child)
-                if error is not None:
-                    return error
+                child_error = _powdrr_schema_error(child)
+                if child_error is not None:
+                    return child_error
     items = schema.get("items")
     if isinstance(items, Mapping):
         return _powdrr_schema_error(items)

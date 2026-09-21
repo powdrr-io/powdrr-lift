@@ -178,8 +178,8 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("finalize_proposal_review"),
         ),
-        "run_opencode": CommandSpec(
-            name="run_opencode",
+        "run_code_agent": CommandSpec(
+            name="run_code_agent",
             input_schema=object_schema(
                 {
                     "baseline": {},
@@ -197,7 +197,7 @@ def feature_command_catalog(
                 additional_properties=False,
             ),
             output_schema={},
-            logic=implementations.get("run_opencode"),
+            logic=implementations.get("run_code_agent"),
         ),
         "run_validation_profile": CommandSpec(
             name="run_validation_profile",
@@ -712,8 +712,8 @@ class FeatureCommandRuntime:
             return feature_endpoint._update_plan_from_sentence_trace(
                 parameters, state=state
             )
-        if name == "run_opencode":
-            return feature_endpoint._run_opencode_phase(
+        if name == "run_code_agent":
+            return feature_endpoint._run_code_agent_phase(
                 config,
                 runner=runner,
                 worktree=worktree,

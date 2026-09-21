@@ -3506,7 +3506,15 @@ def _write_structrr_plan_from_obligations(
         {
             "id": f"test-{item['id']}",
             "description": item["design"]["expected_test"],
-            "intent_refs": [f"feature-obligation-{item['id']}"],
+            # The materialized feature obligation is the canonical intent,
+            # while the generated design item is also an altered Structrr
+            # intent that the verification compiler must be able to trace.
+            # Keep both references on the same executable contract so every
+            # generated intent is covered without inventing another test.
+            "intent_refs": [
+                f"feature-obligation-{item['id']}",
+                f"design-{item['id']}",
+            ],
             "expected_outcome": item["design"]["acceptance_criterion"],
             "test_selection": _select_matching_test_inventory(
                 item["design"]["expected_test"], inventory

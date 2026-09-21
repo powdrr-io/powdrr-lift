@@ -857,10 +857,17 @@ def test_implement_feature_blocks_untraceable_required_test_obligation(
         ).read_text(encoding="utf-8")
     )
     assert verification["complete"] is True
-    assert all(
-        reference.startswith("feature-obligation-")
+    references = {
+        reference
         for contract in yaml.safe_load((result.plan_path).read_text(encoding="utf-8"))[
             "required_test_cases"
         ]
         for reference in contract["intent_refs"]
+    }
+    assert "feature-obligation-sentence-1" in references
+    assert "design-sentence-1" in references
+    assert all(
+        reference.startswith(("feature-obligation-", "design-"))
+        for reference in references
     )
+    assert not any(reference == "does-not-exist" for reference in references)

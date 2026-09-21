@@ -1,0 +1,32 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 777
+title: Cover generated design intents in verification contracts
+intent:
+  problem: The redesigned live implement-feature flow could generate Structrr design intents without binding them to an executable verification contract.
+  goal: Ensure every compiler-generated design intent is covered by the canonical feature obligation test contract and prove that boundary with regression tests.
+human-decisions:
+  - id: reuse-canonical-contract
+    summary: Attach each generated design intent to its corresponding feature obligation contract instead of creating duplicate tests.
+structured_files: []
+files:
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Bind generated design intents to canonical feature obligation contracts, rationale: Make verification-obligation compilation complete for every generated Structrr intent, span: {start_line: 3509, end_line: 3517}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Test generated design intent contract coverage, rationale: Prevent regressions at the structured obligation to verification contract boundary, span: {start_line: 55, end_line: 55}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Assert every structured obligation contract carries canonical and design references, rationale: Prove all generated design intents are traceable without duplicate tests, span: {start_line: 522, end_line: 558}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Update the live-flow reference assertion, rationale: Keep the live-flow contract aligned with complete verification tracing, span: {start_line: 860, end_line: 861}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Assert canonical and generated design references, rationale: Reject untraceable intent references, span: {start_line: 866, end_line: 871}}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, summary: Reject unknown intent references, rationale: Preserve fail-closed verification, span: {start_line: 873, end_line: 873}}
+entities:
+  - {id: generated-design-verification-contract, type: Contract test, action: added, description: A canonical required test contract now covers both the materialized feature obligation and its generated Structrr design intent.}
+entity_relationships:
+  - {id: design-intent-covered-by-obligation-test, type: verifies, source: generated-design-verification-contract, target: generated-design-verification-contract, action: modified, description: The executable test contract traces both canonical and generated intent identifiers.}
+invariants:
+  - id: every-generated-design-intent-is-verifiable
+    action: altered
+    description: Every generated design intent has a reference to an executable required test contract.
+    rationale: Verification must fail closed on untraceable altered intent.
+guidance:
+  - id: run-live-e2e-after-verification-flow-changes
+    action: added
+    description: Run the live implement-feature E2E after changing canonical design or verification contract compilation.
+    rationale: The live run exercises the complete canonical-design to Structrr to verification boundary.
+proposed_prs: []

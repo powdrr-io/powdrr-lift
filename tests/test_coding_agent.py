@@ -13,6 +13,7 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
+    MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
     OpenCodeProvider,
     run_coding_agent,
@@ -187,6 +188,42 @@ def test_opencode_provider_pins_requested_model(
     environment = kwargs["env"]
     assert isinstance(environment, dict)
     assert environment.get("VIRTUAL_ENV") is None
+
+
+def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    diagnostics = tmp_path / "diagnostics"
+    provider = MiniSWEAgentProvider(
+        executable="mini",
+        model="openai/gpt-5",
+        diagnostics_root=diagnostics,
+        prompt_prefix="Use the repository's local conventions.",
+        prompt_suffix="Stop after implementing the requested change.",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(command, 0, "done\n", "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.subprocess.run", fake_run)
+    request = provider.prepare_request(_request(_head(worktree)))
+    provider.run(request, worktree_root=worktree, attempt_id="attempt-1")
+
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert command[:2] == ["mini", "--task"]
+    assert "Use the repository's local conventions." in command[2]
+    assert "Stop after implementing the requested change." in command[2]
+    assert "--yolo" in command
+    assert "--exit-immediately" in command
+    assert command[command.index("--model") + 1] == "openai/gpt-5"
+    assert command[command.index("--output") + 1].endswith("attempt-1.traj.json")
 
 
 def test_execution_plan_compiles_selected_unit_to_worker_request() -> None:
@@ -565,8 +602,8 @@ def test_run_coding_agent_cli_persists_and_reports_attempt(
     request_path = tmp_path / "request.json"
     request_path.write_text(_request(_head(worktree)).to_json(), encoding="utf-8")
     monkeypatch.setattr(
-        "powdrr_lift.cli.OpenCodeProvider",
-        lambda **_: FakeProvider("allowed"),
+        "powdrr_lift.cli.build_coding_agent_provider",
+        lambda *_args, **_kwargs: FakeProvider("allowed"),
     )
 
     result = main(

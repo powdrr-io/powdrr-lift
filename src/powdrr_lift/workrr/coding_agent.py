@@ -13,7 +13,7 @@ import os
 import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -280,7 +280,7 @@ class CodingAgentAttempt:
 
 
 class CodingAgentProvider(Protocol):
-    """Worker interface implemented by OpenCode and deterministic test agents."""
+    """Worker interface implemented by supported coding-agent targets."""
 
     provider_name: str
 
@@ -333,6 +333,11 @@ class OpenCodeProvider:
     diagnostics_root: Path | None = None
     provider_name: str = "opencode"
     session_id: str | None = field(default=None, init=False)
+    prompt_prefix: str = ""
+    prompt_suffix: str = ""
+
+    def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
+        return _tailor_request_prompt(request, self.prompt_prefix, self.prompt_suffix)
 
     def run(
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
@@ -396,6 +401,109 @@ class OpenCodeProvider:
         if session_id is not None:
             self.session_id = session_id
         return completed
+
+
+@dataclass(slots=True)
+class MiniSWEAgentProvider:
+    """Invoke mini-SWE-agent in noninteractive local mode."""
+
+    executable: str = "mini"
+    model: str | None = None
+    timeout_seconds: float = 300.0
+    diagnostics_root: Path | None = None
+    provider_name: str = "minisweagent"
+    prompt_prefix: str = ""
+    prompt_suffix: str = ""
+
+    def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
+        return _tailor_request_prompt(request, self.prompt_prefix, self.prompt_suffix)
+
+    def run(
+        self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
+    ) -> subprocess.CompletedProcess[str]:
+        environment = os.environ.copy()
+        environment.pop("VIRTUAL_ENV", None)
+        environment["PWD"] = str(worktree_root.resolve())
+        command = [
+            self.executable,
+            "--task",
+            request.prompt,
+            "--yolo",
+            "--exit-immediately",
+        ]
+        if self.model is not None:
+            command.extend(("--model", self.model))
+        if self.diagnostics_root is not None:
+            self.diagnostics_root.mkdir(parents=True, exist_ok=True)
+            command.extend(
+                ("--output", str(self.diagnostics_root / f"{attempt_id}.traj.json"))
+            )
+        try:
+            return subprocess.run(
+                command,
+                cwd=worktree_root,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=self.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as error:
+            return subprocess.CompletedProcess(
+                command,
+                124,
+                (error.stdout or "") if isinstance(error.stdout, str) else "",
+                (error.stderr or "") if isinstance(error.stderr, str) else "",
+            )
+
+
+def build_coding_agent_provider(
+    target: str,
+    *,
+    opencode_executable: str,
+    opencode_model: str | None,
+    minisweagent_executable: str,
+    minisweagent_model: str | None,
+    timeout_seconds: float,
+    diagnostics_root: Path | None,
+    permission_policy: OpenCodePermissionPolicy,
+    prompt_prefix: str = "",
+    prompt_suffix: str = "",
+) -> CodingAgentProvider:
+    """Build the configured provider behind the common coding-agent boundary."""
+    if target == "opencode":
+        return OpenCodeProvider(
+            executable=opencode_executable,
+            model=opencode_model,
+            timeout_seconds=timeout_seconds,
+            diagnostics_root=diagnostics_root,
+            permission_policy=permission_policy,
+            prompt_prefix=prompt_prefix,
+            prompt_suffix=prompt_suffix,
+        )
+    if target == "minisweagent":
+        return MiniSWEAgentProvider(
+            executable=minisweagent_executable,
+            model=minisweagent_model,
+            timeout_seconds=timeout_seconds,
+            diagnostics_root=diagnostics_root,
+            prompt_prefix=prompt_prefix,
+            prompt_suffix=prompt_suffix,
+        )
+    raise ValueError(f"unsupported code agent target {target!r}")
+
+
+def _tailor_request_prompt(
+    request: ImplementationRequest, prefix: str, suffix: str
+) -> ImplementationRequest:
+    if not prefix and not suffix:
+        return request
+    return replace(
+        request,
+        prompt=(f"{prefix.rstrip()}\n\n" if prefix else "")
+        + request.prompt
+        + (f"\n\n{suffix.strip()}" if suffix else ""),
+    )
 
 
 class CodingAgentAttemptStore:
@@ -540,6 +648,9 @@ class CodingAgentRunner:
         worktree_root: Path,
         attempt_id: str,
     ) -> CodingAgentAttempt:
+        prepare_request = getattr(self.provider, "prepare_request", None)
+        if callable(prepare_request):
+            request = prepare_request(request)
         self.store.save_request(request)
         self.store.save_prompt(
             request, attempt_id=attempt_id, provider=self.provider.provider_name

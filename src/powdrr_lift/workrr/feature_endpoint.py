@@ -73,8 +73,10 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
+    MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
     OpenCodeProvider,
+    build_coding_agent_provider,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
@@ -119,6 +121,11 @@ class FeatureEndpointConfig:
     base_branch: str = "main"
     opencode_executable: str = "opencode"
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    code_agent: str = "opencode"
+    minisweagent_executable: str = "mini"
+    minisweagent_model: str | None = None
+    code_agent_prompt_prefix: str = ""
+    code_agent_prompt_suffix: str = ""
     output_root: Path | None = None
     open_pr: bool = True
     push_changes: bool = True
@@ -1730,7 +1737,7 @@ def _plan_reference_exists(document: Mapping[str, Any], reference: str) -> bool:
     )
 
 
-def _run_opencode_phase(
+def _run_code_agent_phase(
     config: FeatureEndpointConfig,
     *,
     runner: Runner,
@@ -1888,17 +1895,26 @@ def _run_opencode_phase(
         units=units,
         allowed_paths=config.allowed_paths,
     )
-    provider = state.get("opencode_provider")
-    if not isinstance(provider, OpenCodeProvider):
-        provider = OpenCodeProvider(
-            executable=config.opencode_executable,
-            model=config.opencode_model,
-            diagnostics_root=output_root / "opencode",
-            permission_policy=OpenCodePermissionPolicy(
-                _allowed_validation_commands(state["validation_profiles"])
-            ),
-        )
-        state["opencode_provider"] = provider
+    provider = state.get("code_agent_provider")
+    if not isinstance(provider, (OpenCodeProvider, MiniSWEAgentProvider)):
+        try:
+            provider = build_coding_agent_provider(
+                config.code_agent,
+                opencode_executable=config.opencode_executable,
+                opencode_model=config.opencode_model,
+                minisweagent_executable=config.minisweagent_executable,
+                minisweagent_model=config.minisweagent_model,
+                timeout_seconds=300.0,
+                diagnostics_root=output_root / config.code_agent,
+                permission_policy=OpenCodePermissionPolicy(
+                    _allowed_validation_commands(state["validation_profiles"])
+                ),
+                prompt_prefix=config.code_agent_prompt_prefix,
+                prompt_suffix=config.code_agent_prompt_suffix,
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(str(error)) from error
+        state["code_agent_provider"] = provider
     repair_request = parameters.get("repair_request")
     repair_issue = parameters.get("repair_issue")
     attempt_store = CodingAgentAttemptStore(output_root / "artifacts")

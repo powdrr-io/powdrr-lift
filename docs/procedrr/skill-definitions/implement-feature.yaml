@@ -162,7 +162,7 @@ steps:
       on_failure: {terminal: failed}
   - operation:
       tool: internal
-      command: [run_opencode]
+      command: [run_code_agent]
       parameters:
         baseline: {type: reference, value: baseline.path}
         plan: {type: reference, value: plan.path}
@@ -471,7 +471,7 @@ recoveries:
                 body:
                   - operation:
                       tool: internal
-                      command: [run_opencode]
+                      command: [run_code_agent]
                       parameters:
                         baseline: {type: reference, value: baseline.path}
                         plan: {type: reference, value: plan.path}
@@ -560,7 +560,7 @@ recoveries:
           validation: {kind: json_schema}
       - operation:
           tool: internal
-          command: [run_opencode]
+          command: [run_code_agent]
           parameters:
             baseline: {type: reference, value: baseline.path}
             plan: {type: reference, value: plan.path}
@@ -642,7 +642,7 @@ recoveries:
           validation: {kind: json_schema}
       - operation:
           tool: internal
-          command: [run_opencode]
+          command: [run_code_agent]
           parameters:
             baseline: {type: reference, value: baseline.path}
             plan: {type: reference, value: plan.path}
@@ -724,7 +724,7 @@ recoveries:
           validation: {kind: json_schema}
       - operation:
           tool: internal
-          command: [run_opencode]
+          command: [run_code_agent]
           parameters:
             baseline: {type: reference, value: baseline.path}
             plan: {type: reference, value: plan.path}

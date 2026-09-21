@@ -863,13 +863,11 @@ def _prepare_proposal_review(
     ) = _load_implementation_plan(plan_path, feature_description)
     baseline_document = _load_yaml_mapping(baseline_path)
     plan_document = _load_yaml_mapping(plan_path)
-    procedrr_path = (
-        worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
-    )
+    procedrr_path = _validate_procedrr_flow(worktree)
     source_refs: tuple[str, ...] = (
         f"structrr:{baseline_path.relative_to(worktree)}",
         f"structrr-diff:{plan_path.relative_to(worktree)}",
-        f"procedrr:{procedrr_path.relative_to(worktree)}",
+        _evidence_source_ref("procedrr", procedrr_path, worktree),
     )
     feature_obligations_path = state.get("feature_obligations_path")
     if isinstance(feature_obligations_path, Path):
@@ -2185,13 +2183,11 @@ def _run_opencode_phase(
     baseline_document = _load_yaml_mapping(baseline_path)
     plan_document = _load_yaml_mapping(plan_path)
     required_test_cases = _require_required_test_cases(plan_document)
-    procedrr_path = (
-        worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
-    )
+    procedrr_path = _validate_procedrr_flow(worktree)
     source_refs: tuple[str, ...] = (
         f"structrr:{baseline_path.relative_to(worktree)}",
         f"structrr-diff:{plan_path.relative_to(worktree)}",
-        f"procedrr:{procedrr_path.relative_to(worktree)}",
+        _evidence_source_ref("procedrr", procedrr_path, worktree),
     )
     obligation_path = _feature_obligation_path(parameters.get("obligations"))
     if obligation_path is not None:

@@ -46,6 +46,8 @@ _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_STREAM_CHUNKS = 16384
 _MAX_STREAM_CONTENT_CHARS = 524288
+_MAX_STRUCTURED_COMPLETION_TOKENS = 2048
+_MAX_STRUCTURED_STREAM_CONTENT_CHARS = 65536
 _STREAM_EXCERPT_CHARS = 512
 _STREAM_CAPTURE_COUNTER = itertools.count(1)
 
@@ -378,6 +380,8 @@ class OpenAIChatClient:
             self._limits,
             serialized_messages=serialized_messages,
         )
+        if response_schema is not None:
+            max_tokens = min(max_tokens, _MAX_STRUCTURED_COMPLETION_TOKENS)
         payload = {
             "model": self._model,
             "messages": messages,
@@ -417,6 +421,11 @@ class OpenAIChatClient:
                 raw_response = _read_openai_response(
                     response,
                     progress_stream=self._progress_stream,
+                    max_content_chars=(
+                        _MAX_STRUCTURED_STREAM_CONTENT_CHARS
+                        if response_schema is not None
+                        else _MAX_STREAM_CONTENT_CHARS
+                    ),
                 )
         except HTTPError as exc:
             raise WorkflowLLMHTTPError(
@@ -491,6 +500,7 @@ def _read_openai_response(
     response: Any,
     *,
     progress_stream: TextIO | None,
+    max_content_chars: int = _MAX_STREAM_CONTENT_CHARS,
 ) -> str:
     """Read a streamed OpenAI response and return its normal response shape.
 
@@ -564,14 +574,12 @@ def _read_openai_response(
                     capture.flush()
             chunk_count += 1
             content_length = sum(len(part) for part in content_parts)
-            if (
-                chunk_count > _MAX_STREAM_CHUNKS
-                or content_length > _MAX_STREAM_CONTENT_CHARS
-            ):
+            if chunk_count > _MAX_STREAM_CHUNKS or content_length > max_content_chars:
                 excerpt = _stream_excerpt(content_parts)
                 raise _ModelUnavailableError(
                     "OpenAI streaming response exceeded the bounded output limit "
-                    f"({chunk_count} chunks, {content_length} characters); "
+                    f"({chunk_count} chunks, {content_length} characters; "
+                    f"limit={max_content_chars} characters); "
                     f"partial content prefix: {excerpt!r}"
                 )
             if progress_stream is not None:

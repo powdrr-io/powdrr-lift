@@ -94,18 +94,21 @@ steps:
         - judge:
             kind: construct_one
             provider: planning
-            question: What concrete obligation and acceptance criterion follow from this classified instruction clause?
+            question: What is the one concrete semantic obligation expressed by this instruction clause?
             subject: instruction_clause.text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Use the supplied kind classification and translate only this clause into one concrete semantic obligation.
-              - Preserve the clause's requested behavior, constraints, and prohibitions.
-              - For non_goal, state what is explicitly outside scope and make the acceptance criterion prove it is not required.
+              - Use the supplied kind classification and translate only this clause into one semantic obligation.
+              - For a normal clause, write description as one short imperative sentence naming one behavior, API, invariant, or constraint to implement.
+              - For a normal clause, write acceptance_criterion as one short observable assertion that proves the described obligation.
+              - Preserve concrete names, values, conditions, and prohibitions from the clause, but do not explain, summarize, enumerate scenarios, or add design choices not present in the clause.
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
             prompt_rules:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions:
-                  - The description must be an explicit non-goal, not an implementation task.
+                  - Treat this as an explicit non-goal, not an implementation task.
+                  - Write description as one short sentence beginning with "Do not implement" that names only the excluded behavior.
+                  - Write acceptance_criterion as one short observable assertion that proves the excluded behavior was not introduced.
             context: [feature_description, instruction_clause, semantic_kind]
             output:
               name: semantic_obligation
@@ -114,8 +117,8 @@ steps:
                 required: [description, acceptance_criterion]
                 additionalProperties: false
                 properties:
-                  description: {type: string, minLength: 1}
-                  acceptance_criterion: {type: string, minLength: 1}
+                  description: {type: string, minLength: 1, maxLength: 500}
+                  acceptance_criterion: {type: string, minLength: 1, maxLength: 500}
             validation: {kind: json_schema}
         - judge:
             kind: construct_one
@@ -124,9 +127,13 @@ steps:
             subject: instruction_clause.text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - State one concrete expected test that proves the supplied obligation and acceptance criterion.
-              - For non_goal, state the test or guard that proves the excluded behavior is not introduced.
+              - State one short concrete expected test that proves the supplied obligation and acceptance criterion.
+              - Name the observable behavior or assertion the test must exercise; do not provide test code, a test plan, or multiple test cases.
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+            prompt_rules:
+              - when: {binding: semantic_kind.kind, equals: non_goal}
+                instructions:
+                  - State one short test or guard that proves the excluded behavior is not introduced.
             context: [feature_description, instruction_clause, semantic_kind, semantic_obligation]
             output:
               name: semantic_test_contract
@@ -135,7 +142,7 @@ steps:
                 required: [expected_test]
                 additionalProperties: false
                 properties:
-                  expected_test: {type: string, minLength: 1}
+                  expected_test: {type: string, minLength: 1, maxLength: 400}
             validation: {kind: json_schema}
         - operation:
             tool: internal

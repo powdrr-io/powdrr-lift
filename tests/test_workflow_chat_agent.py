@@ -2818,6 +2818,7 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
     ) == {"action": "complete"}
     assert serialization_calls == 1
     assert request_bodies[0]["messages"] == [{"role": "user", "content": "request"}]
+    assert request_bodies[0]["max_tokens"] == 2048
     assert request_bodies[0]["response_format"] == {
         "type": "json_schema",
         "json_schema": {

@@ -119,3 +119,41 @@ After the single-task smoke test succeeds:
 The first live run is expected to validate the container image, provider
 network allowlist, git identity, adapter discovery, and telemetry collection
 at the same time.
+
+## Running a local Powdrr branch with Pier
+
+Use the installed `datacurve-pier` runner for branch smoke tests. The custom
+agent must be importable by the host Pier process, and the task container
+installs the pushed Powdrr branch from GitHub. The direct `harbor` CLI has a
+different setup path and should not be substituted for this command.
+
+From the Powdrr worktree, run:
+
+```bash
+export DEEPINFRA_API_TOKEN="..."
+export POWDRR_WORKTREE="$(pwd)"
+export PYTHONPATH="$POWDRR_WORKTREE/src"
+export POWDRR_BRANCH="codex/your-powdrr-branch"
+
+/Users/gregory/.local/share/uv/tools/datacurve-pier/bin/pier run \
+  --debug \
+  --force-build \
+  --no-delete \
+  -p /path/to/deep-swe/tasks/python-statemachine-state-data-scoping \
+  --agent-import-path \
+    powdrr_lift.integrations.harbor.powdrr_agent:PowdrrAgent \
+  --env docker \
+  --ae DEEPINFRA_API_TOKEN="$DEEPINFRA_API_TOKEN" \
+  --ae POWDRR_INSTALL_SPEC="git+https://github.com/powdrr-io/powdrr-lift.git@$POWDRR_BRANCH" \
+  --ae POWDRR_OUTPUT_ROOT=/tmp/powdrr-feature-run \
+  --ae POWDRR_COMMAND_LOG=/tmp/powdrr-agent-command.log \
+  --artifact /tmp/powdrr-feature-run \
+  --artifact /tmp/powdrr-agent-command.log \
+  -o /tmp/powdrr-pier-jobs
+```
+
+`--no-delete` keeps the Docker container available for debugging after a
+failure. The two artifact paths preserve the Powdrr run bundle and wrapper
+command log in the Pier job directory. Use a fresh `-o` directory for each
+run. The branch must be pushed before starting the run, and `PYTHONPATH` must
+point at the host worktree so Pier can import the custom agent.

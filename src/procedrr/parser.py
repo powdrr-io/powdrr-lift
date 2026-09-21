@@ -155,6 +155,9 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
                 else:
                     try:
                         Draft7Validator.check_schema(dict(schema))
+                        extension_error = _powdrr_schema_error(schema)
+                        if extension_error is not None:
+                            raise SchemaError(extension_error)
                     except SchemaError as error:
                         diagnostics.append(
                             DocumentDiagnostic(
@@ -255,6 +258,34 @@ def render_document(document: Mapping[str, Any], *, source_format: str = "json")
     if source_format == "yaml":
         return yaml.safe_dump(dict(document), sort_keys=False)
     raise ValueError("source_format must be json or yaml")
+
+
+def _powdrr_schema_error(schema: Mapping[str, Any]) -> str | None:
+    """Validate Powdrr schema annotations layered on standard JSON Schema."""
+    annotation = schema.get("x-powdrr-type")
+    if annotation is not None and annotation != "SchematizedPath":
+        return "unsupported x-powdrr-type annotation"
+    if annotation == "SchematizedPath":
+        if schema.get("type") != "string":
+            return "SchematizedPath must annotate a string path"
+        file_schema = schema.get("x-powdrr-schema")
+        if not isinstance(file_schema, Mapping):
+            return "SchematizedPath requires an x-powdrr-schema object"
+        try:
+            Draft7Validator.check_schema(dict(file_schema))
+        except SchemaError as error:
+            return f"invalid SchematizedPath file schema: {error.message}"
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping):
+        for child in properties.values():
+            if isinstance(child, Mapping):
+                error = _powdrr_schema_error(child)
+                if error is not None:
+                    return error
+    items = schema.get("items")
+    if isinstance(items, Mapping):
+        return _powdrr_schema_error(items)
+    return None
 
 
 def validate_single_decision(
@@ -1232,6 +1263,9 @@ def _validate_steps(
                     schema = output["schema"]
                     try:
                         Draft7Validator.check_schema(dict(schema))
+                        extension_error = _powdrr_schema_error(schema)
+                        if extension_error is not None:
+                            raise SchemaError(extension_error)
                     except SchemaError as error:
                         diagnostics.append(
                             DocumentDiagnostic(

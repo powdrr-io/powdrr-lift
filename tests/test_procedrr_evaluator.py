@@ -446,11 +446,14 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
+            question = messages[1]["content"]
+            if "kind of obligation" in question:
+                return {"kind": "feature"}
+            if "test contract" in question:
+                return {"expected_test": "Run the feature test."}
             return {
-                "kind": "feature",
                 "description": "The feature is implemented.",
                 "acceptance_criterion": "The feature behavior is observable.",
-                "expected_test": "Run the feature test.",
             }
 
     llm = DesignInterviewLLM()
@@ -467,6 +470,13 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "clauses": [
                         {"clause_id": "instruction-001", "text": "Add a thing"}
                     ],
+                }
+            if command[0] == "merge_semantic_design":
+                return {
+                    "kind": "feature",
+                    "description": "The feature is implemented.",
+                    "acceptance_criterion": "The feature behavior is observable.",
+                    "expected_test": "Run the feature test.",
                 }
             if command[0] == "compile_canonical_feature_design":
                 return {
@@ -502,7 +512,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 1
+    assert result.llm_activations == 3
 
 
 class HelloWorldLLM:

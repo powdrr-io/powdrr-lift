@@ -25,7 +25,6 @@ steps:
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
       outputs:
-        instruction_ledger: instruction_ledger
         feature_design: feature_design
         feature_obligations: feature_design
   - operation:

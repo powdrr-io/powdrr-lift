@@ -8,9 +8,47 @@ inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
 outputs:
-  instruction_ledger: {type: object, required: [path]}
-  feature_design: {type: object, required: [path, obligations, required_test_cases]}
-limits: {llm_activations: 128, tool_calls: 256, context_chars: 16000, context_value_chars: 8000}
+  feature_design:
+    type: object
+    required: [path, fingerprint, obligations, required_test_cases]
+    additionalProperties: false
+    properties:
+      path:
+        type: string
+        x-powdrr-type: SchematizedPath
+        minLength: 1
+        x-powdrr-schema:
+          type: object
+          required: [schema_version, fingerprint, obligations, required_test_cases]
+          additionalProperties: false
+      fingerprint: {type: string, minLength: 1}
+      obligations:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          required: [id, instruction_clause_id, kind, description, acceptance_criterion, expected_test]
+          additionalProperties: false
+          properties:
+            id: {type: string, minLength: 1}
+            instruction_clause_id: {type: string, minLength: 1}
+            kind: {type: string, enum: [entity, feature, interface, invariant, guidance, non_goal]}
+            description: {type: string, minLength: 1}
+            acceptance_criterion: {type: string, minLength: 1}
+            expected_test: {type: string, minLength: 1}
+      required_test_cases:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          required: [id, description, intent_refs, expected_outcome, test_selection]
+          additionalProperties: false
+          properties:
+            id: {type: string, minLength: 1}
+            description: {type: string, minLength: 1}
+            intent_refs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+            expected_outcome: {type: string, minLength: 1}
+            test_selection: {type: object}
 steps:
   - operation:
       tool: internal
@@ -32,34 +70,89 @@ steps:
       collect: {binding: semantic_designs, mode: list, value: semantic_design}
       body:
         - judge:
-            kind: construct_one
+            kind: classify_one
             provider: planning
-            question: What one concrete obligation follows from this instruction clause?
+            question: What kind of obligation does this instruction clause express?
             subject: instruction_clause.text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Translate only this clause into one concrete semantic obligation.
-              - Preserve the clause's requested behavior, constraints, and prohibitions.
-              - >-
-                Choose one kind: entity, feature, interface, invariant, guidance,
-                or non_goal.
-              - State one acceptance criterion and one expected test that prove this obligation.
+              - Classify only this clause as entity, feature, interface, invariant, guidance, or non_goal.
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
             context: [feature_description, instruction_clause]
             output:
-              name: semantic_design
+              name: semantic_kind
               schema:
                 type: object
-                required: [kind, description, acceptance_criterion, expected_test]
+                required: [kind]
                 additionalProperties: false
                 properties:
                   kind:
                     type: string
                     enum: [entity, feature, interface, invariant, guidance, non_goal]
+            validation: {kind: json_schema}
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: What concrete obligation and acceptance criterion follow from this classified instruction clause?
+            subject: instruction_clause.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Use the supplied kind classification and translate only this clause into one concrete semantic obligation.
+              - Preserve the clause's requested behavior, constraints, and prohibitions.
+              - For non_goal, state what is explicitly outside scope and make the acceptance criterion prove it is not required.
+              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+            prompt_rules:
+              - when: {binding: semantic_kind.kind, equals: non_goal}
+                instructions:
+                  - The description must be an explicit non-goal, not an implementation task.
+            context: [feature_description, instruction_clause, semantic_kind]
+            output:
+              name: semantic_obligation
+              schema:
+                type: object
+                required: [description, acceptance_criterion]
+                additionalProperties: false
+                properties:
                   description: {type: string, minLength: 1}
                   acceptance_criterion: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: What one test contract proves this classified obligation and acceptance criterion?
+            subject: instruction_clause.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - State one concrete expected test that proves the supplied obligation and acceptance criterion.
+              - For non_goal, state the test or guard that proves the excluded behavior is not introduced.
+              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
+            context: [feature_description, instruction_clause, semantic_kind, semantic_obligation]
+            output:
+              name: semantic_test_contract
+              schema:
+                type: object
+                required: [expected_test]
+                additionalProperties: false
+                properties:
                   expected_test: {type: string, minLength: 1}
             validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [merge_semantic_design]
+            parameters:
+              kind: {type: reference, value: semantic_kind.kind}
+              description: {type: reference, value: semantic_obligation.description}
+              acceptance_criterion: {type: reference, value: semantic_obligation.acceptance_criterion}
+              expected_test: {type: reference, value: semantic_test_contract.expected_test}
+            returns:
+              type: object
+              required: [kind, description, acceptance_criterion, expected_test]
+              properties:
+                kind: {type: string}
+                description: {type: string}
+                acceptance_criterion: {type: string}
+                expected_test: {type: string}
+            bind: semantic_design
   - operation:
       tool: internal
       command: [compile_canonical_feature_design]

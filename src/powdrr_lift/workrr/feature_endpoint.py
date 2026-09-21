@@ -425,6 +425,33 @@ def _execute_procedrr_flow(
                 "clauses": [item.to_data() for item in ledger.clauses],
             }
 
+        def merge_semantic_design_operation() -> Any:
+            """Join the independently elicited semantic fields for one clause."""
+            required = (
+                "kind",
+                "description",
+                "acceptance_criterion",
+                "expected_test",
+            )
+            values = {name: parameters.get(name) for name in required}
+            if any(
+                not isinstance(value, str) or not value.strip()
+                for value in values.values()
+            ):
+                raise PowdrrExecutionError(
+                    "merge_semantic_design requires non-empty semantic fields"
+                )
+            if values["kind"] not in {
+                "entity",
+                "feature",
+                "interface",
+                "invariant",
+                "guidance",
+                "non_goal",
+            }:
+                raise PowdrrExecutionError("merge_semantic_design kind is invalid")
+            return values
+
         def compile_canonical_feature_design_operation() -> Any:
             ledger_path = state.get("instruction_ledger_path")
             if not isinstance(ledger_path, Path):
@@ -525,6 +552,7 @@ def _execute_procedrr_flow(
             "aggregate_category_edits": aggregate_category_edits,
             "decompose_feature_description": decompose_feature_description,
             "compile_instruction_ledger": compile_instruction_ledger_operation,
+            "merge_semantic_design": merge_semantic_design_operation,
             "compile_canonical_feature_design": (
                 compile_canonical_feature_design_operation
             ),

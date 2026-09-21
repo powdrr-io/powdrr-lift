@@ -832,11 +832,14 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
+            question = messages[1]["content"]
+            if "kind of obligation" in question:
+                return {"kind": "feature"}
+            if "test contract" in question:
+                return {"expected_test": "Run the feature test."}
             return {
-                "kind": "feature",
                 "description": "The requested feature is implemented.",
                 "acceptance_criterion": "The requested feature behavior is observable.",
-                "expected_test": "Run the feature test.",
             }
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
@@ -848,6 +851,13 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                 "clauses": [
                     {"clause_id": "instruction-001", "text": "Add the feature."}
                 ],
+            }
+        if command[0] == "merge_semantic_design":
+            return {
+                "kind": "feature",
+                "description": "The requested feature is implemented.",
+                "acceptance_criterion": "The requested feature behavior is observable.",
+                "expected_test": "Run the feature test.",
             }
         if command[0] == "compile_canonical_feature_design":
             return {

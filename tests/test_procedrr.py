@@ -2,6 +2,8 @@ import pytest
 
 from procedrr import (
     CallNode,
+    CommandCatalog,
+    CommandSpec,
     CompilationError,
     DecisionContract,
     DecisionKind,
@@ -105,6 +107,37 @@ def test_parser_rejects_unknown_tool_and_validator_references() -> None:
     with pytest.raises(Exception, match="unknown tool"):
         parse_and_validate(
             "name: bad\nsteps:\n  - operation: {tool: imaginary, bind: x}\n"
+        )
+
+
+def test_parser_validates_internal_commands_against_catalog() -> None:
+    catalog = CommandCatalog(
+        (
+            CommandSpec(
+                "known",
+                {
+                    "type": "object",
+                    "required": ["value"],
+                    "properties": {"value": {"type": "string"}},
+                    "additionalProperties": False,
+                },
+                {"type": "object"},
+            ),
+        )
+    )
+    with pytest.raises(Exception, match="unknown parameters"):
+        parse_and_validate(
+            "name: bad\nsteps:\n"
+            "  - operation:\n"
+            "      tool: internal\n"
+            "      command: [known]\n"
+            "      parameters: {wrong: value}\n",
+            command_catalog=catalog,
+        )
+    with pytest.raises(Exception, match="unknown cataloged internal command"):
+        parse_and_validate(
+            "name: bad\nsteps:\n  - operation: {tool: internal, command: [missing]}\n",
+            command_catalog=catalog,
         )
 
 

@@ -515,6 +515,30 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     assert result.llm_activations == 3
 
 
+def test_evaluator_tracks_operation_output_schema_on_binding() -> None:
+    from procedrr import parse_and_validate
+
+    source = """
+name: schema-tracking
+steps:
+  - operation:
+      tool: internal
+      command: [produce]
+      returns:
+        type: object
+        required: [value]
+        properties:
+          value: {type: string}
+      bind: produced
+  - terminal: succeeded
+"""
+    result = Evaluator(
+        object(),  # type: ignore[arg-type]
+        lambda _tool, _parameters: {"value": "ok"},
+    ).evaluate(parse_and_validate(source))
+    assert result.binding_schemas["produced"]["required"] == ["value"]
+
+
 class HelloWorldLLM:
     def __init__(self) -> None:
         self.plan_round = 0

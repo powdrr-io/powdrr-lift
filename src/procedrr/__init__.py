@@ -1,5 +1,10 @@
 """A small, total control plane for bounded LLM-assisted procedures."""
 
+from procedrr.command_catalog import (
+    CommandCatalog,
+    CommandCatalogError,
+    CommandSpec,
+)
 from procedrr.compiler import CompilationError, CompilationReport, compile_workflow
 from procedrr.editor import append_step, apply_json_edits, set_value
 from procedrr.fragments import (
@@ -47,6 +52,9 @@ __all__ = [
     "CallNode",
     "CompilationError",
     "CompilationReport",
+    "CommandCatalog",
+    "CommandCatalogError",
+    "CommandSpec",
     "DecisionContract",
     "DecisionKind",
     "ForEachNode",

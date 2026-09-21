@@ -52,6 +52,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _validate_procedrr_flow,
     _validate_required_test_cases,
     _write_structrr_plan,
+    _write_structrr_plan_from_obligations,
     review_feature_diff,
     run_feature_in_place,
 )
@@ -516,6 +517,43 @@ def test_sentence_design_trace_maps_consequences_to_plan_sections(
         item["id"] == "design-sentence-1-acceptance"
         for item in document["acceptance_criteria"]
     )
+
+
+def test_structured_obligation_contracts_cover_generated_design_intents(
+    tmp_path: Path,
+) -> None:
+    config = FeatureEndpointConfig(
+        feature_description="Add the second greeting.",
+        work_item_name="design-contract-coverage",
+        repo_root=tmp_path,
+        allowed_paths=(".",),
+    )
+    obligations = [
+        {
+            "id": f"sentence-{index}",
+            "design": {
+                "kind": "invariant" if index == 2 else "feature",
+                "description": f"Obligation {index}.",
+                "acceptance_criterion": f"Acceptance {index}.",
+                "expected_test": f"Test obligation {index}.",
+            },
+        }
+        for index in range(1, 4)
+    ]
+
+    path = _write_structrr_plan_from_obligations(
+        tmp_path / "structrr-diff.yaml",
+        config,
+        obligations,
+        ({"provider": "pytest", "profile": "pytest", "selector": "tests"},),
+    )
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    for index, contract in enumerate(document["required_test_cases"], start=1):
+        assert set(contract["intent_refs"]) == {
+            f"feature-obligation-sentence-{index}",
+            f"design-sentence-{index}",
+        }
 
 
 def test_feature_obligations_become_active_intents(tmp_path: Path) -> None:

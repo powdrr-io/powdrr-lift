@@ -3223,8 +3223,11 @@ def _feature_endpoint_result(
         status,
         branch,
         worktree,
-        state["baseline_path"],
-        state["plan_path"],
+        # Planning can fail before the baseline or plan checkpoints run. Keep
+        # the failure result serializable instead of masking the real error
+        # with a KeyError while constructing the result.
+        state.get("baseline_path", worktree),
+        state.get("plan_path", worktree),
         state.get("request_path"),
         state.get("attempt"),
         state.get("validation"),

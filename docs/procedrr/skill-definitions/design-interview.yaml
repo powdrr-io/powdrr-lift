@@ -38,7 +38,7 @@ outputs:
         minItems: 1
         items:
           type: object
-          required: [id, description, intent_refs, provider, profile, selector, expectation, applicability, status]
+          required: [id, description, intent_refs, provider, profile, name_hint, selector, expectation, applicability, status]
           additionalProperties: false
           properties:
             id: {type: string, minLength: 1}
@@ -46,6 +46,7 @@ outputs:
             intent_refs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
             provider: {type: string, minLength: 1}
             profile: {type: string, minLength: 1}
+            name_hint: {type: string, minLength: 1}
             selector: {type: string, minLength: 1}
             expectation: {type: string, enum: [pass]}
             applicability: {type: object}

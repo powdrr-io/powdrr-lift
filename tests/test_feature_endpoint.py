@@ -43,6 +43,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _derive_feature_test_contracts,
     _ensure_current_baseline,
     _evaluate_proposal_command,
+    _feature_endpoint_result,
     _finalize_proposal_review,
     _load_implementation_plan,
     _materialize_feature_intents,
@@ -228,6 +229,19 @@ def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
     assert metadata["task_id"] == "failure-artifact"
     assert failure["schema_version"] == "powdrr-run-failure-v1"
     assert failure["error_type"] == "PowdrrExecutionError"
+
+
+def test_feature_endpoint_result_preserves_early_failure_without_checkpoints(
+    tmp_path: Path,
+) -> None:
+    result = _feature_endpoint_result(
+        {}, "main", tmp_path, "review_failed"
+    )
+
+    assert result.status == "review_failed"
+    assert result.baseline_path == tmp_path
+    assert result.plan_path == tmp_path
+    assert result.review == {"passed": False}
 
 
 def test_run_feature_in_place_reuses_core_without_git_publication(

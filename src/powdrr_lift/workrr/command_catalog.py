@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -21,132 +21,341 @@ from powdrr_lift.core.instruction_ledger import (
 from powdrr_lift.errors import PowdrrExecutionError
 from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
 
-_OUTPUT: dict[str, Any] = {}
-
-
-def _spec(
-    name: str,
-    parameters: Iterable[str],
-    *,
-    required: bool = True,
-    logic: Callable[[Mapping[str, Any]], Any] | None = None,
-) -> CommandSpec:
-    names = tuple(parameters)
-    return CommandSpec(
-        name=name,
-        input_schema=object_schema(
-            {parameter: {} for parameter in names},
-            required=names if required else (),
-            additional_properties=False,
-        ),
-        output_schema=_OUTPUT,
-        logic=logic,
-    )
-
 
 def feature_command_catalog(
     implementations: Mapping[str, Callable[[Mapping[str, Any]], Any]] | None = None,
 ) -> CommandCatalog:
-    """Return the implement-feature commands and their implementations.
-
-    Static callers omit ``implementations`` and receive the same catalog with
-    dispatch slots intentionally empty. Runtime callers provide the bound
-    implementations, making each returned ``CommandSpec`` the complete command
-    object used for validation and dispatch.
-    """
+    """Return the complete implement-feature command catalog."""
     implementations = implementations or {}
-    commands = {
-        "ensure_current_structrr": (),
-        "discover_validation_profiles": ("baseline",),
-        "compile_instruction_ledger": ("work_item_name", "feature_description"),
-        "merge_semantic_design": (
-            "kind",
-            "description",
-            "acceptance_criterion",
-            "expected_test",
+    commands: dict[str, CommandSpec] = {
+        "ensure_current_structrr": CommandSpec(
+            name="ensure_current_structrr",
+            input_schema=object_schema(
+                {},
+                required=(),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("ensure_current_structrr"),
         ),
-        "compile_canonical_feature_design": ("work_item_name", "design_decisions"),
-        "plan_structrr_diff": (
-            "baseline",
-            "work_item_name",
-            "feature_description",
-            "feature_design",
+        "discover_validation_profiles": CommandSpec(
+            name="discover_validation_profiles",
+            input_schema=object_schema(
+                {"baseline": {}},
+                required=("baseline",),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("discover_validation_profiles"),
         ),
-        "materialize_feature_intents": ("plan", "obligations"),
-        "compile_verification_obligations": (
-            "baseline",
-            "plan",
-            "feature_description",
+        "compile_instruction_ledger": CommandSpec(
+            name="compile_instruction_ledger",
+            input_schema=object_schema(
+                {"work_item_name": {}, "feature_description": {}},
+                required=("work_item_name", "feature_description"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("compile_instruction_ledger"),
         ),
-        "assert_verification_obligations_complete": ("verification_obligations",),
-        "prepare_proposal_review": (
-            "baseline",
-            "plan",
-            "feature_description",
-            "verification_obligations",
+        "merge_semantic_design": CommandSpec(
+            name="merge_semantic_design",
+            input_schema=object_schema(
+                {
+                    "kind": {},
+                    "description": {},
+                    "acceptance_criterion": {},
+                    "expected_test": {},
+                },
+                required=(
+                    "kind",
+                    "description",
+                    "acceptance_criterion",
+                    "expected_test",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("merge_semantic_design"),
         ),
-        "bind_proposal_decision_results": ("worklist", "decisions"),
-        "finalize_proposal_review": (
-            "proposal_revision_path",
-            "worklist_path",
-            "decisions",
+        "compile_canonical_feature_design": CommandSpec(
+            name="compile_canonical_feature_design",
+            input_schema=object_schema(
+                {"work_item_name": {}, "design_decisions": {}},
+                required=("work_item_name", "design_decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("compile_canonical_feature_design"),
         ),
-        "run_opencode": (
-            "baseline",
-            "plan",
-            "proposal_review_receipt",
-            "work_item_name",
-            "feature_description",
-            "obligations",
-            "verification_obligations",
-            "repair_issue",
-            "repair_request",
-            "review_verdict",
+        "plan_structrr_diff": CommandSpec(
+            name="plan_structrr_diff",
+            input_schema=object_schema(
+                {
+                    "baseline": {},
+                    "work_item_name": {},
+                    "feature_description": {},
+                    "feature_design": {},
+                },
+                required=(
+                    "baseline",
+                    "work_item_name",
+                    "feature_description",
+                    "feature_design",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("plan_structrr_diff"),
         ),
-        "run_validation_profile": ("profile", "implementation"),
-        "aggregate_validation": ("implementation", "results"),
-        "validate_required_test_cases": ("plan",),
-        "run_verification_evidence": ("obligations",),
-        "reconcile_verification_evidence": (
-            "obligations",
-            "evidence",
-            "candidate_tree",
+        "materialize_feature_intents": CommandSpec(
+            name="materialize_feature_intents",
+            input_schema=object_schema(
+                {"plan": {}, "obligations": {}},
+                required=("plan", "obligations"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("materialize_feature_intents"),
         ),
-        "review_worker_diff": ("implementation", "validation"),
-        "prepare_implementation_review": ("implementation", "validation", "review"),
-        "compile_obligation_review_packets": ("obligations", "evidence"),
-        "bind_obligation_reviews": ("packets", "decisions"),
-        "aggregate_obligation_reviews": (
-            "packets",
-            "reviews",
-            "verification_reconciliation",
+        "compile_verification_obligations": CommandSpec(
+            name="compile_verification_obligations",
+            input_schema=object_schema(
+                {"baseline": {}, "plan": {}, "feature_description": {}},
+                required=("baseline", "plan", "feature_description"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("compile_verification_obligations"),
         ),
-        "collect_repair_issues": ("validation", "review", "reconciliation"),
-        "open_pull_request": (
-            "review",
-            "plan",
-            "work_item_name",
-            "feature_description",
+        "assert_verification_obligations_complete": CommandSpec(
+            name="assert_verification_obligations_complete",
+            input_schema=object_schema(
+                {"verification_obligations": {}},
+                required=("verification_obligations",),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("assert_verification_obligations_complete"),
         ),
-        "create_pr_changelog": (
-            "pull_request",
-            "plan",
-            "work_item_name",
-            "feature_description",
+        "prepare_proposal_review": CommandSpec(
+            name="prepare_proposal_review",
+            input_schema=object_schema(
+                {
+                    "baseline": {},
+                    "plan": {},
+                    "feature_description": {},
+                    "verification_obligations": {},
+                },
+                required=(
+                    "baseline",
+                    "plan",
+                    "feature_description",
+                    "verification_obligations",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_proposal_review"),
         ),
-        "update_pull_request": ("pull_request", "changelog"),
+        "bind_proposal_decision_results": CommandSpec(
+            name="bind_proposal_decision_results",
+            input_schema=object_schema(
+                {"worklist": {}, "decisions": {}},
+                required=("worklist", "decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_proposal_decision_results"),
+        ),
+        "finalize_proposal_review": CommandSpec(
+            name="finalize_proposal_review",
+            input_schema=object_schema(
+                {"proposal_revision_path": {}, "worklist_path": {}, "decisions": {}},
+                required=("proposal_revision_path", "worklist_path", "decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("finalize_proposal_review"),
+        ),
+        "run_opencode": CommandSpec(
+            name="run_opencode",
+            input_schema=object_schema(
+                {
+                    "baseline": {},
+                    "plan": {},
+                    "proposal_review_receipt": {},
+                    "work_item_name": {},
+                    "feature_description": {},
+                    "obligations": {},
+                    "verification_obligations": {},
+                    "repair_issue": {},
+                    "repair_request": {},
+                    "review_verdict": {},
+                },
+                required=(),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("run_opencode"),
+        ),
+        "run_validation_profile": CommandSpec(
+            name="run_validation_profile",
+            input_schema=object_schema(
+                {"profile": {}, "implementation": {}},
+                required=("profile", "implementation"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("run_validation_profile"),
+        ),
+        "aggregate_validation": CommandSpec(
+            name="aggregate_validation",
+            input_schema=object_schema(
+                {"implementation": {}, "results": {}},
+                required=("implementation", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("aggregate_validation"),
+        ),
+        "validate_required_test_cases": CommandSpec(
+            name="validate_required_test_cases",
+            input_schema=object_schema(
+                {"plan": {}},
+                required=("plan",),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("validate_required_test_cases"),
+        ),
+        "run_verification_evidence": CommandSpec(
+            name="run_verification_evidence",
+            input_schema=object_schema(
+                {"obligations": {}},
+                required=("obligations",),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("run_verification_evidence"),
+        ),
+        "reconcile_verification_evidence": CommandSpec(
+            name="reconcile_verification_evidence",
+            input_schema=object_schema(
+                {"obligations": {}, "evidence": {}, "candidate_tree": {}},
+                required=("obligations", "evidence", "candidate_tree"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("reconcile_verification_evidence"),
+        ),
+        "review_worker_diff": CommandSpec(
+            name="review_worker_diff",
+            input_schema=object_schema(
+                {"implementation": {}, "validation": {}},
+                required=("implementation", "validation"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("review_worker_diff"),
+        ),
+        "prepare_implementation_review": CommandSpec(
+            name="prepare_implementation_review",
+            input_schema=object_schema(
+                {"implementation": {}, "validation": {}, "review": {}},
+                required=("implementation", "validation", "review"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_implementation_review"),
+        ),
+        "compile_obligation_review_packets": CommandSpec(
+            name="compile_obligation_review_packets",
+            input_schema=object_schema(
+                {"obligations": {}, "evidence": {}},
+                required=("obligations", "evidence"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("compile_obligation_review_packets"),
+        ),
+        "bind_obligation_reviews": CommandSpec(
+            name="bind_obligation_reviews",
+            input_schema=object_schema(
+                {"packets": {}, "decisions": {}},
+                required=("packets", "decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_obligation_reviews"),
+        ),
+        "aggregate_obligation_reviews": CommandSpec(
+            name="aggregate_obligation_reviews",
+            input_schema=object_schema(
+                {"packets": {}, "reviews": {}, "verification_reconciliation": {}},
+                required=("packets", "reviews", "verification_reconciliation"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("aggregate_obligation_reviews"),
+        ),
+        "collect_repair_issues": CommandSpec(
+            name="collect_repair_issues",
+            input_schema=object_schema(
+                {"validation": {}, "review": {}, "reconciliation": {}},
+                required=("validation", "review", "reconciliation"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("collect_repair_issues"),
+        ),
+        "open_pull_request": CommandSpec(
+            name="open_pull_request",
+            input_schema=object_schema(
+                {
+                    "review": {},
+                    "plan": {},
+                    "work_item_name": {},
+                    "feature_description": {},
+                },
+                required=("review", "plan", "work_item_name", "feature_description"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("open_pull_request"),
+        ),
+        "create_pr_changelog": CommandSpec(
+            name="create_pr_changelog",
+            input_schema=object_schema(
+                {
+                    "pull_request": {},
+                    "plan": {},
+                    "work_item_name": {},
+                    "feature_description": {},
+                },
+                required=(
+                    "pull_request",
+                    "plan",
+                    "work_item_name",
+                    "feature_description",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("create_pr_changelog"),
+        ),
+        "update_pull_request": CommandSpec(
+            name="update_pull_request",
+            input_schema=object_schema(
+                {"pull_request": {}, "changelog": {}},
+                required=("pull_request", "changelog"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("update_pull_request"),
+        ),
     }
-    return CommandCatalog(
-        tuple(
-            _spec(
-                name,
-                parameters,
-                required=name != "run_opencode",
-                logic=implementations.get(name),
-            )
-            for name, parameters in commands.items()
-        )
-    )
+    return CommandCatalog(tuple(commands.values()))
 
 
 @dataclass(slots=True)
@@ -403,23 +612,6 @@ class FeatureCommandRuntime:
                 )
             return {"passed": not failures, "failure_count": len(failures)}
 
-        handlers: dict[str, Callable[[], Any]] = {
-            "extract_proposal_issues": extract_proposal_issues,
-            "aggregate_category_edits": aggregate_category_edits,
-            "decompose_feature_description": decompose_feature_description,
-            "compile_instruction_ledger": compile_instruction_ledger_operation,
-            "merge_semantic_design": merge_semantic_design_operation,
-            "compile_canonical_feature_design": (
-                compile_canonical_feature_design_operation
-            ),
-            "apply_sentence_design_trace": apply_sentence_design_trace,
-            "materialize_feature_intents": materialize_feature_intents,
-            "compile_verification_obligations": compile_verification_obligations,
-            "assert_verification_obligations_complete": (
-                assert_verification_obligations_complete
-            ),
-        }
-
         def bind_handler(
             handler: Callable[[], Any],
         ) -> Callable[[Mapping[str, Any]], Any]:
@@ -430,7 +622,30 @@ class FeatureCommandRuntime:
 
         runtime_catalog = feature_command_catalog(
             implementations={
-                name: bind_handler(handler) for name, handler in handlers.items()
+                "extract_proposal_issues": bind_handler(extract_proposal_issues),
+                "aggregate_category_edits": bind_handler(aggregate_category_edits),
+                "decompose_feature_description": bind_handler(
+                    decompose_feature_description
+                ),
+                "compile_instruction_ledger": bind_handler(
+                    compile_instruction_ledger_operation
+                ),
+                "merge_semantic_design": bind_handler(merge_semantic_design_operation),
+                "compile_canonical_feature_design": bind_handler(
+                    compile_canonical_feature_design_operation
+                ),
+                "apply_sentence_design_trace": bind_handler(
+                    apply_sentence_design_trace
+                ),
+                "materialize_feature_intents": bind_handler(
+                    materialize_feature_intents
+                ),
+                "compile_verification_obligations": bind_handler(
+                    compile_verification_obligations
+                ),
+                "assert_verification_obligations_complete": bind_handler(
+                    assert_verification_obligations_complete
+                ),
             }
         )
         spec = runtime_catalog.get(name)

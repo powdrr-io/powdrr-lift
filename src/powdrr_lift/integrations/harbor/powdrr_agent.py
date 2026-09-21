@@ -50,6 +50,21 @@ class PowdrrAgent(BaseInstalledAgent):
         package = self._get_env("POWDRR_INSTALL_SPEC") or (
             f"powdrr-lift=={POWDRR_VERSION}"
         )
+        code_agent = self._code_agent()
+        if code_agent == "minisweagent":
+            agent_install = InstallStep(
+                run=(
+                    "python3 -m pip install --user --upgrade --no-cache-dir "
+                    "--disable-pip-version-check mini-swe-agent"
+                )
+            )
+            verification = "powdrr-lift --help >/dev/null && mini --help >/dev/null"
+        else:
+            agent_install = InstallStep(
+                run=f"npm install --global opencode-ai@{OPENCODE_VERSION}",
+                user="root",
+            )
+            verification = "powdrr-lift --help >/dev/null && opencode --version"
         return AgentInstallSpec(
             agent_name=self.name(),
             version=self.version(),
@@ -61,12 +76,9 @@ class PowdrrAgent(BaseInstalledAgent):
                         f"{shlex.quote(package)}"
                     )
                 ),
-                InstallStep(
-                    run=f"npm install --global opencode-ai@{OPENCODE_VERSION}",
-                    user="root",
-                ),
+                agent_install,
             ],
-            verification_command="powdrr-lift --help >/dev/null && opencode --version",
+            verification_command=verification,
         )
 
     def network_allowlist(self) -> Any:
@@ -115,16 +127,27 @@ class PowdrrAgent(BaseInstalledAgent):
             ),
         )
 
-        # OpenCode documents opencode-ai as its npm installation package. Keep
-        # this conditional so a prebuilt Harbor image does not reinstall it.
-        await self.exec_as_root(
-            environment,
-            command=(
-                "if ! command -v opencode >/dev/null 2>&1; then "
-                f"npm install --global opencode-ai@{OPENCODE_VERSION}; "
-                "fi"
-            ),
-        )
+        if self._code_agent() == "minisweagent":
+            await self.exec_as_agent(
+                environment,
+                command=(
+                    "if ! command -v mini >/dev/null 2>&1; then "
+                    "python3 -m pip install --user --upgrade --no-cache-dir "
+                    "--disable-pip-version-check mini-swe-agent; "
+                    "fi"
+                ),
+            )
+        else:
+            # OpenCode documents opencode-ai as its npm installation package. Keep
+            # this conditional so a prebuilt Harbor image does not reinstall it.
+            await self.exec_as_root(
+                environment,
+                command=(
+                    "if ! command -v opencode >/dev/null 2>&1; then "
+                    f"npm install --global opencode-ai@{OPENCODE_VERSION}; "
+                    "fi"
+                ),
+            )
 
     async def run(
         self,
@@ -158,7 +181,21 @@ class PowdrrAgent(BaseInstalledAgent):
             "deepinfra",
             "--opencode-model",
             "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+            "--code-agent",
+            self._code_agent(),
         ]
+        minisweagent_executable = self._get_env("POWDRR_MINISWEAGENT_EXECUTABLE")
+        if minisweagent_executable:
+            command.extend(("--minisweagent-executable", minisweagent_executable))
+        minisweagent_model = self._get_env("POWDRR_MINISWEAGENT_MODEL")
+        if minisweagent_model:
+            command.extend(("--minisweagent-model", minisweagent_model))
+        prompt_prefix = self._get_env("POWDRR_CODE_AGENT_PROMPT_PREFIX")
+        if prompt_prefix:
+            command.extend(("--code-agent-prompt-prefix", prompt_prefix))
+        prompt_suffix = self._get_env("POWDRR_CODE_AGENT_PROMPT_SUFFIX")
+        if prompt_suffix:
+            command.extend(("--code-agent-prompt-suffix", prompt_suffix))
         for path in _split_paths(self._get_env("POWDRR_ALLOWED_PATHS") or "."):
             command.extend(("--allowed-path", path))
 
@@ -209,6 +246,12 @@ class PowdrrAgent(BaseInstalledAgent):
             env=provider_env,
             cwd=repo_root,
         )
+
+    def _code_agent(self) -> str:
+        code_agent = self._get_env("POWDRR_CODE_AGENT") or "opencode"
+        if code_agent not in {"opencode", "minisweagent"}:
+            raise ValueError("POWDRR_CODE_AGENT must be 'opencode' or 'minisweagent'")
+        return code_agent
 
 
 def _split_paths(value: str) -> tuple[str, ...]:

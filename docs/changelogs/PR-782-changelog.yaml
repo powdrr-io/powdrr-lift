@@ -1,0 +1,67 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 782
+title: Support transparent code-agent targeting
+intent:
+  problem: Procedrr implementation steps are coupled to OpenCode, so Powdrr cannot select another coding agent or adapt the handoff prompt to that agent.
+  goal: Route implementation requests through a provider-neutral code-agent boundary with configurable OpenCode and mini-SWE-agent targets and tailored prompts.
+human-decisions:
+  - id: provider-neutral-implementation
+    summary: Keep the feature flow's implementation command independent of the selected coding-agent provider.
+  - id: provider-specific-prompting
+    summary: Allow configured prompt prefixes and suffixes to tailor the same bounded implementation request for a selected provider.
+structured_files: []
+files:
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Rename the implementation command in the primary flow, rationale: Keep the flow provider-neutral, span: {start_line: 165, end_line: 165}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Rename the implementation command in the first repair recovery, rationale: Keep repair dispatch provider-neutral, span: {start_line: 474, end_line: 474}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Rename the implementation command in the second repair recovery, rationale: Keep repair dispatch provider-neutral, span: {start_line: 563, end_line: 563}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Rename the implementation command in the third repair recovery, rationale: Keep repair dispatch provider-neutral, span: {start_line: 645, end_line: 645}}
+  - {path: docs/procedrr/skill-definitions/implement-feature.yaml, type: modified, summary: Rename the implementation command in the final repair recovery, rationale: Keep repair dispatch provider-neutral, span: {start_line: 727, end_line: 727}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Import the provider factory, rationale: Route direct worker execution through the common boundary, span: {start_line: 164, end_line: 164}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Generalize the feature command help text, rationale: Describe the selected code agent rather than a fixed provider, span: {start_line: 1373, end_line: 1374}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Add code-agent selection to workrr-feature, rationale: Allow feature runs to target supported providers, span: {start_line: 1392, end_line: 1394}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Add provider-specific executable, model, and prompt options to workrr-feature, rationale: Configure the selected agent and its tailored handoff, span: {start_line: 1400, end_line: 1403}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Add code-agent options to harbor-feature, rationale: Keep sandboxed feature runs configurable, span: {start_line: 1449, end_line: 1455}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Add code-agent options to run-coding-agent, rationale: Expose the same provider boundary for direct attempts, span: {start_line: 2156, end_line: 2162}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Generalize the direct-agent timeout help, rationale: Make activity monitoring provider-neutral, span: {start_line: 2167, end_line: 2167}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Build the configured provider for direct attempts, rationale: Centralize target selection and prompt tailoring, span: {start_line: 2845, end_line: 2859}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Pass code-agent configuration into workrr-feature, rationale: Preserve target selection through the feature endpoint, span: {start_line: 4510, end_line: 4510}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Pass prompt and mini-SWE-agent settings into workrr-feature, rationale: Preserve provider-specific configuration, span: {start_line: 4513, end_line: 4516}}
+  - {path: src/powdrr_lift/cli.py, type: modified, summary: Pass code-agent configuration into harbor-feature, rationale: Preserve target selection in Harbor runs, span: {start_line: 4571, end_line: 4575}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Generalize the provider protocol documentation, rationale: Define the boundary for multiple coding agents, span: {start_line: 16, end_line: 16}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Generalize the provider protocol documentation, rationale: Define the boundary for multiple coding agents, span: {start_line: 283, end_line: 283}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Add prompt preparation to OpenCode, rationale: Allow the provider to receive a configured tailored request, span: {start_line: 336, end_line: 340}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: added, summary: Implement mini-SWE-agent execution and the provider factory, rationale: Support a second target behind the same Workrr interface, span: {start_line: 406, end_line: 508}}
+  - {path: src/powdrr_lift/workrr/coding_agent.py, type: modified, summary: Prepare requests before persistence and dispatch, rationale: Record the exact prompt sent to the selected provider, span: {start_line: 651, end_line: 653}}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, summary: Rename the command catalog entry to run_code_agent, rationale: Remove OpenCode coupling from Procedrr contracts, span: {start_line: 181, end_line: 182}}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, summary: Rename the command implementation lookup, rationale: Keep catalog dispatch aligned with the flow command, span: {start_line: 200, end_line: 200}}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, summary: Dispatch run_code_agent through the endpoint, rationale: Preserve the existing implementation phase under a neutral name, span: {start_line: 715, end_line: 716}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Import supported provider types, rationale: Allow endpoint state to hold either configured target, span: {start_line: 76, end_line: 76}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Import the provider factory, rationale: Centralize provider selection, span: {start_line: 79, end_line: 79}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Add code-agent and prompt configuration, rationale: Make target and tailored handoff settings part of Workrr configuration, span: {start_line: 124, end_line: 128}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Rename the implementation phase, rationale: Remove the endpoint's OpenCode-specific command terminology, span: {start_line: 1740, end_line: 1740}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Build the configured provider through one factory, rationale: Keep OpenCode and mini-SWE-agent dispatch transparent to the flow, span: {start_line: 1898, end_line: 1917}}
+  - {path: tests/test_coding_agent.py, type: modified, summary: Import the mini-SWE-agent provider in tests, rationale: Exercise the second supported target, span: {start_line: 16, end_line: 16}}
+  - {path: tests/test_coding_agent.py, type: added, summary: Test mini-SWE-agent command construction and prompt tailoring, rationale: Lock in provider-specific invocation and diagnostics behavior, span: {start_line: 193, end_line: 228}}
+  - {path: tests/test_coding_agent.py, type: modified, summary: Patch the shared provider factory in the CLI test, rationale: Test the new injection boundary rather than a concrete provider, span: {start_line: 605, end_line: 606}}
+  - {path: tests/test_feature_endpoint.py, type: modified, summary: Assert the shared feature flow uses run_code_agent, rationale: Prevent reintroduction of provider-specific flow commands, span: {start_line: 759, end_line: 759}}
+entities: []
+entity_relationships: []
+invariants:
+  - id: provider-neutral-flow-command
+    action: added
+    description: The implement-feature Procedrr flow invokes run_code_agent rather than naming a concrete coding-agent provider.
+    rationale: Provider selection belongs to Workrr configuration, not to the reusable flow definition.
+  - id: exact-targeted-prompt-recording
+    action: added
+    description: A configured provider prompt prefix or suffix is applied before the request and prompt artifacts are persisted.
+    rationale: Diagnostics and replay must represent the prompt that the selected agent actually received.
+  - id: bounded-provider-selection
+    action: added
+    description: Supported targets are explicitly limited to opencode and minisweagent at the common factory boundary.
+    rationale: Reject unsupported worker targets before an implementation attempt starts.
+guidance:
+  - id: configure-code-agent
+    action: added
+    description: Use --code-agent together with the provider executable, model, and prompt prefix or suffix options when invoking a feature or direct coding-agent run.
+    rationale: Keep provider-specific operational choices outside the shared Procedrr flow.
+proposed_prs: []

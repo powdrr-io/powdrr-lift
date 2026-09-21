@@ -101,7 +101,9 @@ def parse_document(source: str, *, source_format: str = "auto") -> dict[str, Any
     return dict(document)
 
 
-def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, ...]:
+def validate_document(
+    document: Mapping[str, Any], *, command_catalog: Any | None = None
+) -> tuple[DocumentDiagnostic, ...]:
     diagnostics: list[DocumentDiagnostic] = []
     if not isinstance(document.get("name"), str) or not document["name"].strip():
         diagnostics.append(
@@ -198,7 +200,14 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
             for item in document.get("inputs", [])
             if isinstance(item, Mapping) and isinstance(item.get("name"), str)
         }
-        _validate_steps(steps, "steps", diagnostics, bindings, recovery_names)
+        _validate_steps(
+            steps,
+            "steps",
+            diagnostics,
+            bindings,
+            recovery_names,
+            command_catalog,
+        )
     if recoveries is not None and not isinstance(recoveries, Mapping):
         diagnostics.append(
             DocumentDiagnostic("recoveries", "recoveries must be a mapping")
@@ -238,13 +247,19 @@ def validate_document(document: Mapping[str, Any]) -> tuple[DocumentDiagnostic, 
                     diagnostics,
                     set(bindings) | {"failure"} | recovery_inputs,
                     recovery_names,
+                    command_catalog,
                 )
     return tuple(diagnostics)
 
 
-def parse_and_validate(source: str, *, source_format: str = "auto") -> dict[str, Any]:
+def parse_and_validate(
+    source: str,
+    *,
+    source_format: str = "auto",
+    command_catalog: Any | None = None,
+) -> dict[str, Any]:
     document = parse_document(source, source_format=source_format)
-    diagnostics = validate_document(document)
+    diagnostics = validate_document(document, command_catalog=command_catalog)
     if diagnostics:
         detail = "; ".join(f"{item.path}: {item.message}" for item in diagnostics)
         raise ParseError(detail)
@@ -350,6 +365,7 @@ def _validate_steps(
     diagnostics: list[DocumentDiagnostic],
     bindings: set[str],
     recovery_names: set[Any] | None = None,
+    command_catalog: Any | None = None,
 ) -> None:
     for index, step in enumerate(steps):
         step_path = f"{path}[{index}]"
@@ -665,6 +681,7 @@ def _validate_steps(
                     diagnostics,
                     nested_bindings,
                     recovery_names,
+                    command_catalog,
                 )
                 bindings.update(nested_bindings)
                 if isinstance(collect, Mapping):
@@ -724,6 +741,7 @@ def _validate_steps(
                             diagnostics,
                             branch_bindings,
                             recovery_names,
+                            command_catalog,
                         )
                         branch_results.append(branch_bindings)
             default = value.get("default") if isinstance(value, Mapping) else None
@@ -745,6 +763,7 @@ def _validate_steps(
                     diagnostics,
                     default_bindings,
                     recovery_names,
+                    command_catalog,
                 )
                 branch_results.append(default_bindings)
             if branch_results:
@@ -819,6 +838,7 @@ def _validate_steps(
                     diagnostics,
                     nested_bindings,
                     recovery_names,
+                    command_catalog,
                 )
                 bindings.update(nested_bindings)
         elif control in {"for_each", "worklist", "call"}:
@@ -899,6 +919,7 @@ def _validate_steps(
                     diagnostics,
                     local,
                     recovery_names,
+                    command_catalog,
                 )
                 if isinstance(collect, Mapping):
                     _validate_collect(
@@ -992,6 +1013,31 @@ def _validate_steps(
                             "internal requires a non-empty string command list",
                         )
                     )
+                if (
+                    command_catalog is not None
+                    and isinstance(command, list)
+                    and command
+                    and isinstance(command[0], str)
+                ):
+                    spec = command_catalog.get(command[0])
+                    if spec is None:
+                        diagnostics.append(
+                            DocumentDiagnostic(
+                                f"{step_path}.operation.command",
+                                f"unknown cataloged internal command: {command[0]!r}",
+                            )
+                        )
+                    else:
+                        raw_parameters = operation.get("parameters", {})
+                        if not isinstance(raw_parameters, Mapping):
+                            raw_parameters = {}
+                        for message in spec.static_input_errors(raw_parameters):
+                            diagnostics.append(
+                                DocumentDiagnostic(
+                                    f"{step_path}.operation.parameters",
+                                    message,
+                                )
+                            )
             returns = (
                 operation.get("returns") if isinstance(operation, Mapping) else None
             )

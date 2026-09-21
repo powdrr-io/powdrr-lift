@@ -93,6 +93,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationResultStatus,
     ValidationRunner,
 )
+from powdrr_lift.workrr.command_catalog import feature_command_catalog
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
@@ -279,7 +280,10 @@ def _execute_procedrr_flow(
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {"task_id": config.task_id or config.work_item_name}
     flow_path = _validate_procedrr_flow(worktree)
-    flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
+    command_catalog = feature_command_catalog()
+    flow = parse_and_validate(
+        flow_path.read_text(encoding="utf-8"), command_catalog=command_catalog
+    )
     validation_profiles = _bootstrap_validation_profiles(
         worktree,
         output_root=output_root,
@@ -335,6 +339,19 @@ def _execute_procedrr_flow(
         if not isinstance(command, list) or not command:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         name = command[0]
+        if isinstance(name, str):
+            spec = command_catalog.get(name)
+            if spec is not None:
+                try:
+                    spec.validate_input(
+                        {
+                            key: value
+                            for key, value in parameters.items()
+                            if key != "command"
+                        }
+                    )
+                except ValueError as exc:
+                    raise PowdrrExecutionError(str(exc)) from exc
         if name == "ensure_current_structrr":
             state["baseline_path"] = _ensure_current_baseline(worktree, runner)
             return {"path": str(state["baseline_path"])}
@@ -563,9 +580,24 @@ def _execute_procedrr_flow(
                 assert_verification_obligations_complete
             ),
         }
+
+        def bind_handler(
+            handler: Callable[[], Any],
+        ) -> Callable[[Mapping[str, Any]], Any]:
+            def dispatch(_parameters: Mapping[str, Any]) -> Any:
+                return handler()
+
+            return dispatch
+
+        runtime_catalog = command_catalog.with_logic(
+            {name: bind_handler(handler) for name, handler in handlers.items()}
+        )
         handler = handlers.get(name)
         if handler is not None:
-            return handler()
+            return runtime_catalog.dispatch(
+                name,
+                {key: value for key, value in parameters.items() if key != "command"},
+            )
         if len(command) != 1:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         if name == "plan_structrr_diff":
@@ -807,6 +839,7 @@ def _execute_procedrr_flow(
                     skills_dir=flow_directory,
                 )
             },
+            command_catalog=command_catalog,
         )
         evaluator.evaluate(
             flow,
@@ -3875,7 +3908,10 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     if not path.is_file():
         path = Path(__file__).resolve().parents[2] / "implement-feature.yaml"
     try:
-        parse_and_validate(path.read_text(encoding="utf-8"))
+        parse_and_validate(
+            path.read_text(encoding="utf-8"),
+            command_catalog=feature_command_catalog(),
+        )
     except (OSError, ValueError) as error:
         raise PowdrrExecutionError(
             f"Shared feature Procedrr definition is invalid: {path}: {error}"

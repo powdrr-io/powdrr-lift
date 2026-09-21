@@ -86,3 +86,44 @@ def test_feature_design_compiler_rejects_model_authored_structural_fields() -> N
     design = compile_feature_design(ledger, "feature", semantic)
 
     assert design.obligations[0].obligation_id == "obligation:instruction-001"
+
+
+def test_nonactionable_clause_is_trace_only() -> None:
+    ledger = compile_instruction_ledger(
+        "feature", "Implement state data. Create a branch from main."
+    )
+    semantic = _semantic(2)
+    semantic[1]["design"] = {
+        "kind": "nonactionable",
+        "description": "Ignore the branch instruction as process metadata.",
+        "acceptance_criterion": (
+            "No product obligation is created for the branch instruction."
+        ),
+        "expected_test": "No product test is required.",
+    }
+
+    design = compile_feature_design(ledger, "feature", semantic)
+
+    assert [item.clause_id for item in design.projections] == [
+        "instruction-001",
+        "instruction-002",
+    ]
+    assert [item.clause_id for item in design.obligations] == ["instruction-001"]
+    assert len(design.test_contracts) == 1
+
+
+def test_non_goal_cannot_invert_a_missing_capability_into_a_prohibition() -> None:
+    ledger = compile_instruction_ledger("feature", "States lack data ownership.")
+    semantic = [
+        {
+            "design": {
+                "kind": "non_goal",
+                "description": "Do not implement data ownership.",
+                "acceptance_criterion": "Data ownership is absent.",
+                "expected_test": "Verify data ownership is absent.",
+            }
+        }
+    ]
+
+    with pytest.raises(FeatureObligationError, match="explicit product prohibition"):
+        compile_feature_design(ledger, "feature", semantic)

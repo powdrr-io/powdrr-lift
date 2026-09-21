@@ -448,6 +448,7 @@ def _execute_procedrr_flow(
                 "invariant",
                 "guidance",
                 "non_goal",
+                "nonactionable",
             }:
                 raise PowdrrExecutionError("merge_semantic_design kind is invalid")
             return values
@@ -501,10 +502,10 @@ def _execute_procedrr_flow(
                     "description": item.projection.expected_test,
                     "intent_refs": [f"feature-obligation-sentence-{index}"],
                     "expected_outcome": item.projection.acceptance_criterion,
-                    "test_selection": _select_matching_test_inventory(
-                        item.projection.expected_test,
-                        state.get("provider_inventory", ()),
-                    ),
+                    # Every feature obligation gets a new focused test. Existing
+                    # inventory is repository context, not a list of tests for
+                    # OpenCode to retrofit onto unrelated selectors.
+                    "test_selection": "new",
                 }
                 for index, item in enumerate(design.obligations, start=1)
             ]

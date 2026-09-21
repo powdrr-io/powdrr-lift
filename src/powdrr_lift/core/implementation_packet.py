@@ -102,16 +102,10 @@ class ImplementationPacket:
 
     def render(self) -> str:
         tests = self.to_data()["required_tests"]
-        existing = self.repository.existing_tests
         test_lines = [
             f"- required test {item['ordinal']:03d}: {item['selector']} "
             f"({item['provider']}/{item['profile']}) — {item['description']}"
             for item in tests
-        ] or ["- none"]
-        existing_lines = [
-            f"- candidate {index}: {item.get('selector', '')} "
-            f"({item.get('provider', '')}/{item.get('profile', '')})"
-            for index, item in enumerate(existing, start=1)
         ] or ["- none"]
         obligation_lines = [
             f"- obligation {index:03d}: {description}"
@@ -120,22 +114,14 @@ class ImplementationPacket:
         return "\n".join(
             (
                 "Implement the requested feature using this bounded packet.",
-                f"Objective: {self.objective}",
+                "Original feature description:",
+                self.objective,
                 "\nObligations (in compiler order):",
                 *obligation_lines,
                 "\nRequired tests (create the exact selectors):",
                 *test_lines,
-                "\nExisting test inventory (use only these selectors when "
-                "reusing a test):",
-                *existing_lines,
-                "\nRepository constraints:",
-                "- allowed paths: "
-                f"{', '.join(self.repository.allowed_paths) or 'none'}",
-                "- validation profiles: "
-                + (", ".join(self.repository.validation_profiles) or "none"),
-                "\nDo not invent identifiers, selectors, or references. Do not edit "
-                "generated Powdrr artifacts. Do not change files outside the allowed "
-                "paths. Run the requested tests before reporting completion.",
+                "\nImplement only the original description and obligations above. "
+                "Create only the listed new tests, then stop.",
             )
         )
 

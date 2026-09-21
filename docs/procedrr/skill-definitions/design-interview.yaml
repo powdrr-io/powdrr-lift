@@ -77,7 +77,10 @@ steps:
             subject: instruction_clause.text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Classify only this clause as entity, feature, interface, invariant, guidance, or non_goal.
+              - Classify only this clause as entity, feature, interface, invariant, guidance, non_goal, or nonactionable.
+              - Use nonactionable for process, tooling, delivery, or meta-instructions that do not describe product behavior. Examples include "create a branch from main", "commit everything", "open a PR", "run this with tool X", and "report the result".
+              - A statement that a capability is missing, manual, unsafe, or currently absent is not nonactionable; it is feature context when the surrounding request asks for that capability.
+              - Use non_goal only for an explicit product prohibition or scope exclusion, such as "do not change the transport" or "this feature must not add retries". Do not infer a non-goal from words such as "lacks", "without", or "manual".
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
             context: [feature_description, instruction_clause]
             output:
@@ -89,7 +92,7 @@ steps:
                 properties:
                   kind:
                     type: string
-                    enum: [entity, feature, interface, invariant, guidance, non_goal]
+                    enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable]
             validation: {kind: json_schema}
         - judge:
             kind: construct_one
@@ -99,6 +102,7 @@ steps:
             prompt_system: Return only the declared JSON object.
             instructions:
               - Use the supplied kind classification and translate only this clause into one semantic obligation.
+              - If the kind is nonactionable, produce a trace-only disposition; it must not describe an implementation obligation or a required test.
               - For a normal clause, write description as one short imperative sentence naming one behavior, API, invariant, or constraint to implement.
               - For a normal clause, write acceptance_criterion as one short observable assertion that proves the described obligation.
               - Preserve concrete names, values, conditions, and prohibitions from the clause, but do not explain, summarize, enumerate scenarios, or add design choices not present in the clause.
@@ -109,6 +113,9 @@ steps:
                   - Treat this as an explicit non-goal, not an implementation task.
                   - Write description as one short sentence beginning with "Do not implement" that names only the excluded behavior.
                   - Write acceptance_criterion as one short observable assertion that proves the excluded behavior was not introduced.
+              - when: {binding: semantic_kind.kind, equals: nonactionable}
+                instructions:
+                  - State that the clause is ignored as a process or meta-instruction and must not become a product obligation or test contract.
             context: [feature_description, instruction_clause, semantic_kind]
             output:
               name: semantic_obligation
@@ -134,6 +141,8 @@ steps:
               - when: {binding: semantic_kind.kind, equals: non_goal}
                 instructions:
                   - State one short test or guard that proves the excluded behavior is not introduced.
+              - when: {binding: semantic_kind.kind, equals: nonactionable}
+                instructions: ["Return a trace-only statement: no product test is required because this clause is not actionable."]
             context: [feature_description, instruction_clause, semantic_kind, semantic_obligation]
             output:
               name: semantic_test_contract

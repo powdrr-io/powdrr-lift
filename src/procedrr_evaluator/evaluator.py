@@ -50,6 +50,7 @@ class EvaluationResult:
     events: tuple[EvaluationEvent, ...]
     llm_activations: int
     tool_calls: int
+    binding_schemas: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
 
 class Evaluator:
@@ -62,6 +63,7 @@ class Evaluator:
         *,
         process_directory: Path | None = None,
         judge_clients: Mapping[str, WorkflowLLMClient] | None = None,
+        command_catalog: Any | None = None,
     ) -> None:
         self.llm = llm
         self.operation_executor = operation_executor
@@ -69,6 +71,8 @@ class Evaluator:
         self.process_directory = process_directory or Path(
             "docs/procedrr/skill-definitions"
         )
+        self.command_catalog = command_catalog
+        self._schemas_by_state: dict[int, dict[str, Mapping[str, Any]]] = {}
 
     @classmethod
     def with_workrr(
@@ -98,6 +102,7 @@ class Evaluator:
         bindings: Mapping[str, Any] | None = None,
     ) -> EvaluationResult:
         state = dict(bindings or {})
+        self._schemas_by_state = {id(state): {}}
         self._document_recoveries = document.get("recoveries", {})
         events: list[EvaluationEvent] = []
         usage = {"llm": 0, "tools": 0}
@@ -106,7 +111,16 @@ class Evaluator:
             self._steps(document["steps"], state, events, usage, limits, "steps")
         except (KeyError, TypeError, ValueError, JsonSchemaError) as exc:
             raise EvaluationError(str(exc)) from exc
-        return EvaluationResult(state, tuple(events), usage["llm"], usage["tools"])
+        return EvaluationResult(
+            state,
+            tuple(events),
+            usage["llm"],
+            usage["tools"],
+            dict(self._schemas_by_state[id(state)]),
+        )
+
+    def _schemas_for_state(self, state: dict[str, Any]) -> dict[str, Mapping[str, Any]]:
+        return self._schemas_by_state.setdefault(id(state), {})
 
     def _steps(
         self,
@@ -237,7 +251,10 @@ class Evaluator:
         path = self.process_directory / f"{name}.yaml"
         if not path.is_file():
             raise EvaluationError(f"Procedrr subprocess does not exist: {path}")
-        return parse_and_validate(path.read_text(encoding="utf-8"))
+        return parse_and_validate(
+            path.read_text(encoding="utf-8"),
+            command_catalog=self.command_catalog,
+        )
 
     def _call_fragment(
         self,
@@ -308,6 +325,12 @@ class Evaluator:
         child_state = {
             str(name): _resolve_value(value, state) for name, value in inputs.items()
         }
+        child_schemas: dict[str, Mapping[str, Any]] = {
+            str(name): dict(self._schemas_for_state(state).get(str(name), {}))
+            for name in inputs
+            if str(name) in self._schemas_for_state(state)
+        }
+        self._schemas_by_state[id(child_state)] = child_schemas
         missing = sorted(name for name in required_inputs if name not in child_state)
         if missing:
             raise EvaluationError(
@@ -349,6 +372,8 @@ class Evaluator:
             if isinstance(schema, Mapping):
                 validate_json(value, schema)
             state[parent_name] = value
+            if isinstance(schema, Mapping):
+                self._schemas_for_state(state)[parent_name] = dict(schema)
         events.append(
             EvaluationEvent(
                 "process",
@@ -510,13 +535,40 @@ class Evaluator:
                 "command": _resolve_value(operation["command"], state),
                 **parameters,
             }
+        if self.command_catalog is not None and tool == "internal":
+            command = (
+                parameters.get("command") if isinstance(parameters, Mapping) else None
+            )
+            if (
+                isinstance(command, Sequence)
+                and command
+                and isinstance(command[0], str)
+            ):
+                spec = self.command_catalog.get(command[0])
+                if spec is None:
+                    raise EvaluationError(
+                        f"unknown cataloged internal command: {command[0]!r}"
+                    )
+                try:
+                    spec.validate_input(
+                        {
+                            key: value
+                            for key, value in parameters.items()
+                            if key != "command"
+                        }
+                    )
+                except ValueError as exc:
+                    raise EvaluationError(str(exc)) from exc
         result = self.operation_executor(tool, parameters)
         returns = operation.get("returns")
-        if isinstance(returns, Mapping):
-            validate_json(result, returns)
+        output_schema = returns if isinstance(returns, Mapping) else None
+        if isinstance(output_schema, Mapping):
+            validate_json(result, output_schema)
         bind = operation.get("bind")
         if isinstance(bind, str):
             state[bind] = result
+            if isinstance(output_schema, Mapping):
+                self._schemas_for_state(state)[bind] = dict(output_schema)
         events.append(EvaluationEvent("operation", path, {"tool": tool, "bind": bind}))
 
     def _judge(
@@ -578,6 +630,7 @@ class Evaluator:
             output = client.complete_json(messages)
         validate_json(output, judge["output"]["schema"])
         state[judge["output"]["name"]] = output
+        self._schemas_for_state(state)[judge["output"]["name"]] = dict(schema)
         events.append(
             EvaluationEvent(
                 "judge",

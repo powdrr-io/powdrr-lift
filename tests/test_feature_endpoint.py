@@ -813,7 +813,7 @@ def test_feature_flow_is_shared_and_validated() -> None:
         and "feature_description: {type: reference, value: feature_description}" in flow
     )
     assert "provider: opencode" not in flow
-    assert flow.count("command: [run_opencode]") == 5
+    assert flow.count("command: [run_code_agent]") == 5
 
 
 def test_required_test_obligation_compiles_against_discovered_inventory() -> None:

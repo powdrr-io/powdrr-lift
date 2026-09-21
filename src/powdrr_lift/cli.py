@@ -161,7 +161,7 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentStatus,
     ImplementationRequest,
     OpenCodePermissionPolicy,
-    OpenCodeProvider,
+    build_coding_agent_provider,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationReportStatus,
@@ -1370,7 +1370,8 @@ def build_parser() -> argparse.ArgumentParser:
         "workrr-feature",
         aliases=["workrr_feature"],
         help=(
-            "Plan a feature in Structrr, implement it with OpenCode, validate and "
+            "Plan a feature in Structrr, implement it with the selected code agent, "
+            "validate and "
             "review the diff, then open a pull request."
         ),
     )
@@ -1388,11 +1389,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     workrr_feature_parser.add_argument("--base-branch", default="main")
+    workrr_feature_parser.add_argument(
+        "--code-agent", choices=("opencode", "minisweagent"), default="opencode"
+    )
     workrr_feature_parser.add_argument("--opencode-executable", default="opencode")
     workrr_feature_parser.add_argument(
         "--opencode-model",
         default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
     )
+    workrr_feature_parser.add_argument("--minisweagent-executable", default="mini")
+    workrr_feature_parser.add_argument("--minisweagent-model")
+    workrr_feature_parser.add_argument("--code-agent-prompt-prefix", default="")
+    workrr_feature_parser.add_argument("--code-agent-prompt-suffix", default="")
     workrr_feature_parser.add_argument(
         "--planning-provider",
         default="deepinfra-cheap",
@@ -1438,6 +1446,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--opencode-model",
         default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
     )
+    harbor_feature_parser.add_argument(
+        "--code-agent", choices=("opencode", "minisweagent"), default="opencode"
+    )
+    harbor_feature_parser.add_argument("--minisweagent-executable", default="mini")
+    harbor_feature_parser.add_argument("--minisweagent-model")
+    harbor_feature_parser.add_argument("--code-agent-prompt-prefix", default="")
+    harbor_feature_parser.add_argument("--code-agent-prompt-suffix", default="")
     harbor_feature_parser.add_argument(
         "--planning-provider",
         default="deepinfra",
@@ -2139,10 +2154,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     coding_agent_parser.add_argument(
+        "--code-agent", choices=("opencode", "minisweagent"), default="opencode"
+    )
+    coding_agent_parser.add_argument("--minisweagent-executable", default="mini")
+    coding_agent_parser.add_argument("--minisweagent-model")
+    coding_agent_parser.add_argument("--code-agent-prompt-prefix", default="")
+    coding_agent_parser.add_argument("--code-agent-prompt-suffix", default="")
+    coding_agent_parser.add_argument(
         "--timeout-seconds",
         type=float,
         default=300.0,
-        help="Maximum seconds without Procedrr or OpenCode activity (default: 300).",
+        help="Maximum seconds without Procedrr or code-agent activity (default: 300).",
     )
     coding_agent_parser.add_argument(
         "--validation-timeout-seconds", type=float, default=600.0
@@ -2820,12 +2842,21 @@ def _run_compile_execution_plan(args: argparse.Namespace) -> int:
 def _run_coding_agent(args: argparse.Namespace) -> int:
     request_data = _load_structured_mapping(args.request)
     request = ImplementationRequest.from_data(request_data)
-    provider = OpenCodeProvider(
-        executable=args.opencode_executable,
-        model=args.opencode_model,
-        timeout_seconds=args.timeout_seconds,
-        permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
-    )
+    try:
+        provider = build_coding_agent_provider(
+            args.code_agent,
+            opencode_executable=args.opencode_executable,
+            opencode_model=args.opencode_model,
+            minisweagent_executable=args.minisweagent_executable,
+            minisweagent_model=args.minisweagent_model,
+            timeout_seconds=args.timeout_seconds,
+            diagnostics_root=args.output_dir / args.code_agent,
+            prompt_prefix=args.code_agent_prompt_prefix,
+            prompt_suffix=args.code_agent_prompt_suffix,
+            permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     runner = CodingAgentRunner(
         provider=provider,
         store=CodingAgentAttemptStore(args.output_dir),
@@ -4476,8 +4507,13 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
                 else ()
             ),
             base_branch=args.base_branch,
+            code_agent=args.code_agent,
             opencode_executable=args.opencode_executable,
             opencode_model=args.opencode_model,
+            minisweagent_executable=args.minisweagent_executable,
+            minisweagent_model=args.minisweagent_model,
+            code_agent_prompt_prefix=args.code_agent_prompt_prefix,
+            code_agent_prompt_suffix=args.code_agent_prompt_suffix,
             output_root=args.output_root,
             open_pr=not args.no_open_pr,
             planning_client=planning_client,
@@ -4532,6 +4568,11 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             ),
             opencode_executable=args.opencode_executable,
             opencode_model=args.opencode_model,
+            code_agent=args.code_agent,
+            minisweagent_executable=args.minisweagent_executable,
+            minisweagent_model=args.minisweagent_model,
+            code_agent_prompt_prefix=args.code_agent_prompt_prefix,
+            code_agent_prompt_suffix=args.code_agent_prompt_suffix,
             output_root=args.output_root,
             open_pr=False,
             push_changes=False,

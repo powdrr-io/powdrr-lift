@@ -22,16 +22,7 @@ from powdrr_lift.core.decision_obligation import (
     evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
-from powdrr_lift.core.feature_obligation import (
-    FeatureObligationError,
-    compile_feature_design,
-)
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
-from powdrr_lift.core.instruction_ledger import (
-    InstructionLedger,
-    InstructionLedgerError,
-    compile_instruction_ledger,
-)
 from powdrr_lift.core.obligation_review import (
     ObligationEvidencePacket,
     ObligationReviewError,
@@ -82,8 +73,10 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
+    MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
     OpenCodeProvider,
+    build_coding_agent_provider,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
@@ -92,6 +85,10 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationResult,
     ValidationResultStatus,
     ValidationRunner,
+)
+from powdrr_lift.workrr.command_catalog import (
+    FeatureCommandRuntime,
+    feature_command_catalog,
 )
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
@@ -124,6 +121,11 @@ class FeatureEndpointConfig:
     base_branch: str = "main"
     opencode_executable: str = "opencode"
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    code_agent: str = "opencode"
+    minisweagent_executable: str = "mini"
+    minisweagent_model: str | None = None
+    code_agent_prompt_prefix: str = ""
+    code_agent_prompt_suffix: str = ""
     output_root: Path | None = None
     open_pr: bool = True
     push_changes: bool = True
@@ -279,7 +281,20 @@ def _execute_procedrr_flow(
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {"task_id": config.task_id or config.work_item_name}
     flow_path = _validate_procedrr_flow(worktree)
-    flow = parse_and_validate(flow_path.read_text(encoding="utf-8"))
+    command_catalog = feature_command_catalog()
+    command_runtime = FeatureCommandRuntime(
+        config=config,
+        runner=runner,
+        worktree=worktree,
+        output_root=output_root,
+        branch=branch,
+        slug=slug,
+        state=state,
+        catalog=command_catalog,
+    )
+    flow = parse_and_validate(
+        flow_path.read_text(encoding="utf-8"), command_catalog=command_catalog
+    )
     validation_profiles = _bootstrap_validation_profiles(
         worktree,
         output_root=output_root,
@@ -335,476 +350,24 @@ def _execute_procedrr_flow(
         if not isinstance(command, list) or not command:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         name = command[0]
-        if name == "ensure_current_structrr":
-            state["baseline_path"] = _ensure_current_baseline(worktree, runner)
-            return {"path": str(state["baseline_path"])}
-        if name == "discover_validation_profiles":
-            return [
-                {
-                    "name": profile.name,
-                    "command": list(profile.command),
-                    "source": profile.source,
-                }
-                for profile in state["validation_profiles"]
-            ]
-        if command[:2] == ["powdrr-lift", "design-interview-input"]:
-            _run(runner, worktree, command)
-            work_item_name = _command_option(command, "--work-item-name")
-            return {
-                "path": str(
-                    worktree
-                    / "docs"
-                    / "proposals"
-                    / work_item_name
-                    / "design-interview-input.json"
-                )
-            }
-        if command[:2] == ["powdrr-lift", "feature-pr-specification"]:
-            _run(runner, worktree, command)
-            work_item_name = _command_option(command, "--work-item-name")
-            return {
-                "path": str(
-                    worktree
-                    / "docs"
-                    / "proposals"
-                    / work_item_name
-                    / "feature-pr-specification.yaml"
-                )
-            }
-        if command[:2] == ["powdrr-lift", "evaluate"]:
-            return _evaluate_proposal_command(runner, worktree, command)
-
-        def extract_proposal_issues() -> Any:
-            evaluation = parameters.get("evaluation")
-            return (
-                list(evaluation.get("issues", []))
-                if isinstance(evaluation, Mapping)
-                else []
-            )
-
-        def aggregate_category_edits() -> Any:
-            decisions = parameters.get("decisions")
-            if not isinstance(decisions, Mapping):
-                raise PowdrrExecutionError(
-                    "aggregate_category_edits requires category decisions"
-                )
-            return _aggregate_category_edits(
-                decisions, inventory=state.get("provider_inventory", ())
-            )
-
-        def decompose_feature_description() -> Any:
-            feature_description = parameters.get("feature_description")
-            if (
-                not isinstance(feature_description, str)
-                or not feature_description.strip()
-            ):
-                raise PowdrrExecutionError("feature description is empty")
-            return _decompose_feature_description(feature_description)
-
-        def compile_instruction_ledger_operation() -> Any:
-            feature_description = parameters.get("feature_description")
-            work_item_name = parameters.get("work_item_name")
-            if (
-                not isinstance(feature_description, str)
-                or not feature_description.strip()
-            ):
-                raise PowdrrExecutionError("feature description is empty")
-            if not isinstance(work_item_name, str) or not work_item_name.strip():
-                raise PowdrrExecutionError("work item name is empty")
-            ledger = compile_instruction_ledger(work_item_name, feature_description)
-            path = output_root / "instruction-ledger.json"
-            path.write_text(
-                json.dumps(ledger.to_data(), indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            state["instruction_ledger_path"] = path
-            state["instruction_ledger_fingerprint"] = ledger.fingerprint
-            return {
-                "path": str(path),
-                "fingerprint": ledger.fingerprint,
-                "clauses": [item.to_data() for item in ledger.clauses],
-            }
-
-        def merge_semantic_design_operation() -> Any:
-            """Join the independently elicited semantic fields for one clause."""
-            required = (
-                "kind",
-                "description",
-                "acceptance_criterion",
-                "expected_test",
-            )
-            values = {name: parameters.get(name) for name in required}
-            if any(
-                not isinstance(value, str) or not value.strip()
-                for value in values.values()
-            ):
-                raise PowdrrExecutionError(
-                    "merge_semantic_design requires non-empty semantic fields"
-                )
-            if values["kind"] not in {
-                "entity",
-                "feature",
-                "interface",
-                "invariant",
-                "guidance",
-                "non_goal",
-                "nonactionable",
-            }:
-                raise PowdrrExecutionError("merge_semantic_design kind is invalid")
-            return values
-
-        def compile_canonical_feature_design_operation() -> Any:
-            ledger_path = state.get("instruction_ledger_path")
-            if not isinstance(ledger_path, Path):
-                raise PowdrrExecutionError("instruction ledger is unavailable")
-            try:
-                ledger = InstructionLedger.from_data(
-                    json.loads(ledger_path.read_text(encoding="utf-8"))
-                )
-            except (OSError, json.JSONDecodeError, InstructionLedgerError) as exc:
-                raise PowdrrExecutionError(
-                    f"instruction ledger cannot be loaded: {exc}"
-                ) from exc
-            raw_design_decisions = _collected_results(
-                parameters.get("design_decisions")
-            )
-            if raw_design_decisions is None:
-                raise PowdrrExecutionError(
-                    "canonical design decisions are missing or malformed"
-                )
-            work_item_name = _require_flow_text(parameters, "work_item_name")
-            try:
-                design = compile_feature_design(
-                    ledger,
-                    work_item_name,
-                    raw_design_decisions,
-                )
-            except FeatureObligationError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            path = output_root / "canonical-feature-design.json"
-            path.write_text(
-                json.dumps(design.to_data(), indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            state["canonical_feature_design_path"] = path
-            state["feature_obligations_path"] = path
-            obligations = [
-                {
-                    "id": f"sentence-{index}",
-                    "description": item.projection.description,
-                    "design": item.projection.to_data(),
-                }
-                for index, item in enumerate(design.obligations, start=1)
-            ]
-            semantic_cases = [
-                {
-                    "id": f"test-sentence-{index}",
-                    "description": item.projection.expected_test,
-                    "intent_refs": [f"feature-obligation-sentence-{index}"],
-                    "expected_outcome": item.projection.acceptance_criterion,
-                    # Every feature obligation gets a new focused test. Existing
-                    # inventory is repository context, not a list of tests for
-                    # OpenCode to retrofit onto unrelated selectors.
-                    "test_selection": "new",
-                }
-                for index, item in enumerate(design.obligations, start=1)
-            ]
-            required_test_cases = _compile_required_test_case_edits(
-                semantic_cases,
-                tuple(state.get("provider_inventory", ())),
-            )
-            return {
-                "path": str(path),
-                "fingerprint": content_fingerprint(design.to_data()),
-                "obligations": obligations,
-                "required_test_cases": required_test_cases,
-            }
-
-        def apply_sentence_design_trace() -> Any:
-            return _apply_sentence_design_trace(parameters, state=state)
-
-        def materialize_feature_intents() -> Any:
-            return _materialize_feature_intents(parameters, state=state)
-
-        def compile_verification_obligations() -> Any:
-            return _compile_verification_obligations(
-                parameters,
-                worktree=worktree,
-                output_root=output_root,
-                state=state,
-                allowed_paths=config.allowed_paths,
-            )
-
-        def assert_verification_obligations_complete() -> Any:
-            compilation = parameters.get("verification_obligations")
-            if not isinstance(compilation, Mapping):
-                raise PowdrrExecutionError(
-                    "verification obligation assertion requires compiler output"
-                )
-            failures = compilation.get("failures")
-            if not isinstance(failures, list):
-                raise PowdrrExecutionError(
-                    "verification obligation compiler output has no failure list"
-                )
-            return {"passed": not failures, "failure_count": len(failures)}
-
-        handlers: dict[str, Callable[[], Any]] = {
-            "extract_proposal_issues": extract_proposal_issues,
-            "aggregate_category_edits": aggregate_category_edits,
-            "decompose_feature_description": decompose_feature_description,
-            "compile_instruction_ledger": compile_instruction_ledger_operation,
-            "merge_semantic_design": merge_semantic_design_operation,
-            "compile_canonical_feature_design": (
-                compile_canonical_feature_design_operation
-            ),
-            "apply_sentence_design_trace": apply_sentence_design_trace,
-            "materialize_feature_intents": materialize_feature_intents,
-            "compile_verification_obligations": compile_verification_obligations,
-            "assert_verification_obligations_complete": (
-                assert_verification_obligations_complete
-            ),
-        }
-        handler = handlers.get(name)
-        if handler is not None:
-            return handler()
-        if len(command) != 1:
-            raise PowdrrExecutionError("feature flow operation command is malformed")
-        if name == "plan_structrr_diff":
-            baseline = _require_flow_text(parameters, "baseline")
-            if baseline != str(state["baseline_path"]):
-                raise PowdrrExecutionError(
-                    "planning baseline does not match ensured baseline"
-                )
-            plan_config = replace(
-                config,
-                work_item_name=_require_flow_text(parameters, "work_item_name"),
-                feature_description=_require_flow_text(
-                    parameters, "feature_description"
-                ),
-            )
-            state["plan_path"] = _write_structrr_plan(
-                worktree,
-                plan_config,
-                interview_input=parameters.get(
-                    "feature_design", parameters.get("interview_input")
-                ),
-                inventory=tuple(state.get("provider_inventory", ())),
-            )
-            _commit(runner, worktree, "Record Structrr feature diff")
-            return {"path": str(state["plan_path"])}
-        if name == "prepare_proposal_review":
-            return _prepare_proposal_review(
-                config,
-                runner=runner,
-                worktree=worktree,
-                output_root=output_root,
-                slug=slug,
-                state=state,
-                parameters=parameters,
-            )
-        if name == "finalize_proposal_review":
-            review = _finalize_proposal_review(
-                worktree=worktree,
-                output_root=output_root,
-                parameters=parameters,
-            )
-            state["proposal_review_receipt_path"] = review["receipt_path"]
-            return review
-        if name == "bind_proposal_decision_results":
-            return _bind_proposal_decision_results(parameters)
-        if name == "compile_feature_obligations":
-            return _compile_feature_obligations(
-                parameters,
-                worktree=worktree,
-                output_root=output_root,
-                state=state,
-            )
-        if name == "update_plan_from_sentence_trace":
-            return _update_plan_from_sentence_trace(parameters, state=state)
-        if name == "run_opencode":
-            return _run_opencode_phase(
-                config,
-                runner=runner,
-                worktree=worktree,
-                output_root=output_root,
-                branch=branch,
-                slug=slug,
-                state=state,
-                parameters=parameters,
-            )
-        if name == "run_validation_profile":
-            return _run_validation_profile(parameters, worktree=worktree, state=state)
-        if name == "aggregate_validation":
-            return _aggregate_validation(parameters, worktree=worktree, state=state)
-        if name == "validate_required_test_cases":
-            return _validate_required_test_cases(
-                parameters, worktree=worktree, state=state
-            )
-        if name == "run_verification_evidence":
-            return _run_verification_evidence(
-                parameters,
-                worktree=worktree,
-                output_root=output_root,
-                state=state,
-                runner=runner,
-            )
-        if name == "reconcile_verification_evidence":
-            return _reconcile_verification_evidence(parameters, state=state)
-        if name == "review_worker_diff":
-            if not isinstance(parameters.get("implementation"), Mapping):
-                raise PowdrrExecutionError(
-                    "review did not receive implementation state"
-                )
-            if not isinstance(parameters.get("validation"), Mapping):
-                raise PowdrrExecutionError("review did not receive validation state")
-            review = review_feature_diff(
-                worktree,
-                state["request"],
-                state["attempt"],
-                validation=state["validation"],
-                reconciliation=state.get("verification_reconciliation"),
-                runner=runner,
-            )
-            required_tests = state.get("required_test_case_validation")
-            if (
-                isinstance(required_tests, Mapping)
-                and required_tests.get("passed") is not True
-            ):
-                review = {
-                    **review,
-                    "passed": False,
-                    "required_test_case_validation": dict(required_tests),
-                }
-            state["review"] = review
-            return review
-        if name == "prepare_implementation_review":
-            return _prepare_implementation_review(
-                worktree=worktree,
-                output_root=output_root,
-                runner=runner,
-                state=state,
-                parameters=parameters,
-            )
-        if name == "compile_obligation_review_packets":
-            return _compile_obligation_review_packets(
-                parameters, output_root=output_root
-            )
-        if name == "bind_obligation_reviews":
-            return _bind_obligation_reviews(parameters)
-        if name == "aggregate_obligation_reviews":
-            return _aggregate_obligation_reviews(parameters)
-        if name == "aggregate_intent_review":
-            return _aggregate_intent_review(parameters)
-        if name == "collect_repair_issues":
-            validation = parameters.get("validation")
-            review_value = parameters.get("review")
-            issues: list[dict[str, Any]] = []
-            if isinstance(validation, Mapping):
-                results = validation.get("results")
-                if isinstance(results, list):
-                    issues.extend(
+        if isinstance(name, str):
+            spec = command_catalog.get(name)
+            if spec is not None:
+                try:
+                    spec.validate_input(
                         {
-                            "kind": "validation",
-                            "issue": result,
+                            key: value
+                            for key, value in parameters.items()
+                            if key != "command"
                         }
-                        for result in results
-                        if isinstance(result, Mapping)
-                        and result.get("status") != "passed"
                     )
-                if validation.get("error"):
-                    issues.append(
-                        {"kind": "validation_report", "issue": validation["error"]}
-                    )
-            reconciliation = parameters.get("reconciliation")
-            if isinstance(reconciliation, Mapping):
-                issues.extend(
-                    {"kind": "verification", "issue": issue}
-                    for issue in reconciliation.get("issues", [])
-                    if isinstance(issue, Mapping)
-                )
-            required_tests = parameters.get("required_test_validation")
-            if (
-                isinstance(required_tests, Mapping)
-                and required_tests.get("passed") is not True
-            ):
-                issues.append(
-                    {"kind": "required_test_case", "issue": dict(required_tests)}
-                )
-            if (
-                isinstance(review_value, Mapping)
-                and review_value.get("passed") is not True
-            ):
-                issues.append({"kind": "worker_review", "issue": dict(review_value)})
-            return issues
-        if name == "open_pull_request":
-            review_value = parameters.get("review")
-            if (
-                not isinstance(review_value, Mapping)
-                or review_value.get("passed") is not True
-            ):
-                raise PowdrrExecutionError("cannot open a PR before a passing review")
-            work_item_name = _require_flow_text(parameters, "work_item_name")
-            if Path(_require_flow_text(parameters, "plan")) != state["plan_path"]:
-                raise PowdrrExecutionError(
-                    "PR input plan does not match the planned diff"
-                )
-            feature_config = replace(
-                config,
-                work_item_name=work_item_name,
-                feature_description=_require_flow_text(
-                    parameters, "feature_description"
-                ),
-            )
-            _commit(runner, worktree, f"Implement {work_item_name}")
-            if config.push_changes:
-                _run(
-                    runner,
-                    worktree,
-                    ["git", "push", "--set-upstream", "origin", branch],
-                )
-            if not config.open_pr:
-                return None
-            state["pull_request_url"] = _open_pull_request(
-                runner, worktree, feature_config, branch
-            )
-            return state["pull_request_url"]
-        if name == "create_pr_changelog":
-            pull_request_value = parameters.get("pull_request")
-            if pull_request_value is None:
-                return None
-            pull_request = _require_flow_text(parameters, "pull_request")
-            if Path(_require_flow_text(parameters, "plan")) != state["plan_path"]:
-                raise PowdrrExecutionError(
-                    "changelog input plan does not match the planned diff"
-                )
-            feature_config = replace(
-                config,
-                work_item_name=_require_flow_text(parameters, "work_item_name"),
-                feature_description=_require_flow_text(
-                    parameters, "feature_description"
-                ),
-            )
-            state["changelog_path"] = _create_pr_changelog(
-                runner,
-                worktree,
-                branch,
-                pull_request,
-                feature_config,
-            )
-            return str(state["changelog_path"])
-        if name == "update_pull_request":
-            pull_request_value = parameters.get("pull_request")
-            changelog = parameters.get("changelog")
-            if isinstance(pull_request_value, str) and isinstance(changelog, str):
-                _update_pull_request_description(
-                    runner,
-                    worktree,
-                    pull_request_value,
-                    config,
-                    Path(changelog).relative_to(worktree),
-                )
-            return pull_request_value
-        raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")
+                except ValueError as exc:
+                    raise PowdrrExecutionError(str(exc)) from exc
+        return command_runtime.dispatch(
+            str(name),
+            command,
+            {key: value for key, value in parameters.items() if key != "command"},
+        )
 
     if config.planning_client is None:
         raise PowdrrExecutionError(
@@ -826,6 +389,7 @@ def _execute_procedrr_flow(
                     skills_dir=flow_directory,
                 )
             },
+            command_catalog=command_catalog,
         )
         evaluator.evaluate(
             flow,
@@ -1342,10 +906,49 @@ def _derive_feature_test_contracts(
 
     The interview may propose semantic test obligations, but it cannot be the
     source of the final intent IDs: those IDs are created when obligations are
-    materialized. Feature obligations always receive new focused test
-    contracts. Existing inventory is used only to discover the test provider
-    and profile; it must never replace a new contract with an unrelated test.
+    materialized.  Compile the contract set here so every contract names the
+    exact materialized clause that OpenCode must implement and validate.
     """
+    materialized_ids = {
+        f"feature-obligation-{item['id']}"
+        for item in obligations
+        if isinstance(item.get("id"), str) and item["id"].strip()
+    }
+    existing = plan.get("required_test_cases")
+    retained: list[dict[str, Any]] = []
+    covered: set[str] = set()
+    if isinstance(existing, list):
+        for raw in existing:
+            if not isinstance(raw, Mapping):
+                continue
+            refs = raw.get("intent_refs")
+            if not isinstance(refs, list):
+                continue
+            exact_refs = [ref for ref in refs if ref in materialized_ids]
+            if not exact_refs:
+                continue
+            item = dict(raw)
+            item["intent_refs"] = exact_refs
+            name_hint = item.get("name_hint")
+            selector = item.get("selector")
+            if not (
+                isinstance(name_hint, str)
+                and name_hint.strip()
+                and isinstance(selector, str)
+                and any(
+                    _selector_matches_test_name_hint(
+                        str(candidate.get("selector", "")), name_hint
+                    )
+                    for candidate in inventory
+                    if isinstance(candidate, Mapping)
+                    and candidate.get("provider") == item.get("provider")
+                    and candidate.get("profile") == item.get("profile")
+                )
+            ):
+                continue
+            retained.append(item)
+            covered.update(exact_refs)
+
     semantic_cases: list[dict[str, Any]] = []
     for obligation in obligations:
         obligation_id = obligation.get("id")
@@ -1353,6 +956,8 @@ def _derive_feature_test_contracts(
         if not isinstance(obligation_id, str) or not isinstance(design, Mapping):
             continue
         clause_id = f"feature-obligation-{obligation_id}"
+        if clause_id in covered:
+            continue
         expected_test = design.get("expected_test")
         acceptance = design.get("acceptance_criterion")
         semantic_cases.append(
@@ -1383,7 +988,7 @@ def _derive_feature_test_contracts(
             }
         )
     _attach_feature_trace_refs(compiled, plan, obligations)
-    return compiled
+    return [*retained, *compiled]
 
 
 def _attach_feature_trace_refs(
@@ -1665,32 +1270,9 @@ def _run_verification_evidence(
         raise PowdrrExecutionError("verification obligations must be a list")
     from powdrr_lift.structrr.verification_obligations import VerificationObligation
 
-    plan_cases = {
-        str(item.get("id")): item
-        for item in _mapping_values(
-            _load_yaml_mapping(state["plan_path"]).get("required_test_cases")
-        )
-    }
-    inventory = tuple(state.get("provider_inventory", ()))
-    resolved_obligations: list[VerificationObligation] = []
-    for raw in raw_obligations:
-        resolved = dict(raw)
-        case = plan_cases.get(str(raw.get("contract_id")))
-        name_hint = case.get("name_hint") if case else None
-        if isinstance(name_hint, str) and name_hint.strip():
-            matches = sorted(
-                str(item.get("selector"))
-                for item in inventory
-                if item.get("provider") == raw.get("provider")
-                and item.get("profile") == raw.get("profile")
-                and _selector_matches_test_name_hint(
-                    str(item.get("selector", "")), name_hint
-                )
-            )
-            if matches:
-                resolved["selector"] = matches[0]
-        resolved_obligations.append(VerificationObligation.from_data(resolved))
-    obligations = tuple(resolved_obligations)
+    obligations = tuple(
+        VerificationObligation.from_data(item) for item in raw_obligations
+    )
     head = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
     diff = _git_output(runner, worktree, ["git", "diff", "--binary"])
     status = _git_output(runner, worktree, ["git", "status", "--porcelain"])
@@ -1842,27 +1424,25 @@ def _validate_required_test_cases(
     failures: list[str] = []
     checked: list[dict[str, Any]] = []
     for case in cases:
+        key = (case["provider"], case["profile"], case["selector"])
+        present = key in available
         name_hint = case.get("name_hint")
-        matching_selectors = (
-            sorted(
+        matching_selectors = []
+        if isinstance(name_hint, str) and name_hint.strip():
+            matching_selectors = [
                 str(item.get("selector"))
                 for item in inventory
                 if item.get("provider") == case["provider"]
                 and item.get("profile") == case["profile"]
-                and isinstance(name_hint, str)
                 and _selector_matches_test_name_hint(
                     str(item.get("selector", "")), name_hint
                 )
-            )
-            if isinstance(name_hint, str) and name_hint.strip()
-            else []
-        )
-        key = (case["provider"], case["profile"], case["selector"])
-        present = bool(matching_selectors) if name_hint else key in available
+            ]
+            present = bool(matching_selectors)
         checked.append(
             {
                 "id": case["id"],
-                "name_hint": name_hint,
+                "selector": case["selector"],
                 "matching_selectors": matching_selectors,
                 "present": present,
             }
@@ -1870,12 +1450,9 @@ def _validate_required_test_cases(
         if not present:
             failures.append(
                 f"required test case {case['id']} was not discovered: "
-                f"{case['provider']}/{case['profile']}/"
-                f"{name_hint or case['selector']}"
+                f"{case['provider']}/{case['profile']}/{case['selector']}"
             )
-    result = {"passed": not failures, "failures": failures, "cases": checked}
-    state["required_test_case_validation"] = result
-    return result
+    return {"passed": not failures, "failures": failures, "cases": checked}
 
 
 def _reconcile_verification_evidence(
@@ -2195,7 +1772,7 @@ def _plan_reference_exists(document: Mapping[str, Any], reference: str) -> bool:
     )
 
 
-def _run_opencode_phase(
+def _run_code_agent_phase(
     config: FeatureEndpointConfig,
     *,
     runner: Runner,
@@ -2353,17 +1930,26 @@ def _run_opencode_phase(
         units=units,
         allowed_paths=config.allowed_paths,
     )
-    provider = state.get("opencode_provider")
-    if not isinstance(provider, OpenCodeProvider):
-        provider = OpenCodeProvider(
-            executable=config.opencode_executable,
-            model=config.opencode_model,
-            diagnostics_root=output_root / "opencode",
-            permission_policy=OpenCodePermissionPolicy(
-                _allowed_validation_commands(state["validation_profiles"])
-            ),
-        )
-        state["opencode_provider"] = provider
+    provider = state.get("code_agent_provider")
+    if not isinstance(provider, (OpenCodeProvider, MiniSWEAgentProvider)):
+        try:
+            provider = build_coding_agent_provider(
+                config.code_agent,
+                opencode_executable=config.opencode_executable,
+                opencode_model=config.opencode_model,
+                minisweagent_executable=config.minisweagent_executable,
+                minisweagent_model=config.minisweagent_model,
+                timeout_seconds=300.0,
+                diagnostics_root=output_root / config.code_agent,
+                permission_policy=OpenCodePermissionPolicy(
+                    _allowed_validation_commands(state["validation_profiles"])
+                ),
+                prompt_prefix=config.code_agent_prompt_prefix,
+                prompt_suffix=config.code_agent_prompt_suffix,
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(str(error)) from error
+        state["code_agent_provider"] = provider
     repair_request = parameters.get("repair_request")
     repair_issue = parameters.get("repair_issue")
     attempt_store = CodingAgentAttemptStore(output_root / "artifacts")
@@ -2401,15 +1987,10 @@ def _run_opencode_phase(
             context_refs=source_context,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
         )
-        packet_for_attempt = (
-            implementation_packet.for_obligation(index)
-            if not repair_mode and index <= len(implementation_packet.obligations)
-            else implementation_packet
-        )
         request = replace(
             request,
-            prompt=packet_for_attempt.render(),
-            implementation_packet=packet_for_attempt,
+            prompt=implementation_packet.render(),
+            implementation_packet=implementation_packet,
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):
@@ -2417,6 +1998,7 @@ def _run_opencode_phase(
             fallback_context = ""
             fallback_context = (
                 f"Work item: {work_item_name}\n"
+                f"Feature: {feature_description}\n"
                 "This is a fresh repair session; use the existing worktree and "
                 "repair only the reported issue. Do not re-plan the feature or "
                 "revisit unrelated changes.\n\n"
@@ -3228,9 +2810,6 @@ def _feature_endpoint_result(
         status,
         branch,
         worktree,
-        # Planning can fail before the baseline or plan checkpoints run. Keep
-        # the failure result serializable instead of masking the real error
-        # with a KeyError while constructing the result.
         state.get("baseline_path", worktree),
         state.get("plan_path", worktree),
         state.get("request_path"),
@@ -3581,7 +3160,7 @@ def _write_structrr_plan_from_obligations(
         "acceptance_criteria": sections["acceptance_criteria"],
         "expected_tests": sections["expected_tests"],
         "required_test_cases": _compile_required_test_case_edits(
-            semantic_cases, inventory
+            semantic_cases, inventory, include_existing_name_hint=True
         ),
         "entities": [],
         "entity_relationships": [],
@@ -3737,7 +3316,10 @@ def _aggregate_category_edits(
 
 
 def _compile_required_test_case_edits(
-    items: Sequence[Any], inventory: Sequence[Any]
+    items: Sequence[Any],
+    inventory: Sequence[Any],
+    *,
+    include_existing_name_hint: bool = False,
 ) -> list[dict[str, Any]]:
     """Compile semantic test obligations against discovered executable tests."""
     candidates = [item for item in inventory if isinstance(item, Mapping)]
@@ -3796,13 +3378,14 @@ def _compile_required_test_case_edits(
                 raise PowdrrExecutionError(
                     f"required test case selected unknown inventory entry {selection!r}"
                 )
-            item.update(
-                {
-                    "provider": candidate.get("provider"),
-                    "profile": candidate.get("profile"),
-                    "selector": candidate.get("selector"),
-                }
-            )
+            selected = {
+                "provider": candidate.get("provider"),
+                "profile": candidate.get("profile"),
+                "selector": candidate.get("selector"),
+            }
+            if include_existing_name_hint:
+                selected["name_hint"] = _test_name_hint(str(item["description"]))
+            item.update(selected)
         else:
             if not pytest_profiles:
                 raise PowdrrExecutionError(
@@ -3934,7 +3517,10 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     if not path.is_file():
         path = Path(__file__).resolve().parents[2] / "implement-feature.yaml"
     try:
-        parse_and_validate(path.read_text(encoding="utf-8"))
+        parse_and_validate(
+            path.read_text(encoding="utf-8"),
+            command_catalog=feature_command_catalog(),
+        )
     except (OSError, ValueError) as error:
         raise PowdrrExecutionError(
             f"Shared feature Procedrr definition is invalid: {path}: {error}"

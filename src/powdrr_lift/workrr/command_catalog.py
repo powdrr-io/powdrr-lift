@@ -10,6 +10,7 @@ from typing import Any
 
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.feature_obligation import (
+    SEMANTIC_KINDS,
     FeatureObligationError,
     compile_feature_design,
 )
@@ -62,7 +63,7 @@ def feature_command_catalog(
             name="merge_semantic_design",
             input_schema=object_schema(
                 {
-                    "kind": {},
+                    "kind": {"type": "string", "enum": sorted(SEMANTIC_KINDS)},
                     "description": {},
                     "acceptance_criterion": {},
                     "expected_test": {},
@@ -491,30 +492,7 @@ class FeatureCommandRuntime:
 
         def merge_semantic_design_operation() -> Any:
             """Join the independently elicited semantic fields for one clause."""
-            required = (
-                "kind",
-                "description",
-                "acceptance_criterion",
-                "expected_test",
-            )
-            values = {name: parameters.get(name) for name in required}
-            if any(
-                not isinstance(value, str) or not value.strip()
-                for value in values.values()
-            ):
-                raise PowdrrExecutionError(
-                    "merge_semantic_design requires non-empty semantic fields"
-                )
-            if values["kind"] not in {
-                "entity",
-                "feature",
-                "interface",
-                "invariant",
-                "guidance",
-                "non_goal",
-            }:
-                raise PowdrrExecutionError("merge_semantic_design kind is invalid")
-            return values
+            return _merge_semantic_design_values(parameters)
 
         def compile_canonical_feature_design_operation() -> Any:
             ledger_path = state.get("instruction_ledger_path")
@@ -912,6 +890,21 @@ class FeatureCommandRuntime:
                 )
             return pull_request_value
         raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")
+
+
+def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, str]:
+    """Validate one semantic design, including trace-only clauses."""
+    required = ("kind", "description", "acceptance_criterion", "expected_test")
+    values = {name: parameters.get(name) for name in required}
+    if any(
+        not isinstance(value, str) or not value.strip() for value in values.values()
+    ):
+        raise PowdrrExecutionError(
+            "merge_semantic_design requires non-empty semantic fields"
+        )
+    if values["kind"] not in SEMANTIC_KINDS:
+        raise PowdrrExecutionError("merge_semantic_design kind is invalid")
+    return values
 
 
 __all__ = ["FeatureCommandRuntime", "feature_command_catalog"]

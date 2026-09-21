@@ -32,6 +32,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationReport,
     ValidationReportStatus,
 )
+from powdrr_lift.workrr.command_catalog import _merge_semantic_design_values
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
@@ -60,6 +61,19 @@ from powdrr_lift.workrr.feature_endpoint import (
 )
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
+
+
+def test_merge_semantic_design_accepts_trace_only_nonactionable_clause() -> None:
+    design = _merge_semantic_design_values(
+        {
+            "kind": "nonactionable",
+            "description": "Ignore the delivery instruction as process metadata.",
+            "acceptance_criterion": "No product obligation is created.",
+            "expected_test": "No product test is required.",
+        }
+    )
+
+    assert design["kind"] == "nonactionable"
 
 
 def test_workrr_feature_cli_builds_endpoint_config(

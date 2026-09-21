@@ -31,7 +31,8 @@ def test_packet_renders_bounded_obligations_and_exact_selectors() -> None:
 
     rendered = packet.render()
     assert "obligation 001: Data initializes on entry." in rendered
-    assert "tests/test_state.py::test_entry" in rendered
+    assert "test_verify_entry_initialization" in rendered
+    assert "create the exact selectors" not in rendered
     assert "candidate 1: tests/test_state.py::test_existing" not in rendered
     assert "model-authored" not in rendered
     assert packet.from_data(packet.to_data()).to_data() == packet.to_data()

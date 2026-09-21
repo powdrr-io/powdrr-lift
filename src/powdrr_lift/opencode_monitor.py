@@ -185,7 +185,7 @@ def run_opencode(
     on_snapshot: Callable[[LivenessSnapshot], None] | None = None,
     on_activity: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run OpenCode and stop it after five minutes without activity.
+    """Run OpenCode and stop it after ten minutes without activity.
 
     Activity includes any streamed OpenCode output/event and can also be
     reported by the owning Procedrr flow through ``on_activity``.
@@ -231,6 +231,7 @@ def run_opencode(
         )
         if force or signature != last_snapshot or now - last_snapshot_at >= 15.0:
             if log_path is not None:
+                process_tree = _process_tree(process.pid)
                 append_diagnostic(
                     log_path,
                     "liveness.snapshot",
@@ -241,6 +242,7 @@ def run_opencode(
                     progress_event_count=snapshot.progress_event_count,
                     seconds_since_event=snapshot.seconds_since_event,
                     seconds_since_progress=snapshot.seconds_since_progress,
+                    process_tree=process_tree,
                 )
             if on_snapshot is not None:
                 on_snapshot(snapshot)
@@ -268,6 +270,7 @@ def run_opencode(
                         "process.timed_out",
                         captured_at=time.monotonic(),
                         reason="no progress event or Procedrr activity within timeout",
+                        process_tree=_process_tree(process.pid),
                     )
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
@@ -340,6 +343,7 @@ def run_opencode(
             reason=terminal_snapshot.reason,
             event_count=terminal_snapshot.event_count,
             progress_event_count=terminal_snapshot.progress_event_count,
+            process_tree=_process_tree(process.pid),
         )
     if on_snapshot is not None:
         on_snapshot(terminal_snapshot)
@@ -351,6 +355,44 @@ def run_opencode(
         b"".join(output).decode("utf-8", errors="replace"),
         "",
     )
+
+
+def _process_tree(root_pid: int) -> list[dict[str, Any]]:
+    """Return best-effort process/child diagnostics for a monitored session."""
+    proc_root = Path("/proc")
+    if not proc_root.is_dir():
+        return []
+    pending = [root_pid]
+    seen: set[int] = set()
+    result: list[dict[str, Any]] = []
+    while pending:
+        pid = pending.pop()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        proc_dir = proc_root / str(pid)
+        try:
+            stat = (proc_dir / "stat").read_text(encoding="utf-8")
+            command = (
+                (proc_dir / "cmdline")
+                .read_bytes()
+                .replace(b"\0", b" ")
+                .decode("utf-8", errors="replace")
+                .strip()
+            )
+        except (FileNotFoundError, OSError, UnicodeError):
+            continue
+        closing = stat.rfind(")")
+        state = stat[closing + 2 : closing + 3] if closing >= 0 else "?"
+        result.append({"pid": pid, "state": state, "command": command[:500]})
+        try:
+            children = (proc_dir / "task" / str(pid) / "children").read_text(
+                encoding="utf-8"
+            )
+        except (FileNotFoundError, OSError):
+            children = ""
+        pending.extend(int(value) for value in children.split() if value.isdigit())
+    return sorted(result, key=lambda item: int(item["pid"]))
 
 
 def replay_events(records: Iterable[dict[str, Any]]) -> OpenCodeLiveness:

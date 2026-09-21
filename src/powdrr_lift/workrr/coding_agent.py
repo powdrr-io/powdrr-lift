@@ -357,7 +357,7 @@ class OpenCodeProvider:
 
     executable: str = "opencode"
     agent: str = "build"
-    timeout_seconds: float = 300.0
+    timeout_seconds: float = 600.0
     permission_policy: OpenCodePermissionPolicy = field(
         default_factory=OpenCodePermissionPolicy
     )

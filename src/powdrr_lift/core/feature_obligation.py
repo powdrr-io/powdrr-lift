@@ -88,6 +88,7 @@ class FeatureObligation:
 class RequiredTestContract:
     obligation_id: str
     work_item_slug: str
+    description: str = ""
 
     @property
     def test_id(self) -> str:
@@ -104,6 +105,18 @@ class RequiredTestContract:
             f"::test_instruction_{self.ordinal:03d}"
         )
 
+    @property
+    def name_hint(self) -> str:
+        slug = re.sub(
+            r"[^a-z0-9]+",
+            "_",
+            (
+                self.description
+                or f"{self.work_item_slug}_instruction_{self.ordinal:03d}"
+            ).casefold(),
+        ).strip("_")
+        return f"test_{slug[:100].rstrip('_')}"
+
     def to_data(self) -> dict[str, Any]:
         return {
             "id": self.test_id,
@@ -114,6 +127,7 @@ class RequiredTestContract:
             "profile": "pytest",
             "selector": self.selector,
             "selector_status": "planned",
+            "name_hint": self.name_hint,
             "description": f"Verify {self.obligation_id}.",
             "expectation": "pass",
             "applicability": {"mode": "required"},
@@ -261,7 +275,8 @@ def compile_feature_design(
         projections=tuple(projections),
         obligations=tuple(obligations),
         test_contracts=tuple(
-            RequiredTestContract(item.obligation_id, slug) for item in obligations
+            RequiredTestContract(item.obligation_id, slug, item.projection.description)
+            for item in obligations
         ),
     )
     result.validate(ledger)

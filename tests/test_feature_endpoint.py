@@ -874,6 +874,7 @@ def test_required_test_obligation_generates_new_selector_deterministically() -> 
     )
 
     case = result["required_test_cases"]["added"][0]
+    assert case["name_hint"].startswith("test_state_data_is_isolated")
     assert case["selector"] == (
         "tests/test_verify_state_data_scoping.py::test_verify_state_data_scoping"
     )

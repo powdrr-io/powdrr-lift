@@ -1801,15 +1801,36 @@ def _validate_required_test_cases(
     failures: list[str] = []
     checked: list[dict[str, Any]] = []
     for case in cases:
+        name_hint = case.get("name_hint")
+        matching_selectors = (
+            sorted(
+                str(item.get("selector"))
+                for item in inventory
+                if item.get("provider") == case["provider"]
+                and item.get("profile") == case["profile"]
+                and isinstance(name_hint, str)
+                and _selector_matches_test_name_hint(
+                    str(item.get("selector", "")), name_hint
+                )
+            )
+            if isinstance(name_hint, str) and name_hint.strip()
+            else []
+        )
         key = (case["provider"], case["profile"], case["selector"])
-        present = key in available
+        present = bool(matching_selectors) if name_hint else key in available
         checked.append(
-            {"id": case["id"], "selector": case["selector"], "present": present}
+            {
+                "id": case["id"],
+                "name_hint": name_hint,
+                "matching_selectors": matching_selectors,
+                "present": present,
+            }
         )
         if not present:
             failures.append(
                 f"required test case {case['id']} was not discovered: "
-                f"{case['provider']}/{case['profile']}/{case['selector']}"
+                f"{case['provider']}/{case['profile']}/"
+                f"{name_hint or case['selector']}"
             )
     return {"passed": not failures, "failures": failures, "cases": checked}
 
@@ -3747,6 +3768,7 @@ def _compile_required_test_case_edits(
                 {
                     "provider": "pytest",
                     "profile": profile.get("profile"),
+                    "name_hint": _test_name_hint(str(item["description"])),
                     "selector": (f"tests/test_{test_slug}.py::test_{test_slug}"),
                 }
             )
@@ -3759,6 +3781,20 @@ def _compile_required_test_case_edits(
         )
         compiled.append(item)
     return compiled
+
+
+def _test_name_hint(description: str) -> str:
+    """Create a stable test-function prefix from one feature obligation."""
+    slug = re.sub(r"[^a-z0-9]+", "_", description.casefold()).strip("_")
+    return f"test_{slug[:100].rstrip('_')}"
+
+
+def _selector_matches_test_name_hint(selector: str, name_hint: str) -> bool:
+    """Match a pytest node whose function name has the required prefix."""
+    if not selector or not name_hint:
+        return False
+    test_name = selector.rsplit("::", 1)[-1]
+    return test_name == name_hint or test_name.startswith(name_hint + "_")
 
 
 def _select_matching_test_inventory(

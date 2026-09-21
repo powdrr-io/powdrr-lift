@@ -23,7 +23,7 @@ def _semantic(count: int) -> list[dict[str, object]]:
     ]
 
 
-def test_feature_design_compiler_owns_ids_references_and_selectors() -> None:
+def test_feature_design_compiler_owns_ids_references_and_test_name_hints() -> None:
     ledger = compile_instruction_ledger(
         "state-data", "First behavior. Second behavior."
     )
@@ -42,9 +42,7 @@ def test_feature_design_compiler_owns_ids_references_and_selectors() -> None:
         "test:obligation:instruction-001",
         "test:obligation:instruction-002",
     ]
-    assert design.test_contracts[0].selector == (
-        "tests/test_state-data_instruction_001.py::test_instruction_001"
-    )
+    assert design.test_contracts[0].name_hint == "test_implement_behavior_1"
     data = design.to_data()
     assert data["structrr"]["source_refs"] == ["instruction-ledger"]
     assert all("id" not in item for item in data["obligations"])

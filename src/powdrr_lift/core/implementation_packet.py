@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -46,6 +47,7 @@ class ImplementationPacket:
                     "description": str(item.get("description", "")),
                     "provider": str(item.get("provider", "")),
                     "profile": str(item.get("profile", "")),
+                    "name_hint": str(item.get("name_hint", "")),
                     "selector": str(item.get("selector", "")),
                 }
                 for index, item in enumerate(self.required_tests, start=1)
@@ -72,7 +74,13 @@ class ImplementationPacket:
         tests = tuple(
             {
                 key: item.get(key, "")
-                for key in ("description", "provider", "profile", "selector")
+                for key in (
+                    "description",
+                    "provider",
+                    "profile",
+                    "name_hint",
+                    "selector",
+                )
             }
             for item in raw_tests
             if isinstance(item, Mapping)
@@ -103,7 +111,8 @@ class ImplementationPacket:
     def render(self) -> str:
         tests = self.to_data()["required_tests"]
         test_lines = [
-            f"- required test {item['ordinal']:03d}: {item['selector']} "
+            f"- required new test {item['ordinal']:03d}: function name must start "
+            f"with `{item['name_hint']}` "
             f"({item['provider']}/{item['profile']}) — {item['description']}"
             for item in tests
         ] or ["- none"]
@@ -118,10 +127,14 @@ class ImplementationPacket:
                 self.objective,
                 "\nObligations (in compiler order):",
                 *obligation_lines,
-                "\nRequired tests (create the exact selectors):",
+                "\nRequired new tests (create at least one matching test per "
+                "obligation):",
                 *test_lines,
                 "\nImplement only the original description and obligations above. "
-                "Create only the listed new tests, then stop.",
+                "Create the listed new tests, using the name hints as prefixes; "
+                "optional suffixes such as `_sync` and `_async` are allowed. "
+                "Run the focused new tests, then the repository validation, and "
+                "stop.",
             )
         )
 
@@ -147,15 +160,28 @@ def compile_implementation_packet(
     for item in required_tests:
         if not isinstance(item, Mapping):
             raise ValueError("implementation packet test contract is malformed")
-        for key in ("provider", "profile", "selector"):
+        for key in ("provider", "profile"):
             value = item.get(key)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"implementation packet test lacks {key}")
+        name_hint = item.get("name_hint")
+        if not isinstance(name_hint, str) or not name_hint.strip():
+            description = item.get("description", "")
+            if not isinstance(description, str) or not description.strip():
+                raise ValueError("implementation packet test lacks name_hint")
+            slug = re.sub(r"[^a-z0-9]+", "_", description.casefold()).strip("_")
+            name_hint = f"test_{slug[:100].rstrip('_')}"
         normalized_tests.append(
             {
                 key: item.get(key, "")
-                for key in ("description", "provider", "profile", "selector")
+                for key in (
+                    "description",
+                    "provider",
+                    "profile",
+                    "selector",
+                )
             }
+            | {"name_hint": name_hint}
         )
     if not normalized_tests:
         raise ValueError("implementation packet requires test contracts")

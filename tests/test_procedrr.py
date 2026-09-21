@@ -589,6 +589,42 @@ def test_checked_in_design_interview_definition_parses() -> None:
     assert document["name"] == "design-interview"
 
 
+def test_design_interview_bounds_semantic_obligation_prompts() -> None:
+    from pathlib import Path
+
+    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    document = parse_and_validate(source)
+    body = document["steps"][1]["for_each"]["body"]
+    obligation_judge = body[1]["judge"]
+    test_judge = body[2]["judge"]
+
+    assert obligation_judge["question"] == (
+        "What is the one concrete semantic obligation expressed by this instruction "
+        "clause?"
+    )
+    assert all(
+        "For non_goal" not in instruction
+        for instruction in obligation_judge["instructions"]
+    )
+    assert [rule["when"] for rule in obligation_judge["prompt_rules"]] == [
+        {"binding": "semantic_kind.kind", "equals": "non_goal"}
+    ]
+    assert (
+        obligation_judge["output"]["schema"]["properties"]["description"]["maxLength"]
+        == 500
+    )
+    assert (
+        obligation_judge["output"]["schema"]["properties"]["acceptance_criterion"][
+            "maxLength"
+        ]
+        == 500
+    )
+    assert (
+        test_judge["output"]["schema"]["properties"]["expected_test"]["maxLength"]
+        == 400
+    )
+
+
 def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
     from pathlib import Path
 

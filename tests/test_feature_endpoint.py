@@ -234,9 +234,7 @@ def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
 def test_feature_endpoint_result_preserves_early_failure_without_checkpoints(
     tmp_path: Path,
 ) -> None:
-    result = _feature_endpoint_result(
-        {}, "main", tmp_path, "review_failed"
-    )
+    result = _feature_endpoint_result({}, "main", tmp_path, "review_failed")
 
     assert result.status == "review_failed"
     assert result.baseline_path == tmp_path

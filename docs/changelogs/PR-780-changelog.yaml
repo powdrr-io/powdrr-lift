@@ -1,0 +1,29 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 780
+title: Ask design interview for implementation outcomes
+intent:
+  problem: The design interview asks for an abstract obligation and acceptance criterion, which permits paraphrase without a precise implementation target or preservation boundary.
+  goal: Make each clause produce a concrete implementation outcome, preservation constraints, prohibitions, and observable proof.
+human-decisions:
+  - id: outcome-first-design-question
+    summary: Ask what must be true after implementation and what must remain unchanged or be excluded before deriving compiler-owned obligations and tests.
+structured_files: []
+files:
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Replace the abstract obligation prompt with an implementation-outcome prompt, rationale: Direct semantic reasoning toward the resulting system state and its boundaries, span: {start_line: 5, end_line: 7}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Require outcome preservation and prohibition reasoning, rationale: Capture the constraints that implementation and drift reviews must preserve, span: {start_line: 98, end_line: 98}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Require observable proof in acceptance criteria, rationale: Make the generated acceptance criterion useful to verification, span: {start_line: 102, end_line: 106}}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, summary: Clarify non-goal output, rationale: Prevent excluded scope from becoming an implementation task, span: {start_line: 111, end_line: 111}}
+  - {path: tests/test_procedrr.py, type: modified, summary: Lock the direct outcome interview wording, rationale: Prevent regression to an abstract obligation prompt, span: {start_line: 590, end_line: 595}}
+entities: []
+entity_relationships: []
+invariants:
+  - id: design-interview-produces-observable-outcomes
+    action: added
+    description: Each semantic clause is evaluated in terms of required resulting behavior, preserved state, forbidden scope, and observable proof.
+    rationale: Implementation and verification need explicit outcome boundaries rather than paraphrased obligations.
+guidance:
+  - id: use-outcome-contract-for-design
+    action: added
+    description: Treat the design interview's acceptance criterion as an observable proof of the required outcome and its preservation and prohibition constraints.
+    rationale: Keep semantic design directly useful to Structrr and verification compilation.
+proposed_prs: []

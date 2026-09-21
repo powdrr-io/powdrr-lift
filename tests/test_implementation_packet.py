@@ -47,3 +47,31 @@ def test_packet_requires_a_contract_for_each_obligation() -> None:
             allowed_paths=("src/feature.py",),
             validation_profiles=("pytest",),
         )
+
+
+def test_packet_can_focus_one_obligation_and_its_matching_test() -> None:
+    packet = compile_implementation_packet(
+        objective="Add state data support.",
+        obligations=("Initialize data.", "Reset data."),
+        required_tests=(
+            {
+                "description": "Verify initialization.",
+                "provider": "pytest",
+                "profile": "pytest",
+            },
+            {
+                "description": "Verify reset.",
+                "provider": "pytest",
+                "profile": "pytest",
+            },
+        ),
+        allowed_paths=("src/state.py",),
+        validation_profiles=("pytest",),
+    )
+
+    focused = packet.for_obligation(2)
+
+    assert focused.obligations == ("Reset data.",)
+    assert focused.required_tests[0]["description"] == "Verify reset."
+    assert "Initialize data." not in focused.render()
+    assert "Verify initialization." not in focused.render()

@@ -2401,10 +2401,15 @@ def _run_opencode_phase(
             context_refs=source_context,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
         )
+        packet_for_attempt = (
+            implementation_packet.for_obligation(index)
+            if not repair_mode and index <= len(implementation_packet.obligations)
+            else implementation_packet
+        )
         request = replace(
             request,
-            prompt=implementation_packet.render(),
-            implementation_packet=implementation_packet,
+            prompt=packet_for_attempt.render(),
+            implementation_packet=packet_for_attempt,
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):

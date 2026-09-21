@@ -94,6 +94,7 @@ class ImplementationRequest:
         """
         observed_issue = json.dumps(dict(issue), indent=2, sort_keys=True, default=str)
         paths = ", ".join(self.allowed_paths) or "none declared"
+        commands = _render_allowed_command_forms(self.allowed_commands)
         return (
             "Repair only the reported issue in the existing worktree, then stop.\n"
             "Do not re-plan the feature or revisit unrelated changes.\n\n"
@@ -101,10 +102,15 @@ class ImplementationRequest:
             "Observed issue:\n"
             f"{observed_issue}\n\n"
             f"Allowed durable paths: {paths}\n"
+            f"{commands}\n"
             "Change only what is necessary to resolve this finding. Do not add "
             "new product behavior, tests, dependencies, or files unless the "
-            "finding explicitly requires them. Workrr will rerun the affected "
-            "validators and invalidate evidence affected by your diff."
+            "finding explicitly requires them. Do not prepend environment "
+            "variables, `cd`, pipes, redirects, or unapproved flags to a "
+            "validation command. Workrr owns the full validation profiles; if "
+            "you validate locally, run only a focused selector using one of the "
+            "listed command forms. Workrr will rerun the affected validators "
+            "and invalidate evidence affected by your diff."
         )
 
     @classmethod
@@ -160,6 +166,7 @@ class ImplementationRequest:
         validation_profiles = ", ".join(unit.validation_profiles) or "none"
         allowed_paths = ", ".join(unit.paths) or "none"
         ephemeral_paths = ", ".join(unit.ephemeral_paths) or "none"
+        allowed_commands_text = _render_allowed_command_forms(allowed_commands)
         intent_packet = IntentPacket(
             operation_id=unit.unit_id,
             required_operations=tuple(
@@ -188,6 +195,12 @@ class ImplementationRequest:
             f"{ephemeral_paths}\n"
             f"Acceptance criteria:\n{criteria}\n"
             f"Validation profiles Workrr will run: {validation_profiles}\n\n"
+            f"{allowed_commands_text}\n"
+            "Validation command rules: use the listed command prefix exactly. "
+            "The trailing `*` is an append-only selector placeholder; do not "
+            "type the wildcard literally. Do not prepend environment variables, "
+            "`cd`, pipes, redirects, or unapproved flags. Run focused tests "
+            "only; Workrr owns the full validation profile.\n\n"
             "Use only the allowed paths or declared ephemeral paths. Temporary "
             "helpers are permitted only in the declared ephemeral paths; Workrr "
             "removes them before evaluating the durable diff. Workrr runs the "
@@ -243,6 +256,15 @@ def _format_planned_changes(changes: Sequence[Mapping[str, Any]]) -> str:
     return "\n".join(
         f"- {json.dumps(dict(change), sort_keys=True, ensure_ascii=False)}"
         for change in changes
+    )
+
+
+def _render_allowed_command_forms(commands: Sequence[str]) -> str:
+    """Render policy command patterns as safe, model-facing instructions."""
+    if not commands:
+        return "No validation command is available to the coding agent."
+    return "Allowed validation command forms (append selectors only):\n" + "\n".join(
+        f"- {command}" for command in commands
     )
 
 

@@ -44,6 +44,9 @@ def test_packet_round_trip_preserves_the_request_contract() -> None:
         request_id="request-1",
         base_commit="abc",
         plan_fingerprint="plan-1",
+        allowed_commands=(
+            "uv run pytest -n auto --cov --cov-report=xml:coverage.xml *",
+        ),
     )
 
     assert ImplementationRequest.from_data(request.to_data()) == request
@@ -94,6 +97,9 @@ def test_repair_prompt_keeps_targeted_repair_contract() -> None:
         request_id="request-1",
         base_commit="abc",
         plan_fingerprint="plan-1",
+        allowed_commands=(
+            "uv run pytest -n auto --cov --cov-report=xml:coverage.xml *",
+        ),
     )
 
     prompt = request.repair_prompt(
@@ -104,6 +110,8 @@ def test_repair_prompt_keeps_targeted_repair_contract() -> None:
     assert "Feature objective:\nAdd the bounded adapter." in prompt
     assert prompt.count("Add the bounded adapter.") == 1
     assert "Do not re-plan the feature" in prompt
+    assert "uv run pytest -n auto --cov --cov-report=xml:coverage.xml *" in prompt
+    assert "Do not prepend environment variables" in prompt
 
 
 def test_repair_prompt_does_not_replay_the_full_intent_packet() -> None:
@@ -123,6 +131,9 @@ def test_repair_prompt_does_not_replay_the_full_intent_packet() -> None:
         request_id="request-1",
         base_commit="abc",
         plan_fingerprint="plan-1",
+        allowed_commands=(
+            "uv run pytest -n auto --cov --cov-report=xml:coverage.xml *",
+        ),
     )
 
     prompt = request.repair_prompt(
@@ -134,6 +145,8 @@ def test_repair_prompt_does_not_replay_the_full_intent_packet() -> None:
 
     assert "Feature objective:\nAdd the bounded adapter." in prompt
     assert "Allowed durable paths: src/adapter.py" in prompt
+    assert "Allowed validation command forms" in prompt
+    assert "-p no:django" not in prompt
     assert "Operation-scoped intent packet" not in prompt
     assert "Required operations" not in prompt
     assert "Must preserve" not in prompt

@@ -894,17 +894,23 @@ class FeatureCommandRuntime:
 
 def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, str]:
     """Validate one semantic design, including trace-only clauses."""
-    required = ("kind", "description", "acceptance_criterion", "expected_test")
-    values = {name: parameters.get(name) for name in required}
-    if any(
-        not isinstance(value, str) or not value.strip() for value in values.values()
-    ):
+    kind = parameters.get("kind")
+    description = parameters.get("description")
+    acceptance_criterion = parameters.get("acceptance_criterion")
+    expected_test = parameters.get("expected_test")
+    values = (kind, description, acceptance_criterion, expected_test)
+    if any(not isinstance(value, str) or not value.strip() for value in values):
         raise PowdrrExecutionError(
             "merge_semantic_design requires non-empty semantic fields"
         )
-    if values["kind"] not in SEMANTIC_KINDS:
+    if kind not in SEMANTIC_KINDS:
         raise PowdrrExecutionError("merge_semantic_design kind is invalid")
-    return values
+    return {
+        "kind": kind,
+        "description": description,
+        "acceptance_criterion": acceptance_criterion,
+        "expected_test": expected_test,
+    }
 
 
 __all__ = ["FeatureCommandRuntime", "feature_command_catalog"]

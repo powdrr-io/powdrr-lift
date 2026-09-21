@@ -9,13 +9,17 @@ human-decisions:
     summary: Represent every deterministic feature-flow command as a cataloged Python object with explicit input and output contracts.
 structured_files: []
 files:
-  - {path: src/powdrr_lift/workrr/command_catalog.py, type: added, summary: Define feature command contracts and implementations, rationale: Centralize command names, parameter contracts, and dispatch logic, span: {start_line: 1, end_line: 138}}
-  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Use the command catalog in feature execution, rationale: Apply the same contracts to parsing and dispatch, span: {start_line: 96, end_line: 96}}
-  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate the feature flow with the catalog, rationale: Reject invalid internal calls before execution, span: {start_line: 283, end_line: 286}}
-  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate runtime command parameters, rationale: Enforce command contracts at dispatch time, span: {start_line: 342, end_line: 354}}
-  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Attach handlers and dispatch through catalog specs, rationale: Keep implementations and command definitions aligned, span: {start_line: 583, end_line: 602}}
-  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Pass the catalog to evaluation, rationale: Preserve contracts through flow evaluation, span: {start_line: 844, end_line: 844}}
-  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate checked-in flows with the catalog, rationale: Catch command contract errors during validation, span: {start_line: 3913, end_line: 3916}}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: added, summary: Define feature command contracts and implementations, rationale: Centralize command names, parameter contracts, and dispatch logic, span: {start_line: 1, end_line: 686}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove command implementation imports, rationale: Move command implementations into the catalog runtime, span: {start_line: 25, end_line: 28}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove command implementation imports, rationale: Move command implementations into the catalog runtime, span: {start_line: 30, end_line: 34}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Import the catalog runtime, rationale: Let the catalog own internal command execution, span: {start_line: 87, end_line: 90}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Construct the catalog runtime, rationale: Supply execution context without duplicating command definitions, span: {start_line: 277, end_line: 290}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate command parameters, rationale: Reject invalid internal calls before catalog dispatch, span: {start_line: 346, end_line: 350}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Dispatch through the catalog runtime, rationale: Use one internal command implementation path, span: {start_line: 352, end_line: 354}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove the endpoint command implementation block, rationale: Keep command logic in the catalog runtime, span: {start_line: 357, end_line: 363}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Remove the endpoint command implementation block, rationale: Keep command logic in the catalog runtime, span: {start_line: 699, end_line: 705}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Pass the catalog to evaluation, rationale: Preserve contracts through flow evaluation, span: {start_line: 385, end_line: 385}}
+  - {path: src/powdrr_lift/workrr/feature_endpoint.py, type: modified, summary: Validate checked-in flows with the catalog, rationale: Catch command contract errors during validation, span: {start_line: 3454, end_line: 3457}}
   - {path: src/procedrr/__init__.py, type: modified, summary: Export catalog types, rationale: Make command contracts part of the Procedrr API, span: {start_line: 3, end_line: 7}}
   - {path: src/procedrr/__init__.py, type: modified, summary: Export catalog types, rationale: Make command contracts part of the Procedrr API, span: {start_line: 55, end_line: 57}}
   - {path: src/procedrr/command_catalog.py, type: added, summary: Define typed command specifications, rationale: Provide shared validation and dispatch primitives, span: {start_line: 1, end_line: 154}}

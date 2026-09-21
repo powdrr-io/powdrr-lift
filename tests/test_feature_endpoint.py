@@ -40,6 +40,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _apply_sentence_design_trace,
     _compile_feature_obligations,
     _create_pr_changelog,
+    _derive_feature_test_contracts,
     _ensure_current_baseline,
     _evaluate_proposal_command,
     _finalize_proposal_review,
@@ -554,6 +555,48 @@ def test_structured_obligation_contracts_cover_generated_design_intents(
             f"feature-obligation-sentence-{index}",
             f"design-sentence-{index}",
         }
+
+
+def test_feature_test_contracts_do_not_retain_unrelated_inventory_selectors() -> None:
+    contracts = _derive_feature_test_contracts(
+        {
+            "required_test_cases": [
+                {
+                    "id": "unrelated-existing",
+                    "description": "An unrelated existing test.",
+                    "intent_refs": ["feature-obligation-sentence-1"],
+                    "provider": "pytest",
+                    "profile": "pytest",
+                    "selector": "tests/test_unrelated.py::test_existing",
+                    "expectation": "pass",
+                    "status": "active",
+                }
+            ]
+        },
+        [
+            {
+                "id": "sentence-1",
+                "description": "Implement the behavior.",
+                "design": {
+                    "expected_test": "Verify the behavior.",
+                    "acceptance_criterion": "The behavior is observable.",
+                },
+            }
+        ],
+        inventory=(
+            {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_unrelated.py::test_existing",
+            },
+        ),
+    )
+
+    assert len(contracts) == 1
+    assert contracts[0]["selector"] != "tests/test_unrelated.py::test_existing"
+    assert contracts[0]["selector"].startswith(
+        "tests/test_feature_obligation_sentence_1_test"
+    )
 
 
 def test_feature_obligations_become_active_intents(tmp_path: Path) -> None:

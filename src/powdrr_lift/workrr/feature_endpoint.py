@@ -1324,32 +1324,10 @@ def _derive_feature_test_contracts(
 
     The interview may propose semantic test obligations, but it cannot be the
     source of the final intent IDs: those IDs are created when obligations are
-    materialized.  Compile the contract set here so every contract names the
-    exact materialized clause that OpenCode must implement and validate.
+    materialized. Feature obligations always receive new focused test
+    contracts. Existing inventory is used only to discover the test provider
+    and profile; it must never replace a new contract with an unrelated test.
     """
-    materialized_ids = {
-        f"feature-obligation-{item['id']}"
-        for item in obligations
-        if isinstance(item.get("id"), str) and item["id"].strip()
-    }
-    existing = plan.get("required_test_cases")
-    retained: list[dict[str, Any]] = []
-    covered: set[str] = set()
-    if isinstance(existing, list):
-        for raw in existing:
-            if not isinstance(raw, Mapping):
-                continue
-            refs = raw.get("intent_refs")
-            if not isinstance(refs, list):
-                continue
-            exact_refs = [ref for ref in refs if ref in materialized_ids]
-            if not exact_refs:
-                continue
-            item = dict(raw)
-            item["intent_refs"] = exact_refs
-            retained.append(item)
-            covered.update(exact_refs)
-
     semantic_cases: list[dict[str, Any]] = []
     for obligation in obligations:
         obligation_id = obligation.get("id")
@@ -1357,8 +1335,6 @@ def _derive_feature_test_contracts(
         if not isinstance(obligation_id, str) or not isinstance(design, Mapping):
             continue
         clause_id = f"feature-obligation-{obligation_id}"
-        if clause_id in covered:
-            continue
         expected_test = design.get("expected_test")
         acceptance = design.get("acceptance_criterion")
         semantic_cases.append(
@@ -1389,7 +1365,7 @@ def _derive_feature_test_contracts(
             }
         )
     _attach_feature_trace_refs(compiled, plan, obligations)
-    return [*retained, *compiled]
+    return compiled
 
 
 def _attach_feature_trace_refs(

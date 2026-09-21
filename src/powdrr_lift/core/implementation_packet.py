@@ -148,8 +148,14 @@ class ImplementationPacket:
                 "\nImplement only the original description and obligations above. "
                 "Create the listed new tests, using the name hints as prefixes; "
                 "optional suffixes such as `_sync` and `_async` are allowed. "
-                "Run the focused new tests, then the repository validation, and "
-                "stop.",
+                "The required test is part of this work: if it is broken because "
+                "of an import, fixture, API, assertion, or other test defect, "
+                "repair the test and the implementation as needed. Do not delete "
+                "or weaken the test to make it pass. Run only the focused required "
+                "test command, rerunning it at most twice after a repair, then "
+                "stop. Do not run the full repository suite, coverage, lint, type "
+                "checks, or unrelated tests; Workrr owns repository-wide "
+                "validation.",
             )
         )
 

@@ -35,6 +35,13 @@ def test_packet_renders_bounded_obligations_and_exact_selectors() -> None:
     assert "create the exact selectors" not in rendered
     assert "candidate 1: tests/test_state.py::test_existing" not in rendered
     assert "model-authored" not in rendered
+    assert "repair the test and the implementation as needed" in rendered
+    assert "rerunning it at most twice after a repair" in rendered
+    assert (
+        "Do not run the full repository suite, coverage, lint, type checks" in rendered
+    )
+    assert "Workrr owns repository-wide validation" in rendered
+    assert "repository validation" not in rendered
     assert packet.from_data(packet.to_data()).to_data() == packet.to_data()
 
 

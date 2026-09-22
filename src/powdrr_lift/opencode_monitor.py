@@ -247,19 +247,24 @@ def run_opencode(
     cwd: Path | None = None,
     env: Mapping[str, str] | None = None,
     inactivity_timeout: float = 300.0,
+    absolute_timeout: float | None = None,
     on_snapshot: Callable[[LivenessSnapshot], None] | None = None,
     on_activity: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run OpenCode and stop it after ten minutes without activity.
+    """Run OpenCode with inactivity and optional absolute deadlines.
 
     Activity includes any streamed OpenCode output/event and can also be
     reported by the owning Procedrr flow through ``on_activity``.
     """
     if inactivity_timeout <= 0:
         raise ValueError("inactivity_timeout must be greater than zero")
+    if absolute_timeout is not None and absolute_timeout <= 0:
+        raise ValueError("absolute_timeout must be greater than zero")
+    if absolute_timeout is not None and absolute_timeout < inactivity_timeout:
+        raise ValueError("absolute_timeout must be at least inactivity_timeout")
     monitor = OpenCodeLiveness(
-        slow_after=inactivity_timeout,
-        stalled_after=inactivity_timeout * 2,
+        slow_after=max(inactivity_timeout / 2, 0.001),
+        stalled_after=inactivity_timeout,
     )
     process = subprocess.Popen(
         list(command),
@@ -278,7 +283,8 @@ def run_opencode(
     # Raw bytes are useful for diagnostics, but they are not proof that
     # OpenCode is making progress.  In particular, heartbeats and other
     # transport chatter must not keep a stalled session alive indefinitely.
-    last_progress = time.monotonic()
+    started_at = time.monotonic()
+    last_progress = started_at
     timed_out = False
     last_snapshot: tuple[Any, ...] | None = None
     last_snapshot_at = last_progress
@@ -325,18 +331,40 @@ def run_opencode(
             command=_diagnostic_command(command),
             cwd=str(cwd) if cwd is not None else None,
             inactivity_timeout=inactivity_timeout,
+            absolute_timeout=absolute_timeout,
         )
     try:
         while selector.get_map() or process.poll() is None:
-            remaining = inactivity_timeout - (time.monotonic() - last_progress)
+            now = time.monotonic()
+            inactivity_remaining = inactivity_timeout - (now - last_progress)
+            absolute_remaining = (
+                absolute_timeout - (now - started_at)
+                if absolute_timeout is not None
+                else None
+            )
+            remaining = (
+                min(inactivity_remaining, absolute_remaining)
+                if absolute_remaining is not None
+                else inactivity_remaining
+            )
             if remaining <= 0:
                 timed_out = True
+                timeout_kind = (
+                    "absolute"
+                    if absolute_remaining is not None and absolute_remaining <= 0
+                    else "inactivity"
+                )
                 if log_path is not None:
                     append_diagnostic(
                         log_path,
                         "process.timed_out",
                         captured_at=time.monotonic(),
-                        reason="no progress event or Procedrr activity within timeout",
+                        timeout_kind=timeout_kind,
+                        reason=(
+                            "absolute process deadline exceeded"
+                            if timeout_kind == "absolute"
+                            else "no progress event or Procedrr activity within timeout"
+                        ),
                         process_tree=_process_tree(process.pid),
                     )
                 try:

@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from contextlib import redirect_stdout
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -39,6 +40,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _compile_code_task_plan,
     _compile_feature_obligations,
     _create_pr_changelog,
     _derive_feature_test_contracts,
@@ -51,6 +53,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _operation_checkpoint,
     _plan_text_items,
     _proposal_execution_units,
+    _render_code_task_prompt,
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
     _validate_required_test_cases,
@@ -74,6 +77,68 @@ def test_merge_semantic_design_accepts_trace_only_nonactionable_clause() -> None
     )
 
     assert design["kind"] == "nonactionable"
+
+
+def test_code_task_plan_deduplicates_failures_for_one_focused_contract(
+    tmp_path: Path,
+) -> None:
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {
+                "failing_cases": [
+                    {
+                        "obligation_id": "obligation-1",
+                        "provider": "pytest",
+                        "profile": "pytest",
+                        "selector": "tests/test_export.py::test_export",
+                    },
+                    {
+                        "obligation_id": "obligation-2",
+                        "provider": "pytest",
+                        "profile": "pytest",
+                        "selector": "tests/test_export.py::test_export",
+                    },
+                ]
+            },
+            "verification_plans": [
+                {
+                    "obligation_id": "obligation-1",
+                    "description": "Repair report export.",
+                    "acceptance_criterion": "The export test passes.",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("src/export.py",)),
+    )
+
+    assert len(result["tasks"]) == 1
+    assert result["tasks"][0]["obligation_refs"] == [
+        "obligation-1",
+        "obligation-2",
+    ]
+    assert result["tasks"][0]["validator"]["selector"] == (
+        "tests/test_export.py::test_export"
+    )
+
+
+def test_code_task_prompt_contains_only_bounded_task_contract() -> None:
+    prompt = _render_code_task_prompt(
+        {
+            "task_id": "code-task-001",
+            "objective": "Repair report export.",
+            "allowed_paths": ["src/export.py"],
+            "acceptance_criteria": ["The export test passes."],
+            "validator": {"selector": "tests/test_export.py::test_export"},
+            "baseline_cases": [{"error": "assertion failed"}],
+        },
+        feature_description="Add CSV export.",
+    )
+
+    assert "Repair report export." in prompt
+    assert "tests/test_export.py::test_export" in prompt
+    assert "Do not re-plan the feature" in prompt
+    assert "implementation packet" not in prompt
 
 
 def test_workrr_feature_cli_builds_endpoint_config(

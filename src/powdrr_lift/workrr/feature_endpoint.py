@@ -2002,6 +2002,36 @@ def _run_code_agent_phase(
             prompt=implementation_packet.render(),
             implementation_packet=implementation_packet,
         )
+        if isinstance(code_task, Mapping):
+            task_paths = tuple(
+                item
+                for item in code_task.get("allowed_paths", request.allowed_paths)
+                if isinstance(item, str) and item.strip()
+            )
+            task_acceptance = tuple(
+                item
+                for item in code_task.get("acceptance_criteria", ())
+                if isinstance(item, str) and item.strip()
+            )
+            request = replace(
+                request,
+                objective=str(code_task.get("objective", request.objective)),
+                prompt=_render_code_task_prompt(
+                    code_task, feature_description=feature_description
+                ),
+                allowed_paths=task_paths or request.allowed_paths,
+                acceptance_criteria=task_acceptance or request.acceptance_criteria,
+                planned_additions=tuple(
+                    item
+                    for item in code_task.get("planned_additions", ())
+                    if isinstance(item, Mapping)
+                ),
+                planned_deletions=tuple(
+                    item
+                    for item in code_task.get("planned_deletions", ())
+                    if isinstance(item, Mapping)
+                ),
+            )
         if repair_mode:
             if isinstance(repair_issue, Mapping):
                 repair_request = request.repair_prompt(repair_issue)
@@ -2798,6 +2828,41 @@ def _require_flow_text(parameters: Mapping[str, Any], name: str) -> str:
             f"feature flow parameter {name!r} must be a non-empty string"
         )
     return value
+
+
+def _render_code_task_prompt(
+    task: Mapping[str, Any], *, feature_description: str
+) -> str:
+    """Render only the bounded task contract sent to the coding agent."""
+    task_id = str(task.get("task_id", "unidentified-task"))
+    objective = str(task.get("objective", "Complete the assigned code task."))
+    allowed_paths = task.get("allowed_paths", [])
+    acceptance = task.get("acceptance_criteria", [])
+    validator = task.get("validator", {})
+    failures = task.get("baseline_cases", [])
+    failures_json = json.dumps(failures, sort_keys=True, default=str)
+    additions_json = json.dumps(task.get("planned_additions", []), sort_keys=True)
+    deletions_json = json.dumps(task.get("planned_deletions", []), sort_keys=True)
+    return (
+        "You are implementing exactly one bounded CodeTask. Work on this task "
+        "only, then stop. Do not re-plan the feature, inspect unrelated areas, "
+        "or perform cleanup.\n\n"
+        f"Task ID: {task_id}\n"
+        f"Feature context: {feature_description}\n"
+        f"Objective: {objective}\n"
+        f"Allowed paths: {json.dumps(allowed_paths, sort_keys=True)}\n"
+        f"Acceptance criteria: {json.dumps(acceptance, sort_keys=True)}\n"
+        f"Focused validator: {json.dumps(validator, sort_keys=True)}\n"
+        f"Failing baseline evidence: {failures_json}\n"
+        f"Planned additions: {additions_json}\n"
+        f"Planned deletions: {deletions_json}\n"
+        f"Must preserve: {json.dumps(task.get('must_preserve', []), sort_keys=True)}\n"
+        f"Non-goals: {json.dumps(task.get('non_goals', []), sort_keys=True)}\n\n"
+        "Make the smallest change that satisfies the criteria. Do not commit, "
+        "push, edit files outside the allowed paths, or start another agent. "
+        "If the task cannot be completed safely, leave the worktree coherent "
+        "and report the blocking evidence."
+    )
 
 
 def _command_option(command: list[Any], option: str) -> str:
@@ -3998,25 +4063,54 @@ def _compile_code_task_plan(
         else []
     )
     plans = _flow_items(parameters.get("verification_plans"))
-    tasks: list[dict[str, Any]] = []
-    for index, failure in enumerate(failures, start=1):
+    grouped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for failure in failures:
+        provider = str(failure.get("provider", ""))
+        profile = str(failure.get("profile", ""))
+        selector = str(failure.get("selector", ""))
+        expectation = str(failure.get("expectation", "pass"))
+        key = (provider, profile, selector, expectation)
+        group = grouped.setdefault(
+            key,
+            {
+                "provider": provider,
+                "profile": profile,
+                "selector": selector,
+                "expectation": expectation,
+                "obligation_ids": [],
+                "cases": [],
+            },
+        )
         obligation_id = str(
             failure.get("obligation_id", failure.get("obligation_ref", ""))
         )
+        if obligation_id and obligation_id not in group["obligation_ids"]:
+            group["obligation_ids"].append(obligation_id)
+        group["cases"].append(dict(failure))
+
+    tasks: list[dict[str, Any]] = []
+    for index, group in enumerate(grouped.values(), start=1):
+        obligation_ids = [str(item) for item in group["obligation_ids"]]
+        obligation_id = obligation_ids[0] if obligation_ids else ""
         source = next(
             (item for item in plans if item.get("obligation_id") == obligation_id),
             plans[0] if plans else {},
         )
+        selector = group["selector"] or str(source.get("evidence_case", ""))
+        objective = str(source.get("description", "")).strip()
+        if not objective:
+            objective = f"Repair the failing verification contract for {selector}"
+        acceptance = str(source.get("acceptance_criterion", "")).strip()
+        if not acceptance:
+            acceptance = f"The focused contract {selector} passes."
         tasks.append(
             {
                 "task_id": f"code-task-{index:03d}",
-                "objective": str(
-                    source.get("description", "Repair the failing obligation")
-                ),
-                "obligation_refs": [obligation_id] if obligation_id else [],
+                "objective": objective,
+                "obligation_refs": obligation_ids,
                 "allowed_paths": list(getattr(config, "allowed_paths", ())),
-                "validation_profiles": ["pytest"],
-                "acceptance_criteria": [str(source.get("acceptance_criterion", ""))],
+                "validation_profiles": [group["profile"] or "pytest"],
+                "acceptance_criteria": [acceptance],
                 "planned_additions": [],
                 "planned_deletions": [],
                 "must_preserve": [],
@@ -4024,8 +4118,12 @@ def _compile_code_task_plan(
                 "source_refs": ["obligation-baseline"],
                 "validator": {
                     "kind": "focused-contract",
-                    "evidence_case": str(source.get("evidence_case", "")),
+                    "provider": group["provider"] or "pytest",
+                    "profile": group["profile"] or "pytest",
+                    "selector": group["selector"],
+                    "expectation": group["expectation"],
                 },
+                "baseline_cases": group["cases"],
                 "dependencies": [],
             }
         )

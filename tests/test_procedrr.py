@@ -627,7 +627,11 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     document = parse_and_validate(source)
-    body = document["steps"][1]["for_each"]["body"]
+    atomicity_body = document["steps"][1]["for_each"]["body"]
+    atomicity_judge = atomicity_body[0]["judge"]
+    split_body = document["steps"][3]["for_each"]["body"]
+    split_judge = split_body[0]["judge"]
+    body = document["steps"][5]["for_each"]["body"]
     judges = [step["judge"] for step in body if "judge" in step]
     obligation_judge = judges[1]
     acceptance_judge = judges[2]
@@ -635,6 +639,17 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
     operation_judge = judges[4]
     oracle_judge = judges[5]
     evidence_judge = judges[6]
+
+    assert atomicity_judge["question"] == (
+        "Does this one instruction clause contain more than one independently "
+        "verifiable requirement?"
+    )
+    assert atomicity_judge["output"]["schema"]["required"] == ["multiple"]
+    assert split_judge["question"] == (
+        "What are the smallest independently verifiable requirements contained in "
+        "this one instruction clause?"
+    )
+    assert split_judge["output"]["schema"]["required"] == ["statements"]
 
     assert obligation_judge["question"] == (
         "What is the one concrete semantic obligation expressed by this instruction "

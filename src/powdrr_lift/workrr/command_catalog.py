@@ -17,6 +17,7 @@ from powdrr_lift.core.feature_obligation import (
 from powdrr_lift.core.instruction_ledger import (
     InstructionLedger,
     InstructionLedgerError,
+    apply_atomicity_decisions,
     compile_instruction_ledger,
 )
 from powdrr_lift.errors import PowdrrExecutionError
@@ -58,6 +59,26 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("compile_instruction_ledger"),
+        ),
+        "prepare_atomicity_split_requests": CommandSpec(
+            name="prepare_atomicity_split_requests",
+            input_schema=object_schema(
+                {"decisions": {}},
+                required=("decisions",),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_atomicity_split_requests"),
+        ),
+        "apply_atomicity_splits": CommandSpec(
+            name="apply_atomicity_splits",
+            input_schema=object_schema(
+                {"decisions": {}, "splits": {}},
+                required=("decisions", "splits"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("apply_atomicity_splits"),
         ),
         "merge_semantic_design": CommandSpec(
             name="merge_semantic_design",
@@ -528,22 +549,123 @@ class FeatureCommandRuntime:
                 "clauses": [item.to_data() for item in ledger.clauses],
             }
 
-        def merge_semantic_design_operation() -> Any:
-            """Join the independently elicited semantic fields for one clause."""
-            return _merge_semantic_design_values(parameters)
-
-        def compile_canonical_feature_design_operation() -> Any:
+        def load_instruction_ledger() -> InstructionLedger:
             ledger_path = state.get("instruction_ledger_path")
             if not isinstance(ledger_path, Path):
                 raise PowdrrExecutionError("instruction ledger is unavailable")
             try:
-                ledger = InstructionLedger.from_data(
+                return InstructionLedger.from_data(
                     json.loads(ledger_path.read_text(encoding="utf-8"))
                 )
             except (OSError, json.JSONDecodeError, InstructionLedgerError) as exc:
                 raise PowdrrExecutionError(
                     f"instruction ledger cannot be loaded: {exc}"
                 ) from exc
+
+        def collected_atomicity_decisions() -> list[dict[str, Any]]:
+            raw_decisions = feature_endpoint._collected_results(
+                parameters.get("decisions")
+            )
+            if raw_decisions is None or not all(
+                isinstance(item, Mapping) for item in raw_decisions
+            ):
+                raise PowdrrExecutionError(
+                    "atomicity decisions are missing or malformed"
+                )
+            return [dict(item) for item in raw_decisions]
+
+        def prepare_atomicity_split_requests_operation() -> Any:
+            ledger = load_instruction_ledger()
+            decisions = collected_atomicity_decisions()
+            if len(decisions) != len(ledger.clauses):
+                raise PowdrrExecutionError(
+                    "atomicity decision count does not match instruction clauses"
+                )
+            try:
+                multiple = [
+                    decision["multiple"]
+                    for decision in decisions
+                    if set(decision) == {"multiple"}
+                    and isinstance(decision["multiple"], bool)
+                ]
+            except KeyError as exc:  # defensive: schema validation should catch this.
+                raise PowdrrExecutionError("atomicity decision is malformed") from exc
+            if len(multiple) != len(decisions):
+                raise PowdrrExecutionError(
+                    "atomicity decisions may contain only boolean multiple"
+                )
+            state["atomicity_decisions"] = decisions
+            return {
+                "split_requests": [
+                    {"clause": clause.to_data()}
+                    for clause, is_multiple in zip(
+                        ledger.clauses, multiple, strict=True
+                    )
+                    if is_multiple
+                ]
+            }
+
+        def apply_atomicity_splits_operation() -> Any:
+            ledger = load_instruction_ledger()
+            decisions = collected_atomicity_decisions()
+            stored_decisions = state.get("atomicity_decisions")
+            if decisions != stored_decisions:
+                raise PowdrrExecutionError(
+                    "atomicity decisions changed between classification and split"
+                )
+            split_results = feature_endpoint._collected_results(
+                parameters.get("splits")
+            )
+            if split_results is None or not all(
+                isinstance(item, Mapping) for item in split_results
+            ):
+                raise PowdrrExecutionError("atomicity splits are missing or malformed")
+            multiple_ids = [
+                clause.clause_id
+                for clause, decision in zip(ledger.clauses, decisions, strict=True)
+                if decision["multiple"]
+            ]
+            if len(split_results) != len(multiple_ids):
+                raise PowdrrExecutionError(
+                    "atomicity split count does not match multi-requirement clauses"
+                )
+            compiler_decisions: dict[str, dict[str, Any]] = {
+                clause.clause_id: {"multiple": False} for clause in ledger.clauses
+            }
+            for clause_id, split in zip(multiple_ids, split_results, strict=True):
+                if set(split) != {"statements"}:
+                    raise PowdrrExecutionError(
+                        "atomicity split may contain only ordered statements"
+                    )
+                compiler_decisions[clause_id] = {
+                    "multiple": True,
+                    "statements": split.get("statements"),
+                }
+            try:
+                refined = apply_atomicity_decisions(ledger, compiler_decisions)
+            except InstructionLedgerError as exc:
+                raise PowdrrExecutionError(
+                    f"atomicity split is invalid: {exc}"
+                ) from exc
+            ledger_path = state["instruction_ledger_path"]
+            assert isinstance(ledger_path, Path)
+            ledger_path.write_text(
+                json.dumps(refined.to_data(), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            state["instruction_ledger_fingerprint"] = refined.fingerprint
+            return {
+                "path": str(ledger_path),
+                "fingerprint": refined.fingerprint,
+                "clauses": [item.to_data() for item in refined.clauses],
+            }
+
+        def merge_semantic_design_operation() -> Any:
+            """Join the independently elicited semantic fields for one clause."""
+            return _merge_semantic_design_values(parameters)
+
+        def compile_canonical_feature_design_operation() -> Any:
+            ledger = load_instruction_ledger()
             raw_design_decisions = feature_endpoint._collected_results(
                 parameters.get("design_decisions")
             )
@@ -707,6 +829,12 @@ class FeatureCommandRuntime:
                 ),
                 "compile_instruction_ledger": bind_handler(
                     compile_instruction_ledger_operation
+                ),
+                "prepare_atomicity_split_requests": bind_handler(
+                    prepare_atomicity_split_requests_operation
+                ),
+                "apply_atomicity_splits": bind_handler(
+                    apply_atomicity_splits_operation
                 ),
                 "merge_semantic_design": bind_handler(merge_semantic_design_operation),
                 "compile_canonical_feature_design": bind_handler(

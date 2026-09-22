@@ -476,6 +476,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
+            if "independently verifiable requirement" in question:
+                return {"multiple": False}
             if "kind of obligation" in question:
                 return {"kind": "feature"}
             if "one concrete semantic obligation" in question:
@@ -503,6 +505,16 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 return {
                     "path": "instruction-ledger.json",
                     "fingerprint": "sha256:ledger",
+                    "clauses": [
+                        {"clause_id": "instruction-001", "text": "Add a thing"}
+                    ],
+                }
+            if command[0] == "prepare_atomicity_split_requests":
+                return {"split_requests": []}
+            if command[0] == "apply_atomicity_splits":
+                return {
+                    "path": "instruction-ledger.json",
+                    "fingerprint": "sha256:atomic-ledger",
                     "clauses": [
                         {"clause_id": "instruction-001", "text": "Add a thing"}
                     ],
@@ -568,7 +580,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 7
+    assert result.llm_activations == 8
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events
@@ -618,6 +630,22 @@ def test_live_design_interview_inspects_intermediate_contract_outputs(
             return {
                 "path": str(tmp_path / "instruction-ledger.json"),
                 "fingerprint": "sha256:ledger",
+                "clauses": [
+                    {
+                        "clause_id": "pickle-001",
+                        "text": (
+                            "All persisted data entities should support "
+                            "pickle round-tripping."
+                        ),
+                    }
+                ],
+            }
+        if command[0] == "prepare_atomicity_split_requests":
+            return {"split_requests": []}
+        if command[0] == "apply_atomicity_splits":
+            return {
+                "path": str(tmp_path / "instruction-ledger.json"),
+                "fingerprint": "sha256:atomic-ledger",
                 "clauses": [
                     {
                         "clause_id": "pickle-001",
@@ -682,7 +710,7 @@ def test_live_design_interview_inspects_intermediate_contract_outputs(
         for event in result.events
         if event.kind == "judge" and "value" in event.data
     }
-    assert result.llm_activations == 7
+    assert result.llm_activations == 8
     assert judge_values["semantic_kind"]["kind"] == "invariant"
     assert "pickle" in judge_values["semantic_obligation"]["description"].lower()
     assert any(

@@ -1,10 +1,12 @@
 version: 1
 name: design-interview
 description: >-
-  Compile the feature request into one deterministic instruction ledger, then
-  ask one bounded semantic question at a time to define each clause's durable
-  obligation and verification shape. The compiler owns identity, references,
-  selectors, fingerprints, executable test contracts, and aggregation.
+  Compile the feature request into one deterministic instruction ledger,
+  decompose every multi-requirement clause through bounded single-decision
+  questions, then ask one bounded semantic question at a time to define each
+  atomic clause's durable obligation and verification shape. The compiler owns
+  identity, references, selectors, fingerprints, executable test contracts,
+  and aggregation.
 inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
@@ -83,6 +85,108 @@ steps:
       bind: instruction_ledger
   - for_each:
       snapshot: {name: instruction_ledger.clauses, max_items: 128}
+      item_binding: atomicity_clause
+      collect: {binding: atomicity_decisions, mode: list, value: atomicity_decision}
+      body:
+        - judge:
+            kind: classify_one
+            provider: planning
+            question: Does this one instruction clause contain more than one independently verifiable requirement?
+            subject: atomicity_clause.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Answer true only when this clause requires two or more behaviors, APIs, constraints, lifecycle events, error cases, or observable results that could be verified separately.
+              - Answer false when the clause expresses one behavior with its necessary condition, value, or outcome.
+              - Do not rewrite, classify, design, prioritize, or propose implementation work.
+              - Do not return IDs, references, selectors, hashes, fingerprints, or statements.
+              - >-
+                Example: "On entry, data initializes as a fresh copy of the defaults."
+                contains one requirement, so multiple is false.
+              - >-
+                Example: "On exit, data is removed. Re-entering a state resets data
+                to the original defaults." is already two clauses and each is judged
+                separately; do not combine neighboring clauses.
+              - >-
+                Example: "set_state_data validates active state, declared key, and
+                DataVar type constraints, raising InvalidDefinition on violation."
+                contains independently verifiable validations and an error outcome, so
+                multiple is true.
+            context: [atomicity_clause]
+            output:
+              name: atomicity_decision
+              schema:
+                type: object
+                required: [multiple]
+                additionalProperties: false
+                properties:
+                  multiple: {type: boolean}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [prepare_atomicity_split_requests]
+      parameters:
+        decisions: {type: reference, value: atomicity_decisions}
+      returns:
+        type: object
+        required: [split_requests]
+        properties:
+          split_requests: {type: array}
+      bind: atomicity_plan
+  - for_each:
+      snapshot: {name: atomicity_plan.split_requests, max_items: 128}
+      item_binding: atomicity_split_request
+      collect: {binding: atomicity_splits, mode: list, value: atomicity_split}
+      body:
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: What are the smallest independently verifiable requirements contained in this one instruction clause?
+            subject: atomicity_split_request.clause.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Return an ordered list of 2 to 8 short statements, and nothing else.
+              - Each statement must express exactly one behavior, API result, constraint, lifecycle event, error condition, or prohibition that can be verified separately.
+              - Preserve every concrete API name, value, condition, constraint, and required error from the source clause.
+              - Do not add requirements, choose implementation details, weaken a requirement, or infer an opposite behavior.
+              - Do not return IDs, references, selectors, hashes, fingerprints, source spans, or parent fields; Powdrr assigns structure.
+              - >-
+                Example source: "set_state_data validates active state, declared key,
+                and DataVar type constraints, raising InvalidDefinition on violation."
+              - >-
+                Example statements: ["set_state_data rejects an inactive state.",
+                "set_state_data rejects an undeclared key.", "set_state_data enforces
+                the declared DataVar type constraint.", "An invalid set_state_data
+                call raises InvalidDefinition."]
+            context: [atomicity_split_request]
+            output:
+              name: atomicity_split
+              schema:
+                type: object
+                required: [statements]
+                additionalProperties: false
+                properties:
+                  statements:
+                    type: array
+                    minItems: 2
+                    maxItems: 8
+                    items: {type: string, minLength: 1, maxLength: 500}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [apply_atomicity_splits]
+      parameters:
+        decisions: {type: reference, value: atomicity_decisions}
+        splits: {type: reference, value: atomicity_splits}
+      returns:
+        type: object
+        required: [path, fingerprint, clauses]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          clauses: {type: array, minItems: 1}
+      bind: atomic_instruction_ledger
+  - for_each:
+      snapshot: {name: atomic_instruction_ledger.clauses, max_items: 128}
       item_binding: instruction_clause
       collect: {binding: semantic_designs, mode: list, value: semantic_design}
       body:

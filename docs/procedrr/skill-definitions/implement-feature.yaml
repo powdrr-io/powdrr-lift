@@ -1,5 +1,11 @@
 version: 1
 name: implement-feature
+description: >-
+  Convert an accepted Structrr intent diff into obligation verification
+  contracts, baseline evidence, and independently verifiable code tasks. Every
+  review asks one question about one subject. Workrr owns evidence collection
+  and deterministic evaluation; a coding agent is invoked only for an accepted
+  task that requires repository edits.
 inputs:
   - {name: feature_description, type: string, required: true}
   - {name: work_item_name, type: string, required: true}
@@ -54,6 +60,10 @@ steps:
           updated: {type: integer, minimum: 0}
           intent_clauses: {type: array, minItems: 1}
       bind: feature_intents
+
+  # The accepted proposal remains the authority for intent additions,
+  # removals, and preservation. These existing gates precede all execution
+  # planning.
   - operation:
       tool: internal
       command: [compile_verification_obligations]
@@ -106,21 +116,30 @@ steps:
           active_intent_clauses: {type: array}
       bind: proposal_review
   - for_each:
-      snapshot: {name: proposal_review.worklist.specifications}
+      snapshot: {name: proposal_review.worklist.specifications, max_items: 1024}
       item_binding: proposal_decision
       collect: {binding: proposal_decisions, mode: list, value: proposal_decision_result}
       body:
         - judge:
             kind: verify_proposal_decision
-            question: Does this one proposal decision pass based on the supplied evidence?
+            provider: planning
+            question: Does this one proposal predicate pass based only on its supplied evidence?
             subject: proposal_decision.predicate
             prompt_system: Return only the declared JSON object.
             instructions:
               - Evaluate exactly the one predicate in proposal_decision.
-              - Do not evaluate sibling decisions or provide an aggregate verdict.
-              - Return only the semantic outcome and explanation; Powdrr binds all decision identity and evidence fields.
-              - Use pass only when the evidence proves the predicate; otherwise use fail, unknown, or clarification.
-              - An unknown or clarification outcome blocks proposal acceptance.
+              - Do not evaluate sibling predicates or provide an aggregate verdict.
+              - Use pass only when the supplied evidence proves this predicate.
+              - Return fail, unknown, or clarification when the evidence does not prove it.
+              - Do not return IDs, references, or fingerprints; Powdrr binds them.
+              - >-
+                Examples: predicate "the proposed obligation names a concrete behavior" with evidence containing a nonempty behavior description → pass.
+              - >-
+                Examples: predicate "the required test has a provider, profile, and selector" with evidence missing the selector → fail.
+              - >-
+                Examples: predicate "the proposal preserves the existing transport invariant" with no transport evidence → unknown, not pass.
+              - >-
+                Counterexample: do not pass because the overall feature sounds reasonable; evaluate only the named predicate.
             context: [proposal_decision, feature_description, baseline, plan, feature_design]
             output:
               name: proposal_decision_result
@@ -160,26 +179,435 @@ steps:
       subject: proposal_review_result.accepted
       equals: true
       on_failure: {terminal: failed}
+
+  # Compile each durable obligation into a population, one observable
+  # operation, one oracle, and executable evidence contracts. This operation
+  # does not edit product or test code. Its structural decisions ask one
+  # question each: is there one population selector, one operation, one oracle,
+  # an executable contract, and a current source fingerprint?
   - operation:
       tool: internal
-      command: [run_code_agent]
+      command: [compile_obligation_verification_plans]
       parameters:
         baseline: {type: reference, value: baseline.path}
         plan: {type: reference, value: plan.path}
         proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
-        work_item_name: {type: reference, value: work_item_name}
-        feature_description: {type: reference, value: feature_description}
-        obligations: {type: reference, value: feature_obligations}
-        verification_obligations: {type: reference, value: verification_obligations}
+        feature_design: {type: reference, value: feature_design}
+        obligations: {type: reference, value: verification_obligations.obligations}
       returns:
         type: object
-        required: [request_id, attempt]
+        required: [path, fingerprint, plans, structural_decisions]
         properties:
-          request_id: {type: string, minLength: 1}
-          attempt: {type: object}
-      bind: implementation
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          plans: {type: array, minItems: 1}
+          structural_decisions: {type: array, minItems: 1}
+      bind: obligation_verification_plans
   - for_each:
-      snapshot: {name: validation_profiles}
+      snapshot: {name: obligation_verification_plans.structural_decisions, max_items: 4096}
+      item_binding: verification_plan_decision
+      collect: {binding: verification_plan_decisions, mode: list, value: verification_plan_decision_result}
+      body:
+        - operation:
+            tool: internal
+            command: [evaluate_deterministic_decision]
+            parameters:
+              decision: {type: reference, value: verification_plan_decision}
+            returns:
+              type: object
+              required: [outcome, explanation]
+              properties:
+                outcome: {type: string, enum: [pass, fail, blocked]}
+                explanation: {type: string, minLength: 1}
+            bind: verification_plan_decision_result
+  - operation:
+      tool: internal
+      command: [finalize_obligation_verification_plan_review]
+      parameters:
+        plans: {type: reference, value: obligation_verification_plans}
+        decisions: {type: reference, value: verification_plan_decisions}
+      returns:
+        type: object
+        required: [accepted, receipt_path]
+        properties:
+          accepted: {type: boolean}
+          receipt_path: {type: string, minLength: 1}
+      bind: obligation_verification_plan_review
+  - gate:
+      subject: obligation_verification_plan_review.accepted
+      equals: true
+      on_failure: {terminal: failed}
+
+  # Resolve the complete current population for every obligation. Universal
+  # obligations are not considered covered by one representative example. The
+  # generated decisions check one member at a time, then a deterministic reducer
+  # checks set equality between applicable members and contract cases.
+  - operation:
+      tool: internal
+      command: [resolve_obligation_populations]
+      parameters:
+        baseline: {type: reference, value: baseline.path}
+        plans: {type: reference, value: obligation_verification_plans.plans}
+      returns:
+        type: object
+        required: [path, fingerprint, populations, completeness_decisions]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          populations: {type: array, minItems: 1}
+          completeness_decisions: {type: array, minItems: 1}
+      bind: obligation_populations
+  - for_each:
+      snapshot: {name: obligation_populations.completeness_decisions, max_items: 4096}
+      item_binding: population_decision
+      collect: {binding: population_decisions, mode: list, value: population_decision_result}
+      body:
+        - operation:
+            tool: internal
+            command: [evaluate_deterministic_decision]
+            parameters:
+              decision: {type: reference, value: population_decision}
+            returns:
+              type: object
+              required: [outcome, explanation]
+              properties:
+                outcome: {type: string, enum: [pass, fail, blocked]}
+                explanation: {type: string, minLength: 1}
+            bind: population_decision_result
+  - operation:
+      tool: internal
+      command: [finalize_population_review]
+      parameters:
+        populations: {type: reference, value: obligation_populations}
+        decisions: {type: reference, value: population_decisions}
+      returns:
+        type: object
+        required: [accepted, receipt_path]
+        properties:
+          accepted: {type: boolean}
+          receipt_path: {type: string, minLength: 1}
+      bind: population_review
+  - gate:
+      subject: population_review.accepted
+      equals: true
+      on_failure: {terminal: failed}
+
+  # Run approved contracts before editing. Passing cases require no coding
+  # task; failing cases are the only inputs to task compilation.
+  - operation:
+      tool: internal
+      command: [run_obligation_baseline]
+      parameters:
+        plans: {type: reference, value: obligation_verification_plans.plans}
+        populations: {type: reference, value: obligation_populations.populations}
+        population_review_receipt: {type: reference, value: population_review.receipt_path}
+      returns:
+        type: object
+        required: [path, candidate_tree, case_results, failing_cases]
+        properties:
+          path: {type: string, minLength: 1}
+          candidate_tree: {type: string, minLength: 1}
+          case_results: {type: array}
+          failing_cases: {type: array}
+      bind: obligation_baseline
+
+  # A CodeTask is the smallest independently verifiable repository transition.
+  # It may satisfy several obligations, and one obligation may require several
+  # CodeTasks. Pure Structrr metadata operations produce no CodeTask. Structural
+  # decisions separately check failing-case assignment, obligation references,
+  # validator presence, target-symbol resolution, bounded paths, protected
+  # verification artifacts, and dependency acyclicity.
+  - operation:
+      tool: internal
+      command: [compile_code_task_plan]
+      parameters:
+        baseline: {type: reference, value: baseline.path}
+        plan: {type: reference, value: plan.path}
+        proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
+        verification_plans: {type: reference, value: obligation_verification_plans.plans}
+        populations: {type: reference, value: obligation_populations.populations}
+        baseline_evidence: {type: reference, value: obligation_baseline}
+      returns:
+        type: object
+        required: [path, fingerprint, tasks, structural_decisions, semantic_worklist]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          tasks: {type: array}
+          structural_decisions: {type: array, minItems: 1}
+          semantic_worklist: {type: object}
+      bind: code_task_plan
+  - for_each:
+      snapshot: {name: code_task_plan.structural_decisions, max_items: 4096}
+      item_binding: code_task_structural_decision
+      collect: {binding: code_task_structural_decisions, mode: list, value: code_task_structural_result}
+      body:
+        - operation:
+            tool: internal
+            command: [evaluate_deterministic_decision]
+            parameters:
+              decision: {type: reference, value: code_task_structural_decision}
+            returns:
+              type: object
+              required: [outcome, explanation]
+              properties:
+                outcome: {type: string, enum: [pass, fail, blocked]}
+                explanation: {type: string, minLength: 1}
+            bind: code_task_structural_result
+  - for_each:
+      snapshot: {name: code_task_plan.semantic_worklist.specifications, max_items: 2048}
+      item_binding: code_task_semantic_decision
+      collect: {binding: code_task_semantic_decisions, mode: list, value: code_task_semantic_result}
+      body:
+        - judge:
+            kind: verify_code_task_decision
+            provider: planning
+            question: Does this one code-task predicate pass based only on its supplied repository evidence?
+            subject: code_task_semantic_decision.predicate
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Evaluate exactly the one predicate in code_task_semantic_decision.
+              - Do not evaluate the whole task, sibling tasks, or the complete feature.
+              - Use pass only when the supplied evidence proves this predicate.
+              - Treat unrelated cleanup, speculative scope, and an unexecutable validator as failures.
+              - Do not propose edits or return IDs, references, paths, selectors, or fingerprints.
+              - >-
+                Examples: predicate "the task changes only the declared report exporter symbol" with a diff limited to that symbol → pass.
+              - >-
+                Examples: predicate "the task has an executable focused validator" with only a prose acceptance criterion → fail.
+              - >-
+                Examples: predicate "the task's failing baseline case is assigned to exactly one task" with two assignments → fail.
+              - >-
+                Examples: predicate "the task preserves the approved contract test" with no before/after evidence → unknown.
+              - >-
+                Counterexample: do not pass because the task objective is well written; the repository evidence must prove the predicate.
+            context: [code_task_semantic_decision, feature_description, plan, obligation_baseline, code_task_plan]
+            output:
+              name: code_task_semantic_result
+              schema:
+                type: object
+                required: [outcome, explanation]
+                additionalProperties: false
+                properties:
+                  outcome: {type: string, enum: [pass, fail, unknown, clarification]}
+                  explanation: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [finalize_code_task_plan_review]
+      parameters:
+        task_plan: {type: reference, value: code_task_plan}
+        structural_decisions: {type: reference, value: code_task_structural_decisions}
+        semantic_decisions: {type: reference, value: code_task_semantic_decisions}
+      returns:
+        type: object
+        required: [accepted, receipt_path]
+        properties:
+          accepted: {type: boolean}
+          receipt_path: {type: string, minLength: 1}
+      bind: code_task_plan_review
+  - gate:
+      subject: code_task_plan_review.accepted
+      equals: true
+      on_failure: {terminal: failed}
+
+  # Each accepted task gets one bounded coding-agent invocation. The coding
+  # agent never selects its own task, scope, validator, or success verdict.
+  # Preconditions separately check current fingerprints, accepted dependencies,
+  # a still-failing focused contract, resolvable target symbols, and available
+  # validation commands.
+  - for_each:
+      snapshot: {name: code_task_plan.tasks, max_items: 512}
+      item_binding: code_task
+      collect: {binding: code_task_receipts, mode: list, value: code_task_receipt}
+      body:
+        - operation:
+            tool: internal
+            command: [compile_code_task_preconditions]
+            parameters:
+              task: {type: reference, value: code_task}
+              task_plan_review_receipt: {type: reference, value: code_task_plan_review.receipt_path}
+            returns:
+              type: object
+              required: [decisions]
+              properties:
+                decisions: {type: array, minItems: 1}
+            bind: code_task_preconditions
+        - for_each:
+            snapshot: {name: code_task_preconditions.decisions, max_items: 256}
+            item_binding: code_task_precondition
+            collect: {binding: code_task_precondition_results, mode: list, value: code_task_precondition_result}
+            body:
+              - operation:
+                  tool: internal
+                  command: [evaluate_deterministic_decision]
+                  parameters:
+                    decision: {type: reference, value: code_task_precondition}
+                  returns:
+                    type: object
+                    required: [outcome, explanation]
+                    properties:
+                      outcome: {type: string, enum: [pass, fail, blocked]}
+                      explanation: {type: string, minLength: 1}
+                  bind: code_task_precondition_result
+        - operation:
+            tool: internal
+            command: [finalize_code_task_preconditions]
+            parameters:
+              task: {type: reference, value: code_task}
+              decisions: {type: reference, value: code_task_precondition_results}
+            returns:
+              type: object
+              required: [accepted, receipt_path]
+              properties:
+                accepted: {type: boolean}
+                receipt_path: {type: string, minLength: 1}
+            bind: code_task_precondition_review
+        - gate:
+            subject: code_task_precondition_review.accepted
+            equals: true
+            on_failure: {terminal: failed}
+        - operation:
+            tool: internal
+            command: [capture_code_task_before_state]
+            parameters:
+              task: {type: reference, value: code_task}
+            returns:
+              type: object
+              required: [path, fingerprint]
+              properties:
+                path: {type: string, minLength: 1}
+                fingerprint: {type: string, minLength: 1}
+            bind: code_task_before_state
+        - operation:
+            tool: internal
+            command: [run_code_task_agent]
+            parameters:
+              task: {type: reference, value: code_task}
+              before_state: {type: reference, value: code_task_before_state}
+              precondition_receipt: {type: reference, value: code_task_precondition_review.receipt_path}
+            returns:
+              type: object
+              required: [request_id, attempt]
+              properties:
+                request_id: {type: string, minLength: 1}
+                attempt: {type: object}
+            bind: code_task_implementation
+        - operation:
+            tool: internal
+            command: [compile_code_task_postconditions]
+            parameters:
+              task: {type: reference, value: code_task}
+              before_state: {type: reference, value: code_task_before_state}
+              implementation: {type: reference, value: code_task_implementation}
+            returns:
+              type: object
+              required: [path, fingerprint, decisions]
+              properties:
+                path: {type: string, minLength: 1}
+                fingerprint: {type: string, minLength: 1}
+                decisions: {type: array, minItems: 1}
+            bind: code_task_postconditions
+        # Postconditions are emitted as separate deterministic decisions for:
+        # worker completion, a nonempty task-local diff, allowed-path scope,
+        # protected-path preservation, git diff validity, focused-validator
+        # success, each preservation validator, and evidence currency.
+        - for_each:
+            snapshot: {name: code_task_postconditions.decisions, max_items: 512}
+            item_binding: code_task_postcondition
+            collect: {binding: code_task_postcondition_results, mode: list, value: code_task_postcondition_result}
+            body:
+              - operation:
+                  tool: internal
+                  command: [evaluate_deterministic_decision]
+                  parameters:
+                    decision: {type: reference, value: code_task_postcondition}
+                  returns:
+                    type: object
+                    required: [outcome, explanation]
+                    properties:
+                      outcome: {type: string, enum: [pass, fail, blocked]}
+                      explanation: {type: string, minLength: 1}
+                  bind: code_task_postcondition_result
+        - operation:
+            tool: internal
+            command: [finalize_code_task_receipt]
+            parameters:
+              task: {type: reference, value: code_task}
+              before_state: {type: reference, value: code_task_before_state}
+              implementation: {type: reference, value: code_task_implementation}
+              postconditions: {type: reference, value: code_task_postconditions}
+              decisions: {type: reference, value: code_task_postcondition_results}
+            returns:
+              type: object
+              required: [accepted, receipt_path, task_id, diff_fingerprint]
+              properties:
+                accepted: {type: boolean}
+                receipt_path: {type: string, minLength: 1}
+                task_id: {type: string, minLength: 1}
+                diff_fingerprint: {type: string, minLength: 1}
+            bind: code_task_receipt
+        - gate:
+            subject: code_task_receipt.accepted
+            equals: true
+            on_failure: {terminal: failed}
+
+  # Re-run complete obligation contracts over the final candidate tree. Task
+  # receipts are evidence of local transitions, not substitutes for universal
+  # population coverage or final-state evidence.
+  - operation:
+      tool: internal
+      command: [run_final_obligation_evidence]
+      parameters:
+        plans: {type: reference, value: obligation_verification_plans.plans}
+        populations: {type: reference, value: obligation_populations.populations}
+        task_receipts: {type: reference, value: code_task_receipts}
+      returns:
+        type: object
+        required: [path, candidate_tree, evidence, closure_decisions]
+        properties:
+          path: {type: string, minLength: 1}
+          candidate_tree: {type: string, minLength: 1}
+          evidence: {type: array}
+          closure_decisions: {type: array, minItems: 1}
+      bind: final_obligation_evidence
+  - for_each:
+      snapshot: {name: final_obligation_evidence.closure_decisions, max_items: 8192}
+      item_binding: obligation_closure_decision
+      collect: {binding: obligation_closure_decisions, mode: list, value: obligation_closure_result}
+      body:
+        - operation:
+            tool: internal
+            command: [evaluate_deterministic_decision]
+            parameters:
+              decision: {type: reference, value: obligation_closure_decision}
+            returns:
+              type: object
+              required: [outcome, explanation]
+              properties:
+                outcome: {type: string, enum: [pass, fail, blocked]}
+                explanation: {type: string, minLength: 1}
+            bind: obligation_closure_result
+  - operation:
+      tool: internal
+      command: [finalize_obligation_closure]
+      parameters:
+        evidence: {type: reference, value: final_obligation_evidence}
+        decisions: {type: reference, value: obligation_closure_decisions}
+      returns:
+        type: object
+        required: [accepted, receipt_path]
+        properties:
+          accepted: {type: boolean}
+          receipt_path: {type: string, minLength: 1}
+      bind: obligation_closure
+  - gate:
+      subject: obligation_closure.accepted
+      equals: true
+      on_failure: {terminal: failed}
+
+  - for_each:
+      snapshot: {name: validation_profiles, max_items: 128}
       item_binding: validation_profile
       collect: {binding: validation_results, mode: list, value: validation_result}
       body:
@@ -188,237 +616,124 @@ steps:
             command: [run_validation_profile]
             parameters:
               profile: {type: reference, value: validation_profile}
-              implementation: {type: reference, value: implementation}
+              task_receipts: {type: reference, value: code_task_receipts}
             returns: {type: object}
             bind: validation_result
   - operation:
       tool: internal
       command: [aggregate_validation]
       parameters:
-        implementation: {type: reference, value: implementation}
+        task_receipts: {type: reference, value: code_task_receipts}
         results: {type: reference, value: validation_results}
-      returns: {type: object}
-      bind: validation
-  - operation:
-      tool: internal
-      command: [validate_required_test_cases]
-      parameters:
-        plan: {type: reference, value: plan.path}
-      returns:
-        type: object
-        required: [passed, failures, cases]
-        properties:
-          passed: {type: boolean}
-          failures: {type: array}
-          cases: {type: array}
-      bind: required_test_case_validation
-  - operation:
-      tool: internal
-      command: [run_verification_evidence]
-      parameters:
-        obligations: {type: reference, value: verification_obligations.obligations}
-      returns:
-        type: object
-        required: [candidate_tree, evidence, progress_events, passed]
-        properties:
-          candidate_tree: {type: string, minLength: 1}
-          evidence: {type: array}
-          progress_events: {type: array}
-          passed: {type: boolean}
-      bind: verification_evidence
-  - operation:
-      tool: internal
-      command: [reconcile_verification_evidence]
-      parameters:
-        obligations: {type: reference, value: verification_obligations.obligations}
-        evidence: {type: reference, value: verification_evidence.evidence}
-        candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
-      returns: {type: object}
-      bind: verification_reconciliation
-  - operation:
-      tool: internal
-      command: [review_worker_diff]
-      parameters:
-        implementation: {type: reference, value: implementation}
-        validation: {type: reference, value: validation}
       returns:
         type: object
         required: [passed]
         properties: {passed: {type: boolean}}
-      bind: review
-  - attempt:
-      id: worker-validation-review
-      max_attempts: 4
-      body:
-        - gate:
-            subject: review.passed
-            equals: true
-            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-      on_failure: {recovery: worker-repair, resume: worker-validation-review}
-  - attempt:
-      id: intent-preservation-review
-      max_attempts: 4
+      bind: validation
+  - gate:
+      subject: validation.passed
+      equals: true
+      on_failure: {terminal: failed}
+
+  # Final review is still decomposed into one semantic predicate per decision.
+  # The reducer, not the reviewing model, issues the aggregate verdict.
+  - operation:
+      tool: internal
+      command: [prepare_final_implementation_review]
+      parameters:
+        plan: {type: reference, value: plan.path}
+        proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
+        obligation_closure_receipt: {type: reference, value: obligation_closure.receipt_path}
+        task_receipts: {type: reference, value: code_task_receipts}
+        validation: {type: reference, value: validation}
+      returns:
+        type: object
+        required: [path, fingerprint, deterministic_decisions, semantic_worklist]
+        properties:
+          path: {type: string, minLength: 1}
+          fingerprint: {type: string, minLength: 1}
+          deterministic_decisions: {type: array, minItems: 1}
+          semantic_worklist: {type: object}
+      bind: final_implementation_review
+  - for_each:
+      snapshot: {name: final_implementation_review.deterministic_decisions, max_items: 4096}
+      item_binding: final_deterministic_decision
+      collect: {binding: final_deterministic_decisions, mode: list, value: final_deterministic_result}
       body:
         - operation:
             tool: internal
-            command: [prepare_implementation_review]
+            command: [evaluate_deterministic_decision]
             parameters:
-              implementation: {type: reference, value: implementation}
-              validation: {type: reference, value: validation}
-              review: {type: reference, value: review}
+              decision: {type: reference, value: final_deterministic_decision}
             returns:
               type: object
-              required: [evidence_path, evidence_fingerprint, evidence_refs, active_intent_clauses]
+              required: [outcome, explanation]
               properties:
-                evidence_path: {type: string, minLength: 1}
-                evidence_fingerprint: {type: string, minLength: 1}
-                evidence_refs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
-                active_intent_clauses: {type: array}
-                git_diff: {type: string}
-                changed_paths: {type: array}
-                validation: {type: object}
-                worker_review: {type: object}
-            bind: implementation_review
-        - operation:
-            tool: internal
-            command: [compile_obligation_review_packets]
-            parameters:
-              obligations: {type: reference, value: feature_obligations}
-              evidence: {type: reference, value: implementation_review}
-            returns:
-              type: object
-              required: [packets]
-              properties:
-                path: {type: string, minLength: 1}
-                packets: {type: array, minItems: 1}
-            bind: obligation_review_packets
-        - for_each:
-            snapshot: {name: obligation_review_packets.packets}
-            item_binding: obligation_packet
-            collect: {binding: intent_reviews, mode: list, value: intent_review}
-            body:
-              - judge:
-                  kind: verify_implemented_intent
-                  question: Is this one obligation preserved by the implementation and its bounded evidence?
-                  subject: obligation_packet.obligation_id
-                  prompt_system: Return only the declared JSON object.
-                  instructions:
-                    - Evaluate exactly this one obligation.
-                    - Compare only the obligation with its evidence packet.
-                    - Return preserved only when the obligation remains honored; otherwise return altered or unknown.
-                    - Do not return obligation IDs or evidence references; Powdrr binds both from the packet.
-                  context: [obligation_packet, feature_description, proposal_review, proposal_review_result, implementation_review, implementation, validation, review]
-                  output:
-                    name: intent_review
-                    schema:
-                      type: object
-                      required: [verdict, explanation]
-                      additionalProperties: false
-                      properties:
-                        verdict: {type: string, enum: [preserved, altered, unknown]}
-                        explanation: {type: string, minLength: 1}
-                  validation: {kind: json_schema}
-        - operation:
-            tool: internal
-            command: [bind_obligation_reviews]
-            parameters:
-              packets: {type: reference, value: obligation_review_packets.packets}
-              decisions: {type: reference, value: intent_reviews}
-            returns: {type: object}
-            bind: bound_obligation_reviews
-        - operation:
-            tool: internal
-            # Migration marker for consumers that still recognize the old command:
-            # command: [aggregate_intent_review]
-            command: [aggregate_obligation_reviews]
-            parameters:
-              packets: {type: reference, value: obligation_review_packets.packets}
-              reviews: {type: reference, value: bound_obligation_reviews.reviews}
-              verification_reconciliation: {type: reference, value: verification_reconciliation}
-            returns:
-              type: object
-              required: [passed, failures]
-              properties:
-                passed: {type: boolean}
-                failures: {type: array}
-            bind: intent_review_result
-        - gate:
-            subject: intent_review_result.passed
-            equals: true
-            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-      on_failure: {recovery: intent-repair, resume: intent-preservation-review}
-  - judge:
-      kind: verify_completeness
-      provider: planning
-      question: Does the implementation satisfy every requirement in the feature specification?
-      subject: feature_description
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Compare the implementation and validation evidence with the complete feature specification.
-        - Check every compiled feature obligation individually and require concrete implementation and validation evidence for each one.
-        - Mark complete only when every requested behavior is implemented and validated.
-        - >-
-          Return one verdict: satisfied or missing.
-      context: [feature_description, plan, feature_obligations, implementation, validation, review]
-      output:
-        name: completeness_review
-        schema:
-          type: object
-          required: [verdict]
-          additionalProperties: false
-          properties:
-            verdict: {type: string, enum: [satisfied, missing]}
-      validation: {kind: json_schema}
-  - attempt:
-      id: specification-completeness-review
-      max_attempts: 2
+                outcome: {type: string, enum: [pass, fail, blocked]}
+                explanation: {type: string, minLength: 1}
+            bind: final_deterministic_result
+  - for_each:
+      snapshot: {name: final_implementation_review.semantic_worklist.specifications, max_items: 4096}
+      item_binding: final_semantic_decision
+      collect: {binding: final_semantic_decisions, mode: list, value: final_semantic_result}
       body:
-        - gate:
-            subject: completeness_review.verdict
-            equals: satisfied
-            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-      on_failure: {recovery: completeness-repair, resume: specification-completeness-review}
-  - judge:
-      kind: verify_scope
-      provider: planning
-      question: Is every changed file and hunk justified by the feature specification?
-      subject: review
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Inspect the complete implementation diff, not only the worker summary.
-        - Mark justified only when every change is required by the specification or its validation.
-        - Treat unrelated refactors, cleanup, and speculative improvements as findings.
-        - The review.changed_paths and review.out_of_scope_paths are the
-          authoritative mechanical scope result. If review.passed is true and
-          review.out_of_scope_paths is empty, return justified. Required test
-          files and generated test artifacts under an allowed validation path
-          are justified by the feature's validation obligations.
-        - >-
-          Return one verdict: justified or unjustified.
-      context: [feature_description, plan, feature_obligations, implementation, validation, review, completeness_review]
-      output:
-        name: scope_review
-        schema:
-          type: object
-          required: [verdict]
-          additionalProperties: false
-          properties:
-            verdict: {type: string, enum: [justified, unjustified]}
-      validation: {kind: json_schema}
-  - attempt:
-      id: change-scope-review
-      max_attempts: 2
-      body:
-        - gate:
-            subject: scope_review.verdict
-            equals: justified
-            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-      on_failure: {recovery: scope-repair, resume: change-scope-review}
+        - judge:
+            kind: verify_implementation_decision
+            provider: planning
+            question: Does this one final-state predicate pass based only on its bounded evidence?
+            subject: final_semantic_decision.predicate
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Evaluate exactly the one predicate in final_semantic_decision.
+              - Do not evaluate sibling predicates or issue an aggregate implementation verdict.
+              - Use pass only when the supplied evidence proves this predicate in the final candidate tree.
+              - Return fail or unknown when evidence is missing, stale, or contradictory.
+              - Do not propose repairs or return IDs, references, paths, selectors, or fingerprints.
+              - >-
+                Examples: predicate "every member of the pickle population has a passing contract result" with complete current case evidence → pass.
+              - >-
+                Examples: predicate "the implementation satisfies the export obligation" with only a changed source file and no passing validator → unknown.
+              - >-
+                Examples: predicate "no protected contract file changed" with a diff showing that file changed → fail.
+              - >-
+                Examples: predicate "all changed paths are within the accepted task scopes" with one unrelated path → fail.
+              - >-
+                Counterexample: do not pass because the full repository suite is green if this predicate's own evidence is absent.
+            context: [final_semantic_decision, feature_description, plan, final_obligation_evidence, validation, final_implementation_review]
+            output:
+              name: final_semantic_result
+              schema:
+                type: object
+                required: [outcome, explanation]
+                additionalProperties: false
+                properties:
+                  outcome: {type: string, enum: [pass, fail, unknown]}
+                  explanation: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [finalize_implementation_review]
+      parameters:
+        review: {type: reference, value: final_implementation_review}
+        deterministic_decisions: {type: reference, value: final_deterministic_decisions}
+        semantic_decisions: {type: reference, value: final_semantic_decisions}
+      returns:
+        type: object
+        required: [accepted, receipt_path]
+        properties:
+          accepted: {type: boolean}
+          receipt_path: {type: string, minLength: 1}
+      bind: final_review
+  - gate:
+      subject: final_review.accepted
+      equals: true
+      on_failure: {terminal: failed}
+
   - operation:
       tool: internal
       command: [open_pull_request]
       parameters:
-        review: {type: reference, value: review}
+        review: {type: reference, value: final_review}
         plan: {type: reference, value: plan.path}
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
@@ -443,330 +758,3 @@ steps:
       returns: {type: [string, 'null']}
       bind: updated_pull_request
   - terminal: succeeded
-
-recoveries:
-  worker-repair:
-    steps:
-      - repeat:
-          max_iterations: 4
-          until: {subject: review.passed, equals: true}
-          body:
-            - operation:
-                tool: internal
-                command: [collect_repair_issues]
-                parameters:
-                  validation: {type: reference, value: validation}
-                  review: {type: reference, value: review}
-                  reconciliation: {type: reference, value: verification_reconciliation}
-                  required_test_validation: {type: reference, value: required_test_case_validation}
-                returns: {type: array}
-                bind: repair_issues
-            - for_each:
-                snapshot: {name: repair_issues}
-                item_binding: repair_issue
-                collect: {binding: repair_outputs, mode: list}
-                body:
-                  - operation:
-                      tool: internal
-                      command: [run_code_agent]
-                      parameters:
-                        baseline: {type: reference, value: baseline.path}
-                        plan: {type: reference, value: plan.path}
-                        work_item_name: {type: reference, value: work_item_name}
-                        feature_description: {type: reference, value: feature_description}
-                        obligations: {type: reference, value: feature_obligations}
-                        repair_issue: {type: reference, value: repair_issue}
-                      returns: {type: object}
-                      bind: implementation
-            - for_each:
-                snapshot: {name: validation_profiles}
-                item_binding: validation_profile
-                collect: {binding: validation_results, mode: list, value: validation_result}
-                body:
-                  - operation:
-                      tool: internal
-                      command: [run_validation_profile]
-                      parameters:
-                        profile: {type: reference, value: validation_profile}
-                        implementation: {type: reference, value: implementation}
-                      returns: {type: object}
-                      bind: validation_result
-            - operation:
-                tool: internal
-                command: [aggregate_validation]
-                parameters:
-                  implementation: {type: reference, value: implementation}
-                  results: {type: reference, value: validation_results}
-                returns: {type: object}
-                bind: validation
-            - operation:
-                tool: internal
-                command: [validate_required_test_cases]
-                parameters:
-                  plan: {type: reference, value: plan.path}
-                returns: {type: object}
-                bind: required_test_case_validation
-            - operation:
-                tool: internal
-                command: [run_verification_evidence]
-                parameters:
-                  obligations: {type: reference, value: verification_obligations.obligations}
-                returns: {type: object}
-                bind: verification_evidence
-            - operation:
-                tool: internal
-                command: [reconcile_verification_evidence]
-                parameters:
-                  obligations: {type: reference, value: verification_obligations.obligations}
-                  evidence: {type: reference, value: verification_evidence.evidence}
-                  candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
-                returns: {type: object}
-                bind: verification_reconciliation
-            - operation:
-                tool: internal
-                command: [review_worker_diff]
-                parameters:
-                  implementation: {type: reference, value: implementation}
-                  validation: {type: reference, value: validation}
-                returns: {type: object}
-                bind: review
-  completeness-repair:
-    steps:
-      - judge:
-          kind: construct_repair_plan
-          provider: planning
-          question: What one repair request should be sent to OpenCode for the incomplete implementation?
-          subject: completeness_review
-          prompt_system: Return only the declared JSON object.
-          instructions:
-            - Address only the completeness failure identified by the review verdict.
-            - Preserve the feature scope and do not rewrite unrelated code.
-          context: [feature_description, plan, implementation, validation, completeness_review]
-          output:
-            name: completeness_repair
-            schema:
-              type: object
-              required: [request]
-              additionalProperties: false
-              properties:
-                request: {type: string, minLength: 1}
-          validation: {kind: json_schema}
-      - operation:
-          tool: internal
-          command: [run_code_agent]
-          parameters:
-            baseline: {type: reference, value: baseline.path}
-            plan: {type: reference, value: plan.path}
-            work_item_name: {type: reference, value: work_item_name}
-            feature_description: {type: reference, value: feature_description}
-            obligations: {type: reference, value: feature_obligations}
-            repair_request: {type: reference, value: completeness_repair.request}
-            review_verdict: {type: reference, value: completeness_review.verdict}
-          returns: {type: object}
-          bind: implementation
-      - for_each:
-          snapshot: {name: validation_profiles}
-          item_binding: validation_profile
-          collect: {binding: validation_results, mode: list, value: validation_result}
-          body:
-            - operation:
-                tool: internal
-                command: [run_validation_profile]
-                parameters:
-                  profile: {type: reference, value: validation_profile}
-                  implementation: {type: reference, value: implementation}
-                returns: {type: object}
-                bind: validation_result
-      - operation:
-          tool: internal
-          command: [aggregate_validation]
-          parameters:
-            implementation: {type: reference, value: implementation}
-            results: {type: reference, value: validation_results}
-          returns: {type: object}
-          bind: validation
-      - operation:
-          tool: internal
-          command: [validate_required_test_cases]
-          parameters:
-            plan: {type: reference, value: plan.path}
-          returns: {type: object}
-          bind: required_test_case_validation
-      - operation:
-          tool: internal
-          command: [run_verification_evidence]
-          parameters:
-            obligations: {type: reference, value: verification_obligations.obligations}
-          returns: {type: object}
-          bind: verification_evidence
-      - operation:
-          tool: internal
-          command: [reconcile_verification_evidence]
-          parameters:
-            obligations: {type: reference, value: verification_obligations.obligations}
-            evidence: {type: reference, value: verification_evidence.evidence}
-            candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
-          returns: {type: object}
-          bind: verification_reconciliation
-  scope-repair:
-    steps:
-      - judge:
-          kind: construct_repair_plan
-          provider: planning
-          question: What one repair request should be sent to OpenCode for the unjustified change scope?
-          subject: scope_review
-          prompt_system: Return only the declared JSON object.
-          instructions:
-            - Remove or revert only the change scope identified by the review verdict.
-            - Preserve all behavior required by the specification.
-          context: [feature_description, plan, implementation, validation, scope_review]
-          output:
-            name: scope_repair
-            schema:
-              type: object
-              required: [request]
-              additionalProperties: false
-              properties:
-                request: {type: string, minLength: 1}
-          validation: {kind: json_schema}
-      - operation:
-          tool: internal
-          command: [run_code_agent]
-          parameters:
-            baseline: {type: reference, value: baseline.path}
-            plan: {type: reference, value: plan.path}
-            work_item_name: {type: reference, value: work_item_name}
-            feature_description: {type: reference, value: feature_description}
-            obligations: {type: reference, value: feature_obligations}
-            repair_request: {type: reference, value: scope_repair.request}
-            review_verdict: {type: reference, value: scope_review.verdict}
-          returns: {type: object}
-          bind: implementation
-      - for_each:
-          snapshot: {name: validation_profiles}
-          item_binding: validation_profile
-          collect: {binding: validation_results, mode: list, value: validation_result}
-          body:
-            - operation:
-                tool: internal
-                command: [run_validation_profile]
-                parameters:
-                  profile: {type: reference, value: validation_profile}
-                  implementation: {type: reference, value: implementation}
-                returns: {type: object}
-                bind: validation_result
-      - operation:
-          tool: internal
-          command: [aggregate_validation]
-          parameters:
-            implementation: {type: reference, value: implementation}
-            results: {type: reference, value: validation_results}
-          returns: {type: object}
-          bind: validation
-      - operation:
-          tool: internal
-          command: [validate_required_test_cases]
-          parameters:
-            plan: {type: reference, value: plan.path}
-          returns: {type: object}
-          bind: required_test_case_validation
-      - operation:
-          tool: internal
-          command: [run_verification_evidence]
-          parameters:
-            obligations: {type: reference, value: verification_obligations.obligations}
-          returns: {type: object}
-          bind: verification_evidence
-      - operation:
-          tool: internal
-          command: [reconcile_verification_evidence]
-          parameters:
-            obligations: {type: reference, value: verification_obligations.obligations}
-            evidence: {type: reference, value: verification_evidence.evidence}
-            candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
-          returns: {type: object}
-          bind: verification_reconciliation
-  intent-repair:
-    steps:
-      - judge:
-          kind: construct_intent_repair_plan
-          question: What one targeted repair request should OpenCode apply to preserve the failed intent clauses?
-          subject: intent_review_result
-          prompt_system: Return only the declared JSON object.
-          instructions:
-            - Address only the failed intent preservation findings.
-            - Preserve the accepted proposal and do not rewrite unrelated code.
-            - Return one concrete code-edit request for OpenCode.
-          context: [feature_description, plan, proposal_review, implementation, validation, review]
-          output:
-            name: intent_repair
-            schema:
-              type: object
-              required: [request]
-              additionalProperties: false
-              properties:
-                request: {type: string, minLength: 1}
-          validation: {kind: json_schema}
-      - operation:
-          tool: internal
-          command: [run_code_agent]
-          parameters:
-            baseline: {type: reference, value: baseline.path}
-            plan: {type: reference, value: plan.path}
-            work_item_name: {type: reference, value: work_item_name}
-            feature_description: {type: reference, value: feature_description}
-            repair_request: {type: reference, value: intent_repair.request}
-          returns: {type: object}
-          bind: implementation
-      - for_each:
-          snapshot: {name: validation_profiles}
-          item_binding: validation_profile
-          collect: {binding: validation_results, mode: list, value: validation_result}
-          body:
-            - operation:
-                tool: internal
-                command: [run_validation_profile]
-                parameters:
-                  profile: {type: reference, value: validation_profile}
-                  implementation: {type: reference, value: implementation}
-                returns: {type: object}
-                bind: validation_result
-      - operation:
-          tool: internal
-          command: [aggregate_validation]
-          parameters:
-            implementation: {type: reference, value: implementation}
-            results: {type: reference, value: validation_results}
-          returns: {type: object}
-          bind: validation
-      - operation:
-          tool: internal
-          command: [validate_required_test_cases]
-          parameters:
-            plan: {type: reference, value: plan.path}
-          returns: {type: object}
-          bind: required_test_case_validation
-      - operation:
-          tool: internal
-          command: [run_verification_evidence]
-          parameters:
-            obligations: {type: reference, value: verification_obligations.obligations}
-          returns: {type: object}
-          bind: verification_evidence
-      - operation:
-          tool: internal
-          command: [reconcile_verification_evidence]
-          parameters:
-            obligations: {type: reference, value: verification_obligations.obligations}
-            evidence: {type: reference, value: verification_evidence.evidence}
-            candidate_tree: {type: reference, value: verification_evidence.candidate_tree}
-          returns: {type: object}
-          bind: verification_reconciliation
-      - operation:
-          tool: internal
-          command: [review_worker_diff]
-          parameters:
-            implementation: {type: reference, value: implementation}
-            validation: {type: reference, value: validation}
-          returns: {type: object}
-          bind: review

@@ -811,21 +811,18 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert not any(Path("docs/proposals").glob("*/procedrr-flow.yaml"))
 
     flow = path.read_text(encoding="utf-8")
-    assert "id: worker-validation-review" in flow
-    assert "max_attempts: 4" in flow
-    assert "recovery: worker-repair" in flow
-    assert "max_iterations: 4" in flow
+    assert "command: [finalize_implementation_review]" in flow
+    assert "max_items: 512" in flow
     assert "command: [discover_validation_profiles]" in flow
     assert "command: [run_validation_profile]" in flow
     assert "command: [aggregate_validation]" in flow
-    assert "command: [prepare_implementation_review]" in flow
-    assert "command: [aggregate_intent_review]" in flow
+    assert "command: [prepare_final_implementation_review]" in flow
     assert (
         "command: [compile_verification_obligations]" in flow
         and "feature_description: {type: reference, value: feature_description}" in flow
     )
     assert "provider: opencode" not in flow
-    assert flow.count("command: [run_code_agent]") == 5
+    assert "command: [run_code_task_agent]" in flow
 
 
 def test_required_test_obligation_compiles_against_discovered_inventory() -> None:
@@ -943,12 +940,23 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             question = messages[1]["content"]
             if "kind of obligation" in question:
                 return {"kind": "feature"}
-            if "test contract" in question:
-                return {"expected_test": "Run the feature test."}
-            return {
-                "description": "The requested feature is implemented.",
-                "acceptance_criterion": "The requested feature behavior is observable.",
-            }
+            if "one concrete semantic obligation" in question:
+                return {"description": "The requested feature is implemented."}
+            if "observable result" in question:
+                return {
+                    "acceptance_criterion": (
+                        "The requested feature behavior is observable."
+                    )
+                }
+            if "exact population" in question:
+                return {"population": "all requested feature instances"}
+            if "observable operation" in question:
+                return {"operation": "invoke the requested feature"}
+            if "observable predicate" in question:
+                return {"oracle": "the requested feature result is observable"}
+            if "evidence case" in question:
+                return {"evidence_case": "invoke one representative feature instance"}
+            raise AssertionError(question)
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         command = parameters["command"]
@@ -964,8 +972,13 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             return {
                 "kind": "feature",
                 "description": "The requested feature is implemented.",
-                "acceptance_criterion": "The requested feature behavior is observable.",
-                "expected_test": "Run the feature test.",
+                "acceptance_criterion": (
+                    "The requested feature behavior is observable."
+                ),
+                "population": "all requested feature instances",
+                "operation": "invoke the requested feature",
+                "oracle": "the requested feature result is observable",
+                "evidence_case": "invoke one representative feature instance",
             }
         if command[0] == "compile_canonical_feature_design":
             return {
@@ -981,8 +994,23 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                             "acceptance_criterion": (
                                 "The requested feature behavior is observable."
                             ),
-                            "expected_test": "Run the feature test.",
+                            "population": "all requested feature instances",
+                            "operation": "invoke the requested feature",
+                            "oracle": "the requested feature result is observable",
+                            "evidence_case": (
+                                "invoke one representative feature instance"
+                            ),
                         },
+                    }
+                ],
+                "verification_contracts": [
+                    {
+                        "id": "contract-sentence-1",
+                        "obligation_ref": "sentence-1",
+                        "population": "all requested feature instances",
+                        "operation": "invoke the requested feature",
+                        "oracle": "the requested feature result is observable",
+                        "evidence_case": "invoke one representative feature instance",
                     }
                 ],
                 "required_test_cases": [{"id": "test-sentence-1"}],

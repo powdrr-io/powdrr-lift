@@ -637,6 +637,10 @@ class Evaluator:
                 path,
                 {
                     "output": judge["output"]["name"],
+                    # Preserve the validated intermediate result so live
+                    # validation can inspect classification and contract
+                    # quality, rather than checking only final artifacts.
+                    "value": output,
                     "messages": messages,
                     "context_metrics": {
                         "raw_chars": sum(raw_binding_chars.values()),

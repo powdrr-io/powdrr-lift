@@ -628,8 +628,13 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     document = parse_and_validate(source)
     body = document["steps"][1]["for_each"]["body"]
-    obligation_judge = body[1]["judge"]
-    test_judge = body[2]["judge"]
+    judges = [step["judge"] for step in body if "judge" in step]
+    obligation_judge = judges[1]
+    acceptance_judge = judges[2]
+    population_judge = judges[3]
+    operation_judge = judges[4]
+    oracle_judge = judges[5]
+    evidence_judge = judges[6]
 
     assert obligation_judge["question"] == (
         "What is the one concrete semantic obligation expressed by this instruction "
@@ -647,19 +652,23 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
         obligation_judge["output"]["schema"]["properties"]["description"]["maxLength"]
         == 500
     )
-    assert (
-        obligation_judge["output"]["schema"]["properties"]["acceptance_criterion"][
-            "maxLength"
+    assert acceptance_judge["question"] == (
+        "What one observable result would prove this one semantic obligation?"
+    )
+    assert population_judge["output"]["name"] == "semantic_population"
+    assert operation_judge["output"]["name"] == "semantic_operation"
+    assert oracle_judge["output"]["name"] == "semantic_oracle"
+    assert evidence_judge["output"]["name"] == "semantic_evidence_case"
+    for judge in judges:
+        example_lines = [
+            instruction
+            for instruction in judge["instructions"]
+            if "Examples:" in instruction or "Counterexample:" in instruction
         ]
-        == 500
-    )
-    assert (
-        test_judge["output"]["schema"]["properties"]["expected_test"]["maxLength"]
-        == 400
-    )
+        assert len(example_lines) >= 2, judge["question"]
 
 
-def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
+def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
     from pathlib import Path
 
     source = Path("docs/procedrr/skill-definitions/implement-feature.yaml").read_text()
@@ -675,21 +684,13 @@ def test_checked_in_implement_feature_has_bounded_reviews_and_repairs() -> None:
     assert "design_decisions" not in flow_text
     assert "requirement_decisions" not in flow_text
     assert "reflection_decisions" not in flow_text
-    assert set(document["recoveries"]) == {
-        "completeness-repair",
-        "intent-repair",
-        "scope-repair",
-        "worker-repair",
-    }
     step_text = flow_text
-    assert "specification-completeness-review" in step_text
-    assert "change-scope-review" in step_text
-    review_schemas = [
-        step["judge"]["output"]["schema"]
-        for step in document["steps"]
-        if isinstance(step, dict) and "judge" in step
-    ]
-    assert [set(schema["properties"]) for schema in review_schemas] == [
-        {"verdict"},
-        {"verdict"},
-    ]
+    assert "compile_obligation_verification_plans" in step_text
+    assert "resolve_obligation_populations" in step_text
+    assert "compile_code_task_plan" in step_text
+    assert "run_code_task_agent" in step_text
+    assert "finalize_code_task_receipt" in step_text
+    assert "finalize_obligation_closure" in step_text
+    assert "verify_code_task_decision" in flow_text
+    assert "verify_implementation_decision" in flow_text
+    assert "Does this one" in flow_text

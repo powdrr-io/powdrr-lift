@@ -128,6 +128,25 @@ class DeterministicPlanningClient:
             return {"reflected": True}
         if required == {"kind"}:
             return {"kind": "feature"}
+        if required == {"description"}:
+            return {
+                "description": (
+                    "Add the requested greeting output while preserving the "
+                    "existing output."
+                )
+            }
+        if required == {"acceptance_criterion"}:
+            return {
+                "acceptance_criterion": "The program prints both greetings in order."
+            }
+        if required == {"population"}:
+            return {"population": "the hello_world greeting output"}
+        if required == {"operation"}:
+            return {"operation": "run the hello_world behavior test"}
+        if required == {"oracle"}:
+            return {"oracle": "the observed output contains both greetings in order"}
+        if required == {"evidence_case"}:
+            return {"evidence_case": "Run the hello_world test."}
         if required == {"description", "acceptance_criterion"}:
             return {
                 "description": (
@@ -147,6 +166,27 @@ class DeterministicPlanningClient:
                 ),
                 "acceptance_criterion": "The program prints both greetings in order.",
                 "expected_test": "Run the hello_world test.",
+            }
+        if required == {
+            "kind",
+            "description",
+            "acceptance_criterion",
+            "population",
+            "operation",
+            "oracle",
+            "evidence_case",
+        }:
+            return {
+                "kind": "feature",
+                "description": (
+                    "Add the requested greeting output while preserving the "
+                    "existing output."
+                ),
+                "acceptance_criterion": "The program prints both greetings in order.",
+                "population": "the hello_world greeting output",
+                "operation": "run the hello_world behavior test",
+                "oracle": "the observed output contains both greetings in order",
+                "evidence_case": "Run the hello_world test.",
             }
         if required == {"outcome", "explanation"}:
             return {

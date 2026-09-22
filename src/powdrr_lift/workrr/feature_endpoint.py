@@ -1905,6 +1905,16 @@ def _run_code_agent_phase(
         )
         else (),
     )
+    code_task = parameters.get("task")
+    if isinstance(code_task, Mapping):
+        task_id = str(code_task.get("task_id", ""))
+        try:
+            task_index = int(task_id.rsplit("-", 1)[-1]) - 1
+        except ValueError:
+            task_index = 0
+        if not 0 <= task_index < len(units):
+            raise PowdrrExecutionError(f"code task {task_id!r} has no execution unit")
+        units = (units[task_index],)
     try:
         implementation_packet = compile_implementation_packet(
             objective=feature_description,
@@ -2012,7 +2022,7 @@ def _run_code_agent_phase(
                 ),
                 allow_existing_changes=True,
             )
-        elif index > 1:
+        elif index > 1 or isinstance(code_task, Mapping):
             request = replace(request, allow_existing_changes=True)
         request_path = output_root / "implementation-request.json"
         request_path.write_text(request.to_json(), encoding="utf-8")
@@ -2775,7 +2785,10 @@ def _aggregate_validation(
         )
     state["attempt_store"].save_validation_report(validation)
     state["validation"] = validation
-    return validation.to_data()
+    return {
+        **validation.to_data(),
+        "passed": validation.status is ValidationReportStatus.PASSED,
+    }
 
 
 def _require_flow_text(parameters: Mapping[str, Any], name: str) -> str:
@@ -3800,6 +3813,608 @@ def _run(
 
 def _git_output(runner: Runner, cwd: Path, command: list[str]) -> str:
     return _run(runner, cwd, command).stdout.strip()
+
+
+# The obligation/task commands below are intentionally small reducers.  They
+# keep the flow's state transitions explicit: compilation creates records,
+# evaluation answers one predicate, and finalization accepts only a complete
+# set of passing answers.  None of these helpers ask a model to invent an ID,
+# scope, validator, or verdict.
+def _flow_items(value: Any) -> list[Mapping[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    result: list[Mapping[str, Any]] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            candidate = item.get("result", item)
+            if isinstance(candidate, Mapping):
+                result.append(candidate)
+    return result
+
+
+def _write_flow_artifact(output_root: Path, name: str, value: Any) -> tuple[str, str]:
+    path = output_root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return str(path), content_fingerprint(value)
+
+
+def _compile_obligation_verification_plans(
+    parameters: Mapping[str, Any], *, output_root: Path, **_: Any
+) -> dict[str, Any]:
+    obligations = _flow_items(parameters.get("obligations"))
+    design = parameters.get("feature_design")
+    contracts = (
+        _flow_items(design.get("verification_contracts"))
+        if isinstance(design, Mapping)
+        else []
+    )
+    by_ref = {str(item.get("obligation_ref")): item for item in contracts}
+    plans: list[dict[str, Any]] = []
+    decisions: list[dict[str, Any]] = []
+    for index, obligation in enumerate(obligations):
+        obligation_id = str(obligation.get("obligation_id", ""))
+        contract = by_ref.get(
+            obligation_id, contracts[index] if index < len(contracts) else {}
+        )
+        plan = {
+            "obligation_id": obligation_id,
+            "description": str(obligation.get("description", "")),
+            "acceptance_criterion": str(obligation.get("acceptance_criterion", "")),
+            "population": str(
+                contract.get("population", obligation.get("description", ""))
+            ),
+            "operation": str(contract.get("operation", "inspect the implementation")),
+            "oracle": str(
+                contract.get("oracle", obligation.get("acceptance_criterion", ""))
+            ),
+            "evidence_case": str(
+                contract.get("evidence_case", obligation.get("expected_test", ""))
+            ),
+            "contract_refs": [str(contract.get("id", f"contract-{obligation_id}"))],
+        }
+        plans.append(plan)
+        population_text = str(plan["population"])
+        operation_text = str(plan["operation"])
+        oracle_text = str(plan["oracle"])
+        evidence_text = str(plan["evidence_case"])
+        for check, value in (
+            ("has_contract", bool(contract)),
+            ("has_population", bool(population_text.strip())),
+            ("has_operation", bool(operation_text.strip())),
+            ("has_oracle", bool(oracle_text.strip())),
+            ("has_evidence", bool(evidence_text.strip())),
+        ):
+            decisions.append(
+                {
+                    "decision_id": f"{obligation_id}:{check}",
+                    "check": check,
+                    "passed": value,
+                    "obligation_id": obligation_id,
+                }
+            )
+    if not plans:
+        raise PowdrrExecutionError(
+            "no obligations were available for verification planning"
+        )
+    document = {"plans": plans, "structural_decisions": decisions}
+    path, fingerprint = _write_flow_artifact(
+        output_root, "obligation-verification-plans.json", document
+    )
+    return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _resolve_obligation_populations(
+    parameters: Mapping[str, Any], *, output_root: Path, **_: Any
+) -> dict[str, Any]:
+    plans = _flow_items(parameters.get("plans"))
+    populations: list[dict[str, Any]] = []
+    decisions: list[dict[str, Any]] = []
+    for plan in plans:
+        obligation_id = str(plan.get("obligation_id", ""))
+        member = {
+            "member_id": f"{obligation_id}:representative",
+            "description": str(plan.get("evidence_case", "")),
+        }
+        population = {
+            "obligation_id": obligation_id,
+            "selector": str(plan.get("population", "")),
+            "members": [member],
+            "contract_refs": list(plan.get("contract_refs", [])),
+        }
+        populations.append(population)
+        decisions.append(
+            {
+                "decision_id": f"{obligation_id}:population-nonempty",
+                "check": "population_complete",
+                "passed": bool(
+                    str(population["selector"]).strip()
+                    and str(member["description"]).strip()
+                ),
+                "obligation_id": obligation_id,
+            }
+        )
+    if not populations:
+        raise PowdrrExecutionError("no obligation populations were available")
+    document = {"populations": populations, "completeness_decisions": decisions}
+    path, fingerprint = _write_flow_artifact(
+        output_root, "obligation-populations.json", document
+    )
+    return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _run_obligation_baseline(
+    parameters: Mapping[str, Any],
+    *,
+    output_root: Path,
+    worktree: Path,
+    runner: Runner,
+    state: dict[str, Any],
+    **_: Any,
+) -> dict[str, Any]:
+    compilation = state.get("verification_obligations")
+    raw = (
+        [item.to_data() for item in compilation.obligations]
+        if isinstance(compilation, VerificationObligationCompilation)
+        else []
+    )
+    if raw:
+        evidence = _run_verification_evidence(
+            {"obligations": raw},
+            worktree=worktree,
+            output_root=output_root / "baseline",
+            state=state,
+            runner=runner,
+        )
+        case_results = evidence.get("evidence", [])
+    else:
+        case_results = [
+            {"status": "failed", "error": "verification obligations are unavailable"}
+        ]
+    failing = [item for item in case_results if item.get("status") != "passed"]
+    document = {
+        "candidate_tree": content_fingerprint(
+            {"phase": "baseline", "cases": case_results}
+        ),
+        "case_results": case_results,
+        "failing_cases": failing,
+    }
+    baseline_artifact = _write_flow_artifact(
+        output_root, "obligation-baseline.json", document
+    )
+    baseline_artifact_path: str = baseline_artifact[0]
+    return {"path": baseline_artifact_path, **document}
+
+
+def _compile_code_task_plan(
+    parameters: Mapping[str, Any], *, output_root: Path, config: Any, **_: Any
+) -> dict[str, Any]:
+    baseline = parameters.get("baseline_evidence")
+    failures = (
+        _flow_items(baseline.get("failing_cases"))
+        if isinstance(baseline, Mapping)
+        else []
+    )
+    plans = _flow_items(parameters.get("verification_plans"))
+    tasks: list[dict[str, Any]] = []
+    for index, failure in enumerate(failures, start=1):
+        obligation_id = str(
+            failure.get("obligation_id", failure.get("obligation_ref", ""))
+        )
+        source = next(
+            (item for item in plans if item.get("obligation_id") == obligation_id),
+            plans[0] if plans else {},
+        )
+        tasks.append(
+            {
+                "task_id": f"code-task-{index:03d}",
+                "objective": str(
+                    source.get("description", "Repair the failing obligation")
+                ),
+                "obligation_refs": [obligation_id] if obligation_id else [],
+                "allowed_paths": list(getattr(config, "allowed_paths", ())),
+                "validation_profiles": ["pytest"],
+                "acceptance_criteria": [str(source.get("acceptance_criterion", ""))],
+                "planned_additions": [],
+                "planned_deletions": [],
+                "must_preserve": [],
+                "non_goals": [],
+                "source_refs": ["obligation-baseline"],
+                "validator": {
+                    "kind": "focused-contract",
+                    "evidence_case": str(source.get("evidence_case", "")),
+                },
+                "dependencies": [],
+            }
+        )
+    if not tasks:
+        # A green baseline is a valid no-op implementation plan.
+        tasks = []
+    decisions = [
+        {
+            "decision_id": "task-plan:scope",
+            "check": "task_assignment",
+            "passed": all(
+                bool(item.get("obligation_refs")) and bool(item.get("validator"))
+                for item in tasks
+            ),
+        }
+    ]
+    document = {
+        "tasks": tasks,
+        "structural_decisions": decisions,
+        "semantic_worklist": {"specifications": []},
+    }
+    path, fingerprint = _write_flow_artifact(
+        output_root, "code-task-plan.json", document
+    )
+    return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _evaluate_deterministic_decision(parameters: Mapping[str, Any]) -> dict[str, str]:
+    decision = parameters.get("decision")
+    if not isinstance(decision, Mapping):
+        return {"outcome": "blocked", "explanation": "decision is not an object"}
+    if isinstance(decision.get("passed"), bool):
+        return {
+            "outcome": "pass" if decision["passed"] else "fail",
+            "explanation": (
+                f"deterministic check {decision.get('check', 'unknown')} "
+                "evaluated from supplied evidence"
+            ),
+        }
+    return {
+        "outcome": "blocked",
+        "explanation": "decision did not provide a boolean result",
+    }
+
+
+def _finalize_flow_review(
+    parameters: Mapping[str, Any],
+    *,
+    output_root: Path,
+    filename: str,
+    decision_key: str = "decisions",
+) -> dict[str, Any]:
+    decisions = _flow_items(parameters.get(decision_key))
+    accepted = bool(decisions) and all(
+        item.get("outcome") == "pass" for item in decisions
+    )
+    document = {
+        "accepted": accepted,
+        "decisions": decisions,
+        "source": parameters.get("plans", parameters.get("task_plan", {})),
+    }
+    path, _ = _write_flow_artifact(output_root, filename, document)
+    return {"accepted": accepted, "receipt_path": path}
+
+
+def _finalize_obligation_verification_plan_review(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    return _finalize_flow_review(
+        parameters,
+        output_root=output_root,
+        filename="obligation-verification-plan-review.json",
+    )
+
+
+def _finalize_population_review(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    return _finalize_flow_review(
+        parameters, output_root=output_root, filename="population-review.json"
+    )
+
+
+def _finalize_code_task_plan_review(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    decisions = _flow_items(parameters.get("structural_decisions")) + _flow_items(
+        parameters.get("semantic_decisions")
+    )
+    return _finalize_flow_review(
+        {"decisions": decisions, "task_plan": parameters.get("task_plan")},
+        output_root=output_root,
+        filename="code-task-plan-review.json",
+    )
+
+
+def _compile_code_task_preconditions(
+    parameters: Mapping[str, Any], **_: Any
+) -> dict[str, Any]:
+    task = parameters.get("task")
+    task_mapping = task if isinstance(task, Mapping) else None
+    valid = task_mapping is not None
+    return {
+        "decisions": [
+            {
+                "decision_id": "task:valid",
+                "check": "task_assignment",
+                "passed": valid
+                and bool(task_mapping and task_mapping.get("task_id"))
+                and bool(task_mapping and task_mapping.get("validator")),
+            },
+            {
+                "decision_id": "task:scope",
+                "check": "scope_bounded",
+                "passed": valid
+                and isinstance(
+                    task_mapping and task_mapping.get("allowed_paths"), list
+                ),
+            },
+        ]
+    }
+
+
+def _finalize_code_task_preconditions(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    return _finalize_flow_review(
+        parameters, output_root=output_root, filename="code-task-preconditions.json"
+    )
+
+
+def _capture_code_task_before_state(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    runner: Runner,
+    output_root: Path,
+    **_: Any,
+) -> dict[str, Any]:
+    task = parameters.get("task")
+    task_id = str(task.get("task_id", "task")) if isinstance(task, Mapping) else "task"
+    document = {
+        "task_id": task_id,
+        "head": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
+        "status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
+        "diff": _git_output(runner, worktree, ["git", "diff", "--binary"]),
+    }
+    path, fingerprint = _write_flow_artifact(
+        output_root / "code-tasks" / task_id, "before.json", document
+    )
+    return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _run_code_task_agent(
+    parameters: Mapping[str, Any],
+    *,
+    config: Any,
+    runner: Runner,
+    worktree: Path,
+    output_root: Path,
+    branch: str,
+    slug: str,
+    state: dict[str, Any],
+    **_: Any,
+) -> dict[str, Any]:
+    task = parameters.get("task")
+    forwarded = dict(parameters)
+    forwarded.setdefault("baseline", str(state.get("baseline_path", "")))
+    forwarded.setdefault("plan", str(state.get("plan_path", "")))
+    forwarded.setdefault("feature_description", config.feature_description)
+    forwarded.setdefault("work_item_name", config.work_item_name)
+    forwarded.setdefault(
+        "proposal_review_receipt", str(state.get("proposal_review_receipt_path", ""))
+    )
+    canonical_path = state.get("canonical_feature_design_path")
+    if "obligations" not in forwarded and isinstance(canonical_path, Path):
+        try:
+            canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise PowdrrExecutionError(
+                f"canonical feature design cannot be loaded for code task: {error}"
+            ) from error
+        if isinstance(canonical, Mapping):
+            forwarded["obligations"] = {
+                "path": str(canonical_path),
+                "obligations": canonical.get("obligations", []),
+            }
+    compilation = state.get("verification_obligations")
+    if "obligations" not in forwarded and isinstance(
+        compilation, VerificationObligationCompilation
+    ):
+        forwarded["obligations"] = {
+            "path": str(state.get("feature_obligations_path", "")),
+            "obligations": [item.to_data() for item in compilation.obligations],
+        }
+    if isinstance(task, Mapping):
+        forwarded.setdefault(
+            "obligations",
+            {"obligations": [{"description": task.get("objective", "")}], "path": ""},
+        )
+    return _run_code_agent_phase(
+        config,
+        runner=runner,
+        worktree=worktree,
+        output_root=output_root,
+        branch=branch,
+        slug=slug,
+        state=state,
+        parameters=forwarded,
+    )
+
+
+def _compile_code_task_postconditions(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    runner: Runner,
+    output_root: Path,
+    **_: Any,
+) -> dict[str, Any]:
+    before = parameters.get("before_state")
+    implementation = parameters.get("implementation")
+    current = {
+        "status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
+        "diff": _git_output(runner, worktree, ["git", "diff", "--binary"]),
+    }
+    decisions = [
+        {
+            "decision_id": "post:agent",
+            "check": "agent_completed",
+            "passed": isinstance(implementation, Mapping)
+            and bool(implementation.get("attempt")),
+        },
+        {
+            "decision_id": "post:diff",
+            "check": "diff_nonempty",
+            "passed": bool(current["diff"]),
+        },
+        {
+            "decision_id": "post:diff-check",
+            "check": "git_diff_check",
+            "passed": runner(
+                ["git", "diff", "--check"],
+                cwd=worktree,
+                capture_output=True,
+                text=True,
+                check=False,
+            ).returncode
+            == 0,
+        },
+        {
+            "decision_id": "post:before",
+            "check": "evidence_current",
+            "passed": isinstance(before, Mapping),
+        },
+    ]
+    document = {"decisions": decisions, "current": current}
+    path, fingerprint = _write_flow_artifact(
+        output_root
+        / "code-tasks"
+        / str((parameters.get("task") or {}).get("task_id", "task")),
+        "postconditions.json",
+        document,
+    )
+    return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _finalize_code_task_receipt(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    result = _finalize_flow_review(
+        parameters,
+        output_root=output_root,
+        filename="code-task-receipt.json",
+        decision_key="decisions",
+    )
+    task = parameters.get("task")
+    result.update(
+        {
+            "task_id": str(task.get("task_id", "task"))
+            if isinstance(task, Mapping)
+            else "task",
+            "diff_fingerprint": content_fingerprint(
+                parameters.get("postconditions", {})
+            ),
+        }
+    )
+    return result
+
+
+def _run_final_obligation_evidence(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    output_root: Path,
+    runner: Runner,
+    state: dict[str, Any],
+    **_: Any,
+) -> dict[str, Any]:
+    compilation = state.get("verification_obligations")
+    raw = (
+        [item.to_data() for item in compilation.obligations]
+        if isinstance(compilation, VerificationObligationCompilation)
+        else []
+    )
+    evidence = (
+        _run_verification_evidence(
+            {"obligations": raw},
+            worktree=worktree,
+            output_root=output_root / "final",
+            state=state,
+            runner=runner,
+        )
+        if raw
+        else {"candidate_tree": content_fingerprint({}), "evidence": []}
+    )
+    results = evidence.get("evidence", [])
+    document = {
+        **evidence,
+        "closure_decisions": [
+            {
+                "decision_id": str(item.get("obligation_id", index)),
+                "check": "all_cases_pass",
+                "passed": item.get("status") == "passed",
+            }
+            for index, item in enumerate(results, start=1)
+        ],
+    }
+    final_artifact = _write_flow_artifact(
+        output_root, "final-obligation-evidence.json", document
+    )
+    final_artifact_path: str = final_artifact[0]
+    return {"path": final_artifact_path, **document}
+
+
+def _finalize_obligation_closure(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    return _finalize_flow_review(
+        parameters, output_root=output_root, filename="obligation-closure.json"
+    )
+
+
+def _prepare_final_implementation_review(
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    runner: Runner,
+    output_root: Path,
+    **_: Any,
+) -> dict[str, Any]:
+    validation = parameters.get("validation")
+    document = {
+        "deterministic_decisions": [
+            {
+                "decision_id": "final:validation",
+                "check": "focused_validation",
+                "passed": isinstance(validation, Mapping)
+                and validation.get("passed") is True,
+            },
+            {
+                "decision_id": "final:receipts",
+                "check": "task_receipts",
+                "passed": isinstance(parameters.get("task_receipts"), list),
+            },
+        ],
+        "semantic_worklist": {"specifications": []},
+        "git_status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
+    }
+    path, fingerprint = _write_flow_artifact(
+        output_root, "final-implementation-review.json", document
+    )
+    return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _finalize_implementation_review(
+    parameters: Mapping[str, Any], *, output_root: Path
+) -> dict[str, Any]:
+    result = _finalize_flow_review(
+        parameters,
+        output_root=output_root,
+        filename="final-implementation-review-receipt.json",
+        decision_key="deterministic_decisions",
+    )
+    semantic = _flow_items(parameters.get("semantic_decisions"))
+    if semantic and not all(item.get("outcome") == "pass" for item in semantic):
+        result["accepted"] = False
+    result["passed"] = result["accepted"]
+    return result
 
 
 __all__ = [

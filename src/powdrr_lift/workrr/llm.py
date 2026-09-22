@@ -743,6 +743,7 @@ def is_retryable_provider_error(error: RuntimeError) -> bool:
                 "connection reset",
                 "connection aborted",
                 "broken pipe",
+                "streaming response did not include any events",
             )
         )
     )

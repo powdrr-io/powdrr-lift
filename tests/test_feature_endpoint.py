@@ -47,6 +47,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _feature_endpoint_result,
     _finalize_proposal_review,
     _load_implementation_plan,
+    _load_procedrr_replay_responses,
     _materialize_feature_intents,
     _operation_checkpoint,
     _plan_text_items,
@@ -59,8 +60,32 @@ from powdrr_lift.workrr.feature_endpoint import (
     review_feature_diff,
     run_feature_in_place,
 )
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
+
+
+def test_procedrr_replay_loader_preserves_completed_judge_results(
+    tmp_path: Path,
+) -> None:
+    event_path = tmp_path / "procedrr-events.jsonl"
+    messages = [{"role": "user", "content": "judge this clause"}]
+    event_path.write_text(
+        json.dumps(
+            {
+                "record_type": "procedrr.step",
+                "kind": "judge",
+                "messages": messages,
+                "value": {"multiple": True},
+            }
+        )
+        + "\nmalformed partial record",
+        encoding="utf-8",
+    )
+
+    replay = _load_procedrr_replay_responses(event_path)
+
+    assert replay == {WorkrrProcedrrClient.replay_key(messages): {"multiple": True}}
 
 
 def test_merge_semantic_design_accepts_trace_only_nonactionable_clause() -> None:

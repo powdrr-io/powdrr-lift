@@ -77,6 +77,56 @@ def test_procedrr_retries_transient_provider_failures_with_backoff(
     assert delays == [2.0, 4.0]
 
 
+def test_procedrr_retries_empty_stream_provider_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class EmptyStreamThenSuccess:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls < 3:
+                raise RuntimeError(
+                    "OpenAI streaming response did not include any events."
+                )
+            return {"complete": True}
+
+    provider = EmptyStreamThenSuccess()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider),
+        skills_dir=tmp_path,
+        provider_retry_delay_seconds=2.0,
+    )
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+
+    assert client.complete_json(
+        [{"role": "user", "content": "judge this"}],
+        response_schema=SCHEMA,
+    ) == {"complete": True}
+    assert provider.calls == 3
+    assert delays == [2.0, 4.0]
+
+
+def test_procedrr_replays_completed_judge_without_provider_call(
+    tmp_path: Path,
+) -> None:
+    provider = RepairingClient([{"complete": False}])
+    messages = [{"role": "user", "content": "judge this"}]
+    client = WorkrrProcedrrClient(
+        provider,
+        skills_dir=tmp_path,
+        replay_responses={
+            WorkrrProcedrrClient.replay_key(messages): {"complete": True}
+        },
+    )
+
+    assert client.complete_json(messages, response_schema=SCHEMA) == {"complete": True}
+    assert provider.calls == 0
+
+
 def test_procedrr_does_not_retry_non_transient_provider_failures(
     tmp_path: Path,
 ) -> None:

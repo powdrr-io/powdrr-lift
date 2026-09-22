@@ -597,7 +597,7 @@ def _read_openai_response(
                 last_progress_report = now
 
     if response_metadata is None:
-        raise PowdrrExecutionError(
+        raise ProviderExecutionError(
             "OpenAI streaming response did not include any events."
         )
     if not content_parts:

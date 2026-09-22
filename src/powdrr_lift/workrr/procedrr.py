@@ -226,12 +226,19 @@ class WorkrrProcedrrClient:
         max_retries: int = 3,
         provider_retry_attempts: int = 3,
         provider_retry_delay_seconds: float = 1.0,
+        replay_responses: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> None:
         self._client = client
         self._skills_dir = skills_dir
         self._max_retries = max_retries
         self._provider_retry_attempts = provider_retry_attempts
         self._provider_retry_delay_seconds = provider_retry_delay_seconds
+        self._replay_responses = dict(replay_responses or {})
+
+    @staticmethod
+    def replay_key(messages: list[dict[str, str]]) -> str:
+        """Return the stable key used to replay one completed judge request."""
+        return json.dumps(messages, ensure_ascii=False, sort_keys=True)
 
     def _complete_from_provider(
         self,
@@ -260,6 +267,8 @@ class WorkrrProcedrrClient:
         if response_schema is None:
             raise ProcedrrResponseError("Procedrr judges require an output schema.")
 
+        replay_key = self.replay_key(messages)
+
         schema_example = json.dumps(
             _schema_example(response_schema), ensure_ascii=False, separators=(",", ":")
         )
@@ -287,6 +296,10 @@ class WorkrrProcedrrClient:
         def parse(payload: dict[str, Any]) -> dict[str, Any]:
             validate_json(payload, response_schema)
             return payload
+
+        replay = self._replay_responses.get(replay_key)
+        if replay is not None:
+            return parse(dict(replay))
 
         last_error = ""
         for attempt in range(self._max_retries + 1):
@@ -330,6 +343,7 @@ def _is_retryable_provider_failure(error: Exception) -> bool:
             "remote disconnected",
             "timed out",
             "timeout",
+            "streaming response did not include any events",
         )
     )
 

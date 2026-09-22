@@ -689,6 +689,7 @@ def test_implement_feature_decomposes_state_data_api_requirements_before_design(
         clause["parent_clause_id"] == "candidate:instruction-001"
         for clause in ledger["clauses"]
     )
+    assert result.feature_obligations_path is not None
     design = json.loads(result.feature_obligations_path.read_text(encoding="utf-8"))
     assert len(design["obligations"]) == 4
 

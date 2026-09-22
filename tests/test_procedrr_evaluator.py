@@ -53,6 +53,35 @@ steps:
         )
 
 
+def test_evaluator_operation_event_contains_step_inputs_and_output() -> None:
+    from procedrr import parse_and_validate
+
+    document = parse_and_validate(
+        """
+version: 1
+name: logged-operation
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [record], value: hello}
+      bind: result
+  - terminal: succeeded
+"""
+    )
+
+    streamed: list[Any] = []
+    result = Evaluator(
+        FakeLLM(),
+        lambda _tool, parameters: {"seen": parameters["value"]},
+        event_sink=streamed.append,
+    ).evaluate(document)
+
+    operation = next(event for event in result.events if event.kind == "operation")
+    assert streamed == list(result.events)
+    assert operation.data["inputs"] == {"command": ["record"], "value": "hello"}
+    assert operation.data["output"] == {"seen": "hello"}
+
+
 def test_evaluator_calls_a_named_procedrr_process(tmp_path: Path) -> None:
     from procedrr import parse_and_validate
 

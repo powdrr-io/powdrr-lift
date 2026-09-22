@@ -34,14 +34,28 @@ class ValidationGateError(EvaluationError):
         super().__init__("validation gate failed")
 
 
-OperationExecutor = Callable[[str, Mapping[str, Any]], Any]
-
-
 @dataclass(frozen=True, slots=True)
 class EvaluationEvent:
     kind: str
     path: str
     data: Mapping[str, Any] = field(default_factory=dict)
+
+
+OperationExecutor = Callable[[str, Mapping[str, Any]], Any]
+EventSink = Callable[[EvaluationEvent], None]
+
+
+class _EventLog(list[EvaluationEvent]):
+    """Event list that can stream evaluator events to a run artifact."""
+
+    def __init__(self, sink: EventSink | None = None) -> None:
+        super().__init__()
+        self.sink = sink
+
+    def append(self, event: EvaluationEvent) -> None:
+        super().append(event)
+        if self.sink is not None:
+            self.sink(event)
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +78,7 @@ class Evaluator:
         process_directory: Path | None = None,
         judge_clients: Mapping[str, WorkflowLLMClient] | None = None,
         command_catalog: Any | None = None,
+        event_sink: EventSink | None = None,
     ) -> None:
         self.llm = llm
         self.operation_executor = operation_executor
@@ -72,6 +87,7 @@ class Evaluator:
             "docs/procedrr/skill-definitions"
         )
         self.command_catalog = command_catalog
+        self.event_sink = event_sink
         self._schemas_by_state: dict[int, dict[str, Mapping[str, Any]]] = {}
 
     @classmethod
@@ -104,7 +120,7 @@ class Evaluator:
         state = dict(bindings or {})
         self._schemas_by_state = {id(state): {}}
         self._document_recoveries = document.get("recoveries", {})
-        events: list[EvaluationEvent] = []
+        events: _EventLog = _EventLog(self.event_sink)
         usage = {"llm": 0, "tools": 0}
         limits = document.get("limits", {})
         try:
@@ -569,7 +585,18 @@ class Evaluator:
             state[bind] = result
             if isinstance(output_schema, Mapping):
                 self._schemas_for_state(state)[bind] = dict(output_schema)
-        events.append(EvaluationEvent("operation", path, {"tool": tool, "bind": bind}))
+        events.append(
+            EvaluationEvent(
+                "operation",
+                path,
+                {
+                    "tool": tool,
+                    "bind": bind,
+                    "inputs": _compact_value(dict(parameters), max_chars=12000),
+                    "output": _compact_value(result, max_chars=12000),
+                },
+            )
+        )
 
     def _judge(
         self,

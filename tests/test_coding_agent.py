@@ -187,6 +187,7 @@ def test_opencode_provider_pins_requested_model(
     assert isinstance(kwargs, dict)
     environment = kwargs["env"]
     assert isinstance(environment, dict)
+    assert environment["MSWEA_CONFIGURED"] == "true"
     assert environment.get("VIRTUAL_ENV") is None
 
 

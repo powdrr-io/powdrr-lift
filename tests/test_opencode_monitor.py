@@ -211,3 +211,34 @@ def test_run_opencode_times_out_when_no_activity_is_seen(tmp_path: Path) -> None
 
     assert result.returncode == 124
     assert time.monotonic() - started < 0.5
+
+
+def test_run_opencode_enforces_absolute_deadline_despite_progress_events(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "absolute-deadline.ndjson"
+    result = run_opencode(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys, time; "
+                '[print(\'{"type":"tool_use"}\', flush=True) or '
+                "time.sleep(0.02) for _ in range(30)]"
+            ),
+        ],
+        log_path=path,
+        inactivity_timeout=0.05,
+        absolute_timeout=0.12,
+    )
+
+    assert result.returncode == 124
+    diagnostics = [
+        json.loads(line)
+        for line in path.read_text().splitlines()
+        if json.loads(line).get("record_type") == "diagnostic"
+    ]
+    timeout = next(
+        record for record in diagnostics if record["kind"] == "process.timed_out"
+    )
+    assert timeout["timeout_kind"] == "absolute"

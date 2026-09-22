@@ -275,6 +275,17 @@ class CodingAgentStatus(StrEnum):
     POLICY_DENIED = "policy_denied"
 
 
+class CodingAgentOutcome(StrEnum):
+    """Deterministic classification used to choose bounded recovery."""
+
+    COMPLETED_WITH_PROGRESS = "completed_with_progress"
+    COMPLETED_WITHOUT_PROGRESS = "completed_without_progress"
+    TIMED_OUT_WITH_PARTIAL_PROGRESS = "timed_out_with_partial_progress"
+    TIMED_OUT_WITHOUT_PROGRESS = "timed_out_without_progress"
+    POLICY_VIOLATION = "policy_violation"
+    FAILED = "failed"
+
+
 @dataclass(frozen=True, slots=True)
 class CodingAgentAttempt:
     """Observed result of one bounded worker invocation."""
@@ -309,6 +320,39 @@ class CodingAgentAttempt:
             "stderr": self.stderr,
             "error": self.error,
         }
+
+
+def classify_coding_agent_attempt(
+    attempt: CodingAgentAttempt,
+    *,
+    previous_diff_fingerprint: str | None = None,
+) -> CodingAgentOutcome:
+    """Classify an attempt from process status and observed repository change.
+
+    This is deliberately independent of model output. A changed diff is
+    material progress only when it differs from the previous accepted state;
+    callers can therefore route a partial timeout into a continuation task
+    while routing a repeated no-op into a narrower retry or terminal failure.
+    """
+    changed = bool(attempt.changed_paths) and (
+        attempt.diff_fingerprint is not None
+        and attempt.diff_fingerprint != previous_diff_fingerprint
+    )
+    if attempt.status is CodingAgentStatus.POLICY_DENIED:
+        return CodingAgentOutcome.POLICY_VIOLATION
+    if attempt.status is CodingAgentStatus.TIMED_OUT:
+        return (
+            CodingAgentOutcome.TIMED_OUT_WITH_PARTIAL_PROGRESS
+            if changed
+            else CodingAgentOutcome.TIMED_OUT_WITHOUT_PROGRESS
+        )
+    if attempt.status is CodingAgentStatus.COMPLETED:
+        return (
+            CodingAgentOutcome.COMPLETED_WITH_PROGRESS
+            if changed
+            else CodingAgentOutcome.COMPLETED_WITHOUT_PROGRESS
+        )
+    return CodingAgentOutcome.FAILED
 
 
 class CodingAgentProvider(Protocol):
@@ -358,6 +402,7 @@ class OpenCodeProvider:
     executable: str = "opencode"
     agent: str = "build"
     timeout_seconds: float = 300.0
+    absolute_timeout_seconds: float | None = 900.0
     permission_policy: OpenCodePermissionPolicy = field(
         default_factory=OpenCodePermissionPolicy
     )
@@ -428,6 +473,7 @@ class OpenCodeProvider:
             cwd=worktree_root,
             env=environment,
             inactivity_timeout=self.timeout_seconds,
+            absolute_timeout=self.absolute_timeout_seconds,
         )
         session_id = _extract_opencode_session_id(_json_events(completed.stdout))
         if session_id is not None:

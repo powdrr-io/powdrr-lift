@@ -9,13 +9,16 @@ import pytest
 from powdrr_lift.cli import main
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.workrr.coding_agent import (
+    CodingAgentAttempt,
     CodingAgentAttemptStore,
+    CodingAgentOutcome,
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
     MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
     OpenCodeProvider,
+    classify_coding_agent_attempt,
     run_coding_agent,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
@@ -382,6 +385,28 @@ def test_opencode_policy_is_noninteractive_and_denies_publication() -> None:
 
 def test_opencode_provider_defaults_to_five_minutes_of_inactivity() -> None:
     assert OpenCodeProvider().timeout_seconds == 300.0
+    assert OpenCodeProvider().absolute_timeout_seconds == 900.0
+
+
+def test_coding_agent_attempt_classification_distinguishes_partial_timeout() -> None:
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt-1",
+        request_id="request-1",
+        provider="opencode",
+        status=CodingAgentStatus.TIMED_OUT,
+        exit_code=124,
+        changed_paths=("src/change.py",),
+        diff_fingerprint="new-diff",
+    )
+
+    assert (
+        classify_coding_agent_attempt(attempt, previous_diff_fingerprint="old-diff")
+        is CodingAgentOutcome.TIMED_OUT_WITH_PARTIAL_PROGRESS
+    )
+    assert (
+        classify_coding_agent_attempt(attempt, previous_diff_fingerprint="new-diff")
+        is CodingAgentOutcome.TIMED_OUT_WITHOUT_PROGRESS
+    )
 
 
 def test_opencode_provider_uses_json_events_and_inline_policy(

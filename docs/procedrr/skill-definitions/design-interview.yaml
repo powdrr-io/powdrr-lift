@@ -96,6 +96,7 @@ steps:
               - Classify only this clause as entity, feature, interface, invariant, guidance, non_goal, or nonactionable.
               - Use nonactionable for process, tooling, delivery, or meta-instructions that do not describe product behavior. Examples include "create a branch from main", "commit everything", "open a PR", "run this with tool X", and "report the result".
               - A statement that a capability is missing, manual, unsafe, or currently absent is not nonactionable; it is feature context when the surrounding request asks for that capability.
+              - Treat a universal behavioral rule as an invariant when it uses words such as "all", "every", "always", "must", or "should" to require behavior across an existing population. The words "should" and "must" do not by themselves make a clause a feature.
               - Use non_goal only for an explicit product prohibition or scope exclusion, such as "do not change the transport" or "this feature must not add retries". Do not infer a non-goal from words such as "lacks", "without", or "manual".
               - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
               - >-
@@ -106,6 +107,12 @@ steps:
                 Examples: "The export endpoint accepts a report ID and returns CSV" → interface.
               - >-
                 Examples: "A report can always be loaded after it is saved" → invariant.
+              - >-
+                Examples: "All persisted data entities should support pickle round-tripping" → invariant.
+              - >-
+                Examples: "Every API response must include a request ID" → invariant.
+              - >-
+                Counterexample: "Add CSV export for users" → feature; it requests a new capability rather than a rule that must hold for an existing population.
               - >-
                 Examples: "Prefer the existing repository serialization helper" → guidance.
               - >-

@@ -151,7 +151,11 @@ from powdrr_lift.workrr.execution_state import (
     _ValidationObligation,
     _WorkflowExecutionState,
 )
-from powdrr_lift.workrr.llm import WorkflowAction, workflow_action_summary
+from powdrr_lift.workrr.llm import (
+    ProviderExecutionError,
+    WorkflowAction,
+    workflow_action_summary,
+)
 from powdrr_lift.workrr.llm import WorkflowEdit as SkillChatEdit
 from powdrr_lift.workrr.paths import (
     is_dedicated_worktree,
@@ -7729,6 +7733,20 @@ def test_openai_streaming_response_requires_completion_marker() -> None:
         )
 
     with pytest.raises(RuntimeError, match=r"partial content: '\{\"ok\":true\}'"):
+        _read_openai_response(_FakeResponse(), progress_stream=None)
+
+
+def test_openai_empty_stream_is_a_retryable_provider_failure() -> None:
+    class _FakeResponse:
+        headers = {"Content-Type": "text/event-stream"}
+
+        def readline(self) -> bytes:
+            return b""
+
+    with pytest.raises(
+        ProviderExecutionError,
+        match="streaming response did not include any events",
+    ):
         _read_openai_response(_FakeResponse(), progress_stream=None)
 
 

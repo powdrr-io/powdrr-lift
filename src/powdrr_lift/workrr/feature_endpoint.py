@@ -173,6 +173,39 @@ class FeatureEndpointResult:
         }
 
 
+def _load_procedrr_replay_responses(
+    event_path: Path,
+) -> dict[str, Mapping[str, Any]]:
+    """Load completed judge results so a restarted design can resume."""
+    replay_responses: dict[str, Mapping[str, Any]] = {}
+    if not event_path.is_file():
+        return replay_responses
+    for line in event_path.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if (
+            isinstance(record, Mapping)
+            and record.get("kind") == "judge"
+            and isinstance(record.get("messages"), list)
+            and isinstance(record.get("value"), Mapping)
+        ):
+            messages = record["messages"]
+            if all(
+                isinstance(message, Mapping)
+                and isinstance(message.get("role"), str)
+                and isinstance(message.get("content"), str)
+                for message in messages
+            ):
+                replay_responses[
+                    WorkrrProcedrrClient.replay_key(
+                        [dict(message) for message in messages]
+                    )
+                ] = dict(record["value"])
+    return replay_responses
+
+
 def run_feature_endpoint(
     config: FeatureEndpointConfig,
     *,
@@ -297,7 +330,8 @@ def _execute_procedrr_flow(
     )
     procedrr_event_path = output_root / "procedrr-events.jsonl"
     procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
-    procedrr_event_path.write_text("", encoding="utf-8")
+    replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
+    procedrr_event_path.touch()
 
     def record_procedrr_event(event: Any) -> None:
         record = {
@@ -394,6 +428,7 @@ def _execute_procedrr_flow(
             WorkrrProcedrrClient(
                 config.planning_client,
                 skills_dir=flow_directory,
+                replay_responses=replay_responses,
             ),
             execute,
             process_directory=flow_directory,
@@ -401,6 +436,7 @@ def _execute_procedrr_flow(
                 "planning": WorkrrProcedrrClient(
                     config.planning_client,
                     skills_dir=flow_directory,
+                    replay_responses=replay_responses,
                 )
             },
             command_catalog=command_catalog,

@@ -224,6 +224,11 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     assert "--exit-immediately" in command
     assert command[command.index("--model") + 1] == "openai/gpt-5"
     assert command[command.index("--output") + 1].endswith("attempt-1.traj.json")
+    kwargs = captured["kwargs"]
+    assert isinstance(kwargs, dict)
+    environment = kwargs["env"]
+    assert isinstance(environment, dict)
+    assert environment["MSWEA_CONFIGURED"] == "true"
 
 
 def test_execution_plan_compiles_selected_unit_to_worker_request() -> None:

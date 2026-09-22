@@ -455,6 +455,15 @@ class MiniSWEAgentProvider:
     ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment.pop("VIRTUAL_ENV", None)
+        # mini-swe-agent v2 otherwise launches its first-run interactive setup
+        # when the container has no user config. Coding-agent runs are always
+        # headless, so mark setup complete and rely on the explicit model and
+        # provider credentials supplied by Powdrr.
+        environment["MSWEA_CONFIGURED"] = "true"
+        if environment.get("DEEPINFRA_API_KEY") is None:
+            token = environment.get("DEEPINFRA_API_TOKEN")
+            if token:
+                environment["DEEPINFRA_API_KEY"] = token
         environment["PWD"] = str(worktree_root.resolve())
         command = [
             self.executable,

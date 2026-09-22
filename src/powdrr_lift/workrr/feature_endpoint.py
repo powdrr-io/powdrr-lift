@@ -295,6 +295,20 @@ def _execute_procedrr_flow(
     flow = parse_and_validate(
         flow_path.read_text(encoding="utf-8"), command_catalog=command_catalog
     )
+    procedrr_event_path = output_root / "procedrr-events.jsonl"
+    procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
+    procedrr_event_path.write_text("", encoding="utf-8")
+
+    def record_procedrr_event(event: Any) -> None:
+        record = {
+            "record_type": "procedrr.step",
+            "kind": event.kind,
+            "path": event.path,
+            **dict(event.data),
+        }
+        with procedrr_event_path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
+
     validation_profiles = _bootstrap_validation_profiles(
         worktree,
         output_root=output_root,
@@ -390,6 +404,7 @@ def _execute_procedrr_flow(
                 )
             },
             command_catalog=command_catalog,
+            event_sink=record_procedrr_event,
         )
         evaluator.evaluate(
             flow,

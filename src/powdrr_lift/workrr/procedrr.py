@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -223,10 +224,32 @@ class WorkrrProcedrrClient:
         *,
         skills_dir: Path,
         max_retries: int = 3,
+        provider_retry_attempts: int = 3,
+        provider_retry_delay_seconds: float = 1.0,
     ) -> None:
         self._client = client
         self._skills_dir = skills_dir
         self._max_retries = max_retries
+        self._provider_retry_attempts = provider_retry_attempts
+        self._provider_retry_delay_seconds = provider_retry_delay_seconds
+
+    def _complete_from_provider(
+        self,
+        messages: list[dict[str, str]],
+        response_schema: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        for attempt in range(self._provider_retry_attempts + 1):
+            try:
+                return cast(Any, self._client).complete_json(
+                    messages, response_schema=response_schema
+                )
+            except Exception as exc:  # noqa: BLE001 - classify provider failures below
+                if not _is_retryable_provider_failure(exc):
+                    raise
+                if attempt >= self._provider_retry_attempts:
+                    raise
+                time.sleep(self._provider_retry_delay_seconds * (2**attempt))
+        raise AssertionError("provider retry loop exited without a result")
 
     def complete_json(
         self,
@@ -262,10 +285,7 @@ class WorkrrProcedrrClient:
         ]
 
         def parse(payload: dict[str, Any]) -> dict[str, Any]:
-            try:
-                validate_json(payload, response_schema)
-            except JsonSchemaError as exc:
-                raise RuntimeError(f"response_schema: {exc.message}") from exc
+            validate_json(payload, response_schema)
             return payload
 
         last_error = ""
@@ -283,16 +303,35 @@ class WorkrrProcedrrClient:
                     },
                 ]
             try:
-                return parse(
-                    cast(Any, self._client).complete_json(
-                        messages, response_schema=response_schema
-                    )
-                )
-            except (JsonSchemaError, RuntimeError, ValueError) as exc:
+                payload = self._complete_from_provider(messages, response_schema)
+                return parse(payload)
+            except JsonSchemaError as exc:
                 last_error = str(exc)
         raise ProcedrrResponseError(
             "Workrr exhausted structured repair for a procedrr judge: " + last_error
         )
+
+
+def _is_retryable_provider_failure(error: Exception) -> bool:
+    """Identify transient provider failures that warrant backoff and retry."""
+
+    status_code = getattr(error, "status_code", None)
+    if isinstance(status_code, int):
+        return 500 <= status_code <= 599
+    if isinstance(error, (ConnectionError, TimeoutError)):
+        return True
+    message = str(error).casefold()
+    return any(
+        phrase in message
+        for phrase in (
+            "connection refused",
+            "connection reset",
+            "remote end closed connection",
+            "remote disconnected",
+            "timed out",
+            "timeout",
+        )
+    )
 
 
 __all__ = [

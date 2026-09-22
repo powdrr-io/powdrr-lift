@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -40,6 +40,65 @@ def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:
 
     assert result == {"complete": True}
     assert provider.calls == 2
+
+
+def test_procedrr_retries_transient_provider_failures_with_backoff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FailingClient:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls < 3:
+                error = RuntimeError("upstream failure")
+                error.status_code = 503  # type: ignore[attr-defined]
+                raise error
+            return {"complete": True}
+
+    provider = FailingClient()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider),
+        skills_dir=tmp_path,
+        provider_retry_delay_seconds=2.0,
+    )
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+
+    result = client.complete_json(
+        [{"role": "user", "content": "judge this"}],
+        response_schema=SCHEMA,
+    )
+
+    assert result == {"complete": True}
+    assert provider.calls == 3
+    assert delays == [2.0, 4.0]
+
+
+def test_procedrr_does_not_retry_non_transient_provider_failures(
+    tmp_path: Path,
+) -> None:
+    class FailingClient:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            raise RuntimeError("invalid credentials")
+
+    provider = FailingClient()
+    client = WorkrrProcedrrClient(cast(Any, provider), skills_dir=tmp_path)
+
+    with pytest.raises(RuntimeError, match="invalid credentials"):
+        client.complete_json(
+            [{"role": "user", "content": "judge this"}],
+            response_schema=SCHEMA,
+        )
+
+    assert provider.calls == 1
 
 
 def test_procedrr_requires_a_schema() -> None:

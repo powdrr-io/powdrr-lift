@@ -938,6 +938,8 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
+            if "independently verifiable requirement" in question:
+                return {"multiple": False}
             if "kind of obligation" in question:
                 return {"kind": "feature"}
             if "one concrete semantic obligation" in question:
@@ -964,6 +966,16 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             return {
                 "path": str(tmp_path / "instruction-ledger.json"),
                 "fingerprint": "sha256:ledger",
+                "clauses": [
+                    {"clause_id": "instruction-001", "text": "Add the feature."}
+                ],
+            }
+        if command[0] == "prepare_atomicity_split_requests":
+            return {"split_requests": []}
+        if command[0] == "apply_atomicity_splits":
+            return {
+                "path": str(tmp_path / "instruction-ledger.json"),
+                "fingerprint": "sha256:atomic-ledger",
                 "clauses": [
                     {"clause_id": "instruction-001", "text": "Add the feature."}
                 ],

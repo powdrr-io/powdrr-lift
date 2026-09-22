@@ -476,6 +476,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
+            if "independently verifiable requirement" in question:
+                return {"multiple": False}
             if "kind of obligation" in question:
                 return {"kind": "feature"}
             if "one concrete semantic obligation" in question:
@@ -503,6 +505,16 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 return {
                     "path": "instruction-ledger.json",
                     "fingerprint": "sha256:ledger",
+                    "clauses": [
+                        {"clause_id": "instruction-001", "text": "Add a thing"}
+                    ],
+                }
+            if command[0] == "prepare_atomicity_split_requests":
+                return {"split_requests": []}
+            if command[0] == "apply_atomicity_splits":
+                return {
+                    "path": "instruction-ledger.json",
+                    "fingerprint": "sha256:atomic-ledger",
                     "clauses": [
                         {"clause_id": "instruction-001", "text": "Add a thing"}
                     ],
@@ -568,7 +580,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 7
+    assert result.llm_activations == 8
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events
@@ -588,10 +600,10 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
 
 
 @pytest.mark.live_provider
-def test_live_design_interview_inspects_intermediate_contract_outputs(
+def test_live_design_interview_decomposes_compound_state_data_lifecycle(
     tmp_path: Path,
 ) -> None:
-    """Require a live planning model to produce usable intermediate contracts."""
+    """Require the live planning model to split a compound source clause."""
     if os.environ.get("POWDRR_LIVE_LLM") != "1":
         pytest.skip("set POWDRR_LIVE_LLM=1 to run the paid live-provider test")
 
@@ -620,12 +632,45 @@ def test_live_design_interview_inspects_intermediate_contract_outputs(
                 "fingerprint": "sha256:ledger",
                 "clauses": [
                     {
-                        "clause_id": "pickle-001",
+                        "clause_id": "instruction-001",
                         "text": (
-                            "All persisted data entities should support "
-                            "pickle round-tripping."
+                            "On entry, state data initializes as a fresh copy of "
+                            "the defaults and on exit state data is removed."
                         ),
                     }
+                ],
+            }
+        if command[0] == "prepare_atomicity_split_requests":
+            decision = parameters["decisions"][0]["result"]
+            return {
+                "split_requests": [
+                    {
+                        "clause": {
+                            "clause_id": "instruction-001",
+                            "text": (
+                                "On entry, state data initializes as a fresh copy of "
+                                "the defaults and on exit state data is removed."
+                            ),
+                        }
+                    }
+                ]
+                if decision["multiple"]
+                else []
+            }
+        if command[0] == "apply_atomicity_splits":
+            splits = parameters["splits"]
+            statements = (
+                splits[0]["result"]["statements"] if splits else ["unchanged clause"]
+            )
+            return {
+                "path": str(tmp_path / "instruction-ledger.json"),
+                "fingerprint": "sha256:atomic-ledger",
+                "clauses": [
+                    {
+                        "clause_id": f"instruction-{index:03d}",
+                        "text": statement,
+                    }
+                    for index, statement in enumerate(statements, start=1)
                 ],
             }
         if command[0] == "merge_semantic_design":
@@ -639,28 +684,33 @@ def test_live_design_interview_inspects_intermediate_contract_outputs(
                 "evidence_case": parameters["evidence_case"],
             }
         if command[0] == "compile_canonical_feature_design":
-            design = parameters["design_decisions"][0]["result"]
+            designs = [item["result"] for item in parameters["design_decisions"]]
             return {
                 "path": str(tmp_path / "canonical-feature-design.json"),
                 "fingerprint": "sha256:design",
                 "obligations": [
                     {
-                        "id": "pickle-001",
+                        "id": f"instruction-{index:03d}",
                         "description": design["description"],
                         "design": design,
                     }
+                    for index, design in enumerate(designs, start=1)
                 ],
                 "verification_contracts": [
                     {
-                        "id": "contract-pickle-001",
-                        "obligation_ref": "pickle-001",
+                        "id": f"contract-instruction-{index:03d}",
+                        "obligation_ref": f"instruction-{index:03d}",
                         "population": design["population"],
                         "operation": design["operation"],
                         "oracle": design["oracle"],
                         "evidence_case": design["evidence_case"],
                     }
+                    for index, design in enumerate(designs, start=1)
                 ],
-                "required_test_cases": [{"id": "test-pickle-001"}],
+                "required_test_cases": [
+                    {"id": f"test-instruction-{index:03d}"}
+                    for index, _design in enumerate(designs, start=1)
+                ],
             }
         raise AssertionError((tool, parameters))
 
@@ -670,9 +720,10 @@ def test_live_design_interview_inspects_intermediate_contract_outputs(
     result = Evaluator(llm, execute).evaluate(
         document,
         {
-            "work_item_name": "live-pickle-contract",
+            "work_item_name": "live-state-data-atomicity",
             "feature_description": (
-                "All persisted data entities should support pickle round-tripping."
+                "On entry, state data initializes as a fresh copy of the defaults "
+                "and on exit state data is removed."
             ),
         },
     )
@@ -682,22 +733,11 @@ def test_live_design_interview_inspects_intermediate_contract_outputs(
         for event in result.events
         if event.kind == "judge" and "value" in event.data
     }
-    assert result.llm_activations == 7
-    assert judge_values["semantic_kind"]["kind"] == "invariant"
-    assert "pickle" in judge_values["semantic_obligation"]["description"].lower()
-    assert any(
-        word in judge_values["semantic_population"]["population"].lower()
-        for word in ("data", "entity", "persist")
-    )
-    assert any(
-        word in judge_values["semantic_operation"]["operation"].lower()
-        for word in ("pickle", "serialize", "round-trip")
-    )
-    assert any(
-        word in judge_values["semantic_oracle"]["oracle"].lower()
-        for word in ("same", "equivalent", "equal", "preserv")
-    )
-    assert judge_values["semantic_evidence_case"]["evidence_case"].strip()
+    assert judge_values["atomicity_decision"] == {"multiple": True}
+    statements = judge_values["atomicity_split"]["statements"]
+    assert len(statements) >= 2
+    assert all(statement.strip() for statement in statements)
+    assert len(result.bindings["feature_design"]["obligations"]) == len(statements)
 
 
 def test_evaluator_tracks_operation_output_schema_on_binding() -> None:

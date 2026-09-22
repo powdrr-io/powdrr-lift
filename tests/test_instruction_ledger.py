@@ -91,3 +91,36 @@ def test_atomicity_rejects_model_authored_structural_fields() -> None:
             ledger,
             {"instruction-001": {"multiple": False, "clause_id": "invented"}},
         )
+
+
+def test_atomicity_split_preserves_each_state_data_api_requirement() -> None:
+    ledger = compile_instruction_ledger(
+        "python-statemachine-state-data-scoping",
+        "set_state_data(state, key, value) validates active state, declared key, "
+        "and DataVar type constraints, raising InvalidDefinition on violation.",
+    )
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [
+                    "set_state_data rejects an inactive state.",
+                    "set_state_data rejects an undeclared key.",
+                    "set_state_data enforces the declared DataVar type constraint.",
+                    "An invalid set_state_data call raises InvalidDefinition.",
+                ],
+            }
+        },
+    )
+
+    assert [item.text for item in split.clauses] == [
+        "set_state_data rejects an inactive state.",
+        "set_state_data rejects an undeclared key.",
+        "set_state_data enforces the declared DataVar type constraint.",
+        "An invalid set_state_data call raises InvalidDefinition.",
+    ]
+    assert all(
+        item.parent_clause_id == "candidate:instruction-001" for item in split.clauses
+    )

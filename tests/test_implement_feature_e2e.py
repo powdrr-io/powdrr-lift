@@ -94,6 +94,10 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"multiple"}:
+            return {"multiple": False}
+        if required == {"statements"}:
+            raise AssertionError("a non-multiple clause must not be split")
         if required == {"action"}:
             if "required_test_cases" in text:
                 return {
@@ -341,6 +345,31 @@ class DeterministicPlanningClient:
         if "action" in required:
             return {"action": "no_change"}
         raise AssertionError(f"unhandled planning schema: {sorted(required)}")
+
+
+class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
+    """Planning double that takes the bounded split path for one real clause."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        required = set((response_schema or {}).get("required", ()))
+        text = "\n".join(message.get("content", "") for message in messages)
+        if required == {"multiple"}:
+            return {"multiple": "set_state_data(state, key, value)" in text}
+        if required == {"statements"}:
+            return {
+                "statements": [
+                    "set_state_data rejects an inactive state.",
+                    "set_state_data rejects an undeclared key.",
+                    "set_state_data enforces the declared DataVar type constraint.",
+                    "An invalid set_state_data call raises InvalidDefinition.",
+                ]
+            }
+        return super().complete_json(messages, response_schema=response_schema)
 
 
 def _find_json_value(text: str, key: str) -> Any:
@@ -609,6 +638,60 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             text=True,
         ).stdout
     )
+
+
+def test_implement_feature_decomposes_state_data_api_requirements_before_design(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=(
+                "set_state_data(state, key, value) validates active state, declared "
+                "key, and DataVar type constraints, raising InvalidDefinition on "
+                "violation."
+            ),
+            work_item_name="state-data-atomicity",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            opencode_executable=str(fake_opencode),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=StateDataAtomicityPlanningClient(),
+        )
+    )
+
+    ledger = json.loads(
+        (
+            result.worktree
+            / ".powdrr"
+            / "feature-runs"
+            / "state-data-atomicity"
+            / "instruction-ledger.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert [clause["text"] for clause in ledger["clauses"]] == [
+        "set_state_data rejects an inactive state.",
+        "set_state_data rejects an undeclared key.",
+        "set_state_data enforces the declared DataVar type constraint.",
+        "An invalid set_state_data call raises InvalidDefinition.",
+    ]
+    assert all(
+        clause["parent_clause_id"] == "candidate:instruction-001"
+        for clause in ledger["clauses"]
+    )
+    assert result.feature_obligations_path is not None
+    design = json.loads(result.feature_obligations_path.read_text(encoding="utf-8"))
+    assert len(design["obligations"]) == 4
 
 
 def test_implement_feature_reconciles_non_required_sentence_with_design(

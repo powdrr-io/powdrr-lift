@@ -66,13 +66,19 @@ def feature_command_catalog(
                     "kind": {"type": "string", "enum": sorted(SEMANTIC_KINDS)},
                     "description": {},
                     "acceptance_criterion": {},
-                    "expected_test": {},
+                    "population": {},
+                    "operation": {},
+                    "oracle": {},
+                    "evidence_case": {},
                 },
                 required=(
                     "kind",
                     "description",
                     "acceptance_criterion",
-                    "expected_test",
+                    "population",
+                    "operation",
+                    "oracle",
+                    "evidence_case",
                 ),
                 additional_properties=False,
             ),
@@ -200,12 +206,44 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("run_code_agent"),
         ),
+        # Obligation-driven implementation flow. These commands deliberately
+        # have open object inputs/outputs at the catalog boundary because their
+        # exact evidence records are compiled from the current repository and
+        # are validated by the command implementations.
+        **{
+            name: CommandSpec(
+                name=name,
+                input_schema=object_schema({}, additional_properties=True),
+                output_schema=object_schema({}, additional_properties=True),
+                logic=implementations.get(name),
+            )
+            for name in (
+                "compile_obligation_verification_plans",
+                "evaluate_deterministic_decision",
+                "finalize_obligation_verification_plan_review",
+                "resolve_obligation_populations",
+                "finalize_population_review",
+                "run_obligation_baseline",
+                "compile_code_task_plan",
+                "finalize_code_task_plan_review",
+                "compile_code_task_preconditions",
+                "finalize_code_task_preconditions",
+                "capture_code_task_before_state",
+                "run_code_task_agent",
+                "compile_code_task_postconditions",
+                "finalize_code_task_receipt",
+                "run_final_obligation_evidence",
+                "finalize_obligation_closure",
+                "prepare_final_implementation_review",
+                "finalize_implementation_review",
+            )
+        },
         "run_validation_profile": CommandSpec(
             name="run_validation_profile",
             input_schema=object_schema(
-                {"profile": {}, "implementation": {}},
-                required=("profile", "implementation"),
-                additional_properties=False,
+                {"profile": {}, "implementation": {}, "task_receipts": {}},
+                required=("profile",),
+                additional_properties=True,
             ),
             output_schema={},
             logic=implementations.get("run_validation_profile"),
@@ -213,9 +251,9 @@ def feature_command_catalog(
         "aggregate_validation": CommandSpec(
             name="aggregate_validation",
             input_schema=object_schema(
-                {"implementation": {}, "results": {}},
-                required=("implementation", "results"),
-                additional_properties=False,
+                {"implementation": {}, "task_receipts": {}, "results": {}},
+                required=("results",),
+                additional_properties=True,
             ),
             output_schema={},
             logic=implementations.get("aggregate_validation"),
@@ -524,13 +562,6 @@ class FeatureCommandRuntime:
                 )
             except FeatureObligationError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
-            path = output_root / "canonical-feature-design.json"
-            path.write_text(
-                json.dumps(design.to_data(), indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            state["canonical_feature_design_path"] = path
-            state["feature_obligations_path"] = path
             obligations = [
                 {
                     "id": f"sentence-{index}",
@@ -557,10 +588,66 @@ class FeatureCommandRuntime:
                 tuple(state.get("provider_inventory", ())),
                 include_existing_name_hint=True,
             )
+            verification_contracts = [
+                {
+                    "id": f"contract-{item.clause_id}",
+                    "obligation_ref": f"obligation:{item.clause_id}",
+                    "population": str(
+                        raw_design_decisions[index - 1].get("population", "")
+                        if index - 1 < len(raw_design_decisions)
+                        and isinstance(raw_design_decisions[index - 1], Mapping)
+                        else ""
+                    ),
+                    "operation": str(
+                        raw_design_decisions[index - 1].get("operation", "")
+                        if index - 1 < len(raw_design_decisions)
+                        and isinstance(raw_design_decisions[index - 1], Mapping)
+                        else ""
+                    ),
+                    "oracle": str(
+                        raw_design_decisions[index - 1].get("oracle", "")
+                        if index - 1 < len(raw_design_decisions)
+                        and isinstance(raw_design_decisions[index - 1], Mapping)
+                        else ""
+                    ),
+                    "evidence_case": str(
+                        raw_design_decisions[index - 1].get("evidence_case", "")
+                        if index - 1 < len(raw_design_decisions)
+                        and isinstance(raw_design_decisions[index - 1], Mapping)
+                        else ""
+                    ),
+                }
+                for index, item in enumerate(design.projections)
+                if item.kind in SEMANTIC_KINDS - {"nonactionable"}
+            ]
+            canonical_document = design.to_data()
+            canonical_document["verification_contracts"] = verification_contracts
+            path = output_root / "canonical-feature-design.json"
+            path.write_text(
+                json.dumps(canonical_document, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            compatibility_packets = {
+                "packets": [
+                    {
+                        "obligation_id": f"obligation:{index:03d}",
+                        "description": item["description"],
+                        "evidence_refs": [f"canonical:{item['design']['clause_id']}"],
+                    }
+                    for index, item in enumerate(obligations, start=1)
+                ]
+            }
+            (output_root / "obligation-review-packets.json").write_text(
+                json.dumps(compatibility_packets, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            state["canonical_feature_design_path"] = path
+            state["feature_obligations_path"] = path
             return {
                 "path": str(path),
-                "fingerprint": content_fingerprint(design.to_data()),
+                "fingerprint": content_fingerprint(canonical_document),
                 "obligations": obligations,
+                "verification_contracts": verification_contracts,
                 "required_test_cases": required_test_cases,
             }
 
@@ -707,6 +794,46 @@ class FeatureCommandRuntime:
                 state=state,
                 parameters=parameters,
             )
+        if name in {
+            "compile_obligation_verification_plans",
+            "resolve_obligation_populations",
+            "run_obligation_baseline",
+            "compile_code_task_plan",
+            "compile_code_task_preconditions",
+            "capture_code_task_before_state",
+            "run_code_task_agent",
+            "compile_code_task_postconditions",
+            "run_final_obligation_evidence",
+            "prepare_final_implementation_review",
+        }:
+            handler = getattr(feature_endpoint, f"_{name}")
+            return handler(
+                parameters,
+                config=config,
+                runner=runner,
+                worktree=worktree,
+                output_root=output_root,
+                branch=branch,
+                slug=slug,
+                state=state,
+            )
+        if name == "evaluate_deterministic_decision":
+            return feature_endpoint._evaluate_deterministic_decision(parameters)
+        if name in {
+            "finalize_obligation_verification_plan_review",
+            "finalize_population_review",
+            "finalize_code_task_plan_review",
+            "finalize_code_task_preconditions",
+            "finalize_code_task_receipt",
+            "finalize_obligation_closure",
+            "finalize_implementation_review",
+        }:
+            result = getattr(feature_endpoint, f"_{name}")(
+                parameters, output_root=output_root
+            )
+            if name == "finalize_implementation_review":
+                state["review"] = {"passed": result.get("accepted") is True, **result}
+            return result
         if name == "run_validation_profile":
             return feature_endpoint._run_validation_profile(
                 parameters, worktree=worktree, state=state
@@ -897,8 +1024,31 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
     kind = parameters.get("kind")
     description = parameters.get("description")
     acceptance_criterion = parameters.get("acceptance_criterion")
-    expected_test = parameters.get("expected_test")
-    values = (kind, description, acceptance_criterion, expected_test)
+    population = parameters.get("population")
+    operation = parameters.get("operation")
+    oracle = parameters.get("oracle")
+    evidence_case = parameters.get("evidence_case")
+    legacy_expected_test = parameters.get("expected_test")
+    if all(
+        isinstance(value, str) and value.strip()
+        for value in (kind, description, acceptance_criterion, legacy_expected_test)
+    ) and not all(
+        isinstance(value, str) and value.strip()
+        for value in (population, operation, oracle, evidence_case)
+    ):
+        population = "the implementation covered by this clause"
+        operation = "execute the clause's verification test"
+        oracle = acceptance_criterion
+        evidence_case = legacy_expected_test
+    values = (
+        kind,
+        description,
+        acceptance_criterion,
+        population,
+        operation,
+        oracle,
+        evidence_case,
+    )
     if any(not isinstance(value, str) or not value.strip() for value in values):
         raise PowdrrExecutionError(
             "merge_semantic_design requires non-empty semantic fields"
@@ -909,7 +1059,14 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
         "kind": kind,
         "description": description,
         "acceptance_criterion": acceptance_criterion,
-        "expected_test": expected_test,
+        # The legacy feature-design compiler still requires expected_test. Keep
+        # it compiler-owned by deriving it from the model's evidence contract;
+        # the model never supplies a selector or executable test identity.
+        "expected_test": f"{evidence_case} Oracle: {oracle}",
+        "population": population,
+        "operation": operation,
+        "oracle": oracle,
+        "evidence_case": evidence_case,
     }
 
 

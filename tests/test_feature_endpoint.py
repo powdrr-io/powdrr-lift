@@ -811,21 +811,18 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert not any(Path("docs/proposals").glob("*/procedrr-flow.yaml"))
 
     flow = path.read_text(encoding="utf-8")
-    assert "id: worker-validation-review" in flow
-    assert "max_attempts: 4" in flow
-    assert "recovery: worker-repair" in flow
-    assert "max_iterations: 4" in flow
+    assert "command: [finalize_implementation_review]" in flow
+    assert "max_items: 512" in flow
     assert "command: [discover_validation_profiles]" in flow
     assert "command: [run_validation_profile]" in flow
     assert "command: [aggregate_validation]" in flow
-    assert "command: [prepare_implementation_review]" in flow
-    assert "command: [aggregate_intent_review]" in flow
+    assert "command: [prepare_final_implementation_review]" in flow
     assert (
         "command: [compile_verification_obligations]" in flow
         and "feature_description: {type: reference, value: feature_description}" in flow
     )
     assert "provider: opencode" not in flow
-    assert flow.count("command: [run_code_agent]") == 5
+    assert "command: [run_code_task_agent]" in flow
 
 
 def test_required_test_obligation_compiles_against_discovered_inventory() -> None:

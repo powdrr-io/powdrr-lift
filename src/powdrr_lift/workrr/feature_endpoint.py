@@ -3876,12 +3876,16 @@ def _compile_obligation_verification_plans(
             "contract_refs": [str(contract.get("id", f"contract-{obligation_id}"))],
         }
         plans.append(plan)
+        population_text = str(plan["population"])
+        operation_text = str(plan["operation"])
+        oracle_text = str(plan["oracle"])
+        evidence_text = str(plan["evidence_case"])
         for check, value in (
             ("has_contract", bool(contract)),
-            ("has_population", bool(plan["population"].strip())),
-            ("has_operation", bool(plan["operation"].strip())),
-            ("has_oracle", bool(plan["oracle"].strip())),
-            ("has_evidence", bool(plan["evidence_case"].strip())),
+            ("has_population", bool(population_text.strip())),
+            ("has_operation", bool(operation_text.strip())),
+            ("has_oracle", bool(oracle_text.strip())),
+            ("has_evidence", bool(evidence_text.strip())),
         ):
             decisions.append(
                 {
@@ -3926,7 +3930,8 @@ def _resolve_obligation_populations(
                 "decision_id": f"{obligation_id}:population-nonempty",
                 "check": "population_complete",
                 "passed": bool(
-                    population["selector"].strip() and member["description"].strip()
+                    str(population["selector"]).strip()
+                    and str(member["description"]).strip()
                 ),
                 "obligation_id": obligation_id,
             }
@@ -3976,8 +3981,11 @@ def _run_obligation_baseline(
         "case_results": case_results,
         "failing_cases": failing,
     }
-    path, _ = _write_flow_artifact(output_root, "obligation-baseline.json", document)
-    return {"path": path, **document}
+    baseline_artifact = _write_flow_artifact(
+        output_root, "obligation-baseline.json", document
+    )
+    baseline_artifact_path: str = baseline_artifact[0]
+    return {"path": baseline_artifact_path, **document}
 
 
 def _compile_code_task_plan(
@@ -4118,20 +4126,24 @@ def _compile_code_task_preconditions(
     parameters: Mapping[str, Any], **_: Any
 ) -> dict[str, Any]:
     task = parameters.get("task")
-    valid = isinstance(task, Mapping)
+    task_mapping = task if isinstance(task, Mapping) else None
+    valid = task_mapping is not None
     return {
         "decisions": [
             {
                 "decision_id": "task:valid",
                 "check": "task_assignment",
                 "passed": valid
-                and bool(task.get("task_id"))
-                and bool(task.get("validator")),
+                and bool(task_mapping and task_mapping.get("task_id"))
+                and bool(task_mapping and task_mapping.get("validator")),
             },
             {
                 "decision_id": "task:scope",
                 "check": "scope_bounded",
-                "passed": valid and isinstance(task.get("allowed_paths"), list),
+                "passed": valid
+                and isinstance(
+                    task_mapping and task_mapping.get("allowed_paths"), list
+                ),
             },
         ]
     }
@@ -4342,10 +4354,11 @@ def _run_final_obligation_evidence(
             for index, item in enumerate(results, start=1)
         ],
     }
-    path, _ = _write_flow_artifact(
+    final_artifact = _write_flow_artifact(
         output_root, "final-obligation-evidence.json", document
     )
-    return {"path": path, **document}
+    final_artifact_path: str = final_artifact[0]
+    return {"path": final_artifact_path, **document}
 
 
 def _finalize_obligation_closure(

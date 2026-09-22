@@ -6,7 +6,7 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.feature_obligation import (
@@ -632,7 +632,14 @@ class FeatureCommandRuntime:
                     {
                         "obligation_id": f"obligation:{index:03d}",
                         "description": item["description"],
-                        "evidence_refs": [f"canonical:{item['design']['clause_id']}"],
+                        "evidence_refs": [
+                            "canonical:"
+                            + str(
+                                cast(Any, item.get("design", {})).get("clause_id", "")
+                            )
+                            if isinstance(cast(Any, item.get("design")), Mapping)
+                            else "canonical:unknown"
+                        ],
                     }
                     for index, item in enumerate(obligations, start=1)
                 ]

@@ -1850,6 +1850,18 @@ def _execution_unit_for_code_task(
     )
 
 
+def _is_repository_workflow_objective(value: Any) -> bool:
+    """Identify instructions about git/PR mechanics rather than product work."""
+    if not isinstance(value, str):
+        return False
+    text = value.casefold()
+    workflow_nouns = ("branch", "commit", "pull request", "git", "repository")
+    workflow_verbs = ("create", "make", "open", "commit", "push", "checkout", "verify")
+    return any(noun in text for noun in workflow_nouns) and any(
+        re.search(rf"\b{re.escape(verb)}\b", text) for verb in workflow_verbs
+    )
+
+
 def _feature_obligation_path(value: Any) -> str | None:
     if not isinstance(value, Mapping):
         return None
@@ -4099,22 +4111,52 @@ def _compile_code_task_plan(
     )
     plans = _flow_items(parameters.get("verification_plans"))
     tasks: list[dict[str, Any]] = []
+    rejected_tasks: list[dict[str, str]] = []
     for index, failure in enumerate(failures, start=1):
         obligation_id = str(
             failure.get("obligation_id", failure.get("obligation_ref", ""))
         )
         source = next(
             (item for item in plans if item.get("obligation_id") == obligation_id),
-            plans[0] if plans else {},
+            {},
         )
         evidence_case = str(source.get("evidence_case", "")).strip()
-        description = str(source.get("description", "")).strip()
-        objective = description or (
-            f"Repair the failing obligation by satisfying: {evidence_case}"
-            if evidence_case
-            else "Repair the failing obligation"
+        operation = str(source.get("operation", "")).strip()
+        oracle = str(source.get("oracle", "")).strip()
+        objective_basis = oracle or operation
+        objective = (
+            f"Implement the failing product behavior: {objective_basis}"
+            if objective_basis
+            else ""
         )
         acceptance_criterion = str(source.get("acceptance_criterion", "")).strip()
+        acceptance_criteria = [
+            item
+            for item in (
+                acceptance_criterion,
+                f"The implementation must {oracle}." if oracle else "",
+                f"The focused validator must pass: {evidence_case}."
+                if evidence_case
+                else "",
+            )
+            if item
+        ]
+        if (
+            not obligation_id
+            or not objective
+            or not evidence_case
+            or not acceptance_criteria
+        ):
+            rejected_tasks.append(
+                {
+                    "candidate": f"code-task-{index:03d}",
+                    "reason": (
+                        "missing product objective, acceptance contract, or "
+                        "focused validator"
+                    ),
+                }
+            )
+            continue
         tasks.append(
             {
                 "task_id": f"code-task-{index:03d}",
@@ -4122,9 +4164,7 @@ def _compile_code_task_plan(
                 "obligation_refs": [obligation_id] if obligation_id else [],
                 "allowed_paths": list(getattr(config, "allowed_paths", ())),
                 "validation_profiles": ["pytest"],
-                "acceptance_criteria": (
-                    [acceptance_criterion] if acceptance_criterion else []
-                ),
+                "acceptance_criteria": acceptance_criteria,
                 "planned_additions": [],
                 "planned_deletions": [],
                 "must_preserve": [],
@@ -4149,13 +4189,20 @@ def _compile_code_task_plan(
                 and bool(str(item.get("objective", "")).strip())
                 and bool(item.get("obligation_refs"))
                 and bool(item.get("validator"))
+                and bool(
+                    str(item.get("validator", {}).get("evidence_case", "")).strip()
+                )
+                and isinstance(item.get("acceptance_criteria"), list)
+                and bool(item.get("acceptance_criteria"))
                 and isinstance(item.get("allowed_paths"), list)
                 for item in tasks
-            ),
+            )
+            and not rejected_tasks,
         }
     ]
     document = {
         "tasks": tasks,
+        "rejected_tasks": rejected_tasks,
         "structural_decisions": decisions,
         "semantic_worklist": {"specifications": []},
     }
@@ -4240,6 +4287,17 @@ def _compile_code_task_preconditions(
     task = parameters.get("task")
     task_mapping = task if isinstance(task, Mapping) else None
     valid = task_mapping is not None
+    validator = (
+        task_mapping.get("validator") if isinstance(task_mapping, Mapping) else None
+    )
+    objective = (
+        task_mapping.get("objective") if isinstance(task_mapping, Mapping) else None
+    )
+    acceptance_criteria = (
+        task_mapping.get("acceptance_criteria")
+        if isinstance(task_mapping, Mapping)
+        else None
+    )
     return {
         "decisions": [
             {
@@ -4253,9 +4311,23 @@ def _compile_code_task_preconditions(
                 "decision_id": "task:objective",
                 "check": "objective_nonempty",
                 "passed": valid
-                and bool(
-                    task_mapping and str(task_mapping.get("objective", "")).strip()
-                ),
+                and bool(str(objective or "").strip())
+                and not _is_repository_workflow_objective(objective),
+            },
+            {
+                "decision_id": "task:acceptance",
+                "check": "acceptance_contract",
+                "passed": valid
+                and isinstance(acceptance_criteria, list)
+                and bool(acceptance_criteria)
+                and all(str(item).strip() for item in acceptance_criteria),
+            },
+            {
+                "decision_id": "task:validator",
+                "check": "validator_evidence",
+                "passed": valid
+                and isinstance(validator, Mapping)
+                and bool(str(validator.get("evidence_case", "")).strip()),
             },
             {
                 "decision_id": "task:scope",

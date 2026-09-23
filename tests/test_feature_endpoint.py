@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from contextlib import redirect_stdout
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -39,6 +40,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _compile_code_task_plan,
     _compile_code_task_preconditions,
     _compile_feature_obligations,
     _create_pr_changelog,
@@ -1591,6 +1593,42 @@ def test_code_task_preconditions_reject_empty_objective() -> None:
 
     decisions = {item["check"]: item["passed"] for item in result["decisions"]}
     assert decisions["objective_nonempty"] is False
+
+
+def test_code_task_plan_skips_invalid_candidate_and_keeps_valid_tasks(
+    tmp_path: Path,
+) -> None:
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {
+                "failing_cases": [
+                    {"obligation_id": "missing-plan"},
+                    {"obligation_id": "valid-plan"},
+                ]
+            },
+            "verification_plans": [
+                {
+                    "obligation_id": "valid-plan",
+                    "operation": "implement the greeting behavior",
+                    "oracle": "the output contains the requested greeting",
+                    "evidence_case": "Run the greeting contract test.",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("hello_world.py",)),
+    )
+
+    assert [item["task_id"] for item in result["tasks"]] == ["code-task-002"]
+    assert result["rejected_tasks"] == [
+        {
+            "candidate": "code-task-001",
+            "reason": (
+                "missing product objective, acceptance contract, or focused validator"
+            ),
+        }
+    ]
+    assert result["structural_decisions"][0]["passed"] is False
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

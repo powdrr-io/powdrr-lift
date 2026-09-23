@@ -22,10 +22,7 @@ from powdrr_lift.core.decision_obligation import (
     evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
-from powdrr_lift.core.implementation_packet import (
-    ImplementationPacket,
-    compile_implementation_packet,
-)
+from powdrr_lift.core.implementation_packet import compile_implementation_packet
 from powdrr_lift.core.obligation_review import (
     ObligationEvidencePacket,
     ObligationReviewError,
@@ -1806,27 +1803,50 @@ def _require_feature_obligations(value: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(descriptions))
 
 
-def _implementation_packet_for_code_task(
-    packet: ImplementationPacket,
+def _execution_unit_for_code_task(
     task: Mapping[str, Any],
-) -> ImplementationPacket:
-    """Focus packet metadata on the current code task.
+    *,
+    slug: str,
+    default_paths: Sequence[str],
+    default_profiles: Sequence[str],
+    source_refs: Sequence[str],
+) -> ExecutionUnit:
+    """Compile the accepted task record into its worker execution unit.
 
-    A verification obligation can produce several code tasks (for example,
-    when several failing cases exercise the same feature obligation).  Task
-    ordinals therefore identify the required-test contract, not necessarily a
-    distinct implementation obligation.  Keep the obligation focus bounded to
-    the available packet obligations while retaining the task's test contract.
+    Code tasks are produced from verification failures, not from the
+    proposal-operation units. Selecting a proposal unit by parsing the task
+    ordinal can therefore send a task the wrong objective and repeat unrelated
+    instructions. The task record is already the authoritative bounded
+    handoff, so compile the worker unit directly from it.
     """
-    task_id = str(task.get("task_id", ""))
-    try:
-        task_index = int(task_id.rsplit("-", 1)[-1]) - 1
-    except ValueError:
-        task_index = 0
-    obligation_ordinal = min(task_index + 1, len(packet.obligations))
-    return packet.for_obligation(
-        obligation_ordinal,
-        required_test_ordinal=task_index + 1,
+
+    def strings(name: str, default: Sequence[str] = ()) -> tuple[str, ...]:
+        value = task.get(name)
+        if not isinstance(value, (list, tuple)):
+            value = default
+        return tuple(str(item) for item in value if str(item).strip())
+
+    def mappings(name: str) -> tuple[dict[str, Any], ...]:
+        value = task.get(name)
+        if not isinstance(value, (list, tuple)):
+            return ()
+        return tuple(dict(item) for item in value if isinstance(item, Mapping))
+
+    task_id = str(task.get("task_id", "")).strip()
+    objective = str(task.get("objective", "")).strip()
+    if not task_id or not objective:
+        raise PowdrrExecutionError("code task is missing task_id or objective")
+    return ExecutionUnit(
+        unit_id=f"implement-{slug}-{task_id}",
+        objective=objective,
+        paths=strings("allowed_paths", default_paths),
+        validation_profiles=strings("validation_profiles", default_profiles),
+        acceptance_criteria=strings("acceptance_criteria"),
+        planned_additions=mappings("planned_additions"),
+        planned_deletions=mappings("planned_deletions"),
+        must_preserve=strings("must_preserve"),
+        non_goals=strings("non_goals"),
+        source_refs=tuple(dict.fromkeys((*source_refs, *strings("source_refs")))),
     )
 
 
@@ -1985,14 +2005,15 @@ def _run_code_agent_phase(
     )
     code_task = parameters.get("task")
     if isinstance(code_task, Mapping):
-        task_id = str(code_task.get("task_id", ""))
-        try:
-            task_index = int(task_id.rsplit("-", 1)[-1]) - 1
-        except ValueError:
-            task_index = 0
-        if not 0 <= task_index < len(units):
-            raise PowdrrExecutionError(f"code task {task_id!r} has no execution unit")
-        units = (units[task_index],)
+        units = (
+            _execution_unit_for_code_task(
+                code_task,
+                slug=slug,
+                default_paths=config.allowed_paths,
+                default_profiles=state["validation_profile_names"],
+                source_refs=source_context,
+            ),
+        )
     try:
         implementation_packet = compile_implementation_packet(
             objective=feature_description,
@@ -2078,11 +2099,7 @@ def _run_code_agent_phase(
         request = replace(
             request,
             implementation_packet=(
-                implementation_packet
-                if repair_mode or not isinstance(code_task, Mapping)
-                else _implementation_packet_for_code_task(
-                    implementation_packet, code_task
-                )
+                None if isinstance(code_task, Mapping) else implementation_packet
             ),
         )
         if repair_mode:
@@ -4090,16 +4107,24 @@ def _compile_code_task_plan(
             (item for item in plans if item.get("obligation_id") == obligation_id),
             plans[0] if plans else {},
         )
+        evidence_case = str(source.get("evidence_case", "")).strip()
+        description = str(source.get("description", "")).strip()
+        objective = description or (
+            f"Repair the failing obligation by satisfying: {evidence_case}"
+            if evidence_case
+            else "Repair the failing obligation"
+        )
+        acceptance_criterion = str(source.get("acceptance_criterion", "")).strip()
         tasks.append(
             {
                 "task_id": f"code-task-{index:03d}",
-                "objective": str(
-                    source.get("description", "Repair the failing obligation")
-                ),
+                "objective": objective,
                 "obligation_refs": [obligation_id] if obligation_id else [],
                 "allowed_paths": list(getattr(config, "allowed_paths", ())),
                 "validation_profiles": ["pytest"],
-                "acceptance_criteria": [str(source.get("acceptance_criterion", ""))],
+                "acceptance_criteria": (
+                    [acceptance_criterion] if acceptance_criterion else []
+                ),
                 "planned_additions": [],
                 "planned_deletions": [],
                 "must_preserve": [],
@@ -4107,7 +4132,7 @@ def _compile_code_task_plan(
                 "source_refs": ["obligation-baseline"],
                 "validator": {
                     "kind": "focused-contract",
-                    "evidence_case": str(source.get("evidence_case", "")),
+                    "evidence_case": evidence_case,
                 },
                 "dependencies": [],
             }

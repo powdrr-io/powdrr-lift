@@ -602,6 +602,7 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     prompt = (run_root / "artifacts" / "prompts").glob("*.txt")
     prompt_text = next(prompt).read_text(encoding="utf-8")
     assert "Implement execution unit" in prompt_text
+    assert "Repair the failing obligation" in prompt_text
     assert "Obligations (in compiler order):" not in prompt_text
     assert "function name must start with `test_" not in prompt_text
     assert "create the exact selectors" not in prompt_text

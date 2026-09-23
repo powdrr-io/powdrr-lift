@@ -82,29 +82,3 @@ def test_packet_can_focus_one_obligation_and_its_matching_test() -> None:
     assert focused.required_tests[0]["description"] == "Verify reset."
     assert "Initialize data." not in focused.render()
     assert "Verify initialization." not in focused.render()
-
-
-def test_packet_can_focus_one_obligation_with_a_later_task_test() -> None:
-    packet = compile_implementation_packet(
-        objective="Add state data support.",
-        obligations=("Initialize data.",),
-        required_tests=(
-            {
-                "description": "Verify the first failing case.",
-                "provider": "pytest",
-                "profile": "pytest",
-            },
-            {
-                "description": "Verify the second failing case.",
-                "provider": "pytest",
-                "profile": "pytest",
-            },
-        ),
-        allowed_paths=("src/state.py",),
-        validation_profiles=("pytest",),
-    )
-
-    focused = packet.for_obligation(1, required_test_ordinal=2)
-
-    assert focused.obligations == ("Initialize data.",)
-    assert focused.required_tests[0]["description"] == "Verify the second failing case."

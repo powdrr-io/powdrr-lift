@@ -43,6 +43,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _compile_code_task_plan,
     _compile_code_task_preconditions,
     _compile_feature_obligations,
+    _compile_obligation_verification_plans,
     _create_pr_changelog,
     _derive_feature_test_contracts,
     _ensure_current_baseline,
@@ -1661,6 +1662,73 @@ def test_code_task_plan_never_compiles_non_product_obligations(
             "reason": "clause is not a product implementation obligation",
         }
     ]
+
+
+def test_verification_plan_compiler_skips_terminal_nonactionable_obligations(
+    tmp_path: Path,
+) -> None:
+    result = _compile_obligation_verification_plans(
+        {
+            "obligations": [
+                {
+                    "obligation_id": "hash-process",
+                    "contract_id": "test-sentence-1",
+                    "semantic_kind": "nonactionable",
+                    "description": "Ignore the branch instruction.",
+                },
+                {
+                    "obligation_id": "hash-feature",
+                    "contract_id": "test-sentence-2",
+                    "semantic_kind": "feature",
+                    "description": "Implement state data.",
+                    "acceptance_criterion": "State data works.",
+                },
+            ],
+            "feature_design": {
+                "verification_contracts": [
+                    {
+                        "id": "test-sentence-1",
+                        "kind": "nonactionable",
+                        "operation": "trace-only: no product operation",
+                        "oracle": "This clause has no product success predicate.",
+                        "evidence_case": "No product evidence case is required.",
+                    },
+                    {
+                        "id": "test-sentence-2",
+                        "kind": "feature",
+                        "operation": "Enter a state with data.",
+                        "oracle": "The state data is available.",
+                        "evidence_case": "Enter one state with data.",
+                    },
+                ]
+            },
+        },
+        output_root=tmp_path,
+    )
+
+    assert [item["obligation_id"] for item in result["plans"]] == ["hash-feature"]
+
+
+def test_code_task_plan_skips_trace_only_contract_without_kind(
+    tmp_path: Path,
+) -> None:
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {"failing_cases": [{"obligation_id": "trace-only"}]},
+            "verification_plans": [
+                {
+                    "obligation_id": "trace-only",
+                    "operation": "trace-only: no product operation",
+                    "oracle": "This clause has no product success predicate.",
+                    "evidence_case": "No product evidence case is required.",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("hello_world.py",)),
+    )
+
+    assert result["tasks"] == []
 
 
 def test_code_task_plan_skips_workrr_workflow_candidate_as_no_op(

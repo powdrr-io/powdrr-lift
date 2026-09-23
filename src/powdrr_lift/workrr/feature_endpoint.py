@@ -1224,14 +1224,21 @@ def _compile_verification_obligations(
     active = _resolve_feature_intent(
         worktree, baseline_document=baseline, feature_document=plan
     )
+    candidate_mappings = _merge_contract_mappings(
+        _mapping_values(baseline.get("required_test_cases")),
+        _mapping_values(plan.get("required_test_cases")),
+    )
     candidate_contracts = _verification_contracts(
-        _merge_contract_mappings(
-            _mapping_values(baseline.get("required_test_cases")),
-            _mapping_values(plan.get("required_test_cases")),
+        tuple(
+            item for item in candidate_mappings if not _is_nonactionable_contract(item)
         )
     )
     previous_contracts = _verification_contracts(
-        _mapping_values(baseline.get("required_test_cases"))
+        tuple(
+            item
+            for item in _mapping_values(baseline.get("required_test_cases"))
+            if not _is_nonactionable_contract(item)
+        )
     )
     relationships = tuple(
         _mapping_values(baseline.get("entity_relationships"))
@@ -1860,6 +1867,31 @@ def _is_repository_workflow_objective(value: Any) -> bool:
     return any(noun in text for noun in workflow_nouns) and any(
         re.search(rf"\b{re.escape(verb)}\b", text) for verb in workflow_verbs
     )
+
+
+def _is_trace_only_verification_plan(value: Mapping[str, Any]) -> bool:
+    """Reject verification plans that explicitly describe no product behavior."""
+    kind = str(value.get("kind", value.get("semantic_kind", ""))).casefold()
+    if kind in {"nonactionable", "non_goal", "guidance"}:
+        return True
+    text = " ".join(
+        str(value.get(field, ""))
+        for field in ("operation", "oracle", "evidence_case", "population")
+    ).casefold()
+    return (
+        "trace-only" in text
+        or "no product" in text
+        or "process instruction" in text
+        or "no product success predicate" in text
+    )
+
+
+def _is_nonactionable_contract(value: Mapping[str, Any]) -> bool:
+    """Keep terminal semantic dispositions out of executable validation."""
+    kind = str(value.get("kind", value.get("semantic_kind", ""))).casefold()
+    if kind in {"nonactionable", "non_goal", "guidance"}:
+        return True
+    return _is_trace_only_verification_plan(value)
 
 
 def _feature_obligation_path(value: Any) -> str | None:
@@ -3964,16 +3996,27 @@ def _compile_obligation_verification_plans(
         else []
     )
     by_ref = {str(item.get("obligation_ref")): item for item in contracts}
+    by_id = {str(item.get("id")): item for item in contracts}
     plans: list[dict[str, Any]] = []
     decisions: list[dict[str, Any]] = []
     for index, obligation in enumerate(obligations):
         obligation_id = str(obligation.get("obligation_id", ""))
-        kind = str(obligation.get("kind", "")).strip()
+        contract = by_ref.get(
+            obligation_id,
+            by_id.get(str(obligation.get("contract_id", "")), {}),
+        )
+        if not contract and index < len(contracts):
+            candidate = contracts[index]
+            if not _is_trace_only_verification_plan(candidate):
+                contract = candidate
+        kind = str(
+            obligation.get(
+                "kind",
+                obligation.get("semantic_kind", contract.get("kind", "")),
+            )
+        ).strip()
         if kind in {"nonactionable", "non_goal", "guidance"}:
             continue
-        contract = by_ref.get(
-            obligation_id, contracts[index] if index < len(contracts) else {}
-        )
         plan = {
             "obligation_id": obligation_id,
             "kind": kind,
@@ -4126,7 +4169,9 @@ def _compile_code_task_plan(
             {},
         )
         kind = str(source.get("kind", failure.get("kind", ""))).strip()
-        if kind and kind not in {"entity", "feature", "interface", "invariant"}:
+        if (
+            kind and kind not in {"entity", "feature", "interface", "invariant"}
+        ) or _is_trace_only_verification_plan(source):
             no_op_tasks.append(
                 {
                     "candidate": f"code-task-{index:03d}",

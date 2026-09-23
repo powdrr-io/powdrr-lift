@@ -1,0 +1,60 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 796
+title: Plan local semantic classifier implementation
+intent:
+  problem: The source-anchored semantic contract design identifies classifiers and extractors that could move away from general LLMs, but it does not specify model architecture, gold-data construction, training, calibration, CPU deployment, or the evidence required to prove a local model is at least as accurate.
+  goal: Define an implementation-grade plan for deterministic rules and custom local clause, span, and semantic-pair models that match or exceed the current LLM baseline while running substantially faster on ordinary CPU hardware.
+human-decisions:
+  - id: use-cpu-first-classifier-portfolio
+    summary: Build separate CPU-first clause, exact-span, and semantic-pair model bundles rather than one generative model or one model per decision.
+  - id: require-llm-noninferiority-before-promotion
+    summary: Promote each local decision kind only after a frozen gold evaluation shows accuracy at least as high as the current LLM with critical-label, abstention, latency, and system-level gates.
+  - id: keep-gpu-training-optional-for-runtime
+    summary: Recommend GPU acceleration for repeatable transformer training while requiring all production inference to qualify on ordinary CPU profiles.
+structured_files: []
+files:
+  - path: docs/plans/local-semantic-classifier-implementation-plan.md
+    type: added
+    summary: Map every semantic classifier and extractor to deterministic or learned providers and define datasets, training, calibration, evaluation, CPU optimization, hardware, runtime, monitoring, and an eight-PR delivery sequence.
+    rationale: Give future agents enough concrete architecture and validation detail to build faster local classifiers without redefining labels, inventing evaluation policy, or assuming GPU inference.
+    span:
+      start_line: 1
+      end_line: 1367
+    related:
+      entities:
+        - local-semantic-classifier-implementation-plan
+      decisions:
+        - use-cpu-first-classifier-portfolio
+        - require-llm-noninferiority-before-promotion
+        - keep-gpu-training-optional-for-runtime
+      invariants:
+        - local-classifiers-preserve-provider-neutral-semantics
+        - classifier-promotion-requires-noninferiority
+        - production-classification-remains-cpu-capable
+      guidance:
+        - prefer-smallest-qualified-classifier
+entities:
+  - id: local-semantic-classifier-implementation-plan
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: local-classifiers-preserve-provider-neutral-semantics
+    action: added
+    description: Deterministic rules, local models, Jev, and planning LLMs use the same decision labels, abstention outcomes, and bound semantic-decision envelope without changing Procedrr control flow.
+    rationale: Allow provider replacement without changing durable intent meaning or contract assembly.
+  - id: classifier-promotion-requires-noninferiority
+    action: added
+    description: A local classifier decision kind is promoted only when frozen held-out evidence shows accepted and hybrid accuracy at least as high as the current LLM baseline while preserving critical-label precision and intent-expansion and narrowing limits.
+    rationale: Speed improvements must not come from accepting less accurate semantic decisions.
+  - id: production-classification-remains-cpu-capable
+    action: added
+    description: Every promoted production model must satisfy accuracy, latency, memory, and semantic-equivalence gates on declared ordinary CPU profiles even when GPU acceleration is used for training.
+    rationale: Keep local inference deployable without specialized production hardware.
+guidance:
+  - id: prefer-smallest-qualified-classifier
+    action: added
+    description: Start with deterministic and simple baselines, use 33M-parameter CPU-first encoders for learned tasks, and adopt ModernBERT-base only for demonstrated model-capacity failures that justify its higher resource cost.
+    rationale: Minimize latency and operational complexity while meeting measured semantic accuracy.
+features: []
+proposed_prs: []

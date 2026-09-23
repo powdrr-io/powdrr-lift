@@ -110,6 +110,36 @@ def test_nonactionable_clause_is_trace_only() -> None:
     assert len(design.test_contracts) == 1
 
 
+def test_workflow_clause_is_terminal_even_when_model_calls_it_a_feature() -> None:
+    ledger = compile_instruction_ledger(
+        "feature",
+        "Implement state data. Create a branch from main and commit everything.",
+    )
+    semantic = [
+        {
+            "design": {
+                "kind": "feature",
+                "description": "Implement state data.",
+                "acceptance_criterion": "State data works.",
+                "expected_test": "Test state data.",
+            }
+        },
+        {
+            "design": {
+                "kind": "feature",
+                "description": "Create a branch from main and commit everything.",
+                "acceptance_criterion": "The branch and commit exist.",
+                "expected_test": "Verify the commit.",
+            }
+        },
+    ]
+
+    design = compile_feature_design(ledger, "feature", semantic)
+
+    assert design.projections[1].kind == "nonactionable"
+    assert [item.clause_id for item in design.obligations] == ["instruction-001"]
+
+
 def test_non_goal_cannot_invert_a_missing_capability_into_a_prohibition() -> None:
     ledger = compile_instruction_ledger("feature", "States lack data ownership.")
     semantic = [

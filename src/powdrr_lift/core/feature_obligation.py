@@ -27,6 +27,25 @@ ACTIONABLE_KINDS = frozenset(
 )
 SEMANTIC_KINDS = ACTIONABLE_KINDS | {"nonactionable"}
 
+# These instructions belong to the surrounding delivery workflow.  They are
+# deliberately recognized by the compiler as a safety net: a model that
+# misclassifies one of them must not be able to turn it into product work.
+_NONACTIONABLE_PHRASES = (
+    "create a branch",
+    "make a branch",
+    "switch to a branch",
+    "commit the changes",
+    "commit everything",
+    "push the changes",
+    "open a pull request",
+    "open a pr",
+    "merge the pull request",
+    "merge the pr",
+    "report the result",
+    "run this with",
+    "use tool",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class DesignProjection:
@@ -76,6 +95,7 @@ class FeatureObligation:
             "obligation_id": self.obligation_id,
             "clause_id": self.clause_id,
             "design_id": self.projection.design_id,
+            "kind": self.projection.kind,
             "description": self.projection.description,
             "acceptance_criterion": self.projection.acceptance_criterion,
             "expected_test": self.projection.expected_test,
@@ -233,9 +253,12 @@ def compile_feature_design(
             raise FeatureObligationError(
                 f"missing semantic design for {clause.clause_id}"
             )
+        kind = _required_text(design, "kind")
+        if _is_nonactionable_clause(clause.text):
+            kind = "nonactionable"
         projection = DesignProjection(
             clause_id=clause.clause_id,
-            kind=_required_text(design, "kind"),
+            kind=kind,
             description=_required_text(design, "description"),
             acceptance_criterion=_required_text(design, "acceptance_criterion"),
             expected_test=_required_text(design, "expected_test"),
@@ -296,6 +319,11 @@ def _is_explicit_product_prohibition(text: str) -> bool:
         "exclude ",
     )
     return any(marker in lowered for marker in markers)
+
+
+def _is_nonactionable_clause(text: str) -> bool:
+    lowered = " ".join(text.casefold().split())
+    return any(phrase in lowered for phrase in _NONACTIONABLE_PHRASES)
 
 
 def _required_text(raw: Mapping[str, Any], key: str) -> str:

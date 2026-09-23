@@ -1609,6 +1609,7 @@ def test_code_task_plan_skips_invalid_candidate_and_keeps_valid_tasks(
             "verification_plans": [
                 {
                     "obligation_id": "valid-plan",
+                    "kind": "feature",
                     "operation": "implement the greeting behavior",
                     "oracle": "the output contains the requested greeting",
                     "evidence_case": "Run the greeting contract test.",
@@ -1629,6 +1630,37 @@ def test_code_task_plan_skips_invalid_candidate_and_keeps_valid_tasks(
         }
     ]
     assert result["structural_decisions"][0]["passed"] is False
+
+
+def test_code_task_plan_never_compiles_non_product_obligations(
+    tmp_path: Path,
+) -> None:
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {
+                "failing_cases": [{"obligation_id": "workflow-plan"}]
+            },
+            "verification_plans": [
+                {
+                    "obligation_id": "workflow-plan",
+                    "kind": "nonactionable",
+                    "operation": "create a branch and commit everything",
+                    "oracle": "the commit exists",
+                    "evidence_case": "Verify the workflow commit.",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("hello_world.py",)),
+    )
+
+    assert result["tasks"] == []
+    assert result["no_op_tasks"] == [
+        {
+            "candidate": "code-task-001",
+            "reason": "clause is not a product implementation obligation",
+        }
+    ]
 
 
 def test_code_task_plan_skips_workrr_workflow_candidate_as_no_op(

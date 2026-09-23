@@ -3968,11 +3968,15 @@ def _compile_obligation_verification_plans(
     decisions: list[dict[str, Any]] = []
     for index, obligation in enumerate(obligations):
         obligation_id = str(obligation.get("obligation_id", ""))
+        kind = str(obligation.get("kind", "")).strip()
+        if kind in {"nonactionable", "non_goal", "guidance"}:
+            continue
         contract = by_ref.get(
             obligation_id, contracts[index] if index < len(contracts) else {}
         )
         plan = {
             "obligation_id": obligation_id,
+            "kind": kind,
             "description": str(obligation.get("description", "")),
             "acceptance_criterion": str(obligation.get("acceptance_criterion", "")),
             "population": str(
@@ -4121,6 +4125,15 @@ def _compile_code_task_plan(
             (item for item in plans if item.get("obligation_id") == obligation_id),
             {},
         )
+        kind = str(source.get("kind", failure.get("kind", ""))).strip()
+        if kind and kind not in {"entity", "feature", "interface", "invariant"}:
+            no_op_tasks.append(
+                {
+                    "candidate": f"code-task-{index:03d}",
+                    "reason": "clause is not a product implementation obligation",
+                }
+            )
+            continue
         evidence_case = str(source.get("evidence_case", "")).strip()
         operation = str(source.get("operation", "")).strip()
         oracle = str(source.get("oracle", "")).strip()

@@ -1631,6 +1631,37 @@ def test_code_task_plan_skips_invalid_candidate_and_keeps_valid_tasks(
     assert result["structural_decisions"][0]["passed"] is False
 
 
+def test_code_task_plan_skips_workrr_workflow_candidate_as_no_op(
+    tmp_path: Path,
+) -> None:
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {
+                "failing_cases": [{"obligation_id": "workflow-plan"}]
+            },
+            "verification_plans": [
+                {
+                    "obligation_id": "workflow-plan",
+                    "operation": "create a new branch, commit, and verify the commit",
+                    "evidence_case": "Verify the workflow commit.",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("hello_world.py",)),
+    )
+
+    assert result["tasks"] == []
+    assert result["no_op_tasks"] == [
+        {
+            "candidate": "code-task-001",
+            "reason": "repository workflow work is handled by Workrr",
+        }
+    ]
+    assert result["rejected_tasks"] == []
+    assert result["structural_decisions"][0]["passed"] is True
+
+
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args], cwd=repo, capture_output=True, text=True, check=True

@@ -4111,6 +4111,7 @@ def _compile_code_task_plan(
     )
     plans = _flow_items(parameters.get("verification_plans"))
     tasks: list[dict[str, Any]] = []
+    no_op_tasks: list[dict[str, str]] = []
     rejected_tasks: list[dict[str, str]] = []
     for index, failure in enumerate(failures, start=1):
         obligation_id = str(
@@ -4124,6 +4125,16 @@ def _compile_code_task_plan(
         operation = str(source.get("operation", "")).strip()
         oracle = str(source.get("oracle", "")).strip()
         objective_basis = oracle or operation
+        if _is_repository_workflow_objective(
+            operation
+        ) or _is_repository_workflow_objective(oracle):
+            no_op_tasks.append(
+                {
+                    "candidate": f"code-task-{index:03d}",
+                    "reason": "repository workflow work is handled by Workrr",
+                }
+            )
+            continue
         objective = (
             f"Implement the failing product behavior: {objective_basis}"
             if objective_basis
@@ -4202,6 +4213,7 @@ def _compile_code_task_plan(
     ]
     document = {
         "tasks": tasks,
+        "no_op_tasks": no_op_tasks,
         "rejected_tasks": rejected_tasks,
         "structural_decisions": decisions,
         "semantic_worklist": {"specifications": []},

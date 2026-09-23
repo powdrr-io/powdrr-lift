@@ -810,6 +810,25 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
         f"obligation:instruction-{index:03d}"
         for index in range(1, len(canonical_design["obligations"]) + 1)
     ]
+    nonactionable = [
+        item
+        for item in canonical_design["projections"]
+        if item["kind"] == "nonactionable"
+    ]
+    assert len(nonactionable) == 1
+    assert nonactionable[0]["clause_id"] not in {
+        item["clause_id"] for item in canonical_design["obligations"]
+    }
+    assert [item["id"] for item in canonical_design["verification_contracts"]] == [
+        item["contract_id"] for item in canonical_design["required_test_cases"]
+    ]
+    assert all(
+        "no product"
+        not in " ".join(
+            str(item[field]) for field in ("operation", "oracle", "evidence_case")
+        ).casefold()
+        for item in canonical_design["verification_contracts"]
+    )
     assert all(
         item["selector_status"] == "planned"
         for item in canonical_design["required_test_cases"]

@@ -669,6 +669,7 @@ class FeatureCommandRuntime:
             raw_design_decisions = feature_endpoint._collected_results(
                 parameters.get("design_decisions")
             )
+            raw_design_entries = parameters.get("design_decisions")
             if raw_design_decisions is None:
                 raise PowdrrExecutionError(
                     "canonical design decisions are missing or malformed"
@@ -684,6 +685,24 @@ class FeatureCommandRuntime:
                 )
             except FeatureObligationError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
+            decisions_by_clause_id = {
+                str(entry.get("item", {}).get("clause_id")): entry.get("result", {})
+                for entry in (raw_design_entries or [])
+                if isinstance(entry, Mapping)
+                and isinstance(entry.get("item"), Mapping)
+                and isinstance(entry.get("result"), Mapping)
+                and isinstance(entry.get("item", {}).get("clause_id"), str)
+            }
+            decisions_by_clause_id.update(
+                {
+                    clause.clause_id: decision
+                    for clause, decision in zip(
+                        ledger.clauses, raw_design_decisions, strict=True
+                    )
+                    if clause.clause_id not in decisions_by_clause_id
+                    and isinstance(decision, Mapping)
+                }
+            )
             obligations = [
                 {
                     "id": f"sentence-{index}",
@@ -710,38 +729,19 @@ class FeatureCommandRuntime:
                 tuple(state.get("provider_inventory", ())),
                 include_existing_name_hint=True,
             )
-            verification_contracts = [
-                {
-                    "id": f"contract-{item.clause_id}",
-                    "obligation_ref": f"obligation:{item.clause_id}",
-                    "population": str(
-                        raw_design_decisions[index - 1].get("population", "")
-                        if index - 1 < len(raw_design_decisions)
-                        and isinstance(raw_design_decisions[index - 1], Mapping)
-                        else ""
-                    ),
-                    "operation": str(
-                        raw_design_decisions[index - 1].get("operation", "")
-                        if index - 1 < len(raw_design_decisions)
-                        and isinstance(raw_design_decisions[index - 1], Mapping)
-                        else ""
-                    ),
-                    "oracle": str(
-                        raw_design_decisions[index - 1].get("oracle", "")
-                        if index - 1 < len(raw_design_decisions)
-                        and isinstance(raw_design_decisions[index - 1], Mapping)
-                        else ""
-                    ),
-                    "evidence_case": str(
-                        raw_design_decisions[index - 1].get("evidence_case", "")
-                        if index - 1 < len(raw_design_decisions)
-                        and isinstance(raw_design_decisions[index - 1], Mapping)
-                        else ""
-                    ),
-                }
-                for index, item in enumerate(design.projections)
-                if item.kind in SEMANTIC_KINDS - {"nonactionable"}
-            ]
+            verification_contracts = []
+            for item in design.obligations:
+                decision = decisions_by_clause_id.get(item.clause_id, {})
+                verification_contracts.append(
+                    {
+                        "id": f"test:{item.obligation_id}",
+                        "obligation_ref": item.obligation_id,
+                        "population": str(decision.get("population", "")),
+                        "operation": str(decision.get("operation", "")),
+                        "oracle": str(decision.get("oracle", "")),
+                        "evidence_case": str(decision.get("evidence_case", "")),
+                    }
+                )
             canonical_document = design.to_data()
             canonical_document["verification_contracts"] = verification_contracts
             path = output_root / "canonical-feature-design.json"

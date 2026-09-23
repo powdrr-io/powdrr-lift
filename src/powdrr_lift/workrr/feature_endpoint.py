@@ -4145,7 +4145,11 @@ def _compile_code_task_plan(
             "decision_id": "task-plan:scope",
             "check": "task_assignment",
             "passed": all(
-                bool(item.get("obligation_refs")) and bool(item.get("validator"))
+                bool(str(item.get("task_id", "")).strip())
+                and bool(str(item.get("objective", "")).strip())
+                and bool(item.get("obligation_refs"))
+                and bool(item.get("validator"))
+                and isinstance(item.get("allowed_paths"), list)
                 for item in tasks
             ),
         }
@@ -4244,6 +4248,14 @@ def _compile_code_task_preconditions(
                 "passed": valid
                 and bool(task_mapping and task_mapping.get("task_id"))
                 and bool(task_mapping and task_mapping.get("validator")),
+            },
+            {
+                "decision_id": "task:objective",
+                "check": "objective_nonempty",
+                "passed": valid
+                and bool(
+                    task_mapping and str(task_mapping.get("objective", "")).strip()
+                ),
             },
             {
                 "decision_id": "task:scope",

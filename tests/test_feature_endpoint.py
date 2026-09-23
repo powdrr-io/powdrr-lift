@@ -39,6 +39,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _compile_code_task_preconditions,
     _compile_feature_obligations,
     _create_pr_changelog,
     _derive_feature_test_contracts,
@@ -1573,6 +1574,23 @@ def test_aggregate_intent_review_blocks_altered_intent() -> None:
         "passed": False,
         "failures": ["intent review did not preserve preserve-api"],
     }
+
+
+def test_code_task_preconditions_reject_empty_objective() -> None:
+    result = _compile_code_task_preconditions(
+        {
+            "task": {
+                "task_id": "code-task-001",
+                "objective": "   ",
+                "obligation_refs": ["obligation-1"],
+                "allowed_paths": ["src/example.py"],
+                "validator": {"kind": "focused-contract"},
+            }
+        }
+    )
+
+    decisions = {item["check"]: item["passed"] for item in result["decisions"]}
+    assert decisions["objective_nonempty"] is False
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

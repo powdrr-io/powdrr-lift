@@ -33,13 +33,23 @@ class ImplementationPacket:
     required_tests: tuple[Mapping[str, Any], ...]
     repository: RepositoryContextPacket
 
-    def for_obligation(self, ordinal: int) -> ImplementationPacket:
+    def for_obligation(
+        self, ordinal: int, *, required_test_ordinal: int | None = None
+    ) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
         if ordinal < 1 or ordinal > len(self.obligations):
             raise ValueError(f"obligation ordinal out of range: {ordinal}")
+        test_ordinal = (
+            ordinal if required_test_ordinal is None else required_test_ordinal
+        )
+        if test_ordinal < 1:
+            raise ValueError("required test ordinal must be positive")
         index = ordinal - 1
+        test_index = test_ordinal - 1
         required_tests = (
-            (self.required_tests[index],) if index < len(self.required_tests) else ()
+            (self.required_tests[test_index],)
+            if test_index < len(self.required_tests)
+            else ()
         )
         return ImplementationPacket(
             objective=self.objective,

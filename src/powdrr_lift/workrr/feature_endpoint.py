@@ -22,7 +22,10 @@ from powdrr_lift.core.decision_obligation import (
     evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
-from powdrr_lift.core.implementation_packet import compile_implementation_packet
+from powdrr_lift.core.implementation_packet import (
+    ImplementationPacket,
+    compile_implementation_packet,
+)
 from powdrr_lift.core.obligation_review import (
     ObligationEvidencePacket,
     ObligationReviewError,
@@ -1803,6 +1806,30 @@ def _require_feature_obligations(value: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(descriptions))
 
 
+def _implementation_packet_for_code_task(
+    packet: ImplementationPacket,
+    task: Mapping[str, Any],
+) -> ImplementationPacket:
+    """Focus packet metadata on the current code task.
+
+    A verification obligation can produce several code tasks (for example,
+    when several failing cases exercise the same feature obligation).  Task
+    ordinals therefore identify the required-test contract, not necessarily a
+    distinct implementation obligation.  Keep the obligation focus bounded to
+    the available packet obligations while retaining the task's test contract.
+    """
+    task_id = str(task.get("task_id", ""))
+    try:
+        task_index = int(task_id.rsplit("-", 1)[-1]) - 1
+    except ValueError:
+        task_index = 0
+    obligation_ordinal = min(task_index + 1, len(packet.obligations))
+    return packet.for_obligation(
+        obligation_ordinal,
+        required_test_ordinal=task_index + 1,
+    )
+
+
 def _feature_obligation_path(value: Any) -> str | None:
     if not isinstance(value, Mapping):
         return None
@@ -2050,8 +2077,13 @@ def _run_code_agent_phase(
         )
         request = replace(
             request,
-            prompt=implementation_packet.render(),
-            implementation_packet=implementation_packet,
+            implementation_packet=(
+                implementation_packet
+                if repair_mode or not isinstance(code_task, Mapping)
+                else _implementation_packet_for_code_task(
+                    implementation_packet, code_task
+                )
+            ),
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):

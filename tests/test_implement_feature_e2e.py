@@ -601,9 +601,9 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert packet["schema_version"] == "implementation-packet-v1"
     prompt = (run_root / "artifacts" / "prompts").glob("*.txt")
     prompt_text = next(prompt).read_text(encoding="utf-8")
-    assert "Obligations (in compiler order):" in prompt_text
-    assert "obligation 001:" in prompt_text
-    assert "function name must start with `test_" in prompt_text
+    assert "Implement execution unit" in prompt_text
+    assert "Obligations (in compiler order):" not in prompt_text
+    assert "function name must start with `test_" not in prompt_text
     assert "create the exact selectors" not in prompt_text
     proposal = json.loads(
         (result.plan_path.parent / "proposal-revision.json").read_text(encoding="utf-8")

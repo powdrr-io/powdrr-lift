@@ -329,11 +329,28 @@ steps:
         baseline_evidence: {type: reference, value: obligation_baseline}
       returns:
         type: object
-        required: [path, fingerprint, tasks, structural_decisions, semantic_worklist]
+        required: [path, fingerprint, tasks, no_op_tasks, rejected_tasks, structural_decisions, semantic_worklist]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
-          tasks: {type: array}
+          tasks:
+            type: array
+            items:
+              type: object
+              required: [task_id, objective, obligation_refs, allowed_paths, acceptance_criteria, validator]
+              properties:
+                task_id: {type: string, minLength: 1}
+                objective: {type: string, minLength: 1}
+                obligation_refs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                allowed_paths: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                acceptance_criteria: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                validator:
+                  type: object
+                  required: [evidence_case]
+                  properties:
+                    evidence_case: {type: string, minLength: 1}
+          rejected_tasks: {type: array}
+          no_op_tasks: {type: array}
           structural_decisions: {type: array, minItems: 1}
           semantic_worklist: {type: object}
       bind: code_task_plan

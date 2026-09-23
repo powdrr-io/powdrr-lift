@@ -1,0 +1,57 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 792
+title: Document source-anchored semantic contract compilation
+intent:
+  problem: The design interview currently asks a general model to generate a serial chain of obligation, acceptance, population, operation, oracle, and evidence prose, allowing an early paraphrase error to propagate while leaving repository lookup and contract assembly underspecified.
+  goal: Specify source-anchored atomic classifiers, exact extractors, deterministic repository matching, typed contract assembly, and a migration path to specialized local classifiers in enough detail for future agents to implement without redefining the architecture.
+human-decisions:
+  - id: compile-contracts-from-atomic-classifications
+    summary: Build typed semantic contracts from independently validated source classifications and extractions rather than asking one model to author the complete contract.
+  - id: specify-classifier-replacement-boundary
+    summary: Treat bounded semantic decisions as provider-neutral contracts so suitable decisions can move from general LLMs to specialized classifiers.
+structured_files: []
+files:
+  - path: docs/design/source-anchored-semantic-contract-compilation.md
+    type: added
+    summary: Define the classifier catalog, extraction rules, abstention protocol, repository inventory, candidate lookup and matching algorithms, contract assembly, projections, executable-case compilation, classifier migration, tests, and implementation slices.
+    rationale: Preserve the agreed weak-model reliability architecture as an implementation-grade specification with no missing lookup or assembly decisions left for future agents to invent.
+    span:
+      start_line: 1
+      end_line: 1669
+    related:
+      entities:
+        - source-anchored-semantic-contract-compilation-design
+      decisions:
+        - compile-contracts-from-atomic-classifications
+        - specify-classifier-replacement-boundary
+      invariants:
+        - immutable-source-remains-semantic-authority
+        - unresolved-semantics-never-become-guesses
+        - repository-bindings-require-versioned-evidence
+      guidance:
+        - migrate-bounded-decisions-by-measured-reliability
+entities:
+  - id: source-anchored-semantic-contract-compilation-design
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: immutable-source-remains-semantic-authority
+    action: added
+    description: Every semantic classifier and extractor remains anchored to the immutable source proposition, and no generated paraphrase becomes authoritative input to a later semantic decision.
+    rationale: Prevent early weak-model wording errors from propagating into population, operation, predicate, and verification meaning.
+  - id: unresolved-semantics-never-become-guesses
+    action: added
+    description: A required semantic field that is ambiguous, underspecified, unsupported, or missing repository evidence remains explicitly unresolved and blocks executable-contract compilation.
+    rationale: Make abstention and targeted clarification safer than pressuring a weak model to invent a complete answer.
+  - id: repository-bindings-require-versioned-evidence
+    action: added
+    description: Subject populations, symbols, behaviors, predicates, fixtures, and test selectors are bound only from versioned Structrr, repository inventory, ontology, adapter, or human-decision evidence.
+    rationale: Keep repository facts and executable identities out of unconstrained model generation.
+guidance:
+  - id: migrate-bounded-decisions-by-measured-reliability
+    action: added
+    description: Replace general-LLM decisions with deterministic rules or specialized classifiers one decision kind at a time through shared schemas, shadow evaluation, per-label metrics, calibrated abstention, and pinned model revisions.
+    rationale: Improve weak-model reliability without changing Procedrr control flow or canonical semantic artifacts.
+features: []
+proposed_prs: []

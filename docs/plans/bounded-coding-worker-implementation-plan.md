@@ -172,7 +172,13 @@ such documentation in the candidate diff.
 validated canonical design and verification obligations
     |
     v
+compile private obligation-validation-manifest-v1
+    |
+    v
 compile one immutable minisweagent-implementation-prompt-v1
+    |
+    v
+prove prompt/manifest obligation and case parity
     |
     v
 capture clean candidate baseline and enforce artifact isolation
@@ -229,17 +235,52 @@ into `prompt`. Those source records remain separate provenance artifacts; they
 are not fields mini-SWE-agent can inspect. The reference tuples prove coverage
 without exposing internal IDs in the rendered prompt.
 
+### Private obligation validation manifest
+
+```python
+@dataclass(frozen=True, slots=True)
+class ObligationValidationManifest:
+    manifest_id: str
+    design_revision: str
+    prompt_id: str
+    prompt_fingerprint: str
+    base_commit: str
+    entries: tuple[ObligationValidationEntry, ...]
+    preservation_case_refs: tuple[str, ...]
+    full_validation_profiles: tuple[str, ...]
+    schema_version: str = "obligation-validation-manifest-v1"
+```
+
+Each `ObligationValidationEntry` binds one actionable obligation to:
+
+- its immutable source and contract references;
+- an executable, static, artifact, or human-observation verification mode;
+- whether a durable repository test must be added, modified, or may use proven
+  existing coverage;
+- every required verification case and expected target;
+- the precompiled scenario, operation, and oracle for each target;
+- the baseline expectation and allowed failure kinds;
+- relevant symbols and paths used to select diff evidence; and
+- the exact evidence kinds required for acceptance.
+
+Executable verification is mandatory for behavioral obligations unless a
+typed design-time exemption names replacement evidence and passes semantic
+review. The prompt and manifest are compiled atomically from the same inputs,
+but only the prompt is given to mini-SWE-agent.
+
 `ExpectedTest` contains:
 
 - a Powdrr-owned ID;
 - a name prefix such as `test_state_constructor_accepts_data`;
-- the behavior the test must demonstrate;
+- the scenario, operation, and oracle the test must demonstrate;
+- its baseline expectation and allowed failure kinds;
 - optional discovered test directory hints; and
 - the obligation IDs it protects.
 
-The expected name is a prefix. A worker may append a meaningful suffix. Workrr
-must verify at least one collected test whose function name equals the prefix
-or starts with `prefix + "_"`.
+The expected name is a target contract rather than proof. A worker may append a
+meaningful suffix, but Workrr must resolve exactly one collected target, bind it
+to the manifest entry, and validate its behavior. Name matching by itself never
+satisfies an obligation.
 
 `RepositoryFact` is bounded and typed. Initial kinds are:
 
@@ -366,9 +407,10 @@ Do not include:
 - validation findings from another attempt; or
 - instructions to wait for a later repair turn.
 
-The prompt is the terminal output of design. It is persisted before invocation
-and its exact bytes are passed to mini-SWE-agent once. No other coding prompt
-exists in the run.
+The prompt is the sole worker-facing output of design. It is persisted before
+invocation and its exact bytes are passed to mini-SWE-agent once. The private
+validation manifest remains with Powdrr, and no other coding prompt exists in
+the run.
 
 ## Customized mini-SWE-agent integration
 
@@ -517,16 +559,22 @@ The current code-task population may remain as planning/verification data, but
 the flow must not execute `run_code_task_agent` once per obligation. Replace
 that implementation loop with these phases:
 
-1. `compile_minisweagent_implementation_prompt`
-2. deterministic prompt completeness decisions, one predicate per decision
-3. `capture_coding_baseline`
-4. `run_minisweagent_once`
-5. deterministic attempt decisions, one predicate per decision
-6. `collect_expected_tests`
-7. `run_focused_obligation_validation`
-8. `run_final_obligation_evidence`
-9. existing semantic and scope review
-10. `sanitize_candidate_patch`
+1. `compile_obligation_validation_manifest`
+2. deterministic validation-readiness decisions, one predicate per decision
+3. `compile_minisweagent_implementation_prompt`
+4. deterministic prompt completeness and prompt/manifest parity decisions
+5. `capture_coding_baseline`
+6. `run_minisweagent_once`
+7. deterministic attempt decisions, one predicate per decision
+8. `collect_expected_tests`
+9. `run_candidate_obligation_cases`
+10. `run_independent_obligation_probes`
+11. `run_baseline_differential_cases`
+12. `review_test_oracle_alignment`
+13. for each obligation: `review_implemented_obligation`
+14. `finalize_obligation_validation_receipts`
+15. existing preservation and scope review
+16. `sanitize_candidate_patch`
 
 Each LLM decision still receives one simple question. All worker supervision,
 budgeting, diff comparison, test collection, and status classification are
@@ -569,17 +617,26 @@ timeout. Workrr owns full validation after focused checks pass.
 ### Expected-test collection
 
 Implement provider-specific collection behind existing verification adapters.
-For pytest, collect node IDs without running tests. Match the function portion
-against the expected prefix. Distinguish:
+For pytest, collect node IDs without running tests. Resolve each manifest target
+contract to exactly one selector using the expected path, function prefix, test
+scenario, and obligation mapping. Distinguish:
 
 - collected;
 - missing;
 - collection error; and
 - duplicate/ambiguous matches.
 
-At least one collected test must map to each actionable obligation before final
-completion unless an obligation's accepted verification contract explicitly
-uses another provider.
+At least one collected executable test must map to each actionable behavioral
+obligation before final completion unless its accepted manifest entry contains
+a typed exemption and replacement evidence. One test may map to multiple
+obligations only when the manifest identifies a distinct assertion, parameter,
+or observable predicate for every mapping.
+
+Enforce the manifest's durable-test disposition against the candidate diff:
+`add` requires a new collected test, `modify` requires an attributable change
+to the resolved test, and `existing_proven` requires fresh source and execution
+evidence for the exact mapped assertion. An unrelated existing passing test
+cannot be rebound after coding merely because its name is similar.
 
 ### Focused validation
 
@@ -587,16 +644,63 @@ Run only collected expected tests and any directly affected preservation tests.
 Record per-selector statuses. `skipped`, `xfailed`, `deselected`, missing, and
 timed out are failures, consistent with the verification-contract plan.
 
+For each new-behavior case, create an isolated shadow worktree containing the
+pre-implementation product baseline and candidate-authored test changes. Run
+the resolved selector there. The normal acceptance pattern is:
+
+- candidate implementation plus candidate test: pass; and
+- baseline implementation plus candidate test: fail for a manifest-approved
+  reason.
+
+A test that passes in both trees is non-discriminating and cannot prove new
+behavior. A collection, import, or symbol-missing baseline failure is accepted
+only when that failure kind was declared before coding. Existing preservation
+tests can be non-discriminating because their role is to prove no regression,
+not the newly requested behavior.
+
+When the language adapter can materialize a verification case directly from
+its typed fixture, operation, and oracle bindings, run that Workrr-owned probe
+from the artifact area against the candidate. Do not place it in the worker's
+editable checkout or reveal its source in the implementation prompt. The probe
+does not replace the durable repository test; it supplies independent evidence
+that mini-SWE-agent did not define both the behavior and the only assertion
+used to accept it.
+
+### Per-obligation evidence review
+
+Workrr builds one bounded evidence packet per manifest entry from:
+
+- immutable source proposition and resolved contract;
+- precompiled verification scenario and oracle;
+- collected test source and exact assertion or parameter mapping;
+- candidate and baseline execution evidence;
+- independent probe evidence when the adapter supports it;
+- relevant implementation hunks selected by subject/path closure; and
+- applicable preservation and static-analysis results.
+
+Deterministic adapters first decide collection, execution, differential, scope,
+and known oracle-shape predicates. When semantic judgment remains, Procedrr
+asks exactly one read-only question: “Does this implementation and verification
+evidence satisfy this one obligation?” The response is only `pass`, `fail`, or
+`abstain` plus a bounded explanation. Workrr adds the obligation identity and
+evidence references and persists one
+`obligation-validation-receipt-v1`. `abstain` fails closed.
+
+Every required evidence predicate and every obligation receipt must pass.
+Powdrr does not average verdicts or allow a whole-feature review to override a
+failed obligation.
+
 ### Final validation
 
 After focused evidence is green:
 
-1. run all affected verification contracts;
-2. run repository-required lint, formatting, and type checks;
-3. run the repository's full test profile once;
-4. rerun evidence collection if validation changed generated test artifacts;
-5. perform final implementation completeness and scope reviews; and
-6. sanitize and export the candidate patch.
+1. finalize all per-obligation validation receipts;
+2. run all affected preservation and non-goal contracts;
+3. run repository-required lint, formatting, and type checks;
+4. run the repository's full test profile once;
+5. rerun evidence collection if validation changed generated test artifacts;
+6. perform final completeness and unmapped-diff scope reviews; and
+7. sanitize and export the candidate patch.
 
 ## Configuration and compatibility
 
@@ -630,6 +734,8 @@ Write all artifacts below:
     config.json
     minisweagent-prompt.json
     minisweagent-prompt.txt
+    obligation-validation-manifest.json
+    validation-readiness-receipt.json
     baseline.json
     attempt/
         request.json
@@ -641,7 +747,12 @@ Write all artifacts below:
         diff.patch
     validation/
         collection.json
+        independent-probes.json
+        baseline-differential.json
         focused.json
+        oracle-alignment.json
+        obligations/
+            <obligation-id>.json
         final.json
     patch-sanitization.json
 ```
@@ -778,23 +889,44 @@ Goal: eliminate obligation-per-worker execution.
 
 Implementation:
 
-1. Compile one `minisweagent-implementation-prompt-v1` from the complete
-   canonical design, repository bindings, scope, and verification plans.
-2. Add deterministic one-to-one coverage checks for contracts and cases.
-3. Replace every code-task, continuation, and repair implementation loop with
+1. Compile one private `obligation-validation-manifest-v1` from the complete
+   canonical design, verification cases, baseline expectations, and evidence
+   requirements.
+2. Compile one `minisweagent-implementation-prompt-v1` from the same design,
+   repository bindings, scope, and verification plans.
+3. Add deterministic prompt/manifest parity and complete obligation/case
+   coverage checks.
+4. Replace every code-task, continuation, and repair implementation loop with
    one mini-SWE-agent phase.
-4. Add expected-test collection and focused validation.
-5. Make every attempt or validation failure terminal for the run.
-6. Preserve obligation-to-prompt, obligation-to-test, and obligation-to-diff
-   traceability in evidence.
+5. Add exact expected-test collection, candidate execution, baseline
+   differential execution, adapter-owned independent probes, and
+   oracle-alignment validation.
+6. Produce one fail-closed validation receipt per obligation.
+7. Make every attempt or validation failure terminal for the run.
+8. Preserve obligation-to-prompt, obligation-to-test, obligation-to-diff, and
+   obligation-to-receipt traceability in evidence.
 
 Required tests:
 
 - 35 obligations compile into one prompt and one worker invocation;
-- every obligation remains represented in the prompt and final evidence;
+- every obligation remains represented in the prompt, private manifest, and
+  final evidence;
+- prompt and manifest obligation/case sets have exact parity;
 - the prompt excludes all forbidden internal representations;
 - expected test prefixes permit meaningful suffixes;
 - missing, xfailed, skipped, and deselected expected tests fail;
+- a candidate test that passes against the product baseline cannot prove a new
+  behavior obligation;
+- every adapter-materializable case runs through a Workrr-owned probe that the
+  coding worker could not edit;
+- `add`, `modify`, and `existing_proven` durable-test requirements are enforced
+  against the attributable test diff;
+- an oracle-misaligned or semantically irrelevant passing test fails its
+  obligation receipt;
+- one shared test cannot cover multiple obligations without distinct mapped
+  assertions, parameters, or predicates;
+- every obligation receives an independent pass, fail, or abstain verdict and
+  abstention fails closed;
 - failed validation creates findings but no worker request;
 - timeout, limit, and no-progress exits create no continuation request;
 - full validation runs only after focused validation passes; and
@@ -846,13 +978,18 @@ Procedrr definition. It must assert:
 3. compound instruction sentences remain decomposed into their separate
    obligations;
 4. one mini-SWE-agent prompt and one worker invocation are produced;
-5. required test prefixes cover every actionable obligation;
+5. the private validation manifest covers every actionable obligation with an
+   executable case or reviewed typed exemption;
 6. no internal proposal/Structrr artifact is present in the worker prompt;
-7. generated planning files cannot satisfy diff progress;
-8. a timeout cannot satisfy any code-task receipt;
-9. validation failures produce durable terminal findings and no new prompt;
-10. OpenCode is never invoked; and
-11. final completion requires collected passing tests and a sanitized patch.
+7. prompt and manifest contract/case references have exact parity;
+8. generated planning files cannot satisfy diff progress;
+9. a timeout cannot satisfy any code-task receipt;
+10. validation failures produce durable terminal findings and no new prompt;
+11. baseline-nondiscriminating and oracle-misaligned tests fail validation;
+12. adapter-materializable cases run independent Workrr-owned probes;
+13. OpenCode is never invoked; and
+14. final completion requires a passing receipt for every obligation, passing
+    global checks, and a sanitized patch.
 
 The deterministic test uses scripted provider actions and real Git operations.
 The opt-in live test uses DeepInfra and the pinned model. The deterministic test
@@ -945,7 +1082,11 @@ This plan is fully implemented only when all of the following are true:
 - repeated actions and event storms terminate deterministically;
 - timeout, limit, no-progress, and validation failures create no continuation,
   repair, or fallback coding prompt;
-- required tests are collected and passed before final completion;
+- the prompt and private validation manifest have exact obligation and case
+  parity;
+- required tests are collected, candidate-passing, baseline-discriminating
+  where applicable, and oracle-aligned before final completion;
+- every actionable obligation has an independent passing validation receipt;
 - all final obligation, preservation, scope, and patch-sanitization gates pass;
 - normal and Harbor flows share the same implementation core;
 - the DeepSWE regression fixture passes in CI;

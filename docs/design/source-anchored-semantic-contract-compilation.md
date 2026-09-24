@@ -53,12 +53,13 @@ This design covers:
 - Procedrr control flow and Workrr operation responsibilities;
 - provenance, invalidation, artifacts, evaluation, and rollout; and
 - the conversion of all resolved contracts into one immutable mini-SWE-agent
-  implementation prompt.
+  implementation prompt plus a private obligation validation manifest.
 
 It does not specify code-task execution, interactive coding-agent control,
-proposal publication, or final implementation review except where those
-consumers constrain the compiled contract. It does specify the complete,
-immutable prompt artifact at the design-to-implementation boundary.
+or proposal publication except where those consumers constrain the compiled
+contract. It does specify the complete immutable prompt, the private validation
+contract, and the required post-coding evidence flow at the
+design-to-implementation boundary.
 
 ## Related documents
 
@@ -101,6 +102,10 @@ The implementation must satisfy these properties.
 13. One completed design revision produces exactly one prompt for exactly one
     mini-SWE-agent invocation; obligations never become separate worker
     prompts, and validation never creates an in-run repair prompt.
+14. The same design revision preserves a private, immutable validation manifest
+    that maps every actionable obligation to the evidence required after
+    coding. The prompt is the only worker-facing projection, not the only
+    design artifact.
 
 ## Authority boundaries
 
@@ -1205,7 +1210,12 @@ Case compilation rules:
 
 These records are compiler inputs, not separate worker tasks. After every
 contract and verification case in the design revision is resolved, Workrr
-compiles exactly one terminal artifact:
+compiles a design handoff with two synchronized projections:
+
+1. exactly one worker-facing implementation prompt; and
+2. one Powdrr-private validation manifest used after coding.
+
+The worker-facing projection is:
 
 ```yaml
 schema_version: minisweagent-implementation-prompt-v1
@@ -1228,10 +1238,98 @@ focused_commands:
 fingerprint: sha256:...
 ```
 
-The metadata preserves provenance and supports deterministic validation. Only
-the `prompt` field is sent to mini-SWE-agent. The worker never sees Structrr
-diffs, classifier decisions, fingerprints, proposal worklists, or parallel
+The private projection is:
+
+```yaml
+schema_version: obligation-validation-manifest-v1
+manifest_id: validation:feature-state-data:v1
+design_revision: sha256:...
+prompt_ref: prompt:feature-state-data:v1
+prompt_fingerprint: sha256:...
+base_commit: git:...
+obligations:
+  - obligation_ref: contract:instruction-001
+    source_proposition_ref: instruction-001
+    verification_mode: executable_case
+    durable_test_requirement: add
+    case_refs:
+      - case:contract-instruction-001:user-record
+    required_evidence:
+      - target_collected
+      - candidate_passed
+      - baseline_discriminated
+      - test_oracle_aligned
+      - implementation_satisfies_obligation
+    baseline_expectation:
+      status: fail
+      allowed_failure_kinds:
+        - assertion_failed
+        - symbol_missing
+    relevant_scope:
+      - python:src/models/user.py::UserRecord
+preservation_case_refs: []
+full_validation_profiles:
+  - format
+  - lint
+  - typecheck
+  - test
+fingerprint: sha256:...
+```
+
+The prompt and manifest are deterministic projections of the same canonical
+contracts and verification cases. Their shared design revision, references,
+and fingerprints let Workrr prove that every obligation shown to the worker is
+also retained for independent validation. Only the prompt's `prompt` field is
+sent to mini-SWE-agent. The worker never sees Structrr diffs, classifier
+decisions, validation verdicts, fingerprints, proposal worklists, or parallel
 representations of the same requirement.
+
+### Validation-manifest rules
+
+Every actionable behavioral obligation must have at least one executable
+verification case unless the design records a typed exemption such as
+`documentation_only`, `static_artifact`, or `human_observation`. An exemption
+must name its replacement evidence and pass the same source-faithfulness
+review; free-form claims that an obligation is “not testable” are invalid.
+
+The obligation-to-case relationship is many-to-many:
+
+- one obligation may require several cases for different population members,
+  preconditions, or failure modes;
+- one case may protect several obligations only when it identifies a distinct
+  assertion, parameter, or observable predicate for each mapping; and
+- every mapping records the scenario, operation, oracle, expected selector,
+  and baseline expectation compiled before coding.
+
+Each behavioral entry declares `durable_test_requirement` as `add`, `modify`,
+or `existing_proven`. Post-coding validation checks the test diff for `add` and
+`modify`; `existing_proven` requires fresh evidence that the exact existing
+assertion already covers the obligation. A typed exemption is required when no
+durable repository test is appropriate.
+
+Whenever a language adapter can materialize the precompiled scenario,
+operation, and oracle, Workrr also creates an independent validation probe
+outside the candidate checkout. This probe is derived before coding and is not
+authored or editable by mini-SWE-agent. It is preferred evidence because it
+does not trust the worker to define both the implementation and its judge. The
+durable repository test is still required for regression protection; the
+independent probe validates the implementation directly.
+
+A planned feature test defaults to `baseline_expectation.status: fail`. After
+coding, Workrr runs the candidate test against the candidate implementation and
+also runs the candidate test source against the pre-implementation product
+baseline in an isolated shadow worktree. The case is discriminating only when
+the candidate passes and the baseline fails for an allowed reason. Existing
+preservation tests may legitimately pass on both revisions, but they cannot be
+the sole evidence for newly requested behavior. When differential execution is
+impossible, the design must declare that fact before coding and require another
+independent evidence kind.
+
+Test existence and passing execution are necessary, not sufficient. The
+manifest also requires an oracle-alignment check proving that the test's setup,
+operation, and assertions correspond to the precompiled verification case.
+Deterministic adapters perform this check when they can; otherwise Procedrr
+asks one bounded, read-only semantic question for that one mapping.
 
 ### Prompt sections
 
@@ -1270,14 +1368,14 @@ not send another model prompt during that implementation run.
 - No fallback invocation of OpenCode.
 
 After mini-SWE-agent submits or terminates, Workrr captures the attributable
-diff and runs deterministic validation. A failure is a terminal implementation
-result. Its evidence may be supplied to a future design revision, which can
-compile a new prompt under a new run identity; it is never appended as a
-second prompt to the existing run.
+diff and runs deterministically orchestrated, manifest-driven validation. A
+failure is a terminal implementation result. Its evidence may be supplied to a
+future design revision, which can compile a new prompt under a new run
+identity; it is never appended as a second prompt to the existing run.
 
 ### Prompt completeness gate
 
-The prompt artifact can be emitted only when deterministic checks prove:
+The design handoff can be emitted only when deterministic checks prove:
 
 1. every actionable source proposition reaches one resolved contract;
 2. every resolved contract is represented exactly once in `Required behavior`;
@@ -1291,6 +1389,51 @@ The prompt artifact can be emitted only when deterministic checks prove:
 9. no required field is unresolved;
 10. no internal artifact path or model reasoning appears in the prompt; and
 11. rendering the same versioned inputs produces the same prompt fingerprint.
+
+The validation manifest must additionally prove:
+
+1. every actionable obligation has one manifest entry;
+2. every manifest entry has an accepted verification mode;
+3. every behavioral obligation has an executable case or a typed, reviewed
+   exemption with replacement evidence;
+4. every case mapping has a scenario, operation, oracle, target contract, and
+   baseline expectation;
+5. universal obligations cover the complete bound population;
+6. preservation obligations and non-goals have explicit checks;
+7. every required evidence kind has a registered collector or judge, and every
+   adapter-materializable case has an independent probe;
+8. prompt contract references equal manifest obligation references;
+9. prompt verification-case references equal manifest case references; and
+10. the prompt, manifest, and canonical design share one design revision and
+    base commit.
+
+### Post-coding obligation validation
+
+After the single mini-SWE-agent invocation, Workrr evaluates the frozen
+manifest without changing it:
+
+1. Bind every planned target to a collected test or other concrete validator.
+2. Reject missing, ambiguous, skipped, xfailed, deselected, or weakened cases.
+3. Run each required case against the candidate and retain fresh evidence.
+4. Run each adapter-materializable independent probe against the candidate.
+5. For new behavior, run candidate-authored test code against the product
+   baseline and verify the declared discriminating result.
+6. Check each test mapping against its precompiled scenario, operation, and
+   oracle.
+7. Select relevant diff hunks by bound subject and changed-path closure.
+8. For each obligation, ask at most one final read-only semantic question:
+   “Does this implementation and verification evidence satisfy this one
+   obligation?” The judge returns only `pass`, `fail`, or `abstain` plus a
+   bounded explanation; Workrr supplies the identity and evidence references.
+9. Emit one immutable `obligation-validation-receipt-v1` per obligation.
+10. Run preservation, scope, formatting, lint, type, and full-suite checks.
+11. Accept the implementation only when every required receipt and global
+    check passes. There is no averaging and no “mostly complete” outcome.
+
+An obligation receipt records the contract and manifest fingerprints, target
+collection status, candidate result, baseline result, oracle-alignment result,
+relevant diff evidence, semantic verdict when required, and exact failure
+findings. It is validation evidence, never a new worker instruction.
 
 ## Procedrr flow
 
@@ -1341,9 +1484,11 @@ for each immutable atomic proposition:
   compile verification case specifications
 
 after all propositions complete:
+  compile one obligation validation manifest
+  validate obligation and evidence coverage
   compile one mini-SWE-agent implementation prompt
-  validate prompt completeness and source coverage
-  emit one immutable prompt artifact
+  validate prompt completeness and prompt-to-manifest parity
+  emit one design handoff with one worker-facing prompt
 ```
 
 Every `classify` or `extract` line is one judge activation. Every `compile`,
@@ -1371,8 +1516,10 @@ operation with no model discretion.
 | `compile_semantic_contract` | partial contract and resolved bindings | resolved contract |
 | `render_semantic_contract_views` | resolved contract and template revision | non-authoritative prose views |
 | `compile_verification_case_specs` | contract, population, fixtures, adapters | case specifications |
+| `compile_obligation_validation_manifest` | complete design revision, cases, baseline expectations, evidence collectors | one immutable private validation manifest |
+| `validate_obligation_validation_manifest` | manifest, contracts, cases, adapters | readiness receipt or exact findings |
 | `compile_minisweagent_prompt` | complete design revision, cases, inventory, scope, commands | one immutable prompt artifact |
-| `validate_minisweagent_prompt` | prompt artifact and canonical design inputs | completeness receipt or exact findings |
+| `validate_minisweagent_prompt` | prompt, manifest, and canonical design inputs | completeness and cross-projection receipt or exact findings |
 
 ## Suggested module boundaries
 
@@ -1521,6 +1668,10 @@ artifacts/semantic-contracts/
     verification-cases.json
   minisweagent-prompt.json
   minisweagent-prompt.txt
+  obligation-validation-manifest.json
+  validation-readiness-receipt.json
+  obligation-validation-receipts/
+    contract-instruction-001.json
 ```
 
 Artifacts are diagnostic and replay inputs. Structrr stores accepted durable
@@ -1734,13 +1885,17 @@ invented, while an accepted definition resolves deterministically.
 - Compile member-specific or parameterized case specifications.
 - Bind fixtures and existing tests from inventory.
 - Run baseline evidence and verify population coverage.
+- Compile the private obligation validation manifest, including required
+  evidence, baseline expectations, typed exemptions, and preservation checks.
 - Compile all resolved contracts, repository facts, verification cases, scope,
   and focused commands into one mini-SWE-agent prompt.
-- Add deterministic prompt coverage and forbidden-content checks.
+- Add deterministic manifest coverage, prompt coverage, cross-projection
+  parity, and forbidden-content checks.
 
 Acceptance gate: universal contracts cannot pass with one synthetic
-representative member, and one complete design revision emits exactly one
-prompt containing every actionable contract exactly once.
+representative member; every actionable obligation has a ready validation
+entry; and one complete design revision emits exactly one worker-facing prompt
+containing every actionable contract exactly once.
 
 ### Slice 6: specialized classifiers
 
@@ -1783,7 +1938,9 @@ The design is implemented when:
    provider contract; and
 9. the completed design deterministically emits one immutable mini-SWE-agent
    prompt containing the complete implementation and verification contract;
-10. an end-to-end feature run invokes mini-SWE-agent once with that exact
+10. the same design emits a private validation manifest that preserves every
+    obligation, case, oracle, baseline expectation, and required evidence kind;
+11. an end-to-end feature run invokes mini-SWE-agent once with that exact
     prompt and creates no repair or continuation prompt; and
-11. the run proves that no model-authored paraphrase became authoritative
-    intent.
+12. the run produces a passing receipt for every obligation and proves that no
+    model-authored paraphrase became authoritative intent.

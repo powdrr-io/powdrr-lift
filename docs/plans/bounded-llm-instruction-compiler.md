@@ -12,11 +12,13 @@ delivery sections record the earlier architecture and must not be implemented.
 
 The normative design-phase output is now defined by
 `docs/design/source-anchored-semantic-contract-compilation.md`: one completed
-design revision compiles exactly one immutable
-`minisweagent-implementation-prompt-v1`. The downstream boundary in
-`docs/design/external-coding-agent-boundary.md` sends that prompt exactly once
-to one mini-SWE-agent invocation. Deterministic post-implementation validation
-is terminal for that run and cannot produce a continuation, repair, or fallback
+design revision compiles exactly one worker-facing
+`minisweagent-implementation-prompt-v1` plus one private
+`obligation-validation-manifest-v1`. The downstream boundary in
+`docs/design/external-coding-agent-boundary.md` sends only the prompt, exactly
+once, to one mini-SWE-agent invocation and retains the manifest for independent
+per-obligation validation. Deterministic post-implementation validation is
+terminal for that run and cannot produce a continuation, repair, or fallback
 prompt. A subsequent attempt requires a new run and a revalidated design
 revision.
 

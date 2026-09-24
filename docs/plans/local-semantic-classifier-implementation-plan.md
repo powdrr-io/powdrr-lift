@@ -71,17 +71,28 @@ the label.
 Local classifiers do not produce worker tasks. They resolve fields in the
 canonical design. After all fields, repository bindings, populations,
 predicates, and verification cases are complete, deterministic code compiles
-the entire accepted design into one `minisweagent-implementation-prompt-v1`.
+the entire accepted design into one worker-facing
+`minisweagent-implementation-prompt-v1` and one private
+`obligation-validation-manifest-v1`.
 
 Exactly one prompt is sent to mini-SWE-agent exactly once. The classifier
 provider cascade may use many small local decisions during design, but those
 decisions must not leak into multiple implementation prompts. mini-SWE-agent's
 internal inspect/edit/test turns are part of one invocation and one prompt.
 
-Post-worker validation is deterministic. It may accept or reject the result,
-but it does not create a repair, continuation, per-obligation, or fallback
-worker prompt. Failed evidence can become input to a later design revision and
-new run, never another prompt in the same run.
+The private manifest preserves every obligation, verification case, oracle,
+baseline expectation, and required evidence kind for post-coding validation.
+Classifier replacement must leave both projections semantically equivalent:
+the prompt and manifest must contain the same contract and case sets even
+though only the prompt is sent to the worker.
+
+Post-worker validation is deterministically orchestrated from the private
+manifest. Collection, execution, baseline differential, scope, and supported
+oracle checks are deterministic; irreducibly semantic checks use bounded
+read-only judges one obligation at a time. Validation may accept or reject the
+result, but it does not create a repair, continuation, per-obligation, or
+fallback worker prompt. Failed evidence can become input to a later design
+revision and new run, never another prompt in the same run.
 
 ## Decision summary
 
@@ -809,8 +820,11 @@ Replay complete design interviews and require:
 - clarification rate no more than five percentage points above baseline;
 - no high-risk intent erasure; and
 - a materially faster median and tail design latency;
-- one completed design emits exactly one prompt artifact; and
-- the prompt contains every actionable resolved contract exactly once.
+- one completed design emits exactly one worker-facing prompt and one private
+  validation manifest;
+- the prompt contains every actionable resolved contract exactly once; and
+- prompt and manifest obligation and verification-case references have exact
+  parity.
 
 ## Latency and resource targets
 
@@ -1395,8 +1409,11 @@ This plan is complete when:
 7. model artifacts and datasets are reproducible and content-addressed;
 8. provider replacement does not change Procedrr or semantic contract schemas;
 9. design-flow replay finds no new intent loss or expansion; and
-10. every completed design produces one deterministic mini-SWE-agent prompt
-    and no implementation repair or continuation prompts; and
-11. production monitoring can detect classifier drift and roll back to
+10. every completed design produces one deterministic mini-SWE-agent prompt,
+    one complete private validation manifest, and no implementation repair or
+    continuation prompts;
+11. prompt and manifest obligation and case sets remain identical across
+    qualified classifier providers; and
+12. production monitoring can detect classifier drift and roll back to
     LLM-only design decisions without changing the single mini-SWE-agent
     implementation boundary.

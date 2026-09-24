@@ -160,7 +160,8 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     assert "Required operations" not in request.prompt
     assert '"id": "worker-adapter"' in request.prompt
     assert '"id": "old-adapter"' in request.prompt
-    assert "Validation profiles Workrr will run: unit-tests" in request.prompt
+    assert "Validation profiles that will run: unit-tests" in request.prompt
+    assert "Workrr" not in request.prompt
     assert (
         json.loads(request.to_json())["schema_version"] == "implementation-request-v2"
     )

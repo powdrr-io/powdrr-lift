@@ -1,40 +1,47 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 801
-title: Target one mini-SWE-agent prompt after design
+title: Target one mini-SWE-agent prompt with obligation validation
 intent:
-  problem: The semantic-contract and coding-worker designs still allowed competing downstream interpretations, including per-unit worker packets, provider selection, continuation, and validation-derived repair prompts, instead of defining one terminal implementation handoff.
-  goal: Make one immutable prompt for one mini-SWE-agent invocation the explicit final output of every completed design revision, with deterministic completeness checks and terminal post-implementation validation.
+  problem: The design and coding-worker documents did not distinguish one worker-facing prompt from the private design artifacts needed to prove, obligation by obligation, that the resulting implementation and tests preserve accepted intent.
+  goal: Compile each completed design into one mini-SWE-agent prompt plus an immutable private validation manifest, then require durable tests, independent evidence where possible, and a passing receipt for every obligation after coding.
 human-decisions:
   - id: compile-one-terminal-implementation-prompt
-    summary: Compile every resolved contract, verification case, repository fact, preservation rule, and scope constraint into one immutable mini-SWE-agent prompt after design validation completes.
-  - id: invoke-minisweagent-exactly-once
-    summary: Send the compiled prompt to exactly one mini-SWE-agent invocation while allowing its internal inspect, edit, and test turns to remain inside that invocation.
+    summary: Compile every resolved contract, repository fact, and verification requirement into one immutable prompt sent once to mini-SWE-agent.
+  - id: preserve-private-obligation-validation-manifest
+    summary: Preserve every obligation, case, oracle, baseline expectation, durable-test requirement, and evidence requirement in a private manifest that is never sent to the coding worker.
+  - id: validate-every-obligation-independently
+    summary: Require one fail-closed validation receipt per obligation from collected tests, candidate and baseline execution, oracle alignment, relevant diff evidence, and bounded semantic review when needed.
+  - id: prefer-independent-validator-evidence
+    summary: Run adapter-materialized Workrr-owned probes outside the candidate checkout whenever the typed verification case can produce them.
   - id: make-validation-failure-terminal
-    summary: Treat timeout, limit, worker, and validation failures as terminal evidence for the run rather than sources of repair, continuation, or OpenCode fallback prompts.
+    summary: Treat worker and validation failures as terminal evidence rather than sources of continuation, repair, or OpenCode fallback prompts.
 structured_files: []
 files:
   - path: docs/design/external-coding-agent-boundary.md
     type: modified
-    summary: Define the normative single-prompt mini-SWE-agent lifecycle, attempt evidence, validation policy, failure semantics, and required tests.
-    rationale: Give implementation agents one unambiguous worker boundary with no per-obligation sessions, repair prompts, or provider fallback.
+    summary: Define the one-prompt mini-SWE-agent lifecycle and the private manifest-driven, per-obligation validation boundary.
+    rationale: Give implementation agents an unambiguous handoff and acceptance model with independent evidence and no repair prompts.
     span:
       start_line: 1
-      end_line: 188
+      end_line: 255
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
       start_line: 55
       end_line: 56
@@ -43,304 +50,355 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
       start_line: 58
-      end_line: 61
+      end_line: 62
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 101
-      end_line: 103
+      start_line: 102
+      end_line: 108
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 115
-      end_line: 115
+      start_line: 120
+      end_line: 120
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1077
-      end_line: 1079
+      start_line: 1082
+      end_line: 1084
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1171
-      end_line: 1171
+      start_line: 1176
+      end_line: 1176
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1173
-      end_line: 1175
+      start_line: 1178
+      end_line: 1180
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1206
-      end_line: 1294
+      start_line: 1211
+      end_line: 1437
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1342
-      end_line: 1346
+      start_line: 1485
+      end_line: 1491
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1374
-      end_line: 1375
+      start_line: 1519
+      end_line: 1522
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1388
-      end_line: 1388
+      start_line: 1535
+      end_line: 1535
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1522
-      end_line: 1523
+      start_line: 1669
+      end_line: 1674
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1732
-      end_line: 1732
+      start_line: 1883
+      end_line: 1883
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1737
-      end_line: 1739
+      start_line: 1888
+      end_line: 1893
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1742
-      end_line: 1743
+      start_line: 1896
+      end_line: 1898
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1766
-      end_line: 1769
+      start_line: 1921
+      end_line: 1924
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/design/source-anchored-semantic-contract-compilation.md
     type: modified
-    summary: Connect semantic-contract compilation to the terminal mini-SWE-agent prompt schema, renderer, completeness gate, artifacts, and flow.
-    rationale: Make the complete accepted design compile deterministically into one worker-facing prompt without exposing internal intent representations.
+    summary: Compile canonical contracts into one worker prompt plus a private obligation validation manifest and fail-closed evidence receipts.
+    rationale: Preserve every accepted obligation for independent post-coding validation while keeping one coherent worker-facing prompt.
     span:
-      start_line: 1784
-      end_line: 1789
+      start_line: 1939
+      end_line: 1946
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 12
       end_line: 16
@@ -349,16 +407,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 63
       end_line: 64
@@ -367,16 +428,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 74
       end_line: 76
@@ -385,16 +449,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 81
       end_line: 83
@@ -403,16 +470,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 96
       end_line: 97
@@ -421,16 +491,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 111
       end_line: 113
@@ -439,16 +512,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 126
       end_line: 128
@@ -457,16 +533,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 130
       end_line: 130
@@ -475,16 +554,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 133
       end_line: 135
@@ -493,16 +575,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 137
       end_line: 140
@@ -511,16 +596,19 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 164
       end_line: 165
@@ -529,430 +617,418 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 175
-      end_line: 175
+      end_line: 181
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 189
-      end_line: 189
+      start_line: 195
+      end_line: 195
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 193
-      end_line: 193
+      start_line: 199
+      end_line: 199
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 208
-      end_line: 208
+      start_line: 214
+      end_line: 214
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 212
-      end_line: 219
+      start_line: 218
+      end_line: 225
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 223
-      end_line: 223
+      start_line: 225
+      end_line: 226
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 226
-      end_line: 230
+      start_line: 229
+      end_line: 251
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 253
-      end_line: 253
+      start_line: 254
+      end_line: 269
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 268
-      end_line: 273
+      start_line: 275
+      end_line: 276
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 333
-      end_line: 343
+      start_line: 280
+      end_line: 283
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 348
-      end_line: 348
+      start_line: 294
+      end_line: 294
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 365
-      end_line: 367
+      start_line: 309
+      end_line: 314
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 369
-      end_line: 371
+      start_line: 374
+      end_line: 384
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 405
-      end_line: 405
+      start_line: 389
+      end_line: 389
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 444
-      end_line: 444
+      start_line: 406
+      end_line: 408
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 446
-      end_line: 448
+      start_line: 410
+      end_line: 413
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 504
-      end_line: 504
+      start_line: 447
+      end_line: 447
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 514
-      end_line: 514
+      start_line: 486
+      end_line: 486
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 520
-      end_line: 521
+      start_line: 488
+      end_line: 490
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
-    span:
-      start_line: 523
-      end_line: 523
-    related:
-      entities:
-        - single-prompt-minisweagent-implementation-flow
-      decisions:
-        - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
-        - make-validation-failure-terminal
-      invariants:
-        - one-design-revision-produces-one-worker-prompt
-        - implementation-validation-never-creates-another-prompt
-        - minisweagent-is-the-only-target-editor
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
-    span:
-      start_line: 527
-      end_line: 529
-    related:
-      entities:
-        - single-prompt-minisweagent-implementation-flow
-      decisions:
-        - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
-        - make-validation-failure-terminal
-      invariants:
-        - one-design-revision-produces-one-worker-prompt
-        - implementation-validation-never-creates-another-prompt
-        - minisweagent-is-the-only-target-editor
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
-    span:
-      start_line: 535
-      end_line: 535
-    related:
-      entities:
-        - single-prompt-minisweagent-implementation-flow
-      decisions:
-        - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
-        - make-validation-failure-terminal
-      invariants:
-        - one-design-revision-produces-one-worker-prompt
-        - implementation-validation-never-creates-another-prompt
-        - minisweagent-is-the-only-target-editor
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
-    span:
-      start_line: 537
-      end_line: 539
-    related:
-      entities:
-        - single-prompt-minisweagent-implementation-flow
-      decisions:
-        - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
-        - make-validation-failure-terminal
-      invariants:
-        - one-design-revision-produces-one-worker-prompt
-        - implementation-validation-never-creates-another-prompt
-        - minisweagent-is-the-only-target-editor
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
       start_line: 546
       end_line: 546
@@ -961,628 +1037,1027 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 554
-      end_line: 555
+      start_line: 556
+      end_line: 556
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 609
-      end_line: 609
+      start_line: 562
+      end_line: 577
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 621
+      start_line: 583
+      end_line: 583
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 585
+      end_line: 587
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 594
+      end_line: 594
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 602
+      end_line: 603
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 620
       end_line: 622
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 631
-      end_line: 632
+      start_line: 629
+      end_line: 639
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 634
-      end_line: 634
+      start_line: 647
+      end_line: 692
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 644
-      end_line: 644
+      start_line: 697
+      end_line: 703
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 659
-      end_line: 661
+      start_line: 641
+      end_line: 641
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 718
-      end_line: 718
+      start_line: 713
+      end_line: 713
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 721
-      end_line: 722
+      start_line: 646
+      end_line: 646
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 731
-      end_line: 731
+      start_line: 653
+      end_line: 653
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 775
-      end_line: 775
+      start_line: 656
+      end_line: 656
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 781
-      end_line: 785
+      start_line: 725
+      end_line: 726
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 787
-      end_line: 789
+      start_line: 735
+      end_line: 738
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 793
-      end_line: 795
+      start_line: 740
+      end_line: 740
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 798
-      end_line: 799
+      start_line: 673
+      end_line: 673
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 804
-      end_line: 804
+      start_line: 750
+      end_line: 755
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 806
-      end_line: 806
+      start_line: 684
+      end_line: 685
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 813
-      end_line: 814
+      start_line: 770
+      end_line: 772
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 817
-      end_line: 818
+      start_line: 829
+      end_line: 829
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 823
-      end_line: 823
+      start_line: 832
+      end_line: 833
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 833
-      end_line: 836
+      start_line: 842
+      end_line: 842
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 841
-      end_line: 841
+      start_line: 886
+      end_line: 886
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 844
-      end_line: 844
+      start_line: 892
+      end_line: 907
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 848
-      end_line: 848
+      start_line: 911
+      end_line: 915
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 853
-      end_line: 855
+      start_line: 918
+      end_line: 931
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 880
-      end_line: 889
+      start_line: 936
+      end_line: 936
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 893
-      end_line: 893
+      start_line: 938
+      end_line: 938
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 897
-      end_line: 899
+      start_line: 945
+      end_line: 946
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 922
-      end_line: 924
+      start_line: 949
+      end_line: 950
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 940
-      end_line: 941
+      start_line: 955
+      end_line: 955
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 946
-      end_line: 947
+      start_line: 965
+      end_line: 968
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-coding-worker-implementation-plan.md
     type: modified
-    summary: Align worker schemas, control flow, budgets, tests, migration, and completion gates with one prompt and one mini-SWE-agent invocation.
-    rationale: Remove competing target behavior for per-unit sessions, continuations, validation repairs, and OpenCode fallback.
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
     span:
-      start_line: 954
-      end_line: 954
+      start_line: 973
+      end_line: 973
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 976
+      end_line: 976
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 980
+      end_line: 982
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 984
+      end_line: 992
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 1017
+      end_line: 1026
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 1030
+      end_line: 1030
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 1034
+      end_line: 1036
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 1059
+      end_line: 1061
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 1077
+      end_line: 1078
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 1083
+      end_line: 1089
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
+        - implementation-validation-never-creates-another-prompt
+        - minisweagent-is-the-only-target-editor
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    summary: Align worker schemas, flow, tests, and delivery slices with one invocation and manifest-driven per-obligation validation.
+    rationale: Ensure durable tests, independent probes, baseline differential checks, and semantic receipts all gate implementation acceptance.
+    span:
+      start_line: 1095
+      end_line: 1095
+    related:
+      entities:
+        - single-prompt-minisweagent-implementation-flow
+      decisions:
+        - compile-one-terminal-implementation-prompt
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
+        - make-validation-failure-terminal
+      invariants:
+        - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-llm-instruction-compiler.md
     type: modified
-    summary: Limit the older plan's normative scope to source capture and atomic-clause production and supersede its historical downstream worker design.
-    rationale: Preserve useful upstream design history without allowing obsolete OpenCode and repair-loop sections to control implementation.
+    summary: Supersede the historical downstream worker design with one worker prompt and one private obligation validation manifest.
+    rationale: Preserve useful upstream compiler history without allowing obsolete OpenCode and repair-loop sections to govern execution.
     span:
       start_line: 3
-      end_line: 26
+      end_line: 28
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/bounded-llm-instruction-compiler.md
     type: modified
-    summary: Limit the older plan's normative scope to source capture and atomic-clause production and supersede its historical downstream worker design.
-    rationale: Preserve useful upstream design history without allowing obsolete OpenCode and repair-loop sections to control implementation.
+    summary: Supersede the historical downstream worker design with one worker prompt and one private obligation validation manifest.
+    rationale: Preserve useful upstream compiler history without allowing obsolete OpenCode and repair-loop sections to govern execution.
     span:
-      start_line: 42
-      end_line: 43
+      start_line: 44
+      end_line: 45
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/local-semantic-classifier-implementation-plan.md
     type: modified
-    summary: Bind classifier output to deterministic assembly of one terminal mini-SWE-agent implementation prompt.
-    rationale: Keep classifier specialization inside design and prevent classifier routing from multiplying worker prompts or selecting coding providers.
+    summary: Require classifier output to preserve semantic parity across the worker prompt and private validation manifest.
+    rationale: Keep classifier specialization inside design while retaining complete evidence requirements for post-coding validation.
     span:
       start_line: 16
       end_line: 17
@@ -1591,169 +2066,141 @@ files:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/local-semantic-classifier-implementation-plan.md
     type: modified
-    summary: Bind classifier output to deterministic assembly of one terminal mini-SWE-agent implementation prompt.
-    rationale: Keep classifier specialization inside design and prevent classifier routing from multiplying worker prompts or selecting coding providers.
+    summary: Require classifier output to preserve semantic parity across the worker prompt and private validation manifest.
+    rationale: Keep classifier specialization inside design while retaining complete evidence requirements for post-coding validation.
     span:
       start_line: 69
-      end_line: 85
+      end_line: 96
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/local-semantic-classifier-implementation-plan.md
     type: modified
-    summary: Bind classifier output to deterministic assembly of one terminal mini-SWE-agent implementation prompt.
-    rationale: Keep classifier specialization inside design and prevent classifier routing from multiplying worker prompts or selecting coding providers.
+    summary: Require classifier output to preserve semantic parity across the worker prompt and private validation manifest.
+    rationale: Keep classifier specialization inside design while retaining complete evidence requirements for post-coding validation.
     span:
-      start_line: 811
-      end_line: 813
+      start_line: 822
+      end_line: 827
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/local-semantic-classifier-implementation-plan.md
     type: modified
-    summary: Bind classifier output to deterministic assembly of one terminal mini-SWE-agent implementation prompt.
-    rationale: Keep classifier specialization inside design and prevent classifier routing from multiplying worker prompts or selecting coding providers.
+    summary: Require classifier output to preserve semantic parity across the worker prompt and private validation manifest.
+    rationale: Keep classifier specialization inside design while retaining complete evidence requirements for post-coding validation.
     span:
-      start_line: 1318
-      end_line: 1321
+      start_line: 1332
+      end_line: 1335
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/local-semantic-classifier-implementation-plan.md
     type: modified
-    summary: Bind classifier output to deterministic assembly of one terminal mini-SWE-agent implementation prompt.
-    rationale: Keep classifier specialization inside design and prevent classifier routing from multiplying worker prompts or selecting coding providers.
+    summary: Require classifier output to preserve semantic parity across the worker prompt and private validation manifest.
+    rationale: Keep classifier specialization inside design while retaining complete evidence requirements for post-coding validation.
     span:
-      start_line: 1355
-      end_line: 1358
+      start_line: 1369
+      end_line: 1372
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/local-semantic-classifier-implementation-plan.md
     type: modified
-    summary: Bind classifier output to deterministic assembly of one terminal mini-SWE-agent implementation prompt.
-    rationale: Keep classifier specialization inside design and prevent classifier routing from multiplying worker prompts or selecting coding providers.
+    summary: Require classifier output to preserve semantic parity across the worker prompt and private validation manifest.
+    rationale: Keep classifier specialization inside design while retaining complete evidence requirements for post-coding validation.
     span:
-      start_line: 1375
-      end_line: 1377
+      start_line: 1389
+      end_line: 1391
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
   - path: docs/plans/local-semantic-classifier-implementation-plan.md
     type: modified
-    summary: Bind classifier output to deterministic assembly of one terminal mini-SWE-agent implementation prompt.
-    rationale: Keep classifier specialization inside design and prevent classifier routing from multiplying worker prompts or selecting coding providers.
+    summary: Require classifier output to preserve semantic parity across the worker prompt and private validation manifest.
+    rationale: Keep classifier specialization inside design while retaining complete evidence requirements for post-coding validation.
     span:
-      start_line: 1398
-      end_line: 1402
+      start_line: 1412
+      end_line: 1419
     related:
       entities:
         - single-prompt-minisweagent-implementation-flow
       decisions:
         - compile-one-terminal-implementation-prompt
-        - invoke-minisweagent-exactly-once
+        - preserve-private-obligation-validation-manifest
+        - validate-every-obligation-independently
+        - prefer-independent-validator-evidence
         - make-validation-failure-terminal
       invariants:
         - one-design-revision-produces-one-worker-prompt
+        - every-actionable-obligation-retains-a-validation-contract
         - implementation-validation-never-creates-another-prompt
         - minisweagent-is-the-only-target-editor
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Remove obsolete worker-packet fields from the terminal prompt contract.
-    rationale: Keep the durable artifact aligned with the exact prompt sent to mini-SWE-agent.
-    span:
-      start_line: 225
-      end_line: 226
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Remove obsolete runtime provider and repair configuration from the target flow.
-    rationale: Prevent runtime configuration from reintroducing multiple worker prompts or fallback providers.
-    span:
-      start_line: 641
-      end_line: 641
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Remove obsolete runtime provider and repair configuration from the target flow.
-    rationale: Prevent runtime configuration from reintroducing multiple worker prompts or fallback providers.
-    span:
-      start_line: 646
-      end_line: 646
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Remove obsolete runtime provider and repair configuration from the target flow.
-    rationale: Prevent runtime configuration from reintroducing multiple worker prompts or fallback providers.
-    span:
-      start_line: 653
-      end_line: 653
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Remove obsolete runtime provider and repair configuration from the target flow.
-    rationale: Prevent runtime configuration from reintroducing multiple worker prompts or fallback providers.
-    span:
-      start_line: 656
-      end_line: 656
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Remove obsolete repair artifact layout from the implementation plan.
-    rationale: Persist one prompt and one attempt without implying additional repair sessions.
-    span:
-      start_line: 673
-      end_line: 673
-  - path: docs/plans/bounded-coding-worker-implementation-plan.md
-    type: modified
-    summary: Remove obsolete repair artifact layout from the implementation plan.
-    rationale: Persist one prompt and one attempt without implying additional repair sessions.
-    span:
-      start_line: 684
-      end_line: 685
 entities:
   - id: single-prompt-minisweagent-implementation-flow
     type: Workflow
@@ -1762,20 +2209,29 @@ entity_relationships: []
 invariants:
   - id: one-design-revision-produces-one-worker-prompt
     action: added
-    description: A completed and validated design revision deterministically produces exactly one immutable minisweagent-implementation-prompt-v1 artifact and exactly one mini-SWE-agent invocation.
+    description: A completed design revision deterministically produces exactly one worker-facing minisweagent-implementation-prompt-v1 and exactly one mini-SWE-agent invocation.
     rationale: Preserve feature coherence and prevent obligation, file, test, or validation boundaries from multiplying coding sessions.
+  - id: every-actionable-obligation-retains-a-validation-contract
+    action: added
+    description: The design handoff preserves every actionable obligation in a private immutable manifest with its verification cases, durable-test requirement, oracle, baseline expectation, and required evidence, and acceptance requires one passing receipt per obligation.
+    rationale: Ensure the single worker prompt does not discard the structured information required to prove completeness after coding.
   - id: implementation-validation-never-creates-another-prompt
     action: added
-    description: Timeout, limit, provider, scope, test, and final-validation failures terminate the implementation run and cannot generate a continuation, repair, or fallback coding prompt.
-    rationale: Keep retry and design revision explicit while ensuring one failed implementation attempt cannot silently alter its accepted contract.
+    description: Timeout, provider, scope, test, obligation, and final-validation failures terminate the run and cannot generate a continuation, repair, or fallback coding prompt.
+    rationale: Keep retry and design revision explicit while ensuring a failed implementation attempt cannot silently alter its accepted contract.
   - id: minisweagent-is-the-only-target-editor
     action: added
     description: The completed feature flow invokes mini-SWE-agent as its sole repository editor and never selects OpenCode as an implementation fallback.
     rationale: Remove provider-dependent ambiguity from the design-to-implementation contract.
 guidance:
+  - id: require-layered-obligation-evidence
+    action: added
+    description: Treat test collection and passing execution as necessary but insufficient; also require the declared durable-test diff, baseline discrimination for new behavior, oracle alignment, independent probes where materializable, and bounded per-obligation semantic review.
+    rationale: Prevent tautological, unrelated, or worker-controlled tests from becoming the only evidence that an obligation was implemented.
   - id: improve-future-runs-through-design-revision
     action: added
     description: Use durable failure evidence to improve and revalidate a future design revision or model configuration under a new run identity instead of appending instructions to the failed run.
     rationale: Preserve prompt immutability and make every implementation attempt reproducible from one accepted design.
 features: []
 proposed_prs: []
+

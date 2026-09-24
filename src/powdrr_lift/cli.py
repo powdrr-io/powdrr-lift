@@ -4576,6 +4576,7 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             output_root=args.output_root,
             open_pr=False,
             push_changes=False,
+            cleanup_temporary_artifacts=True,
             planning_client=planning_client,
             task_id=args.task_id or args.work_item_name,
         )

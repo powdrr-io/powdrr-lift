@@ -41,6 +41,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_intent_review,
     _apply_sentence_design_trace,
     _compile_code_task_plan,
+    _compile_code_task_postconditions,
     _compile_code_task_preconditions,
     _compile_feature_obligations,
     _compile_obligation_verification_plans,
@@ -56,9 +57,12 @@ from powdrr_lift.workrr.feature_endpoint import (
     _operation_checkpoint,
     _plan_text_items,
     _proposal_execution_units,
+    _remove_temporary_feature_artifacts,
+    _run_code_task_agent,
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
     _validate_required_test_cases,
+    _worktree_state_fingerprint,
     _write_structrr_plan,
     _write_structrr_plan_from_obligations,
     review_feature_diff,
@@ -796,7 +800,7 @@ def test_create_pr_changelog_absorbs_and_removes_temporary_proposal(
     )
 
     assert path.exists()
-    assert not proposal.exists()
+    assert not (proposal / "structrr-diff.yaml").exists()
     changelog = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert [item["path"] for item in changelog["files"]] == ["src/app.py"]
     assert changelog["invariants"] == [{"id": "invariant", "description": "i"}]
@@ -1466,7 +1470,7 @@ def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> N
         before_paths={"src/adapter.py"},
     )
     assert failed["passed"] is False
-    assert failed["error"] == "operation produced no new worktree changes"
+    assert failed["error"] == "operation produced no material worktree changes"
 
     reused = _operation_checkpoint(
         runner=runner,
@@ -1476,8 +1480,217 @@ def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> N
         attempt=attempt,
         before_paths={"src/adapter.py"},
     )
-    assert reused["passed"] is True
+    assert reused["passed"] is False
     assert reused["changed_paths"] == []
+
+
+def test_code_task_agent_continues_after_timed_out_attempt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    attempt_results: list[dict[str, Any]] = [
+        {
+            "attempt": {
+                "status": CodingAgentStatus.TIMED_OUT.value,
+                "error": "coding-agent process timed out",
+                "changed_paths": ["src/partial.py"],
+            },
+            "attempts": [
+                {"status": CodingAgentStatus.TIMED_OUT.value},
+            ],
+        },
+        {
+            "attempt": {
+                "status": CodingAgentStatus.COMPLETED.value,
+                "error": None,
+                "changed_paths": ["src/partial.py", "tests/test_feature.py"],
+            },
+            "attempts": [
+                {"status": CodingAgentStatus.COMPLETED.value},
+            ],
+        },
+    ]
+    attempts = iter(attempt_results)
+    calls: list[dict[str, Any]] = []
+
+    def fake_phase(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        calls.append(dict(kwargs["parameters"]))
+        result = next(attempts)
+        kwargs["state"]["operation_checkpoints"] = [
+            {"passed": result["attempt"]["status"] == "completed"}
+        ]
+        return result
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", fake_phase
+    )
+    result = _run_code_task_agent(
+        {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
+        config=SimpleNamespace(
+            feature_description="Implement the feature.",
+            work_item_name="feature",
+        ),
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        branch="feature",
+        slug="feature",
+        state={},
+    )
+
+    assert result["attempt"]["status"] == CodingAgentStatus.COMPLETED.value
+    assert result["continuations"] == 1
+    assert len(calls) == 2
+    assert calls[0].get("repair_issue") is None
+    assert calls[1]["repair_issue"]["category"] == "coding_attempt_incomplete"
+    assert (
+        "Continue the existing implementation"
+        in calls[1]["repair_issue"]["instruction"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("attempt_status", "current_diff", "agent_passed", "diff_passed"),
+    [
+        ("timed_out", "new diff", False, True),
+        ("completed", "old diff", True, False),
+        ("completed", "new diff", True, True),
+    ],
+)
+def test_code_task_postconditions_require_completed_attempt_and_new_state(
+    tmp_path: Path,
+    attempt_status: str,
+    current_diff: str,
+    agent_passed: bool,
+    diff_passed: bool,
+) -> None:
+    status = " M src/adapter.py\n"
+    paths = ["src/adapter.py"]
+    before = {
+        "status": status,
+        "diff": "old diff",
+        "paths": paths,
+    }
+
+    def runner(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        del kwargs
+        if command == ["git", "status", "--porcelain"]:
+            return subprocess.CompletedProcess(command, 0, status, "")
+        if command == ["git", "diff", "--binary"]:
+            return subprocess.CompletedProcess(command, 0, current_diff, "")
+        if command in (
+            ["git", "diff", "--name-only"],
+            ["git", "diff", "--cached", "--name-only"],
+        ):
+            output = "src/adapter.py\n" if command[-1] == "--name-only" else ""
+            return subprocess.CompletedProcess(command, 0, output, "")
+        if command == ["git", "ls-files", "--others", "--exclude-standard"]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command == ["git", "diff", "--check"]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        raise AssertionError(f"unexpected command: {command}")
+
+    def before_runner(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command == ["git", "diff", "--binary"]:
+            return subprocess.CompletedProcess(command, 0, "old diff", "")
+        return runner(command, **kwargs)
+
+    before["state_fingerprint"] = _worktree_state_fingerprint(before_runner, tmp_path)
+
+    result = _compile_code_task_postconditions(
+        {
+            "before_state": before,
+            "implementation": {
+                "attempt": {"status": attempt_status},
+            },
+            "task": {"task_id": "code-task-001"},
+        },
+        worktree=tmp_path,
+        runner=runner,
+        output_root=tmp_path / "artifacts",
+    )
+
+    decisions = {item["check"]: item["passed"] for item in result["decisions"]}
+    assert decisions["agent_completed"] is agent_passed
+    assert decisions["diff_nonempty"] is diff_passed
+
+
+def test_harbor_cleanup_removes_generated_planning_files_from_candidate(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "initial",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    initial_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    proposal = tmp_path / "docs" / "proposals" / "example-task"
+    proposal.mkdir(parents=True)
+    (proposal / "structrr-diff.yaml").write_text("generated\n", encoding="utf-8")
+    baseline = tmp_path / "docs" / "structrr" / "current"
+    baseline.mkdir(parents=True)
+    (baseline / "baseline-generated.yaml").write_text("generated\n", encoding="utf-8")
+    product = tmp_path / "src" / "product.py"
+    product.parent.mkdir()
+    product.write_text("value = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "run artifacts and product",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    _remove_temporary_feature_artifacts(
+        subprocess.run,
+        tmp_path,
+        slug="example-task",
+        initial_head=initial_head,
+    )
+
+    assert not (proposal / "structrr-diff.yaml").exists()
+    assert not (baseline / "baseline-generated.yaml").exists()
+    assert product.exists()
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", initial_head, "--"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert changed == ["src/product.py"]
 
 
 def test_plan_acceptance_criteria_have_stable_ids() -> None:
@@ -1631,6 +1844,48 @@ def test_code_task_plan_skips_invalid_candidate_and_keeps_valid_tasks(
         }
     ]
     assert result["structural_decisions"][0]["passed"] is False
+
+
+def test_code_task_plan_coalesces_product_obligations_into_one_worker_task(
+    tmp_path: Path,
+) -> None:
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {
+                "failing_cases": [
+                    {"obligation_id": "first"},
+                    {"obligation_id": "second"},
+                ]
+            },
+            "verification_plans": [
+                {
+                    "obligation_id": "first",
+                    "kind": "feature",
+                    "operation": "implement the first behavior",
+                    "oracle": "the first behavior works",
+                    "evidence_case": "Run the first contract test.",
+                },
+                {
+                    "obligation_id": "second",
+                    "kind": "feature",
+                    "operation": "implement the second behavior",
+                    "oracle": "the second behavior works",
+                    "evidence_case": "Run the second contract test.",
+                },
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("src",)),
+    )
+
+    assert len(result["tasks"]) == 1
+    task = result["tasks"][0]
+    assert task["execution_mode"] == "cohesive"
+    assert task["obligation_refs"] == ["first", "second"]
+    assert "first behavior" in task["objective"]
+    assert "second behavior" in task["objective"]
+    assert "first contract test" in task["validator"]["evidence_case"]
+    assert "second contract test" in task["validator"]["evidence_case"]
 
 
 def test_code_task_plan_never_compiles_non_product_obligations(

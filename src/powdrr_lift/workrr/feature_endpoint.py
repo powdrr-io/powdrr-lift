@@ -129,6 +129,7 @@ class FeatureEndpointConfig:
     output_root: Path | None = None
     open_pr: bool = True
     push_changes: bool = True
+    cleanup_temporary_artifacts: bool = False
     planning_client: WorkflowLLMClient | None = None
     task_id: str | None = None
 
@@ -288,13 +289,22 @@ def run_feature_in_place(
         branch = _git_output(runner, root, ["git", "branch", "--show-current"])
         if not branch:
             branch = "HEAD"
-        return _execute_procedrr_flow(
+        initial_head = _git_output(runner, root, ["git", "rev-parse", "HEAD"])
+        result = _execute_procedrr_flow(
             replace(config, open_pr=False, push_changes=False),
             runner=runner,
             worktree=root,
             output_root=output_root,
             branch=branch,
         )
+        if config.cleanup_temporary_artifacts:
+            _remove_temporary_feature_artifacts(
+                runner,
+                root,
+                slug=slug,
+                initial_head=initial_head,
+            )
+        return result
     except Exception as error:
         _write_failure_artifact(
             output_root,
@@ -1843,11 +1853,22 @@ def _execution_unit_for_code_task(
     objective = str(task.get("objective", "")).strip()
     if not task_id or not objective:
         raise PowdrrExecutionError("code task is missing task_id or objective")
+    requested_profiles = strings("validation_profiles")
+    available_profiles = tuple(dict.fromkeys(default_profiles))
+    validation_profiles = tuple(
+        profile for profile in requested_profiles if profile in available_profiles
+    )
+    if not validation_profiles:
+        # Code-task compilation may use the conventional name ``pytest`` while
+        # discovery names an explicit task command ``feature-validation``.
+        # Bind to the discovered profile instead of sending the worker a
+        # validator that cannot be resolved.
+        validation_profiles = available_profiles[:1]
     return ExecutionUnit(
         unit_id=f"implement-{slug}-{task_id}",
         objective=objective,
         paths=strings("allowed_paths", default_paths),
-        validation_profiles=strings("validation_profiles", default_profiles),
+        validation_profiles=validation_profiles,
         acceptance_criteria=strings("acceptance_criteria"),
         planned_additions=mappings("planned_additions"),
         planned_deletions=mappings("planned_deletions"),
@@ -2174,6 +2195,7 @@ def _run_code_agent_phase(
         operation_request_path.parent.mkdir(parents=True, exist_ok=True)
         operation_request_path.write_text(request.to_json(), encoding="utf-8")
         before_paths = _changed_paths(runner, worktree)
+        before_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
         state["opencode_attempt_number"] = attempt_number
         if not repair_mode and isinstance(provider, OpenCodeProvider):
@@ -2196,6 +2218,7 @@ def _run_code_agent_phase(
             request=request,
             attempt=attempt,
             before_paths=before_paths,
+            before_state_fingerprint=before_state_fingerprint,
         )
         checkpoint_path = _write_operation_checkpoint(
             output_root, attempt.attempt_id, checkpoint
@@ -2640,6 +2663,7 @@ def _operation_checkpoint(
     request: ImplementationRequest,
     attempt: CodingAgentAttempt,
     before_paths: set[str],
+    before_state_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     after_paths = _changed_paths(runner, worktree)
     task_paths = tuple(sorted(after_paths - before_paths))
@@ -2660,18 +2684,13 @@ def _operation_checkpoint(
         text=True,
         check=False,
     )
-    existing_in_scope = bool(after_paths) and all(
-        any(
-            scope == "."
-            or Path(path) == Path(scope)
-            or Path(scope) in Path(path).parents
-            for scope in request.allowed_paths
-        )
-        for path in after_paths
+    after_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
+    state_changed = (
+        after_state_fingerprint != before_state_fingerprint
+        if before_state_fingerprint is not None
+        else bool(task_paths)
     )
-    has_changes = bool(task_paths) or (
-        request.allow_existing_changes and existing_in_scope
-    )
+    has_changes = state_changed
     passed = (
         attempt.status is CodingAgentStatus.COMPLETED
         and has_changes
@@ -2681,8 +2700,8 @@ def _operation_checkpoint(
     reason = None
     if attempt.status is not CodingAgentStatus.COMPLETED:
         reason = f"coding-agent attempt was {attempt.status.value}"
-    elif not task_paths and not has_changes:
-        reason = "operation produced no new worktree changes"
+    elif not has_changes:
+        reason = "operation produced no material worktree changes"
     elif out_of_scope:
         reason = f"operation changed out-of-scope paths: {list(out_of_scope)}"
     elif diff_check.returncode != 0:
@@ -2694,10 +2713,28 @@ def _operation_checkpoint(
         "status": "passed" if passed else "failed",
         "passed": passed,
         "changed_paths": list(task_paths),
+        "state_changed": state_changed,
+        "before_state_fingerprint": before_state_fingerprint,
+        "after_state_fingerprint": after_state_fingerprint,
         "out_of_scope_paths": list(out_of_scope),
         "diff_check_returncode": diff_check.returncode,
         "error": reason,
     }
+
+
+def _worktree_state_fingerprint(runner: Runner, worktree: Path) -> str:
+    """Fingerprint the candidate state, including already-dirty files."""
+    status = _git_output(runner, worktree, ["git", "status", "--porcelain"])
+    diff = _git_output(runner, worktree, ["git", "diff", "--binary"])
+    paths = sorted(_changed_paths(runner, worktree))
+    untracked: dict[str, str] = {}
+    for relative_path in paths:
+        path = worktree / relative_path
+        if path.is_file() and relative_path not in diff:
+            untracked[relative_path] = path.read_bytes().hex()
+    return content_fingerprint(
+        {"status": status, "diff": diff, "paths": paths, "untracked": untracked}
+    )
 
 
 def _write_operation_checkpoint(
@@ -3053,6 +3090,77 @@ def _exclude_telemetry_from_patch(repo_root: Path, output_root: Path) -> None:
         exclude_path.write_text(
             current.rstrip() + "\n" + pattern + "\n", encoding="utf-8"
         )
+
+
+def _remove_temporary_feature_artifacts(
+    runner: Runner,
+    worktree: Path,
+    *,
+    slug: str,
+    initial_head: str,
+) -> None:
+    """Remove generated planning files from an in-place candidate tree.
+
+    Harbor collects the checkout after the shared flow returns. Proposal and
+    Structrr bootstrap files are runtime evidence, not product changes, so
+    restore pre-existing files and remove files created by this run before the
+    candidate patch is evaluated.
+    """
+    generated_prefixes = (
+        f"docs/proposals/{slug}/",
+        "docs/structrr/current/",
+    )
+    changed_paths = set(
+        _git_output(
+            runner,
+            worktree,
+            ["git", "diff", "--name-only", initial_head, "--"],
+        ).splitlines()
+    )
+    changed_paths.update(_changed_paths(runner, worktree))
+    generated_paths = sorted(
+        path
+        for path in changed_paths
+        if any(path.startswith(prefix) for prefix in generated_prefixes)
+    )
+    for relative_path in generated_paths:
+        initial_path = _git_output(
+            runner,
+            worktree,
+            ["git", "ls-tree", "-r", "--name-only", initial_head, "--", relative_path],
+        )
+        target = worktree / relative_path
+        if initial_path.strip():
+            _run(
+                runner,
+                worktree,
+                ["git", "restore", "--source", initial_head, "--", relative_path],
+            )
+        else:
+            runner(
+                [
+                    "git",
+                    "rm",
+                    "-r",
+                    "--cached",
+                    "--ignore-unmatch",
+                    "--",
+                    relative_path,
+                ],
+                cwd=worktree,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target)
+            elif target.exists() or target.is_symlink():
+                target.unlink()
+    if (
+        generated_paths
+        and _git_output(runner, worktree, ["git", "status", "--porcelain"]).strip()
+    ):
+        _commit(runner, worktree, "Remove temporary feature planning artifacts")
 
 
 def _latest_model_response_path(state: Mapping[str, Any]) -> str | None:
@@ -3803,7 +3911,20 @@ def _require_clean_root(root: Path, runner: Runner) -> None:
 
 def _commit(runner: Runner, worktree: Path, message: str) -> None:
     _run(runner, worktree, ["git", "add", "-A"])
-    _run(runner, worktree, ["git", "commit", "-am", message])
+    _run(
+        runner,
+        worktree,
+        [
+            "git",
+            "-c",
+            "user.name=Powdrr Automation",
+            "-c",
+            "user.email=powdrr-automation@users.noreply.github.com",
+            "commit",
+            "-am",
+            message,
+        ],
+    )
 
 
 def _create_pr_changelog(
@@ -4249,6 +4370,42 @@ def _compile_code_task_plan(
     if not tasks:
         # A green baseline is a valid no-op implementation plan.
         tasks = []
+    elif len(tasks) > 1:
+        # Obligations remain separate verification units, but implementation is
+        # one coherent repository operation. Starting a fresh coding process
+        # for every sentence makes each worker rediscover the repository and
+        # causes later workers to fail after an earlier worker already changed
+        # the shared implementation surface.
+        tasks = [
+            {
+                **tasks[0],
+                "objective": (
+                    "Implement the feature behavior covered by these obligations:\n"
+                    + "\n".join(f"- {item['objective']}" for item in tasks)
+                ),
+                "obligation_refs": list(
+                    dict.fromkeys(
+                        reference
+                        for item in tasks
+                        for reference in item["obligation_refs"]
+                    )
+                ),
+                "acceptance_criteria": list(
+                    dict.fromkeys(
+                        criterion
+                        for item in tasks
+                        for criterion in item["acceptance_criteria"]
+                    )
+                ),
+                "validator": {
+                    **tasks[0]["validator"],
+                    "evidence_case": "\n".join(
+                        f"- {item['validator']['evidence_case']}" for item in tasks
+                    ),
+                },
+                "execution_mode": "cohesive",
+            }
+        ]
     decisions = [
         {
             "decision_id": "task-plan:scope",
@@ -4429,11 +4586,14 @@ def _capture_code_task_before_state(
 ) -> dict[str, Any]:
     task = parameters.get("task")
     task_id = str(task.get("task_id", "task")) if isinstance(task, Mapping) else "task"
+    paths = sorted(_changed_paths(runner, worktree))
     document = {
         "task_id": task_id,
         "head": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
         "status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
         "diff": _git_output(runner, worktree, ["git", "diff", "--binary"]),
+        "paths": paths,
+        "state_fingerprint": _worktree_state_fingerprint(runner, worktree),
     }
     path, fingerprint = _write_flow_artifact(
         output_root / "code-tasks" / task_id, "before.json", document
@@ -4488,16 +4648,111 @@ def _run_code_task_agent(
             "obligations",
             {"obligations": [{"description": task.get("objective", "")}], "path": ""},
         )
-    return _run_code_agent_phase(
-        config,
-        runner=runner,
-        worktree=worktree,
-        output_root=output_root,
-        branch=branch,
-        slug=slug,
-        state=state,
-        parameters=forwarded,
-    )
+    # A provider timeout is not a completed coding task.  It also must not
+    # discard useful partial edits: the next session needs to inspect the
+    # current tree and continue from the actual failure.  Keep this recovery
+    # local to the coding-task operation so Procedrr can still make one
+    # bounded decision about the resulting receipt.
+    attempt_results: list[dict[str, Any]] = []
+    recovery_issue: Mapping[str, Any] | None = None
+    for continuation in range(3):
+        current_parameters = dict(forwarded)
+        if recovery_issue is not None:
+            current_parameters["repair_issue"] = dict(recovery_issue)
+        result = _run_code_agent_phase(
+            config,
+            runner=runner,
+            worktree=worktree,
+            output_root=output_root,
+            branch=branch,
+            slug=slug,
+            state=state,
+            parameters=current_parameters,
+        )
+        attempt_results.append(result)
+        attempt = result.get("attempt")
+        checkpoints = state.get("operation_checkpoints", ())
+        checkpoint = checkpoints[-1] if checkpoints else None
+        focused_validation = _run_code_task_focused_validation(state, worktree=worktree)
+        if focused_validation is not None:
+            result = {**result, "coding_validation": focused_validation}
+            attempt_results[-1] = result
+        if (
+            isinstance(attempt, Mapping)
+            and attempt.get("status") == CodingAgentStatus.COMPLETED.value
+            and isinstance(checkpoint, Mapping)
+            and checkpoint.get("passed") is True
+            and (
+                focused_validation is None
+                or focused_validation.get("status")
+                == ValidationReportStatus.PASSED.value
+            )
+        ):
+            return {
+                **result,
+                "attempts": [
+                    attempt
+                    for item in attempt_results
+                    for attempt in item.get("attempts", [])
+                    if isinstance(attempt, Mapping)
+                ],
+                "continuations": continuation,
+            }
+        if not isinstance(attempt, Mapping):
+            break
+        if attempt.get("status") == CodingAgentStatus.POLICY_DENIED.value:
+            break
+        recovery_issue = {
+            "category": "coding_attempt_incomplete",
+            "status": attempt.get("status"),
+            "error": attempt.get("error"),
+            "changed_paths": attempt.get("changed_paths", []),
+            "validation": focused_validation,
+            "instruction": (
+                "Continue the existing implementation from the current worktree. "
+                "Inspect what the previous session changed, preserve correct edits, "
+                "and finish the requested task. Do not restart or re-plan "
+                "unrelated work."
+            ),
+        }
+    final = attempt_results[-1]
+    return {
+        **final,
+        "attempts": [
+            attempt
+            for item in attempt_results
+            for attempt in item.get("attempts", [])
+            if isinstance(attempt, Mapping)
+        ],
+        "continuations": len(attempt_results) - 1,
+    }
+
+
+def _run_code_task_focused_validation(
+    state: Mapping[str, Any], *, worktree: Path
+) -> dict[str, Any] | None:
+    """Validate a completed coding attempt before accepting its task receipt."""
+    request = state.get("request")
+    attempt = state.get("attempt")
+    profiles = state.get("validation_profiles")
+    if (
+        not isinstance(request, ImplementationRequest)
+        or not isinstance(attempt, CodingAgentAttempt)
+        or not isinstance(profiles, Sequence)
+    ):
+        return None
+    discovered = {
+        profile.name: ValidationProfile(profile.name, tuple(profile.command))
+        for profile in profiles
+        if isinstance(profile, DiscoveredValidationProfile)
+    }
+    if not discovered:
+        return None
+    report = ValidationRunner(discovered).run(request, attempt, worktree_root=worktree)
+    attempt_store = state.get("attempt_store")
+    if isinstance(attempt_store, CodingAgentAttemptStore):
+        attempt_store.save_validation_report(report)
+    return report.to_data()
 
 
 def _compile_code_task_postconditions(
@@ -4513,18 +4768,32 @@ def _compile_code_task_postconditions(
     current = {
         "status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
         "diff": _git_output(runner, worktree, ["git", "diff", "--binary"]),
+        "paths": sorted(_changed_paths(runner, worktree)),
     }
+    current["state_fingerprint"] = _worktree_state_fingerprint(runner, worktree)
+    attempt = (
+        implementation.get("attempt") if isinstance(implementation, Mapping) else None
+    )
+    attempt_status = attempt.get("status") if isinstance(attempt, Mapping) else None
+    coding_validation = (
+        implementation.get("coding_validation")
+        if isinstance(implementation, Mapping)
+        else None
+    )
+    before_fingerprint = (
+        before.get("state_fingerprint") if isinstance(before, Mapping) else None
+    )
     decisions = [
         {
             "decision_id": "post:agent",
             "check": "agent_completed",
-            "passed": isinstance(implementation, Mapping)
-            and bool(implementation.get("attempt")),
+            "passed": attempt_status == CodingAgentStatus.COMPLETED.value,
         },
         {
             "decision_id": "post:diff",
             "check": "diff_nonempty",
-            "passed": bool(current["diff"]),
+            "passed": bool(current["state_fingerprint"])
+            and current["state_fingerprint"] != before_fingerprint,
         },
         {
             "decision_id": "post:diff-check",
@@ -4541,7 +4810,15 @@ def _compile_code_task_postconditions(
         {
             "decision_id": "post:before",
             "check": "evidence_current",
-            "passed": isinstance(before, Mapping),
+            "passed": isinstance(before, Mapping)
+            and isinstance(before_fingerprint, str)
+            and bool(before_fingerprint),
+        },
+        {
+            "decision_id": "post:focused-validation",
+            "check": "focused_validation_passed",
+            "passed": isinstance(coding_validation, Mapping)
+            and coding_validation.get("status") == ValidationReportStatus.PASSED.value,
         },
     ]
     document = {"decisions": decisions, "current": current}

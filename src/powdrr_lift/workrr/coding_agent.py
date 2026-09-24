@@ -187,18 +187,23 @@ class ImplementationRequest:
                 "Preservation constraints come from the unit acceptance contract.",
             ),
         )
-        intent_packet_text = intent_packet.render()
         implementation_packet_text = (
             implementation_packet.render() if implementation_packet is not None else ""
         )
-        prompt = (
-            f"Implement execution unit {unit.unit_id}: {unit.objective}\n\n"
-            f"{implementation_packet_text}\n\n"
-            f"{intent_packet_text}\n\n"
+        product_changes = (
+            "Required product changes:\n"
+            f"Additions: {_format_planned_changes(unit.planned_additions)}\n"
+            f"Deletions: {_format_planned_changes(unit.planned_deletions)}\n"
+        )
+        validation_contract = (
+            f"{implementation_packet_text}\n"
+            if implementation_packet is not None
+            else f"Acceptance criteria:\n{criteria}\n"
+        )
+        worker_policy = (
             f"Allowed paths: {allowed_paths}\n"
             "Ephemeral paths (Workrr removes these after the attempt): "
             f"{ephemeral_paths}\n"
-            f"Acceptance criteria:\n{criteria}\n"
             f"Validation profiles Workrr will run: {validation_profiles}\n\n"
             f"{allowed_commands_text}\n"
             "Validation command rules: use the listed command prefix exactly. "
@@ -206,11 +211,25 @@ class ImplementationRequest:
             "type the wildcard literally. Do not prepend environment variables, "
             "`cd`, pipes, redirects, or unapproved flags. Run focused tests "
             "only; Workrr owns the full validation profile.\n\n"
-            "Use only the allowed paths or declared ephemeral paths. Temporary "
-            "helpers are permitted only in the declared ephemeral paths; Workrr "
-            "removes them before evaluating the durable diff. Workrr runs the "
-            "declared validation profiles after you "
-            "finish. Do not commit, push, or alter files outside the request."
+            "Work in the existing Workrr worktree. Do not create branches, "
+            "commits, pull requests, or generated repository metadata. Use only "
+            "the allowed paths or declared ephemeral paths. Temporary helpers "
+            "are permitted only in declared ephemeral paths. Do not alter files "
+            "outside the request."
+        )
+        product_objective = (
+            implementation_packet.objective
+            if implementation_packet is not None
+            else unit.objective
+        )
+        prompt = (
+            f"Implement this feature: {product_objective}\n\n"
+            "Product contract:\n"
+            f"{product_changes}\n"
+            "Validation contract:\n"
+            f"{validation_contract}\n"
+            "Worker policy:\n"
+            f"{worker_policy}"
         )
         return cls(
             request_id=request_id,

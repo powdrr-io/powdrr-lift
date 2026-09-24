@@ -30,19 +30,40 @@ def test_packet_renders_bounded_obligations_and_exact_selectors() -> None:
     )
 
     rendered = packet.render()
-    assert "obligation 001: Data initializes on entry." in rendered
-    assert "test_verify_entry_initialization" in rendered
+    assert "Required behavioral tests:" in rendered
+    assert "obligation 001" not in rendered
+    assert "Add state data support." not in rendered
+    assert "IMPORTANT:" not in rendered
+    assert "tests/test_state.py::test_entry" in rendered
+    assert "Verify entry initialization." in rendered
     assert "create the exact selectors" not in rendered
     assert "candidate 1: tests/test_state.py::test_existing" not in rendered
     assert "model-authored" not in rendered
-    assert "repair the test and the implementation as needed" in rendered
-    assert "rerunning it at most twice after a repair" in rendered
-    assert (
-        "Do not run the full repository suite, coverage, lint, type checks" in rendered
-    )
-    assert "Workrr owns repository-wide validation" in rendered
+    assert "repair the test and implementation as needed" in rendered
     assert "repository validation" not in rendered
     assert packet.from_data(packet.to_data()).to_data() == packet.to_data()
+
+
+def test_packet_removes_source_workflow_instructions_from_objective() -> None:
+    packet = compile_implementation_packet(
+        objective=(
+            "Add behavior.\n\n"
+            "IMPORTANT: create a branch from main and commit everything."
+        ),
+        obligations=("The behavior exists.",),
+        required_tests=(
+            {
+                "description": "Verify the behavior.",
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_feature.py::test_behavior",
+            },
+        ),
+        allowed_paths=("src",),
+        validation_profiles=("pytest",),
+    )
+
+    assert packet.objective == "Add behavior."
 
 
 def test_packet_requires_a_contract_for_each_obligation() -> None:

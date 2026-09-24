@@ -8,6 +8,15 @@ from dataclasses import dataclass
 from typing import Any
 
 
+def _worker_objective(text: str) -> str:
+    """Remove source-level repository workflow instructions from the objective."""
+    # Branching, committing, and PR instructions belong to Workrr. They are
+    # frequently present in task descriptions, but must not compete with the
+    # worker policy rendered by the request compiler.
+    objective, separator, _process_instructions = text.partition("\nIMPORTANT:")
+    return (objective if separator else text).strip()
+
+
 @dataclass(frozen=True, slots=True)
 class RepositoryContextPacket:
     """Stable repository facts supplied to a coding worker."""
@@ -104,7 +113,7 @@ class ImplementationPacket:
         if not isinstance(existing, list):
             raise ValueError("implementation packet existing tests are malformed")
         packet = cls(
-            objective=str(raw.get("objective", "")),
+            objective=_worker_objective(str(raw.get("objective", ""))),
             obligations=obligations,
             required_tests=tests,
             repository=RepositoryContextPacket(
@@ -124,38 +133,37 @@ class ImplementationPacket:
         return packet
 
     def render(self) -> str:
-        tests = self.to_data()["required_tests"]
-        test_lines = [
-            f"- required new test {item['ordinal']:03d}: function name must start "
-            f"with `{item['name_hint']}` "
-            f"({item['provider']}/{item['profile']}) — {item['description']}"
-            for item in tests
-        ] or ["- none"]
-        obligation_lines = [
-            f"- obligation {index:03d}: {description}"
-            for index, description in enumerate(self.obligations, start=1)
-        ] or ["- none"]
+        """Render the worker-facing validation contract.
+
+        Obligations, provenance, and structural identity remain compiler-owned
+        artifacts. Rendering them here duplicated the same requirements in the
+        execution unit, intent packet, and acceptance criteria. The worker only
+        needs the executable behavioral contracts that it must make true.
+        """
+        test_lines = []
+        for index, item in enumerate(self.required_tests, start=1):
+            selector = str(item.get("selector", "")).strip()
+            name_hint = str(item.get("name_hint", "")).strip()
+            location = selector or name_hint or "new focused test"
+            provider = str(item.get("provider", "")).strip()
+            profile = str(item.get("profile", "")).strip()
+            runner = f" ({provider}/{profile})" if provider or profile else ""
+            description = (
+                str(item.get("description", "")).strip().split(" Oracle:", 1)[0]
+            )
+            test_lines.append(f"- T{index:02d}{runner} `{location}` — {description}")
+        test_lines = test_lines or ["- none"]
         return "\n".join(
             (
-                "Implement the requested feature using this bounded packet.",
-                "Original feature description:",
-                self.objective,
-                "\nObligations (in compiler order):",
-                *obligation_lines,
-                "\nRequired new tests (create at least one matching test per "
-                "obligation):",
+                "Required behavioral tests:",
+                "Make every required behavioral test below pass. These tests "
+                "are the executable acceptance contract; do not weaken or "
+                "delete them.",
                 *test_lines,
-                "\nImplement only the original description and obligations above. "
-                "Create the listed new tests, using the name hints as prefixes; "
-                "optional suffixes such as `_sync` and `_async` are allowed. "
-                "The required test is part of this work: if it is broken because "
-                "of an import, fixture, API, assertion, or other test defect, "
-                "repair the test and the implementation as needed. Do not delete "
-                "or weaken the test to make it pass. Run only the focused required "
-                "test command, rerunning it at most twice after a repair, then "
-                "stop. Do not run the full repository suite, coverage, lint, type "
-                "checks, or unrelated tests; Workrr owns repository-wide "
-                "validation.",
+                "Run the focused required tests after implementation. If a "
+                "test is broken because of an import, fixture, API, assertion, "
+                "or other test defect, repair the test and implementation as "
+                "needed; never weaken the behavioral assertion.",
             )
         )
 
@@ -207,7 +215,7 @@ def compile_implementation_packet(
     if not normalized_tests:
         raise ValueError("implementation packet requires test contracts")
     return ImplementationPacket(
-        objective=objective.strip(),
+        objective=_worker_objective(objective),
         obligations=normalized_obligations,
         required_tests=tuple(normalized_tests),
         repository=RepositoryContextPacket(

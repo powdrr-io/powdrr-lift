@@ -190,11 +190,13 @@ class ImplementationRequest:
         implementation_packet_text = (
             implementation_packet.render() if implementation_packet is not None else ""
         )
-        product_changes = (
-            "Required product changes:\n"
-            f"Additions: {_format_planned_changes(unit.planned_additions)}\n"
-            f"Deletions: {_format_planned_changes(unit.planned_deletions)}\n"
-        )
+        product_changes = ""
+        if unit.planned_additions or unit.planned_deletions:
+            product_changes = (
+                "\nRequired product changes:\n"
+                f"Additions: {_format_planned_changes(unit.planned_additions)}\n"
+                f"Deletions: {_format_planned_changes(unit.planned_deletions)}\n"
+            )
         validation_contract = (
             f"{implementation_packet_text}\n"
             if implementation_packet is not None
@@ -223,9 +225,8 @@ class ImplementationRequest:
             else unit.objective
         )
         prompt = (
-            f"Implement this feature: {product_objective}\n\n"
             "Product contract:\n"
-            f"{product_changes}\n"
+            f"Implement this feature: {product_objective}{product_changes}\n"
             "Validation contract:\n"
             f"{validation_contract}\n"
             "Worker policy:\n"

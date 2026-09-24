@@ -105,7 +105,7 @@ def test_packet_can_focus_one_obligation_and_its_matching_test() -> None:
     assert "Verify initialization." not in focused.render()
 
 
-def test_packet_prompt_contains_every_obligation_and_required_test() -> None:
+def test_packet_prompt_contains_every_required_test_without_compiler_metadata() -> None:
     packet = compile_implementation_packet(
         objective="Add state data support.",
         obligations=("Initialize data on entry.", "Reset data on re-entry."),
@@ -132,10 +132,11 @@ def test_packet_prompt_contains_every_obligation_and_required_test() -> None:
     rendered = packet.render()
 
     for expected in (
-        "obligation 001: Initialize data on entry.",
-        "obligation 002: Reset data on re-entry.",
-        "`test_state_data_initialization`",
-        "`test_state_data_reset`",
+        "`tests/test_state.py::test_initialization`",
+        "`tests/test_state.py::test_reset`",
         "pytest/pytest",
     ):
         assert expected in rendered
+
+    assert "Initialize data on entry." not in rendered
+    assert "Reset data on re-entry." not in rendered

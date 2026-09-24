@@ -79,7 +79,7 @@ def test_packet_compiles_one_execution_unit_with_explainable_context() -> None:
         "structrr:entities/adapter",
         "plan:structrr-diff.yaml",
     )
-    assert "Operation-scoped intent packet: operation-1" in request.prompt
+    assert "Operation-scoped intent packet: operation-1" not in request.prompt
     assert "Do not redesign the transport." in request.prompt
     assert "the adapter rejects unknown inputs" in request.prompt
 
@@ -145,7 +145,7 @@ def test_repair_prompt_does_not_replay_the_full_intent_packet() -> None:
 
     assert "Feature objective:\nAdd the bounded adapter." in prompt
     assert "Allowed durable paths: src/adapter.py" in prompt
-    assert "Allowed validation command forms" in prompt
+    assert "Discovered validation command prefixes" in prompt
     assert "-p no:django" not in prompt
     assert "Operation-scoped intent packet" not in prompt
     assert "Required operations" not in prompt

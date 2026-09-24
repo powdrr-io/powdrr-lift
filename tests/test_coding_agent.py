@@ -152,15 +152,37 @@ def test_execution_unit_compiles_to_worker_request() -> None:
 
     assert request.allowed_paths == ("src/powdrr_lift/workrr",)
     assert request.context_refs == ("entity:worker-adapter",)
-    assert "unit-1" in request.prompt
+    assert "unit-1" not in request.prompt
+    assert "Product contract:" in request.prompt
+    assert "Worker policy:" in request.prompt
+    assert "Required product changes:" in request.prompt
     assert "Acceptance criteria:\n- the adapter is bounded" in request.prompt
-    assert "Required operations" in request.prompt
+    assert "Required operations" not in request.prompt
     assert '"id": "worker-adapter"' in request.prompt
     assert '"id": "old-adapter"' in request.prompt
-    assert "Validation profiles Workrr will run: unit-tests" in request.prompt
+    assert "Validation profiles that will run: unit-tests" in request.prompt
+    assert "Workrr" not in request.prompt
     assert (
         json.loads(request.to_json())["schema_version"] == "implementation-request-v2"
     )
+
+
+def test_empty_product_change_lists_are_omitted_from_worker_prompt() -> None:
+    request = ImplementationRequest.from_execution_unit(
+        ExecutionUnit(
+            unit_id="unit-without-explicit-changes",
+            objective="Implement the behavior.",
+            paths=("src",),
+            validation_profiles=("unit-tests",),
+            acceptance_criteria=("the behavior works",),
+        ),
+        request_id="request-1",
+        base_commit="abc123",
+        plan_fingerprint="plan-1",
+    )
+
+    assert "Required product changes:" not in request.prompt
+    assert "None declared" not in request.prompt
 
 
 def test_opencode_provider_pins_requested_model(

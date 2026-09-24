@@ -602,11 +602,11 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert packet["schema_version"] == "implementation-packet-v1"
     prompt = (run_root / "artifacts" / "prompts").glob("*.txt")
     prompt_text = next(prompt).read_text(encoding="utf-8")
-    assert "Implement execution unit" in prompt_text
-    assert "Implement the failing product behavior" in prompt_text
-    assert "Obligations (in compiler order):" in prompt_text
-    assert "Required new tests" in prompt_text
-    assert "function name must start with `test_" in prompt_text
+    assert "Product contract:" in prompt_text
+    assert "Validation contract:" in prompt_text
+    assert "Required behavioral tests:" in prompt_text
+    assert "Run the focused required tests after implementation." in prompt_text
+    assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text
     proposal = json.loads(
         (result.plan_path.parent / "proposal-revision.json").read_text(encoding="utf-8")

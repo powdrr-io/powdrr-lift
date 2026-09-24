@@ -107,9 +107,11 @@ class ImplementationRequest:
             "new product behavior, tests, dependencies, or files unless the "
             "finding explicitly requires them. Do not prepend environment "
             "variables, `cd`, pipes, redirects, or unapproved flags to a "
-            "validation command. Workrr owns the full validation profiles; if "
+            "validation command. The surrounding workflow owns the full "
+            "validation profiles; if "
             "you validate locally, run only a focused selector using one of the "
-            "listed command forms. Workrr will rerun the affected validators "
+            "listed command forms. The surrounding workflow will rerun the "
+            "affected validators "
             "and invalidate evidence affected by your diff."
         )
 
@@ -187,30 +189,54 @@ class ImplementationRequest:
                 "Preservation constraints come from the unit acceptance contract.",
             ),
         )
-        intent_packet_text = intent_packet.render()
         implementation_packet_text = (
             implementation_packet.render() if implementation_packet is not None else ""
         )
-        prompt = (
-            f"Implement execution unit {unit.unit_id}: {unit.objective}\n\n"
-            f"{implementation_packet_text}\n\n"
-            f"{intent_packet_text}\n\n"
+        product_changes = ""
+        if unit.planned_additions or unit.planned_deletions:
+            product_changes = (
+                "\nRequired product changes:\n"
+                f"Additions: {_format_planned_changes(unit.planned_additions)}\n"
+                f"Deletions: {_format_planned_changes(unit.planned_deletions)}\n"
+            )
+        non_goals = (
+            "\nNon-goals:\n" + "\n".join(f"- {item}" for item in unit.non_goals) + "\n"
+            if unit.non_goals
+            else ""
+        )
+        validation_contract = (
+            f"{implementation_packet_text}\n"
+            if implementation_packet is not None
+            else f"Acceptance criteria:\n{criteria}\n"
+        )
+        worker_policy = (
             f"Allowed paths: {allowed_paths}\n"
-            "Ephemeral paths (Workrr removes these after the attempt): "
+            "Ephemeral paths (removed after the attempt): "
             f"{ephemeral_paths}\n"
-            f"Acceptance criteria:\n{criteria}\n"
-            f"Validation profiles Workrr will run: {validation_profiles}\n\n"
+            f"Validation profiles that will run: {validation_profiles}\n\n"
             f"{allowed_commands_text}\n"
-            "Validation command rules: use the listed command prefix exactly. "
-            "The trailing `*` is an append-only selector placeholder; do not "
-            "type the wildcard literally. Do not prepend environment variables, "
+            "Validation command rules: use a discovered command prefix from the "
+            "list. Do not prepend environment variables, "
             "`cd`, pipes, redirects, or unapproved flags. Run focused tests "
-            "only; Workrr owns the full validation profile.\n\n"
-            "Use only the allowed paths or declared ephemeral paths. Temporary "
-            "helpers are permitted only in the declared ephemeral paths; Workrr "
-            "removes them before evaluating the durable diff. Workrr runs the "
-            "declared validation profiles after you "
-            "finish. Do not commit, push, or alter files outside the request."
+            "only; the surrounding workflow owns the full validation profile.\n\n"
+            "Work in the existing task worktree. Do not create branches, "
+            "commits, pull requests, or generated repository metadata. Use only "
+            "the allowed paths or declared ephemeral paths. Temporary helpers "
+            "are permitted only in declared ephemeral paths. Do not alter files "
+            "outside the request."
+        )
+        product_objective = (
+            implementation_packet.objective
+            if implementation_packet is not None
+            else unit.objective
+        )
+        prompt = (
+            "Product contract:\n"
+            f"Implement this feature: {product_objective}{product_changes}{non_goals}\n"
+            "Validation contract:\n"
+            f"{validation_contract}\n"
+            "Worker policy:\n"
+            f"{worker_policy}"
         )
         return cls(
             request_id=request_id,
@@ -268,10 +294,10 @@ def _format_planned_changes(changes: Sequence[Mapping[str, Any]]) -> str:
 
 
 def _render_allowed_command_forms(commands: Sequence[str]) -> str:
-    """Render policy command patterns as safe, model-facing instructions."""
+    """Render discovered command prefixes without inventing command syntax."""
     if not commands:
         return "No validation command is available to the coding agent."
-    return "Allowed validation command forms (append selectors only):\n" + "\n".join(
+    return "Discovered validation command prefixes:\n" + "\n".join(
         f"- {command}" for command in commands
     )
 
@@ -380,7 +406,10 @@ class OpenCodePermissionPolicy:
     allowed_commands: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
-        bash_rules = {command: "allow" for command in self.allowed_commands}
+        bash_rules = {
+            f"{command.removesuffix(' *').rstrip()} *": "allow"
+            for command in self.allowed_commands
+        }
         bash_rules.update(
             {
                 "git commit *": "deny",

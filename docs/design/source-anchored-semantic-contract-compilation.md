@@ -52,11 +52,13 @@ This design covers:
 - deterministic contract assembly and derived prose;
 - Procedrr control flow and Workrr operation responsibilities;
 - provenance, invalidation, artifacts, evaluation, and rollout; and
-- the conversion of a resolved contract into an executable verification input.
+- the conversion of all resolved contracts into one immutable mini-SWE-agent
+  implementation prompt.
 
-It does not specify code-task execution, coding-agent prompting, proposal
-publication, or final implementation review except where those consumers
-constrain the compiled contract.
+It does not specify code-task execution, interactive coding-agent control,
+proposal publication, or final implementation review except where those
+consumers constrain the compiled contract. It does specify the complete,
+immutable prompt artifact at the design-to-implementation boundary.
 
 ## Related documents
 
@@ -96,6 +98,9 @@ The implementation must satisfy these properties.
     Procedrr flow or the bound-result schema.
 12. No contract advances to executable verification while a required semantic
     field is unresolved.
+13. One completed design revision produces exactly one prompt for exactly one
+    mini-SWE-agent invocation; obligations never become separate worker
+    prompts, and validation never creates an in-run repair prompt.
 
 ## Authority boundaries
 
@@ -107,6 +112,7 @@ The implementation must satisfy these properties.
 | Semantic classifier | One label, exact quotation, or candidate relation for one supplied subject |
 | Language adapter | Repository symbols, type relationships, references, tests, and executable validation capabilities |
 | Human | Resolution of meaning that is not entailed by the source or accepted definitions |
+| mini-SWE-agent | Repository inspection, edits, and focused checks from the one compiled implementation prompt |
 
 The same decision contract is used whether its provider is a general LLM,
 Jev-like classifier, fine-tuned local encoder, or deterministic rule. Provider
@@ -1068,7 +1074,9 @@ Powdrr renders, rather than asks a model to author:
 - oracle text;
 - evidence-case skeleton;
 - Structrr proposal records; and
-- Workrr verification inputs.
+- Workrr verification inputs; and
+- one complete mini-SWE-agent implementation prompt after every contract in the
+  design revision is resolved.
 
 Templates are selected by disposition, behavior family, quantifier, and
 predicate kind. Each rendering records the contract fingerprint and template
@@ -1160,10 +1168,11 @@ restored values.
 
 No model independently paraphrases these four representations.
 
-## Executable-contract compilation
+## Single-prompt mini-SWE-agent compilation
 
-A semantic contract does not directly contain test code. A language adapter
-compiles it into one or more `verification-case-spec-v1` records:
+A semantic contract does not directly contain test code or coding-agent prose.
+Language adapters first compile contracts into internal
+`verification-case-spec-v1` records:
 
 ```yaml
 case_id: case:contract-instruction-001:user-record
@@ -1193,6 +1202,95 @@ Case compilation rules:
    population coverage.
 6. Baseline execution must establish whether each case already passes, fails
    for the expected reason, or is blocked.
+
+These records are compiler inputs, not separate worker tasks. After every
+contract and verification case in the design revision is resolved, Workrr
+compiles exactly one terminal artifact:
+
+```yaml
+schema_version: minisweagent-implementation-prompt-v1
+prompt_id: prompt:feature-state-data:v1
+design_revision: sha256:...
+base_commit: git:...
+repository_inventory: sha256:...
+rendering_revision: minisweagent-single-prompt-v1
+prompt: |-
+  <complete rendered prompt>
+contract_refs:
+  - contract:instruction-001
+verification_case_refs:
+  - case:contract-instruction-001:user-record
+allowed_paths:
+  - src/models/user.py
+  - tests/models/test_pickle.py
+focused_commands:
+  - uv run pytest tests/models/test_pickle.py
+fingerprint: sha256:...
+```
+
+The metadata preserves provenance and supports deterministic validation. Only
+the `prompt` field is sent to mini-SWE-agent. The worker never sees Structrr
+diffs, classifier decisions, fingerprints, proposal worklists, or parallel
+representations of the same requirement.
+
+### Prompt sections
+
+The renderer emits these sections once, in this order:
+
+1. `Objective` — one compiler-rendered statement of the complete requested
+   final state.
+2. `Repository starting point` — exact relevant files, symbols, existing
+   tests, language/toolchain facts, and known baseline failures.
+3. `Required behavior` — every resolved contract rendered once and ordered by
+   dependency, not by conversation order.
+4. `Required verification` — tests to add or update, population coverage, and
+   observable predicates.
+5. `Preserve and avoid` — applicable invariants, non-goals, compatibility
+   requirements, and forbidden generated paths.
+6. `Allowed scope` — durable paths and explicitly permitted new paths.
+7. `Focused commands` — exact commands mini-SWE-agent may use while working.
+8. `Completion protocol` — inspect only relevant code, implement the complete
+   design, run focused checks, do not commit or publish, and submit once.
+
+The renderer must not repeat the original feature description after the
+objective when its content has already been compiled into requirements. Exact
+user terms that carry unresolved domain meaning remain quoted in the relevant
+requirement with their accepted definition.
+
+### Single-invocation rule
+
+Workrr invokes mini-SWE-agent exactly once with the prompt artifact. The agent
+may use its normal internal multi-turn inspect/edit/test loop, but Powdrr does
+not send another model prompt during that implementation run.
+
+- No obligation-per-agent calls.
+- No per-file or per-test worker calls.
+- No automatic continuation after timeout or step exhaustion.
+- No validation-derived repair prompt.
+- No fallback invocation of OpenCode.
+
+After mini-SWE-agent submits or terminates, Workrr captures the attributable
+diff and runs deterministic validation. A failure is a terminal implementation
+result. Its evidence may be supplied to a future design revision, which can
+compile a new prompt under a new run identity; it is never appended as a
+second prompt to the existing run.
+
+### Prompt completeness gate
+
+The prompt artifact can be emitted only when deterministic checks prove:
+
+1. every actionable source proposition reaches one resolved contract;
+2. every resolved contract is represented exactly once in `Required behavior`;
+3. every universal population has a complete current enumeration rule;
+4. every predicate has an authority and executable assertion strategy;
+5. every required verification case is represented exactly once;
+6. all relevant preservation constraints and non-goals are included;
+7. every named path, symbol, test, and command comes from the bound repository
+   inventory or an adapter-owned planned target;
+8. allowed scope covers every planned target and no unrelated path;
+9. no required field is unresolved;
+10. no internal artifact path or model reasoning appears in the prompt; and
+11. rendering the same versioned inputs produces the same prompt fingerprint.
 
 ## Procedrr flow
 
@@ -1241,6 +1339,11 @@ for each immutable atomic proposition:
   validate required-field matrix
   derive prose projections
   compile verification case specifications
+
+after all propositions complete:
+  compile one mini-SWE-agent implementation prompt
+  validate prompt completeness and source coverage
+  emit one immutable prompt artifact
 ```
 
 Every `classify` or `extract` line is one judge activation. Every `compile`,
@@ -1268,6 +1371,8 @@ operation with no model discretion.
 | `compile_semantic_contract` | partial contract and resolved bindings | resolved contract |
 | `render_semantic_contract_views` | resolved contract and template revision | non-authoritative prose views |
 | `compile_verification_case_specs` | contract, population, fixtures, adapters | case specifications |
+| `compile_minisweagent_prompt` | complete design revision, cases, inventory, scope, commands | one immutable prompt artifact |
+| `validate_minisweagent_prompt` | prompt artifact and canonical design inputs | completeness receipt or exact findings |
 
 ## Suggested module boundaries
 
@@ -1280,6 +1385,7 @@ src/powdrr_lift/workrr/semantic_classifier.py
 src/powdrr_lift/workrr/semantic_lookup.py
 src/powdrr_lift/workrr/semantic_contract_compiler.py
 src/powdrr_lift/workrr/verification_case_compiler.py
+src/powdrr_lift/workrr/minisweagent_prompt_compiler.py
 ```
 
 Core modules own immutable schemas, IDs, fingerprints, and validation. Workrr
@@ -1413,6 +1519,8 @@ artifacts/semantic-contracts/
     resolved-contract.json
     rendered-views.json
     verification-cases.json
+  minisweagent-prompt.json
+  minisweagent-prompt.txt
 ```
 
 Artifacts are diagnostic and replay inputs. Structrr stores accepted durable
@@ -1621,14 +1729,18 @@ member without a model-generated member list.
 Acceptance gate: underspecified success semantics block instead of being
 invented, while an accepted definition resolves deterministically.
 
-### Slice 5: executable verification contracts
+### Slice 5: executable verification and single-prompt compilation
 
 - Compile member-specific or parameterized case specifications.
 - Bind fixtures and existing tests from inventory.
 - Run baseline evidence and verify population coverage.
+- Compile all resolved contracts, repository facts, verification cases, scope,
+  and focused commands into one mini-SWE-agent prompt.
+- Add deterministic prompt coverage and forbidden-content checks.
 
 Acceptance gate: universal contracts cannot pass with one synthetic
-representative member.
+representative member, and one complete design revision emits exactly one
+prompt containing every actionable contract exactly once.
 
 ### Slice 6: specialized classifiers
 
@@ -1651,6 +1763,10 @@ artifact schemas.
 - Do not invoke a coding agent to perform read-only repository discovery.
 - Do not allow classifier replacement to alter flow control or persisted
   semantic values.
+- Do not create one coding-agent prompt per obligation, test, file, repair, or
+  validation failure.
+- Do not invoke OpenCode after the design phase; mini-SWE-agent is the single
+  target worker.
 
 ## Completion criteria for this design
 
@@ -1665,5 +1781,9 @@ The design is implemented when:
 7. intermediate classifications are visible in live validation artifacts;
 8. at least one specialized classifier can replace an LLM through the common
    provider contract; and
-9. an end-to-end feature run can prove that no model-authored paraphrase became
-   authoritative intent.
+9. the completed design deterministically emits one immutable mini-SWE-agent
+   prompt containing the complete implementation and verification contract;
+10. an end-to-end feature run invokes mini-SWE-agent once with that exact
+    prompt and creates no repair or continuation prompt; and
+11. the run proves that no model-authored paraphrase became authoritative
+    intent.

@@ -1390,7 +1390,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workrr_feature_parser.add_argument("--base-branch", default="main")
     workrr_feature_parser.add_argument(
-        "--code-agent", choices=("opencode", "minisweagent"), default="opencode"
+        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
     )
     workrr_feature_parser.add_argument("--opencode-executable", default="opencode")
     workrr_feature_parser.add_argument(
@@ -1398,7 +1398,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
     )
     workrr_feature_parser.add_argument("--minisweagent-executable", default="mini")
-    workrr_feature_parser.add_argument("--minisweagent-model")
+    workrr_feature_parser.add_argument(
+        "--minisweagent-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
     workrr_feature_parser.add_argument("--code-agent-prompt-prefix", default="")
     workrr_feature_parser.add_argument("--code-agent-prompt-suffix", default="")
     workrr_feature_parser.add_argument(
@@ -1447,10 +1450,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
     )
     harbor_feature_parser.add_argument(
-        "--code-agent", choices=("opencode", "minisweagent"), default="opencode"
+        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
     )
     harbor_feature_parser.add_argument("--minisweagent-executable", default="mini")
-    harbor_feature_parser.add_argument("--minisweagent-model")
+    harbor_feature_parser.add_argument(
+        "--minisweagent-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
     harbor_feature_parser.add_argument("--code-agent-prompt-prefix", default="")
     harbor_feature_parser.add_argument("--code-agent-prompt-suffix", default="")
     harbor_feature_parser.add_argument(
@@ -2154,10 +2160,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     coding_agent_parser.add_argument(
-        "--code-agent", choices=("opencode", "minisweagent"), default="opencode"
+        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
     )
     coding_agent_parser.add_argument("--minisweagent-executable", default="mini")
-    coding_agent_parser.add_argument("--minisweagent-model")
+    coding_agent_parser.add_argument(
+        "--minisweagent-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
     coding_agent_parser.add_argument("--code-agent-prompt-prefix", default="")
     coding_agent_parser.add_argument("--code-agent-prompt-suffix", default="")
     coding_agent_parser.add_argument(

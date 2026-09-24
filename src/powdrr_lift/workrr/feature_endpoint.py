@@ -121,9 +121,9 @@ class FeatureEndpointConfig:
     base_branch: str = "main"
     opencode_executable: str = "opencode"
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
-    code_agent: str = "opencode"
+    code_agent: str = "minisweagent"
     minisweagent_executable: str = "mini"
-    minisweagent_model: str | None = None
+    minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
     code_agent_prompt_prefix: str = ""
     code_agent_prompt_suffix: str = ""
     output_root: Path | None = None

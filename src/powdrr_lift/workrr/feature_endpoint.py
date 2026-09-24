@@ -2861,9 +2861,7 @@ def _plan_text_values(value: Any) -> tuple[str, ...]:
 def _allowed_validation_commands(
     profiles: Sequence[DiscoveredValidationProfile],
 ) -> tuple[str, ...]:
-    return tuple(
-        f"{' '.join(profile.command)} *" for profile in profiles if profile.command
-    )
+    return tuple(" ".join(profile.command) for profile in profiles if profile.command)
 
 
 def _run_validation_profile(

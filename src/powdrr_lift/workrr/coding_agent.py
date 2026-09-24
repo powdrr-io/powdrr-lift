@@ -199,6 +199,11 @@ class ImplementationRequest:
                 f"Additions: {_format_planned_changes(unit.planned_additions)}\n"
                 f"Deletions: {_format_planned_changes(unit.planned_deletions)}\n"
             )
+        non_goals = (
+            "\nNon-goals:\n" + "\n".join(f"- {item}" for item in unit.non_goals) + "\n"
+            if unit.non_goals
+            else ""
+        )
         validation_contract = (
             f"{implementation_packet_text}\n"
             if implementation_packet is not None
@@ -210,9 +215,8 @@ class ImplementationRequest:
             f"{ephemeral_paths}\n"
             f"Validation profiles that will run: {validation_profiles}\n\n"
             f"{allowed_commands_text}\n"
-            "Validation command rules: use the listed command prefix exactly. "
-            "The trailing `*` is an append-only selector placeholder; do not "
-            "type the wildcard literally. Do not prepend environment variables, "
+            "Validation command rules: use a discovered command prefix from the "
+            "list. Do not prepend environment variables, "
             "`cd`, pipes, redirects, or unapproved flags. Run focused tests "
             "only; the surrounding workflow owns the full validation profile.\n\n"
             "Work in the existing task worktree. Do not create branches, "
@@ -228,7 +232,7 @@ class ImplementationRequest:
         )
         prompt = (
             "Product contract:\n"
-            f"Implement this feature: {product_objective}{product_changes}\n"
+            f"Implement this feature: {product_objective}{product_changes}{non_goals}\n"
             "Validation contract:\n"
             f"{validation_contract}\n"
             "Worker policy:\n"
@@ -290,10 +294,10 @@ def _format_planned_changes(changes: Sequence[Mapping[str, Any]]) -> str:
 
 
 def _render_allowed_command_forms(commands: Sequence[str]) -> str:
-    """Render policy command patterns as safe, model-facing instructions."""
+    """Render discovered command prefixes without inventing command syntax."""
     if not commands:
         return "No validation command is available to the coding agent."
-    return "Allowed validation command forms (append selectors only):\n" + "\n".join(
+    return "Discovered validation command prefixes:\n" + "\n".join(
         f"- {command}" for command in commands
     )
 
@@ -402,7 +406,10 @@ class OpenCodePermissionPolicy:
     allowed_commands: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
-        bash_rules = {command: "allow" for command in self.allowed_commands}
+        bash_rules = {
+            f"{command.removesuffix(' *').rstrip()} *": "allow"
+            for command in self.allowed_commands
+        }
         bash_rules.update(
             {
                 "git commit *": "deny",

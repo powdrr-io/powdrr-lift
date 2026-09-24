@@ -3911,7 +3911,20 @@ def _require_clean_root(root: Path, runner: Runner) -> None:
 
 def _commit(runner: Runner, worktree: Path, message: str) -> None:
     _run(runner, worktree, ["git", "add", "-A"])
-    _run(runner, worktree, ["git", "commit", "-am", message])
+    _run(
+        runner,
+        worktree,
+        [
+            "git",
+            "-c",
+            "user.name=Powdrr Automation",
+            "-c",
+            "user.email=powdrr-automation@users.noreply.github.com",
+            "commit",
+            "-am",
+            message,
+        ],
+    )
 
 
 def _create_pr_changelog(

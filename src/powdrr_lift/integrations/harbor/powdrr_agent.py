@@ -25,6 +25,8 @@ except ImportError:
 
 POWDRR_VERSION = "0.1.0"
 OPENCODE_VERSION = "1.18.31"
+MINISWEAGENT_VERSION = "2.4.6"
+MINISWEAGENT_MODEL = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
 
 
 class PowdrrAgent(BaseInstalledAgent):
@@ -55,7 +57,8 @@ class PowdrrAgent(BaseInstalledAgent):
             agent_install = InstallStep(
                 run=(
                     "python3 -m pip install --user --upgrade --no-cache-dir "
-                    "--disable-pip-version-check mini-swe-agent"
+                    "--disable-pip-version-check "
+                    f"mini-swe-agent=={MINISWEAGENT_VERSION}"
                 )
             )
             verification = "powdrr-lift --help >/dev/null && mini --help >/dev/null"
@@ -133,7 +136,8 @@ class PowdrrAgent(BaseInstalledAgent):
                 command=(
                     "if ! command -v mini >/dev/null 2>&1; then "
                     "python3 -m pip install --user --upgrade --no-cache-dir "
-                    "--disable-pip-version-check mini-swe-agent; "
+                    "--disable-pip-version-check "
+                    f"mini-swe-agent=={MINISWEAGENT_VERSION}; "
                     "fi"
                 ),
             )
@@ -166,6 +170,7 @@ class PowdrrAgent(BaseInstalledAgent):
             or self._get_env("HARBOR_TASK_NAME")
             or "harbor-task"
         )
+        code_agent = self._code_agent()
         command: list[str] = [
             "powdrr-lift",
             "harbor-feature",
@@ -179,11 +184,18 @@ class PowdrrAgent(BaseInstalledAgent):
             repo_root,
             "--planning-provider",
             "deepinfra",
-            "--opencode-model",
-            "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
             "--code-agent",
-            self._code_agent(),
+            code_agent,
         ]
+        if code_agent == "minisweagent":
+            command.extend(("--minisweagent-model", MINISWEAGENT_MODEL))
+        else:
+            command.extend(
+                (
+                    "--opencode-model",
+                    "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+                )
+            )
         minisweagent_executable = self._get_env("POWDRR_MINISWEAGENT_EXECUTABLE")
         if minisweagent_executable:
             command.extend(("--minisweagent-executable", minisweagent_executable))
@@ -248,7 +260,7 @@ class PowdrrAgent(BaseInstalledAgent):
         )
 
     def _code_agent(self) -> str:
-        code_agent = self._get_env("POWDRR_CODE_AGENT") or "opencode"
+        code_agent = self._get_env("POWDRR_CODE_AGENT") or "minisweagent"
         if code_agent not in {"opencode", "minisweagent"}:
             raise ValueError("POWDRR_CODE_AGENT must be 'opencode' or 'minisweagent'")
         return code_agent

@@ -121,9 +121,9 @@ class FeatureEndpointConfig:
     base_branch: str = "main"
     opencode_executable: str = "opencode"
     opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
-    code_agent: str = "opencode"
+    code_agent: str = "minisweagent"
     minisweagent_executable: str = "mini"
-    minisweagent_model: str | None = None
+    minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
     code_agent_prompt_prefix: str = ""
     code_agent_prompt_suffix: str = ""
     output_root: Path | None = None
@@ -2160,12 +2160,11 @@ def _run_code_agent_phase(
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=source_context,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
+            implementation_packet=implementation_packet,
         )
         request = replace(
             request,
-            implementation_packet=(
-                None if isinstance(code_task, Mapping) else implementation_packet
-            ),
+            implementation_packet=(implementation_packet),
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):

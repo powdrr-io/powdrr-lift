@@ -568,6 +568,7 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(fake_opencode),
             opencode_model="deterministic-test-model",
             open_pr=False,
@@ -603,8 +604,9 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     prompt_text = next(prompt).read_text(encoding="utf-8")
     assert "Implement execution unit" in prompt_text
     assert "Implement the failing product behavior" in prompt_text
-    assert "Obligations (in compiler order):" not in prompt_text
-    assert "function name must start with `test_" not in prompt_text
+    assert "Obligations (in compiler order):" in prompt_text
+    assert "Required new tests" in prompt_text
+    assert "function name must start with `test_" in prompt_text
     assert "create the exact selectors" not in prompt_text
     proposal = json.loads(
         (result.plan_path.parent / "proposal-revision.json").read_text(encoding="utf-8")
@@ -663,6 +665,7 @@ def test_implement_feature_decomposes_state_data_api_requirements_before_design(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(fake_opencode),
             opencode_model="deterministic-test-model",
             open_pr=False,
@@ -716,6 +719,7 @@ def test_implement_feature_reconciles_non_required_sentence_with_design(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(fake_opencode),
             opencode_model="deterministic-test-model",
             open_pr=False,
@@ -770,6 +774,7 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(
                 _fake_opencode(tmp_path / "fake-opencode", write_required_tests=True)
             ),
@@ -889,6 +894,7 @@ def test_implement_feature_retries_schema_invalid_planner_output(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(_fake_opencode(tmp_path / "fake-opencode")),
             opencode_model="deterministic-test-model",
             open_pr=False,
@@ -918,6 +924,7 @@ def test_implement_feature_uses_deterministic_structural_proposal_gate(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(_fake_opencode(tmp_path / "fake-opencode")),
             opencode_model="deterministic-test-model",
             open_pr=False,
@@ -949,6 +956,7 @@ def test_implement_feature_rejects_worker_out_of_scope_edits(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(
                 _fake_opencode(tmp_path / "fake-opencode", out_of_scope=True)
             ),
@@ -983,6 +991,7 @@ def test_implement_feature_blocks_untraceable_required_test_obligation(
                 "-q",
                 "--import-mode=importlib",
             ),
+            code_agent="opencode",
             opencode_executable=str(_fake_opencode(tmp_path / "fake-opencode")),
             opencode_model="deterministic-test-model",
             open_pr=False,

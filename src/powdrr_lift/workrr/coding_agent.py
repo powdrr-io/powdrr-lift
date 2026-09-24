@@ -157,6 +157,7 @@ class ImplementationRequest:
         plan_fingerprint: str,
         context_refs: tuple[str, ...] = (),
         allowed_commands: tuple[str, ...] = (),
+        implementation_packet: ImplementationPacket | None = None,
     ) -> ImplementationRequest:
         """Compile one validated execution unit into a worker handoff."""
         criteria = (
@@ -187,8 +188,12 @@ class ImplementationRequest:
             ),
         )
         intent_packet_text = intent_packet.render()
+        implementation_packet_text = (
+            implementation_packet.render() if implementation_packet is not None else ""
+        )
         prompt = (
             f"Implement execution unit {unit.unit_id}: {unit.objective}\n\n"
+            f"{implementation_packet_text}\n\n"
             f"{intent_packet_text}\n\n"
             f"Allowed paths: {allowed_paths}\n"
             "Ephemeral paths (Workrr removes these after the attempt): "
@@ -222,6 +227,7 @@ class ImplementationRequest:
             planned_additions=unit.planned_additions,
             planned_deletions=unit.planned_deletions,
             intent_packet=intent_packet,
+            implementation_packet=implementation_packet,
         )
 
     @classmethod
@@ -234,6 +240,7 @@ class ImplementationRequest:
         base_commit: str,
         context_refs: tuple[str, ...] = (),
         allowed_commands: tuple[str, ...] = (),
+        implementation_packet: ImplementationPacket | None = None,
     ) -> ImplementationRequest:
         """Compile one unit from a typed execution plan into a worker handoff."""
         try:
@@ -247,6 +254,7 @@ class ImplementationRequest:
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=context_refs,
             allowed_commands=allowed_commands,
+            implementation_packet=implementation_packet,
         )
 
 
@@ -403,6 +411,7 @@ class OpenCodeProvider:
     agent: str = "build"
     timeout_seconds: float = 300.0
     absolute_timeout_seconds: float | None = 900.0
+    max_events: int | None = 256
     permission_policy: OpenCodePermissionPolicy = field(
         default_factory=OpenCodePermissionPolicy
     )
@@ -474,6 +483,7 @@ class OpenCodeProvider:
             env=environment,
             inactivity_timeout=self.timeout_seconds,
             absolute_timeout=self.absolute_timeout_seconds,
+            max_events=self.max_events,
         )
         session_id = _extract_opencode_session_id(_json_events(completed.stdout))
         if session_id is not None:

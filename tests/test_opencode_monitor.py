@@ -213,6 +213,39 @@ def test_run_opencode_times_out_when_no_activity_is_seen(tmp_path: Path) -> None
     assert time.monotonic() - started < 0.5
 
 
+def test_run_opencode_terminates_unique_event_storm_at_event_budget(
+    tmp_path: Path,
+) -> None:
+    result = run_opencode(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json, time\n"
+                "i = 0\n"
+                "while True:\n"
+                "    print(json.dumps({'type': 'text', 'text': str(i)}), flush=True)\n"
+                "    i += 1\n"
+                "    time.sleep(0.001)\n"
+            ),
+        ],
+        log_path=tmp_path / "event-budget.ndjson",
+        inactivity_timeout=1.0,
+        max_events=4,
+    )
+
+    assert result.returncode == 124
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "event-budget.ndjson").read_text().splitlines()
+    ]
+    budget = [
+        record for record in records if record.get("kind") == "process.budget_exceeded"
+    ]
+    assert len(budget) == 1
+    assert budget[0]["limit"] == 4
+
+
 def test_run_opencode_enforces_absolute_deadline_despite_progress_events(
     tmp_path: Path,
 ) -> None:

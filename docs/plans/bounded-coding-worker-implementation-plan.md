@@ -9,11 +9,11 @@ worker boundary. It is written for another implementation agent and makes the
 architectural decisions that should not be rediscovered while coding.
 
 The redesign keeps intent interpretation, workflow control, validation, and
-completion authority in Structrr/Procedrr/Workrr. A coding agent remains an
-untrusted repository editor. The recommended editor is a small Powdrr-specific
-agent built on mini-SWE-agent's model and environment primitives. OpenCode
-remains available temporarily as a comparison provider, but is not the target
-default for Harbor runs.
+completion authority in Structrr/Procedrr/Workrr. mini-SWE-agent is the single
+target repository editor. One completed design compiles one prompt and starts
+one mini-SWE-agent invocation. OpenCode, per-obligation sessions, automatic
+continuations, and validation-derived repair prompts are outside the target
+architecture.
 
 The governing rule is:
 
@@ -60,8 +60,8 @@ The completed system must:
 
 1. Finish, fail, or produce a resumable partial result within a deterministic
    global coding budget smaller than Harbor's agent timeout.
-2. Dispatch one coherent implementation request for a feature, followed only
-   by validation-derived repair requests.
+2. Dispatch exactly one coherent implementation prompt for the complete
+   feature and never issue a second coding prompt in that run.
 3. Keep semantic obligations as a complete verification checklist without
    turning each obligation into an independent coding session.
 4. Measure progress from repository and validator state, not transport events.
@@ -71,16 +71,16 @@ The completed system must:
    that attempt's exact starting state.
 7. Keep generated Powdrr, Structrr, Procedrr, and coding-agent artifacts outside
    the candidate repository diff.
-8. Give the coding model a concise packet containing only the original feature
-   description, actionable obligations, expected new test names, repository
-   facts, allowed paths, and focused validation commands.
+8. Give the coding model one concise rendered prompt containing only the
+   objective, actionable obligations, expected verification, repository facts,
+   allowed scope, focused commands, and preservation constraints.
 9. Preserve full worker trajectories, command results, diff fingerprints,
    liveness decisions, and budget consumption for debugging.
 10. Support the same coding-worker contract in standard feature and Harbor
     flows.
-11. Allow OpenCode and mini-SWE-agent to be compared behind one provider
-    interface without provider-specific semantics leaking into Procedrr.
-12. Prove the behavior with deterministic tests and a live DeepInfra opt-in
+11. Make mini-SWE-agent the fixed implementation target after design; model
+    choice inside mini-SWE-agent remains configuration.
+12. Prove the one-prompt, one-invocation behavior with deterministic tests and a live DeepInfra opt-in
     regression using the complete state-data-scoping task.
 
 ## Non-goals
@@ -93,6 +93,8 @@ This redesign does not:
 - let the worker choose its own budget, validation profile, allowed paths, or
   success criteria;
 - require one coding session per sentence or obligation;
+- issue a continuation, repair, or fallback coding prompt after the one
+  invocation starts;
 - accept the worker's claim that it is finished as evidence;
 - run the complete repository validation suite after every worker action;
 - expose internal proposal documents, Structrr baselines, fingerprints,
@@ -106,9 +108,9 @@ This redesign does not:
 
 ### Own the supervisor, reuse the agent substrate
 
-Powdrr must own a small `BoundedCodingSupervisor`. The supervisor owns request
-shape, budgets, material-progress detection, validation transitions, repair
-selection, and terminal classification.
+Powdrr must own a small `BoundedCodingSupervisor`. The supervisor owns prompt
+shape, budgets, material-progress detection, validation transitions, and
+terminal classification.
 
 Use mini-SWE-agent through its Python API for:
 
@@ -121,22 +123,21 @@ Use mini-SWE-agent through its Python API for:
 
 Do not fork mini-SWE-agent initially. Pin a compatible release and subclass or
 compose its documented `DefaultAgent`, model, and environment interfaces. Keep
-Powdrr-owned types independent so another provider can be substituted later.
+Powdrr-owned records independent of mini-SWE-agent's internal schemas so a
+future architecture revision does not require rewriting durable artifacts;
+this isolation is not runtime provider selection or fallback authority.
 
-### Obligations are verification units, not execution units
+### Obligations compile into one prompt
 
 The canonical obligation list remains one record per requested behavior. The
-coding boundary receives all actionable obligations in one concise feature
-packet. One primary coding session implements the coherent feature.
+prompt compiler renders every actionable obligation, verification case,
+preservation rule, and non-goal exactly once into one feature prompt. One
+mini-SWE-agent session implements the coherent feature.
 
-Only validation results create repair units. A repair unit may cover multiple
-obligations when they share the same failing tests or code surface. The runtime
-must not mechanically create one worker process per obligation.
-
-If a future feature exceeds configured packet limits, compile at most five
-coherent slices. Slices must be based on an explicit shared code surface or
-dependency edge and must each list the obligations they cover. The default and
-the DeepSWE regression use one primary slice.
+If the prompt exceeds configured limits, prompt compilation fails before
+implementation. Deterministic compaction may remove duplicate views and
+irrelevant repository facts, but Powdrr must not split the feature across
+worker sessions or omit mandatory intent.
 
 ### Powdrr decides when work is complete
 
@@ -160,8 +161,8 @@ such documentation in the candidate diff.
 | --- | --- | --- |
 | Structrr | Repository facts, active intent, verification contracts | Worker loop or completion |
 | Procedrr | Ordered phases, branches, bounded retries, terminal gates | Provider event parsing |
-| Workrr | Worker requests, budgets, supervisor, diff attribution, validation and artifacts | Reinterpreting user intent |
-| mini-SWE-agent | Model turns, one shell action, command observation, trajectory serialization | Scope, durable success, repair policy |
+| Workrr | Prompt compilation, budgets, supervisor, diff attribution, validation and artifacts | Reinterpreting user intent or generating follow-up prompts |
+| mini-SWE-agent | Model turns, shell actions, command observation, edits, and trajectory serialization from one prompt | Scope, durable success, retry, or repair policy |
 | Coding model | Product and test edits within the supplied boundary | Plans, IDs, selectors, completion status, publication |
 | Harbor | Task checkout, outer timeout, artifact collection, benchmark evaluation | Feature decomposition or inner retries |
 
@@ -171,7 +172,13 @@ such documentation in the candidate diff.
 validated canonical design and verification obligations
     |
     v
-compile one concise CodingWorkPacket
+compile private obligation-validation-manifest-v1
+    |
+    v
+compile one immutable minisweagent-implementation-prompt-v1
+    |
+    v
+prove prompt/manifest obligation and case parity
     |
     v
 capture clean candidate baseline and enforce artifact isolation
@@ -185,16 +192,11 @@ classify exit + attributable diff
     +---- no useful diff / policy failure ----> terminal worker failure
     |
     v
-collect required test names and run focused validation
+collect required tests and run focused validation
     |
     +---- pass ----> run final repository validation
     |
-    +---- fail ----> compile current failure clusters
-                         |
-                         v
-                   bounded targeted repair
-                         |
-                         +----> recapture diff -> rerun affected validation
+    +---- fail ----> terminal failed implementation result
     |
     v
 final obligation evidence, scope review, and patch sanitation
@@ -209,41 +211,76 @@ Add provider-neutral records under `src/powdrr_lift/workrr/`. Follow existing
 frozen dataclass, `to_data`, `from_data`, schema-version, and fingerprint
 patterns.
 
-### Coding work packet
+### mini-SWE-agent implementation prompt
 
 ```python
 @dataclass(frozen=True, slots=True)
-class CodingWorkPacket:
-    packet_id: str
-    mode: Literal["primary", "repair"]
-    feature_description: str
-    obligations: tuple[CodingObligation, ...]
-    expected_tests: tuple[ExpectedTest, ...]
-    repository_facts: tuple[RepositoryFact, ...]
+class MiniSWEAgentImplementationPrompt:
+    prompt_id: str
+    design_revision: str
+    repository_inventory_fingerprint: str
+    rendering_revision: str
+    prompt: str
+    contract_refs: tuple[str, ...]
+    verification_case_refs: tuple[str, ...]
     allowed_paths: tuple[str, ...]
     focused_commands: tuple[CommandContract, ...]
-    must_preserve: tuple[str, ...]
-    non_goals: tuple[str, ...]
     base_commit: str
-    starting_diff_fingerprint: str
-    schema_version: str = "coding-work-packet-v1"
+    schema_version: str = "minisweagent-implementation-prompt-v1"
 ```
 
-`CodingObligation` contains only the Powdrr-owned obligation ID, behavioral
-description, acceptance criterion, and expected-test references. It does not
-contain proposal internals or duplicated prose representations.
+The compiler accepts canonical obligations, verification cases, repository
+facts, preservation constraints, and non-goals as inputs, then renders them
+into `prompt`. Those source records remain separate provenance artifacts; they
+are not fields mini-SWE-agent can inspect. The reference tuples prove coverage
+without exposing internal IDs in the rendered prompt.
+
+### Private obligation validation manifest
+
+```python
+@dataclass(frozen=True, slots=True)
+class ObligationValidationManifest:
+    manifest_id: str
+    design_revision: str
+    prompt_id: str
+    prompt_fingerprint: str
+    base_commit: str
+    entries: tuple[ObligationValidationEntry, ...]
+    preservation_case_refs: tuple[str, ...]
+    full_validation_profiles: tuple[str, ...]
+    schema_version: str = "obligation-validation-manifest-v1"
+```
+
+Each `ObligationValidationEntry` binds one actionable obligation to:
+
+- its immutable source and contract references;
+- an executable, static, artifact, or human-observation verification mode;
+- whether a durable repository test must be added, modified, or may use proven
+  existing coverage;
+- every required verification case and expected target;
+- the precompiled scenario, operation, and oracle for each target;
+- the baseline expectation and allowed failure kinds;
+- relevant symbols and paths used to select diff evidence; and
+- the exact evidence kinds required for acceptance.
+
+Executable verification is mandatory for behavioral obligations unless a
+typed design-time exemption names replacement evidence and passes semantic
+review. The prompt and manifest are compiled atomically from the same inputs,
+but only the prompt is given to mini-SWE-agent.
 
 `ExpectedTest` contains:
 
 - a Powdrr-owned ID;
 - a name prefix such as `test_state_constructor_accepts_data`;
-- the behavior the test must demonstrate;
+- the scenario, operation, and oracle the test must demonstrate;
+- its baseline expectation and allowed failure kinds;
 - optional discovered test directory hints; and
 - the obligation IDs it protects.
 
-The expected name is a prefix. A worker may append a meaningful suffix. Workrr
-must verify at least one collected test whose function name equals the prefix
-or starts with `prefix + "_"`.
+The expected name is a target contract rather than proof. A worker may append a
+meaningful suffix, but Workrr must resolve exactly one collected target, bind it
+to the manifest entry, and validate its behavior. Name matching by itself never
+satisfies an obligation.
 
 `RepositoryFact` is bounded and typed. Initial kinds are:
 
@@ -254,7 +291,7 @@ or starts with `prefix + "_"`.
 - `constraint`.
 
 Do not include raw Structrr files. Compile only facts selected as relevant to
-the packet.
+the prompt.
 
 ### Budget
 
@@ -269,18 +306,12 @@ class CodingBudget:
     output_bytes_limit: int
 ```
 
-Default budgets:
-
-| Mode | Model calls | Wall time | Command time | No-progress calls |
-| --- | ---: | ---: | ---: | ---: |
-| Primary | 30 | 1,800 seconds | 300 seconds | 5 |
-| Repair | 10 | 600 seconds | 300 seconds | 3 |
-
-The complete feature run has a separate global budget of 4,500 seconds,
-leaving at least 900 seconds for final validation and Harbor overhead before
-the current 5,400-second outer timeout. At most three repair sessions may run.
-Budget exhaustion is terminal and persisted; it is not converted into another
-retry.
+The one implementation invocation initially receives 40 model calls, 2,700
+seconds wall time, 300 seconds per command, and five consecutive no-progress
+calls. The complete feature run has a 4,500-second global budget, leaving at
+least 1,800 seconds for final validation and Harbor overhead before the current
+5,400-second outer timeout. Budget exhaustion is terminal and persisted; it
+does not start a continuation or repair invocation.
 
 ### Material state and progress
 
@@ -340,20 +371,22 @@ satisfy obligations until validation succeeds.
 
 ## Prompt contract
 
-Render `CodingWorkPacket` into one compact prompt with exactly these sections:
+Render the complete canonical design into one
+`MiniSWEAgentImplementationPrompt` whose `prompt` field has exactly these
+sections:
 
-1. `Original feature description`
-2. `Required behaviors`
-3. `Tests to add`
-4. `Repository facts`
-5. `Allowed paths`
-6. `Focused commands`
-7. `Preserve and avoid`
+1. `Objective`
+2. `Repository starting point`
+3. `Required behavior`
+4. `Required verification`
+5. `Preserve and avoid`
+6. `Allowed scope`
+7. `Focused commands`
 8. `Completion protocol`
 
 The completion protocol says:
 
-- inspect only what is needed to implement the packet;
+- inspect only what is needed to implement the prompt;
 - add the named tests and product behavior;
 - use focused commands during development;
 - do not run the whole suite;
@@ -370,13 +403,14 @@ Do not include:
 - obligation-population reviews;
 - fingerprints;
 - internal artifact paths;
-- previous model reasoning; or
-- resolved repair findings.
+- previous model reasoning;
+- validation findings from another attempt; or
+- instructions to wait for a later repair turn.
 
-A repair prompt is newly rendered from a repair packet. It includes only the
-relevant obligations, current failing/missing test evidence, allowed paths,
-current diff summary, and focused commands. It must not repeat the complete
-primary packet.
+The prompt is the sole worker-facing output of design. It is persisted before
+invocation and its exact bytes are passed to mini-SWE-agent once. The private
+validation manifest remains with Powdrr, and no other coding prompt exists in
+the run.
 
 ## Customized mini-SWE-agent integration
 
@@ -410,7 +444,7 @@ src/powdrr_lift/workrr/coding_workers/
 
 Responsibilities:
 
-- `model.py`: provider-neutral packet, budget, state, action, and result types;
+- `model.py`: durable prompt, budget, state, action, and result types;
 - `progress.py`: Git/test state capture, fingerprints, and progress decisions;
 - `policy.py`: allowed command/path validation and generated-artifact rules;
 - `supervisor.py`: global/session budgets, repetition detection, terminal
@@ -449,20 +483,11 @@ Preserve existing model override support for experiments. Persist the resolved
 provider, model, package version, model-call limit, and wall budget in run
 metadata without persisting the secret.
 
-### OpenCode containment during migration
+### One target worker
 
-Keep `OpenCodeProvider` behind the same provider-neutral interface until the
-comparison rollout is complete. Add these containment measures immediately:
-
-- generate an isolated OpenCode configuration with an explicit finite `steps`;
-- retain the external process-group absolute deadline;
-- classify repeated tool calls and no-diff activity in the shared supervisor;
-- never let OpenCode transport events reset material-progress state; and
-- do not make OpenCode the Harbor default after mini-SWE-agent passes the live
-  acceptance gate.
-
-OpenCode-specific event parsing remains diagnostic. It must not affect
-provider-neutral success semantics.
+The feature flow invokes mini-SWE-agent only. OpenCode compatibility may remain
+in lower-level diagnostic commands during migration, but it is not a target of
+the completed design flow and is never an implementation fallback.
 
 ## Artifact isolation and diff attribution
 
@@ -518,7 +543,7 @@ Before Harbor completion or PR creation:
 1. compute the candidate patch from the recorded task input baseline;
 2. assert at least one product or test path changed;
 3. assert no generated artifact path appears;
-4. assert every changed path is allowed by the implementation packet;
+4. assert every changed path is allowed by the implementation prompt;
 5. run `git diff --check`;
 6. persist patch stats and changed-path classifications; and
 7. block completion on any violation.
@@ -528,51 +553,45 @@ Before Harbor completion or PR creation:
 Update `docs/procedrr/skill-definitions/implement-feature.yaml` while preserving
 single-decision normal form.
 
-### Remove obligation-per-agent iteration
+### Replace coding iteration with one invocation
 
 The current code-task population may remain as planning/verification data, but
 the flow must not execute `run_code_task_agent` once per obligation. Replace
 that implementation loop with these phases:
 
-1. `compile_coding_work_packet`
-2. deterministic packet decisions, one predicate per decision
-3. `capture_coding_baseline`
-4. `run_primary_coding_worker`
-5. deterministic attempt decisions, one predicate per decision
-6. `collect_expected_tests`
-7. `run_focused_obligation_validation`
-8. `compile_repair_clusters`
-9. bounded `for_each` over current repair clusters, maximum three
-10. after each repair, rerun affected validation and recompute clusters
-11. `run_final_obligation_evidence`
-12. existing semantic and scope review
-13. `sanitize_candidate_patch`
+1. `compile_obligation_validation_manifest`
+2. deterministic validation-readiness decisions, one predicate per decision
+3. `compile_minisweagent_implementation_prompt`
+4. deterministic prompt completeness and prompt/manifest parity decisions
+5. `capture_coding_baseline`
+6. `run_minisweagent_once`
+7. deterministic attempt decisions, one predicate per decision
+8. `collect_expected_tests`
+9. `run_candidate_obligation_cases`
+10. `run_independent_obligation_probes`
+11. `run_baseline_differential_cases`
+12. `review_test_oracle_alignment`
+13. for each obligation: `review_implemented_obligation`
+14. `finalize_obligation_validation_receipts`
+15. existing preservation and scope review
+16. `sanitize_candidate_patch`
 
 Each LLM decision still receives one simple question. All worker supervision,
 budgeting, diff comparison, test collection, and status classification are
 deterministic operations.
 
-### Repair cluster rules
+### Terminal validation failures
 
-Compile clusters deterministically from current evidence:
-
-- missing expected tests with the same target test directory may cluster;
-- failing selectors sharing the same source path or traceback root may cluster;
-- obligations that reference the same expected test may cluster;
-- unrelated failures remain separate;
-- resolved findings are never copied into a later cluster; and
-- no more than three clusters may be dispatched in one run.
-
-If more than three clusters remain, select the three with the greatest
-obligation coverage, then terminate as `repair_budget_exhausted` if the next
-validation still has failures. Do not silently drop the remainder.
+Missing tests, failing selectors, scope violations, and incomplete obligation
+evidence terminate the run. Persist exact findings for diagnosis and possible
+future design input. Do not cluster them into additional worker requests.
 
 ### Gate corrections
 
 Delete or replace the current postconditions that treat an attempt object's
 presence and any nonempty worktree diff as success.
 
-Required primary-attempt decisions:
+Required attempt decisions:
 
 - provider result classification is `completed_with_progress`;
 - attempt-local durable diff is nonempty;
@@ -580,12 +599,8 @@ Required primary-attempt decisions:
 - generated paths are absent;
 - expected tests are collected after the attempt;
 - `git diff --check` passes; and
-- evidence was captured from the current candidate fingerprint.
-
-Required repair-attempt decisions are the same, except an attempt may complete
-without a new expected test when it changes product code and improves current
-focused evidence. An unchanged focused result and unchanged diff is never
-progress.
+- evidence was captured from the current candidate fingerprint; and
+- the invocation count for the run is exactly one.
 
 ## Validation strategy
 
@@ -602,17 +617,26 @@ timeout. Workrr owns full validation after focused checks pass.
 ### Expected-test collection
 
 Implement provider-specific collection behind existing verification adapters.
-For pytest, collect node IDs without running tests. Match the function portion
-against the expected prefix. Distinguish:
+For pytest, collect node IDs without running tests. Resolve each manifest target
+contract to exactly one selector using the expected path, function prefix, test
+scenario, and obligation mapping. Distinguish:
 
 - collected;
 - missing;
 - collection error; and
 - duplicate/ambiguous matches.
 
-At least one collected test must map to each actionable obligation before final
-completion unless an obligation's accepted verification contract explicitly
-uses another provider.
+At least one collected executable test must map to each actionable behavioral
+obligation before final completion unless its accepted manifest entry contains
+a typed exemption and replacement evidence. One test may map to multiple
+obligations only when the manifest identifies a distinct assertion, parameter,
+or observable predicate for every mapping.
+
+Enforce the manifest's durable-test disposition against the candidate diff:
+`add` requires a new collected test, `modify` requires an attributable change
+to the resolved test, and `existing_proven` requires fresh source and execution
+evidence for the exact mapped assertion. An unrelated existing passing test
+cannot be rebound after coding merely because its name is similar.
 
 ### Focused validation
 
@@ -620,16 +644,63 @@ Run only collected expected tests and any directly affected preservation tests.
 Record per-selector statuses. `skipped`, `xfailed`, `deselected`, missing, and
 timed out are failures, consistent with the verification-contract plan.
 
+For each new-behavior case, create an isolated shadow worktree containing the
+pre-implementation product baseline and candidate-authored test changes. Run
+the resolved selector there. The normal acceptance pattern is:
+
+- candidate implementation plus candidate test: pass; and
+- baseline implementation plus candidate test: fail for a manifest-approved
+  reason.
+
+A test that passes in both trees is non-discriminating and cannot prove new
+behavior. A collection, import, or symbol-missing baseline failure is accepted
+only when that failure kind was declared before coding. Existing preservation
+tests can be non-discriminating because their role is to prove no regression,
+not the newly requested behavior.
+
+When the language adapter can materialize a verification case directly from
+its typed fixture, operation, and oracle bindings, run that Workrr-owned probe
+from the artifact area against the candidate. Do not place it in the worker's
+editable checkout or reveal its source in the implementation prompt. The probe
+does not replace the durable repository test; it supplies independent evidence
+that mini-SWE-agent did not define both the behavior and the only assertion
+used to accept it.
+
+### Per-obligation evidence review
+
+Workrr builds one bounded evidence packet per manifest entry from:
+
+- immutable source proposition and resolved contract;
+- precompiled verification scenario and oracle;
+- collected test source and exact assertion or parameter mapping;
+- candidate and baseline execution evidence;
+- independent probe evidence when the adapter supports it;
+- relevant implementation hunks selected by subject/path closure; and
+- applicable preservation and static-analysis results.
+
+Deterministic adapters first decide collection, execution, differential, scope,
+and known oracle-shape predicates. When semantic judgment remains, Procedrr
+asks exactly one read-only question: “Does this implementation and verification
+evidence satisfy this one obligation?” The response is only `pass`, `fail`, or
+`abstain` plus a bounded explanation. Workrr adds the obligation identity and
+evidence references and persists one
+`obligation-validation-receipt-v1`. `abstain` fails closed.
+
+Every required evidence predicate and every obligation receipt must pass.
+Powdrr does not average verdicts or allow a whole-feature review to override a
+failed obligation.
+
 ### Final validation
 
 After focused evidence is green:
 
-1. run all affected verification contracts;
-2. run repository-required lint, formatting, and type checks;
-3. run the repository's full test profile once;
-4. rerun evidence collection if validation changed generated test artifacts;
-5. perform final implementation completeness and scope reviews; and
-6. sanitize and export the candidate patch.
+1. finalize all per-obligation validation receipts;
+2. run all affected preservation and non-goal contracts;
+3. run repository-required lint, formatting, and type checks;
+4. run the repository's full test profile once;
+5. rerun evidence collection if validation changed generated test artifacts;
+6. perform final completeness and unmapped-diff scope reviews; and
+7. sanitize and export the candidate patch.
 
 ## Configuration and compatibility
 
@@ -638,26 +709,21 @@ Add a typed coding-worker configuration rather than more unrelated CLI flags:
 ```python
 @dataclass(frozen=True, slots=True)
 class CodingWorkerConfig:
-    provider: Literal["minisweagent", "opencode"]
     model: str
-    primary_budget: CodingBudget
-    repair_budget: CodingBudget
+    budget: CodingBudget
     global_wall_time_seconds: int
-    repair_limit: int
 ```
 
 Retain existing CLI and environment names as compatibility inputs, normalize
 them once, and persist the resolved config. Add explicit flags only where an
 operator needs experimentation:
 
-- `--code-agent`;
 - `--coding-model-call-limit`;
 - `--coding-wall-time-seconds`;
-- `--coding-repair-limit`; and
 - `--coding-global-wall-time-seconds`.
 
-Harbor defaults to the pinned mini-SWE-agent provider after rollout. Standard
-feature flow uses the same default. OpenCode remains opt-in.
+Harbor and the standard feature flow use the pinned mini-SWE-agent provider.
+The completed design flow has no coding-provider selector.
 
 ## Telemetry and artifacts
 
@@ -666,11 +732,13 @@ Write all artifacts below:
 ```text
 <feature-run-root>/coding/
     config.json
-    packet.json
+    minisweagent-prompt.json
+    minisweagent-prompt.txt
+    obligation-validation-manifest.json
+    validation-readiness-receipt.json
     baseline.json
-    attempts/<attempt-id>/
+    attempt/
         request.json
-        prompt.txt
         trajectory.json
         events.jsonl
         material-states.jsonl
@@ -679,10 +747,13 @@ Write all artifacts below:
         diff.patch
     validation/
         collection.json
-        focused-<round>.json
+        independent-probes.json
+        baseline-differential.json
+        focused.json
+        oracle-alignment.json
+        obligations/
+            <obligation-id>.json
         final.json
-    repairs/
-        round-<n>-clusters.json
     patch-sanitization.json
 ```
 
@@ -696,9 +767,9 @@ cancellation, or provider failure.
 
 ## Implementation sequence
 
-Each phase below should be a separate pull request. Do not switch the default
-provider until the earlier correctness phases are merged and the live gate
-passes.
+Each remaining phase below should be a separate pull request. Historical
+OpenCode containment work may already be merged; the target state is always one
+mini-SWE-agent prompt and invocation.
 
 ### PR 1: Correct attempt attribution and terminal gates
 
@@ -755,11 +826,11 @@ Implementation:
 2. Capture material state after every completed worker action when the provider
    exposes actions, and at a bounded polling interval otherwise.
 3. Add action/output repetition detection.
-4. Add primary, repair, and global budgets.
+4. Add one invocation budget and one global run budget.
 5. Translate provider exits into the closed attempt classifications.
 6. Persist complete budget/progress telemetry.
-7. Make OpenCode run under the supervisor with finite configured steps and an
-   external process-group deadline.
+7. Keep any compatibility worker under finite configured steps and an external
+   process-group deadline until it is removed from the feature flow.
 
 Required tests:
 
@@ -768,7 +839,7 @@ Required tests:
 - a new diff fingerprint counts once;
 - repeated command/output triggers one recovery then termination;
 - absolute and global deadlines kill the process group;
-- budget exhaustion cannot start another repair;
+- budget exhaustion cannot start a continuation or repair;
 - partial artifacts survive every terminal classification; and
 - event storms terminate at the deterministic budget.
 
@@ -812,57 +883,76 @@ product/test-only patch.
 Exit gate: the live smoke passes twice consecutively and both trajectories show
 bounded termination.
 
-### PR 4: Cohesive primary implementation and validation-derived repair
+### PR 4: Terminal single-prompt compilation and invocation
 
 Goal: eliminate obligation-per-worker execution.
 
 Implementation:
 
-1. Add `CodingWorkPacket` compilation from the canonical obligations and
-   verification plans.
-2. Render the concise prompt contract.
-3. Replace the Procedrr code-task implementation loop with one primary worker
-   phase.
-4. Add expected-test collection and focused validation.
-5. Add deterministic failure clustering and at most three repair rounds.
-6. Recompute failures after every repair; never replay resolved findings.
-7. Preserve obligation-to-test and obligation-to-diff traceability in evidence.
+1. Compile one private `obligation-validation-manifest-v1` from the complete
+   canonical design, verification cases, baseline expectations, and evidence
+   requirements.
+2. Compile one `minisweagent-implementation-prompt-v1` from the same design,
+   repository bindings, scope, and verification plans.
+3. Add deterministic prompt/manifest parity and complete obligation/case
+   coverage checks.
+4. Replace every code-task, continuation, and repair implementation loop with
+   one mini-SWE-agent phase.
+5. Add exact expected-test collection, candidate execution, baseline
+   differential execution, adapter-owned independent probes, and
+   oracle-alignment validation.
+6. Produce one fail-closed validation receipt per obligation.
+7. Make every attempt or validation failure terminal for the run.
+8. Preserve obligation-to-prompt, obligation-to-test, obligation-to-diff, and
+   obligation-to-receipt traceability in evidence.
 
 Required tests:
 
-- 35 obligations compile into one primary packet and one worker invocation;
-- every obligation remains represented in packet and final evidence;
-- packet excludes all forbidden internal representations;
+- 35 obligations compile into one prompt and one worker invocation;
+- every obligation remains represented in the prompt, private manifest, and
+  final evidence;
+- prompt and manifest obligation/case sets have exact parity;
+- the prompt excludes all forbidden internal representations;
 - expected test prefixes permit meaningful suffixes;
 - missing, xfailed, skipped, and deselected expected tests fail;
-- related failures cluster and unrelated failures remain separate;
-- repairs receive only current failures;
-- a repair that makes no progress terminates without another identical repair;
+- a candidate test that passes against the product baseline cannot prove a new
+  behavior obligation;
+- every adapter-materializable case runs through a Workrr-owned probe that the
+  coding worker could not edit;
+- `add`, `modify`, and `existing_proven` durable-test requirements are enforced
+  against the attributable test diff;
+- an oracle-misaligned or semantically irrelevant passing test fails its
+  obligation receipt;
+- one shared test cannot cover multiple obligations without distinct mapped
+  assertions, parameters, or predicates;
+- every obligation receives an independent pass, fail, or abstain verdict and
+  abstention fails closed;
+- failed validation creates findings but no worker request;
+- timeout, limit, and no-progress exits create no continuation request;
 - full validation runs only after focused validation passes; and
 - normal and Harbor wrappers invoke the same core flow.
 
 Exit gate: a deterministic DeepSWE fixture reaches final validation using one
-primary invocation and no more than three repair invocations.
+prompt and exactly one mini-SWE-agent invocation.
 
-### PR 5: Live DeepSWE comparison and default switch
+### PR 5: Live DeepSWE single-prompt proof
 
 Goal: prove that the new path completes useful benchmark work before making it
 the default.
 
 Implementation:
 
-1. Add a documented A/B command that runs the same task with OpenCode and the
-   customized mini-SWE-agent using the same model and compiled packet.
-2. Preserve all trajectories and evaluator artifacts.
+1. Preserve the exact prompt, trajectory, and evaluator artifacts.
+2. Assert one mini-SWE-agent process and one prompt fingerprint per run.
 3. Run the complete `python-statemachine-state-data-scoping` task at least three
    times with mini-SWE-agent.
-4. Diagnose and fix deterministic harness failures before changing defaults.
-5. Switch Harbor and standard feature defaults only after the acceptance gate
-   below passes.
+4. Diagnose and fix deterministic harness failures without adding follow-up
+   worker prompts.
 
 Acceptance gate:
 
 - every run terminates before 4,500 seconds;
+- every run invokes mini-SWE-agent exactly once;
 - no run artifact is present in the candidate patch;
 - every run changes at least one product file and one required test file;
 - all expected tests are collected;
@@ -872,27 +962,34 @@ Acceptance gate:
 - a failed run produces a terminal, actionable classification rather than an
   outer Harbor timeout.
 
-If the model cannot meet the quality gate, do not weaken completion criteria.
-Keep the bounded worker and test another model. Harness correctness and model
-capability are separate concerns.
+If the model cannot meet the quality gate, do not weaken completion criteria or
+add repair prompts. Change the configured model for a new run or improve the
+compiled design prompt. Harness correctness, prompt quality, and model
+capability remain separate concerns.
 
 ## End-to-end regression fixture
 
 Add the complete DeepSWE state-data-scoping instructions as a versioned test
-fixture. The test must exercise production packet compilation and the real
+fixture. The test must exercise production prompt compilation and the real
 Procedrr definition. It must assert:
 
-1. nonactionable clauses do not enter the coding packet;
+1. nonactionable clauses do not enter the coding prompt;
 2. all actionable obligations do enter it;
 3. compound instruction sentences remain decomposed into their separate
    obligations;
-4. one primary worker request is produced;
-5. required test prefixes cover every actionable obligation;
+4. one mini-SWE-agent prompt and one worker invocation are produced;
+5. the private validation manifest covers every actionable obligation with an
+   executable case or reviewed typed exemption;
 6. no internal proposal/Structrr artifact is present in the worker prompt;
-7. generated planning files cannot satisfy diff progress;
-8. a timeout cannot satisfy any code-task receipt;
-9. validation failures produce bounded, current repair clusters; and
-10. final completion requires collected passing tests and a sanitized patch.
+7. prompt and manifest contract/case references have exact parity;
+8. generated planning files cannot satisfy diff progress;
+9. a timeout cannot satisfy any code-task receipt;
+10. validation failures produce durable terminal findings and no new prompt;
+11. baseline-nondiscriminating and oracle-misaligned tests fail validation;
+12. adapter-materializable cases run independent Workrr-owned probes;
+13. OpenCode is never invoked; and
+14. final completion requires a passing receipt for every obligation, passing
+    global checks, and a sanitized patch.
 
 The deterministic test uses scripted provider actions and real Git operations.
 The opt-in live test uses DeepInfra and the pinned model. The deterministic test
@@ -917,28 +1014,26 @@ path to the PR description.
 
 ## Migration and rollback
 
-1. Merge correctness gates before adding or selecting a new provider.
-2. Keep `--code-agent opencode` and `POWDRR_CODE_AGENT=opencode` available during
-   comparison.
-3. Do not maintain two completion semantics. Both providers use the same
-   supervisor and result types.
-4. If mini-SWE-agent integration regresses, switch the provider default back
-   without reverting correctness gates, artifact isolation, cohesive task
-   execution, or validation-driven repair.
-5. Remove the legacy generic mini CLI adapter after one release with the new
-   provider as default and no supported caller depending on it.
-6. Consider removing OpenCode from the Harbor image only after benchmark and
-   standard feature flows have used the new default successfully for a full
-   release cycle.
+1. Merge prompt completeness and one-invocation gates before removing legacy
+   loops.
+2. Remove coding-provider selection from the feature and Harbor design paths;
+   diagnostic CLIs may retain compatibility temporarily.
+3. Remove timeout continuation and validation repair dispatch from the feature
+   flow.
+4. Roll back by disabling the new feature flow or reverting its configuration,
+   not by silently selecting OpenCode or adding another prompt.
+5. Remove the legacy OpenCode and continuation paths after no supported caller
+   depends on them.
 
 ## Risks and mitigations
 
-### The primary packet is still too large
+### The single prompt is too large
 
 Measure rendered characters and token estimates. Keep only one representation
 of each obligation and repository fact. If the configured bound is exceeded,
-compile no more than five code-surface slices; do not return to one process per
-obligation.
+fail prompt compilation with a coverage report. Improve deterministic
+selection or require the design to be narrowed; do not split it into multiple
+worker prompts.
 
 ### A model writes weak or tautological tests
 
@@ -961,9 +1056,9 @@ public result schema.
 ### Partial changes are useful after timeout
 
 Persist them and classify them, but do not mark the attempt successful. A
-subsequent repair may start from the partial diff only when deterministic diff
-and policy checks accept it and the repair packet explicitly records that
-baseline.
+new run may explicitly use an accepted partial diff as its starting repository
+state after design revalidation. The failed run does not continue and does not
+receive another prompt.
 
 ### Strong limits reduce solve rate
 
@@ -979,19 +1074,25 @@ This plan is fully implemented only when all of the following are true:
   attempt;
 - pre-existing or generated diffs cannot satisfy attempt-local progress;
 - the final patch cannot contain run-generated planning or telemetry files;
-- one coherent feature produces one primary coding session by default;
+- one coherent feature produces exactly one immutable prompt and one coding
+  session;
 - mini-SWE-agent runs through a Powdrr-controlled, pinned, bounded Python
   integration;
 - progress is based on diff and validator state;
 - repeated actions and event storms terminate deterministically;
-- repair requests derive only from current validation failures and are bounded;
-- required tests are collected and passed before final completion;
+- timeout, limit, no-progress, and validation failures create no continuation,
+  repair, or fallback coding prompt;
+- the prompt and private validation manifest have exact obligation and case
+  parity;
+- required tests are collected, candidate-passing, baseline-discriminating
+  where applicable, and oracle-aligned before final completion;
+- every actionable obligation has an independent passing validation receipt;
 - all final obligation, preservation, scope, and patch-sanitization gates pass;
 - normal and Harbor flows share the same implementation core;
 - the DeepSWE regression fixture passes in CI;
 - the live DeepInfra smoke terminates reliably; and
 - at least two of three full state-data-scoping runs pass the hidden evaluator
-  before mini-SWE-agent becomes the default.
+  using one mini-SWE-agent invocation each.
 
 Until those conditions hold, a run that merely emits model activity or a large
 patch is not evidence that the coding system works.

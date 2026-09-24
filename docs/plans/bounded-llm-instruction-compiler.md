@@ -1,6 +1,31 @@
 # Bounded-LLM Instruction Compiler Implementation Plan
 
-Status: proposed
+Status: proposed for source capture and atomic-clause production; downstream
+worker design superseded
+
+## Downstream target amendment
+
+This plan remains normative only through deterministic source capture,
+segmentation, instruction-ledger construction, and atomic-clause production.
+Its later `ImplementationPacket`, `RepairPacket`, OpenCode, repair-loop, and
+delivery sections record the earlier architecture and must not be implemented.
+
+The normative design-phase output is now defined by
+`docs/design/source-anchored-semantic-contract-compilation.md`: one completed
+design revision compiles exactly one worker-facing
+`minisweagent-implementation-prompt-v1` plus one private
+`obligation-validation-manifest-v1`. The downstream boundary in
+`docs/design/external-coding-agent-boundary.md` sends only the prompt, exactly
+once, to one mini-SWE-agent invocation and retains the manifest for independent
+per-obligation validation. Deterministic post-implementation validation is
+terminal for that run and cannot produce a continuation, repair, or fallback
+prompt. A subsequent attempt requires a new run and a revalidated design
+revision.
+
+When this document conflicts with either normative downstream document, the
+newer single-prompt design controls. Future implementation work should extract
+the still-normative source-compilation material into its own document and then
+archive this mixed historical plan.
 
 ## Purpose
 
@@ -16,8 +41,8 @@ The governing rule is:
 > configuration, or completion state.
 
 Powdrr must become the compiler and authority for structure. Planning models
-become bounded semantic judges. OpenCode remains the only model allowed to edit
-code.
+become bounded semantic judges. After design, Powdrr compiles one complete
+prompt and mini-SWE-agent is the only target allowed to edit code.
 
 This plan is written for an implementation agent. It identifies the current
 failure, target contracts, ownership boundaries, exact workflow changes,

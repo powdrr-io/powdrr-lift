@@ -900,7 +900,20 @@ def _compile_feature_obligations(
             raise PowdrrExecutionError("feature sentence is missing id or text")
         if not isinstance(design, Mapping):
             raise PowdrrExecutionError("sentence design decision is malformed")
-        if not _decision_value(requirement, "required"):
+        _validate_sentence_design_decision(design)
+        required = _require_boolean_decision(
+            requirement, "required", "sentence requirement decision"
+        )
+        _require_boolean_decision(
+            _reflection, "reflected", "sentence reflection decision"
+        )
+        if design["kind"] == "nonactionable":
+            if required:
+                raise PowdrrExecutionError(
+                    "nonactionable sentence cannot become a feature obligation"
+                )
+            continue
+        if not required:
             continue
         identifier = sentence_id or f"sentence-{index}"
         if identifier in seen_ids:
@@ -1609,9 +1622,13 @@ def _update_plan_from_sentence_trace(
     for sentence, requirement, reflection in zip(
         sentences, requirement_decisions, reflection_decisions, strict=True
     ):
-        if not _decision_value(requirement, "required") or _decision_value(
-            reflection, "reflected"
-        ):
+        required = _require_boolean_decision(
+            requirement, "required", "sentence requirement decision"
+        )
+        reflected = _require_boolean_decision(
+            reflection, "reflected", "sentence reflection decision"
+        )
+        if not required or reflected:
             continue
         if not isinstance(sentence, Mapping):
             raise PowdrrExecutionError("feature sentence is malformed")
@@ -1662,6 +1679,7 @@ def _apply_sentence_design_trace(
         "expected_test": "expected_tests",
         "intent": "features",
         "non_goal": "guidance",
+        "nonactionable": "guidance",
     }
     document = _load_yaml_mapping(Path(plan))
     updated_document = {key: value for key, value in document.items()}
@@ -1686,6 +1704,8 @@ def _apply_sentence_design_trace(
             )
         if not isinstance(expected_test, str) or not expected_test.strip():
             raise PowdrrExecutionError("sentence design item is missing expected test")
+        if kind == "nonactionable":
+            continue
 
         design_id = f"design-{sentence_id}"
         section_name = section_by_kind[kind]
@@ -1777,6 +1797,35 @@ def _decompose_feature_description(feature_description: str) -> list[dict[str, s
 
 def _decision_value(value: Any, key: str) -> bool:
     return isinstance(value, Mapping) and value.get(key) is True
+
+
+def _require_boolean_decision(value: Any, key: str, label: str) -> bool:
+    """Reject ambiguous LLM booleans before they can alter the handoff."""
+    if not isinstance(value, Mapping) or not isinstance(value.get(key), bool):
+        raise PowdrrExecutionError(f"{label} must contain boolean {key}")
+    return bool(value[key])
+
+
+def _validate_sentence_design_decision(value: Mapping[str, Any]) -> None:
+    """Require every design field consumed by plan and worker compilation."""
+    kind = value.get("kind")
+    if not isinstance(kind, str) or kind not in {
+        "entity",
+        "feature",
+        "interface",
+        "invariant",
+        "guidance",
+        "acceptance_criterion",
+        "expected_test",
+        "intent",
+        "non_goal",
+        "nonactionable",
+    }:
+        raise PowdrrExecutionError("sentence design decision has invalid kind")
+    for field in ("description", "acceptance_criterion", "expected_test"):
+        item = value.get(field)
+        if not isinstance(item, str) or not item.strip():
+            raise PowdrrExecutionError(f"sentence design decision is missing {field}")
 
 
 def _collected_results(value: Any) -> list[Any] | None:
@@ -4628,9 +4677,18 @@ def _run_code_task_agent(
                 f"canonical feature design cannot be loaded for code task: {error}"
             ) from error
         if isinstance(canonical, Mapping):
+            obligations = canonical.get("obligations")
+            if (
+                not isinstance(obligations, list)
+                or not obligations
+                or any(not isinstance(item, Mapping) for item in obligations)
+            ):
+                raise PowdrrExecutionError(
+                    "canonical feature design has no valid obligations for code task"
+                )
             forwarded["obligations"] = {
                 "path": str(canonical_path),
-                "obligations": canonical.get("obligations", []),
+                "obligations": obligations,
             }
     compilation = state.get("verification_obligations")
     if "obligations" not in forwarded and isinstance(

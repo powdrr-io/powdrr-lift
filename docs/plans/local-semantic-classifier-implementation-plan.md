@@ -13,6 +13,8 @@ merely to replace an API call with a smaller model. The local path must:
 - run inference on ordinary CPU hardware by default;
 - preserve the provider-neutral semantic-decision contract;
 - abstain and fall back when a local prediction is not sufficiently reliable;
+- feed deterministic design assembly whose terminal output is one immutable
+  prompt for one mini-SWE-agent implementation invocation;
 - remain reproducible from pinned data, code, model, tokenizer, and runtime
   revisions; and
 - support replacement one decision kind at a time without changing Procedrr.
@@ -63,6 +65,34 @@ This plan adds the missing machine-learning implementation details:
 It does not change classifier semantics. A trained model that requires a label
 change has discovered a design issue; it does not have authority to redefine
 the label.
+
+## Downstream compilation target
+
+Local classifiers do not produce worker tasks. They resolve fields in the
+canonical design. After all fields, repository bindings, populations,
+predicates, and verification cases are complete, deterministic code compiles
+the entire accepted design into one worker-facing
+`minisweagent-implementation-prompt-v1` and one private
+`obligation-validation-manifest-v1`.
+
+Exactly one prompt is sent to mini-SWE-agent exactly once. The classifier
+provider cascade may use many small local decisions during design, but those
+decisions must not leak into multiple implementation prompts. mini-SWE-agent's
+internal inspect/edit/test turns are part of one invocation and one prompt.
+
+The private manifest preserves every obligation, verification case, oracle,
+baseline expectation, and required evidence kind for post-coding validation.
+Classifier replacement must leave both projections semantically equivalent:
+the prompt and manifest must contain the same contract and case sets even
+though only the prompt is sent to the worker.
+
+Post-worker validation is deterministically orchestrated from the private
+manifest. Collection, execution, baseline differential, scope, and supported
+oracle checks are deterministic; irreducibly semantic checks use bounded
+read-only judges one obligation at a time. Validation may accept or reject the
+result, but it does not create a repair, continuation, per-obligation, or
+fallback worker prompt. Failed evidence can become input to a later design
+revision and new run, never another prompt in the same run.
 
 ## Decision summary
 
@@ -789,7 +819,12 @@ Replay complete design interviews and require:
 - at least the same final-contract accuracy against adjudicated contracts;
 - clarification rate no more than five percentage points above baseline;
 - no high-risk intent erasure; and
-- a materially faster median and tail latency.
+- a materially faster median and tail design latency;
+- one completed design emits exactly one worker-facing prompt and one private
+  validation manifest;
+- the prompt contains every actionable resolved contract exactly once; and
+- prompt and manifest obligation and verification-case references have exact
+  parity.
 
 ## Latency and resource targets
 
@@ -1294,6 +1329,10 @@ Gate:
 - fallback and clarification rates remain within limits; and
 - rollback requires configuration only, not a code deployment.
 
+This routing changes only design-time semantic decisions. Regardless of which
+classifier provider resolves them, the downstream design emits one
+mini-SWE-agent prompt and does not select among coding-agent providers.
+
 ### PR 8: ModernBERT fallback only where justified
 
 For any task that failed with MiniLM:
@@ -1327,6 +1366,10 @@ For `All data should pickle.` the qualified runtime should behave as follows:
    threshold, latency, and source fingerprint.
 10. The final contract is identical to the contract produced by correct LLM
     decisions, because assembly is provider-independent.
+11. Deterministic prompt compilation combines that contract with all other
+    resolved contracts, repository facts, scope, and verification cases.
+12. The design phase emits one immutable prompt and Workrr invokes
+    mini-SWE-agent once with its exact `prompt` field.
 
 The local path succeeds only if it preserves the deliberate unresolved result
 at step 7. Faster confident invention is a regression.
@@ -1343,6 +1386,9 @@ at step 7. Faster confident invention is a regression.
 - Do not require a GPU in the production runtime.
 - Do not make Jev or another remote service a prerequisite for local
   classification.
+- Do not turn classifier decisions, obligations, verification cases, or
+  validation failures into multiple mini-SWE-agent prompts.
+- Do not use OpenCode as a fallback after prompt compilation.
 - Do not store private repository source in model artifacts or aggregate
   telemetry.
 - Do not silently update weights, tokenizers, label maps, or thresholds.
@@ -1363,5 +1409,11 @@ This plan is complete when:
 7. model artifacts and datasets are reproducible and content-addressed;
 8. provider replacement does not change Procedrr or semantic contract schemas;
 9. design-flow replay finds no new intent loss or expansion; and
-10. production monitoring can detect drift and roll back to LLM-only routing
-    without a code change.
+10. every completed design produces one deterministic mini-SWE-agent prompt,
+    one complete private validation manifest, and no implementation repair or
+    continuation prompts;
+11. prompt and manifest obligation and case sets remain identical across
+    qualified classifier providers; and
+12. production monitoring can detect classifier drift and roll back to
+    LLM-only design decisions without changing the single mini-SWE-agent
+    implementation boundary.

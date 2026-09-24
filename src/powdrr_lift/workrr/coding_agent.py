@@ -411,6 +411,7 @@ class OpenCodeProvider:
     agent: str = "build"
     timeout_seconds: float = 300.0
     absolute_timeout_seconds: float | None = 900.0
+    max_events: int | None = 256
     permission_policy: OpenCodePermissionPolicy = field(
         default_factory=OpenCodePermissionPolicy
     )
@@ -482,6 +483,7 @@ class OpenCodeProvider:
             env=environment,
             inactivity_timeout=self.timeout_seconds,
             absolute_timeout=self.absolute_timeout_seconds,
+            max_events=self.max_events,
         )
         session_id = _extract_opencode_session_id(_json_events(completed.stdout))
         if session_id is not None:

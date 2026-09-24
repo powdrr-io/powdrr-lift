@@ -248,6 +248,7 @@ def run_opencode(
     env: Mapping[str, str] | None = None,
     inactivity_timeout: float = 300.0,
     absolute_timeout: float | None = None,
+    max_events: int | None = None,
     on_snapshot: Callable[[LivenessSnapshot], None] | None = None,
     on_activity: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
@@ -262,6 +263,8 @@ def run_opencode(
         raise ValueError("absolute_timeout must be greater than zero")
     if absolute_timeout is not None and absolute_timeout < inactivity_timeout:
         raise ValueError("absolute_timeout must be at least inactivity_timeout")
+    if max_events is not None and max_events <= 0:
+        raise ValueError("max_events must be greater than zero")
     monitor = OpenCodeLiveness(
         slow_after=max(inactivity_timeout / 2, 0.001),
         stalled_after=inactivity_timeout,
@@ -286,6 +289,7 @@ def run_opencode(
     started_at = time.monotonic()
     last_progress = started_at
     timed_out = False
+    budget_exceeded = False
     last_snapshot: tuple[Any, ...] | None = None
     last_snapshot_at = last_progress
 
@@ -411,6 +415,25 @@ def run_opencode(
                         if on_activity is not None:
                             on_activity()
                     report_snapshot()
+                    if max_events is not None and len(monitor.events) >= max_events:
+                        budget_exceeded = True
+                        if log_path is not None:
+                            append_diagnostic(
+                                log_path,
+                                "process.budget_exceeded",
+                                captured_at=time.monotonic(),
+                                budget="events",
+                                limit=max_events,
+                                event_count=len(monitor.events),
+                                process_tree=_process_tree(process.pid),
+                            )
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except (PermissionError, ProcessLookupError):
+                            pass
+                        break
+            if budget_exceeded:
+                break
     finally:
         # A caller may cancel the parent while OpenCode is blocked in select.
         # Since OpenCode owns its process group, reap the whole group so a
@@ -425,7 +448,7 @@ def run_opencode(
 
     returncode = process.returncode
     assert returncode is not None
-    if timed_out:
+    if timed_out or budget_exceeded:
         returncode = 124
     terminal_snapshot = monitor.snapshot(process_returncode=returncode)
     if log_path is not None:

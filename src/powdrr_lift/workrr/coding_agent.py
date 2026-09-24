@@ -527,6 +527,11 @@ class MiniSWEAgentProvider:
             request.prompt,
             "--yolo",
             "--exit-immediately",
+            # Powdrr owns the wall-clock budget and can continue a partial
+            # attempt locally. mini's default dollar limit otherwise exits
+            # cleanly in the middle of an implementation.
+            "--cost-limit",
+            "0",
         ]
         if self.model is not None:
             command.extend(("--model", self.model))
@@ -536,7 +541,7 @@ class MiniSWEAgentProvider:
                 ("--output", str(self.diagnostics_root / f"{attempt_id}.traj.json"))
             )
         try:
-            return subprocess.run(
+            completed = subprocess.run(
                 command,
                 cwd=worktree_root,
                 env=environment,
@@ -552,6 +557,37 @@ class MiniSWEAgentProvider:
                 (error.stdout or "") if isinstance(error.stdout, str) else "",
                 (error.stderr or "") if isinstance(error.stderr, str) else "",
             )
+        if completed.returncode == 0 and self.diagnostics_root is not None:
+            trajectory_path = self.diagnostics_root / f"{attempt_id}.traj.json"
+            exit_status = _mini_trajectory_exit_status(trajectory_path)
+            if exit_status is not None and exit_status != "Submitted":
+                diagnostic = (
+                    "mini-swe-agent did not submit the task; "
+                    f"trajectory exit_status={exit_status!r}"
+                )
+                stderr = f"{completed.stderr}\n{diagnostic}".strip()
+                return subprocess.CompletedProcess(
+                    completed.args,
+                    125,
+                    completed.stdout,
+                    stderr,
+                )
+        return completed
+
+
+def _mini_trajectory_exit_status(path: Path) -> str | None:
+    """Read mini's terminal status without trusting its process exit code."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, Mapping):
+        return None
+    info = data.get("info")
+    if not isinstance(info, Mapping):
+        return None
+    status = info.get("exit_status")
+    return status if isinstance(status, str) else None
 
 
 def build_coding_agent_provider(

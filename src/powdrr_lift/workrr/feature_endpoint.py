@@ -2160,12 +2160,11 @@ def _run_code_agent_phase(
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=source_context,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
+            implementation_packet=implementation_packet,
         )
         request = replace(
             request,
-            implementation_packet=(
-                None if isinstance(code_task, Mapping) else implementation_packet
-            ),
+            implementation_packet=(implementation_packet),
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):

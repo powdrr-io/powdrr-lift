@@ -212,6 +212,12 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     ) -> subprocess.CompletedProcess[str]:
         captured["command"] = command
         captured["kwargs"] = kwargs
+        if "--output" in command:
+            output = command[command.index("--output") + 1]
+            Path(output).write_text(
+                json.dumps({"info": {"exit_status": "Submitted"}}),
+                encoding="utf-8",
+            )
         return subprocess.CompletedProcess(command, 0, "done\n", "")
 
     monkeypatch.setattr("powdrr_lift.workrr.coding_agent.subprocess.run", fake_run)
@@ -225,6 +231,7 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     assert "Stop after implementing the requested change." in command[2]
     assert "--yolo" in command
     assert "--exit-immediately" in command
+    assert command[command.index("--cost-limit") + 1] == "0"
     assert command[command.index("--model") + 1] == "openai/gpt-5"
     assert command[command.index("--output") + 1].endswith("attempt-1.traj.json")
     kwargs = captured["kwargs"]
@@ -232,6 +239,30 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     environment = kwargs["env"]
     assert isinstance(environment, dict)
     assert environment["MSWEA_CONFIGURED"] == "true"
+
+
+def test_minisweagent_provider_rejects_clean_exit_without_submission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    diagnostics = tmp_path / "diagnostics"
+    provider = MiniSWEAgentProvider(diagnostics_root=diagnostics)
+    head = _head(worktree)
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        assert "--output" in command
+        output = command[command.index("--output") + 1]
+        Path(output).write_text(
+            json.dumps({"info": {"exit_status": "LimitsExceeded"}}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.subprocess.run", fake_run)
+    result = provider.run(_request(head), worktree_root=worktree, attempt_id="limited")
+
+    assert result.returncode == 125
+    assert "exit_status='LimitsExceeded'" in result.stderr
 
 
 def test_execution_plan_compiles_selected_unit_to_worker_request() -> None:

@@ -1853,11 +1853,22 @@ def _execution_unit_for_code_task(
     objective = str(task.get("objective", "")).strip()
     if not task_id or not objective:
         raise PowdrrExecutionError("code task is missing task_id or objective")
+    requested_profiles = strings("validation_profiles")
+    available_profiles = tuple(dict.fromkeys(default_profiles))
+    validation_profiles = tuple(
+        profile for profile in requested_profiles if profile in available_profiles
+    )
+    if not validation_profiles:
+        # Code-task compilation may use the conventional name ``pytest`` while
+        # discovery names an explicit task command ``feature-validation``.
+        # Bind to the discovered profile instead of sending the worker a
+        # validator that cannot be resolved.
+        validation_profiles = available_profiles[:1]
     return ExecutionUnit(
         unit_id=f"implement-{slug}-{task_id}",
         objective=objective,
         paths=strings("allowed_paths", default_paths),
-        validation_profiles=strings("validation_profiles", default_profiles),
+        validation_profiles=validation_profiles,
         acceptance_criteria=strings("acceptance_criteria"),
         planned_additions=mappings("planned_additions"),
         planned_deletions=mappings("planned_deletions"),
@@ -4649,11 +4660,20 @@ def _run_code_task_agent(
         attempt = result.get("attempt")
         checkpoints = state.get("operation_checkpoints", ())
         checkpoint = checkpoints[-1] if checkpoints else None
+        focused_validation = _run_code_task_focused_validation(state, worktree=worktree)
+        if focused_validation is not None:
+            result = {**result, "coding_validation": focused_validation}
+            attempt_results[-1] = result
         if (
             isinstance(attempt, Mapping)
             and attempt.get("status") == CodingAgentStatus.COMPLETED.value
             and isinstance(checkpoint, Mapping)
             and checkpoint.get("passed") is True
+            and (
+                focused_validation is None
+                or focused_validation.get("status")
+                == ValidationReportStatus.PASSED.value
+            )
         ):
             return {
                 **result,
@@ -4674,6 +4694,7 @@ def _run_code_task_agent(
             "status": attempt.get("status"),
             "error": attempt.get("error"),
             "changed_paths": attempt.get("changed_paths", []),
+            "validation": focused_validation,
             "instruction": (
                 "Continue the existing implementation from the current worktree. "
                 "Inspect what the previous session changed, preserve correct edits, "
@@ -4692,6 +4713,33 @@ def _run_code_task_agent(
         ],
         "continuations": len(attempt_results) - 1,
     }
+
+
+def _run_code_task_focused_validation(
+    state: Mapping[str, Any], *, worktree: Path
+) -> dict[str, Any] | None:
+    """Validate a completed coding attempt before accepting its task receipt."""
+    request = state.get("request")
+    attempt = state.get("attempt")
+    profiles = state.get("validation_profiles")
+    if (
+        not isinstance(request, ImplementationRequest)
+        or not isinstance(attempt, CodingAgentAttempt)
+        or not isinstance(profiles, Sequence)
+    ):
+        return None
+    discovered = {
+        profile.name: ValidationProfile(profile.name, tuple(profile.command))
+        for profile in profiles
+        if isinstance(profile, DiscoveredValidationProfile)
+    }
+    if not discovered:
+        return None
+    report = ValidationRunner(discovered).run(request, attempt, worktree_root=worktree)
+    attempt_store = state.get("attempt_store")
+    if isinstance(attempt_store, CodingAgentAttemptStore):
+        attempt_store.save_validation_report(report)
+    return report.to_data()
 
 
 def _compile_code_task_postconditions(
@@ -4714,6 +4762,11 @@ def _compile_code_task_postconditions(
         implementation.get("attempt") if isinstance(implementation, Mapping) else None
     )
     attempt_status = attempt.get("status") if isinstance(attempt, Mapping) else None
+    coding_validation = (
+        implementation.get("coding_validation")
+        if isinstance(implementation, Mapping)
+        else None
+    )
     before_fingerprint = (
         before.get("state_fingerprint") if isinstance(before, Mapping) else None
     )
@@ -4747,6 +4800,12 @@ def _compile_code_task_postconditions(
             "passed": isinstance(before, Mapping)
             and isinstance(before_fingerprint, str)
             and bool(before_fingerprint),
+        },
+        {
+            "decision_id": "post:focused-validation",
+            "check": "focused_validation_passed",
+            "passed": isinstance(coding_validation, Mapping)
+            and coding_validation.get("status") == ValidationReportStatus.PASSED.value,
         },
     ]
     document = {"decisions": decisions, "current": current}

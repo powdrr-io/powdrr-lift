@@ -4624,16 +4624,74 @@ def _run_code_task_agent(
             "obligations",
             {"obligations": [{"description": task.get("objective", "")}], "path": ""},
         )
-    return _run_code_agent_phase(
-        config,
-        runner=runner,
-        worktree=worktree,
-        output_root=output_root,
-        branch=branch,
-        slug=slug,
-        state=state,
-        parameters=forwarded,
-    )
+    # A provider timeout is not a completed coding task.  It also must not
+    # discard useful partial edits: the next session needs to inspect the
+    # current tree and continue from the actual failure.  Keep this recovery
+    # local to the coding-task operation so Procedrr can still make one
+    # bounded decision about the resulting receipt.
+    attempt_results: list[dict[str, Any]] = []
+    recovery_issue: Mapping[str, Any] | None = None
+    for continuation in range(3):
+        current_parameters = dict(forwarded)
+        if recovery_issue is not None:
+            current_parameters["repair_issue"] = dict(recovery_issue)
+        result = _run_code_agent_phase(
+            config,
+            runner=runner,
+            worktree=worktree,
+            output_root=output_root,
+            branch=branch,
+            slug=slug,
+            state=state,
+            parameters=current_parameters,
+        )
+        attempt_results.append(result)
+        attempt = result.get("attempt")
+        checkpoints = state.get("operation_checkpoints", ())
+        checkpoint = checkpoints[-1] if checkpoints else None
+        if (
+            isinstance(attempt, Mapping)
+            and attempt.get("status") == CodingAgentStatus.COMPLETED.value
+            and isinstance(checkpoint, Mapping)
+            and checkpoint.get("passed") is True
+        ):
+            return {
+                **result,
+                "attempts": [
+                    attempt
+                    for item in attempt_results
+                    for attempt in item.get("attempts", [])
+                    if isinstance(attempt, Mapping)
+                ],
+                "continuations": continuation,
+            }
+        if not isinstance(attempt, Mapping):
+            break
+        if attempt.get("status") == CodingAgentStatus.POLICY_DENIED.value:
+            break
+        recovery_issue = {
+            "category": "coding_attempt_incomplete",
+            "status": attempt.get("status"),
+            "error": attempt.get("error"),
+            "changed_paths": attempt.get("changed_paths", []),
+            "instruction": (
+                "Continue the existing implementation from the current worktree. "
+                "Inspect what the previous session changed, preserve correct edits, "
+                "and finish the requested task. Do not restart or re-plan "
+                "unrelated work."
+            ),
+        }
+    final = attempt_results[-1]
+    return {
+        **final,
+        "attempts": [
+            attempt
+            for item in attempt_results
+            for attempt in item.get("attempts", [])
+            if isinstance(attempt, Mapping)
+        ],
+        "continuations": len(attempt_results) - 1,
+    }
 
 
 def _compile_code_task_postconditions(

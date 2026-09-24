@@ -58,6 +58,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _plan_text_items,
     _proposal_execution_units,
     _remove_temporary_feature_artifacts,
+    _run_code_task_agent,
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
     _validate_required_test_cases,
@@ -1481,6 +1482,72 @@ def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> N
     )
     assert reused["passed"] is False
     assert reused["changed_paths"] == []
+
+
+def test_code_task_agent_continues_after_timed_out_attempt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    attempts = iter(
+        [
+            {
+                "attempt": {
+                    "status": CodingAgentStatus.TIMED_OUT.value,
+                    "error": "coding-agent process timed out",
+                    "changed_paths": ["src/partial.py"],
+                },
+                "attempts": [
+                    {"status": CodingAgentStatus.TIMED_OUT.value},
+                ],
+            },
+            {
+                "attempt": {
+                    "status": CodingAgentStatus.COMPLETED.value,
+                    "error": None,
+                    "changed_paths": ["src/partial.py", "tests/test_feature.py"],
+                },
+                "attempts": [
+                    {"status": CodingAgentStatus.COMPLETED.value},
+                ],
+            },
+        ]
+    )
+    calls: list[dict[str, Any]] = []
+
+    def fake_phase(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        calls.append(dict(kwargs["parameters"]))
+        result = next(attempts)
+        kwargs["state"]["operation_checkpoints"] = [
+            {"passed": result["attempt"]["status"] == "completed"}
+        ]
+        return result
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", fake_phase
+    )
+    result = _run_code_task_agent(
+        {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
+        config=SimpleNamespace(
+            feature_description="Implement the feature.",
+            work_item_name="feature",
+        ),
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        branch="feature",
+        slug="feature",
+        state={},
+    )
+
+    assert result["attempt"]["status"] == CodingAgentStatus.COMPLETED.value
+    assert result["continuations"] == 1
+    assert len(calls) == 2
+    assert calls[0].get("repair_issue") is None
+    assert calls[1]["repair_issue"]["category"] == "coding_attempt_incomplete"
+    assert (
+        "Continue the existing implementation"
+        in calls[1]["repair_issue"]["instruction"]
+    )
 
 
 @pytest.mark.parametrize(

@@ -1487,30 +1487,29 @@ def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> N
 def test_code_task_agent_continues_after_timed_out_attempt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    attempts = iter(
-        [
-            {
-                "attempt": {
-                    "status": CodingAgentStatus.TIMED_OUT.value,
-                    "error": "coding-agent process timed out",
-                    "changed_paths": ["src/partial.py"],
-                },
-                "attempts": [
-                    {"status": CodingAgentStatus.TIMED_OUT.value},
-                ],
+    attempt_results: list[dict[str, Any]] = [
+        {
+            "attempt": {
+                "status": CodingAgentStatus.TIMED_OUT.value,
+                "error": "coding-agent process timed out",
+                "changed_paths": ["src/partial.py"],
             },
-            {
-                "attempt": {
-                    "status": CodingAgentStatus.COMPLETED.value,
-                    "error": None,
-                    "changed_paths": ["src/partial.py", "tests/test_feature.py"],
-                },
-                "attempts": [
-                    {"status": CodingAgentStatus.COMPLETED.value},
-                ],
+            "attempts": [
+                {"status": CodingAgentStatus.TIMED_OUT.value},
+            ],
+        },
+        {
+            "attempt": {
+                "status": CodingAgentStatus.COMPLETED.value,
+                "error": None,
+                "changed_paths": ["src/partial.py", "tests/test_feature.py"],
             },
-        ]
-    )
+            "attempts": [
+                {"status": CodingAgentStatus.COMPLETED.value},
+            ],
+        },
+    ]
+    attempts = iter(attempt_results)
     calls: list[dict[str, Any]] = []
 
     def fake_phase(*args: Any, **kwargs: Any) -> dict[str, Any]:

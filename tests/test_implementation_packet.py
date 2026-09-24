@@ -82,3 +82,39 @@ def test_packet_can_focus_one_obligation_and_its_matching_test() -> None:
     assert focused.required_tests[0]["description"] == "Verify reset."
     assert "Initialize data." not in focused.render()
     assert "Verify initialization." not in focused.render()
+
+
+def test_packet_prompt_contains_every_obligation_and_required_test() -> None:
+    packet = compile_implementation_packet(
+        objective="Add state data support.",
+        obligations=("Initialize data on entry.", "Reset data on re-entry."),
+        required_tests=(
+            {
+                "description": "Verify initialization.",
+                "provider": "pytest",
+                "profile": "pytest",
+                "name_hint": "test_state_data_initialization",
+                "selector": "tests/test_state.py::test_initialization",
+            },
+            {
+                "description": "Verify reset.",
+                "provider": "pytest",
+                "profile": "pytest",
+                "name_hint": "test_state_data_reset",
+                "selector": "tests/test_state.py::test_reset",
+            },
+        ),
+        allowed_paths=("src/state.py", "tests/test_state.py"),
+        validation_profiles=("pytest",),
+    )
+
+    rendered = packet.render()
+
+    for expected in (
+        "obligation 001: Initialize data on entry.",
+        "obligation 002: Reset data on re-entry.",
+        "`test_state_data_initialization`",
+        "`test_state_data_reset`",
+        "pytest/pytest",
+    ):
+        assert expected in rendered

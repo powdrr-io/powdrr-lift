@@ -448,6 +448,159 @@ def test_update_plan_from_sentence_trace_adds_missing_requirement(
     }
 
 
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_compile_feature_obligations_accepts_both_llm_result_shapes(
+    tmp_path: Path, wrapped: bool
+) -> None:
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="result-shape-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+    design = {
+        "kind": "feature",
+        "description": "Implement the feature.",
+        "acceptance_criterion": "The feature works.",
+        "expected_test": "Run the feature test.",
+    }
+
+    def result_shape(value: Any) -> Any:
+        return {"result": value} if wrapped else value
+
+    state: dict[str, Any] = {
+        "plan_path": plan,
+        "provider_inventory": (
+            {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_existing.py::test_existing",
+            },
+        ),
+    }
+
+    result = _compile_feature_obligations(
+        {
+            "feature_description": "Add the feature.",
+            "plan": str(plan),
+            "sentences": [{"id": "sentence-1", "text": "It works."}],
+            "design_decisions": [result_shape(design)],
+            "requirement_decisions": [result_shape({"required": True})],
+            "reflection_decisions": [result_shape({"reflected": True})],
+        },
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        state=state,
+    )
+
+    assert result["obligations"][0]["design"] == design
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("required", "true", "boolean required"),
+        ("reflected", 1, "boolean reflected"),
+    ],
+)
+def test_compile_feature_obligations_rejects_ambiguous_llm_decisions(
+    tmp_path: Path, field: str, value: Any, message: str
+) -> None:
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="ambiguous-decision-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+    decisions = {
+        "required": True,
+        "reflected": True,
+    }
+    decisions[field] = value
+
+    with pytest.raises(PowdrrExecutionError, match=message):
+        _compile_feature_obligations(
+            {
+                "feature_description": "Add the feature.",
+                "plan": str(plan),
+                "sentences": [{"id": "sentence-1", "text": "It works."}],
+                "design_decisions": [
+                    {
+                        "kind": "feature",
+                        "description": "Implement it.",
+                        "acceptance_criterion": "It works.",
+                        "expected_test": "Run the test.",
+                    }
+                ],
+                "requirement_decisions": [{"required": decisions["required"]}],
+                "reflection_decisions": [{"reflected": decisions["reflected"]}],
+            }
+            | (
+                {"requirement_decisions": [{"required": value}]}
+                if field == "required"
+                else {}
+            )
+            | (
+                {"reflection_decisions": [{"reflected": value}]}
+                if field == "reflected"
+                else {}
+            ),
+            worktree=tmp_path,
+            output_root=tmp_path / "output",
+            state={"plan_path": plan, "provider_inventory": ()},
+        )
+
+
+@pytest.mark.parametrize(
+    "design",
+    [
+        {"kind": "feature", "description": "Implement it."},
+        {
+            "kind": "not-a-design-kind",
+            "description": "Implement it.",
+            "acceptance_criterion": "It works.",
+            "expected_test": "Run the test.",
+        },
+    ],
+)
+def test_compile_feature_obligations_rejects_incomplete_design_before_handoff(
+    tmp_path: Path, design: dict[str, str]
+) -> None:
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="incomplete-design-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="sentence design decision"):
+        _compile_feature_obligations(
+            {
+                "feature_description": "Add the feature.",
+                "plan": str(plan),
+                "sentences": [{"id": "sentence-1", "text": "It works."}],
+                "design_decisions": [design],
+                "requirement_decisions": [{"required": True}],
+                "reflection_decisions": [{"reflected": True}],
+            },
+            worktree=tmp_path,
+            output_root=tmp_path / "output",
+            state={"plan_path": plan, "provider_inventory": ()},
+        )
+
+
 def test_state_data_deepswe_description_becomes_structured_plan_criteria(
     tmp_path: Path,
 ) -> None:
@@ -581,6 +734,81 @@ def test_sentence_design_trace_maps_consequences_to_plan_sections(
         item["id"] == "design-sentence-1-acceptance"
         for item in document["acceptance_criteria"]
     )
+
+
+def test_sentence_design_trace_skips_nonactionable_process_response(
+    tmp_path: Path,
+) -> None:
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="nonactionable-trace-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+    before = plan.read_text(encoding="utf-8")
+
+    result = _apply_sentence_design_trace(
+        {
+            "plan": str(plan),
+            "sentences": [{"id": "sentence-1", "text": "Open a PR."}],
+            "design_decisions": [
+                {
+                    "kind": "nonactionable",
+                    "description": "Ignore the delivery instruction.",
+                    "acceptance_criterion": "No product behavior is required.",
+                    "expected_test": "No product test is required.",
+                }
+            ],
+        },
+        state={"plan_path": plan},
+    )
+
+    assert result["updated"] == 0
+    assert plan.read_text(encoding="utf-8") == before
+
+
+def test_compile_feature_obligations_rejects_required_nonactionable_response(
+    tmp_path: Path,
+) -> None:
+    plan = _write_structrr_plan(
+        tmp_path,
+        FeatureEndpointConfig(
+            feature_description="Add the feature.",
+            work_item_name="nonactionable-obligation-test",
+            repo_root=tmp_path,
+            allowed_paths=(".",),
+        ),
+        interview_input={"acceptance_criteria_edits": {"added": []}},
+    )
+
+    with pytest.raises(
+        PowdrrExecutionError,
+        match="nonactionable sentence cannot become a feature obligation",
+    ):
+        _compile_feature_obligations(
+            {
+                "feature_description": "Add the feature.",
+                "plan": str(plan),
+                "sentences": [{"id": "sentence-1", "text": "Open a PR."}],
+                "design_decisions": [
+                    {
+                        "kind": "nonactionable",
+                        "description": "Ignore the delivery instruction.",
+                        "acceptance_criterion": "No product behavior is required.",
+                        "expected_test": "No product test is required.",
+                    }
+                ],
+                "requirement_decisions": [{"required": True}],
+                "reflection_decisions": [{"reflected": True}],
+            },
+            worktree=tmp_path,
+            output_root=tmp_path / "output",
+            state={"plan_path": plan, "provider_inventory": ()},
+        )
 
 
 def test_structured_obligation_contracts_cover_generated_design_intents(
@@ -1551,6 +1779,98 @@ def test_code_task_agent_continues_after_timed_out_attempt(
         "Continue the existing implementation"
         in calls[1]["repair_issue"]["instruction"]
     )
+
+
+def test_code_task_agent_forwards_canonical_design_obligations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    canonical = tmp_path / "canonical-feature-design.json"
+    canonical.write_text(
+        json.dumps(
+            {
+                "obligations": [
+                    {
+                        "id": "state-data",
+                        "description": "State data resets on re-entry.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: list[dict[str, Any]] = []
+
+    def fake_phase(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        calls.append(dict(kwargs["parameters"]))
+        kwargs["state"]["operation_checkpoints"] = [{"passed": True}]
+        return {
+            "attempt": {
+                "status": CodingAgentStatus.COMPLETED.value,
+                "changed_paths": ["src/state.py"],
+            },
+            "attempts": [],
+        }
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", fake_phase
+    )
+    result = _run_code_task_agent(
+        {"task": {"task_id": "state-data", "objective": "Implement state data."}},
+        config=SimpleNamespace(
+            feature_description="Implement state data.",
+            work_item_name="state-data",
+        ),
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        branch="state-data",
+        slug="state-data",
+        state={"canonical_feature_design_path": canonical},
+    )
+
+    assert result["attempt"]["status"] == CodingAgentStatus.COMPLETED.value
+    assert calls[0]["obligations"] == {
+        "path": str(canonical),
+        "obligations": [
+            {
+                "id": "state-data",
+                "description": "State data resets on re-entry.",
+            }
+        ],
+    }
+
+
+def test_code_task_agent_rejects_canonical_design_without_obligations(
+    tmp_path: Path,
+) -> None:
+    canonical = tmp_path / "canonical-feature-design.json"
+    canonical.write_text(json.dumps({"obligations": []}), encoding="utf-8")
+
+    with pytest.raises(
+        PowdrrExecutionError,
+        match="canonical feature design has no valid obligations",
+    ):
+        _run_code_task_agent(
+            {
+                "task": {
+                    "task_id": "empty-design",
+                    "objective": "Implement the feature.",
+                }
+            },
+            config=SimpleNamespace(
+                feature_description="Implement the feature.",
+                work_item_name="empty-design",
+            ),
+            runner=lambda *args, **kwargs: subprocess.CompletedProcess(
+                args[0], 0, "", ""
+            ),
+            worktree=tmp_path,
+            output_root=tmp_path / "output",
+            branch="empty-design",
+            slug="empty-design",
+            state={"canonical_feature_design_path": canonical},
+        )
 
 
 @pytest.mark.parametrize(

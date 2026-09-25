@@ -1,0 +1,542 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 804
+title: Plan semantic boundary preservation through prompt compilation
+intent:
+  problem: The design-to-prompt path could preserve broad obligations while collapsing
+    subtle distinctions such as owned versus merged data views, absent versus explicitly
+    empty declarations, or mutation persistence versus immutability, and its nonactionable
+    filtering lacked an independent conservation gate.
+  goal: Define an implementation-ready semantic-boundary compiler and lossless prompt
+    projection that preserve every source disposition, modifier, partition, interaction,
+    oracle, and contrast through independently verifiable prompt and validation mappings.
+human-decisions:
+- id: conserve-every-source-disposition
+  summary: Give every source proposition one terminal actionable, preservation, non-goal,
+    or safely routed process-only disposition so no instruction disappears between
+    design and prompt compilation.
+- id: compile-semantic-boundaries-before-rendering
+  summary: Compile authority-backed dimensions, pairwise contract interactions, and
+    minimal discriminating contrast cases before any worker prompt can be emitted.
+- id: render-lossless-worker-prompt
+  summary: Render complete behavior, interaction, scenario, operation, oracle, expected-result,
+    and contrast semantics while omitting only duplicate prose and internal metadata.
+- id: prove-projection-and-validation-parity
+  summary: Bind canonical meaning to exact prompt byte ranges and require prompt,
+    manifest, independent probes, and per-obligation evidence to preserve the same
+    semantic references.
+structured_files: []
+files:
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 109
+    end_line: 123
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+  related:
+    entities:
+    - source-anchored-semantic-contract-compilation-design
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 566
+    end_line: 647
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+  related:
+    entities:
+    - source-anchored-semantic-contract-compilation-design
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1168
+    end_line: 1514
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+  related:
+    entities:
+    - source-anchored-semantic-contract-compilation-design
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1632
+    end_line: 1643
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+  related:
+    entities:
+    - source-anchored-semantic-contract-compilation-design
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1665
+    end_line: 1675
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+  related:
+    entities:
+    - source-anchored-semantic-contract-compilation-design
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1697
+    end_line: 1702
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1722
+    end_line: 1729
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1737
+    end_line: 1741
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1772
+    end_line: 1807
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1865
+    end_line: 1871
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1873
+    end_line: 1875
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1883
+    end_line: 1926
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1949
+    end_line: 1970
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1972
+    end_line: 1977
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1987
+    end_line: 1992
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1994
+    end_line: 1999
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2011
+    end_line: 2013
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2015
+    end_line: 2015
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2017
+    end_line: 2021
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2025
+    end_line: 2027
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2042
+    end_line: 2048
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 1483
+    end_line: 1484
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+  related:
+    entities:
+    - source-anchored-semantic-contract-compilation-design
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2089
+    end_line: 2097
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2099
+    end_line: 2100
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2102
+    end_line: 2104
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2118
+    end_line: 2118
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2132
+    end_line: 2137
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2143
+    end_line: 2144
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2152
+    end_line: 2152
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2157
+    end_line: 2157
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2181
+    end_line: 2183
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2424
+    end_line: 2428
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2454
+    end_line: 2462
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2475
+    end_line: 2481
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2528
+    end_line: 2546
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2555
+    end_line: 2559
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2563
+    end_line: 2565
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2567
+    end_line: 2567
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span:
+    start_line: 2613
+    end_line: 2621
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 23
+    end_line: 30
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 61
+    end_line: 69
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 98
+    end_line: 104
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 245
+    end_line: 247
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 271
+    end_line: 274
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 913
+    end_line: 1017
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1023
+    end_line: 1026
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1029
+    end_line: 1029
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1031
+    end_line: 1044
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1046
+    end_line: 1046
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1049
+    end_line: 1056
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1063
+    end_line: 1074
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1076
+    end_line: 1076
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1090
+    end_line: 1094
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1103
+    end_line: 1105
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1107
+    end_line: 1107
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1120
+    end_line: 1122
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1133
+    end_line: 1136
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1152
+    end_line: 1158
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1160
+    end_line: 1171
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1173
+    end_line: 1186
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1189
+    end_line: 1196
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1246
+    end_line: 1265
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1309
+    end_line: 1314
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 1321
+    end_line: 1323
+  summary: Specify the semantic-boundary and lossless prompt requirements represented by this changed section.
+  rationale: Preserve subtle source intent through implementation instructions and independent validation evidence.
+entities:
+- id: source-anchored-semantic-contract-compilation-design
+  type: Design doc
+  action: modified
+- id: semantic-boundary-preservation-flow
+  type: Workflow
+  action: added
+entity_relationships: []
+invariants:
+- id: product-semantics-cannot-be-excluded-as-process-only
+  action: added
+  description: A nonactionable classification excludes text from product behavior
+    only after an independent safety decision proves it process-only and binds any
+    imperative to its registered Procedrr route.
+  rationale: Prevent nonactionable filtering from erasing product non-goals, mixed
+    clauses, or workflow requirements.
+- id: behaviorally-distinct-contracts-require-contrast-evidence
+  action: added
+  description: Distinct observation views, lifecycle phases, precedence rules, variants,
+    and behaviorally different partitions require an authority-backed case whose observations
+    discriminate the intended behavior from the plausible conflation.
+  rationale: Detect implementations that are broadly similar but collapse a required
+    semantic boundary.
+- id: worker-prompt-is-a-lossless-design-projection
+  action: added
+  description: The worker prompt preserves every required condition, exception, result,
+    observation view, oracle, interaction, contrast, and preservation rule while removing
+    only duplicate prose and private metadata.
+  rationale: Ensure prompt optimization cannot strip the details needed for a correct
+    first implementation attempt.
+- id: prompt-and-validation-projections-remain-semantically-equal
+  action: added
+  description: Exact prompt byte ranges and manifest mappings cover the same contracts,
+    dimensions, interactions, contrast cases, and verification predicates from one
+    design revision.
+  rationale: Ensure the worker is instructed to implement the same semantics that
+    Powdrr independently validates afterward.
+guidance:
+- id: derive-boundaries-only-from-accepted-authority
+  action: added
+  description: Derive semantic dimensions, interaction relations, forbidden results,
+    and contrast cases only from exact source spans, accepted Structrr definitions
+    or invariants, repository API contracts, ontology rules, or language-adapter rules,
+    and clarify unresolved meaning instead of guessing.
+  rationale: Improve subtlety detection without inventing edge-case behavior from
+    model familiarity or world knowledge.
+features: []
+proposed_prs: []

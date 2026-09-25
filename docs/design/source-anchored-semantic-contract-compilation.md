@@ -106,6 +106,21 @@ The implementation must satisfy these properties.
     that maps every actionable obligation to the evidence required after
     coding. The prompt is the only worker-facing projection, not the only
     design artifact.
+15. Every source proposition has exactly one terminal disposition receipt:
+    represented as required behavior, represented as preservation or a
+    non-goal, or excluded as proven process-only text. No proposition simply
+    disappears between design and prompt compilation.
+16. Every meaning-bearing modifier and every accepted derived semantic field
+    reaches an identifiable prompt span and either an executable assertion or
+    a typed replacement-evidence requirement.
+17. Contracts that share a subject are compared before prompt compilation so
+    distinct observation views, lifecycle phases, precedence rules, and
+    boundary cases cannot be silently collapsed into one approximately similar
+    behavior.
+18. The implementation prompt is a lossless implementation projection of the
+    canonical design. Concision may remove duplicate prose and internal
+    metadata, but never a condition, exception, result, oracle, contrast, or
+    preservation rule.
 
 ## Authority boundaries
 
@@ -547,6 +562,88 @@ Workrr constructs a coverage matrix and enforces:
 
 Specialized-classifier suitability: **medium**. This is a semantic textual
 similarity/NLI task and should initially retain a general-model fallback.
+
+### C12: nonactionable-exclusion-safety classifier
+
+Purpose: make exclusion of a proposition from the product prompt a separate,
+fail-closed decision rather than a side effect of C01.
+
+This classifier runs only when C01 returns `nonactionable`. It answers one
+question:
+
+> Does this exact proposition contain any requested product state, behavior,
+> prohibition, compatibility rule, or observable result in addition to process
+> or delivery instructions?
+
+Output value:
+
+```text
+process_only | product_semantics_present | mixed | unresolved
+```
+
+Rules:
+
+- `process_only` permits exclusion from product behavior while retaining an
+  auditable source-disposition receipt and, for an imperative process
+  instruction, a bound Procedrr operation or policy route.
+- `product_semantics_present` invalidates the C01 result and routes the
+  proposition back through disposition classification.
+- `mixed` invalidates the proposition's atomicity. Workrr returns it to the
+  atomic-clause compiler, which must produce separately covered child
+  propositions before semantic compilation resumes.
+- `unresolved` blocks prompt compilation.
+- A source proposition classified as `non_goal`, `guidance`, or any actionable
+  product disposition never reaches this classifier and cannot be excluded by
+  it.
+
+Examples:
+
+| Proposition | Result | Route |
+| --- | --- | --- |
+| `Open a pull request after implementation.` | `process_only` | Exclude from product prompt; retain receipt |
+| `Do not add retries.` | `product_semantics_present` | Reclassify as `non_goal` |
+| `Add state data and then open a pull request.` | `mixed` | Re-split into two propositions |
+| `Use a dictionary so callers can mutate values.` | `product_semantics_present` | Reclassify as product guidance or interface behavior |
+
+Specialized-classifier suitability: **medium-high**. False `process_only`
+results erase intent, so promotion requires high per-label recall for
+`product_semantics_present` and `mixed`, calibrated abstention, and adversarial
+fixtures containing product and process language in the same sentence.
+
+### C13: contract-observation-relation classifier
+
+Purpose: decide one semantic relation between two resolved contracts that
+share a subject, repository binding, state value, or output type when ontology
+metadata does not resolve the relation mechanically.
+
+The classifier receives exactly two contracts, their exact source spans, and
+one compiler-selected relation candidate. It does not receive a list to rank.
+
+Output value:
+
+```text
+same_observation | distinct_observations | ordered_phases | precedence |
+mutual_exclusion | preservation_boundary | independent | unresolved
+```
+
+Examples:
+
+| Contract A | Contract B | Relation |
+| --- | --- | --- |
+| Callback receives ancestor-plus-child data | Snapshot returns each state's owned data | `distinct_observations` |
+| Data exists during `on_enter` | Data is removed after `on_exit` | `ordered_phases` |
+| Child key shadows equal parent key | Parent value is otherwise inherited by callback scope | `precedence` |
+| State data can be pickled | Diagrams annotate data-bearing states | `independent` |
+
+`same_observation` is legal only when both contracts bind the same operation,
+view, lifecycle phase, scope, and predicate. Shared nouns or return types are
+not sufficient. `unresolved` blocks boundary compilation and routes to one
+human clarification question.
+
+Specialized-classifier suitability: **medium**. Exact ontology relations and
+operation identities should resolve deterministically first. Semantic
+relations retain an LLM fallback until a pairwise held-out suite demonstrates
+high recall for `distinct_observations`, `ordered_phases`, and `precedence`.
 
 ## Classifier execution policy
 
@@ -1068,7 +1165,353 @@ provenance:
 fingerprint: sha256:...
 ```
 
-### A10: derive projections
+### A10: compile semantic dimensions and partitions
+
+Before rendering, Workrr derives the finite semantic dimensions that can alter
+the observable result of each resolved contract. A dimension is accepted only
+when its values come from an exact source modifier, a bound ontology concept,
+an accepted Structrr definition or invariant, a repository API contract, or a
+language-adapter rule. General model knowledge cannot create dimension values.
+
+Dimension binding is deterministic where possible:
+
+1. Collect exact precondition, exception, explicit-result, temporal-scope, and
+   behavior spans from the partial contracts.
+2. Ask the bound operation ontology and language adapter for candidate axes and
+   values applicable to those spans; providers cannot invent candidates.
+3. Bind exact lexical and accepted-definition matches mechanically.
+4. For every remaining span/candidate pair, reuse C09 to decide only
+   `matches`, `does_not_match`, or `insufficient_evidence`.
+5. Aggregate accepted candidates. Zero matches for a meaning-bearing span is
+   `unsupported_concept`; multiple incompatible matches is
+   `multiple_candidates`. Both block compilation.
+6. Apply accepted Structrr invariants and repository API contracts only after
+   source-derived values, preserving separate authority references.
+
+The immutable record is:
+
+```yaml
+schema_version: semantic-dimension-v1
+dimension_id: dimension:state-data:declaration-presence
+subject_binding_refs:
+  - python:statemachine.state.State.data
+axis: declaration_presence
+authority_refs:
+  - source-span:instruction-017:42-60
+values:
+  - value_id: absent
+    predicate: no_data_argument_declared
+  - value_id: explicit_empty
+    predicate: data_argument_equals_empty_mapping
+  - value_id: nonempty
+    predicate: data_argument_has_members
+completeness: complete_for_authority
+fingerprint: sha256:...
+```
+
+Initial adapter-neutral axes are:
+
+- declaration presence: absent, explicit empty, nonempty, and invalid forms
+  stated by the design;
+- activity or availability: active, inactive, before creation, and after
+  removal when applicable;
+- observation view: owned storage, effective callback scope, public snapshot,
+  serialized form, or rendered form;
+- structural position: root, ancestor, child, parallel sibling, or population
+  member when those relationships are bound;
+- lifecycle phase: before entry, during entry, active, during exit, after exit,
+  ordinary reentry, and history restoration when applicable;
+- polarity and validity: accepted input, rejected input, prohibited behavior,
+  or permitted omission; and
+- variant: each explicitly distinct mode such as shallow versus deep history.
+
+This is not an instruction to generate a Cartesian product. The compiler keeps
+only partitions that can change an operation's applicability or expected
+predicate. Every retained value records its authority. If the source promises
+`dict or None` but does not say which state produces `None`, and neither an
+accepted API definition nor repository compatibility evidence resolves it,
+the contract remains unresolved and Procedrr asks one targeted clarification;
+the compiler does not guess.
+
+### A11: compile the modifier-conservation ledger
+
+Workrr creates one row for every meaning-bearing source span and every accepted
+derived field:
+
+Before creating field rows, Workrr emits one disposition receipt per source
+proposition:
+
+```yaml
+schema_version: source-disposition-receipt-v1
+receipt_id: disposition:instruction-031
+source_ref: instruction-031
+source_fingerprint: sha256:...
+c01_decision_ref: decision:instruction-031:disposition
+disposition: nonactionable
+exclusion_safety_decision_ref: decision:instruction-031:exclusion-safety
+terminal_route: process_only_exclusion
+child_proposition_refs: []
+prompt_inclusion: forbidden
+procedural_route_ref: procedrr:publish-feature-pr
+metadata_exclusion_reason: null
+fingerprint: sha256:...
+```
+
+For actionable dispositions, `terminal_route` is
+`required_behavior`, `preservation`, or `non_goal`, and
+`exclusion_safety_decision_ref` is absent. For `mixed`, the parent receipt names
+all child proposition references and is not terminal until C11 proves complete,
+non-overlapping child coverage and every child has its own terminal receipt.
+Exactly one terminal receipt is permitted for each leaf proposition.
+
+A process-only imperative must bind `procedural_route_ref` to a registered
+Procedrr operation or policy that owns it; for example, publication belongs to
+the publication flow rather than the coding prompt. Descriptive delivery
+metadata may instead set a closed `metadata_exclusion_reason`. Neither route
+creates product code work. A process instruction with neither route remains
+unresolved, ensuring that `nonactionable` means “handled outside product
+semantics,” not “discarded.”
+
+```yaml
+schema_version: semantic-conservation-row-v1
+row_id: conservation:instruction-017:result-none
+source_ref: instruction-017
+source_span: {start: 42, end: 60}
+semantic_field_refs:
+  - contract:instruction-017:predicate
+authority_refs:
+  - source-span:instruction-017:42-60
+required_destinations:
+  prompt: required_behavior
+  verification: executable_assertion
+prompt_fragment_ref: null
+verification_assertion_refs: []
+status: unresolved
+fingerprint: sha256:...
+```
+
+Rows are required for polarity, quantifier, subject, operation, input and
+output shapes, every precondition, exception, explicit result, temporal scope,
+population rule, precedence rule, preservation constraint, and non-goal.
+Rows derived from accepted definitions or repository contracts cite those
+authorities instead of pretending the source stated them.
+
+Disposition controls the required route:
+
+| Disposition | Required terminal route |
+| --- | --- |
+| `entity` | Required design fact plus static, repository, or executable existence evidence |
+| `feature`, `interface`, `invariant` | Required behavior plus verification or typed exemption |
+| `guidance` | Required behavior or `Preserve and avoid`, according to enforcement level |
+| `non_goal` | `Preserve and avoid` plus absence/preservation evidence |
+| `nonactionable` | C12 `process_only` receipt and explicit prompt exclusion |
+| unresolved or mixed | No handoff may be emitted |
+
+No row may have zero routes or more than one conflicting terminal route. A
+nonactionable row is covered by its exclusion receipt; it must not be counted
+as an actionable contract and must not leak back through the objective,
+repository summary, required tests, or completion protocol.
+
+### A12: compile cross-contract interactions
+
+Workrr generates bounded contract pairs using shared subject bindings,
+overlapping repository symbols, operation output types, lifecycle resources,
+and explicit relationship edges. It does not compare every contract to every
+other contract.
+
+For each candidate pair:
+
+1. Resolve exact ontology relationships first.
+2. Compare operation, observation view, phase, scope, preconditions,
+   exceptions, precedence, and predicate.
+3. If all fields are equal, record `same_observation` and permit deterministic
+   deduplication only when source coverage remains one-to-one.
+4. If a field differs, record the typed relation mechanically when possible;
+   otherwise run C13 for that one candidate relation.
+5. Reject `same_observation` when any meaning-bearing field differs.
+6. Require a human clarification when C13 remains unresolved.
+
+The resulting record is:
+
+```yaml
+schema_version: contract-interaction-v1
+interaction_id: interaction:state-data:callback-vs-snapshot
+contract_refs:
+  - contract:callback-state-data
+  - contract:state-data-values
+shared_subject_refs:
+  - python:statemachine.state.State.data
+relation: distinct_observations
+difference_fields:
+  - observation_view
+left:
+  view: effective_callback_scope
+  includes: [active_ancestor_data, own_data]
+right:
+  view: owned_state_snapshot
+  includes: [own_data]
+must_not_conflate: true
+authority_refs:
+  - source-span:instruction-008:...
+  - source-span:instruction-017:...
+status: resolved
+fingerprint: sha256:...
+```
+
+Required interaction kinds are:
+
+- `distinct_observations`: similar APIs or contexts expose intentionally
+  different views;
+- `ordered_phases`: behavior changes before, during, or after lifecycle events;
+- `precedence`: both values apply but one shadows or overrides another;
+- `mutual_exclusion`: exactly one mode or branch applies;
+- `preservation_boundary`: a new behavior must not alter another contract;
+  and
+- `same_observation`: exact semantic duplication eligible for controlled
+  rendering deduplication.
+
+### A13: compile minimal discriminating contrast cases
+
+Every `distinct_observations`, `ordered_phases`, `precedence`, or
+`mutual_exclusion` interaction must produce at least one case in which an
+implementation that collapses the distinction yields a different observable
+result. Each source-derived partition with two behaviorally distinct values
+must do the same.
+
+```yaml
+schema_version: contrast-case-spec-v1
+case_id: contrast:state-data:callback-vs-snapshot
+interaction_ref: interaction:state-data:callback-vs-snapshot
+contract_refs:
+  - contract:callback-state-data
+  - contract:state-data-values
+setup:
+  parent_owned_data: {x: 1}
+  child_owned_data: {y: 2}
+observations:
+  - operation: invoke_child_callback
+    expected: {x: 1, y: 2}
+  - operation: read_state_data_values_child
+    expected: {y: 2}
+discriminating_predicate:
+  kind: unequal_observations
+  forbidden_result:
+    read_state_data_values_child: {x: 1, y: 2}
+prompt_requirement: required
+independent_probe_requirement: required
+authority_refs:
+  - interaction:state-data:callback-vs-snapshot
+fingerprint: sha256:...
+```
+
+Contrast-case rules:
+
+1. Use the smallest fixture that makes the semantic difference observable.
+2. State both the required result and the plausible-but-wrong result when the
+   wrong result can be derived from the neighboring contract.
+3. Never invent a forbidden result merely to create a contrast.
+4. Bind every setup value and operation through repository inventory or a
+   separately accepted fixture-design decision.
+5. Require an adapter-owned independent probe whenever the adapter can execute
+   the contrast.
+6. Preserve each side's separate contract mapping even when one durable test
+   contains both assertions.
+7. If two partition values are observably equivalent, record that result and
+   do not manufacture a test solely for structural coverage.
+
+For the state-data feature, this stage must produce at least:
+
+- callback merged scope versus each state's owned snapshot;
+- no data declaration versus explicit `data={}`;
+- active declared data versus inactive declared data;
+- mutation persistence through callbacks versus immutability across callbacks;
+- shallow-history restoration versus deep-history restoration; and
+- non-dict declarations versus mappings with non-string keys as independently
+  attributable invalid cases.
+
+The boundary compiler is a pure function over versioned inputs:
+
+```python
+def compile_semantic_boundaries(inputs: BoundaryInputs) -> BoundaryResult:
+    dispositions = finalize_all_source_dispositions(
+        inputs.source_ledger,
+        inputs.disposition_decisions,
+        inputs.exclusion_safety_decisions,
+        inputs.atomic_coverage,
+    )
+    if findings := validate_terminal_disposition_conservation(dispositions):
+        return Failed(findings)
+
+    dimensions = compile_authority_backed_dimensions(
+        contracts=inputs.contracts,
+        ontology=inputs.ontology,
+        repository_contracts=inputs.repository_contracts,
+        candidate_relation_decisions=inputs.dimension_binding_decisions,
+    )
+    if findings := validate_dimension_authority_and_completeness(dimensions):
+        return Failed(findings)
+
+    ledger = compile_conservation_ledger(
+        dispositions=dispositions,
+        contracts=inputs.contracts,
+        dimensions=dimensions,
+    )
+    candidates = generate_bounded_interaction_candidates(
+        contracts=inputs.contracts,
+        dimensions=dimensions,
+        inventory=inputs.inventory,
+    )
+    interactions = finalize_interactions(
+        candidates=candidates,
+        ontology=inputs.ontology,
+        decisions=inputs.contract_relation_decisions,
+    )
+    contrasts = compile_minimal_contrast_cases(
+        dimensions=dimensions,
+        interactions=interactions,
+        fixtures=inputs.fixtures,
+        adapters=inputs.adapters,
+    )
+    findings = validate_boundary_coverage(
+        ledger=ledger,
+        dimensions=dimensions,
+        interactions=interactions,
+        contrasts=contrasts,
+    )
+    return (
+        Failed(findings)
+        if findings
+        else Completed(
+            SemanticBoundaries(
+                dispositions, ledger, dimensions, interactions, contrasts
+            )
+        )
+    )
+```
+
+Expected design failures use stable codes so Procedrr routing and tests do not
+parse prose:
+
+| Code | Meaning |
+| --- | --- |
+| `source_disposition_missing` | A leaf proposition has no terminal route |
+| `unsafe_nonactionable_exclusion` | Product meaning or mixed content would be excluded |
+| `semantic_field_uncovered` | A conservation row lacks a required destination |
+| `dimension_authority_missing` | A partition value has no accepted authority |
+| `dimension_binding_ambiguous` | A source span matches incompatible dimensions |
+| `behavioral_partition_uncovered` | Distinct values lack evidence or equivalence receipt |
+| `interaction_unresolved` | A justified contract pair has no accepted relation |
+| `contrast_case_missing` | A required relation has no discriminating case |
+| `contrast_not_discriminating` | Both sides produce the same asserted observation |
+| `prompt_projection_missing` | Canonical meaning has no final prompt range |
+| `prompt_projection_mismatch` | The recorded range does not match final prompt bytes |
+| `cross_projection_mismatch` | Prompt and manifest semantic reference sets differ |
+
+Findings include the source, contract, field, dimension, interaction, or case
+reference that failed, plus the exact expected route. They never recommend a
+semantic repair that is not already supported by authority.
+
+### A14: derive projections
 
 Powdrr renders, rather than asks a model to author:
 
@@ -1186,6 +1629,18 @@ population_member_ref: python:src/models/user.py::UserRecord
 fixture_ref: pytest:fixture:user_record
 operation_ref: operation:python-pickle-round-trip
 predicate_ref: predicate:semantic-equivalence
+scenario:
+  fixture_refs: [pytest:fixture:user_record]
+  preconditions: [constructed_valid_member]
+operation:
+  operation_ref: operation:python-pickle-round-trip
+oracle:
+  predicate_ref: predicate:semantic-equivalence
+  expected_result: restored_observably_equivalent_to_original
+  forbidden_results: []
+semantic_dimension_refs: []
+interaction_refs: []
+contrast_case_refs: []
 test_target:
   provider: pytest
   path: tests/models/test_pickle.py
@@ -1207,6 +1662,17 @@ Case compilation rules:
    population coverage.
 6. Baseline execution must establish whether each case already passes, fails
    for the expected reason, or is blocked.
+7. Scenario, operation, oracle, and expected result are separate required
+   fields. Renderers may not truncate the case at the scenario boundary.
+8. Every semantically relevant dimension value is covered by a case or a typed
+   equivalence receipt proving that another value has the same observable
+   result.
+9. Every required interaction has a contrast case, and every contrast case
+   records both the intended observation and any authority-backed
+   plausible-but-wrong observation it is meant to reject.
+10. A case that combines multiple contracts preserves separately attributable
+    assertions and mappings; a broad passing result cannot satisfy every
+    mapped contract.
 
 These records are compiler inputs, not separate worker tasks. After every
 contract and verification case in the design revision is resolved, Workrr
@@ -1228,6 +1694,12 @@ prompt: |-
   <complete rendered prompt>
 contract_refs:
   - contract:instruction-001
+semantic_dimension_refs:
+  - dimension:state-data:declaration-presence
+interaction_refs:
+  - interaction:state-data:callback-vs-snapshot
+contrast_case_refs:
+  - contrast:state-data:callback-vs-snapshot
 verification_case_refs:
   - case:contract-instruction-001:user-record
 allowed_paths:
@@ -1247,6 +1719,14 @@ design_revision: sha256:...
 prompt_ref: prompt:feature-state-data:v1
 prompt_fingerprint: sha256:...
 base_commit: git:...
+source_disposition_receipt_refs:
+  - disposition:instruction-001
+semantic_dimension_refs:
+  - dimension:state-data:declaration-presence
+interaction_refs:
+  - interaction:state-data:callback-vs-snapshot
+contrast_case_refs:
+  - contrast:state-data:callback-vs-snapshot
 obligations:
   - obligation_ref: contract:instruction-001
     source_proposition_ref: instruction-001
@@ -1254,6 +1734,11 @@ obligations:
     durable_test_requirement: add
     case_refs:
       - case:contract-instruction-001:user-record
+    conservation_row_refs:
+      - conservation:instruction-001:round-trip-result
+    semantic_dimension_refs: []
+    interaction_refs: []
+    contrast_case_refs: []
     required_evidence:
       - target_collected
       - candidate_passed
@@ -1283,6 +1768,42 @@ also retained for independent validation. Only the prompt's `prompt` field is
 sent to mini-SWE-agent. The worker never sees Structrr diffs, classifier
 decisions, validation verdicts, fingerprints, proposal worklists, or parallel
 representations of the same requirement.
+
+The compiler also emits a private `prompt-projection-map-v1`. It binds
+canonical meaning to exact UTF-8 byte ranges in the final rendered prompt; it
+is not sent to mini-SWE-agent.
+
+```yaml
+schema_version: prompt-projection-map-v1
+prompt_ref: prompt:feature-state-data:v1
+prompt_fingerprint: sha256:...
+fragments:
+  - fragment_id: fragment:state-data-values:owned-view
+    prompt_section: required_behavior
+    byte_range: {start: 1842, end: 1967}
+    rendered_text_fingerprint: sha256:...
+    semantic_field_refs:
+      - contract:state-data-values:observation-view
+    conservation_row_refs:
+      - conservation:instruction-017:owned-view
+  - fragment_id: fragment:callback-vs-snapshot:contrast
+    prompt_section: required_verification
+    byte_range: {start: 3110, end: 3372}
+    rendered_text_fingerprint: sha256:...
+    interaction_refs:
+      - interaction:state-data:callback-vs-snapshot
+    contrast_case_refs:
+      - contrast:state-data:callback-vs-snapshot
+fingerprint: sha256:...
+```
+
+Prompt coverage is established from this map, not by the presence of hidden
+contract IDs beside arbitrary prose. Workrr verifies each range against the
+final prompt bytes and checks that every conservation row, interaction, and
+required contrast case has the required destination. This makes transformations
+such as dropping everything after `Oracle:`, replacing an owned view with a
+merged view, or retaining a test name while deleting its expected result fail
+deterministically.
 
 ### Validation-manifest rules
 
@@ -1341,19 +1862,67 @@ The renderer emits these sections once, in this order:
    tests, language/toolchain facts, and known baseline failures.
 3. `Required behavior` — every resolved contract rendered once and ordered by
    dependency, not by conversation order.
-4. `Required verification` — tests to add or update, population coverage, and
-   observable predicates.
-5. `Preserve and avoid` — applicable invariants, non-goals, compatibility
+4. `Interaction boundaries` — each required distinction, lifecycle ordering,
+   precedence rule, and authority-backed plausible-but-wrong conflation to
+   avoid.
+5. `Required verification` — tests to add or update, full scenario, operation,
+   oracle, expected and forbidden observations, population coverage, and
+   contrast cases.
+6. `Preserve and avoid` — applicable invariants, non-goals, compatibility
    requirements, and forbidden generated paths.
-6. `Allowed scope` — durable paths and explicitly permitted new paths.
-7. `Focused commands` — exact commands mini-SWE-agent may use while working.
-8. `Completion protocol` — inspect only relevant code, implement the complete
+7. `Allowed scope` — durable paths and explicitly permitted new paths.
+8. `Focused commands` — exact commands mini-SWE-agent may use while working.
+9. `Completion protocol` — inspect only relevant code, implement the complete
    design, run focused checks, do not commit or publish, and submit once.
 
 The renderer must not repeat the original feature description after the
 objective when its content has already been compiled into requirements. Exact
 user terms that carry unresolved domain meaning remain quoted in the relevant
 requirement with their accepted definition.
+
+The objective is rendered only from resolved actionable contracts. It is not a
+copy of the original instruction and cannot reintroduce process-only text.
+`Required behavior` renders every condition, exception, result, temporal scope,
+and observation view from canonical fields. `Required verification` renders
+the entire case contract; shortening a case to its setup or stripping its
+oracle is forbidden. The renderer may suppress internal IDs, provenance, and
+duplicate prose only when the projection map proves that all canonical meaning
+still has one destination.
+
+For the DeepSWE state-data fixture, the following distinction is a normative
+golden rendering target. Exact wording may change only with a rendering
+revision; the represented fields and contrasts may not change:
+
+```text
+Required behavior — state-data views
+- Each active state that declared data owns an independent data dictionary.
+- get_state_data(state) returns that state's own active dictionary.
+- An active state with no data declaration returns None.
+- An inactive state returns None.
+- Explicit data={} is a declaration and returns an empty dictionary.
+- state_data_values maps active state identifiers to each state's own data.
+- The state_data argument injected into a child callback is a different,
+  effective view: active ancestor data merged with child-owned data, with child
+  keys taking precedence.
+
+Interaction boundaries
+- Ancestor merging applies to callback injection, not to get_state_data or
+  state_data_values. Do not implement all three with the same merged view.
+- Persistence through on_enter and on_exit means data remains available and
+  callback mutations persist. It does not require values to remain unchanged.
+
+Required verification
+- Given parent data {x: 1} and child data {y: 2}, the child callback receives
+  {x: 1, y: 2}, while state_data_values[child] equals {y: 2} and does not
+  contain x.
+- An active state without a data declaration returns None; an active state
+  explicitly declared with data={} returns {}.
+- Data initialized before on_enter can be changed during on_enter, remains
+  changed while active and during on_exit, and is removed only after on_exit.
+```
+
+This text is assembled from separate contracts, dimensions, interactions, and
+contrast cases. It is not generated as one model-authored paragraph.
 
 ### Single-invocation rule
 
@@ -1377,18 +1946,35 @@ identity; it is never appended as a second prompt to the existing run.
 
 The design handoff can be emitted only when deterministic checks prove:
 
-1. every actionable source proposition reaches one resolved contract;
-2. every resolved contract is represented exactly once in `Required behavior`;
-3. every universal population has a complete current enumeration rule;
-4. every predicate has an authority and executable assertion strategy;
-5. every required verification case is represented exactly once;
-6. all relevant preservation constraints and non-goals are included;
-7. every named path, symbol, test, and command comes from the bound repository
+1. every source proposition has exactly one current terminal disposition
+   receipt;
+2. every C01 `nonactionable` result has a matching C12 `process_only` result,
+   and mixed or product-bearing propositions have been reprocessed rather than
+   excluded;
+3. every actionable source proposition reaches one resolved contract;
+4. every resolved contract is represented exactly once in `Required behavior`;
+5. every conservation row reaches its disposition-specific prompt and
+   verification destinations;
+6. every universal population has a complete current enumeration rule;
+7. every predicate has an authority and executable assertion strategy;
+8. every retained semantic dimension is complete for its authority and every
+   behaviorally distinct value has case coverage;
+9. every required contract interaction is resolved and represented exactly
+   once in `Interaction boundaries`;
+10. every required contrast case is represented exactly once with its intended
+    and forbidden observations;
+11. every required verification case is represented exactly once with its
+    scenario, operation, oracle, and expected result intact;
+12. all relevant preservation constraints and non-goals are included;
+13. process-only propositions appear in no worker-facing prompt section;
+14. every named path, symbol, test, and command comes from the bound repository
    inventory or an adapter-owned planned target;
-8. allowed scope covers every planned target and no unrelated path;
-9. no required field is unresolved;
-10. no internal artifact path or model reasoning appears in the prompt; and
-11. rendering the same versioned inputs produces the same prompt fingerprint.
+15. allowed scope covers every planned target and no unrelated path;
+16. no required field, interaction, or disposition is unresolved;
+17. no internal artifact path or model reasoning appears in the prompt;
+18. every projection-map UTF-8 byte range and text fingerprint matches the
+    final prompt bytes; and
+19. rendering the same versioned inputs produces the same prompt fingerprint.
 
 The validation manifest must additionally prove:
 
@@ -1398,13 +1984,19 @@ The validation manifest must additionally prove:
    exemption with replacement evidence;
 4. every case mapping has a scenario, operation, oracle, target contract, and
    baseline expectation;
-5. universal obligations cover the complete bound population;
-6. preservation obligations and non-goals have explicit checks;
-7. every required evidence kind has a registered collector or judge, and every
+5. every contrast case maps separately to each contract and assertion it
+   distinguishes;
+6. universal obligations cover the complete bound population;
+7. every behaviorally distinct semantic partition has evidence coverage;
+8. preservation obligations and non-goals have explicit checks;
+9. every required evidence kind has a registered collector or judge, and every
    adapter-materializable case has an independent probe;
-8. prompt contract references equal manifest obligation references;
-9. prompt verification-case references equal manifest case references; and
-10. the prompt, manifest, and canonical design share one design revision and
+10. prompt contract references equal manifest obligation references;
+11. prompt verification-case references equal manifest case references;
+12. prompt interaction and contrast references equal manifest interaction and
+    contrast references; and
+13. the prompt, projection map, manifest, conservation ledger, and canonical
+    design share one design revision and
     base commit.
 
 ### Post-coding obligation validation
@@ -1416,18 +2008,23 @@ manifest without changing it:
 2. Reject missing, ambiguous, skipped, xfailed, deselected, or weakened cases.
 3. Run each required case against the candidate and retain fresh evidence.
 4. Run each adapter-materializable independent probe against the candidate.
-5. For new behavior, run candidate-authored test code against the product
+5. Run every required contrast case and prove both observations, including the
+   negative assertion that rejects the recorded plausible conflation.
+6. For new behavior, run candidate-authored test code against the product
    baseline and verify the declared discriminating result.
-6. Check each test mapping against its precompiled scenario, operation, and
+7. Check each test mapping against its precompiled scenario, operation, and
    oracle.
-7. Select relevant diff hunks by bound subject and changed-path closure.
-8. For each obligation, ask at most one final read-only semantic question:
+8. Check every conservation row against its prompt fragment and collected
+   evidence; a passing broad test cannot substitute for a missing mapped
+   assertion.
+9. Select relevant diff hunks by bound subject and changed-path closure.
+10. For each obligation, ask at most one final read-only semantic question:
    “Does this implementation and verification evidence satisfy this one
    obligation?” The judge returns only `pass`, `fail`, or `abstain` plus a
    bounded explanation; Workrr supplies the identity and evidence references.
-9. Emit one immutable `obligation-validation-receipt-v1` per obligation.
-10. Run preservation, scope, formatting, lint, type, and full-suite checks.
-11. Accept the implementation only when every required receipt and global
+11. Emit one immutable `obligation-validation-receipt-v1` per obligation.
+12. Run preservation, scope, formatting, lint, type, and full-suite checks.
+13. Accept the implementation only when every required receipt and global
     check passes. There is no averaging and no “mostly complete” outcome.
 
 An obligation receipt records the contract and manifest fingerprints, target
@@ -1442,6 +2039,13 @@ The target logical flow is:
 ```text
 for each immutable atomic proposition:
   classify disposition
+  if disposition is nonactionable:
+    classify nonactionable exclusion safety
+    if mixed, return to atomic decomposition and re-check coverage
+    if product semantics are present, reclassify disposition
+    if process-only, issue terminal exclusion receipt and continue with the
+      next proposition
+    otherwise suspend
   classify polarity
   classify requirement strength
   classify quantifier
@@ -1480,14 +2084,24 @@ for each immutable atomic proposition:
 
   compile resolved semantic contract
   validate required-field matrix
-  derive prose projections
-  compile verification case specifications
 
 after all propositions complete:
+  compile semantic dimensions and partitions
+  compile modifier-conservation ledger
+  generate bounded cross-contract interaction candidates
+  for each interaction candidate not resolved by ontology:
+    classify one contract observation relation
+  finalize interaction graph
+  compile minimal discriminating contrast cases
+  derive prose projections
+  compile verification case specifications
   compile one obligation validation manifest
-  validate obligation and evidence coverage
+  validate disposition, modifier, partition, interaction, obligation, and
+    evidence coverage
   compile one mini-SWE-agent implementation prompt
-  validate prompt completeness and prompt-to-manifest parity
+  compile prompt projection map
+  validate prompt completeness, byte-range fidelity, and
+    prompt-to-manifest parity
   emit one design handoff with one worker-facing prompt
 ```
 
@@ -1501,6 +2115,7 @@ operation with no model discretion.
 | --- | --- | --- |
 | `prepare_semantic_decisions` | atomic proposition | sealed list of required decision specifications |
 | `bind_semantic_decision` | decision specification and provider result | semantic decision envelope |
+| `finalize_source_disposition` | C01 result, C12 result when required, and atomic coverage | actionable route, process-only exclusion receipt, re-split request, or unresolved result |
 | `resolve_exact_source_span` | source and extraction result | validated source span or diagnostic |
 | `compile_partial_semantic_contract` | bound source decisions | partial contract |
 | `prepare_field_entailment_reviews` | partial contract | one review specification per interpreted field |
@@ -1514,12 +2129,19 @@ operation with no model discretion.
 | `lookup_behavior_ontology` | behavior span, family, languages | candidate ontology records |
 | `resolve_predicate_authority` | source result, definitions, applicable intents | predicate binding or clarification request |
 | `compile_semantic_contract` | partial contract and resolved bindings | resolved contract |
+| `compile_semantic_dimensions` | contracts, authorities, ontology, repository API contracts | accepted finite dimensions and partitions |
+| `compile_conservation_ledger` | source ledger, contracts, dispositions, and derived fields | one terminal-route row per source proposition and semantic field |
+| `generate_interaction_candidates` | contracts, bindings, dimensions, relationships | bounded contract-pair candidates with reasons |
+| `prepare_contract_relation_decisions` | unresolved interaction candidate | one C13 decision specification |
+| `finalize_contract_interactions` | candidates, ontology facts, and bound C13 results | resolved interaction graph or exact findings |
+| `compile_contrast_case_specs` | dimensions, interactions, fixtures, and adapters | minimal discriminating contrast cases |
 | `render_semantic_contract_views` | resolved contract and template revision | non-authoritative prose views |
 | `compile_verification_case_specs` | contract, population, fixtures, adapters | case specifications |
 | `compile_obligation_validation_manifest` | complete design revision, cases, baseline expectations, evidence collectors | one immutable private validation manifest |
 | `validate_obligation_validation_manifest` | manifest, contracts, cases, adapters | readiness receipt or exact findings |
 | `compile_minisweagent_prompt` | complete design revision, cases, inventory, scope, commands | one immutable prompt artifact |
-| `validate_minisweagent_prompt` | prompt, manifest, and canonical design inputs | completeness and cross-projection receipt or exact findings |
+| `compile_prompt_projection_map` | rendered prompt, contracts, ledger, interactions, and cases | exact prompt ranges bound to canonical semantic inputs |
+| `validate_minisweagent_prompt` | prompt, projection map, manifest, conservation ledger, and canonical design inputs | completeness, byte-level fidelity, and cross-projection receipt or exact findings |
 
 ## Suggested module boundaries
 
@@ -1527,10 +2149,12 @@ operation with no model discretion.
 src/powdrr_lift/core/semantic_decision.py
 src/powdrr_lift/core/semantic_contract.py
 src/powdrr_lift/core/semantic_ontology.py
+src/powdrr_lift/core/semantic_boundary.py
 src/powdrr_lift/core/repository_inventory.py
 src/powdrr_lift/workrr/semantic_classifier.py
 src/powdrr_lift/workrr/semantic_lookup.py
 src/powdrr_lift/workrr/semantic_contract_compiler.py
+src/powdrr_lift/workrr/semantic_boundary_compiler.py
 src/powdrr_lift/workrr/verification_case_compiler.py
 src/powdrr_lift/workrr/minisweagent_prompt_compiler.py
 ```
@@ -1554,7 +2178,9 @@ Implement specialized classifiers in this order:
 7. E01/E02 subject and behavior token extraction;
 8. C10 entailment;
 9. C09 candidate relation; and
-10. C11 proposition coverage.
+10. C11 proposition coverage;
+11. C12 nonactionable exclusion safety; and
+12. C13 contract observation relation.
 
 The first six have small labels and strong lexical signals. The last three
 require more semantic comparison and should retain an LLM fallback longer.
@@ -1795,6 +2421,11 @@ add retries.”
 - universal population completeness;
 - predicate precedence;
 - disposition-specific completion matrices;
+- source-disposition conservation and exclusion safety;
+- semantic-dimension authority and partition completeness;
+- bounded interaction candidate generation and pairwise relation aggregation;
+- minimal discriminating contrast-case generation;
+- projection-map byte ranges and fingerprint verification;
 - provenance and fingerprint invalidation;
 - deterministic rendering; and
 - artifact round trips.
@@ -1820,7 +2451,15 @@ Maintain at least these families:
 - ambiguous repository nouns;
 - singular symbols versus declared populations;
 - current versus future applicability; and
-- atomic split coverage, overlap, omission, and invention.
+- atomic split coverage, overlap, omission, and invention;
+- process-only versus product non-goal versus mixed product/process clauses;
+- absent versus explicitly empty declarations;
+- owned data versus inherited or merged observation views;
+- availability and mutation persistence versus value immutability;
+- before, during, and after lifecycle ordering;
+- shallow versus deep restoration behavior;
+- independently invalid input classes that share one exception type; and
+- pairs of similar contracts whose one differing field changes the oracle.
 
 ### Live validation
 
@@ -1833,7 +2472,13 @@ outputs, not merely the final YAML. For each fixture, assert:
 - selected repository bindings;
 - population members;
 - authority used for every derived field; and
-- resolved contract and verification-case fingerprints.
+- resolved contract and verification-case fingerprints;
+- disposition and process-only exclusion receipts;
+- semantic dimensions and their authority-backed values;
+- contract interactions and relation decisions;
+- generated contrast cases and plausible-but-wrong results;
+- conservation-ledger terminal routes; and
+- exact prompt projection ranges for every required semantic field.
 
 At least one live fixture must intentionally remain unresolved and demonstrate
 the correct clarification route.
@@ -1880,7 +2525,25 @@ member without a model-generated member list.
 Acceptance gate: underspecified success semantics block instead of being
 invented, while an accepted definition resolves deterministically.
 
-### Slice 5: executable verification and single-prompt compilation
+### Slice 5: semantic boundaries and conservation
+
+- Add semantic dimension, conservation row, contract interaction, contrast
+  case, and prompt projection-map schemas.
+- Compile authority-backed partitions after all contracts resolve.
+- Add bounded pair generation and deterministic interaction resolution.
+- Add C12 exclusion safety and C13 pairwise relation decisions where exact
+  rules do not decide.
+- Compile minimal contrast cases and adapter-owned independent probes.
+- Fail closed on unresolved interactions, uncovered modifier rows, or
+  behaviorally distinct partitions without verification.
+
+Acceptance gate: the complete DeepSWE state-data fixture deterministically
+distinguishes callback-effective scope from owned query state, absent from
+explicitly empty declarations, persistence from immutability, shallow from
+deep history, and each separately invalid declaration class. Process-only
+instructions have exclusion receipts and appear nowhere in worker-facing text.
+
+### Slice 6: executable verification and single-prompt compilation
 
 - Compile member-specific or parameterized case specifications.
 - Bind fixtures and existing tests from inventory.
@@ -1889,15 +2552,19 @@ invented, while an accepted definition resolves deterministically.
   evidence, baseline expectations, typed exemptions, and preservation checks.
 - Compile all resolved contracts, repository facts, verification cases, scope,
   and focused commands into one mini-SWE-agent prompt.
-- Add deterministic manifest coverage, prompt coverage, cross-projection
-  parity, and forbidden-content checks.
+- Render the full scenario, operation, oracle, expected result, interaction
+  boundary, and contrast case; do not use lossy description splitting.
+- Compile exact prompt UTF-8 byte ranges into a projection map.
+- Add deterministic disposition, conservation, partition, interaction,
+  manifest, prompt, cross-projection parity, and forbidden-content checks.
 
 Acceptance gate: universal contracts cannot pass with one synthetic
 representative member; every actionable obligation has a ready validation
-entry; and one complete design revision emits exactly one worker-facing prompt
-containing every actionable contract exactly once.
+entry; every canonical semantic field reaches a verified prompt range and
+evidence mapping; and one complete design revision emits exactly one
+worker-facing prompt containing every actionable contract exactly once.
 
-### Slice 6: specialized classifiers
+### Slice 7: specialized classifiers
 
 - Export adjudicated decision datasets.
 - Implement shadow execution and comparison reports.
@@ -1943,4 +2610,12 @@ The design is implemented when:
 11. an end-to-end feature run invokes mini-SWE-agent once with that exact
     prompt and creates no repair or continuation prompt; and
 12. the run produces a passing receipt for every obligation and proves that no
-    model-authored paraphrase became authoritative intent.
+    model-authored paraphrase became authoritative intent;
+13. every source proposition has exactly one terminal disposition receipt and
+    process-only exclusions cannot erase product semantics;
+14. every meaning-bearing modifier, partition, and interaction has a verified
+    prompt projection and evidence route; and
+15. the DeepSWE state-data fixture rejects prompts or implementations that
+    conflate owned and merged views, absent and empty declarations, persistence
+    and immutability, shallow and deep history, or distinct invalid-input
+    classes.

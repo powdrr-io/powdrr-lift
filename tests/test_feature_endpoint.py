@@ -24,6 +24,7 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_lift.structrr.proposal import compile_proposal_revision
+from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentStatus,
@@ -1169,6 +1170,42 @@ def test_required_test_obligation_generates_new_selector_deterministically() -> 
     assert case["provider"] == "pytest"
     assert case["profile"] == "pytest"
     assert case["expectation"] == "pass"
+
+
+def test_new_required_test_uses_profile_when_selector_collection_fails() -> None:
+    result = _aggregate_category_edits(
+        {
+            "required_test_cases": {
+                "action": "add",
+                "item": {
+                    "id": "verify-new-behavior",
+                    "description": "The new behavior is supported.",
+                    "intent_refs": ["new-behavior"],
+                    "test_selection": "new",
+                },
+            }
+        },
+        inventory=(
+            {
+                "provider": "pytest",
+                "profile": "pytest",
+                "selectors": [],
+                "collection_error": "pytest collection exited with 4",
+            },
+        ),
+        validation_profiles=(
+            DiscoveredValidationProfile(
+                "pytest", ("pytest", "-q"), "project configuration"
+            ),
+        ),
+    )
+
+    case = result["required_test_cases"]["added"][0]
+    assert case["provider"] == "pytest"
+    assert case["profile"] == "pytest"
+    assert case["selector"] == (
+        "tests/test_verify_new_behavior.py::test_verify_new_behavior"
+    )
 
 
 def test_required_test_obligation_rejects_llm_executable_fields() -> None:

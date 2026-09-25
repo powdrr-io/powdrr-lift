@@ -944,6 +944,7 @@ def _compile_feature_obligations(
         plan_document,
         obligations,
         inventory=tuple(state.get("provider_inventory", ())),
+        validation_profiles=tuple(state.get("validation_profiles", ())),
     )
     Path(plan).write_text(
         yaml.safe_dump(plan_document, sort_keys=False), encoding="utf-8"
@@ -975,6 +976,7 @@ def _derive_feature_test_contracts(
     obligations: Sequence[Mapping[str, Any]],
     *,
     inventory: Sequence[Mapping[str, Any]],
+    validation_profiles: Sequence[Any] = (),
 ) -> list[dict[str, Any]]:
     """Create one executable test contract for every sentence obligation.
 
@@ -1051,7 +1053,11 @@ def _derive_feature_test_contracts(
                 "test_selection": "new",
             }
         )
-    compiled = _compile_required_test_case_edits(semantic_cases, inventory)
+    compiled = _compile_required_test_case_edits(
+        semantic_cases,
+        inventory,
+        validation_profiles=validation_profiles,
+    )
     for item in compiled:
         item.update(
             {
@@ -3280,6 +3286,7 @@ def _write_structrr_plan(
     *,
     interview_input: Any,
     inventory: Sequence[Any] = (),
+    validation_profiles: Sequence[Any] = (),
 ) -> Path:
     slug = slugify_workflow_id(config.work_item_name)
     proposal = worktree / "docs" / "proposals" / slug
@@ -3293,6 +3300,7 @@ def _write_structrr_plan(
             config,
             structured_obligations,
             inventory,
+            validation_profiles,
         )
     sections = {
         key: _interview_edits(interview.get(f"{key}_edits"))
@@ -3373,6 +3381,7 @@ def _write_structrr_plan_from_obligations(
     config: FeatureEndpointConfig,
     obligations: list[Any],
     inventory: Sequence[Any],
+    validation_profiles: Sequence[Any] = (),
 ) -> Path:
     """Render the Structrr diff directly from canonical feature obligations."""
     sections: dict[str, list[dict[str, Any]]] = {
@@ -3477,7 +3486,10 @@ def _write_structrr_plan_from_obligations(
         "acceptance_criteria": sections["acceptance_criteria"],
         "expected_tests": sections["expected_tests"],
         "required_test_cases": _compile_required_test_case_edits(
-            semantic_cases, inventory, include_existing_name_hint=True
+            semantic_cases,
+            inventory,
+            validation_profiles=validation_profiles,
+            include_existing_name_hint=True,
         ),
         "entities": [],
         "entity_relationships": [],
@@ -3609,6 +3621,7 @@ def _aggregate_category_edits(
     decisions: Mapping[str, Any],
     *,
     inventory: Sequence[Any] = (),
+    validation_profiles: Sequence[Any] = (),
 ) -> dict[str, Any]:
     aggregated: dict[str, Any] = {}
     for category, decision in decisions.items():
@@ -3625,7 +3638,9 @@ def _aggregate_category_edits(
     if "required_test_cases" in aggregated:
         aggregated["required_test_cases"] = {
             "added": _compile_required_test_case_edits(
-                aggregated["required_test_cases"]["added"], inventory
+                aggregated["required_test_cases"]["added"],
+                inventory,
+                validation_profiles=validation_profiles,
             ),
             "deleted": aggregated["required_test_cases"]["deleted"],
         }
@@ -3636,18 +3651,36 @@ def _compile_required_test_case_edits(
     items: Sequence[Any],
     inventory: Sequence[Any],
     *,
+    validation_profiles: Sequence[Any] = (),
     include_existing_name_hint: bool = False,
 ) -> list[dict[str, Any]]:
     """Compile semantic test obligations against discovered executable tests."""
     candidates = [item for item in inventory if isinstance(item, Mapping)]
     candidate_by_id = {_verification_inventory_id(item): item for item in candidates}
     pytest_profiles = [
-        item
-        for item in candidates
-        if item.get("provider") == "pytest"
-        and isinstance(item.get("profile"), str)
-        and str(item.get("profile")).strip()
+        profile
+        for profile in validation_profiles
+        if getattr(profile, "provider", "") == "pytest"
+        or getattr(profile, "name", "") == "pytest"
     ]
+    if not pytest_profiles:
+        # Direct callers that already have selector inventory may not have the
+        # bootstrap profile object.  Production flow callers pass profiles so
+        # new tests do not depend on existing selector collection.
+        pytest_profiles = [
+            item
+            for item in candidates
+            if item.get("provider") == "pytest"
+            and isinstance(item.get("profile"), str)
+            and str(item.get("profile")).strip()
+        ]
+    pytest_profile_name = (
+        getattr(pytest_profiles[0], "name", None)
+        if pytest_profiles and not isinstance(pytest_profiles[0], Mapping)
+        else pytest_profiles[0].get("profile")
+        if pytest_profiles
+        else None
+    )
     compiled: list[dict[str, Any]] = []
     for raw in items:
         if not isinstance(raw, Mapping):
@@ -3708,7 +3741,6 @@ def _compile_required_test_case_edits(
                 raise PowdrrExecutionError(
                     "new required test cases need a discovered pytest profile"
                 )
-            profile = pytest_profiles[0]
             identifier = str(item.get("id", "required-test")).strip()
             test_slug = re.sub(r"[^a-z0-9]+", "_", identifier.lower()).strip("_")
             if not test_slug:
@@ -3718,7 +3750,7 @@ def _compile_required_test_case_edits(
             item.update(
                 {
                     "provider": "pytest",
-                    "profile": profile.get("profile"),
+                    "profile": pytest_profile_name,
                     "name_hint": _test_name_hint(str(item["description"])),
                     "selector": (f"tests/test_{test_slug}.py::test_{test_slug}"),
                 }

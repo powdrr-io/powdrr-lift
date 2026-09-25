@@ -1279,6 +1279,12 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                     "value": "create",
                     "reason_code": None,
                 }
+            if "candidate field" in question:
+                return {
+                    "status": "resolved",
+                    "value": "entailed",
+                    "reason_code": None,
+                }
             raise AssertionError(question)
 
     catalog = feature_command_catalog()
@@ -1317,8 +1323,8 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     assert json.loads(partial.read_text())["proposition_text"] == "Add the feature."
     canonical = json.loads((tmp_path / "canonical-feature-design.json").read_text())
     projection = canonical["projections"][0]
-    assert projection["description"] == "Add the feature."
-    assert projection["expected_test"] == "Add the feature."
+    assert projection["description"] == "feature Add."
+    assert projection["expected_test"] == "Test Add for feature."
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

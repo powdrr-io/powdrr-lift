@@ -356,7 +356,7 @@ steps:
               behavior_family_result: {type: reference, value: behavior_family_result}
             returns:
               type: object
-              required: [kind, description, acceptance_criterion, expected_test, population, operation, oracle, evidence_case, partial_contract_path, partial_contract_fingerprint]
+              required: [kind, description, acceptance_criterion, expected_test, population, operation, oracle, evidence_case, partial_contract_path, partial_contract_fingerprint, partial_contract]
               additionalProperties: false
               properties:
                 kind: {type: string}
@@ -369,7 +369,75 @@ steps:
                 evidence_case: {type: string}
                 partial_contract_path: {type: string, minLength: 1}
                 partial_contract_fingerprint: {type: string, minLength: 1}
+                partial_contract: {type: object}
             bind: semantic_design
+        - operation:
+            tool: internal
+            command: [prepare_field_entailment_reviews]
+            parameters:
+              contract: {type: reference, value: semantic_design.partial_contract}
+            returns:
+              type: object
+              required: [requests]
+              properties:
+                requests: {type: array, minItems: 1}
+            bind: field_entailment_plan
+        - for_each:
+            snapshot: {name: field_entailment_plan.requests, max_items: 16}
+            item_binding: field_entailment_request
+            collect: {binding: field_entailment_results, mode: list, value: field_entailment_result}
+            body:
+              - judge:
+                  kind: classify_one
+                  provider: planning
+                  question: Is this candidate field entailed by the exact source proposition?
+                  subject: field_entailment_request.source_text
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Evaluate only the named candidate field against the exact source text.
+                    - Return entailed only when the source supports it without added meaning.
+                    - Return contradicted when the source rules it out, or not_stated when it does not say enough.
+                    - Never rewrite the candidate, repair it, or return explanations or extra fields.
+                  context: [field_entailment_request]
+                  output:
+                    name: field_entailment_result
+                    schema:
+                      type: object
+                      required: [status, value, reason_code]
+                      additionalProperties: false
+                      properties:
+                        status: {type: string, enum: [resolved, unresolved]}
+                        value: {type: [string, 'null'], enum: [entailed, contradicted, not_stated, null]}
+                        reason_code:
+                          type: [string, 'null']
+                          enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
+                  validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [bind_field_entailment_reviews]
+            parameters:
+              requests: {type: reference, value: field_entailment_plan.requests}
+              results: {type: reference, value: field_entailment_results}
+            returns:
+              type: object
+              required: [reviews]
+              properties:
+                reviews: {type: array, minItems: 1}
+            bind: bound_field_entailment_reviews
+        - operation:
+            tool: internal
+            command: [finalize_source_faithfulness]
+            parameters:
+              contract: {type: reference, value: semantic_design.partial_contract}
+              reviews: {type: reference, value: bound_field_entailment_reviews.reviews}
+            returns:
+              type: object
+              required: [accepted, unresolved_fields, findings]
+              properties:
+                accepted: {type: boolean}
+                unresolved_fields: {type: array}
+                findings: {type: array}
+            bind: source_faithfulness
   - operation:
       tool: internal
       command: [compile_canonical_feature_design]

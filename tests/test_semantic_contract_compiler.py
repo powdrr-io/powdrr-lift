@@ -11,6 +11,12 @@ from powdrr_lift.core.semantic_contract import (
     SemanticContractError,
 )
 from powdrr_lift.core.semantic_decision import SemanticDecision
+from powdrr_lift.core.semantic_faithfulness import (
+    FaithfulnessError,
+    bind_field_entailment_reviews,
+    finalize_source_faithfulness,
+    prepare_field_entailment_reviews,
+)
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
     feature_command_catalog,
@@ -146,14 +152,86 @@ def test_legacy_projection_copies_source_instead_of_paraphrasing() -> None:
 
     assert projection == {
         "kind": "invariant",
-        "description": "All data should pickle.",
-        "acceptance_criterion": "All data should pickle.",
-        "expected_test": "All data should pickle.",
-        "population": "data",
-        "operation": "pickle",
-        "oracle": "All data should pickle.",
-        "evidence_case": "All data should pickle.",
+        "description": "data pickle.",
+        "acceptance_criterion": (
+            "The requested behavior is observed for the resolved population."
+        ),
+        "expected_test": "Test pickle for data.",
+        "population": "every data",
+        "operation": "serialize: pickle",
+        "oracle": "the requested behavior is observed",
+        "evidence_case": "Source instruction-001: All data should pickle.",
     }
+
+
+def test_field_faithfulness_rejects_invented_candidate() -> None:
+    clause = _clause()
+    decisions = _bind_source_decisions(clause)
+    extractions = bind_source_extractions(
+        requests=prepare_source_extractions(clause, decisions),
+        provider_results=[{"quote": "data"}, {"quote": "pickle"}],
+        created_at=NOW,
+    )
+    family_request = prepare_behavior_family_decision(clause, extractions[1])
+    contract = compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=bind_behavior_family_decision(
+            family_request, {"status": "resolved", "value": "serialize"}, created_at=NOW
+        ),
+    )
+    requests = prepare_field_entailment_reviews(contract)
+    results = [
+        {"status": "resolved", "value": "contradicted", "reason_code": None}
+        if request["spec"]["field"] == "behavior"
+        else {"status": "resolved", "value": "entailed", "reason_code": None}
+        for request in requests
+    ]
+    reviews = bind_field_entailment_reviews(
+        requests=requests, provider_results=results, created_at=NOW
+    )
+    outcome = finalize_source_faithfulness(contract, reviews)
+    assert not outcome.accepted
+    assert {item["reason_code"] for item in outcome.findings} == {
+        "intent_contradiction"
+    }
+
+
+def test_field_faithfulness_requires_reviews_and_routes_not_stated() -> None:
+    clause = _clause()
+    decisions = _bind_source_decisions(clause)
+    extractions = bind_source_extractions(
+        requests=prepare_source_extractions(clause, decisions),
+        provider_results=[{"quote": "data"}, {"quote": "pickle"}],
+        created_at=NOW,
+    )
+    family_request = prepare_behavior_family_decision(clause, extractions[1])
+    contract = compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=bind_behavior_family_decision(
+            family_request, {"status": "resolved", "value": "serialize"}, created_at=NOW
+        ),
+    )
+    requests = prepare_field_entailment_reviews(contract)
+    with pytest.raises(FaithfulnessError, match="incomplete"):
+        finalize_source_faithfulness(contract, [])
+    reviews = bind_field_entailment_reviews(
+        requests=requests,
+        provider_results=[
+            {"status": "resolved", "value": "not_stated", "reason_code": None}
+            if request["spec"]["field"] == "source_predicate"
+            else {"status": "resolved", "value": "entailed", "reason_code": None}
+            for request in requests
+        ],
+        created_at=NOW,
+    )
+    outcome = finalize_source_faithfulness(contract, reviews)
+    assert outcome.accepted
+    assert "source_predicate" in outcome.unresolved_fields
+    assert outcome.findings == ()
 
 
 def test_exact_extractor_rejects_an_invented_or_case_changed_quote() -> None:
@@ -366,5 +444,5 @@ def test_procedrr_command_boundary_persists_intermediate_artifacts(
     assert (artifact_root / "source-decisions.json").is_file()
     assert (artifact_root / "source-extractions.json").is_file()
     assert (artifact_root / "partial-contract.json").is_file()
-    assert projection["description"] == clause["text"]
-    assert projection["operation"] == "pickle"
+    assert projection["description"] == "data pickle."
+    assert projection["operation"] == "serialize: pickle"

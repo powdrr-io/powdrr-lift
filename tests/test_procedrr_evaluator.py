@@ -505,6 +505,12 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "quote": next(self.extraction_values),
                     "occurrence": None,
                 }
+            if "candidate field" in question:
+                return {
+                    "status": "resolved",
+                    "value": "entailed",
+                    "reason_code": None,
+                }
             if "one registered behavior family" in question:
                 return {
                     "status": "resolved",
@@ -593,7 +599,20 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "evidence_case": "Add a thing",
                     "partial_contract_path": "partial-contract.json",
                     "partial_contract_fingerprint": "sha256:contract",
+                    "partial_contract": {
+                        "schema_version": "partial-semantic-contract-v1",
+                        "contract_id": "contract:instruction-001",
+                        "source_ref": "instruction-001",
+                        "source_fingerprint": "sha256:clause",
+                        "proposition_text": "Add a thing",
+                    },
                 }
+            if command[0] == "prepare_field_entailment_reviews":
+                return {"requests": [{"source_text": "Add a thing", "spec": {}}]}
+            if command[0] == "bind_field_entailment_reviews":
+                return {"reviews": [{}]}
+            if command[0] == "finalize_source_faithfulness":
+                return {"accepted": True, "unresolved_fields": [], "findings": []}
             if command[0] == "compile_canonical_feature_design":
                 return {
                     "path": "canonical-feature-design.json",
@@ -645,7 +664,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 14
+    assert result.llm_activations == 15
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events

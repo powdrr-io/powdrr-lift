@@ -22,16 +22,25 @@ from powdrr_lift.core.instruction_ledger import (
 )
 from powdrr_lift.core.semantic_contract import (
     BoundSourceExtraction,
+    PartialSemanticContract,
     SemanticContractError,
 )
 from powdrr_lift.core.semantic_decision import SemanticDecision, SemanticDecisionError
+from powdrr_lift.core.semantic_faithfulness import (
+    FaithfulnessError,
+    FieldEntailmentReview,
+    FieldEntailmentSpec,
+)
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_behavior_family_decision,
+    bind_field_entailment_reviews,
     bind_source_extractions,
     bind_source_semantic_decisions,
     compile_source_contract,
+    finalize_source_faithfulness,
     prepare_behavior_family_decision,
+    prepare_field_entailment_reviews,
     prepare_source_extractions,
     prepare_source_semantic_decisions,
     project_partial_contract_to_legacy_design,
@@ -164,6 +173,34 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("compile_partial_semantic_contract"),
+        ),
+        "prepare_field_entailment_reviews": CommandSpec(
+            name="prepare_field_entailment_reviews",
+            input_schema=object_schema(
+                {"contract": {}}, required=("contract",), additional_properties=False
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_field_entailment_reviews"),
+        ),
+        "bind_field_entailment_reviews": CommandSpec(
+            name="bind_field_entailment_reviews",
+            input_schema=object_schema(
+                {"requests": {}, "results": {}},
+                required=("requests", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_field_entailment_reviews"),
+        ),
+        "finalize_source_faithfulness": CommandSpec(
+            name="finalize_source_faithfulness",
+            input_schema=object_schema(
+                {"contract": {}, "reviews": {}},
+                required=("contract", "reviews"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("finalize_source_faithfulness"),
         ),
         "merge_semantic_design": CommandSpec(
             name="merge_semantic_design",
@@ -785,6 +822,14 @@ class FeatureCommandRuntime:
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
+        def semantic_contract(raw: Any) -> PartialSemanticContract:
+            if not isinstance(raw, Mapping):
+                raise PowdrrExecutionError("semantic contract is malformed")
+            try:
+                return PartialSemanticContract.from_data(raw)
+            except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
         def prepare_source_semantic_decisions_operation() -> Any:
             try:
                 return prepare_source_semantic_decisions(semantic_clause())
@@ -885,7 +930,68 @@ class FeatureCommandRuntime:
             return project_partial_contract_to_legacy_design(contract) | {
                 "partial_contract_path": str(path),
                 "partial_contract_fingerprint": contract.fingerprint,
+                "partial_contract": document,
             }
+
+        def prepare_field_entailment_reviews_operation() -> Any:
+            contract = semantic_contract(parameters.get("contract"))
+            try:
+                return {"requests": prepare_field_entailment_reviews(contract)}
+            except (SemanticContractError, FaithfulnessError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def bind_field_entailment_reviews_operation() -> Any:
+            requests = parameters.get("requests")
+            raw_results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(requests, list) or raw_results is None:
+                raise PowdrrExecutionError("field entailment binding is malformed")
+            try:
+                reviews = bind_field_entailment_reviews(
+                    requests=requests, provider_results=raw_results
+                )
+            except (
+                SemanticContractError,
+                FaithfulnessError,
+                SemanticDecisionError,
+            ) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            return {"reviews": [item.to_data() for item in reviews]}
+
+        def finalize_source_faithfulness_operation() -> Any:
+            contract = semantic_contract(parameters.get("contract"))
+            raw_reviews = parameters.get("reviews")
+            if not isinstance(raw_reviews, list):
+                raise PowdrrExecutionError("field entailment reviews are malformed")
+            try:
+                reviews = []
+                for raw in raw_reviews:
+                    if not isinstance(raw, Mapping):
+                        raise FaithfulnessError("field entailment review is malformed")
+                    spec_raw = raw.get("spec")
+                    decision_raw = raw.get("decision")
+                    if not isinstance(spec_raw, Mapping) or not isinstance(
+                        decision_raw, Mapping
+                    ):
+                        raise FaithfulnessError("field entailment review is incomplete")
+                    reviews.append(
+                        FieldEntailmentReview(
+                            spec=FieldEntailmentSpec.from_data(spec_raw),
+                            decision=SemanticDecision.from_data(decision_raw),
+                        )
+                    )
+                outcome = finalize_source_faithfulness(contract, reviews)
+                if not outcome.get("accepted", False):
+                    raise PowdrrExecutionError(
+                        "source-faithfulness gate failed: "
+                        + json.dumps(outcome, sort_keys=True)
+                    )
+                return outcome
+            except (
+                SemanticContractError,
+                FaithfulnessError,
+                SemanticDecisionError,
+            ) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
 
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
@@ -1076,6 +1182,15 @@ class FeatureCommandRuntime:
                 ),
                 "compile_partial_semantic_contract": bind_handler(
                     compile_partial_semantic_contract_operation
+                ),
+                "prepare_field_entailment_reviews": bind_handler(
+                    prepare_field_entailment_reviews_operation
+                ),
+                "bind_field_entailment_reviews": bind_handler(
+                    bind_field_entailment_reviews_operation
+                ),
+                "finalize_source_faithfulness": bind_handler(
+                    finalize_source_faithfulness_operation
                 ),
                 "merge_semantic_design": bind_handler(merge_semantic_design_operation),
                 "compile_canonical_feature_design": bind_handler(

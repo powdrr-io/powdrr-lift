@@ -20,6 +20,18 @@ from powdrr_lift.core.semantic_decision import (
     SemanticDecisionProvider,
     SemanticDecisionSpec,
 )
+from powdrr_lift.core.semantic_faithfulness import (
+    FieldEntailmentReview,
+)
+from powdrr_lift.core.semantic_faithfulness import (
+    bind_field_entailment_reviews as bind_field_reviews,
+)
+from powdrr_lift.core.semantic_faithfulness import (
+    finalize_source_faithfulness as finalize_faithfulness,
+)
+from powdrr_lift.core.semantic_faithfulness import (
+    prepare_field_entailment_reviews as prepare_field_reviews,
+)
 from powdrr_lift.workrr.semantic_classifier import (
     resolve_deterministic_source_decision,
 )
@@ -392,22 +404,76 @@ def compile_source_contract(
 def project_partial_contract_to_legacy_design(
     contract: PartialSemanticContract,
 ) -> dict[str, str]:
-    """Render a lossless temporary view for legacy feature-design consumers."""
-    result_text = (
-        contract.explicit_result.span.text
-        if contract.explicit_result is not None
-        else contract.proposition_text
-    )
+    """Render a deterministic, disposable view for legacy consumers."""
+    result_text = _render_result(contract)
     return {
         "kind": contract.disposition,
-        "description": contract.proposition_text,
-        "acceptance_criterion": result_text,
-        "expected_test": contract.proposition_text,
-        "population": contract.subject.span.text,
-        "operation": contract.behavior.span.text,
+        "description": _render_description(contract),
+        "acceptance_criterion": _render_acceptance(contract),
+        "expected_test": _render_expected_test(contract),
+        "population": _render_population(contract),
+        "operation": _render_operation(contract),
         "oracle": result_text,
-        "evidence_case": contract.proposition_text,
+        "evidence_case": _render_evidence_case(contract),
     }
+
+
+def prepare_field_entailment_reviews(
+    contract: PartialSemanticContract,
+) -> list[dict[str, Any]]:
+    return prepare_field_reviews(contract)
+
+
+def bind_field_entailment_reviews(
+    *,
+    requests: Sequence[Mapping[str, Any]],
+    provider_results: Sequence[Mapping[str, Any]],
+    created_at: str | None = None,
+) -> list[FieldEntailmentReview]:
+    return bind_field_reviews(
+        requests=requests,
+        provider_results=provider_results,
+        created_at=created_at or _created_at(),
+    )
+
+
+def finalize_source_faithfulness(
+    contract: PartialSemanticContract,
+    reviews: Sequence[FieldEntailmentReview],
+) -> dict[str, Any]:
+    return finalize_faithfulness(contract, reviews).to_data()
+
+
+def _render_description(contract: PartialSemanticContract) -> str:
+    return f"{contract.subject.span.text} {contract.behavior.span.text}."
+
+
+def _render_acceptance(contract: PartialSemanticContract) -> str:
+    if contract.explicit_result is not None:
+        return f"The operation produces {contract.explicit_result.span.text}."
+    return "The requested behavior is observed for the resolved population."
+
+
+def _render_expected_test(contract: PartialSemanticContract) -> str:
+    return f"Test {contract.behavior.span.text} for {contract.subject.span.text}."
+
+
+def _render_population(contract: PartialSemanticContract) -> str:
+    return f"{contract.quantifier} {contract.subject.span.text}"
+
+
+def _render_operation(contract: PartialSemanticContract) -> str:
+    return f"{contract.behavior_family}: {contract.behavior.span.text}"
+
+
+def _render_result(contract: PartialSemanticContract) -> str:
+    if contract.explicit_result is not None:
+        return contract.explicit_result.span.text
+    return "the requested behavior is observed"
+
+
+def _render_evidence_case(contract: PartialSemanticContract) -> str:
+    return f"Source {contract.source_ref}: {contract.proposition_text}"
 
 
 def _classifier_request(
@@ -459,11 +525,14 @@ __all__ = [
     "SOURCE_DECISION_KINDS",
     "SOURCE_EXTRACTOR_REVISION",
     "bind_behavior_family_decision",
+    "bind_field_entailment_reviews",
     "bind_source_extractions",
     "bind_source_semantic_decisions",
     "compile_source_contract",
     "prepare_behavior_family_decision",
+    "prepare_field_entailment_reviews",
     "prepare_source_extractions",
     "prepare_source_semantic_decisions",
     "project_partial_contract_to_legacy_design",
+    "finalize_source_faithfulness",
 ]

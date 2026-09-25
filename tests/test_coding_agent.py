@@ -248,9 +248,12 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
 
     command = captured["command"]
     assert isinstance(command, list)
-    assert command[:2] == ["mini", "--task"]
-    assert "Use the repository's local conventions." in command[2]
-    assert "Stop after implementing the requested change." in command[2]
+    assert command[0] == "mini"
+    assert "--task" in command
+    task = command[command.index("--task") + 1]
+    assert "Use the repository's local conventions." in task
+    assert "Stop after implementing the requested change." in task
+    assert any(item.startswith("environment.cwd=") for item in command)
     assert "--yolo" in command
     assert "--exit-immediately" in command
     assert command[command.index("--cost-limit") + 1] == "0"

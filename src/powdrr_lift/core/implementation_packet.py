@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -57,6 +56,30 @@ class ImplementationPacket:
             repository=self.repository,
         )
 
+    def for_task(
+        self,
+        *,
+        objective: str,
+        acceptance_criteria: Sequence[str],
+    ) -> ImplementationPacket:
+        """Return a worker packet scoped to one compiled code task."""
+        task_objective = _worker_objective(objective).strip()
+        if not task_objective:
+            raise ValueError("task packet objective must not be empty")
+        tests = tuple(
+            {"description": criterion.strip()}
+            for criterion in acceptance_criteria
+            if isinstance(criterion, str) and criterion.strip()
+        )
+        if not tests:
+            raise ValueError("task packet requires acceptance criteria")
+        return ImplementationPacket(
+            objective=task_objective,
+            obligations=(task_objective,),
+            required_tests=tests,
+            repository=self.repository,
+        )
+
     def to_data(self) -> dict[str, Any]:
         return {
             "schema_version": "implementation-packet-v1",
@@ -69,10 +92,6 @@ class ImplementationPacket:
                 {
                     "ordinal": index,
                     "description": str(item.get("description", "")),
-                    "provider": str(item.get("provider", "")),
-                    "profile": str(item.get("profile", "")),
-                    "name_hint": str(item.get("name_hint", "")),
-                    "selector": str(item.get("selector", "")),
                 }
                 for index, item in enumerate(self.required_tests, start=1)
             ],
@@ -96,16 +115,7 @@ class ImplementationPacket:
             if isinstance(item, Mapping) and isinstance(item.get("description"), str)
         )
         tests = tuple(
-            {
-                key: item.get(key, "")
-                for key in (
-                    "description",
-                    "provider",
-                    "profile",
-                    "name_hint",
-                    "selector",
-                )
-            }
+            {"description": item.get("description", "")}
             for item in raw_tests
             if isinstance(item, Mapping)
         )
@@ -142,16 +152,12 @@ class ImplementationPacket:
         """
         test_lines = []
         for index, item in enumerate(self.required_tests, start=1):
-            selector = str(item.get("selector", "")).strip()
-            name_hint = str(item.get("name_hint", "")).strip()
-            location = selector or name_hint or "new focused test"
-            provider = str(item.get("provider", "")).strip()
-            profile = str(item.get("profile", "")).strip()
-            runner = f" ({provider}/{profile})" if provider or profile else ""
             description = (
                 str(item.get("description", "")).strip().split(" Oracle:", 1)[0]
             )
-            test_lines.append(f"- T{index:02d}{runner} `{location}` — {description}")
+            test_lines.append(
+                f"- T{index:02d} — add a focused test proving {description}"
+            )
         test_lines = test_lines or ["- none"]
         return "\n".join(
             (
@@ -189,29 +195,10 @@ def compile_implementation_packet(
     for item in required_tests:
         if not isinstance(item, Mapping):
             raise ValueError("implementation packet test contract is malformed")
-        for key in ("provider", "profile"):
-            value = item.get(key)
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"implementation packet test lacks {key}")
-        name_hint = item.get("name_hint")
-        if not isinstance(name_hint, str) or not name_hint.strip():
-            description = item.get("description", "")
-            if not isinstance(description, str) or not description.strip():
-                raise ValueError("implementation packet test lacks name_hint")
-            slug = re.sub(r"[^a-z0-9]+", "_", description.casefold()).strip("_")
-            name_hint = f"test_{slug[:100].rstrip('_')}"
-        normalized_tests.append(
-            {
-                key: item.get(key, "")
-                for key in (
-                    "description",
-                    "provider",
-                    "profile",
-                    "selector",
-                )
-            }
-            | {"name_hint": name_hint}
-        )
+        description = item.get("description", "")
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError("implementation packet test lacks description")
+        normalized_tests.append({"description": description.strip()})
     if not normalized_tests:
         raise ValueError("implementation packet requires test contracts")
     return ImplementationPacket(

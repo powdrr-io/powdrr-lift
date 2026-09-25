@@ -223,8 +223,10 @@ class ImplementationRequest:
             "Work in the existing task worktree. Do not create branches, "
             "commits, pull requests, or generated repository metadata. Use only "
             "the allowed paths or declared ephemeral paths. Temporary helpers "
-            "are permitted only in declared ephemeral paths. Do not alter files "
-            "outside the request."
+            "are permitted only in declared ephemeral paths. Stay in the current "
+            "working directory; do not cd to, inspect, or select sibling "
+            "worktrees or paths outside it. Do not alter files outside the "
+            "request."
         )
         product_objective = (
             implementation_packet.objective
@@ -551,18 +553,36 @@ class MiniSWEAgentProvider:
             if token:
                 environment["DEEPINFRA_API_KEY"] = token
         environment["PWD"] = str(worktree_root.resolve())
+        mini_config = _miniswe_builtin_config(self.executable)
         command = [
             self.executable,
-            "--task",
-            request.prompt,
-            "--yolo",
-            "--exit-immediately",
-            # Powdrr owns the wall-clock budget and can continue a partial
-            # attempt locally. mini's default dollar limit otherwise exits
-            # cleanly in the middle of an implementation.
-            "--cost-limit",
-            "0",
         ]
+        if mini_config is not None:
+            # mini's LocalEnvironment gives its configured cwd precedence over
+            # the subprocess cwd. Preserve the built-in defaults, then bind
+            # that setting to the task worktree so a global config cannot make
+            # the worker inspect a sibling checkout.
+            command.extend(
+                (
+                    "--config",
+                    str(mini_config),
+                    "--config",
+                    f"environment.cwd={worktree_root.resolve()}",
+                )
+            )
+        command.extend(
+            [
+                "--task",
+                request.prompt,
+                "--yolo",
+                "--exit-immediately",
+                # Powdrr owns the wall-clock budget and can continue a partial
+                # attempt locally. mini's default dollar limit otherwise exits
+                # cleanly in the middle of an implementation.
+                "--cost-limit",
+                "0",
+            ]
+        )
         if self.model is not None:
             command.extend(("--model", self.model))
         if self.diagnostics_root is not None:
@@ -602,6 +622,16 @@ class MiniSWEAgentProvider:
                     stderr,
                 )
         return completed
+
+
+def _miniswe_builtin_config(executable: str) -> Path | None:
+    """Locate mini's built-in config so cwd overrides retain its defaults."""
+    executable_path = Path(shutil.which(executable) or executable).resolve()
+    package_root = executable_path.parent.parent / "lib"
+    matches = sorted(
+        package_root.glob("python*/site-packages/minisweagent/config/mini.yaml")
+    )
+    return matches[0] if matches else None
 
 
 def _mini_trajectory_exit_status(path: Path) -> str | None:

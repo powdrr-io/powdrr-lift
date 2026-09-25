@@ -180,6 +180,15 @@ def compile_verification_obligations(
         for operation in proposal.operations
         if operation.section == "required_test_cases" and operation.action == "add"
     }
+    # Contracts introduced by the current feature are planned tests. Their
+    # selectors are created by the coding worker, so they cannot be present in
+    # the baseline provider inventory yet. Only contracts inherited from the
+    # baseline require an already-discovered executable selector.
+    planned_contract_ids.update(
+        contract.contract_id
+        for contract in contracts
+        if contract.contract_id not in previous_contract_ids
+    )
     for contract in contracts:
         errors = contract.validation_errors()
         if errors:

@@ -128,6 +128,7 @@ def test_missing_selector_blocks_compilation() -> None:
         active_intents=({"clause_id": "intent.transcript"},),
         contracts=(_contract(),),
         provider_inventory=_inventory("tests/test_transcript.py::test_other"),
+        previous_contracts=(_contract(),),
     )
 
     assert not result.complete

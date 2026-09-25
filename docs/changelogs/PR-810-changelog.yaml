@@ -1,0 +1,52 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 810
+title: Strengthen intent contracts and repair handoffs
+intent:
+  problem: The implementation plan did not require behavior contracts to distinguish error propagation from continuation, supported from rejected capabilities, or local validation failures from verifier failures delivered to repair agents.
+  goal: Define a lossless scenario-based handoff with explicit negative behavior, structured failure feedback, and repair commits validated by fresh evidence and diff scope.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/intent-preserving-change-pr-plan.md
+    type: modified
+    summary: Add PR 4A for typed behavior scenarios, capability matrices, concise prompt projection, structured verifier failures, and repair boundaries.
+    rationale: Preserve observable error, continuation, rejection, cleanup, and compatibility intent through coding and repair.
+    span:
+      start_line: 516
+      end_line: 675
+  - path: docs/plans/intent-preserving-change-pr-plan.md
+    type: modified
+    summary: Add behavior and repair requirements to the implementation handoff checklist and dependency sequence.
+    rationale: Make the new contract and repair controls part of the executable plan for subsequent agents.
+    span:
+      start_line: 785
+      end_line: 786
+  - path: docs/plans/intent-preserving-change-pr-plan.md
+    type: modified
+    summary: Require behavior dimensions and structured repair handoff tests in the agent checklist.
+    rationale: Ensure future implementation slices verify error, negative-capability, and repair-commit behavior.
+    span:
+      start_line: 807
+      end_line: 815
+entities: []
+entity_relationships: []
+invariants:
+  - id: behavior-dimensions-are-explicit
+    action: added
+    description: A public behavior contract explicitly records normal results, error propagation, continuation, unsupported capabilities, cleanup, compatibility, and boundary behavior, including not_applicable decisions.
+    rationale: Prevent omitted negative or error semantics from being left for the coding worker to infer.
+  - id: verifier-failures-reach-repair
+    action: added
+    description: Local validation and verifier failures are normalized into structured records containing expected and actual behavior, test identity, contract references, and repairability before repair is requested.
+    rationale: Give repair agents the precise current failure instead of a generic incomplete-attempt status.
+  - id: repair-commits-are-valid-candidates
+    action: added
+    description: A repair agent may advance HEAD by committing changes; Workrr validates the resulting diff from the repair base and fresh evidence rather than rejecting the commit solely because HEAD changed.
+    rationale: Allow the requested repair workflow while retaining scope and evidence controls.
+guidance:
+  - id: render-one-behavior-matrix
+    action: added
+    description: Render each behavior scenario once in the worker prompt with its inputs, outputs, errors, continuation, rejection, and validator target while retaining richer provenance in the private manifest.
+    rationale: Reduce duplicate prose without dropping meaning-bearing conditions or exceptions.
+features: []
+proposed_prs: []

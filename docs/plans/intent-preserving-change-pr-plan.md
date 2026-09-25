@@ -513,6 +513,168 @@ it does not trigger a dump of all historical intent.
 OpenCode receives a fingerprinted, operation-scoped intent packet whose
 completeness is mechanically explainable and irrelevant context is bounded.
 
+## PR 4A: Lossless behavior contracts and repair feedback
+
+### Suggested title
+
+`Compile typed behavior scenarios and verifier-driven repair handoffs`
+
+### Goal
+
+Close the gap between a requirement that is mentioned in prose and the exact
+behavior the coding worker must implement. A worker prompt must preserve not
+only the desired success path, but also observable errors, continuation rules,
+unsupported capabilities, cleanup behavior, and compatibility boundaries.
+
+This slice is prompted by a failure mode where the prompt said that errors must
+not halt later records, but did not say that errors nested inside a result
+record must be exposed on the returned result. The worker continued correctly
+while silently dropping the errors. A second failure exposed the opposite
+omission: unsupported execution contexts were never assigned a required
+behavior, so the worker had no contract for whether to support or reject them.
+
+### Typed behavior scenario
+
+Each public behavior change must compile its requirements into scenarios with
+these fields:
+
+```yaml
+scenario_id: nested-result-errors
+subject: result-processing-operation
+given:
+  result_shape: nested result record containing errors and a location
+when:
+  operation: process the record and then a later record
+then:
+  returned_result_errors: include every nested error with its location
+  later_record: still returns a result and is processed
+must_expose:
+  - errors
+must_preserve:
+  - error message
+  - error location
+must_reject: []
+must_continue:
+  - later records are processed
+evidence:
+  - focused executable test
+```
+
+The compiler must require an explicit value, including `not_applicable`, for
+each of these dimensions:
+
+- normal result and accumulated state;
+- error location, shape, and propagation;
+- continuation after an error;
+- unsupported input, execution context, or capability behavior;
+- cancellation and cleanup;
+- compatibility and preservation behavior; and
+- negative or boundary cases.
+
+`not_applicable` is a recorded contract decision, not an omitted field. The
+compiler must reject an unresolved dimension before producing a worker prompt.
+
+### Capability matrix
+
+For any API, provider, adapter, command, integration, or runtime extension,
+compile a capability matrix from the repository's authoritative inventory:
+
+```text
+capability or context   required behavior       evidence
+supported context A     support                 executable test
+supported context B     support                 executable test
+unsupported context C   reject with defined error executable test
+unknown context         reject or fallback       executable test
+```
+
+The context may be a transport, backend, input shape, dependency mode,
+configuration, lifecycle state, or other boundary selected by the feature.
+The matrix must distinguish “not mentioned by the feature request” from
+“explicitly unsupported.” Existing adapter behavior, public API conventions,
+and compatibility tests may supply the authority; otherwise the dimension is
+unresolved and blocks handoff rather than being guessed by the worker.
+
+### Prompt projection
+
+Render one concise behavior matrix into the coding-worker prompt. Each row
+contains the scenario, input/result shape, expected output, error behavior,
+continuation behavior, and validator target. Do not render the same meaning
+again as separate product-contract, acceptance-criterion, and focused-validator
+paragraphs. The private manifest may retain the richer provenance and evidence
+mapping.
+
+The prompt/manifest gate must prove:
+
+- every scenario has one prompt reference and one evidence reference;
+- every `must_expose`, `must_reject`, and `must_continue` field is rendered;
+- every negative capability has an executable assertion or an explicit typed
+  exemption;
+- no scenario is represented only by a vague phrase such as “handle errors”;
+- prompt and manifest fingerprints are derived from the same contract revision;
+- generated prompt size is bounded by deduplicating representations, never by
+  dropping a behavior dimension.
+
+### Structured validation failure
+
+Normalize local validation and benchmark/verifier results into the same failure
+record:
+
+```yaml
+failure_id:
+stage: local_validation | verifier | scope | policy
+test_id:
+command: []
+contract_refs: []
+expected: ...
+actual: ...
+source_location: ...
+evidence_path: ...
+classification: product_failure | test_failure | environment_failure | policy_failure
+repairability: repairable | blocked | human_required
+```
+
+The repair handoff must include the exact current failures, not only a generic
+`coding_attempt_incomplete` status. It must include the relevant test names,
+assertion or expected/actual values, contract references, and the current
+candidate diff. Historical passing evidence is retained for diagnosis but is
+not substituted for current failure evidence.
+
+### Repair boundary
+
+Repair is a new bounded evidence epoch over the existing candidate worktree.
+The repair agent may edit and commit. Workrr records the repair base commit,
+allows `HEAD` to advance, and validates the resulting diff from that base.
+It rejects out-of-scope paths, destructive history rewrites, or changes not
+covered by the repair scope; it must not reject a normal repair commit merely
+because `HEAD` changed.
+
+After repair, the runtime reruns all affected validation and verifier gates.
+Evidence from before the repair cannot be reused as current proof. A repair
+prompt may be concise, but it must contain the current failure records and the
+original contract context needed to interpret them.
+
+### Required validation gates
+
+- A contract with an omitted error, negative-capability, continuation, or
+  cleanup dimension cannot compile.
+- A nested error is covered separately from the rule that later work continues.
+- Every supported capability has a positive executable case.
+- Every rejected capability has a negative executable case and defined error
+  type/condition.
+- A local validation failure and a verifier failure produce the same typed
+  repair input shape.
+- A repair commit advances `HEAD` without triggering a policy failure.
+- Repair reruns the affected gates against a fresh candidate-tree fingerprint.
+- Golden prompt tests prove each scenario appears exactly once in the worker
+  prompt.
+
+### Exit condition
+
+The coding worker receives a lossless, scenario-based implementation contract;
+the repair worker receives exact current failures; and repair commits are
+validated by diff scope and fresh evidence rather than rejected as illegal
+state changes.
+
 ## PR 5: Actualization and post-implementation reconciliation
 
 ### Suggested title
@@ -622,6 +784,8 @@ PR 3  Implementation-start revalidation and revision
   |
 PR 4  Targeted OpenCode intent packets
   |
+PR 4A Lossless behavior contracts and verifier-driven repair handoffs
+  |
 PR 5  Actualization and post-implementation reconciliation
   |
 PR 6  Cumulative lineage and drift audits
@@ -642,12 +806,15 @@ For each PR, the implementing agent must:
 5. Implement pure validation before orchestration integration.
 6. Add the Procedrr operation and explicit gate before worker behavior.
 7. Add Workrr boundary checks so direct invocation fails closed.
-8. Test success, every closed outcome, malformed output, stale evidence,
-   tampering, and prohibited bypass.
-9. Run the complete repository verification suite.
-10. Add and validate the PR changelog.
-11. Inspect the final diff for scope and generated files.
-12. Commit, push, and open a PR without merging it.
+8. For behavior changes, cover success, error propagation, continuation,
+   unsupported capabilities, cleanup, every closed outcome, malformed output,
+   stale evidence, tampering, and prohibited bypass.
+9. Normalize local and verifier failures into repair records and test the
+   repair handoff, including an allowed repair commit.
+10. Run the complete repository verification suite.
+11. Add and validate the PR changelog.
+12. Inspect the final diff for scope and generated files.
+13. Commit, push, and open a PR without merging it.
 
 The PR description must identify the protected transition, scheduling
 authority, atomic decisions, evidence freshness rules, failure and revision

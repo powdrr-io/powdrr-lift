@@ -63,6 +63,28 @@ def test_explicit_validation_command_is_used_when_no_tooling_is_detected(
     assert profiles[0].command == ("python", "-m", "pytest")
 
 
+def test_ignores_unresolved_ci_templates_for_local_validation_command(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    workflow = tmp_path / ".github" / "workflows"
+    workflow.mkdir(parents=True)
+    (workflow / "ci.yml").write_text(
+        """
+jobs:
+  test:
+    steps:
+      - run: pytest tests --${{ matrix.dependency }}-only
+""",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+
+    assert [profile.name for profile in profiles] == ["pytest"]
+    assert profiles[0].command == ("pytest", "-q")
+
+
 def test_discovers_polyglot_project_validation(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text(
         '{"scripts": {"test": "vitest", "lint": "eslint ."}}\n',

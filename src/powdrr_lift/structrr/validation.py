@@ -219,9 +219,19 @@ def _find_command(
 ) -> tuple[str, ...] | None:
     for command in commands:
         normalized = tuple(part.removeprefix("uv") for part in command)
-        if _contains_marker(normalized, marker):
+        if _contains_marker(normalized, marker) and _is_locally_runnable(normalized):
             return command
     return None
+
+
+def _is_locally_runnable(command: Sequence[str]) -> bool:
+    """Reject CI commands containing unresolved template expressions.
+
+    CI matrix/context expressions are useful in the originating workflow but
+    are not executable command arguments in the task container.  Let the
+    project-native fallback command be selected instead.
+    """
+    return not any(re.search(r"\$\{\{|\{\{|\}\}|\$\{[^}]+\}", part) for part in command)
 
 
 def _contains_marker(command: tuple[str, ...], marker: tuple[str, ...]) -> bool:

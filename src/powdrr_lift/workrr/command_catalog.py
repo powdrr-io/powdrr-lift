@@ -513,7 +513,9 @@ class FeatureCommandRuntime:
                     "aggregate_category_edits requires category decisions"
                 )
             return feature_endpoint._aggregate_category_edits(
-                decisions, inventory=state.get("provider_inventory", ())
+                decisions,
+                inventory=state.get("provider_inventory", ()),
+                validation_profiles=state.get("validation_profiles", ()),
             )
 
         def decompose_feature_description() -> Any:
@@ -884,6 +886,7 @@ class FeatureCommandRuntime:
                     "feature_design", parameters.get("interview_input")
                 ),
                 inventory=tuple(state.get("provider_inventory", ())),
+                validation_profiles=tuple(state.get("validation_profiles", ())),
             )
             feature_endpoint._commit(runner, worktree, "Record Structrr feature diff")
             return {"path": str(state["plan_path"])}

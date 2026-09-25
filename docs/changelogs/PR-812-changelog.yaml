@@ -1,0 +1,46 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 812
+title: Add repository inventory subject binding primitives
+intent:
+  problem: Source-anchored contracts cannot resolve subjects against repository evidence without a stable inventory and explicit candidate decision boundary.
+  goal: Collect immutable repository symbols, retrieve and score candidates deterministically, use Structrr aliases for recall, and aggregate one-at-a-time C09 decisions without model-selected winners.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/repository_inventory.py
+    type: added
+    span: {start_line: 1, end_line: 464}
+    summary: Define immutable inventory records, lookup queries, candidate evidence, Structrr context, and population receipts.
+    rationale: Establish a versioned evidence boundary for repository subject resolution.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: added
+    span: {start_line: 1, end_line: 162}
+    summary: Prepare and bind one C09 candidate relation decision per retrieved candidate, then aggregate binding outcomes.
+    rationale: Keep semantic selection separate from retrieval scores and prevent model comparison across candidates.
+  - path: tests/test_repository_inventory.py
+    type: added
+    span: {start_line: 1, end_line: 139}
+    summary: Cover normalization, deterministic retrieval, ambiguity, population receipts, Python collection, and C09 aggregation.
+    rationale: Protect the repository-evidence and subject-binding contracts with executable tests.
+entities: []
+entity_relationships: []
+invariants:
+  - id: inventory-is-immutable-evidence
+    action: added
+    description: Repository inventory records are tied to commit, Structrr, and adapter revisions and carry deterministic fingerprints.
+    rationale: Prevent stale or model-invented repository members from becoming binding evidence.
+  - id: candidate-scores-do-not-bind
+    action: added
+    description: Retrieval scores order candidates but only candidate relation decisions can establish a binding; multiple unrelated matches remain unresolved.
+    rationale: Avoid silently selecting a plausible but incorrect subject.
+  - id: population-members-are-enumerated
+    action: added
+    description: A complete population receipt may contain only inventory-known members and must name its membership rule.
+    rationale: Ensure universal obligations are backed by explicit current repository evidence.
+guidance:
+  - id: normalize-for-retrieval-only
+    action: added
+    description: Normalized terms and Structrr aliases improve candidate recall but never replace authoritative names or prove semantic identity.
+    rationale: Separate search convenience from intent acceptance.
+features: []
+proposed_prs: []

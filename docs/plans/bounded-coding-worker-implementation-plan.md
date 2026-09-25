@@ -20,10 +20,14 @@ The governing rule is:
 > Model activity is not progress, a worker exit is not success, and an existing
 > dirty diff is not evidence that the current work unit changed anything.
 
-This plan complements `docs/plans/bounded-llm-instruction-compiler.md` and
-`docs/plans/intent-linked-verification-implementation-plan.md`. Those plans own
-instruction compilation and verification contracts. This plan begins after
-actionable obligations and required test cases have been compiled.
+This plan complements `docs/plans/bounded-llm-instruction-compiler.md`,
+`docs/design/source-anchored-semantic-contract-compilation.md`, and
+`docs/plans/intent-linked-verification-implementation-plan.md`. The
+source-anchored design is normative for instruction disposition, semantic
+dimensions, cross-contract interactions, contrast cases, and prompt
+projection. This plan must not accept merely present obligations and test
+cases; it begins only after their source conservation and semantic-boundary
+gates pass.
 
 ## Failure being corrected
 
@@ -54,6 +58,15 @@ The implementation must treat this run as a regression fixture. It is not
 enough to show that an agent process starts or that a mocked provider returns a
 successful exit code.
 
+A later near-complete mini-SWE-agent implementation exposed the complementary
+quality failure: 67 focused state-data tests passed and five failed because the
+implementation conflated an ancestor-merged callback view with each state's
+owned public snapshot and conflated an absent data declaration with explicit
+`data={}`. The generated design also contained a lifecycle case whose setup
+mutated data while its oracle incorrectly required values to remain unchanged.
+These are not worker-liveness failures. They are design-to-prompt semantic-loss
+failures and are equally normative regression cases for this plan.
+
 ## Goals
 
 The completed system must:
@@ -82,6 +95,13 @@ The completed system must:
     choice inside mini-SWE-agent remains configuration.
 12. Prove the one-prompt, one-invocation behavior with deterministic tests and a live DeepInfra opt-in
     regression using the complete state-data-scoping task.
+13. Preserve every source disposition and meaning-bearing semantic field
+    through exact prompt ranges and private evidence mappings.
+14. Identify contracts that are individually correct but easy to conflate,
+    render their difference explicitly, and validate them with discriminating
+    contrast cases.
+15. Exclude process-only instructions only after a separate fail-closed safety
+    decision, while preserving product non-goals and mixed clauses.
 
 ## Non-goals
 
@@ -222,6 +242,9 @@ class MiniSWEAgentImplementationPrompt:
     rendering_revision: str
     prompt: str
     contract_refs: tuple[str, ...]
+    semantic_dimension_refs: tuple[str, ...]
+    interaction_refs: tuple[str, ...]
+    contrast_case_refs: tuple[str, ...]
     verification_case_refs: tuple[str, ...]
     allowed_paths: tuple[str, ...]
     focused_commands: tuple[CommandContract, ...]
@@ -245,6 +268,10 @@ class ObligationValidationManifest:
     prompt_id: str
     prompt_fingerprint: str
     base_commit: str
+    source_disposition_receipt_refs: tuple[str, ...]
+    semantic_dimension_refs: tuple[str, ...]
+    interaction_refs: tuple[str, ...]
+    contrast_case_refs: tuple[str, ...]
     entries: tuple[ObligationValidationEntry, ...]
     preservation_case_refs: tuple[str, ...]
     full_validation_profiles: tuple[str, ...]
@@ -883,35 +910,170 @@ product/test-only patch.
 Exit gate: the live smoke passes twice consecutively and both trajectories show
 bounded termination.
 
-### PR 4: Terminal single-prompt compilation and invocation
+### PR 4: Semantic conservation and boundary compilation
+
+Goal: make “close but not quite” interpretations structurally visible before a
+worker prompt can be emitted.
+
+Dependencies:
+
+- immutable source propositions and atomic decomposition coverage;
+- resolved source-anchored semantic contracts;
+- repository inventory, ontology, and accepted-definition revisions; and
+- language adapters capable of naming operations, views, lifecycle phases,
+  fixture types, and observable predicates.
+
+Implementation:
+
+1. Add the versioned immutable schemas defined by the source-anchored design:
+   `semantic-dimension-v1`, `semantic-conservation-row-v1`,
+   `contract-interaction-v1`, `contrast-case-spec-v1`,
+   `source-disposition-receipt-v1`, and `prompt-projection-map-v1`.
+2. Add C12 nonactionable exclusion safety. A C01 `nonactionable` result cannot
+   become prompt exclusion without a C12 `process_only` result. `mixed` returns
+   to atomic decomposition, `product_semantics_present` returns to disposition
+   classification, and unresolved blocks the design. Bind every process-only
+   imperative to its registered Procedrr operation or policy; exclusion from
+   product behavior must not mean ignoring a workflow requirement.
+3. Compile one conservation row for every source proposition and every
+   meaning-bearing field: polarity, quantifier, subject, operation, input,
+   output, precondition, exception, explicit result, temporal scope,
+   observation view, precedence, population, preservation rule, and non-goal.
+4. Compile authority-backed semantic dimensions. Reject unproven partition
+   values; route a required but underspecified value to clarification.
+5. Generate bounded interaction candidates only from shared subject bindings,
+   overlapping repository symbols, operation outputs, lifecycle resources, or
+   explicit relationship edges. Persist the reason each pair was selected.
+6. Resolve exact ontology relations mechanically. For unresolved candidates,
+   invoke C13 once per pair and bind only its closed relation label.
+7. Compile minimal discriminating contrast cases for distinct observations,
+   ordered phases, precedence, mutual exclusion, and behaviorally different
+   partition values. Include authority-backed plausible-but-wrong results.
+8. Extend verification-case compilation with complete scenario, operation,
+   oracle, expected result, forbidden result, semantic-dimension,
+   interaction, and contrast references.
+9. Extend design readiness so unresolved dispositions, uncovered conservation
+   rows, unresolved interactions, or uncovered distinct partitions fail before
+   any coding-worker request exists.
+10. Persist all intermediate artifacts in the feature-run artifact root and
+    expose them in live-validation summaries.
+
+Expected touchpoints:
+
+- `src/powdrr_lift/core/semantic_boundary.py`;
+- `src/powdrr_lift/core/semantic_decision.py`;
+- `src/powdrr_lift/core/semantic_contract.py`;
+- `src/powdrr_lift/workrr/semantic_boundary_compiler.py`;
+- `src/powdrr_lift/workrr/semantic_contract_compiler.py`;
+- `src/powdrr_lift/workrr/verification_case_compiler.py`;
+- design-interview and implement-feature Procedrr definitions;
+- production design-flow fixtures; and
+- artifact serialization and fingerprint tests.
+
+Required deterministic tests:
+
+- a pure pull-request instruction becomes a process-only exclusion receipt and
+  binds the publication flow while appearing nowhere in product behavior;
+- `Do not add retries` cannot be excluded as nonactionable and reaches a
+  non-goal/preservation route;
+- a mixed product/process sentence is re-split and every child proposition has
+  one terminal disposition;
+- every source proposition has exactly one terminal route and no actionable
+  proposition can disappear;
+- conditions, exceptions, output alternatives, temporal modifiers, and
+  precedence fields each create conservation rows;
+- an unsupported or underspecified partition blocks instead of being guessed;
+- callback-effective data and owned snapshot data become
+  `distinct_observations` with a contrast case;
+- absent, explicit-empty, and nonempty declarations remain distinct;
+- callback mutation persistence cannot compile into a value-immutability
+  oracle;
+- shallow and deep history receive separate variant coverage;
+- non-dict declarations and non-string-key declarations remain independently
+  attributable cases even though both raise the same exception;
+- unrelated contracts do not produce quadratic contrast noise; and
+- changing a source, ontology, inventory, adapter, or relation decision
+  invalidates all dependent fingerprints.
+
+Required mutation tests:
+
+- flip `owned_state_snapshot` to `effective_callback_scope`;
+- delete the absent-declaration partition;
+- merge explicit-empty and absent declaration values;
+- replace mutation persistence with equality before and after a callback;
+- merge shallow and deep history cases;
+- classify a product non-goal as process-only; and
+- remove one modifier's conservation destination.
+
+Every mutation must make design readiness fail with a finding naming the exact
+contract, field, interaction, or source proposition. Snapshot differences
+alone are not sufficient assertions.
+
+Exit gate: the production DeepSWE fixture reaches design readiness only with
+all known subtle distinctions represented by resolved interactions and
+contrast cases. The same fixture with any required mutation fails before
+worker invocation.
+
+### PR 5: Terminal single-prompt compilation and invocation
 
 Goal: eliminate obligation-per-worker execution.
 
 Implementation:
 
-1. Compile one private `obligation-validation-manifest-v1` from the complete
+1. Require a passing semantic-boundary readiness receipt from PR 4. The prompt
+   compiler cannot accept legacy obligations or test descriptions that lack
+   conservation, dimension, interaction, and contrast metadata.
+2. Compile one private `obligation-validation-manifest-v1` from the complete
    canonical design, verification cases, baseline expectations, and evidence
    requirements.
-2. Compile one `minisweagent-implementation-prompt-v1` from the same design,
+3. Compile one `minisweagent-implementation-prompt-v1` from the same design,
    repository bindings, scope, and verification plans.
-3. Add deterministic prompt/manifest parity and complete obligation/case
-   coverage checks.
-4. Replace every code-task, continuation, and repair implementation loop with
+4. Render an `Interaction boundaries` section between required behavior and
+   required verification. Render the complete scenario, operation, oracle,
+   expected result, forbidden result, and contrast assertions for each case.
+   Do not split free-form descriptions on marker text such as `Oracle:`.
+5. Render the objective only from resolved actionable contracts. Never copy
+   the raw feature text into the objective, because doing so can reintroduce
+   process-only clauses and create an untracked parallel representation of
+   intent.
+6. Compile `prompt-projection-map-v1` while rendering. Record exact UTF-8 byte
+   ranges and text fingerprints for every conservation row, interaction, and
+   contrast case.
+7. Add deterministic prompt/manifest parity and complete disposition,
+   conservation, partition, interaction, obligation, and case coverage checks.
+8. Replace every code-task, continuation, and repair implementation loop with
    one mini-SWE-agent phase.
-5. Add exact expected-test collection, candidate execution, baseline
+9. Add exact expected-test collection, candidate execution, baseline
    differential execution, adapter-owned independent probes, and
    oracle-alignment validation.
-6. Produce one fail-closed validation receipt per obligation.
-7. Make every attempt or validation failure terminal for the run.
-8. Preserve obligation-to-prompt, obligation-to-test, obligation-to-diff, and
-   obligation-to-receipt traceability in evidence.
+10. Execute every required contrast case through an independent probe where an
+    adapter exists. Require both positive observations and negative assertions
+    against the recorded plausible conflation.
+11. Produce one fail-closed validation receipt per obligation.
+12. Make every attempt or validation failure terminal for the run.
+13. Preserve source-to-contract, field-to-prompt-range,
+    interaction-to-contrast, obligation-to-test, obligation-to-diff, and
+    obligation-to-receipt traceability in evidence.
 
 Required tests:
 
 - 35 obligations compile into one prompt and one worker invocation;
 - every obligation remains represented in the prompt, private manifest, and
   final evidence;
+- every source proposition has one terminal disposition receipt;
+- process-only text is absent from the objective and every worker-facing
+  section;
+- a product non-goal cannot be removed through nonactionable filtering;
+- every condition, exception, explicit result, temporal modifier, observation
+  view, and precedence rule maps to an exact verified prompt range;
+- deleting or truncating an oracle fails prompt compilation even when the test
+  description and selector remain present;
+- replacing a mapped prompt fragment with semantically adjacent text fails its
+  projection-map fingerprint and rendering-template test;
+- every required interaction appears once in `Interaction boundaries` and
+  every contrast appears once in `Required verification`;
 - prompt and manifest obligation/case sets have exact parity;
+- prompt and manifest interaction/contrast sets have exact parity;
 - the prompt excludes all forbidden internal representations;
 - expected test prefixes permit meaningful suffixes;
 - missing, xfailed, skipped, and deselected expected tests fail;
@@ -925,6 +1087,11 @@ Required tests:
   obligation receipt;
 - one shared test cannot cover multiple obligations without distinct mapped
   assertions, parameters, or predicates;
+- callback merged scope cannot satisfy owned-snapshot evidence;
+- an explicit-empty declaration cannot satisfy the absent-declaration case;
+- an equality-before/after assertion cannot satisfy callback mutation
+  persistence;
+- one generic history test cannot satisfy both shallow and deep restoration;
 - every obligation receives an independent pass, fail, or abstain verdict and
   abstention fails closed;
 - failed validation creates findings but no worker request;
@@ -933,9 +1100,11 @@ Required tests:
 - normal and Harbor wrappers invoke the same core flow.
 
 Exit gate: a deterministic DeepSWE fixture reaches final validation using one
-prompt and exactly one mini-SWE-agent invocation.
+prompt and exactly one mini-SWE-agent invocation; each known subtle distinction
+has a prompt range, a manifest mapping, an independent contrast where
+materializable, and separately attributable evidence.
 
-### PR 5: Live DeepSWE single-prompt proof
+### PR 6: Live DeepSWE single-prompt proof
 
 Goal: prove that the new path completes useful benchmark work before making it
 the default.
@@ -948,6 +1117,9 @@ Implementation:
    times with mini-SWE-agent.
 4. Diagnose and fix deterministic harness failures without adding follow-up
    worker prompts.
+5. Retain and inspect source-disposition, conservation, dimension, interaction,
+   contrast, projection-map, prompt, manifest, probe, and receipt artifacts for
+   every run.
 
 Acceptance gate:
 
@@ -958,6 +1130,10 @@ Acceptance gate:
 - all expected tests are collected;
 - no attempt exceeds its step or wall budget;
 - the complete pre-existing suite has no regression;
+- all semantic-boundary independent probes pass, including owned versus merged
+  views and absent versus explicit-empty declarations;
+- no run is accepted solely because broad tests pass while a mapped contrast
+  assertion is missing;
 - at least two of three runs pass the hidden feature evaluator; and
 - a failed run produces a terminal, actionable classification rather than an
   outer Harbor timeout.
@@ -973,23 +1149,50 @@ Add the complete DeepSWE state-data-scoping instructions as a versioned test
 fixture. The test must exercise production prompt compilation and the real
 Procedrr definition. It must assert:
 
-1. nonactionable clauses do not enter the coding prompt;
-2. all actionable obligations do enter it;
-3. compound instruction sentences remain decomposed into their separate
+1. every source proposition has exactly one terminal disposition receipt;
+2. C01 nonactionable clauses also pass C12 exclusion safety before they are
+   omitted from the coding prompt;
+3. product non-goals and mixed product/process clauses cannot disappear through
+   nonactionable filtering;
+4. all actionable obligations do enter the prompt;
+5. compound instruction sentences remain decomposed into their separate
    obligations;
-4. one mini-SWE-agent prompt and one worker invocation are produced;
-5. the private validation manifest covers every actionable obligation with an
+6. every condition, exception, result, temporal scope, observation view,
+   precedence rule, and population modifier has a conservation row;
+7. callback-effective merged data and per-state owned query data compile into
+   distinct observations and a discriminating contrast case;
+8. absent, explicit-empty, nonempty, and invalid declaration partitions remain
+   distinct where their outcomes differ;
+9. callback mutation persistence does not become value immutability;
+10. shallow and deep history restoration remain separately verifiable;
+11. non-dict and non-string-key invalid declarations remain separately
+    attributable;
+12. one mini-SWE-agent prompt and one worker invocation are produced;
+13. the private validation manifest covers every actionable obligation with an
    executable case or reviewed typed exemption;
-6. no internal proposal/Structrr artifact is present in the worker prompt;
-7. prompt and manifest contract/case references have exact parity;
-8. generated planning files cannot satisfy diff progress;
-9. a timeout cannot satisfy any code-task receipt;
-10. validation failures produce durable terminal findings and no new prompt;
-11. baseline-nondiscriminating and oracle-misaligned tests fail validation;
-12. adapter-materializable cases run independent Workrr-owned probes;
-13. OpenCode is never invoked; and
-14. final completion requires a passing receipt for every obligation, passing
+14. no internal proposal/Structrr artifact is present in the worker prompt;
+15. the objective contains only resolved actionable product meaning and does
+    not copy process-only source text;
+16. prompt projection ranges cover every required conservation row,
+    interaction, and contrast and match the rendered bytes;
+17. prompt and manifest contract, case, interaction, and contrast references
+    have exact parity;
+18. generated planning files cannot satisfy diff progress;
+19. a timeout cannot satisfy any code-task receipt;
+20. validation failures produce durable terminal findings and no new prompt;
+21. baseline-nondiscriminating and oracle-misaligned tests fail validation;
+22. adapter-materializable cases run independent Workrr-owned probes;
+23. OpenCode is never invoked; and
+24. final completion requires a passing receipt for every obligation, passing
     global checks, and a sanitized patch.
+
+Run mutation variants through the same production path. Each variant changes
+one semantic fact while retaining IDs and structural shape: drop an oracle,
+merge owned and callback views, remove the `None` outcome, merge absent and
+empty declarations, invert persistence into immutability, merge shallow and
+deep history, or mark a product non-goal process-only. Each variant must fail
+at the earliest responsible gate with an exact finding. This prevents tests
+that verify only schemas, counts, or snapshots from masking semantic loss.
 
 The deterministic test uses scripted provider actions and real Git operations.
 The opt-in live test uses DeepInfra and the pinned model. The deterministic test
@@ -1040,7 +1243,26 @@ worker prompts.
 Required test names prove presence, not semantic quality. Preserve the existing
 semantic obligation review and hidden benchmark evaluation. Add deterministic
 guards against empty tests, unconditional passes, all-mocked product behavior,
-and test deletion, but do not pretend syntax alone proves quality.
+and test deletion, but do not pretend syntax alone proves quality. Execute
+precompiled contrast cases through Workrr-owned probes and require exact
+scenario/operation/oracle mappings. Candidate-authored tests supplement those
+probes; they do not define the expected semantics.
+
+### Boundary compilation creates invented edge cases
+
+Every dimension value, relationship, forbidden result, and contrast must cite
+an exact source span, accepted Structrr definition or invariant, repository API
+contract, ontology rule, or language-adapter rule. If none resolves a necessary
+distinction, suspend for clarification. Never turn model familiarity with a
+framework into authoritative product behavior.
+
+### Pairwise interaction analysis becomes quadratic
+
+Generate pairs only from shared bindings, repository-symbol overlap, operation
+output types, lifecycle resources, and explicit relationship edges. Persist
+the candidate reason and test that unrelated contracts are not compared. Do
+not cap candidates with a lossy numeric limit; partition the graph by connected
+semantic component and process every justified edge.
 
 ### Focused commands differ by repository
 
@@ -1084,12 +1306,21 @@ This plan is fully implemented only when all of the following are true:
   repair, or fallback coding prompt;
 - the prompt and private validation manifest have exact obligation and case
   parity;
+- every source proposition has one terminal disposition receipt and no product
+  meaning can be excluded without passing the nonactionable safety gate;
+- every meaning-bearing field, semantic partition, and contract interaction
+  has a verified prompt and evidence destination;
+- prompt projection ranges prove that complete oracles and contrasts survived
+  rendering without lossy description truncation;
 - required tests are collected, candidate-passing, baseline-discriminating
   where applicable, and oracle-aligned before final completion;
 - every actionable obligation has an independent passing validation receipt;
 - all final obligation, preservation, scope, and patch-sanitization gates pass;
 - normal and Harbor flows share the same implementation core;
 - the DeepSWE regression fixture passes in CI;
+- the DeepSWE regression fixture's known subtle distinctions pass independent
+  contrast probes and all semantic mutation variants fail before invocation or
+  acceptance, as appropriate;
 - the live DeepInfra smoke terminates reliably; and
 - at least two of three full state-data-scoping runs pass the hidden evaluator
   using one mini-SWE-agent invocation each.

@@ -4416,6 +4416,41 @@ def _compile_code_task_plan(
     if not tasks:
         # A green baseline is a valid no-op implementation plan.
         tasks = []
+    elif len(tasks) > 1:
+        # Verification remains decomposed, but implementation is one coherent
+        # repository operation. Starting a fresh coding process for every
+        # obligation makes each worker rediscover the repository and causes
+        # later workers to conflict with earlier changes.
+        tasks = [
+            {
+                **tasks[0],
+                "objective": (
+                    "Implement the feature behavior covered by these obligations:\n"
+                    + "\n".join(f"- {item['objective']}" for item in tasks)
+                ),
+                "obligation_refs": list(
+                    dict.fromkeys(
+                        reference
+                        for item in tasks
+                        for reference in item["obligation_refs"]
+                    )
+                ),
+                "acceptance_criteria": list(
+                    dict.fromkeys(
+                        criterion
+                        for item in tasks
+                        for criterion in item["acceptance_criteria"]
+                    )
+                ),
+                "validator": {
+                    **tasks[0]["validator"],
+                    "evidence_case": "\n".join(
+                        f"- {item['validator']['evidence_case']}" for item in tasks
+                    ),
+                },
+                "execution_mode": "cohesive",
+            }
+        ]
     decisions = [
         {
             "decision_id": "task-plan:scope",

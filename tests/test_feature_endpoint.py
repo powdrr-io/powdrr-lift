@@ -2170,7 +2170,7 @@ def test_code_task_plan_skips_invalid_candidate_and_keeps_valid_tasks(
     assert result["structural_decisions"][0]["passed"] is False
 
 
-def test_code_task_plan_keeps_product_obligations_as_separate_worker_tasks(
+def test_code_task_plan_coalesces_product_obligations_into_one_worker_task(
     tmp_path: Path,
 ) -> None:
     result = _compile_code_task_plan(
@@ -2202,26 +2202,14 @@ def test_code_task_plan_keeps_product_obligations_as_separate_worker_tasks(
         config=SimpleNamespace(allowed_paths=("src",)),
     )
 
-    assert [task["task_id"] for task in result["tasks"]] == [
-        "code-task-001",
-        "code-task-002",
-    ]
-    assert [task["obligation_refs"] for task in result["tasks"]] == [
-        ["first"],
-        ["second"],
-    ]
-    assert result["tasks"][0]["objective"] == (
-        "Implement the product behavior: the first behavior works"
-    )
-    assert result["tasks"][1]["objective"] == (
-        "Implement the product behavior: the second behavior works"
-    )
-    assert result["tasks"][0]["validator"]["evidence_case"] == (
-        "Run the first contract test."
-    )
-    assert result["tasks"][1]["validator"]["evidence_case"] == (
-        "Run the second contract test."
-    )
+    assert len(result["tasks"]) == 1
+    task = result["tasks"][0]
+    assert task["execution_mode"] == "cohesive"
+    assert task["obligation_refs"] == ["first", "second"]
+    assert "first behavior" in task["objective"]
+    assert "second behavior" in task["objective"]
+    assert "first contract test" in task["validator"]["evidence_case"]
+    assert "second contract test" in task["validator"]["evidence_case"]
 
 
 def test_code_task_plan_never_compiles_non_product_obligations(

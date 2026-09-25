@@ -569,60 +569,6 @@ steps:
             equals: true
             on_failure: {terminal: failed}
 
-  # Re-run complete obligation contracts over the final candidate tree. Task
-  # receipts are evidence of local transitions, not substitutes for universal
-  # population coverage or final-state evidence.
-  - operation:
-      tool: internal
-      command: [run_final_obligation_evidence]
-      parameters:
-        plans: {type: reference, value: obligation_verification_plans.plans}
-        populations: {type: reference, value: obligation_populations.populations}
-        task_receipts: {type: reference, value: code_task_receipts}
-      returns:
-        type: object
-        required: [path, candidate_tree, evidence, closure_decisions]
-        properties:
-          path: {type: string, minLength: 1}
-          candidate_tree: {type: string, minLength: 1}
-          evidence: {type: array}
-          closure_decisions: {type: array, minItems: 1}
-      bind: final_obligation_evidence
-  - for_each:
-      snapshot: {name: final_obligation_evidence.closure_decisions, max_items: 8192}
-      item_binding: obligation_closure_decision
-      collect: {binding: obligation_closure_decisions, mode: list, value: obligation_closure_result}
-      body:
-        - operation:
-            tool: internal
-            command: [evaluate_deterministic_decision]
-            parameters:
-              decision: {type: reference, value: obligation_closure_decision}
-            returns:
-              type: object
-              required: [outcome, explanation]
-              properties:
-                outcome: {type: string, enum: [pass, fail, blocked]}
-                explanation: {type: string, minLength: 1}
-            bind: obligation_closure_result
-  - operation:
-      tool: internal
-      command: [finalize_obligation_closure]
-      parameters:
-        evidence: {type: reference, value: final_obligation_evidence}
-        decisions: {type: reference, value: obligation_closure_decisions}
-      returns:
-        type: object
-        required: [accepted, receipt_path]
-        properties:
-          accepted: {type: boolean}
-          receipt_path: {type: string, minLength: 1}
-      bind: obligation_closure
-  - gate:
-      subject: obligation_closure.accepted
-      equals: true
-      on_failure: {terminal: failed}
-
   - for_each:
       snapshot: {name: validation_profiles, max_items: 128}
       item_binding: validation_profile
@@ -660,7 +606,6 @@ steps:
       parameters:
         plan: {type: reference, value: plan.path}
         proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
-        obligation_closure_receipt: {type: reference, value: obligation_closure.receipt_path}
         task_receipts: {type: reference, value: code_task_receipts}
         validation: {type: reference, value: validation}
       returns:
@@ -716,7 +661,7 @@ steps:
                 Examples: predicate "all changed paths are within the accepted task scopes" with one unrelated path → fail.
               - >-
                 Counterexample: do not pass because the full repository suite is green if this predicate's own evidence is absent.
-            context: [final_semantic_decision, feature_description, plan, final_obligation_evidence, validation, final_implementation_review]
+            context: [final_semantic_decision, feature_description, plan, validation, final_implementation_review]
             output:
               name: final_semantic_result
               schema:

@@ -705,7 +705,8 @@ def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
     assert "compile_code_task_plan" in step_text
     assert "run_code_task_agent" in step_text
     assert "finalize_code_task_receipt" in step_text
-    assert "finalize_obligation_closure" in step_text
+    assert "run_final_obligation_evidence" not in step_text
+    assert "finalize_obligation_closure" not in step_text
     assert "verify_code_task_decision" in flow_text
     assert "verify_implementation_decision" in flow_text
     assert "Does this one" in flow_text

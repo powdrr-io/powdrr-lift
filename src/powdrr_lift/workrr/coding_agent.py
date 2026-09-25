@@ -21,6 +21,7 @@ from typing import Any, Protocol, cast
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
 from powdrr_lift.core.intent_packet import IntentPacket
+from powdrr_lift.minisweagent_monitor import run_minisweagent
 from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
@@ -569,23 +570,22 @@ class MiniSWEAgentProvider:
             command.extend(
                 ("--output", str(self.diagnostics_root / f"{attempt_id}.traj.json"))
             )
-        try:
-            completed = subprocess.run(
-                command,
-                cwd=worktree_root,
-                env=environment,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=self.timeout_seconds,
-            )
-        except subprocess.TimeoutExpired as error:
-            return subprocess.CompletedProcess(
-                command,
-                124,
-                (error.stdout or "") if isinstance(error.stdout, str) else "",
-                (error.stderr or "") if isinstance(error.stderr, str) else "",
-            )
+        completed = run_minisweagent(
+            command,
+            trajectory_path=(
+                self.diagnostics_root / f"{attempt_id}.traj.json"
+                if self.diagnostics_root is not None
+                else None
+            ),
+            log_path=(
+                self.diagnostics_root / f"{attempt_id}.ndjson"
+                if self.diagnostics_root is not None
+                else None
+            ),
+            cwd=worktree_root,
+            env=environment,
+            timeout_seconds=self.timeout_seconds,
+        )
         if completed.returncode == 0 and self.diagnostics_root is not None:
             trajectory_path = self.diagnostics_root / f"{attempt_id}.traj.json"
             exit_status = _mini_trajectory_exit_status(trajectory_path)

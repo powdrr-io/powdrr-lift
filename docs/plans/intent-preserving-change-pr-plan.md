@@ -576,17 +576,19 @@ compiler must reject an unresolved dimension before producing a worker prompt.
 
 ### Capability matrix
 
-For an API or protocol extension, compile a capability matrix from the
-repository's transport/provider inventory:
+For any API, provider, adapter, command, integration, or runtime extension,
+compile a capability matrix from the repository's authoritative inventory:
 
 ```text
-capability           required behavior       evidence
-HTTP multipart       support                 executable test
-WebSocket            support                 executable test
-LocalSchemaTransport reject with exception   executable test
-unknown transport    reject with exception   executable test
+capability or context   required behavior       evidence
+supported context A     support                 executable test
+supported context B     support                 executable test
+unsupported context C   reject with defined error executable test
+unknown context         reject or fallback       executable test
 ```
 
+The context may be a transport, backend, input shape, dependency mode,
+configuration, lifecycle state, or other boundary selected by the feature.
 The matrix must distinguish “not mentioned by the feature request” from
 “explicitly unsupported.” Existing adapter behavior, public API conventions,
 and compatibility tests may supply the authority; otherwise the dimension is

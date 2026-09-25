@@ -620,9 +620,10 @@ def test_checked_in_design_interview_definition_parses() -> None:
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     document = parse_and_validate(source)
     assert document["name"] == "design-interview"
+    assert validate_single_decision(document) == ()
 
 
-def test_design_interview_bounds_semantic_obligation_prompts() -> None:
+def test_design_interview_uses_single_field_source_classification() -> None:
     from pathlib import Path
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
@@ -632,13 +633,11 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
     split_body = document["steps"][3]["for_each"]["body"]
     split_judge = split_body[0]["judge"]
     body = document["steps"][5]["for_each"]["body"]
-    judges = [step["judge"] for step in body if "judge" in step]
-    obligation_judge = judges[1]
-    acceptance_judge = judges[2]
-    population_judge = judges[3]
-    operation_judge = judges[4]
-    oracle_judge = judges[5]
-    evidence_judge = judges[6]
+    classifier_loop = body[1]["for_each"]
+    classifier_judge = classifier_loop["body"][0]["judge"]
+    extractor_loop = body[4]["for_each"]
+    extractor_judge = extractor_loop["body"][0]["judge"]
+    behavior_judge = body[7]["judge"]
 
     assert atomicity_judge["question"] == (
         "Does this one instruction clause contain more than one independently "
@@ -651,36 +650,25 @@ def test_design_interview_bounds_semantic_obligation_prompts() -> None:
     )
     assert split_judge["output"]["schema"]["required"] == ["statements"]
 
-    assert obligation_judge["question"] == (
-        "What is the one concrete semantic obligation expressed by this instruction "
-        "clause?"
-    )
-    assert all(
-        "For non_goal" not in instruction
-        for instruction in obligation_judge["instructions"]
-    )
-    assert [rule["when"] for rule in obligation_judge["prompt_rules"]] == [
-        {"binding": "semantic_kind.kind", "equals": "non_goal"},
-        {"binding": "semantic_kind.kind", "equals": "nonactionable"},
+    assert classifier_loop["snapshot"]["max_items"] == 16
+    assert classifier_judge["output"]["schema"]["required"] == [
+        "status",
+        "value",
+        "reason_code",
     ]
-    assert (
-        obligation_judge["output"]["schema"]["properties"]["description"]["maxLength"]
-        == 500
-    )
-    assert acceptance_judge["question"] == (
-        "What one observable result would prove this one semantic obligation?"
-    )
-    assert population_judge["output"]["name"] == "semantic_population"
-    assert operation_judge["output"]["name"] == "semantic_operation"
-    assert oracle_judge["output"]["name"] == "semantic_oracle"
-    assert evidence_judge["output"]["name"] == "semantic_evidence_case"
-    for judge in judges:
-        example_lines = [
-            instruction
-            for instruction in judge["instructions"]
-            if "Examples:" in instruction or "Counterexample:" in instruction
-        ]
-        assert len(example_lines) >= 2, judge["question"]
+    assert classifier_judge["context"] == ["semantic_decision_request"]
+    assert extractor_loop["snapshot"]["max_items"] == 5
+    assert extractor_judge["output"]["schema"]["required"] == [
+        "quote",
+        "occurrence",
+    ]
+    assert behavior_judge["output"]["name"] == "behavior_family_result"
+    flow_text = str(body)
+    assert "semantic_obligation" not in flow_text
+    assert "semantic_acceptance" not in flow_text
+    assert "semantic_population" not in flow_text
+    assert "semantic_oracle" not in flow_text
+    assert "compile_partial_semantic_contract" in flow_text
 
 
 def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:

@@ -39,6 +39,7 @@ def _resolve_polarity(text: str) -> DeterministicResolution | None:
             r"\bmust not\b",
             r"\bshould not\b",
             r"\bshall not\b",
+            r"\bmay not\b",
             r"\bnever\b",
         ),
     )

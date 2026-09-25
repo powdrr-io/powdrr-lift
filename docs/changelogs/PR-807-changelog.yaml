@@ -1,0 +1,174 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 807
+title: Harden local validation command discovery
+intent:
+  problem: Validation discovery could select CI commands containing unresolved template expressions, and new pytest obligations depended on selector collection succeeding even when a pytest profile had already been discovered.
+  goal: Select only executable local validation commands and preserve discovered pytest profiles as the execution basis for new required test cases.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    summary: Reject unresolved CI template expressions when selecting a local validation command.
+    rationale: Ensure local validation uses an executable project-native fallback instead of a workflow-only command.
+    span:
+      start_line: 222
+      end_line: 222
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    summary: Add generic detection for unresolved CI template expressions.
+    rationale: Keep workflow context variables from being passed as literal local command arguments.
+    span:
+      start_line: 227
+      end_line: 236
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Carry discovered validation profiles into required-test compilation.
+    rationale: Allow new pytest obligations to compile from the discovered pytest profile even when existing selector collection fails.
+    span:
+      start_line: 947
+      end_line: 947
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Accept discovered validation profiles while deriving feature test contracts.
+    rationale: Keep profile selection independent from collected selector inventory.
+    span:
+      start_line: 979
+      end_line: 979
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use the discovered profiles when compiling semantic test cases.
+    rationale: Ensure new test obligations retain an executable provider profile.
+    span:
+      start_line: 1056
+      end_line: 1060
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Thread validation profiles through Structrr plan creation.
+    rationale: Preserve discovery context across plan compilation boundaries.
+    span:
+      start_line: 3289
+      end_line: 3289
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Forward validation profiles into the Structrr plan compiler.
+    rationale: Keep profile-aware test compilation available to generated plans.
+    span:
+      start_line: 3303
+      end_line: 3303
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Thread validation profiles through obligation-based plan creation.
+    rationale: Preserve discovery context for plans compiled from obligations.
+    span:
+      start_line: 3384
+      end_line: 3384
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Use validation profiles while compiling obligation test cases.
+    rationale: Allow new tests to use discovered pytest execution even without selectors.
+    span:
+      start_line: 3489
+      end_line: 3492
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Accept validation profiles during category edit aggregation.
+    rationale: Preserve the profile at the command that compiles required test edits.
+    span:
+      start_line: 3624
+      end_line: 3624
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Forward validation profiles into required-test edit compilation.
+    rationale: Prevent selector collection results from determining profile availability.
+    span:
+      start_line: 3641
+      end_line: 3643
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Add validation profiles as required-test compiler input.
+    rationale: Separate executable provider profiles from collected test selectors.
+    span:
+      start_line: 3654
+      end_line: 3654
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Prefer discovered pytest profiles and retain an inventory fallback for direct callers.
+    rationale: Compile new tests when selector collection fails while preserving existing callers.
+    span:
+      start_line: 3661
+      end_line: 3664
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Derive the pytest profile name from either a discovered profile or selector inventory.
+    rationale: Give generated new tests the correct executable profile without inventing a command.
+    span:
+      start_line: 3666
+      end_line: 3683
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Remove the selector-inventory-only profile lookup.
+    rationale: Make profile discovery the primary source for new test execution.
+    span:
+      start_line: 3711
+      end_line: 3711
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    summary: Store the discovered pytest profile on generated test cases.
+    rationale: Ensure the compiled case points at the executable validation profile.
+    span:
+      start_line: 3753
+      end_line: 3753
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    summary: Pass discovered validation profiles through planning and category aggregation commands.
+    rationale: Keep validation discovery available at every command boundary that compiles required tests.
+    span:
+      start_line: 516
+      end_line: 518
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    summary: Pass discovered validation profiles into structural planning.
+    rationale: Preserve the discovered execution profile through the planning command boundary.
+    span:
+      start_line: 889
+      end_line: 889
+  - path: tests/test_validation_discovery.py
+    type: modified
+    summary: Cover fallback selection when a workflow command contains a split GitHub Actions template expression.
+    rationale: Prevent CI-only matrix syntax from becoming a local validation command.
+    span:
+      start_line: 66
+      end_line: 87
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Import the discovered validation profile type used by the regression test.
+    rationale: Exercise the production profile handoff with the same typed discovery result.
+    span:
+      start_line: 27
+      end_line: 27
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    summary: Cover new required-test compilation when pytest selector collection reports an error.
+    rationale: Prevent a collection failure from discarding an otherwise usable discovered pytest profile.
+    span:
+      start_line: 1175
+      end_line: 1210
+entities: []
+entity_relationships: []
+invariants:
+  - id: local-validation-commands-are-executable
+    action: added
+    description: A validation command selected for local execution must not contain unresolved CI template or context expressions.
+    rationale: CI workflow syntax cannot be executed as-is inside the task container.
+  - id: new-tests-use-discovered-profiles
+    action: added
+    description: A new required test case uses a discovered provider profile independently of whether existing test selector collection produced inventory entries.
+    rationale: A selector collection error must not erase the executable validation profile needed to run newly required tests.
+guidance:
+  - id: prefer-project-native-validation-fallbacks
+    action: added
+    description: When a workflow-derived validation command is not locally executable, continue discovery using the repository's native validation configuration.
+    rationale: Keep local validation deterministic without hardcoding a particular CI matrix expansion.
+features: []
+proposed_prs: []

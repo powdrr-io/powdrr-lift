@@ -206,6 +206,24 @@ class LookupQuery:
             result["fingerprint"] = self.fingerprint
         return result
 
+    @classmethod
+    def from_data(cls, raw: Mapping[str, Any]) -> LookupQuery:
+        if raw.get("schema_version") != LOOKUP_SCHEMA_VERSION:
+            raise InventoryError("lookup query schema is invalid")
+        query = cls(
+            _string(raw, "source_ref"),
+            _string(raw, "source_text"),
+            _string(raw, "subject_text"),
+            _string(raw, "disposition"),
+            _string(raw, "behavior_family"),
+            _string(raw, "inventory_fingerprint"),
+            _strings(raw, "explicit_names"),
+            _string(raw, "structrr_context_fingerprint"),
+        )
+        if raw.get("fingerprint") != query.fingerprint:
+            raise InventoryError("lookup query fingerprint is stale")
+        return query
+
 
 @dataclass(frozen=True, slots=True)
 class CandidateEvidence:
@@ -227,6 +245,19 @@ class Candidate:
             },
         }
 
+    @classmethod
+    def from_data(cls, raw: Mapping[str, Any]) -> Candidate:
+        record = raw.get("record")
+        evidence = raw.get("evidence")
+        if not isinstance(record, Mapping) or not isinstance(evidence, Mapping):
+            raise InventoryError("candidate is malformed")
+        return cls(
+            InventoryRecord.from_data(record),
+            CandidateEvidence(
+                _strings(evidence, "reasons"), int(evidence.get("score", 0))
+            ),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class CandidateSet:
@@ -240,6 +271,21 @@ class CandidateSet:
             "inventory_fingerprint": self.inventory_fingerprint,
             "candidates": [candidate.to_data() for candidate in self.candidates],
         }
+
+    @classmethod
+    def from_data(cls, raw: Mapping[str, Any]) -> CandidateSet:
+        candidates = raw.get("candidates")
+        if not isinstance(candidates, list):
+            raise InventoryError("candidate set is malformed")
+        return cls(
+            _string(raw, "query_fingerprint"),
+            _string(raw, "inventory_fingerprint"),
+            tuple(
+                Candidate.from_data(item)
+                for item in candidates
+                if isinstance(item, Mapping)
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)

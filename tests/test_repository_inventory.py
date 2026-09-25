@@ -16,6 +16,10 @@ from powdrr_lift.core.repository_inventory import (
     normalize_terms,
     retrieve_candidates,
 )
+from powdrr_lift.workrr.command_catalog import (
+    FeatureCommandRuntime,
+    feature_command_catalog,
+)
 from powdrr_lift.workrr.repository_subject_binding import (
     bind_candidate_relation_decisions,
     finalize_subject_binding,
@@ -137,3 +141,26 @@ def test_workrr_prepares_and_aggregates_one_c09_decision_per_candidate() -> None
     result = finalize_subject_binding(candidates, decisions, quantifier="every")
     assert result["status"] == "bound"
     assert result["binding_ref"] == record.inventory_id
+
+
+def test_inventory_is_available_through_the_procedrr_command_boundary(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "models.py").write_text("class DataRecord:\n    pass\n")
+    runtime = FeatureCommandRuntime(
+        config=None,
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="feature/test",
+        slug="inventory",
+        state={},
+        catalog=feature_command_catalog(),
+    )
+    result = runtime.dispatch(
+        "build_semantic_repository_inventory",
+        ["build_semantic_repository_inventory"],
+        {},
+    )
+    assert result["schema_version"] == "semantic-repository-inventory-v1"
+    assert any(item["canonical_name"] == "DataRecord" for item in result["records"])

@@ -20,6 +20,14 @@ from powdrr_lift.core.instruction_ledger import (
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
+from powdrr_lift.core.repository_inventory import (
+    CandidateSet,
+    InventoryError,
+    LookupQuery,
+    RepositoryInventory,
+    build_inventory,
+    enumerate_population,
+)
 from powdrr_lift.core.semantic_contract import (
     BoundSourceExtraction,
     PartialSemanticContract,
@@ -32,6 +40,13 @@ from powdrr_lift.core.semantic_faithfulness import (
     FieldEntailmentSpec,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.repository_subject_binding import (
+    bind_candidate_relation_decisions,
+    finalize_subject_binding,
+    prepare_candidate_relation_decisions,
+    prepare_subject_lookup_query,
+    retrieve_subject_candidates,
+)
 from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_behavior_family_decision,
     bind_field_entailment_reviews,
@@ -201,6 +216,84 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("finalize_source_faithfulness"),
+        ),
+        "build_semantic_repository_inventory": CommandSpec(
+            name="build_semantic_repository_inventory",
+            input_schema=object_schema({}, required=(), additional_properties=False),
+            output_schema={},
+            logic=implementations.get("build_semantic_repository_inventory"),
+        ),
+        "prepare_subject_lookup_query": CommandSpec(
+            name="prepare_subject_lookup_query",
+            input_schema=object_schema(
+                {"contract": {}, "inventory": {}},
+                required=("contract", "inventory"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_subject_lookup_query"),
+        ),
+        "retrieve_subject_candidates": CommandSpec(
+            name="retrieve_subject_candidates",
+            input_schema=object_schema(
+                {"query": {}, "inventory": {}},
+                required=("query", "inventory"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("retrieve_subject_candidates"),
+        ),
+        "prepare_candidate_relation_decisions": CommandSpec(
+            name="prepare_candidate_relation_decisions",
+            input_schema=object_schema(
+                {"query": {}, "candidates": {}},
+                required=("query", "candidates"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_candidate_relation_decisions"),
+        ),
+        "bind_candidate_relation_decisions": CommandSpec(
+            name="bind_candidate_relation_decisions",
+            input_schema=object_schema(
+                {"requests": {}, "results": {}},
+                required=("requests", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_candidate_relation_decisions"),
+        ),
+        "finalize_subject_binding": CommandSpec(
+            name="finalize_subject_binding",
+            input_schema=object_schema(
+                {"candidates": {}, "decisions": {}, "quantifier": {}},
+                required=("candidates", "decisions", "quantifier"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("finalize_subject_binding"),
+        ),
+        "enumerate_subject_population": CommandSpec(
+            name="enumerate_subject_population",
+            input_schema=object_schema(
+                {
+                    "inventory": {},
+                    "population_ref": {},
+                    "membership_rule_ref": {},
+                    "member_ids": {},
+                    "complete": {},
+                },
+                required=(
+                    "inventory",
+                    "population_ref",
+                    "membership_rule_ref",
+                    "member_ids",
+                    "complete",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("enumerate_subject_population"),
         ),
         "merge_semantic_design": CommandSpec(
             name="merge_semantic_design",
@@ -830,10 +923,117 @@ class FeatureCommandRuntime:
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
+        def semantic_inventory(raw: Any) -> RepositoryInventory:
+            if not isinstance(raw, Mapping):
+                raise PowdrrExecutionError("repository inventory is malformed")
+            try:
+                return RepositoryInventory.from_data(raw)
+            except InventoryError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def semantic_query(raw: Any) -> LookupQuery:
+            if not isinstance(raw, Mapping):
+                raise PowdrrExecutionError("subject lookup query is malformed")
+            try:
+                return LookupQuery.from_data(raw)
+            except InventoryError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def semantic_candidates(raw: Any) -> CandidateSet:
+            if not isinstance(raw, Mapping):
+                raise PowdrrExecutionError("candidate set is malformed")
+            try:
+                return CandidateSet.from_data(raw)
+            except InventoryError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
         def prepare_source_semantic_decisions_operation() -> Any:
             try:
                 return prepare_source_semantic_decisions(semantic_clause())
             except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def build_semantic_repository_inventory_operation() -> Any:
+            try:
+                inventory = build_inventory(
+                    worktree,
+                    commit_ref="working-tree",
+                    structrr_revision="structrr:current",
+                )
+                return inventory.to_data()
+            except (InventoryError, OSError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def prepare_subject_lookup_query_operation() -> Any:
+            try:
+                inventory = semantic_inventory(parameters.get("inventory"))
+                query = prepare_subject_lookup_query(
+                    semantic_contract(parameters.get("contract")), inventory
+                )
+                return query.to_data()
+            except (InventoryError, SemanticContractError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def retrieve_subject_candidates_operation() -> Any:
+            try:
+                inventory = semantic_inventory(parameters.get("inventory"))
+                candidates = retrieve_subject_candidates(
+                    semantic_query(parameters.get("query")), inventory
+                )
+                return candidates.to_data()
+            except InventoryError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def prepare_candidate_relation_decisions_operation() -> Any:
+            try:
+                requests = prepare_candidate_relation_decisions(
+                    semantic_query(parameters.get("query")),
+                    semantic_candidates(parameters.get("candidates")),
+                )
+                return {"requests": requests}
+            except InventoryError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def bind_candidate_relation_decisions_operation() -> Any:
+            requests = parameters.get("requests")
+            raw_results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(requests, list) or raw_results is None:
+                raise PowdrrExecutionError("candidate relation binding is malformed")
+            try:
+                decisions = bind_candidate_relation_decisions(requests, raw_results)
+                return {"decisions": [decision.to_data() for decision in decisions]}
+            except (InventoryError, SemanticDecisionError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def finalize_subject_binding_operation() -> Any:
+            raw_decisions = parameters.get("decisions")
+            if not isinstance(raw_decisions, list):
+                raise PowdrrExecutionError("candidate relation decisions are malformed")
+            try:
+                decisions = [SemanticDecision.from_data(item) for item in raw_decisions]
+                return finalize_subject_binding(
+                    semantic_candidates(parameters.get("candidates")),
+                    decisions,
+                    quantifier=str(parameters.get("quantifier")),
+                )
+            except (InventoryError, SemanticDecisionError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def enumerate_subject_population_operation() -> Any:
+            member_ids = parameters.get("member_ids")
+            if not isinstance(member_ids, list) or not all(
+                isinstance(item, str) for item in member_ids
+            ):
+                raise PowdrrExecutionError("population member IDs are malformed")
+            try:
+                return enumerate_population(
+                    semantic_inventory(parameters.get("inventory")),
+                    population_ref=str(parameters.get("population_ref")),
+                    membership_rule_ref=str(parameters.get("membership_rule_ref")),
+                    member_ids=member_ids,
+                    complete=bool(parameters.get("complete")),
+                ).to_data()
+            except InventoryError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
         def bind_source_semantic_decisions_operation() -> Any:
@@ -1191,6 +1391,27 @@ class FeatureCommandRuntime:
                 ),
                 "finalize_source_faithfulness": bind_handler(
                     finalize_source_faithfulness_operation
+                ),
+                "build_semantic_repository_inventory": bind_handler(
+                    build_semantic_repository_inventory_operation
+                ),
+                "prepare_subject_lookup_query": bind_handler(
+                    prepare_subject_lookup_query_operation
+                ),
+                "retrieve_subject_candidates": bind_handler(
+                    retrieve_subject_candidates_operation
+                ),
+                "prepare_candidate_relation_decisions": bind_handler(
+                    prepare_candidate_relation_decisions_operation
+                ),
+                "bind_candidate_relation_decisions": bind_handler(
+                    bind_candidate_relation_decisions_operation
+                ),
+                "finalize_subject_binding": bind_handler(
+                    finalize_subject_binding_operation
+                ),
+                "enumerate_subject_population": bind_handler(
+                    enumerate_subject_population_operation
                 ),
                 "merge_semantic_design": bind_handler(merge_semantic_design_operation),
                 "compile_canonical_feature_design": bind_handler(

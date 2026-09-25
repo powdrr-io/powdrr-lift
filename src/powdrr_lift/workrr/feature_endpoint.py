@@ -9,7 +9,7 @@ import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -2200,6 +2200,12 @@ def _run_code_agent_phase(
         # hypotheses drift into already-correct files.
         provider.session_id = None
     for index, unit in enumerate(request_units, start=1):
+        worker_packet = implementation_packet
+        if isinstance(code_task, Mapping) and not repair_mode:
+            worker_packet = implementation_packet.for_task(
+                objective=unit.objective,
+                acceptance_criteria=unit.acceptance_criteria,
+            )
         request = ImplementationRequest.from_execution_unit(
             unit,
             request_id=(
@@ -2209,11 +2215,11 @@ def _run_code_agent_phase(
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=source_context,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
-            implementation_packet=implementation_packet,
+            implementation_packet=worker_packet,
         )
         request = replace(
             request,
-            implementation_packet=(implementation_packet),
+            implementation_packet=worker_packet,
         )
         if repair_mode:
             if isinstance(repair_issue, Mapping):
@@ -3745,27 +3751,14 @@ def _selector_matches_test_name_hint(selector: str, name_hint: str) -> bool:
 def _select_matching_test_inventory(
     expected_test: str, inventory: Sequence[Any]
 ) -> str:
-    """Select an existing test only when its selector is named by the prose."""
-    words = {
-        token
-        for token in re.findall(r"[a-z0-9]+", expected_test.lower().replace("_", " "))
-        if len(token) > 2
-    }
-    best: tuple[int, str] | None = None
-    for item in inventory:
-        if not isinstance(item, Mapping) or item.get("provider") != "pytest":
-            continue
-        inventory_id = item.get("inventory_id") or _verification_inventory_id(item)
-        selector = item.get("selector")
-        if not isinstance(inventory_id, str) or not isinstance(selector, str):
-            continue
-        selector_words = set(
-            re.findall(r"[a-z0-9]+", selector.lower().replace("_", " "))
-        )
-        score = len(words & selector_words)
-        if score and (best is None or score > best[0]):
-            best = (score, inventory_id)
-    return best[1] if best is not None else "new"
+    """Keep feature obligations as new tests until the worker adds them.
+
+    Feature obligations describe behavior that is not present in the baseline.
+    A lexical match against an unrelated existing test cannot prove that
+    behavior and caused green baseline tests to suppress the coding task.
+    """
+    del expected_test, inventory
+    return "new"
 
 
 def _verification_inventory_id(item: Mapping[str, Any]) -> str:
@@ -4324,18 +4317,25 @@ def _compile_code_task_plan(
         else []
     )
     plans = _flow_items(parameters.get("verification_plans"))
+    # Feature obligations are new product work.  A passing baseline cannot
+    # satisfy them because their focused tests do not exist until the worker
+    # adds them.  Baseline failures are still useful evidence, but the absence
+    # of failures must not turn the feature into a no-op plan.
+    candidates = failures or plans
     tasks: list[dict[str, Any]] = []
     no_op_tasks: list[dict[str, str]] = []
     rejected_tasks: list[dict[str, str]] = []
-    for index, failure in enumerate(failures, start=1):
+    for index, candidate in enumerate(candidates, start=1):
         obligation_id = str(
-            failure.get("obligation_id", failure.get("obligation_ref", ""))
+            candidate.get("obligation_id", candidate.get("obligation_ref", ""))
         )
         source = next(
             (item for item in plans if item.get("obligation_id") == obligation_id),
             {},
         )
-        kind = str(source.get("kind", failure.get("kind", ""))).strip()
+        if not source and candidate in plans:
+            source = candidate
+        kind = str(source.get("kind", candidate.get("kind", ""))).strip()
         if (
             kind and kind not in {"entity", "feature", "interface", "invariant"}
         ) or _is_trace_only_verification_plan(source):
@@ -4361,7 +4361,7 @@ def _compile_code_task_plan(
             )
             continue
         objective = (
-            f"Implement the failing product behavior: {objective_basis}"
+            f"Implement the product behavior: {objective_basis}"
             if objective_basis
             else ""
         )
@@ -4405,7 +4405,7 @@ def _compile_code_task_plan(
                 "planned_deletions": [],
                 "must_preserve": [],
                 "non_goals": [],
-                "source_refs": ["obligation-baseline"],
+                "source_refs": ["obligation-verification-plan"],
                 "validator": {
                     "kind": "focused-contract",
                     "evidence_case": evidence_case,
@@ -4416,42 +4416,6 @@ def _compile_code_task_plan(
     if not tasks:
         # A green baseline is a valid no-op implementation plan.
         tasks = []
-    elif len(tasks) > 1:
-        # Obligations remain separate verification units, but implementation is
-        # one coherent repository operation. Starting a fresh coding process
-        # for every sentence makes each worker rediscover the repository and
-        # causes later workers to fail after an earlier worker already changed
-        # the shared implementation surface.
-        tasks = [
-            {
-                **tasks[0],
-                "objective": (
-                    "Implement the feature behavior covered by these obligations:\n"
-                    + "\n".join(f"- {item['objective']}" for item in tasks)
-                ),
-                "obligation_refs": list(
-                    dict.fromkeys(
-                        reference
-                        for item in tasks
-                        for reference in item["obligation_refs"]
-                    )
-                ),
-                "acceptance_criteria": list(
-                    dict.fromkeys(
-                        criterion
-                        for item in tasks
-                        for criterion in item["acceptance_criteria"]
-                    )
-                ),
-                "validator": {
-                    **tasks[0]["validator"],
-                    "evidence_case": "\n".join(
-                        f"- {item['validator']['evidence_case']}" for item in tasks
-                    ),
-                },
-                "execution_mode": "cohesive",
-            }
-        ]
     decisions = [
         {
             "decision_id": "task-plan:scope",
@@ -4732,6 +4696,32 @@ def _run_code_task_agent(
         if focused_validation is not None:
             result = {**result, "coding_validation": focused_validation}
             attempt_results[-1] = result
+        no_op = (
+            isinstance(checkpoint, Mapping)
+            and checkpoint.get("passed") is not True
+            and checkpoint.get("error")
+            == "operation produced no material worktree changes"
+            and isinstance(focused_validation, Mapping)
+            and focused_validation.get("status") == ValidationReportStatus.PASSED.value
+        )
+        if no_op:
+            # A later bounded task may already be satisfied by an earlier task
+            # in the same worktree. Treat that as skipped only when validation
+            # passes; an empty task with failing validation remains a failure.
+            skipped_checkpoint = dict(cast(Mapping[str, Any], checkpoint))
+            skipped_checkpoint.update(
+                error=None,
+                passed=True,
+                status="skipped",
+                no_op=True,
+            )
+            checkpoint_list = list(state.get("operation_checkpoints", ()))
+            if checkpoint_list:
+                checkpoint_list[-1] = skipped_checkpoint
+                state["operation_checkpoints"] = checkpoint_list
+            checkpoint = skipped_checkpoint
+            result = {**result, "no_op": True}
+            attempt_results[-1] = result
         if (
             isinstance(attempt, Mapping)
             and attempt.get("status") == CodingAgentStatus.COMPLETED.value
@@ -4847,8 +4837,14 @@ def _compile_code_task_postconditions(
         {
             "decision_id": "post:diff",
             "check": "diff_nonempty",
-            "passed": bool(current["state_fingerprint"])
-            and current["state_fingerprint"] != before_fingerprint,
+            "passed": (
+                bool(current["state_fingerprint"])
+                and current["state_fingerprint"] != before_fingerprint
+            )
+            or (
+                isinstance(implementation, Mapping)
+                and implementation.get("no_op") is True
+            ),
         },
         {
             "decision_id": "post:diff-check",

@@ -5,7 +5,7 @@ import pytest
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
 
 
-def test_packet_renders_bounded_obligations_and_exact_selectors() -> None:
+def test_packet_renders_behavioral_test_descriptions_without_selectors() -> None:
     packet = compile_implementation_packet(
         objective="Add state data support.",
         obligations=("Data initializes on entry.",),
@@ -34,7 +34,9 @@ def test_packet_renders_bounded_obligations_and_exact_selectors() -> None:
     assert "obligation 001" not in rendered
     assert "Add state data support." not in rendered
     assert "IMPORTANT:" not in rendered
-    assert "tests/test_state.py::test_entry" in rendered
+    assert "add a focused test proving Verify entry initialization." in rendered
+    assert "tests/test_state.py::test_entry" not in rendered
+    assert "pytest/pytest" not in rendered
     assert "Verify entry initialization." in rendered
     assert "create the exact selectors" not in rendered
     assert "candidate 1: tests/test_state.py::test_existing" not in rendered
@@ -105,6 +107,28 @@ def test_packet_can_focus_one_obligation_and_its_matching_test() -> None:
     assert "Verify initialization." not in focused.render()
 
 
+def test_packet_can_focus_a_compiled_code_task() -> None:
+    packet = compile_implementation_packet(
+        objective="Implement the entire feature.",
+        obligations=("The entire feature exists.",),
+        required_tests=({"description": "Verify the entire feature."},),
+        allowed_paths=("src/state.py",),
+        validation_profiles=("pytest",),
+    )
+
+    focused = packet.for_task(
+        objective="Implement the reset behavior.",
+        acceptance_criteria=("The reset behavior works.",),
+    )
+
+    assert focused.objective == "Implement the reset behavior."
+    assert focused.obligations == ("Implement the reset behavior.",)
+    assert focused.required_tests == ({"description": "The reset behavior works."},)
+    assert "Implement the entire feature." not in focused.render()
+    assert "Verify the entire feature." not in focused.render()
+    assert "The reset behavior works." in focused.render()
+
+
 def test_packet_prompt_contains_every_required_test_without_compiler_metadata() -> None:
     packet = compile_implementation_packet(
         objective="Add state data support.",
@@ -132,11 +156,13 @@ def test_packet_prompt_contains_every_required_test_without_compiler_metadata() 
     rendered = packet.render()
 
     for expected in (
-        "`tests/test_state.py::test_initialization`",
-        "`tests/test_state.py::test_reset`",
-        "pytest/pytest",
+        "add a focused test proving Verify initialization.",
+        "add a focused test proving Verify reset.",
     ):
         assert expected in rendered
+    assert "tests/test_state.py::test_initialization" not in rendered
+    assert "tests/test_state.py::test_reset" not in rendered
+    assert "pytest/pytest" not in rendered
 
     assert "Initialize data on entry." not in rendered
     assert "Reset data on re-entry." not in rendered

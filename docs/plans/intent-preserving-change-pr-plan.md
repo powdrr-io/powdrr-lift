@@ -527,10 +527,10 @@ only the desired success path, but also observable errors, continuation rules,
 unsupported capabilities, cleanup behavior, and compatibility boundaries.
 
 This slice is prompted by a failure mode where the prompt said that errors must
-not halt later incremental items, but did not say that errors nested inside an
-incremental item must be exposed on the yielded result. The worker continued
-correctly while silently dropping the errors. A second failure exposed the
-opposite omission: unsupported transports were never assigned a required
+not halt later records, but did not say that errors nested inside a result
+record must be exposed on the returned result. The worker continued correctly
+while silently dropping the errors. A second failure exposed the opposite
+omission: unsupported execution contexts were never assigned a required
 behavior, so the worker had no contract for whether to support or reject them.
 
 ### Typed behavior scenario
@@ -539,23 +539,23 @@ Each public behavior change must compile its requirements into scenarios with
 these fields:
 
 ```yaml
-scenario_id: incremental-item-errors
-subject: session.execute_incremental
+scenario_id: nested-result-errors
+subject: result-processing-operation
 given:
-  payload_shape: incremental item containing errors and a path
+  result_shape: nested result record containing errors and a location
 when:
-  operation: consume the payload and then a later payload
+  operation: process the record and then a later record
 then:
-  yielded_result_errors: include every item error with its path
-  later_payload: still yields a result and is merged
+  returned_result_errors: include every nested error with its location
+  later_record: still returns a result and is processed
 must_expose:
   - errors
 must_preserve:
   - error message
-  - error path
+  - error location
 must_reject: []
 must_continue:
-  - later incremental items are processed
+  - later records are processed
 evidence:
   - focused executable test
 ```
@@ -566,7 +566,7 @@ each of these dimensions:
 - normal result and accumulated state;
 - error location, shape, and propagation;
 - continuation after an error;
-- unsupported input, transport, or capability behavior;
+- unsupported input, execution context, or capability behavior;
 - cancellation and cleanup;
 - compatibility and preservation behavior; and
 - negative or boundary cases.
@@ -597,7 +597,7 @@ unresolved and blocks handoff rather than being guessed by the worker.
 ### Prompt projection
 
 Render one concise behavior matrix into the coding-worker prompt. Each row
-contains the scenario, input/payload shape, expected output, error behavior,
+contains the scenario, input/result shape, expected output, error behavior,
 continuation behavior, and validator target. Do not render the same meaning
 again as separate product-contract, acceptance-criterion, and focused-validator
 paragraphs. The private manifest may retain the richer provenance and evidence

@@ -1,0 +1,52 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 811
+title: Add source-faithfulness gate to design flow
+intent:
+  problem: Source classification can introduce subtly unsupported fields before a partial contract reaches downstream consumers.
+  goal: Review interpreted fields against exact source text, route unsupported meaning as unresolved, and render compatibility views deterministically.
+human-decisions: []
+structured_files: []
+files:
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, span: {start_line: 359, end_line: 359}, summary: Include the partial contract in the design binding., rationale: Make the canonical contract available to the faithfulness gate.}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, span: {start_line: 372, end_line: 372}, summary: Add the field-review operation., rationale: Prepare compiler-owned entailment requests.}
+  - {path: docs/procedrr/skill-definitions/design-interview.yaml, type: modified, span: {start_line: 374, end_line: 440}, summary: Run field-entailment judges and finalize faithfulness., rationale: Prevent unsupported fields from becoming canonical intent.}
+  - {path: src/powdrr_lift/core/semantic_contract.py, type: modified, span: {start_line: 361, end_line: 449}, summary: Restore persisted partial contracts at the command boundary., rationale: Consume serialized evidence rather than in-memory state.}
+  - {path: src/powdrr_lift/core/semantic_faithfulness.py, type: added, span: {start_line: 1, end_line: 287}, summary: Define field-entailment specifications, reviews, and required-field routing., rationale: Give source faithfulness a strict compiler-owned artifact.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 25, end_line: 25}, summary: Import persisted-contract support., rationale: Wire the serialized contract into runtime operations.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 29, end_line: 33}, summary: Import faithfulness types and operations., rationale: Expose the gate through the typed catalog.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 37, end_line: 37}, summary: Import faithfulness compiler functions., rationale: Keep command orchestration explicit.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 41, end_line: 41}, summary: Register faithfulness operations., rationale: Make each gate a command.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 43, end_line: 43}, summary: Import the final faithfulness operation., rationale: Keep runtime wiring explicit.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 177, end_line: 204}, summary: Add faithfulness command schemas., rationale: Enforce single-decision command boundaries.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 825, end_line: 832}, summary: Parse serialized partial contracts., rationale: Preserve the artifact boundary.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 933, end_line: 933}, summary: Include serialized contract in compile output., rationale: Pass canonical data to the next gate.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 936, end_line: 995}, summary: Implement faithfulness preparation, binding, and finalization., rationale: Enforce failed required-field review rejection.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 1186, end_line: 1194}, summary: Bind faithfulness operations into dispatch., rationale: Prevent bypassing implementations.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 23, end_line: 34}, summary: Import field-faithfulness orchestration., rationale: Keep providers separate from deterministic assembly.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 407, end_line: 408}, summary: Render compatibility fields deterministically., rationale: Remove model-authored legacy prose.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 411, end_line: 415}, summary: Update deterministic projection values., rationale: Render from canonical fields.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 417, end_line: 417}, summary: Render the deterministic oracle., rationale: Keep the projection compiler-owned.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 421, end_line: 478}, summary: Expose field-review and finalization functions., rationale: Provide Procedrr single-decision operations.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 528, end_line: 528}, summary: Export field-review binding., rationale: Keep runtime integration discoverable.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 533, end_line: 533}, summary: Export faithfulness finalization., rationale: Preserve the compiler boundary.}
+  - {path: src/powdrr_lift/workrr/semantic_contract_compiler.py, type: modified, span: {start_line: 537, end_line: 537}, summary: Export field-review preparation., rationale: Preserve the compiler boundary.}
+  - {path: tests/test_feature_endpoint.py, type: modified, span: {start_line: 1282, end_line: 1287}, summary: Add field-review responses to the design-flow double., rationale: Exercise intermediate classifications.}
+  - {path: tests/test_feature_endpoint.py, type: modified, span: {start_line: 1326, end_line: 1327}, summary: Assert deterministic projection output., rationale: Protect the compatibility path.}
+  - {path: tests/test_implement_feature_e2e.py, type: modified, span: {start_line: 103, end_line: 104}, summary: Extend the realistic planning double for entailment., rationale: Keep e2e coverage representative.}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, span: {start_line: 508, end_line: 513}, summary: Add entailment responses to flow evaluation., rationale: Verify the checked-in flow remains executable.}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, span: {start_line: 602, end_line: 608}, summary: Add faithfulness command fixtures., rationale: Exercise each new operation.}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, span: {start_line: 610, end_line: 615}, summary: Add serialized contract fixture data., rationale: Verify the command boundary.}
+  - {path: tests/test_procedrr_evaluator.py, type: modified, span: {start_line: 667, end_line: 667}, summary: Update activation accounting., rationale: Keep flow accounting exact.}
+  - {path: tests/test_semantic_contract_compiler.py, type: modified, span: {start_line: 14, end_line: 19}, summary: Import faithfulness helpers., rationale: Test the review contract directly.}
+  - {path: tests/test_semantic_contract_compiler.py, type: modified, span: {start_line: 155, end_line: 197}, summary: Test projection and contradiction rejection., rationale: Catch unsupported semantic expansion.}
+  - {path: tests/test_semantic_contract_compiler.py, type: modified, span: {start_line: 201, end_line: 236}, summary: Test incomplete and not-stated routing., rationale: Protect required-field completion.}
+  - {path: tests/test_semantic_contract_compiler.py, type: modified, span: {start_line: 447, end_line: 448}, summary: Assert command-boundary rendering., rationale: Verify runtime output matches compiler rendering.}
+entities: []
+entity_relationships: []
+invariants:
+  - {id: source-fields-require-entailment, action: added, description: Every interpreted field has a bounded entailment review or explicit unresolved route., rationale: Prevent close-but-not-quite interpretations from becoming intent.}
+  - {id: required-fields-block-completion, action: added, description: Contradicted or unresolved required fields fail the faithfulness gate., rationale: Do not emit downstream design from an incomplete contract.}
+guidance:
+  - {id: deterministic-compatibility-rendering, action: added, description: Legacy views are compiler-rendered and non-authoritative., rationale: Avoid chained model paraphrases.}
+features: []
+proposed_prs: []

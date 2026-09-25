@@ -100,6 +100,8 @@ class DeterministicPlanningClient:
             raise AssertionError("a non-multiple clause must not be split")
         if required == {"status", "value", "reason_code"}:
             decision_kind = _find_json_value(text, "decision_kind")
+            if _find_json_value(text, "candidate_field") is not None:
+                return {"status": "resolved", "value": "entailed", "reason_code": None}
             proposition = str(_find_json_value(text, "proposition_text") or text)
             lowered = proposition.casefold()
             process_only = "new branch" in lowered or "commit everything" in lowered

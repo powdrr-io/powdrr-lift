@@ -358,6 +358,95 @@ class PartialSemanticContract:
             result["fingerprint"] = self.fingerprint
         return result
 
+    @classmethod
+    def from_data(cls, raw: Mapping[str, Any]) -> PartialSemanticContract:
+        """Restore the persisted source-only view for downstream compiler gates."""
+        if raw.get("schema_version") != PARTIAL_SEMANTIC_CONTRACT_SCHEMA_VERSION:
+            raise SemanticContractError("unsupported partial contract schema")
+
+        def extraction(
+            kind: str, span_raw: Mapping[str, Any], index: int = 0
+        ) -> BoundSourceExtraction:
+            return BoundSourceExtraction(
+                extraction_id=f"persisted:{raw.get('source_ref')}:{kind}:{index}",
+                extraction_kind=kind,
+                subject_ref=_required_string(raw, "source_ref"),
+                input_fingerprint="persisted-contract",
+                provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                span=ExactSourceSpan.from_data(span_raw),
+                created_at="persisted",
+            )
+
+        subject_raw = raw.get("subject")
+        behavior_raw = raw.get("behavior")
+        if not isinstance(subject_raw, Mapping) or not isinstance(
+            behavior_raw, Mapping
+        ):
+            raise SemanticContractError("partial contract source fields are incomplete")
+        unresolved_raw = raw.get("unresolved")
+        provenance_raw = raw.get("field_provenance")
+        if not isinstance(unresolved_raw, list) or not isinstance(
+            provenance_raw, Mapping
+        ):
+            raise SemanticContractError(
+                "partial contract completion metadata is invalid"
+            )
+        explicit_raw = raw.get("explicit_result")
+        precondition_raw = raw.get("preconditions")
+        exception_raw = raw.get("exceptions")
+        if not isinstance(precondition_raw, list) or not isinstance(
+            exception_raw, list
+        ):
+            raise SemanticContractError("partial contract modifiers are invalid")
+        temporal_raw = raw.get("temporal_scope")
+        if not isinstance(temporal_raw, Mapping):
+            raise SemanticContractError("partial contract temporal scope is invalid")
+        return cls(
+            contract_id=_required_string(raw, "contract_id"),
+            source_ref=_required_string(raw, "source_ref"),
+            source_fingerprint=_required_string(raw, "source_fingerprint"),
+            proposition_text=_required_string(raw, "proposition_text"),
+            disposition=_required_string(raw, "disposition"),
+            polarity=_required_string(raw, "polarity"),
+            requirement_strength=_required_string(raw, "requirement_strength"),
+            quantifier=_required_string(raw, "quantifier"),
+            subject=extraction("subject", subject_raw.get("source_span", {})),
+            behavior=extraction("behavior", behavior_raw.get("source_span", {})),
+            behavior_family=_required_string(behavior_raw, "family"),
+            preconditions=tuple(
+                extraction("precondition", item, index)
+                for index, item in enumerate(precondition_raw)
+                if isinstance(item, Mapping)
+            ),
+            exceptions=tuple(
+                extraction("exception", item, index)
+                for index, item in enumerate(exception_raw)
+                if isinstance(item, Mapping)
+            ),
+            explicit_result=(
+                extraction("explicit_result", explicit_raw)
+                if isinstance(explicit_raw, Mapping)
+                else None
+            ),
+            temporal_scope=_required_string(temporal_raw, "value"),
+            source_predicate=_required_string(
+                raw.get("predicate", {}), "source_classification"
+            )
+            if isinstance(raw.get("predicate"), Mapping)
+            else "not_stated",
+            field_provenance=tuple(
+                (str(key), str(value)) for key, value in provenance_raw.items()
+            ),
+            unresolved=tuple(
+                UnresolvedSemanticField(
+                    field=_required_string(item, "field"),
+                    reason_code=_required_string(item, "reason_code"),
+                )
+                for item in unresolved_raw
+                if isinstance(item, Mapping)
+            ),
+        )
+
 
 def compile_partial_semantic_contract(
     *,

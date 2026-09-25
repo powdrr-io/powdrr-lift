@@ -98,6 +98,92 @@ class DeterministicPlanningClient:
             return {"multiple": False}
         if required == {"statements"}:
             raise AssertionError("a non-multiple clause must not be split")
+        if required == {"status", "value", "reason_code"}:
+            decision_kind = _find_json_value(text, "decision_kind")
+            proposition = str(_find_json_value(text, "proposition_text") or text)
+            lowered = proposition.casefold()
+            process_only = "new branch" in lowered or "commit everything" in lowered
+            values = {
+                "disposition": (
+                    "nonactionable"
+                    if process_only
+                    else (
+                        "invariant"
+                        if any(
+                            marker in lowered
+                            for marker in ("all ", "every ", "always ", "must ")
+                        )
+                        else "feature"
+                    )
+                ),
+                "polarity": (
+                    "prohibited"
+                    if any(marker in lowered for marker in ("do not ", "must not "))
+                    else "required"
+                ),
+                "quantifier": (
+                    "every"
+                    if any(marker in lowered for marker in ("all ", "every "))
+                    else "unspecified"
+                ),
+                "requirement_strength": (
+                    "must"
+                    if "must " in lowered
+                    else "should"
+                    if "should " in lowered
+                    else "may"
+                    if "may " in lowered
+                    else "unspecified"
+                ),
+                "has_precondition": (
+                    "present"
+                    if any(marker in lowered for marker in (" if ", " when "))
+                    else "absent"
+                ),
+                "has_exception": "present" if " except " in lowered else "absent",
+                "has_explicit_result": (
+                    "present"
+                    if any(
+                        marker in lowered
+                        for marker in (" returns ", " raises ", " prints ")
+                    )
+                    else "absent"
+                ),
+                "temporal_scope": (
+                    "event_bound"
+                    if any(marker in lowered for marker in ("on entry", "on exit"))
+                    else "unspecified"
+                ),
+                "source_predicate": (
+                    "explicit"
+                    if any(
+                        marker in lowered
+                        for marker in (" returns ", " raises ", " prints ")
+                    )
+                    else "not_stated"
+                ),
+                "nonactionable_exclusion_safety": (
+                    "process_only" if process_only else "product_semantics_present"
+                ),
+                "behavior_family": (
+                    "serialize"
+                    if "pickle" in lowered
+                    else "validate"
+                    if any(marker in lowered for marker in ("validate", "reject"))
+                    else "create"
+                ),
+            }
+            value = values.get(decision_kind)
+            if value is None:
+                raise AssertionError(
+                    f"unhandled semantic decision kind: {decision_kind!r}"
+                )
+            return {"status": "resolved", "value": value, "reason_code": None}
+        if required == {"quote", "occurrence"}:
+            proposition = _find_json_value(text, "proposition_text")
+            if not isinstance(proposition, str) or not proposition:
+                raise AssertionError("source extraction has no proposition")
+            return {"quote": proposition, "occurrence": None}
         if required == {"action"}:
             if "required_test_cases" in text:
                 return {

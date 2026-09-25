@@ -190,285 +190,185 @@ steps:
       item_binding: instruction_clause
       collect: {binding: semantic_designs, mode: list, value: semantic_design}
       body:
+        - operation:
+            tool: internal
+            command: [prepare_source_semantic_decisions]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+            returns:
+              type: object
+              required: [resolved_decisions, pending_specs]
+              additionalProperties: false
+              properties:
+                resolved_decisions: {type: array}
+                pending_specs: {type: array}
+            bind: semantic_decision_plan
+        - for_each:
+            snapshot: {name: semantic_decision_plan.pending_specs, max_items: 16}
+            item_binding: semantic_decision_request
+            collect: {binding: semantic_decision_results, mode: list, value: semantic_decision_result}
+            body:
+              - judge:
+                  kind: classify_one
+                  provider: planning
+                  question: Resolve only the one semantic classification specified in this request.
+                  subject: semantic_decision_request.subject_text
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Follow the request's question, instructions, and allowed_values exactly.
+                    - Return resolved with exactly one allowed value when the source supports it.
+                    - Return unresolved with a closed reason_code when the source does not support one value.
+                    - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.
+                  context: [semantic_decision_request]
+                  output:
+                    name: semantic_decision_result
+                    schema:
+                      type: object
+                      required: [status, value, reason_code]
+                      additionalProperties: false
+                      properties:
+                        status: {type: string, enum: [resolved, unresolved]}
+                        value:
+                          type: [string, 'null']
+                          enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
+                        reason_code:
+                          type: [string, 'null']
+                          enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
+                  validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [bind_source_semantic_decisions]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              plan: {type: reference, value: semantic_decision_plan}
+              results: {type: reference, value: semantic_decision_results}
+            returns:
+              type: object
+              required: [path, decisions]
+              properties:
+                path: {type: string, minLength: 1}
+                decisions: {type: array, minItems: 1}
+            bind: bound_semantic_decisions
+        - operation:
+            tool: internal
+            command: [prepare_source_extractions]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              decisions: {type: reference, value: bound_semantic_decisions.decisions}
+            returns:
+              type: object
+              required: [requests]
+              properties:
+                requests: {type: array, minItems: 2, maxItems: 5}
+            bind: source_extraction_plan
+        - for_each:
+            snapshot: {name: source_extraction_plan.requests, max_items: 5}
+            item_binding: source_extraction_request
+            collect: {binding: source_extraction_results, mode: list, value: source_extraction_result}
+            body:
+              - judge:
+                  kind: construct_one
+                  provider: planning
+                  question: Copy only the one exact source span specified in this extraction request.
+                  subject: source_extraction_request.spec.proposition_text
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Follow the request's question and instructions exactly.
+                    - quote must be a non-empty, case-sensitive, exact substring of the proposition.
+                    - occurrence is one-based when the same quote occurs more than once; otherwise return null.
+                    - Never paraphrase, normalize, explain, or return IDs, spans, fingerprints, or extra fields.
+                  context: [source_extraction_request]
+                  output:
+                    name: source_extraction_result
+                    schema:
+                      type: object
+                      required: [quote, occurrence]
+                      additionalProperties: false
+                      properties:
+                        quote: {type: string, minLength: 1, maxLength: 500}
+                        occurrence: {type: [integer, 'null'], minimum: 1}
+                  validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [bind_source_extractions]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              requests: {type: reference, value: source_extraction_plan.requests}
+              results: {type: reference, value: source_extraction_results}
+            returns:
+              type: object
+              required: [path, extractions]
+              properties:
+                path: {type: string, minLength: 1}
+                extractions: {type: array, minItems: 2, maxItems: 5}
+            bind: bound_source_extractions
+        - operation:
+            tool: internal
+            command: [prepare_behavior_family_decision]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              extractions: {type: reference, value: bound_source_extractions.extractions}
+            returns:
+              type: object
+              required: [spec, question, instructions, allowed_values, subject_text]
+              properties:
+                spec: {type: object}
+                question: {type: string, minLength: 1}
+                instructions: {type: array, minItems: 1}
+                allowed_values: {type: array, minItems: 1}
+                subject_text: {type: string, minLength: 1}
+            bind: behavior_family_request
         - judge:
             kind: classify_one
             provider: planning
-            question: What kind of obligation does this instruction clause express?
-            subject: instruction_clause.text
+            question: Classify only the extracted behavior into one registered behavior family.
+            subject: behavior_family_request.subject_text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Classify only this clause as entity, feature, interface, invariant, guidance, non_goal, or nonactionable.
-              - Use nonactionable for process, tooling, delivery, or meta-instructions that do not describe product behavior. Examples include "create a branch from main", "commit everything", "open a PR", "run this with tool X", and "report the result".
-              - A statement that a capability is missing, manual, unsafe, or currently absent is not nonactionable; it is feature context when the surrounding request asks for that capability.
-              - Treat a universal behavioral rule as an invariant when it uses words such as "all", "every", "always", "must", or "should" to require behavior across an existing population. The words "should" and "must" do not by themselves make a clause a feature.
-              - Use non_goal only for an explicit product prohibition or scope exclusion, such as "do not change the transport" or "this feature must not add retries". Do not infer a non-goal from words such as "lacks", "without", or "manual".
-              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
-              - >-
-                Examples: "A saved report has an owner and a timestamp" → entity.
-              - >-
-                Examples: "Users can export a report as CSV" → feature.
-              - >-
-                Examples: "The export endpoint accepts a report ID and returns CSV" → interface.
-              - >-
-                Examples: "A report can always be loaded after it is saved" → invariant.
-              - >-
-                Examples: "All persisted data entities should support pickle round-tripping" → invariant.
-              - >-
-                Examples: "Every API response must include a request ID" → invariant.
-              - >-
-                Counterexample: "Add CSV export for users" → feature; it requests a new capability rather than a rule that must hold for an existing population.
-              - >-
-                Examples: "Prefer the existing repository serialization helper" → guidance.
-              - >-
-                Examples: "Do not add retries to report exports" → non_goal.
-              - >-
-                Examples: "Open a PR after the implementation" → nonactionable.
-              - >-
-                Counterexample: "The exporter currently has no retry handling" is feature context when the request asks to add retry handling; it is not nonactionable or automatically a non_goal.
-            context: [feature_description, instruction_clause]
+              - Follow the request's question, instructions, and allowed_values exactly.
+              - Return resolved with one allowed value or unresolved with one closed reason_code.
+              - Do not infer a broader behavior, implementation, predicate, or repository identity.
+              - Never return IDs, evidence, provenance, explanations, confidence, or extra fields.
+            context: [behavior_family_request]
             output:
-              name: semantic_kind
+              name: behavior_family_result
               schema:
                 type: object
-                required: [kind]
+                required: [status, value, reason_code]
                 additionalProperties: false
                 properties:
-                  kind:
-                    type: string
-                    enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable]
-            validation: {kind: json_schema}
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: What is the one concrete semantic obligation expressed by this instruction clause?
-            subject: instruction_clause.text
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Use the supplied kind classification and translate only this clause into one semantic obligation.
-              - If the kind is nonactionable, produce a trace-only disposition; it must not describe an implementation obligation or a required test.
-              - For a normal clause, write description as one short imperative sentence naming one behavior, API, invariant, or constraint to implement.
-              - Preserve concrete names, values, conditions, and prohibitions from the clause, but do not explain, summarize, enumerate scenarios, or add design choices not present in the clause.
-              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
-              - >-
-                Examples: "Users can export reports" → "Allow users to export reports."
-              - >-
-                Examples: "All data should pickle" → "Make every applicable data entity support pickle round-tripping."
-              - >-
-                Examples: "Do not change the transport" → "Do not implement transport changes."
-              - >-
-                Counterexample: do not turn one clause into a list of implementation tasks such as "add a class, add a route, add tests".
-            prompt_rules:
-              - when: {binding: semantic_kind.kind, equals: non_goal}
-                instructions:
-                  - Treat this as an explicit non-goal, not an implementation task.
-                  - Write description as one short sentence beginning with "Do not implement" that names only the excluded behavior.
-              - when: {binding: semantic_kind.kind, equals: nonactionable}
-                instructions:
-                  - State that the clause is ignored as a process or meta-instruction and must not become a product obligation or test contract.
-            context: [feature_description, instruction_clause, semantic_kind]
-            output:
-              name: semantic_obligation
-              schema:
-                type: object
-                required: [description]
-                additionalProperties: false
-                properties:
-                  description: {type: string, minLength: 1, maxLength: 500}
-            validation: {kind: json_schema}
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: What one observable result would prove this one semantic obligation?
-            subject: semantic_obligation.description
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Write one short observable assertion that proves only the supplied obligation.
-              - State the required result, not the operation used to produce it and not implementation mechanics.
-              - Preserve concrete names, values, conditions, and prohibitions from the clause.
-              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
-              - >-
-                Examples: obligation "users can export reports" → "The requested report is returned in the requested export format."
-              - >-
-                Examples: obligation "all data supports pickle round-tripping" → "The restored value has the same semantic state as the original value."
-              - >-
-                Examples: obligation "do not add retries" → "A failed export produces no retry attempt."
-              - >-
-                Counterexample: do not write "the implementation is correct"; that is not an observable result.
-            prompt_rules:
-              - when: {binding: semantic_kind.kind, equals: non_goal}
-                instructions: ["State one observable result proving the excluded behavior was not introduced."]
-              - when: {binding: semantic_kind.kind, equals: nonactionable}
-                instructions: ["Return a trace-only statement: this clause has no product acceptance result."]
-            context: [feature_description, instruction_clause, semantic_kind, semantic_obligation]
-            output:
-              name: semantic_acceptance
-              schema:
-                type: object
-                required: [acceptance_criterion]
-                additionalProperties: false
-                properties:
-                  acceptance_criterion: {type: string, minLength: 1, maxLength: 500}
-            validation: {kind: json_schema}
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: What exact population of subjects does this one obligation apply to?
-            subject: instruction_clause.text
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Describe only the complete set of subjects quantified by this obligation.
-              - For a singular obligation, name the one subject or invocation class to which it applies.
-              - For a universal obligation such as "all data should pickle", identify the category whose current and future members must be enumerated.
-              - Do not choose repository files, symbols, fixtures, commands, selectors, or implementation tasks.
-              - Do not return IDs, references, selectors, hashes, or fingerprints; Powdrr assigns them.
-              - >-
-                Examples: "all data should pickle" → "every persisted domain-data entity registered by Structrr."
-              - >-
-                Examples: "users can export reports" → "each supported report export request."
-              - >-
-                Examples: "the export endpoint accepts report IDs" → "all requests handled by the report export interface."
-              - >-
-                Examples: "do not add retries to exports" → "all failed report export attempts."
-              - >-
-                Counterexample: "the Report class in reports.py" is an implementation location, not a subject population.
-            prompt_rules:
-              - when: {binding: semantic_kind.kind, equals: non_goal}
-                instructions:
-                  - Identify the population across which absence of the excluded behavior must be checked.
-              - when: {binding: semantic_kind.kind, equals: nonactionable}
-                instructions: ["Return a trace-only statement: this clause has no product subject population."]
-            context: [feature_description, instruction_clause, semantic_kind, semantic_obligation, semantic_acceptance]
-            output:
-              name: semantic_population
-              schema:
-                type: object
-                required: [population]
-                additionalProperties: false
-                properties:
-                  population: {type: string, minLength: 1, maxLength: 400}
-            validation: {kind: json_schema}
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: What single observable operation exercises this one obligation?
-            subject: semantic_obligation.description
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Name one externally observable operation applied to one member of the supplied population.
-              - Describe the stimulus or action, not the expected result and not implementation mechanics.
-              - Do not provide test code, repository paths, commands, selectors, IDs, hashes, or fingerprints.
-              - >-
-                Examples: population "persisted domain-data entities" → "pickle.dumps followed by pickle.loads on one valid entity instance."
-              - >-
-                Examples: population "supported report export requests" → "submit one export request for a supported report and format."
-              - >-
-                Examples: population "failed export attempts" → "cause one export attempt to fail and observe the resulting request behavior."
-              - >-
-                Counterexample: "edit reports.py" is an implementation action, not an observable operation.
-            prompt_rules:
-              - when: {binding: semantic_kind.kind, equals: non_goal}
-                instructions: ["Name the one operation during which the excluded behavior could otherwise appear."]
-              - when: {binding: semantic_kind.kind, equals: nonactionable}
-                instructions: ["Return a trace-only statement: this clause has no product operation."]
-            context: [feature_description, instruction_clause, semantic_kind, semantic_obligation, semantic_acceptance, semantic_population]
-            output:
-              name: semantic_operation
-              schema:
-                type: object
-                required: [operation]
-                additionalProperties: false
-                properties:
-                  operation: {type: string, minLength: 1, maxLength: 400}
-            validation: {kind: json_schema}
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: What single observable predicate proves this one obligation for one population member?
-            subject: semantic_acceptance.acceptance_criterion
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - State one pass/fail predicate over the result of the supplied operation.
-              - Include the required equivalence or comparison semantics when success means preserving state.
-              - Do not add another behavior, operation, scenario, or implementation choice.
-              - Do not provide test code, repository paths, commands, selectors, IDs, hashes, or fingerprints.
-              - >-
-                Examples: pickle round-trip → "loads(dumps(value)) is semantically equivalent to value."
-              - >-
-                Examples: report export → "The response status is successful and its body contains the requested report in the requested format."
-              - >-
-                Examples: no-retry invariant → "The count of retry attempts remains zero after the initial failure."
-              - >-
-                Counterexample: "the test passes" is not an oracle because it does not state what the test must prove.
-            prompt_rules:
-              - when: {binding: semantic_kind.kind, equals: non_goal}
-                instructions: ["State the one predicate proving the excluded behavior is absent."]
-              - when: {binding: semantic_kind.kind, equals: nonactionable}
-                instructions: ["Return a trace-only statement: this clause has no product success predicate."]
-            context: [feature_description, instruction_clause, semantic_kind, semantic_obligation, semantic_acceptance, semantic_population, semantic_operation]
-            output:
-              name: semantic_oracle
-              schema:
-                type: object
-                required: [oracle]
-                additionalProperties: false
-                properties:
-                  oracle: {type: string, minLength: 1, maxLength: 400}
-            validation: {kind: json_schema}
-        - judge:
-            kind: construct_one
-            provider: planning
-            question: What one concrete evidence case demonstrates this operation and predicate?
-            subject: semantic_obligation.description
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - Describe one representative input or setup, the supplied operation, and the supplied predicate.
-              - This is an evidence example from which Powdrr compiles executable contracts; it is not the complete population and does not prove universal coverage by itself.
-              - Do not provide test code, a multi-step test plan, repository paths, commands, selectors, IDs, hashes, or fingerprints.
-              - >-
-                Examples: pickle → "Construct one UserRecord with representative fields, round-trip it, and compare its semantic fields."
-              - >-
-                Examples: report export → "Submit an export request for a report containing two rows and verify the returned CSV contains both rows."
-              - >-
-                Examples: no retries → "Use a transport that fails once, invoke one export, and verify only one transport call occurred."
-              - >-
-                Counterexample: "run the full test suite" is not an evidence case; it does not identify a subject, operation, or oracle.
-            prompt_rules:
-              - when: {binding: semantic_kind.kind, equals: non_goal}
-                instructions: ["Describe one evidence case that would detect introduction of the excluded behavior."]
-              - when: {binding: semantic_kind.kind, equals: nonactionable}
-                instructions: ["Return a trace-only statement: no product evidence case is required."]
-            context: [feature_description, instruction_clause, semantic_kind, semantic_obligation, semantic_acceptance, semantic_population, semantic_operation, semantic_oracle]
-            output:
-              name: semantic_evidence_case
-              schema:
-                type: object
-                required: [evidence_case]
-                additionalProperties: false
-                properties:
-                  evidence_case: {type: string, minLength: 1, maxLength: 500}
+                  status: {type: string, enum: [resolved, unresolved]}
+                  value:
+                    type: [string, 'null']
+                    enum: [create, read, update, delete, list, search, validate, transform, serialize, deserialize, round_trip, persist, retrieve, compare, invoke, emit, receive, authorize, authenticate, retry, render, configure, other, null]
+                  reason_code:
+                    type: [string, 'null']
+                    enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
             validation: {kind: json_schema}
         - operation:
             tool: internal
-            command: [merge_semantic_design]
+            command: [compile_partial_semantic_contract]
             parameters:
-              kind: {type: reference, value: semantic_kind.kind}
-              description: {type: reference, value: semantic_obligation.description}
-              acceptance_criterion: {type: reference, value: semantic_acceptance.acceptance_criterion}
-              population: {type: reference, value: semantic_population.population}
-              operation: {type: reference, value: semantic_operation.operation}
-              oracle: {type: reference, value: semantic_oracle.oracle}
-              evidence_case: {type: reference, value: semantic_evidence_case.evidence_case}
+              clause: {type: reference, value: instruction_clause}
+              decisions: {type: reference, value: bound_semantic_decisions.decisions}
+              extractions: {type: reference, value: bound_source_extractions.extractions}
+              behavior_family_request: {type: reference, value: behavior_family_request}
+              behavior_family_result: {type: reference, value: behavior_family_result}
             returns:
               type: object
-              required: [kind, description, acceptance_criterion, population, operation, oracle, evidence_case]
+              required: [kind, description, acceptance_criterion, expected_test, population, operation, oracle, evidence_case, partial_contract_path, partial_contract_fingerprint]
+              additionalProperties: false
               properties:
                 kind: {type: string}
                 description: {type: string}
                 acceptance_criterion: {type: string}
+                expected_test: {type: string}
                 population: {type: string}
                 operation: {type: string}
                 oracle: {type: string}
                 evidence_case: {type: string}
+                partial_contract_path: {type: string, minLength: 1}
+                partial_contract_fingerprint: {type: string, minLength: 1}
             bind: semantic_design
   - operation:
       tool: internal

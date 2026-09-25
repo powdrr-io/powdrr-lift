@@ -20,7 +20,22 @@ from powdrr_lift.core.instruction_ledger import (
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
+from powdrr_lift.core.semantic_contract import (
+    BoundSourceExtraction,
+    SemanticContractError,
+)
+from powdrr_lift.core.semantic_decision import SemanticDecision, SemanticDecisionError
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.semantic_contract_compiler import (
+    bind_behavior_family_decision,
+    bind_source_extractions,
+    bind_source_semantic_decisions,
+    compile_source_contract,
+    prepare_behavior_family_decision,
+    prepare_source_extractions,
+    prepare_source_semantic_decisions,
+    project_partial_contract_to_legacy_design,
+)
 from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
 
 
@@ -79,6 +94,76 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("apply_atomicity_splits"),
+        ),
+        "prepare_source_semantic_decisions": CommandSpec(
+            name="prepare_source_semantic_decisions",
+            input_schema=object_schema(
+                {"clause": {}}, required=("clause",), additional_properties=False
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_source_semantic_decisions"),
+        ),
+        "bind_source_semantic_decisions": CommandSpec(
+            name="bind_source_semantic_decisions",
+            input_schema=object_schema(
+                {"clause": {}, "plan": {}, "results": {}},
+                required=("clause", "plan", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_source_semantic_decisions"),
+        ),
+        "prepare_source_extractions": CommandSpec(
+            name="prepare_source_extractions",
+            input_schema=object_schema(
+                {"clause": {}, "decisions": {}},
+                required=("clause", "decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_source_extractions"),
+        ),
+        "bind_source_extractions": CommandSpec(
+            name="bind_source_extractions",
+            input_schema=object_schema(
+                {"clause": {}, "requests": {}, "results": {}},
+                required=("clause", "requests", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_source_extractions"),
+        ),
+        "prepare_behavior_family_decision": CommandSpec(
+            name="prepare_behavior_family_decision",
+            input_schema=object_schema(
+                {"clause": {}, "extractions": {}},
+                required=("clause", "extractions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_behavior_family_decision"),
+        ),
+        "compile_partial_semantic_contract": CommandSpec(
+            name="compile_partial_semantic_contract",
+            input_schema=object_schema(
+                {
+                    "clause": {},
+                    "decisions": {},
+                    "extractions": {},
+                    "behavior_family_request": {},
+                    "behavior_family_result": {},
+                },
+                required=(
+                    "clause",
+                    "decisions",
+                    "extractions",
+                    "behavior_family_request",
+                    "behavior_family_result",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("compile_partial_semantic_contract"),
         ),
         "merge_semantic_design": CommandSpec(
             name="merge_semantic_design",
@@ -666,6 +751,142 @@ class FeatureCommandRuntime:
             """Join the independently elicited semantic fields for one clause."""
             return _merge_semantic_design_values(parameters)
 
+        def semantic_artifact_directory(clause: Mapping[str, Any]) -> Path:
+            clause_id = clause.get("clause_id")
+            if not isinstance(clause_id, str) or not clause_id.strip():
+                raise PowdrrExecutionError("semantic operation requires a clause ID")
+            path = output_root / "semantic-contracts" / clause_id
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+
+        def semantic_clause() -> Mapping[str, Any]:
+            clause = parameters.get("clause")
+            if not isinstance(clause, Mapping):
+                raise PowdrrExecutionError("semantic operation requires a clause")
+            return clause
+
+        def semantic_decisions(raw: Any) -> list[SemanticDecision]:
+            if not isinstance(raw, list) or not all(
+                isinstance(item, Mapping) for item in raw
+            ):
+                raise PowdrrExecutionError("semantic decisions are malformed")
+            try:
+                return [SemanticDecision.from_data(item) for item in raw]
+            except SemanticDecisionError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def semantic_extractions(raw: Any) -> list[BoundSourceExtraction]:
+            if not isinstance(raw, list) or not all(
+                isinstance(item, Mapping) for item in raw
+            ):
+                raise PowdrrExecutionError("source extractions are malformed")
+            try:
+                return [BoundSourceExtraction.from_data(item) for item in raw]
+            except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def prepare_source_semantic_decisions_operation() -> Any:
+            try:
+                return prepare_source_semantic_decisions(semantic_clause())
+            except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def bind_source_semantic_decisions_operation() -> Any:
+            clause = semantic_clause()
+            plan = parameters.get("plan")
+            raw_results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(plan, Mapping) or raw_results is None:
+                raise PowdrrExecutionError("semantic decision binding is malformed")
+            resolved = plan.get("resolved_decisions")
+            pending = plan.get("pending_specs")
+            if not isinstance(resolved, list) or not isinstance(pending, list):
+                raise PowdrrExecutionError("semantic decision plan is malformed")
+            try:
+                decisions = bind_source_semantic_decisions(
+                    resolved_decisions=resolved,
+                    pending_specs=pending,
+                    provider_results=raw_results,
+                )
+            except (SemanticContractError, SemanticDecisionError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            data = [item.to_data() for item in decisions]
+            path = semantic_artifact_directory(clause) / "source-decisions.json"
+            path.write_text(
+                json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            return {"path": str(path), "decisions": data}
+
+        def prepare_source_extractions_operation() -> Any:
+            try:
+                requests = prepare_source_extractions(
+                    semantic_clause(), semantic_decisions(parameters.get("decisions"))
+                )
+            except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            return {"requests": requests}
+
+        def bind_source_extractions_operation() -> Any:
+            clause = semantic_clause()
+            requests = parameters.get("requests")
+            raw_results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(requests, list) or raw_results is None:
+                raise PowdrrExecutionError("source extraction binding is malformed")
+            try:
+                extractions = bind_source_extractions(
+                    requests=requests, provider_results=raw_results
+                )
+            except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            data = [item.to_data() for item in extractions]
+            path = semantic_artifact_directory(clause) / "source-extractions.json"
+            path.write_text(
+                json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            return {"path": str(path), "extractions": data}
+
+        def prepare_behavior_family_decision_operation() -> Any:
+            extractions = semantic_extractions(parameters.get("extractions"))
+            behaviors = [
+                item for item in extractions if item.extraction_kind == "behavior"
+            ]
+            if len(behaviors) != 1:
+                raise PowdrrExecutionError(
+                    "behavior-family classification requires one behavior extraction"
+                )
+            try:
+                return prepare_behavior_family_decision(semantic_clause(), behaviors[0])
+            except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def compile_partial_semantic_contract_operation() -> Any:
+            clause = semantic_clause()
+            family_request = parameters.get("behavior_family_request")
+            family_result = parameters.get("behavior_family_result")
+            if not isinstance(family_request, Mapping) or not isinstance(
+                family_result, Mapping
+            ):
+                raise PowdrrExecutionError("behavior-family decision is malformed")
+            try:
+                family = bind_behavior_family_decision(family_request, family_result)
+                contract = compile_source_contract(
+                    clause=clause,
+                    decisions=semantic_decisions(parameters.get("decisions")),
+                    extractions=semantic_extractions(parameters.get("extractions")),
+                    behavior_family=family,
+                )
+            except (SemanticContractError, SemanticDecisionError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            path = semantic_artifact_directory(clause) / "partial-contract.json"
+            document = contract.to_data()
+            path.write_text(
+                json.dumps(document, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            return project_partial_contract_to_legacy_design(contract) | {
+                "partial_contract_path": str(path),
+                "partial_contract_fingerprint": contract.fingerprint,
+            }
+
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
             raw_design_decisions = feature_endpoint._collected_results(
@@ -837,6 +1058,24 @@ class FeatureCommandRuntime:
                 ),
                 "apply_atomicity_splits": bind_handler(
                     apply_atomicity_splits_operation
+                ),
+                "prepare_source_semantic_decisions": bind_handler(
+                    prepare_source_semantic_decisions_operation
+                ),
+                "bind_source_semantic_decisions": bind_handler(
+                    bind_source_semantic_decisions_operation
+                ),
+                "prepare_source_extractions": bind_handler(
+                    prepare_source_extractions_operation
+                ),
+                "bind_source_extractions": bind_handler(
+                    bind_source_extractions_operation
+                ),
+                "prepare_behavior_family_decision": bind_handler(
+                    prepare_behavior_family_decision_operation
+                ),
+                "compile_partial_semantic_contract": bind_handler(
+                    compile_partial_semantic_contract_operation
                 ),
                 "merge_semantic_design": bind_handler(merge_semantic_design_operation),
                 "compile_canonical_feature_design": bind_handler(

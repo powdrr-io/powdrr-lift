@@ -1,0 +1,428 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 809
+title: Compile source classifications into semantic contracts
+intent:
+  problem: The design interview transformed each source clause through a chain of
+    free-form obligation, acceptance, population, operation, oracle, and evidence
+    paraphrases, allowing early interpretation errors to compound before coding.
+  goal: Classify one bounded semantic field at a time, bind exact source spans into a
+    canonical partial contract, persist the intermediate evidence, and project source
+    text losslessly to existing downstream consumers during migration.
+human-decisions:
+  - id: replace-chained-prose-with-source-classification
+    summary: Replace the seven dependent prose questions with independently validated
+      source classifiers and exact-span extractors.
+  - id: preserve-legacy-consumers-through-source-projection
+    summary: Keep current feature-design consumers operational through a temporary
+      compiler-owned projection that copies source meaning rather than asking a model
+      to paraphrase it.
+  - id: independently-confirm-nonactionable-exclusion
+    summary: Require a separate process-only classification before a nonactionable
+      disposition can exclude a clause from product obligations.
+structured_files: []
+files:
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 193
+    end_line: 320
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 324
+    end_line: 325
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 328
+    end_line: 332
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 334
+    end_line: 334
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 337
+    end_line: 337
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 340
+    end_line: 346
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 350
+    end_line: 350
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 352
+    end_line: 356
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 359
+    end_line: 360
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 365
+    end_line: 365
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 370
+    end_line: 371
+  summary: Route atomic clauses through bounded source decisions, exact extraction, behavior-family classification, and deterministic partial-contract compilation.
+  rationale: Remove the error-amplifying chain of model-generated semantic prose from the active design flow.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 561
+  summary: Define strict exact-extraction and partial semantic-contract artifacts with fingerprints, provenance, unresolved fields, and cross-field validation.
+  rationale: Give source classifications a canonical compiler-owned representation before repository or ontology binding.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 469
+  summary: Prepare focused classifier requests, bind provider results and exact spans, compile partial contracts, and render the temporary legacy projection.
+  rationale: Keep provider discretion to one semantic choice while Powdrr owns assembly and compatibility rendering.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 27
+  summary: Register and implement strict Procedrr operations that persist source decisions, exact extractions, and partial contracts.
+  rationale: Make the classification pipeline an enforced runtime path instead of a dormant data model.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 38
+  summary: Register and implement strict Procedrr operations that persist source decisions, exact extractions, and partial contracts.
+  rationale: Make the classification pipeline an enforced runtime path instead of a dormant data model.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 167
+  summary: Register and implement strict Procedrr operations that persist source decisions, exact extractions, and partial contracts.
+  rationale: Make the classification pipeline an enforced runtime path instead of a dormant data model.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 752
+    end_line: 887
+  summary: Register and implement strict Procedrr operations that persist source decisions, exact extractions, and partial contracts.
+  rationale: Make the classification pipeline an enforced runtime path instead of a dormant data model.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 1060
+    end_line: 1077
+  summary: Register and implement strict Procedrr operations that persist source decisions, exact extractions, and partial contracts.
+  rationale: Make the classification pipeline an enforced runtime path instead of a dormant data model.
+- path: src/powdrr_lift/workrr/semantic_classifier.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Classify explicit may-not language as prohibited before model fallback.
+  rationale: Preserve explicit negative polarity in the deterministic lexical layer.
+- path: tests/test_semantic_contract_compiler.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 370
+  summary: Test classification, extraction, compilation, persistence, conflict handling, and source-preserving projection behavior.
+  rationale: Protect the canonical source-to-contract boundary and its fail-closed cases.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 40
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1206
+    end_line: 1221
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1228
+    end_line: 1228
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1230
+    end_line: 1243
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1247
+    end_line: 1267
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1269
+    end_line: 1269
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1271
+    end_line: 1271
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1278
+    end_line: 1284
+  summary: Run the checked-in design workflow through real semantic handlers and assert source-preserving artifacts.
+  rationale: Catch mechanical breaks across Procedrr collection, Workrr operations, and existing feature-design consumers.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 101
+    end_line: 186
+  summary: Teach the deterministic full-flow planner to answer bounded semantic and exact-extraction schemas.
+  rationale: Keep all implement-feature E2E scenarios on the new active design protocol.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 623
+    end_line: 623
+  summary: Assert the design definition remains single-decision normal form and omits chained semantic prose bindings.
+  rationale: Prevent the old error-amplifying prompt structure from returning.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 626
+    end_line: 626
+  summary: Assert the design definition remains single-decision normal form and omits chained semantic prose bindings.
+  rationale: Prevent the old error-amplifying prompt structure from returning.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 636
+    end_line: 640
+  summary: Assert the design definition remains single-decision normal form and omits chained semantic prose bindings.
+  rationale: Prevent the old error-amplifying prompt structure from returning.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 653
+    end_line: 657
+  summary: Assert the design definition remains single-decision normal form and omits chained semantic prose bindings.
+  rationale: Prevent the old error-amplifying prompt structure from returning.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 659
+    end_line: 671
+  summary: Assert the design definition remains single-decision normal form and omits chained semantic prose bindings.
+  rationale: Prevent the old error-amplifying prompt structure from returning.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 475
+    end_line: 490
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 497
+    end_line: 513
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 532
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 542
+    end_line: 557
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 560
+    end_line: 584
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 587
+    end_line: 595
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 648
+    end_line: 648
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 654
+    end_line: 657
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 659
+    end_line: 659
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 672
+    end_line: 675
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 689
+    end_line: 699
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 704
+    end_line: 704
+  summary: Exercise collected classifier and extractor results through the checked-in and live design flows.
+  rationale: Verify evaluator mechanics and expose intermediate classification outputs.
+- path: tests/test_semantic_decision.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 178
+  summary: Cover deterministic prohibited polarity for explicit may-not language.
+  rationale: Prevent a negative modal from being misclassified as permission.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1218
+    end_line: 1225
+  summary: Remove the obsolete chained-prose planner responses from the design-flow test.
+  rationale: Keep the integration fixture aligned with the classification-oriented protocol.
+entities:
+  - id: partial-semantic-contract
+    type: Module
+    action: added
+  - id: source-semantic-contract-compiler
+    type: Module
+    action: added
+  - id: classification-oriented-design-interview
+    type: Workflow
+    action: added
+  - id: deterministic-source-classifier
+    type: Module
+    action: modified
+  - id: semantic-contract-compilation-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: design-interview-invokes-source-contract-compiler
+    source: classification-oriented-design-interview
+    target: source-semantic-contract-compiler
+    relationship: invokes
+    description: The design interview invokes deterministic operations around each
+      bounded classifier and extractor activation.
+    rationale: Put sequencing in Procedrr while keeping artifact assembly in Workrr.
+    action: added
+  - id: source-compiler-produces-partial-contract
+    source: source-semantic-contract-compiler
+    target: partial-semantic-contract
+    relationship: produces
+    description: The source compiler assembles validated decisions and exact extractions
+      into one partial semantic contract per proposition.
+    rationale: Separate provider output from canonical semantic assembly.
+    action: added
+  - id: semantic-contract-tests-verify-compiler
+    source: semantic-contract-compilation-tests
+    target: source-semantic-contract-compiler
+    relationship: verifies
+    description: The semantic contract tests verify compilation, persistence, and
+      fail-closed conflict handling.
+    rationale: Preserve the source-to-contract boundary as later slices extend it.
+    action: added
+invariants:
+  - id: partial-contract-authority-is-source-anchored
+    action: added
+    description: Canonical partial-contract meaning consists only of closed decisions,
+      exact proposition spans, and compiler-derived structure; generated paraphrase is
+      never an authority field.
+    rationale: Stop interpretation drift from compounding across model-generated prose.
+  - id: exact-extractions-must-match-the-proposition
+    action: added
+    description: Every extracted subject, behavior, condition, exception, and result is
+      case-sensitive exact text from the immutable proposition with an unambiguous
+      occurrence and compiler-owned span.
+    rationale: Make source evidence mechanically verifiable and replayable.
+  - id: nonactionable-exclusion-requires-process-only-confirmation
+    action: added
+    description: A nonactionable disposition compiles only when an independent decision
+      confirms the proposition is process-only; conflicting actionable and process-only
+      results also fail compilation.
+    rationale: Prevent classification error from silently erasing product intent.
+guidance:
+  - id: classifiers-abstain-instead-of-inventing
+    action: added
+    description: Resolve deterministic lexical cases first, then ask a provider for one
+      closed value and preserve unresolved status when the proposition cannot support it.
+    rationale: Make weaker providers useful without allowing them to manufacture missing
+      semantics or repository identities.
+features: []
+proposed_prs: []

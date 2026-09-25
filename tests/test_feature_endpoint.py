@@ -34,7 +34,11 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationReport,
     ValidationReportStatus,
 )
-from powdrr_lift.workrr.command_catalog import _merge_semantic_design_values
+from powdrr_lift.workrr.command_catalog import (
+    FeatureCommandRuntime,
+    _merge_semantic_design_values,
+    feature_command_catalog,
+)
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     FeatureEndpointResult,
@@ -1236,106 +1240,85 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     )
 
     class PlanningLLM:
+        source_values = iter(
+            (
+                "feature",
+                "required",
+                "unspecified",
+                "unspecified",
+                "absent",
+                "absent",
+                "absent",
+                "unspecified",
+                "not_stated",
+                "product_semantics_present",
+            )
+        )
+        extraction_values = iter(("feature", "Add"))
+
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "kind of obligation" in question:
-                return {"kind": "feature"}
-            if "one concrete semantic obligation" in question:
-                return {"description": "The requested feature is implemented."}
-            if "observable result" in question:
+            if "one semantic classification" in question:
                 return {
-                    "acceptance_criterion": (
-                        "The requested feature behavior is observable."
-                    )
+                    "status": "resolved",
+                    "value": next(self.source_values),
+                    "reason_code": None,
                 }
-            if "exact population" in question:
-                return {"population": "all requested feature instances"}
-            if "observable operation" in question:
-                return {"operation": "invoke the requested feature"}
-            if "observable predicate" in question:
-                return {"oracle": "the requested feature result is observable"}
-            if "evidence case" in question:
-                return {"evidence_case": "invoke one representative feature instance"}
+            if "one exact source span" in question:
+                return {
+                    "quote": next(self.extraction_values),
+                    "occurrence": None,
+                }
+            if "one registered behavior family" in question:
+                return {
+                    "status": "resolved",
+                    "value": "create",
+                    "reason_code": None,
+                }
             raise AssertionError(question)
 
+    catalog = feature_command_catalog()
+    runtime = FeatureCommandRuntime(
+        config=None,
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="feature/test",
+        slug="demo",
+        state={
+            "provider_inventory": (
+                {
+                    "inventory_id": "pytest:pytest:tests",
+                    "provider": "pytest",
+                    "profile": "pytest",
+                    "selector": "tests",
+                },
+            )
+        },
+        catalog=catalog,
+    )
+
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        assert tool == "internal"
         command = parameters["command"]
-        if command[0] == "compile_instruction_ledger":
-            return {
-                "path": str(tmp_path / "instruction-ledger.json"),
-                "fingerprint": "sha256:ledger",
-                "clauses": [
-                    {"clause_id": "instruction-001", "text": "Add the feature."}
-                ],
-            }
-        if command[0] == "prepare_atomicity_split_requests":
-            return {"split_requests": []}
-        if command[0] == "apply_atomicity_splits":
-            return {
-                "path": str(tmp_path / "instruction-ledger.json"),
-                "fingerprint": "sha256:atomic-ledger",
-                "clauses": [
-                    {"clause_id": "instruction-001", "text": "Add the feature."}
-                ],
-            }
-        if command[0] == "merge_semantic_design":
-            return {
-                "kind": "feature",
-                "description": "The requested feature is implemented.",
-                "acceptance_criterion": (
-                    "The requested feature behavior is observable."
-                ),
-                "population": "all requested feature instances",
-                "operation": "invoke the requested feature",
-                "oracle": "the requested feature result is observable",
-                "evidence_case": "invoke one representative feature instance",
-            }
-        if command[0] == "compile_canonical_feature_design":
-            return {
-                "path": str(tmp_path / "canonical-feature-design.json"),
-                "fingerprint": "sha256:design",
-                "obligations": [
-                    {
-                        "id": "sentence-1",
-                        "description": "The requested feature is implemented.",
-                        "design": {
-                            "kind": "feature",
-                            "description": "The requested feature is implemented.",
-                            "acceptance_criterion": (
-                                "The requested feature behavior is observable."
-                            ),
-                            "population": "all requested feature instances",
-                            "operation": "invoke the requested feature",
-                            "oracle": "the requested feature result is observable",
-                            "evidence_case": (
-                                "invoke one representative feature instance"
-                            ),
-                        },
-                    }
-                ],
-                "verification_contracts": [
-                    {
-                        "id": "contract-sentence-1",
-                        "obligation_ref": "sentence-1",
-                        "population": "all requested feature instances",
-                        "operation": "invoke the requested feature",
-                        "oracle": "the requested feature result is observable",
-                        "evidence_case": "invoke one representative feature instance",
-                    }
-                ],
-                "required_test_cases": [{"id": "test-sentence-1"}],
-            }
-        raise AssertionError((tool, parameters))
+        return runtime.dispatch(command[0], list(command), parameters)
 
     result = Evaluator(PlanningLLM(), execute).evaluate(
         flow,
         {"work_item_name": "demo", "feature_description": "Add the feature."},
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
+    partial = tmp_path / "semantic-contracts/instruction-001/partial-contract.json"
+    assert partial.is_file()
+    assert json.loads(partial.read_text())["proposition_text"] == "Add the feature."
+    canonical = json.loads((tmp_path / "canonical-feature-design.json").read_text())
+    projection = canonical["projections"][0]
+    assert projection["description"] == "Add the feature."
+    assert projection["expected_test"] == "Add the feature."
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

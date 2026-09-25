@@ -175,6 +175,7 @@ def test_modifier_presence_decisions_are_independent() -> None:
     [
         ("polarity", "Do not add retries.", "prohibited"),
         ("polarity", "Clients may omit the field.", "permitted"),
+        ("polarity", "Clients may not omit the field.", "prohibited"),
         ("polarity", "All data should pickle.", "required"),
         ("quantifier", "Every active report can be exported.", "every"),
         ("quantifier", "Some reports can be exported.", "some"),

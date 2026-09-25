@@ -472,26 +472,45 @@ def test_for_each_without_max_items_reviews_the_entire_snapshot() -> None:
 
 def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     class DesignInterviewLLM:
+        source_values = iter(
+            (
+                "feature",
+                "required",
+                "unspecified",
+                "unspecified",
+                "absent",
+                "absent",
+                "absent",
+                "unspecified",
+                "not_stated",
+                "product_semantics_present",
+            )
+        )
+        extraction_values = iter(("thing", "Add"))
+
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "kind of obligation" in question:
-                return {"kind": "feature"}
-            if "one concrete semantic obligation" in question:
-                return {"description": "The feature is implemented."}
-            if "observable result" in question:
-                return {"acceptance_criterion": "The feature behavior is observable."}
-            if "exact population" in question:
-                return {"population": "all feature instances"}
-            if "observable operation" in question:
-                return {"operation": "invoke the feature"}
-            if "observable predicate" in question:
-                return {"oracle": "the feature result matches the requirement"}
-            if "evidence case" in question:
-                return {"evidence_case": "invoke one representative feature instance"}
+            if "one semantic classification" in question:
+                return {
+                    "status": "resolved",
+                    "value": next(self.source_values),
+                    "reason_code": None,
+                }
+            if "one exact source span" in question:
+                return {
+                    "quote": next(self.extraction_values),
+                    "occurrence": None,
+                }
+            if "one registered behavior family" in question:
+                return {
+                    "status": "resolved",
+                    "value": "create",
+                    "reason_code": None,
+                }
             raise AssertionError(question)
 
     llm = DesignInterviewLLM()
@@ -506,7 +525,11 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "path": "instruction-ledger.json",
                     "fingerprint": "sha256:ledger",
                     "clauses": [
-                        {"clause_id": "instruction-001", "text": "Add a thing"}
+                        {
+                            "clause_id": "instruction-001",
+                            "text": "Add a thing",
+                            "fingerprint": "sha256:clause",
+                        }
                     ],
                 }
             if command[0] == "prepare_atomicity_split_requests":
@@ -516,18 +539,60 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "path": "instruction-ledger.json",
                     "fingerprint": "sha256:atomic-ledger",
                     "clauses": [
-                        {"clause_id": "instruction-001", "text": "Add a thing"}
+                        {
+                            "clause_id": "instruction-001",
+                            "text": "Add a thing",
+                            "fingerprint": "sha256:clause",
+                        }
                     ],
                 }
-            if command[0] == "merge_semantic_design":
+            if command[0] == "prepare_source_semantic_decisions":
+                return {
+                    "resolved_decisions": [],
+                    "pending_specs": [
+                        {
+                            "kind": kind,
+                            "subject_text": "Add a thing",
+                        }
+                        for kind in range(10)
+                    ],
+                }
+            if command[0] == "bind_source_semantic_decisions":
+                return {"path": "source-decisions.json", "decisions": [1]}
+            if command[0] == "prepare_source_extractions":
+                return {
+                    "requests": [
+                        {
+                            "spec": {
+                                "proposition_text": "Add a thing",
+                                "extraction_kind": kind,
+                            }
+                        }
+                        for kind in ("subject", "behavior")
+                    ]
+                }
+            if command[0] == "bind_source_extractions":
+                return {"path": "source-extractions.json", "extractions": [1, 2]}
+            if command[0] == "prepare_behavior_family_decision":
+                return {
+                    "spec": {},
+                    "question": "Classify behavior.",
+                    "instructions": ["Choose one value."],
+                    "allowed_values": ["create"],
+                    "subject_text": "Add",
+                }
+            if command[0] == "compile_partial_semantic_contract":
                 return {
                     "kind": "feature",
-                    "description": "The feature is implemented.",
-                    "acceptance_criterion": "The feature behavior is observable.",
-                    "population": "all feature instances",
-                    "operation": "invoke the feature",
-                    "oracle": "the feature result matches the requirement",
-                    "evidence_case": "invoke one representative feature instance",
+                    "description": "Add a thing",
+                    "acceptance_criterion": "Add a thing",
+                    "expected_test": "Add a thing",
+                    "population": "thing",
+                    "operation": "Add",
+                    "oracle": "Add a thing",
+                    "evidence_case": "Add a thing",
+                    "partial_contract_path": "partial-contract.json",
+                    "partial_contract_fingerprint": "sha256:contract",
                 }
             if command[0] == "compile_canonical_feature_design":
                 return {
@@ -580,23 +645,18 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 8
+    assert result.llm_activations == 14
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events
         if event.kind == "judge" and "value" in event.data
     }
-    assert judge_values["semantic_kind"] == {"kind": "feature"}
-    assert judge_values["semantic_obligation"] == {
-        "description": "The feature is implemented."
+    assert judge_values["behavior_family_result"] == {
+        "status": "resolved",
+        "value": "create",
+        "reason_code": None,
     }
-    assert judge_values["semantic_population"] == {
-        "population": "all feature instances"
-    }
-    assert judge_values["semantic_operation"] == {"operation": "invoke the feature"}
-    assert judge_values["semantic_oracle"] == {
-        "oracle": "the feature result matches the requirement"
-    }
+    assert judge_values["source_extraction_result"]["quote"] == "Add"
 
 
 @pytest.mark.live_provider
@@ -609,6 +669,10 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
 
     from importlib import import_module
 
+    from powdrr_lift.workrr.command_catalog import (
+        FeatureCommandRuntime,
+        feature_command_catalog,
+    )
     from procedrr import parse_and_validate
 
     build_probe_client = import_module(
@@ -622,97 +686,22 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
         repo_root=tmp_path,
         progress_stream=sys.stderr,
     )
+    catalog = feature_command_catalog()
+    runtime = FeatureCommandRuntime(
+        config=None,
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="feature/live-test",
+        slug="live-state-data-atomicity",
+        state={},
+        catalog=catalog,
+    )
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         assert tool == "internal"
         command = parameters["command"]
-        if command[0] == "compile_instruction_ledger":
-            return {
-                "path": str(tmp_path / "instruction-ledger.json"),
-                "fingerprint": "sha256:ledger",
-                "clauses": [
-                    {
-                        "clause_id": "instruction-001",
-                        "text": (
-                            "On entry, state data initializes as a fresh copy of "
-                            "the defaults and on exit state data is removed."
-                        ),
-                    }
-                ],
-            }
-        if command[0] == "prepare_atomicity_split_requests":
-            decision = parameters["decisions"][0]["result"]
-            return {
-                "split_requests": [
-                    {
-                        "clause": {
-                            "clause_id": "instruction-001",
-                            "text": (
-                                "On entry, state data initializes as a fresh copy of "
-                                "the defaults and on exit state data is removed."
-                            ),
-                        }
-                    }
-                ]
-                if decision["multiple"]
-                else []
-            }
-        if command[0] == "apply_atomicity_splits":
-            splits = parameters["splits"]
-            statements = (
-                splits[0]["result"]["statements"] if splits else ["unchanged clause"]
-            )
-            return {
-                "path": str(tmp_path / "instruction-ledger.json"),
-                "fingerprint": "sha256:atomic-ledger",
-                "clauses": [
-                    {
-                        "clause_id": f"instruction-{index:03d}",
-                        "text": statement,
-                    }
-                    for index, statement in enumerate(statements, start=1)
-                ],
-            }
-        if command[0] == "merge_semantic_design":
-            return {
-                "kind": parameters["kind"],
-                "description": parameters["description"],
-                "acceptance_criterion": parameters["acceptance_criterion"],
-                "population": parameters["population"],
-                "operation": parameters["operation"],
-                "oracle": parameters["oracle"],
-                "evidence_case": parameters["evidence_case"],
-            }
-        if command[0] == "compile_canonical_feature_design":
-            designs = [item["result"] for item in parameters["design_decisions"]]
-            return {
-                "path": str(tmp_path / "canonical-feature-design.json"),
-                "fingerprint": "sha256:design",
-                "obligations": [
-                    {
-                        "id": f"instruction-{index:03d}",
-                        "description": design["description"],
-                        "design": design,
-                    }
-                    for index, design in enumerate(designs, start=1)
-                ],
-                "verification_contracts": [
-                    {
-                        "id": f"contract-instruction-{index:03d}",
-                        "obligation_ref": f"instruction-{index:03d}",
-                        "population": design["population"],
-                        "operation": design["operation"],
-                        "oracle": design["oracle"],
-                        "evidence_case": design["evidence_case"],
-                    }
-                    for index, design in enumerate(designs, start=1)
-                ],
-                "required_test_cases": [
-                    {"id": f"test-instruction-{index:03d}"}
-                    for index, _design in enumerate(designs, start=1)
-                ],
-            }
-        raise AssertionError((tool, parameters))
+        return runtime.dispatch(command[0], list(command), parameters)
 
     document = parse_and_validate(
         Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()

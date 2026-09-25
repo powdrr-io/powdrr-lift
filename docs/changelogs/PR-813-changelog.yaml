@@ -1,0 +1,29 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 813
+title: Expose repository binding through Procedrr commands
+intent:
+  problem: Repository inventory and subject-binding primitives are not useful to the design flow until serialized artifacts and explicit Procedrr command boundaries expose them.
+  goal: Make inventory, lookup, candidate decisions, binding, and population receipts available as independently verifiable commands.
+human-decisions: []
+structured_files: []
+files:
+  - {path: src/powdrr_lift/core/repository_inventory.py, type: modified, span: {start_line: 209, end_line: 226}, summary: Restore serialized lookup queries., rationale: Preserve the query fingerprint across command boundaries.}
+  - {path: src/powdrr_lift/core/repository_inventory.py, type: modified, span: {start_line: 248, end_line: 260}, summary: Restore serialized candidates., rationale: Make candidate evidence auditable after retrieval.}
+  - {path: src/powdrr_lift/core/repository_inventory.py, type: modified, span: {start_line: 275, end_line: 289}, summary: Restore serialized candidate sets., rationale: Prevent downstream commands from depending on in-memory objects.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 23, end_line: 30}, summary: Import inventory command dependencies., rationale: Wire evidence and subject-binding operations into Workrr.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 43, end_line: 49}, summary: Import subject-binding operations., rationale: Expose deterministic lookup and C09 orchestration.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 220, end_line: 297}, summary: Register inventory, lookup, candidate, binding, and population commands., rationale: Make each repository resolution decision a typed Procedrr boundary.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 926, end_line: 949}, summary: Add serialized inventory, query, and candidate parsing helpers., rationale: Validate artifacts before downstream use.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 956, end_line: 1038}, summary: Implement inventory and subject-binding operations., rationale: Enforce deterministic retrieval and explicit candidate relation handling.}
+  - {path: src/powdrr_lift/workrr/command_catalog.py, type: modified, span: {start_line: 1395, end_line: 1415}, summary: Bind repository operations into runtime dispatch., rationale: Ensure declared commands cannot bypass their implementations.}
+  - {path: tests/test_repository_inventory.py, type: modified, span: {start_line: 19, end_line: 22}, summary: Import command-boundary test dependencies., rationale: Exercise inventory through FeatureCommandRuntime.}
+  - {path: tests/test_repository_inventory.py, type: modified, span: {start_line: 144, end_line: 166}, summary: Test inventory generation through Procedrr dispatch., rationale: Verify repository evidence is available at the actual command boundary.}
+entities: []
+entity_relationships: []
+invariants:
+  - {id: serialized-repository-artifacts, action: added, description: Lookup queries and candidate sets are fingerprint-validated when restored from command results., rationale: Prevent stale evidence from silently crossing command boundaries.}
+  - {id: subject-binding-is-explicit, action: added, description: Candidate retrieval, relation decisions, aggregation, and population enumeration are separate commands., rationale: Keep each semantic choice independently observable and testable.}
+guidance:
+  - {id: use-command-boundary-evidence, action: added, description: Downstream subject resolution consumes serialized inventory artifacts rather than model-authored repository descriptions., rationale: Preserve repository evidence as the authority.}
+features: []
+proposed_prs: []

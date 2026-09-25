@@ -1,0 +1,121 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 808
+title: Add semantic decision contract core
+intent:
+  problem: The classification-oriented design pipeline needs a stable, provider-neutral
+    boundary so deterministic rules, language models, and future local classifiers cannot
+    invent decision identity, provenance, unsupported labels, or stale cached meaning.
+  goal: Add strict semantic decision artifacts, exact source evidence, fingerprint-based
+    replay validation, and conservative deterministic classifiers without changing the
+    active design-interview flow.
+human-decisions:
+  - id: keep-semantic-decision-identity-compiler-owned
+    summary: Providers return only a bounded result; Powdrr binds identity, provenance,
+      evidence, timestamps, and input fingerprints.
+  - id: abstain-outside-deterministic-lexical-cases
+    summary: Deterministic source rules resolve only explicit polarity, quantifier, and
+      requirement-strength tokens and otherwise defer to the provider cascade.
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 566
+    summary: Define strict semantic decision specifications, bound results, exact source
+      spans, closed vocabularies, evidence requirements, serialization, and stale-input
+      validation.
+    rationale: Establish one replayable artifact contract shared by planning models,
+      deterministic rules, humans, and future local classifiers.
+    related:
+      entities:
+        - semantic-decision-contract
+      decisions:
+        - keep-semantic-decision-identity-compiler-owned
+      invariants:
+        - semantic-providers-cannot-author-compiler-metadata
+        - stale-semantic-decisions-cannot-be-reused
+  - path: src/powdrr_lift/workrr/semantic_classifier.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 90
+    summary: Resolve explicit polarity, quantifier, and requirement-strength tokens with
+      deterministic high-precision rules that fall through when no rule applies.
+    rationale: Avoid model calls for unambiguous lexical decisions without guessing at
+      unstated semantics.
+    related:
+      entities:
+        - deterministic-source-classifier
+      decisions:
+        - abstain-outside-deterministic-lexical-cases
+      invariants:
+        - deterministic-rules-do-not-guess
+  - path: tests/test_semantic_decision.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 204
+    summary: Verify strict artifact binding, replay, evidence, closed labels, source-span
+      resolution, stale fingerprints, independent modifier decisions, and deterministic
+      classifier fallthrough.
+    rationale: Protect the provider boundary and fail-closed behavior before the live
+      design flow begins consuming these artifacts.
+    related:
+      entities:
+        - semantic-decision-contract-tests
+      invariants:
+        - semantic-providers-cannot-author-compiler-metadata
+        - stale-semantic-decisions-cannot-be-reused
+        - deterministic-rules-do-not-guess
+entities:
+  - id: semantic-decision-contract
+    type: Module
+    action: added
+  - id: deterministic-source-classifier
+    type: Module
+    action: added
+  - id: semantic-decision-contract-tests
+    type: Source file
+    action: added
+entity_relationships:
+  - id: deterministic-classifier-supplies-semantic-results
+    source: deterministic-source-classifier
+    target: semantic-decision-contract
+    relationship: implements
+    description: Deterministic rules supply bounded values that can be bound into the
+      provider-neutral semantic decision contract.
+    rationale: Keep provider selection separate from canonical identity and validation.
+    action: added
+  - id: semantic-decision-tests-verify-contract
+    source: semantic-decision-contract-tests
+    target: semantic-decision-contract
+    relationship: verifies
+    description: The test module verifies strict construction, replay, source evidence,
+      and invalidation behavior for semantic decision artifacts.
+    rationale: Prevent provider output or stale inputs from bypassing the compiler-owned
+      decision boundary.
+    action: added
+invariants:
+  - id: semantic-providers-cannot-author-compiler-metadata
+    action: added
+    description: A semantic provider may return only status, value, and unresolved reason;
+      Powdrr owns identity, subject, fingerprints, provenance, evidence, and timestamps.
+    rationale: Make provider implementations interchangeable without trusting them to
+      define canonical artifact identity or authority.
+  - id: stale-semantic-decisions-cannot-be-reused
+    action: added
+    description: A persisted decision is valid only while its exact proposition, source,
+      candidate set, accepted definition, and classifier contract fingerprints remain
+      unchanged.
+    rationale: Prevent cached classifications from surviving changes to their semantic
+      inputs.
+  - id: deterministic-rules-do-not-guess
+    action: added
+    description: Deterministic source classifiers return a value only for registered
+      explicit lexical forms and otherwise return no resolution so the provider cascade
+      can continue.
+    rationale: Preserve precision and surface ambiguity instead of manufacturing meaning.
+guidance: []
+features: []
+proposed_prs: []

@@ -242,7 +242,7 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
             )
         return subprocess.CompletedProcess(command, 0, "done\n", "")
 
-    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.subprocess.run", fake_run)
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
     request = provider.prepare_request(_request(_head(worktree)))
     provider.run(request, worktree_root=worktree, attempt_id="attempt-1")
 
@@ -280,7 +280,7 @@ def test_minisweagent_provider_rejects_clean_exit_without_submission(
         )
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.subprocess.run", fake_run)
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
     result = provider.run(_request(head), worktree_root=worktree, attempt_id="limited")
 
     assert result.returncode == 125

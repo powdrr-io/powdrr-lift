@@ -6,6 +6,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_lift.core.behavior_contract import (
+    BehaviorScenario,
+    compile_behavior_scenarios,
+    render_behavior_matrix,
+)
+
 
 def _worker_objective(text: str) -> str:
     """Remove source-level repository workflow instructions from the objective."""
@@ -40,6 +46,7 @@ class ImplementationPacket:
     obligations: tuple[str, ...]
     required_tests: tuple[Mapping[str, Any], ...]
     repository: RepositoryContextPacket
+    behavior_scenarios: tuple[BehaviorScenario, ...] = ()
 
     def for_obligation(self, ordinal: int) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
@@ -54,6 +61,11 @@ class ImplementationPacket:
             obligations=(self.obligations[index],),
             required_tests=required_tests,
             repository=self.repository,
+            behavior_scenarios=(
+                (self.behavior_scenarios[index],)
+                if index < len(self.behavior_scenarios)
+                else ()
+            ),
         )
 
     def for_task(
@@ -78,6 +90,7 @@ class ImplementationPacket:
             obligations=(task_objective,),
             required_tests=tests,
             repository=self.repository,
+            behavior_scenarios=self.behavior_scenarios,
         )
 
     def to_data(self) -> dict[str, Any]:
@@ -96,6 +109,7 @@ class ImplementationPacket:
                 for index, item in enumerate(self.required_tests, start=1)
             ],
             "repository": self.repository.to_data(),
+            "behavior_scenarios": [item.to_data() for item in self.behavior_scenarios],
         }
 
     @classmethod
@@ -122,6 +136,11 @@ class ImplementationPacket:
         existing = repository.get("existing_tests", [])
         if not isinstance(existing, list):
             raise ValueError("implementation packet existing tests are malformed")
+        raw_scenarios = raw.get("behavior_scenarios", [])
+        if not isinstance(raw_scenarios, list) or not all(
+            isinstance(item, Mapping) for item in raw_scenarios
+        ):
+            raise ValueError("implementation packet behavior scenarios are malformed")
         packet = cls(
             objective=_worker_objective(str(raw.get("objective", ""))),
             obligations=obligations,
@@ -137,6 +156,7 @@ class ImplementationPacket:
                     item for item in existing if isinstance(item, Mapping)
                 ),
             ),
+            behavior_scenarios=compile_behavior_scenarios(raw_scenarios),
         )
         if not packet.objective.strip() or not packet.obligations:
             raise ValueError("implementation packet is missing required content")
@@ -159,6 +179,8 @@ class ImplementationPacket:
                 f"- T{index:02d} — add a focused test proving {description}"
             )
         test_lines = test_lines or ["- none"]
+        if self.behavior_scenarios:
+            return render_behavior_matrix(self.behavior_scenarios)
         return "\n".join(
             (
                 "Required behavioral tests:",
@@ -182,6 +204,7 @@ def compile_implementation_packet(
     allowed_paths: Sequence[str],
     validation_profiles: Sequence[str],
     existing_tests: Sequence[Mapping[str, Any]] = (),
+    behavior_scenarios: Sequence[Mapping[str, Any]] = (),
 ) -> ImplementationPacket:
     """Normalize worker inputs and reject incomplete executable contracts."""
     if not objective.strip():
@@ -201,6 +224,11 @@ def compile_implementation_packet(
         normalized_tests.append({"description": description.strip()})
     if not normalized_tests:
         raise ValueError("implementation packet requires test contracts")
+    embedded_scenarios = tuple(
+        item["behavior_scenario"]
+        for item in required_tests
+        if isinstance(item.get("behavior_scenario"), Mapping)
+    )
     return ImplementationPacket(
         objective=_worker_objective(objective),
         obligations=normalized_obligations,
@@ -218,6 +246,9 @@ def compile_implementation_packet(
                 for item in existing_tests
                 if isinstance(item, Mapping) and isinstance(item.get("selector"), str)
             ),
+        ),
+        behavior_scenarios=compile_behavior_scenarios(
+            (*embedded_scenarios, *behavior_scenarios)
         ),
     )
 

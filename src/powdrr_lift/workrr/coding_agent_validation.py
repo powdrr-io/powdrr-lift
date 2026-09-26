@@ -51,6 +51,11 @@ class ValidationResult:
     stdout: str = ""
     stderr: str = ""
     error: str | None = None
+    test_id: str | None = None
+    expected: str | None = None
+    actual: str | None = None
+    source_location: str | None = None
+    evidence_path: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -61,6 +66,11 @@ class ValidationResult:
             "stdout": self.stdout,
             "stderr": self.stderr,
             "error": self.error,
+            "test_id": self.test_id,
+            "expected": self.expected,
+            "actual": self.actual,
+            "source_location": self.source_location,
+            "evidence_path": self.evidence_path,
         }
 
 
@@ -74,6 +84,34 @@ class ValidationReport:
     schema_version: str = CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
+        failures = [
+            normalize_failure(
+                failure_id=f"local-validation:{result.profile}",
+                stage="local_validation",
+                test_id=result.test_id or result.profile,
+                command=result.command,
+                expected=result.expected or "validation command exits successfully",
+                actual=result.actual or result.error or result.status.value,
+                source_location=result.source_location,
+                evidence_path=result.evidence_path,
+                classification=(
+                    "environment_failure"
+                    if result.status is ValidationResultStatus.BLOCKED
+                    else "test_failure"
+                ),
+                repairability=(
+                    "blocked"
+                    if result.status
+                    in (
+                        ValidationResultStatus.BLOCKED,
+                        ValidationResultStatus.TIMED_OUT,
+                    )
+                    else "repairable"
+                ),
+            )
+            for result in self.results
+            if result.status is not ValidationResultStatus.PASSED
+        ]
         return {
             "schema_version": self.schema_version,
             "attempt_id": self.attempt_id,
@@ -81,7 +119,49 @@ class ValidationReport:
             "status": self.status.value,
             "results": [result.to_data() for result in self.results],
             "error": self.error,
+            "failures": failures,
         }
+
+
+def normalize_failure(
+    *,
+    failure_id: str,
+    stage: str,
+    test_id: str,
+    command: Sequence[str] = (),
+    contract_refs: Sequence[str] = (),
+    expected: Any = None,
+    actual: Any = None,
+    source_location: str | None = None,
+    evidence_path: str | None = None,
+    classification: str = "product_failure",
+    repairability: str = "repairable",
+) -> dict[str, Any]:
+    """Normalize local, verifier, scope, and policy failures for repair handoff."""
+    if stage not in {"local_validation", "verifier", "scope", "policy"}:
+        raise ValueError(f"unsupported validation failure stage: {stage}")
+    if classification not in {
+        "product_failure",
+        "test_failure",
+        "environment_failure",
+        "policy_failure",
+    }:
+        raise ValueError(f"unsupported failure classification: {classification}")
+    if repairability not in {"repairable", "blocked", "human_required"}:
+        raise ValueError(f"unsupported failure repairability: {repairability}")
+    return {
+        "failure_id": failure_id,
+        "stage": stage,
+        "test_id": test_id,
+        "command": list(command),
+        "contract_refs": list(contract_refs),
+        "expected": expected,
+        "actual": actual,
+        "source_location": source_location,
+        "evidence_path": evidence_path,
+        "classification": classification,
+        "repairability": repairability,
+    }
 
 
 class ValidationRunner:
@@ -241,6 +321,14 @@ class ValidationRunner:
             stdout=completed.stdout,
             stderr=completed.stderr,
             error=None if completed.returncode == 0 else "validation command failed",
+            actual=(
+                None
+                if completed.returncode == 0
+                else "\n".join(
+                    part for part in (completed.stdout, completed.stderr) if part
+                )
+                or "command exited with status " + str(completed.returncode)
+            ),
         )
 
 
@@ -276,6 +364,11 @@ def validation_report_from_data(data: Mapping[str, Any]) -> ValidationReport:
             stdout=str(item.get("stdout", "")),
             stderr=str(item.get("stderr", "")),
             error=item.get("error"),
+            test_id=item.get("test_id"),
+            expected=item.get("expected"),
+            actual=item.get("actual"),
+            source_location=item.get("source_location"),
+            evidence_path=item.get("evidence_path"),
         )
         for item in data.get("results", [])
     )

@@ -137,6 +137,7 @@ from powdrr_lift.structrr.intent import (
     IntentTrigger,
     make_intent_source,
 )
+from powdrr_lift.structrr.intent_lineage import audit_intent_lineage
 from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 from powdrr_lift.structrr.verification_health import (
     VerificationPolicyMode,
@@ -1977,6 +1978,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     audit_parser.set_defaults(func=_run_audit_capabilities)
 
+    intent_audit_parser = subparsers.add_parser(
+        "audit-intent-lineage",
+        aliases=["audit_intent_lineage"],
+        help="Replay a fingerprinted history manifest and report intent drift.",
+    )
+    intent_audit_parser.add_argument("--input", type=Path, required=True)
+    intent_audit_parser.add_argument("--output", type=Path)
+    intent_audit_parser.set_defaults(func=_run_audit_intent_lineage)
+
     remember_intent_parser = subparsers.add_parser(
         "remember-intent",
         aliases=["remember_intent"],
@@ -2689,6 +2699,24 @@ def _run_audit_capabilities(args: argparse.Namespace) -> int:
         "checks": [item.to_data() for item in checks],
     }
     print(json.dumps(report, indent=2))
+    return 0 if report["passed"] else 1
+
+
+def _run_audit_intent_lineage(args: argparse.Namespace) -> int:
+    try:
+        history = json.loads(args.input.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"Could not read intent lineage history: {error}", file=sys.stderr)
+        return 2
+    if not isinstance(history, Mapping):
+        print("Intent lineage history must be a JSON object", file=sys.stderr)
+        return 2
+    report = audit_intent_lineage(history)
+    rendered = json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
     return 0 if report["passed"] else 1
 
 

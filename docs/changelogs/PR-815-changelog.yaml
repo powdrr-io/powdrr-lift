@@ -1,0 +1,106 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 815
+title: Add deterministic intent lineage and drift audits
+intent:
+  problem: Per-change proposal reviews cannot reveal slow drift across accepted revisions, stale verification evidence, broken provenance, or current invariant failures hidden by historical acceptance.
+  goal: Replay an immutable history manifest and produce a deterministic audit with concrete lineage findings, the first drift revision, and severity counts.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/intent_lineage.py
+    type: added
+    span: {start_line: 1, end_line: 672}
+    summary: Audit proposal lineage, source and clause provenance, operation realization, execution units, intent packets, actualization, validation freshness, accepted state, supersession, and current invariant evidence.
+    rationale: Detect cumulative drift from immutable artifact data with reproducible findings instead of a fuzzy score.
+    related:
+      entities: [intent-lineage-audit]
+      invariants: [intent-audit-is-replayable, current-invariant-failures-remain-visible]
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 140, end_line: 140}
+    summary: Import the Structrr lineage auditor into the CLI.
+    rationale: Expose the pure audit through the repository command surface.
+    related:
+      entities: [intent-lineage-audit-cli]
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1981, end_line: 1989}
+    summary: Register the audit-intent-lineage command with input and output artifact options.
+    rationale: Make full-history audit invocation explicit and scriptable.
+    related:
+      entities: [intent-lineage-audit-cli]
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2705, end_line: 2722}
+    summary: Load a history manifest, run the deterministic audit, persist the report when requested, and return a failing status when findings remain.
+    rationale: Provide a stable command boundary for replay and automation.
+    related:
+      entities: [intent-lineage-audit-cli, intent-lineage-audit]
+      invariants: [intent-audit-is-replayable]
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    span: {start_line: 30, end_line: 33}
+    summary: Export the history schema identifier and audit function from Structrr.
+    rationale: Keep the deterministic audit available through the product-state API.
+    related:
+      entities: [intent-lineage-audit]
+  - path: src/powdrr_lift/structrr/__init__.py
+    type: modified
+    span: {start_line: 79, end_line: 80}
+    summary: Add the audit API to Structrr's public exports.
+    rationale: Make the public package surface match its declared implementation.
+    related:
+      entities: [intent-lineage-audit]
+  - path: tests/test_intent_lineage.py
+    type: added
+    span: {start_line: 1, end_line: 236}
+    summary: Verify deterministic replay, missing and stale lineage, current invariant failures, supersession errors, tampered reports, and CLI output.
+    rationale: Cover the audit's required drift and evidence checks with executable fixtures.
+    related:
+      entities: [intent-lineage-audit-tests]
+      invariants: [intent-audit-is-replayable, current-invariant-failures-remain-visible]
+  - path: docs/intent-lineage-audit.md
+    type: added
+    span: {start_line: 1, end_line: 61}
+    summary: Document the fingerprinted source and accepted-state inputs, history manifest, audit command, output, and stable artifact references.
+    rationale: Allow callers to prepare reproducible audits from persisted artifacts.
+    related:
+      entities: [intent-lineage-audit-doc]
+entities:
+  - id: intent-lineage-audit
+    type: Module
+    action: added
+  - id: intent-lineage-audit-cli
+    type: Command
+    action: added
+  - id: intent-lineage-audit-tests
+    type: Test suite
+    action: added
+  - id: intent-lineage-audit-doc
+    type: Source file
+    action: added
+entity_relationships:
+  - id: intent-audit-command-runs-structrr-audit
+    source: intent-lineage-audit-cli
+    target: intent-lineage-audit
+    relationship: invokes
+    description: The CLI loads a history manifest and invokes the deterministic Structrr audit.
+    rationale: Keep command parsing separate from lineage and drift rules.
+    action: added
+  - id: intent-audit-tests-verify-the-audit
+    source: intent-lineage-audit-tests
+    target: intent-lineage-audit
+    relationship: verifies
+    description: The test suite exercises replay stability, provenance, evidence freshness, supersession, and current-state failure reporting.
+    rationale: Prevent historical acceptance or missing lineage from masking drift.
+    action: added
+invariants:
+  - id: intent-audit-is-replayable
+    action: added
+    description: Identical history manifest content produces the same report fingerprint and finding order.
+    rationale: Make cumulative audit results reproducible and comparable over time.
+  - id: current-invariant-failures-remain-visible
+    action: added
+    description: Current invariant failures and stale current evidence remain blocking findings regardless of prior revision acceptance.
+    rationale: Historical approval cannot prove current conformance.
+guidance: []

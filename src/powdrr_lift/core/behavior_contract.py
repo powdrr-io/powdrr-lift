@@ -34,6 +34,7 @@ class BehaviorScenario:
     dimensions: Mapping[str, Any]
     evidence: tuple[str, ...]
     validator: str
+    capability_matrix: tuple[Mapping[str, Any], ...] = ()
     schema_version: str = "behavior-scenario-v1"
 
     def to_data(self) -> dict[str, Any]:
@@ -47,6 +48,7 @@ class BehaviorScenario:
             "dimensions": {name: self.dimensions[name] for name in BEHAVIOR_DIMENSIONS},
             "evidence": list(self.evidence),
             "validator": self.validator,
+            "capability_matrix": [dict(item) for item in self.capability_matrix],
         }
 
 
@@ -89,6 +91,18 @@ def compile_behavior_scenarios(
             )
         evidence = _texts(item.get("evidence"), f"scenario {scenario_id} evidence")
         validator = _text(item.get("validator"), f"scenario {scenario_id} validator")
+        raw_capabilities = item.get("capability_matrix", [])
+        if (
+            not isinstance(raw_capabilities, Sequence)
+            or isinstance(raw_capabilities, (str, bytes))
+            or not all(isinstance(value, Mapping) for value in raw_capabilities)
+        ):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} capability_matrix must be a list of mappings"
+            )
+        capabilities = (
+            validate_capability_matrix(raw_capabilities) if raw_capabilities else ()
+        )
         scenarios.append(
             BehaviorScenario(
                 scenario_id=scenario_id,
@@ -99,6 +113,7 @@ def compile_behavior_scenarios(
                 dimensions=dimensions,
                 evidence=evidence,
                 validator=validator,
+                capability_matrix=capabilities,
             )
         )
     return tuple(scenarios)
@@ -120,6 +135,9 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                     **item.dimensions,
                     "validator": item.validator,
                     "evidence": list(item.evidence),
+                    "capability_matrix": [
+                        dict(value) for value in item.capability_matrix
+                    ],
                 },
                 sort_keys=True,
                 ensure_ascii=False,
@@ -128,6 +146,7 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
     return (
         "Behavior contract matrix (implement and verify each row exactly once):\n"
         + "\n".join(rows)
+        + "\nRun the focused required tests after implementation."
     )
 
 

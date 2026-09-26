@@ -78,6 +78,29 @@ from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 
 
+def _test_behavior_scenario(identifier: str) -> dict[str, Any]:
+    return {
+        "schema_version": "behavior-scenario-v1",
+        "scenario_id": f"scenario:{identifier}",
+        "subject": identifier,
+        "given": "the declared feature input",
+        "when": "the feature operation is invoked",
+        "then": "the declared acceptance outcome is observed",
+        "dimensions": {
+            "normal_result": "the acceptance outcome is observed",
+            "error_behavior": "not_applicable",
+            "continuation": "not_applicable",
+            "unsupported_behavior": "not_applicable",
+            "cancellation_cleanup": "not_applicable",
+            "compatibility": "not_applicable",
+            "negative_boundaries": "not_applicable",
+        },
+        "evidence": [f"focused test for {identifier}"],
+        "validator": f"focused test for {identifier}",
+        "capability_matrix": [],
+    }
+
+
 def test_procedrr_replay_loader_preserves_completed_judge_results(
     tmp_path: Path,
 ) -> None:
@@ -387,6 +410,7 @@ def test_compile_feature_obligations_binds_sentence_trace_to_plan(
                         "description": "Implement the feature.",
                         "acceptance_criterion": "It works.",
                         "expected_test": "Test that it works.",
+                        "behavior_scenario": _test_behavior_scenario("sentence-1"),
                     },
                 }
             ],
@@ -472,6 +496,7 @@ def test_compile_feature_obligations_accepts_both_llm_result_shapes(
         "description": "Implement the feature.",
         "acceptance_criterion": "The feature works.",
         "expected_test": "Run the feature test.",
+        "behavior_scenario": _test_behavior_scenario("sentence-1"),
     }
 
     def result_shape(value: Any) -> Any:
@@ -833,6 +858,7 @@ def test_structured_obligation_contracts_cover_generated_design_intents(
                 "description": f"Obligation {index}.",
                 "acceptance_criterion": f"Acceptance {index}.",
                 "expected_test": f"Test obligation {index}.",
+                "behavior_scenario": _test_behavior_scenario(f"sentence-{index}"),
             },
         }
         for index in range(1, 4)
@@ -876,6 +902,7 @@ def test_feature_test_contracts_do_not_retain_unrelated_inventory_selectors() ->
                 "design": {
                     "expected_test": "Verify the behavior.",
                     "acceptance_criterion": "The behavior is observable.",
+                    "behavior_scenario": _test_behavior_scenario("sentence-1"),
                 },
             }
         ],
@@ -1284,6 +1311,27 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                     "status": "resolved",
                     "value": "entailed",
                     "reason_code": None,
+                }
+            if "lossless behavior scenario" in question:
+                return {
+                    "status": "resolved",
+                    "unresolved_dimensions": [],
+                    "scenario": {
+                        "subject": "the feature",
+                        "given": "the declared feature input",
+                        "when": "the feature is invoked",
+                        "then": "the acceptance result is observed",
+                        "dimensions": {
+                            "normal_result": "the acceptance result is observed",
+                            "error_behavior": "not_applicable",
+                            "continuation": "not_applicable",
+                            "unsupported_behavior": "not_applicable",
+                            "cancellation_cleanup": "not_applicable",
+                            "compatibility": "not_applicable",
+                            "negative_boundaries": "not_applicable",
+                        },
+                        "capability_matrix": [],
+                    },
                 }
             raise AssertionError(question)
 

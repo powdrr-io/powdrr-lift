@@ -32,6 +32,7 @@ def _scenario() -> dict[str, Any]:
         "validator": (
             "pytest -q tests/test_processor.py::test_nested_error_and_continuation"
         ),
+        "capability_matrix": [],
     }
 
 

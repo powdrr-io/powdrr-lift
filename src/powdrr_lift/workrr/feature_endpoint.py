@@ -1006,6 +1006,10 @@ def _derive_feature_test_contracts(
                 continue
             item = dict(raw)
             item["intent_refs"] = exact_refs
+            if not isinstance(item.get("behavior_scenario"), Mapping):
+                # A legacy test without the typed behavior contract cannot
+                # satisfy coverage for an actionable obligation.
+                continue
             name_hint = item.get("name_hint")
             selector = item.get("selector")
             if not (
@@ -1037,6 +1041,11 @@ def _derive_feature_test_contracts(
             continue
         expected_test = design.get("expected_test")
         acceptance = design.get("acceptance_criterion")
+        behavior_scenario = design.get("behavior_scenario")
+        if not isinstance(behavior_scenario, Mapping):
+            raise PowdrrExecutionError(
+                f"feature obligation {obligation_id!r} has no typed behavior scenario"
+            )
         semantic_cases.append(
             {
                 "id": f"{clause_id}-test",
@@ -1052,6 +1061,7 @@ def _derive_feature_test_contracts(
                     else "The sentence obligation is satisfied."
                 ),
                 "test_selection": "new",
+                "behavior_scenario": dict(behavior_scenario),
             }
         )
     compiled = _compile_required_test_case_edits(
@@ -3414,6 +3424,12 @@ def _write_structrr_plan_from_obligations(
             raise PowdrrExecutionError(
                 f"structured feature obligation {obligation_id!r} is incomplete"
             )
+        behavior_scenario = design.get("behavior_scenario")
+        if not isinstance(behavior_scenario, Mapping):
+            raise PowdrrExecutionError(
+                f"structured feature obligation {obligation_id!r} is missing "
+                "its typed behavior scenario"
+            )
         kind_text = str(kind)
         description_text = str(description).strip()
         acceptance_text = str(acceptance).strip()
@@ -3469,6 +3485,7 @@ def _write_structrr_plan_from_obligations(
             "test_selection": _select_matching_test_inventory(
                 item["design"]["expected_test"], inventory
             ),
+            "behavior_scenario": item["design"]["behavior_scenario"],
         }
         for item in obligations
     ]
@@ -3694,6 +3711,7 @@ def _compile_required_test_case_edits(
             "expected_outcome",
             "test_selection",
             "existing_test",
+            "behavior_scenario",
         }
         if unknown:
             raise PowdrrExecutionError(
@@ -3713,6 +3731,15 @@ def _compile_required_test_case_edits(
             )
         selection = item.pop("test_selection", item.pop("existing_test", "new"))
         expected_outcome = item.pop("expected_outcome", None)
+        behavior_scenario = item.get("behavior_scenario")
+        if behavior_scenario is not None and not isinstance(behavior_scenario, Mapping):
+            raise PowdrrExecutionError(
+                f"required test case {item['id']!r} has an invalid behavior scenario"
+            )
+        if isinstance(behavior_scenario, Mapping):
+            from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
+
+            compile_behavior_scenarios((behavior_scenario,))
         if isinstance(expected_outcome, str) and expected_outcome.strip():
             item["description"] = (
                 f"{item['description'].strip()} "

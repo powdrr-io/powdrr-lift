@@ -282,7 +282,11 @@ class DeterministicPlanningClient:
             }
         if required == {"outcome", "explanation"}:
             return {
-                "outcome": self.proposal_outcome,
+                "outcome": (
+                    "pass"
+                    if "final_semantic_decision" in text
+                    else self.proposal_outcome
+                ),
                 "explanation": "The supplied evidence proves this predicate.",
             }
         if required == {

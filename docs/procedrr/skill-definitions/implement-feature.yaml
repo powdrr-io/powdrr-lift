@@ -610,7 +610,7 @@ steps:
         validation: {type: reference, value: validation}
       returns:
         type: object
-        required: [path, fingerprint, deterministic_decisions, semantic_worklist]
+        required: [path, fingerprint, deterministic_decisions, semantic_worklist, proposal_fingerprint, diff_fingerprint, observed_diff, operation_ids, retained_clause_ids]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
@@ -648,8 +648,9 @@ steps:
             instructions:
               - Evaluate exactly the one predicate in final_semantic_decision.
               - Do not evaluate sibling predicates or issue an aggregate implementation verdict.
-              - Use pass only when the supplied evidence proves this predicate in the final candidate tree.
+              - Use pass only when the observed diff and the accepted operation or intent clause in the supplied evidence prove this predicate in the final candidate tree.
               - Return fail or unknown when evidence is missing, stale, or contradictory.
+              - Every operation must be fulfilled, every retained clause must be preserved, and the unexplained-change review must account for every semantic effect in the observed diff.
               - Do not propose repairs or return IDs, references, paths, selectors, or fingerprints.
               - >-
                 Examples: predicate "every member of the pickle population has a passing contract result" with complete current case evidence → pass.
@@ -681,10 +682,13 @@ steps:
         semantic_decisions: {type: reference, value: final_semantic_decisions}
       returns:
         type: object
-        required: [accepted, receipt_path]
+        required: [accepted, receipt_path, actualization_report_path, actualization_fingerprint, actualization_passed]
         properties:
           accepted: {type: boolean}
           receipt_path: {type: string, minLength: 1}
+          actualization_report_path: {type: string, minLength: 1}
+          actualization_fingerprint: {type: string, minLength: 1}
+          actualization_passed: {type: boolean}
       bind: final_review
   - gate:
       subject: final_review.accepted

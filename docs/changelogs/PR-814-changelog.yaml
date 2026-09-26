@@ -1,0 +1,146 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 814
+title: Reconcile implementation against accepted intent
+intent:
+  problem: Final implementation review checks validation and task receipts but does not prove that accepted proposal operations were fulfilled or retained intent was preserved.
+  goal: Bind atomic post-implementation judgments to the accepted proposal and observed diff, persist an actualization report, and block PR creation when evidence is missing, stale, or failing.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/actualization.py
+    type: added
+    span: {start_line: 1, end_line: 93}
+    summary: Reconcile operation, retained-intent, and unexplained-change judgments into a fingerprinted fail-closed report.
+    rationale: Make actualization results deterministic, inspectable, and bound to the exact accepted proposal and implementation diff.
+    related:
+      entities: [actualization-reconciliation]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 70, end_line: 70}
+    summary: Import the actualization reconciler into the feature endpoint.
+    rationale: Integrate deterministic post-implementation reconciliation into the production flow.
+    related:
+      entities: [actualization-reconciliation]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5036, end_line: 5036}
+    summary: Pass execution state into final implementation review.
+    rationale: Bind final review to the proposal revision and implementation request.
+    related:
+      entities: [actualization-reconciliation]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5040, end_line: 5109}
+    summary: Compile operation, retained-intent, and unexplained-change judgments against the accepted proposal and observed diff.
+    rationale: Ensure the production feature flow requires fulfillment, preservation, and unexplained-change review before opening a PR.
+    related:
+      entities: [actualization-reconciliation]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5124, end_line: 5135}
+    summary: Persist proposal and diff identities, observed changes, and the actualization decision worklist in final-review evidence.
+    rationale: Give each final judge current, inspectable evidence and stable decision subjects.
+    related:
+      entities: [actualization-reconciliation]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5156, end_line: 5196}
+    summary: Reconcile final decisions into the actualization report and reject failed or stale findings.
+    rationale: Block PR progression unless every required intent outcome passes against the current diff.
+    related:
+      entities: [actualization-reconciliation]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5198, end_line: 5209}
+    summary: Include the actualization report in the persisted final-review receipt.
+    rationale: Keep the durable acceptance receipt consistent with the final gate outcome.
+    related:
+      entities: [actualization-reconciliation]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 613, end_line: 613}
+    summary: Require the proposal and observed-diff identities in final-review evidence.
+    rationale: Bind actualization judgments to the accepted proposal and exact current diff.
+    related:
+      entities: [implement-feature-workflow]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 651, end_line: 651}
+    summary: Require each final judgment to use the accepted operation or intent clause and observed diff.
+    rationale: Ground final semantic outcomes in the evidence they reconcile.
+    related:
+      entities: [implement-feature-workflow]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 653, end_line: 653}
+    summary: State the required operation, intent-preservation, and unexplained-change outcomes.
+    rationale: Keep the semantic review contract aligned with the gate.
+    related:
+      entities: [implement-feature-workflow]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 685, end_line: 685}
+    summary: Require actualization receipt fields in the final review result.
+    rationale: Make the reconciliation outcome available to the downstream gate.
+    related:
+      entities: [implement-feature-workflow]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 689, end_line: 691}
+    summary: Expose the persisted actualization report path, fingerprint, and pass state.
+    rationale: Carry review evidence and identity through checked-in Procedrr control flow.
+    related:
+      entities: [implement-feature-workflow]
+      invariants: [actualization-requires-complete-fresh-evidence]
+    rationale: Keep mandatory actualization decisions in checked-in Procedrr flow control.
+    related:
+      entities: [actualization-reconciliation]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: tests/test_actualization.py
+    type: added
+    span: {start_line: 1, end_line: 70}
+    summary: Cover passing reports and rejection of missing, duplicate, failed, and stale judgments.
+    rationale: Protect actualization completeness and evidence freshness behavior.
+    related:
+      entities: [actualization-reconciliation-tests]
+      invariants: [actualization-requires-complete-fresh-evidence]
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 285, end_line: 289}
+    summary: Provide passing final actualization judgments independently from proposal-review outcomes in the deterministic flow fixture.
+    rationale: Keep end-to-end coverage aligned with the new distinct final-review decisions.
+    related:
+      entities: [actualization-reconciliation-tests]
+entities:
+  - id: actualization-reconciliation
+    type: Module
+    action: added
+  - id: actualization-reconciliation-tests
+    type: Test suite
+    action: added
+  - id: implement-feature-workflow
+    type: Workflow
+    action: added
+entity_relationships:
+  - id: feature-flow-enforces-actualization
+    source: actualization-reconciliation
+    target: implement-feature-workflow
+    relationship: enforces
+    description: The final implementation review compiles and evaluates actualization decisions before the PR creation operation.
+    rationale: Prevent validated but unfulfilled or intent-violating implementations from advancing.
+    action: added
+invariants:
+  - id: actualization-requires-complete-fresh-evidence
+    action: added
+    description: Final review passes only when each proposal operation and retained intent clause has exactly one passing judgment bound to the current diff and no unexplained semantic change is found.
+    rationale: Passing tests and path checks alone do not establish proposal fulfillment or retained-intent preservation.
+guidance: []

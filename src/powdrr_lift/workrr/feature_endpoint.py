@@ -67,6 +67,7 @@ from powdrr_lift.structrr.verification_obligations import (
     VerificationObligationCompilation,
     compile_verification_obligations,
 )
+from powdrr_lift.workrr.actualization import reconcile_actualization
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -5032,9 +5033,80 @@ def _prepare_final_implementation_review(
     worktree: Path,
     runner: Runner,
     output_root: Path,
+    state: Mapping[str, Any],
     **_: Any,
 ) -> dict[str, Any]:
     validation = parameters.get("validation")
+    proposal = state.get("proposal_revision")
+    if not isinstance(proposal, ProposalRevision):
+        raise PowdrrExecutionError(
+            "final review requires the accepted proposal revision"
+        )
+    request = state.get("request")
+    if not isinstance(request, ImplementationRequest):
+        raise PowdrrExecutionError("final review requires the implementation request")
+    diff = _git_output(
+        runner, worktree, ["git", "diff", "--binary", request.base_commit, "--"]
+    )
+    diff_fingerprint = content_fingerprint(
+        {"base_commit": request.base_commit, "patch": diff}
+    )
+    baseline_document = _load_yaml_mapping(Path(state["baseline_path"]))
+    active_clauses = _resolve_feature_intent(
+        worktree, baseline_document=baseline_document
+    )
+    removed_clause_ids = {
+        operation.subject_id
+        for operation in proposal.operations
+        if operation.action == "remove"
+        and operation.section in {"invariants", "guidance", "active_intent"}
+    }
+    retained_clause_ids = sorted(
+        clause.clause_id
+        for clause in active_clauses
+        if clause.clause_id not in removed_clause_ids
+    )
+    specifications = [
+        {
+            "decision_id": f"operation:{operation.operation_id}",
+            "category": "operation",
+            "subject_id": operation.operation_id,
+            "predicate": (
+                f"the observed implementation fulfills proposal operation "
+                f"{operation.operation_id} without contradicting its accepted content"
+            ),
+            "accepted_operation": operation.to_data(),
+            "evidence_fingerprint": diff_fingerprint,
+        }
+        for operation in proposal.operations
+    ]
+    clauses_by_id = {clause.clause_id: clause for clause in active_clauses}
+    specifications.extend(
+        {
+            "decision_id": f"intent:{clause_id}",
+            "category": "retained_intent",
+            "subject_id": clause_id,
+            "predicate": (
+                "the observed implementation preserves active intent clause "
+                f"{clause_id}"
+            ),
+            "intent_clause": clauses_by_id[clause_id].to_data(),
+            "evidence_fingerprint": diff_fingerprint,
+        }
+        for clause_id in retained_clause_ids
+    )
+    specifications.append(
+        {
+            "decision_id": "unexplained:semantic-change-review",
+            "category": "unexplained_change",
+            "subject_id": proposal.proposal_id,
+            "predicate": (
+                "every semantic change in the observed diff is explained by an "
+                "accepted proposal operation or is an implementation detail"
+            ),
+            "evidence_fingerprint": diff_fingerprint,
+        }
+    )
     document = {
         "deterministic_decisions": [
             {
@@ -5049,7 +5121,18 @@ def _prepare_final_implementation_review(
                 "passed": isinstance(parameters.get("task_receipts"), list),
             },
         ],
-        "semantic_worklist": {"specifications": []},
+        "semantic_worklist": {"specifications": specifications},
+        "proposal_fingerprint": proposal.fingerprint,
+        "diff_fingerprint": diff_fingerprint,
+        "observed_diff": diff,
+        "changed_paths": _git_output(
+            runner,
+            worktree,
+            ["git", "diff", "--name-only", request.base_commit, "--"],
+        ).splitlines(),
+        "operation_ids": [item.operation_id for item in proposal.operations],
+        "retained_clause_ids": retained_clause_ids,
+        "unexplained_changes": ["semantic-change-review"],
         "git_status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
     }
     path, fingerprint = _write_flow_artifact(
@@ -5070,7 +5153,60 @@ def _finalize_implementation_review(
     semantic = _flow_items(parameters.get("semantic_decisions"))
     if semantic and not all(item.get("outcome") == "pass" for item in semantic):
         result["accepted"] = False
+    review = parameters.get("review")
+    if not isinstance(review, Mapping):
+        raise PowdrrExecutionError("final review is missing its actualization worklist")
+    semantic_worklist = review.get("semantic_worklist")
+    specifications = _flow_items(
+        semantic_worklist.get("specifications")
+        if isinstance(semantic_worklist, Mapping)
+        else None
+    )
+    if len(specifications) != len(semantic):
+        raise PowdrrExecutionError("actualization decisions are incomplete")
+    bound_decisions = [
+        {
+            "decision_id": specification.get("decision_id"),
+            "outcome": decision.get("outcome"),
+            "explanation": decision.get("explanation"),
+            "evidence_fingerprint": specification.get("evidence_fingerprint"),
+        }
+        for specification, decision in zip(specifications, semantic, strict=True)
+    ]
+    actualization = reconcile_actualization(
+        proposal_fingerprint=str(review.get("proposal_fingerprint", "")),
+        diff_fingerprint=str(review.get("diff_fingerprint", "")),
+        operation_ids=[str(item) for item in review.get("operation_ids", [])],
+        retained_clause_ids=[
+            str(item) for item in review.get("retained_clause_ids", [])
+        ],
+        unexplained_changes=[
+            str(item) for item in review.get("unexplained_changes", [])
+        ],
+        decisions=bound_decisions,
+    )
+    actualization_path = output_root / "actualization-report.json"
+    actualization_path.write_text(
+        json.dumps(actualization, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    result["actualization_report_path"] = str(actualization_path)
+    result["actualization_fingerprint"] = actualization["fingerprint"]
+    result["actualization_passed"] = actualization["passed"]
+    if actualization["passed"] is not True:
+        result["accepted"] = False
     result["passed"] = result["accepted"]
+    receipt_path, receipt_fingerprint = _write_flow_artifact(
+        output_root,
+        "final-implementation-review-receipt.json",
+        {
+            "accepted": result["accepted"],
+            "decisions": _flow_items(parameters.get("deterministic_decisions")),
+            "semantic_decisions": semantic,
+            "actualization_report": actualization,
+        },
+    )
+    result["receipt_path"] = receipt_path
+    result["receipt_fingerprint"] = receipt_fingerprint
     return result
 
 

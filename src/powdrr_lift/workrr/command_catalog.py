@@ -904,7 +904,12 @@ class FeatureCommandRuntime:
             return _merge_semantic_design_values(parameters)
 
         def merge_behavior_scenario_operation() -> Any:
-            return _merge_behavior_scenario_values(parameters)
+            return _merge_behavior_scenario_values(
+                parameters,
+                allow_clarification=bool(
+                    config is not None and getattr(config, "design_only", False)
+                ),
+            )
 
         def semantic_artifact_directory(clause: Mapping[str, Any]) -> Path:
             clause_id = clause.get("clause_id")
@@ -1310,6 +1315,7 @@ class FeatureCommandRuntime:
             required_test_cases = feature_endpoint._compile_required_test_case_edits(
                 semantic_cases,
                 tuple(state.get("provider_inventory", ())),
+                validation_profiles=tuple(state.get("validation_profiles", ())),
                 include_existing_name_hint=True,
             )
             verification_contracts = []
@@ -1844,9 +1850,9 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
 
 
 def _merge_behavior_scenario_values(
-    parameters: Mapping[str, Any],
+    parameters: Mapping[str, Any], *, allow_clarification: bool = False
 ) -> dict[str, Any]:
-    """Bind one fully resolved authored scenario to its clause and test evidence."""
+    """Bind a resolved scenario, or a visibly provisional design-only draft."""
     clause = parameters.get("clause")
     design = parameters.get("design")
     result = parameters.get("scenario")
@@ -1854,15 +1860,49 @@ def _merge_behavior_scenario_values(
         raise PowdrrExecutionError("behavior scenario is missing its source design")
     if not isinstance(result, Mapping):
         raise PowdrrExecutionError("behavior scenario response is malformed")
-    if result.get("status") != "resolved":
-        unresolved = result.get("unresolved_dimensions", [])
+    raw_scenario = result.get("scenario")
+    if not isinstance(raw_scenario, Mapping):
+        raise PowdrrExecutionError("behavior scenario has no scenario object")
+    status = result.get("status")
+    unresolved = result.get("unresolved_dimensions", [])
+    if status not in {"resolved", "needs_clarification"} or not isinstance(
+        unresolved, list
+    ):
+        raise PowdrrExecutionError("behavior scenario status is malformed")
+    if (status == "resolved") != (not unresolved):
+        raise PowdrrExecutionError(
+            "behavior scenario status conflicts with unresolved_dimensions"
+        )
+    if status == "needs_clarification" and not allow_clarification:
         raise PowdrrExecutionError(
             "behavior scenario needs clarification before implementation: "
             + ", ".join(str(item) for item in unresolved)
         )
-    raw_scenario = result.get("scenario")
-    if not isinstance(raw_scenario, Mapping):
-        raise PowdrrExecutionError("resolved behavior scenario has no scenario object")
+    if status == "needs_clarification":
+        from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
+
+        if not all(item in BEHAVIOR_DIMENSIONS for item in unresolved):
+            raise PowdrrExecutionError(
+                "behavior scenario names an unsupported unresolved dimension"
+            )
+        draft_scenario = dict(raw_scenario)
+        dimensions = draft_scenario.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise PowdrrExecutionError(
+                "provisional behavior scenario has no dimensions"
+            )
+        draft_dimensions = dict(dimensions)
+        for name in unresolved:
+            draft_dimensions[name] = (
+                f"NEEDS CLARIFICATION: the task specification does not resolve {name}."
+            )
+        draft_scenario["dimensions"] = draft_dimensions
+        draft_scenario["then"] = (
+            str(draft_scenario.get("then", ""))
+            + " This design is provisional; resolve the marked dimensions "
+            "before implementation."
+        ).strip()
+        raw_scenario = draft_scenario
     clause_id = clause.get("clause_id")
     evidence = design.get("expected_test")
     if not isinstance(clause_id, str) or not clause_id.strip():

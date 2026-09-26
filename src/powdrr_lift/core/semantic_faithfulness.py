@@ -19,7 +19,6 @@ FAITHFULNESS_REVISION = "source-faithfulness-v1"
 REVIEWABLE_FIELDS = (
     "behavior_family",
     "temporal_scope",
-    "source_predicate",
     "subject",
     "behavior",
     "preconditions",

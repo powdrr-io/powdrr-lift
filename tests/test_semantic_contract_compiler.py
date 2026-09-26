@@ -70,6 +70,15 @@ def test_every_source_classifier_has_twenty_examples_and_label_coverage() -> Non
         ), kind
 
 
+def test_behavior_family_classifies_public_api_availability_as_other() -> None:
+    assert any(
+        example.proposition
+        == "DataVar and DataChangeInfo are importable from the package."
+        and example.value == "other"
+        for example in CLASSIFIER_DEFINITIONS["behavior_family"].examples
+    )
+
+
 def test_background_clause_takes_context_branch_before_child_classifiers() -> None:
     clause = _clause(
         "States lack built-in data ownership, forcing manual variable management "
@@ -98,6 +107,30 @@ def test_background_clause_takes_context_branch_before_child_classifiers() -> No
     assert child_values["polarity"] == "descriptive"
     assert child_values["requirement_strength"] == "descriptive"
     assert child_values["source_predicate"] == "not_stated"
+
+
+def test_nonactionable_clause_takes_process_only_branch() -> None:
+    clause = _clause("Create a new branch and commit everything when done.")
+    root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=[],
+        pending_specs=root_plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "nonactionable"}],
+        created_at=NOW,
+    )
+
+    child_plan = prepare_dependent_source_semantic_decisions(
+        clause, root, created_at=NOW
+    )
+
+    assert [item["spec"]["decision_kind"] for item in child_plan["pending_specs"]] == [
+        "nonactionable_exclusion_safety"
+    ]
+    child_values = {
+        item["decision_kind"]: item["result"]["value"]
+        for item in child_plan["resolved_decisions"]
+    }
+    assert child_values["polarity"] == "descriptive"
 
 
 def _clause(text: str = "All data should pickle.") -> dict[str, Any]:
@@ -300,7 +333,7 @@ def test_field_faithfulness_requires_reviews_and_routes_not_stated() -> None:
         requests=requests,
         provider_results=[
             {"status": "resolved", "value": "not_stated", "reason_code": None}
-            if request["spec"]["field"] == "source_predicate"
+            if request["spec"]["field"] == "behavior_family"
             else {"status": "resolved", "value": "entailed", "reason_code": None}
             for request in requests
         ],
@@ -308,7 +341,7 @@ def test_field_faithfulness_requires_reviews_and_routes_not_stated() -> None:
     )
     outcome = finalize_source_faithfulness(contract, reviews)
     assert outcome.accepted
-    assert "source_predicate" in outcome.unresolved_fields
+    assert "behavior_family" in outcome.unresolved_fields
     assert outcome.findings == ()
 
 

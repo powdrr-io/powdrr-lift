@@ -641,6 +641,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     extractor_loop = body[7]["for_each"]
     extractor_judge = extractor_loop["body"][0]["judge"]
     behavior_judge = body[10]["judge"]
+    scenario_judge = body[16]["judge"]
 
     assert atomicity_judge["question"] == (
         "Does this one instruction clause contain more than one independently "
@@ -670,6 +671,11 @@ def test_design_interview_uses_single_field_source_classification() -> None:
         "occurrence",
     ]
     assert behavior_judge["output"]["name"] == "behavior_family_result"
+    assert "atomic_instruction_ledger" in scenario_judge["context"]
+    assert any(
+        "complete atomic instruction ledger" in item
+        for item in scenario_judge["instructions"]
+    )
     flow_text = str(body)
     assert "semantic_obligation" not in flow_text
     assert "semantic_acceptance" not in flow_text

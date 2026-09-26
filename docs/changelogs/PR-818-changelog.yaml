@@ -1,6 +1,6 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 818
-title: Add parent-conditioned semantic decision tree and design-only evaluation
+title: Add conditional semantic decision tree and design-only evaluation
 intent:
   problem: Independent semantic classifiers can contradict one another, and evaluating a design prompt currently requires entering the coding workflow.
   goal: Resolve a root disposition first, constrain dependent decisions to its branch, and allow isolated design generation without launching a coding agent.
@@ -9,92 +9,762 @@ structured_files: []
 files:
   - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 244, end_line: 620}
-    summary: Stage source classification behind a root disposition and add parent-aware branches for context, product, and non-goal clauses.
-    rationale: Prevent inconsistent child decisions and avoid treating background context as an implementation obligation.
-    related: {entities: [semantic-decision-tree, design-only-evaluation], invariants: [child-decisions-respect-parent-branch]}
-  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    span: {start_line: 58, end_line: 58}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 1, end_line: 1160}
-    summary: Add staged root and dependent classifiers, deterministic branch constraints, cross-decision validation, and context-safe contract review.
-    rationale: Make semantic decisions conditional on already resolved parent choices.
-    related: {entities: [semantic-decision-tree], invariants: [child-decisions-respect-parent-branch]}
-  - path: src/powdrr_lift/core/semantic_decision.py
+    span: {start_line: 71, end_line: 106}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 1, end_line: 500}
-    summary: Allow context as a source disposition.
-    rationale: Represent non-obligation background clauses explicitly.
-    related: {entities: [semantic-decision-tree], invariants: [context-does-not-create-obligation]}
-  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    span: {start_line: 244, end_line: 245}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 1, end_line: 300}
-    summary: Treat context clauses as requiring no field-entailment review and avoid re-reviewing tree-governed decisions.
-    rationale: Prevent downstream checks from contradicting validated parent decisions.
-    related: {entities: [semantic-decision-tree], invariants: [child-decisions-respect-parent-branch]}
-  - path: src/powdrr_lift/core/feature_obligation.py
+    span: {start_line: 250, end_line: 251}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 1, end_line: 100}
-    summary: Register context as a non-actionable semantic kind.
-    rationale: Keep background clauses out of implementation obligations.
-    related: {entities: [semantic-decision-tree], invariants: [context-does-not-create-obligation]}
-  - path: src/powdrr_lift/workrr/command_catalog.py
+    span: {start_line: 255, end_line: 255}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 1, end_line: 1900}
-    summary: Expose the dependent-classifier operation and pass resolved tree decisions to family classification.
-    rationale: Execute the staged decision tree through the design workflow.
-    related: {entities: [semantic-decision-tree], invariants: [child-decisions-respect-parent-branch]}
-  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    span: {start_line: 259, end_line: 259}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 1, end_line: 5300}
-    summary: Add a design-only execution path that runs classification and evaluation without invoking a coding agent.
-    rationale: Enable isolated live evaluation of generated task designs.
-    related: {entities: [design-only-evaluation], invariants: [design-only-does-not-launch-coder]}
+    span: {start_line: 261, end_line: 261}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 270, end_line: 270}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 281, end_line: 341}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 408, end_line: 408}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 471, end_line: 471}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 476, end_line: 476}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 481, end_line: 481}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 523, end_line: 523}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 529, end_line: 529}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 539, end_line: 621}
+    summary: "Stage source classification behind a root disposition and provide worked scenario guidance for design compilation."
+    rationale: "Keep dependent classification and scenario decisions consistent with resolved source context."
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 1470, end_line: 4650}
-    summary: Add the harbor-feature --design-only option and report generated design output.
-    rationale: Provide a user-facing entry point for isolated prompt evaluation.
-    related: {entities: [design-only-evaluation], invariants: [design-only-does-not-launch-coder]}
+    span: {start_line: 1472, end_line: 1479}
+    summary: "Expose isolated design-only compilation and accurately report its result."
+    rationale: "Allow prompt evaluation without claiming implementation review was run."
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4627, end_line: 4627}
+    summary: "Expose isolated design-only compilation and accurately report its result."
+    rationale: "Allow prompt evaluation without claiming implementation review was run."
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4636, end_line: 4638}
+    summary: "Expose isolated design-only compilation and accurately report its result."
+    rationale: "Allow prompt evaluation without claiming implementation review was run."
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: added
+    span: {start_line: 1, end_line: 211}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 28, end_line: 28}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 57, end_line: 57}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 68, end_line: 68}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 76, end_line: 77}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 268, end_line: 272}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 9, end_line: 14}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 49, end_line: 49}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 64, end_line: 68}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 93, end_line: 93}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 112, end_line: 112}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 139, end_line: 143}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 159, end_line: 159}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 182, end_line: 183}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 207, end_line: 207}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 227, end_line: 231}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: added
+    span: {start_line: 250, end_line: 252}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 28, end_line: 28}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    type: modified
+    span: {start_line: 20, end_line: 23}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    type: modified
+    span: {start_line: 38, end_line: 38}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
+  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    type: modified
+    span: {start_line: 142, end_line: 143}
+    summary: "Represent and validate conditional semantic decisions without downstream reclassification."
+    rationale: "Preserve a consistent, source-grounded obligation contract."
   - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
     type: modified
-    span: {start_line: 210, end_line: 240}
-    summary: Forward the design-only environment setting to the CLI.
-    rationale: Preserve isolated evaluation when launched through Harbor.
-    related: {entities: [design-only-evaluation], invariants: [design-only-does-not-launch-coder]}
-  - path: tests/test_semantic_contract_compiler.py
+    span: {start_line: 223, end_line: 224}
+    summary: "Forward design-only mode through the Harbor integration."
+    rationale: "Keep isolated design evaluation available at the agent boundary."
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    span: {start_line: 54, end_line: 58}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    span: {start_line: 69, end_line: 73}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    span: {start_line: 87, end_line: 114}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    span: {start_line: 122, end_line: 122}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    span: {start_line: 126, end_line: 166}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    span: {start_line: 324, end_line: 331}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: added
+    span: {start_line: 367, end_line: 371}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
     type: modified
-    span: {start_line: 1, end_line: 520}
-    summary: Test root-first classification, branch constraints, context defaults, and inconsistent-decision rejection.
-    rationale: Protect decision-tree invariants and deterministic resolutions.
-    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+    span: {start_line: 11, end_line: 11}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 59, end_line: 59}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 132, end_line: 141}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 175, end_line: 176}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 336, end_line: 345}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 906, end_line: 908}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 981, end_line: 988}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1135, end_line: 1139}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1272, end_line: 1279}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1298, end_line: 1298}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1302, end_line: 1309}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1425, end_line: 1427}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1474, end_line: 1476}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1846, end_line: 1886}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 136, end_line: 136}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 302, end_line: 302}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 328, end_line: 332}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 482, end_line: 485}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 490, end_line: 496}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 1024, end_line: 1027}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 1059, end_line: 1063}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 1079, end_line: 1079}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3442, end_line: 3447}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3503, end_line: 3503}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3729, end_line: 3729}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3749, end_line: 3757}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3910, end_line: 3945}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3950, end_line: 3950}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3952, end_line: 3963}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 40, end_line: 40}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 44, end_line: 51}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 56, end_line: 56}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 64, end_line: 65}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 70, end_line: 111}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 120, end_line: 155}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 163, end_line: 186}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 196, end_line: 223}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 229, end_line: 260}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 269, end_line: 300}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 306, end_line: 337}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 345, end_line: 392}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 402, end_line: 461}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 474, end_line: 527}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 535, end_line: 591}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 660, end_line: 660}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 662, end_line: 689}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 691, end_line: 691}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 693, end_line: 713}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 715, end_line: 753}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 781, end_line: 781}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 784, end_line: 835}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 898, end_line: 900}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 916, end_line: 936}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 966, end_line: 967}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 972, end_line: 972}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 997, end_line: 1012}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1070, end_line: 1093}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1097, end_line: 1097}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1145, end_line: 1145}
+    summary: "Implement parent-conditioned semantic compilation and isolated design review behavior."
+    rationale: "Constrain child decisions and preserve unresolved specification questions explicitly."
+  - path: tests/test_behavior_contract.py
+    type: added
+    span: {start_line: 1, end_line: 130}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
   - path: tests/test_feature_endpoint.py
     type: modified
-    span: {start_line: 1260, end_line: 1400}
-    summary: Update the end-to-end design fixture for deterministic parent-conditioned decisions.
-    rationale: Keep the design compilation test aligned with the staged classifier.
-    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+    span: {start_line: 81, end_line: 103}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 413, end_line: 413}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 499, end_line: 499}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 861, end_line: 861}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 905, end_line: 905}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1246, end_line: 1247}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1274, end_line: 1274}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1291, end_line: 1291}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1314, end_line: 1334}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_implement_feature_e2e.py
+    type: added
+    span: {start_line: 101, end_line: 121}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_implement_feature_e2e.py
+    type: added
+    span: {start_line: 720, end_line: 721}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
   - path: tests/test_procedrr.py
     type: modified
-    span: {start_line: 620, end_line: 680}
-    summary: Verify the staged decision operations in the design interview definition.
-    rationale: Ensure the workflow binds parent results before child classification.
-    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+    span: {start_line: 636, end_line: 639}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 641, end_line: 641}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 643, end_line: 643}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 657, end_line: 660}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 666, end_line: 666}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
   - path: tests/test_procedrr_evaluator.py
     type: modified
-    span: {start_line: 470, end_line: 650}
-    summary: Update evaluator activation and response fixtures for staged semantic classification.
-    rationale: Verify the complete prompt-driven decision sequence.
-    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+    span: {start_line: 480, end_line: 480}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 497, end_line: 497}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 520, end_line: 540}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 581, end_line: 581}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 584, end_line: 594}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 639, end_line: 639}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 683, end_line: 733}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 735, end_line: 735}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 749, end_line: 749}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 13, end_line: 17}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 35, end_line: 35}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 44, end_line: 102}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 127, end_line: 130}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 132, end_line: 140}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 142, end_line: 145}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 162, end_line: 165}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 336, end_line: 348}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 364, end_line: 368}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 374, end_line: 378}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 392, end_line: 397}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 444, end_line: 444}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 449, end_line: 468}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 489, end_line: 493}
+    summary: "Test conditional semantic branches and design-only evaluation outcomes."
+    rationale: "Prevent regressions in decision consistency and truthful reporting."
 entities:
   - id: semantic-decision-tree
     type: Module
-    action: modified
+    action: added
   - id: design-only-evaluation
     type: Command-line flag
     action: added
+  - id: design-interview
+    type: Workflow
+    action: added
   - id: semantic-decision-tree-tests
     type: Test suite
-    action: modified
+    action: added
 entity_relationships:
   - id: child-classifiers-follow-root-disposition
     source: semantic-decision-tree
@@ -107,7 +777,7 @@ entity_relationships:
     source: design-only-evaluation
     target: design-interview
     relationship: invokes
-    description: The command runs the design interview and its evaluators without starting a coding agent.
+    description: The command runs design classification and evaluation without starting a coding agent.
     rationale: Allow safe isolated testing of generated designs.
     action: added
 invariants:

@@ -544,6 +544,43 @@ steps:
             prompt_system: Return only the declared JSON object.
             instructions:
               - Use the exact source clause and accepted semantic design; do not add behavior that the user did not request.
+              - Use the complete atomic instruction ledger as supporting specification context when another clause explicitly supplies this behavior's result, error, compatibility, or boundary detail.
+              - Keep each scenario scoped to its exact clause; sibling clauses may resolve a dimension but must not add a separate obligation to this scenario.
+              - Before returning needs_clarification, search the ledger for sibling clauses that explicitly resolve each dimension. A dimension supported by a related sibling clause is resolved, not missing.
+              - Return status resolved exactly when unresolved_dimensions is empty; return needs_clarification exactly when unresolved_dimensions lists every materially applicable, unresolved dimension.
+              - Use not_applicable only when the dimension cannot apply to this operation by its nature (for example, cancellation for a synchronous declaration-time configuration); use needs_clarification when the dimension can apply and the entire ledger leaves it open.
+              - >-
+                Example: for an atomic clause saying "The client accepts a settings
+                mapping", sibling clauses saying "the mapping is copied before use",
+                "non-string keys raise InvalidDefinition", and "existing positional
+                arguments remain supported" resolve normal_result, error_behavior,
+                and compatibility for that clause. Do not mark those dimensions
+                unresolved because their evidence is in sibling clauses.
+              - >-
+                Worked example from this specification: "DataVar supports optional
+                type enforcement" is resolved by the sibling clauses stating that
+                set_state_data validates DataVar type constraints and raises
+                InvalidDefinition on violation. Record valid typed assignment as the
+                normal result and the declared InvalidDefinition as error behavior
+                and a negative boundary; do not list those dimensions as unresolved.
+              - >-
+                Do not mark every dimension unresolved as a shortcut. Decide each
+                dimension independently: cite its supporting clause in the dimension
+                text when applicable, use not_applicable only for dimensions that
+                cannot apply to this behavior, and ask for clarification only for a
+                materially applicable dimension left open by the entire ledger.
+              - >-
+                Worked example: "SCXML data elements are parsed as Python literals"
+                resolves the normal result to literal Python values. Parsing is a
+                synchronous operation, so continuation and cancellation/cleanup do
+                not apply. If the ledger does not define malformed-literal behavior,
+                ask only about the applicable error and negative-boundary details.
+              - >-
+                Worked example: "Diagrams annotate state data variables" resolves
+                the normal result to variable annotations in the rendered diagram;
+                a state with no data variables has no data annotation. Synchronous
+                rendering has no continuation or cancellation/cleanup dimension.
+                Do not mark the explicitly stated normal result unresolved.
               - Describe one scenario with concrete given, when, and then values.
               - Explicitly cover normal result/state, errors and propagation, continuation, unsupported capabilities, cancellation/cleanup, compatibility, and negative boundaries.
               - For each dimension, write a concrete requirement or the exact value not_applicable when that dimension genuinely does not apply.
@@ -557,7 +594,12 @@ steps:
                   - This clause is background context only and must not create an implementation obligation.
                   - Return status resolved, list no unresolved dimensions, and set every dimension to "not_applicable (context only)".
                   - Set given to "The source clause is context only", when to "The feature design is compiled", and then to "No implementation obligation is generated".
-            context: [instruction_clause, partial_semantic_design, source_faithfulness]
+              - when: {binding: partial_semantic_design.partial_contract.disposition, equals: nonactionable}
+                instructions:
+                  - This clause is delivery-process metadata only and must not create a product obligation.
+                  - Return status resolved, list no unresolved dimensions, and set every dimension to "not_applicable (process metadata only)".
+                  - Set given to "The delivery instruction is recorded", when to "The feature design is compiled", and then to "No product implementation obligation is generated".
+            context: [instruction_clause, atomic_instruction_ledger, partial_semantic_design, source_faithfulness]
             output:
               name: behavior_scenario_result
               schema:

@@ -324,7 +324,10 @@ def _execute_procedrr_flow(
     branch: str,
 ) -> FeatureEndpointResult:
     slug = slugify_workflow_id(config.work_item_name)
-    state: dict[str, Any] = {"task_id": config.task_id or config.work_item_name}
+    state: dict[str, Any] = {
+        "task_id": config.task_id or config.work_item_name,
+        "design_only": config.design_only,
+    }
     flow_path = (
         _validate_design_interview_flow(worktree)
         if config.design_only
@@ -483,6 +486,11 @@ def _execute_procedrr_flow(
             canonical_path = state.get("canonical_feature_design_path")
             if isinstance(canonical_path, Path):
                 state["plan_path"] = canonical_path
+            state["review"] = {
+                "passed": True,
+                "scope": "design compilation",
+                "implementation_review": "not_run",
+            }
         result = _feature_endpoint_result(
             state,
             branch,
@@ -3696,6 +3704,14 @@ def _compile_required_test_case_edits(
         if getattr(profile, "provider", "") == "pytest"
         or getattr(profile, "name", "") == "pytest"
     ]
+    if not pytest_profiles and include_existing_name_hint:
+        pytest_profiles = [
+            DiscoveredValidationProfile(
+                "pytest-provisional",
+                ("pytest", "-q"),
+                "provisional design test profile; validation has not run",
+            )
+        ]
     if not pytest_profiles:
         # Direct callers that already have selector inventory may not have the
         # bootstrap profile object.  Production flow callers pass profiles so

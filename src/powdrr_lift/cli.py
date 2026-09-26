@@ -4632,9 +4632,11 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
     else:
         print(f"Harbor feature run {result.status}")
         print(f"Worktree: {result.worktree}")
-        print(f"Review passed: {result.review['passed']}")
         if args.design_only:
+            print("Design compilation: passed; implementation review: not run")
             print(f"Generated design: {result.plan_path}")
+        else:
+            print(f"Review passed: {result.review['passed']}")
     return 0 if result.status in {"completed", "design_generated"} else 1
 
 

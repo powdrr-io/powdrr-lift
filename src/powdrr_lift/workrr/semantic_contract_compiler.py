@@ -579,6 +579,11 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
                 "Configure the machine's default timeout.", "configure"
             ),
             ClassificationExample(
+                "DataVar and DataChangeInfo are importable from the package.",
+                "other",
+            ),
+            ClassificationExample("Export StateData from the public module.", "other"),
+            ClassificationExample(
                 "Keep values scoped to the active invocation only.", "other"
             ),
             ClassificationExample(
@@ -690,7 +695,7 @@ def prepare_dependent_source_semantic_decisions(
     timestamp = created_at or _created_at()
     resolved = [root.to_data()]
     pending: list[dict[str, Any]] = []
-    if root.result.value == "context":
+    if root.result.value in {"context", "nonactionable"}:
         defaults = {
             "polarity": "descriptive",
             "quantifier": "unspecified",
@@ -700,7 +705,6 @@ def prepare_dependent_source_semantic_decisions(
             "has_explicit_result": "absent",
             "temporal_scope": "unspecified",
             "source_predicate": "not_stated",
-            "nonactionable_exclusion_safety": "product_semantics_present",
         }
         for kind, value in defaults.items():
             spec = _decision_spec(clause_id, text, source_fingerprint, kind)
@@ -712,6 +716,34 @@ def prepare_dependent_source_semantic_decisions(
                     created_at=timestamp,
                 ).to_data()
             )
+        if root.result.value == "context":
+            spec = _decision_spec(
+                clause_id, text, source_fingerprint, "nonactionable_exclusion_safety"
+            )
+            resolved.append(
+                spec.bind(
+                    provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                    provider_result={
+                        "status": "resolved",
+                        "value": "product_semantics_present",
+                    },
+                    evidence_refs=(f"source-proposition:{clause_id}",),
+                    created_at=timestamp,
+                ).to_data()
+            )
+        else:
+            spec = _decision_spec(
+                clause_id, text, source_fingerprint, "nonactionable_exclusion_safety"
+            )
+            request = _classifier_request(
+                spec, CLASSIFIER_DEFINITIONS["nonactionable_exclusion_safety"]
+            )
+            request["allowed_values"] = ["process_only"]
+            request["instructions"].append(
+                "Independently verify that this exact clause contains no product "
+                "behavior or product non-goal."
+            )
+            pending.append(request)
     else:
         for kind in SOURCE_DECISION_KINDS:
             if kind == "disposition":
@@ -928,9 +960,11 @@ def prepare_behavior_family_decision(
         ),
         None,
     )
-    if root is not None and root.result.value == "context":
+    if root is not None and root.result.value in {"context", "nonactionable"}:
+        disposition = root.result.value
         request["instructions"] = [
-            "The root decision classified the clause as context, not an obligation.",
+            f"The root decision classified the clause as {disposition}, "
+            "not a product obligation.",
             "Use other only as a non-actionable placeholder; do not infer behavior.",
         ]
         request["allowed_values"] = ["other"]

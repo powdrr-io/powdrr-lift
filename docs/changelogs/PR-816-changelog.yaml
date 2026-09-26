@@ -1,0 +1,183 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 816
+title: Compile lossless behavior scenarios and structured repair failures
+intent:
+  problem: Acceptance prose can omit behavior dimensions, while validation and verifier failures lack a common evidence-rich repair shape.
+  goal: Compile explicit behavior scenarios into a concise worker contract and normalize validation failures for bounded repair.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: added
+    span: {start_line: 1, end_line: 192}
+    summary: Validate typed behavior scenarios and capability matrices, reject omitted dimensions, and render behavior contracts as a concise matrix.
+    rationale: Make success, error, continuation, unsupported, cleanup, compatibility, negative-boundary, and evidence requirements explicit before worker handoff.
+    related:
+      entities: [behavior-contract-compiler]
+      invariants: [behavior-dimensions-are-explicit, capability-cases-have-evidence]
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 9, end_line: 14}
+    summary: Persist, validate, and render typed behavior scenarios in implementation packets, including scenarios supplied with required test contracts.
+    rationale: Bind the prompt projection to the same compiler-owned packet used for implementation handoff.
+    related:
+      entities: [behavior-contract-compiler, behavior-matrix-renderer]
+      invariants: [behavior-prompt-matches-contract]
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 49, end_line: 49}
+    summary: Add typed scenarios to the implementation packet.
+    rationale: Persist the behavior requirements with the handoff artifact.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 64, end_line: 68}
+    summary: Keep scenario context when focusing an obligation.
+    rationale: Prevent behavior requirements from disappearing during packet scoping.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 93, end_line: 93}
+    summary: Preserve scenario context when compiling a task packet.
+    rationale: Keep task-level handoffs bound to their behavior requirements.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 112, end_line: 112}
+    summary: Serialize scenarios in packet artifacts.
+    rationale: Make worker contracts durable and replayable.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 139, end_line: 143}
+    summary: Reject malformed scenario artifacts during packet restoration.
+    rationale: Fail closed when persisted worker contracts are corrupted.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 159, end_line: 159}
+    summary: Recompile and validate restored behavior scenarios.
+    rationale: Apply the same validation rules to persisted and new packets.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 182, end_line: 183}
+    summary: Render typed scenarios as the worker-facing behavior matrix.
+    rationale: Provide one concise representation without duplicate acceptance prose.
+    related: {entities: [behavior-matrix-renderer], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 207, end_line: 207}
+    summary: Accept typed scenarios in packet compilation.
+    rationale: Allow behavior details to be compiled before worker handoff.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 227, end_line: 231}
+    summary: Extract typed scenarios attached to required test cases.
+    rationale: Bind scenario contracts to existing executable acceptance requirements.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 250, end_line: 252}
+    summary: Validate explicit and test-attached scenarios during packet compilation.
+    rationale: Reject incomplete scenarios before producing the worker prompt.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 54, end_line: 58}
+    summary: Add structured failure details to validation results and normalize local, verifier, scope, and policy failures into a shared repair record.
+    rationale: Give repair workers exact current evidence rather than a generic incomplete-attempt status.
+    related:
+      entities: [validation-failure-normalizer]
+      invariants: [repair-failures-share-one-schema]
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 69, end_line: 73}
+    summary: Persist structured failure fields in validation results.
+    rationale: Preserve repair evidence through validation artifact serialization.
+    related: {entities: [validation-failure-normalizer], invariants: [repair-failures-share-one-schema]}
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 87, end_line: 114}
+    summary: Emit normalized failure records from unsuccessful validation results.
+    rationale: Provide repair consumers one stable, evidence-rich failure shape.
+    related: {entities: [validation-failure-normalizer], invariants: [repair-failures-share-one-schema]}
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 122, end_line: 122}
+    summary: Include structured failures in validation reports.
+    rationale: Make failure records available to bounded repair handoffs.
+    related: {entities: [validation-failure-normalizer], invariants: [repair-failures-share-one-schema]}
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 126, end_line: 166}
+    summary: Add a shared normalizer for local, verifier, scope, and policy failures.
+    rationale: Keep failure records structurally consistent across validation stages.
+    related: {entities: [validation-failure-normalizer], invariants: [repair-failures-share-one-schema]}
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 324, end_line: 331}
+    summary: Preserve command output as actual failure evidence.
+    rationale: Ensure repair prompts can inspect the observed validation failure.
+    related: {entities: [validation-failure-normalizer], invariants: [repair-failures-share-one-schema]}
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 367, end_line: 371}
+    summary: Restore structured fields from persisted validation reports.
+    rationale: Retain diagnostic evidence across restart and replay.
+    related: {entities: [validation-failure-normalizer], invariants: [repair-failures-share-one-schema]}
+  - path: tests/test_behavior_contract.py
+    type: added
+    span: {start_line: 1, end_line: 129}
+    summary: Test explicit behavior dimensions, concise prompt projection, capability evidence, packet round-tripping, and normalized repair failures.
+    rationale: Protect fail-closed compilation and the worker-facing contract from omissions and duplication.
+    related:
+      entities: [behavior-contract-tests]
+      invariants: [behavior-dimensions-are-explicit, behavior-prompt-matches-contract, repair-failures-share-one-schema]
+entities:
+  - id: behavior-contract-compiler
+    type: Module
+    action: added
+  - id: behavior-matrix-renderer
+    type: Function
+    action: added
+  - id: validation-failure-normalizer
+    type: Function
+    action: added
+  - id: behavior-contract-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: implementation-packet-renders-behavior-contract
+    source: behavior-contract-compiler
+    target: behavior-matrix-renderer
+    relationship: invokes
+    description: Implementation packets validate behavior scenarios and render them into worker prompts.
+    rationale: Keep prompt content derived from the explicit behavior contract.
+    action: added
+  - id: behavior-contract-tests-verify-compiler
+    source: behavior-contract-tests
+    target: behavior-contract-compiler
+    relationship: verifies
+    description: Tests verify fail-closed scenario compilation and concise behavior-matrix rendering.
+    rationale: Prevent omitted behavior dimensions from silently reaching a coding worker.
+    action: added
+invariants:
+  - id: behavior-dimensions-are-explicit
+    action: added
+    description: Every compiled scenario explicitly states all required behavior dimensions or marks a dimension not_applicable.
+    rationale: An omitted behavior dimension is unresolved and cannot be treated as an implementation decision.
+  - id: capability-cases-have-evidence
+    action: added
+    description: Each declared supported, rejected, or fallback capability has executable evidence, and rejected capabilities define their error behavior.
+    rationale: Make capability boundaries testable rather than leaving them implicit in prose.
+  - id: behavior-prompt-matches-contract
+    action: added
+    description: When typed scenarios are present, the worker prompt renders each scenario once from the validated packet.
+    rationale: Avoid divergent or duplicated representations of required behavior.
+  - id: repair-failures-share-one-schema
+    action: added
+    description: Local validation and verifier failures use the same structured fields for expected and actual behavior, contract references, and repairability.
+    rationale: Preserve current evidence across bounded repair handoffs.
+guidance: []

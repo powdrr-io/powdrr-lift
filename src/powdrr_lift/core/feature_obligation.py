@@ -54,6 +54,7 @@ class DesignProjection:
     description: str
     acceptance_criterion: str
     expected_test: str
+    behavior_scenario: Mapping[str, Any] | None = None
 
     @property
     def design_id(self) -> str:
@@ -64,7 +65,7 @@ class DesignProjection:
         return _fingerprint(self.to_data(include_fingerprint=False))
 
     def to_data(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
-        data = {
+        data: dict[str, Any] = {
             "design_id": self.design_id,
             "clause_id": self.clause_id,
             "kind": self.kind,
@@ -72,6 +73,8 @@ class DesignProjection:
             "acceptance_criterion": self.acceptance_criterion,
             "expected_test": self.expected_test,
         }
+        if self.behavior_scenario is not None:
+            data["behavior_scenario"] = dict(self.behavior_scenario)
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
@@ -262,6 +265,11 @@ def compile_feature_design(
             description=_required_text(design, "description"),
             acceptance_criterion=_required_text(design, "acceptance_criterion"),
             expected_test=_required_text(design, "expected_test"),
+            behavior_scenario=(
+                dict(design["behavior_scenario"])
+                if isinstance(design.get("behavior_scenario"), Mapping)
+                else None
+            ),
         )
         projections.append(projection)
         semantic_projections[clause.clause_id] = projection

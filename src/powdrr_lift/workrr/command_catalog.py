@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.feature_obligation import (
     SEMANTIC_KINDS,
@@ -320,6 +321,16 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("merge_semantic_design"),
+        ),
+        "merge_behavior_scenario": CommandSpec(
+            name="merge_behavior_scenario",
+            input_schema=object_schema(
+                {"clause": {}, "design": {}, "scenario": {}},
+                required=("clause", "design", "scenario"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("merge_behavior_scenario"),
         ),
         "compile_canonical_feature_design": CommandSpec(
             name="compile_canonical_feature_design",
@@ -881,6 +892,9 @@ class FeatureCommandRuntime:
             """Join the independently elicited semantic fields for one clause."""
             return _merge_semantic_design_values(parameters)
 
+        def merge_behavior_scenario_operation() -> Any:
+            return _merge_behavior_scenario_values(parameters)
+
         def semantic_artifact_directory(clause: Mapping[str, Any]) -> Path:
             clause_id = clause.get("clause_id")
             if not isinstance(clause_id, str) or not clause_id.strip():
@@ -1232,6 +1246,14 @@ class FeatureCommandRuntime:
                     and isinstance(decision, Mapping)
                 }
             )
+            scenarios_by_clause_id = {
+                clause.clause_id: decision.get("behavior_scenario")
+                for clause, decision in zip(
+                    ledger.clauses, raw_design_decisions, strict=True
+                )
+                if isinstance(decision, Mapping)
+                and isinstance(decision.get("behavior_scenario"), Mapping)
+            }
             obligations = [
                 {
                     "id": f"sentence-{index}",
@@ -1250,9 +1272,18 @@ class FeatureCommandRuntime:
                         item.projection.expected_test,
                         state.get("provider_inventory", ()),
                     ),
+                    "behavior_scenario": scenarios_by_clause_id.get(item.clause_id),
                 }
                 for index, item in enumerate(design.obligations, start=1)
             ]
+            if any(
+                not isinstance(item.get("behavior_scenario"), Mapping)
+                for item in semantic_cases
+            ):
+                raise PowdrrExecutionError(
+                    "every actionable feature obligation requires one typed "
+                    "behavior scenario"
+                )
             required_test_cases = feature_endpoint._compile_required_test_case_edits(
                 semantic_cases,
                 tuple(state.get("provider_inventory", ())),
@@ -1414,6 +1445,9 @@ class FeatureCommandRuntime:
                     enumerate_subject_population_operation
                 ),
                 "merge_semantic_design": bind_handler(merge_semantic_design_operation),
+                "merge_behavior_scenario": bind_handler(
+                    merge_behavior_scenario_operation
+                ),
                 "compile_canonical_feature_design": bind_handler(
                     compile_canonical_feature_design_operation
                 ),
@@ -1781,6 +1815,47 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
         "oracle": oracle,
         "evidence_case": evidence_case,
     }
+
+
+def _merge_behavior_scenario_values(
+    parameters: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one fully resolved authored scenario to its clause and test evidence."""
+    clause = parameters.get("clause")
+    design = parameters.get("design")
+    result = parameters.get("scenario")
+    if not isinstance(clause, Mapping) or not isinstance(design, Mapping):
+        raise PowdrrExecutionError("behavior scenario is missing its source design")
+    if not isinstance(result, Mapping):
+        raise PowdrrExecutionError("behavior scenario response is malformed")
+    if result.get("status") != "resolved":
+        unresolved = result.get("unresolved_dimensions", [])
+        raise PowdrrExecutionError(
+            "behavior scenario needs clarification before implementation: "
+            + ", ".join(str(item) for item in unresolved)
+        )
+    raw_scenario = result.get("scenario")
+    if not isinstance(raw_scenario, Mapping):
+        raise PowdrrExecutionError("resolved behavior scenario has no scenario object")
+    clause_id = clause.get("clause_id")
+    evidence = design.get("expected_test")
+    if not isinstance(clause_id, str) or not clause_id.strip():
+        raise PowdrrExecutionError("behavior scenario source clause has no ID")
+    if not isinstance(evidence, str) or not evidence.strip():
+        raise PowdrrExecutionError("behavior scenario has no executable test evidence")
+    scenario = {
+        "scenario_id": f"scenario:{clause_id}",
+        **dict(raw_scenario),
+        "evidence": [evidence.strip()],
+        "validator": evidence.strip(),
+    }
+    try:
+        compiled = compile_behavior_scenarios((scenario,))[0]
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            f"behavior scenario is incomplete: {error}"
+        ) from error
+    return {**dict(design), "behavior_scenario": compiled.to_data()}
 
 
 __all__ = ["FeatureCommandRuntime", "feature_command_catalog"]

@@ -98,6 +98,27 @@ class DeterministicPlanningClient:
             return {"multiple": False}
         if required == {"statements"}:
             raise AssertionError("a non-multiple clause must not be split")
+        if required == {"status", "unresolved_dimensions", "scenario"}:
+            return {
+                "status": "resolved",
+                "unresolved_dimensions": [],
+                "scenario": {
+                    "subject": "the requested feature behavior",
+                    "given": "the declared inputs and supported context",
+                    "when": "the requested operation is performed",
+                    "then": "the stated acceptance outcome is observed",
+                    "dimensions": {
+                        "normal_result": "the stated acceptance outcome is observed",
+                        "error_behavior": "not_applicable",
+                        "continuation": "not_applicable",
+                        "unsupported_behavior": "not_applicable",
+                        "cancellation_cleanup": "not_applicable",
+                        "compatibility": "not_applicable",
+                        "negative_boundaries": "not_applicable",
+                    },
+                    "capability_matrix": [],
+                },
+            }
         if required == {"status", "value", "reason_code"}:
             decision_kind = _find_json_value(text, "decision_kind")
             if _find_json_value(text, "candidate_field") is not None:
@@ -696,7 +717,8 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     prompt_text = next(prompt).read_text(encoding="utf-8")
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
-    assert "Required behavioral tests:" in prompt_text
+    assert "Behavior contract matrix" in prompt_text
+    assert '"normal_result": "the stated acceptance outcome is observed"' in prompt_text
     assert "Run the focused required tests after implementation." in prompt_text
     assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text

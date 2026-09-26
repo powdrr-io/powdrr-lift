@@ -517,6 +517,27 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "value": "create",
                     "reason_code": None,
                 }
+            if "lossless behavior scenario" in question:
+                return {
+                    "status": "resolved",
+                    "unresolved_dimensions": [],
+                    "scenario": {
+                        "subject": "the feature",
+                        "given": "the declared feature input",
+                        "when": "the feature is invoked",
+                        "then": "the acceptance result is observed",
+                        "dimensions": {
+                            "normal_result": ("the acceptance result is observed"),
+                            "error_behavior": "not_applicable",
+                            "continuation": "not_applicable",
+                            "unsupported_behavior": "not_applicable",
+                            "cancellation_cleanup": "not_applicable",
+                            "compatibility": "not_applicable",
+                            "negative_boundaries": "not_applicable",
+                        },
+                        "capability_matrix": [],
+                    },
+                }
             raise AssertionError(question)
 
     llm = DesignInterviewLLM()
@@ -648,9 +669,59 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                             ),
                         }
                     ],
-                    "required_test_cases": [{"id": "test-sentence-1"}],
+                    "required_test_cases": [
+                        {
+                            "id": "test-sentence-1",
+                            "behavior_scenario": {
+                                "schema_version": "behavior-scenario-v1",
+                                "scenario_id": "scenario:instruction-001",
+                                "subject": "the feature",
+                                "given": "the declared feature input",
+                                "when": "the feature is invoked",
+                                "then": "the acceptance result is observed",
+                                "dimensions": {
+                                    "normal_result": (
+                                        "the acceptance result is observed"
+                                    ),
+                                    "error_behavior": "not_applicable",
+                                    "continuation": "not_applicable",
+                                    "unsupported_behavior": "not_applicable",
+                                    "cancellation_cleanup": "not_applicable",
+                                    "compatibility": "not_applicable",
+                                    "negative_boundaries": "not_applicable",
+                                },
+                                "evidence": ["focused test"],
+                                "validator": "focused test",
+                                "capability_matrix": [],
+                            },
+                        }
+                    ],
                 }
-        return {"ok": True}
+            if command[0] == "merge_behavior_scenario":
+                return {
+                    **parameters["design"],
+                    "behavior_scenario": {
+                        "schema_version": "behavior-scenario-v1",
+                        "scenario_id": "scenario:instruction-001",
+                        "subject": "the feature",
+                        "given": "the declared feature input",
+                        "when": "the feature is invoked",
+                        "then": "the acceptance result is observed",
+                        "dimensions": {
+                            "normal_result": "the acceptance result is observed",
+                            "error_behavior": "not_applicable",
+                            "continuation": "not_applicable",
+                            "unsupported_behavior": "not_applicable",
+                            "cancellation_cleanup": "not_applicable",
+                            "compatibility": "not_applicable",
+                            "negative_boundaries": "not_applicable",
+                        },
+                        "evidence": ["focused test"],
+                        "validator": "focused test",
+                        "capability_matrix": [],
+                    },
+                }
+            return {"ok": True}
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     from procedrr import parse_and_validate
@@ -664,7 +735,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 15
+    assert result.llm_activations == 16
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events

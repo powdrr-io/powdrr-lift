@@ -55,7 +55,7 @@ outputs:
         minItems: 1
         items:
           type: object
-          required: [id, description, intent_refs, provider, profile, name_hint, selector, expectation, applicability, status]
+          required: [id, description, intent_refs, provider, profile, name_hint, selector, expectation, applicability, status, behavior_scenario]
           additionalProperties: false
           properties:
             id: {type: string, minLength: 1}
@@ -68,6 +68,42 @@ outputs:
             expectation: {type: string, enum: [pass]}
             applicability: {type: object}
             status: {type: string, enum: [active]}
+            behavior_scenario:
+              type: object
+              required: [schema_version, scenario_id, subject, given, when, then, dimensions, evidence, validator, capability_matrix]
+              additionalProperties: false
+              properties:
+                schema_version: {type: string, const: behavior-scenario-v1}
+                scenario_id: {type: string, minLength: 1}
+                subject: {type: string, minLength: 1}
+                given: {type: string, minLength: 1}
+                when: {type: string, minLength: 1}
+                then: {type: string, minLength: 1}
+                dimensions:
+                  type: object
+                  required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
+                  additionalProperties: false
+                  properties:
+                    normal_result: {type: string, minLength: 1}
+                    error_behavior: {type: string, minLength: 1}
+                    continuation: {type: string, minLength: 1}
+                    unsupported_behavior: {type: string, minLength: 1}
+                    cancellation_cleanup: {type: string, minLength: 1}
+                    compatibility: {type: string, minLength: 1}
+                    negative_boundaries: {type: string, minLength: 1}
+                evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                validator: {type: string, minLength: 1}
+                capability_matrix:
+                  type: array
+                  items:
+                    type: object
+                    required: [capability, behavior, evidence]
+                    additionalProperties: false
+                    properties:
+                      capability: {type: string, minLength: 1}
+                      behavior: {type: string, enum: [support, reject, fallback]}
+                      evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                      error: {type: string, minLength: 1}
 steps:
   - operation:
       tool: internal
@@ -370,12 +406,12 @@ steps:
                 partial_contract_path: {type: string, minLength: 1}
                 partial_contract_fingerprint: {type: string, minLength: 1}
                 partial_contract: {type: object}
-            bind: semantic_design
+            bind: partial_semantic_design
         - operation:
             tool: internal
             command: [prepare_field_entailment_reviews]
             parameters:
-              contract: {type: reference, value: semantic_design.partial_contract}
+              contract: {type: reference, value: partial_semantic_design.partial_contract}
             returns:
               type: object
               required: [requests]
@@ -428,7 +464,7 @@ steps:
             tool: internal
             command: [finalize_source_faithfulness]
             parameters:
-              contract: {type: reference, value: semantic_design.partial_contract}
+              contract: {type: reference, value: partial_semantic_design.partial_contract}
               reviews: {type: reference, value: bound_field_entailment_reviews.reviews}
             returns:
               type: object
@@ -438,6 +474,83 @@ steps:
                 unresolved_fields: {type: array}
                 findings: {type: array}
             bind: source_faithfulness
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: Compile one lossless behavior scenario for this atomic product obligation.
+            subject: instruction_clause.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Use the exact source clause and accepted semantic design; do not add behavior that the user did not request.
+              - Describe one scenario with concrete given, when, and then values.
+              - Explicitly cover normal result/state, errors and propagation, continuation, unsupported capabilities, cancellation/cleanup, compatibility, and negative boundaries.
+              - For each dimension, write a concrete requirement or the exact value not_applicable when that dimension genuinely does not apply.
+              - Never use not_applicable merely because the source is silent. If a dimension can materially affect behavior and the source does not resolve it, return needs_clarification and list that dimension.
+              - Keep error shape and location separate from whether later work continues; nested errors must be represented explicitly when relevant.
+              - For APIs, adapters, commands, integrations, and runtime extensions, include each supported/rejected/unknown context in capability_matrix with executable evidence and the defined error for rejected contexts. Return an empty list only when this behavior change has no capability boundary.
+              - Do not return selectors, IDs, evidence paths, validator commands, or extra fields; Powdrr binds those from the compiled test contract.
+            context: [instruction_clause, partial_semantic_design, source_faithfulness]
+            output:
+              name: behavior_scenario_result
+              schema:
+                type: object
+                required: [status, unresolved_dimensions, scenario]
+                additionalProperties: false
+                properties:
+                  status: {type: string, enum: [resolved, needs_clarification]}
+                  unresolved_dimensions:
+                    type: array
+                    items: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                  scenario:
+                    type: object
+                    required: [subject, given, when, then, dimensions]
+                    additionalProperties: false
+                    properties:
+                      subject: {type: string, minLength: 1}
+                      given: {type: string, minLength: 1}
+                      when: {type: string, minLength: 1}
+                      then: {type: string, minLength: 1}
+                      dimensions:
+                        type: object
+                        required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
+                        additionalProperties: false
+                        properties:
+                          normal_result: {type: string, minLength: 1}
+                          error_behavior: {type: string, minLength: 1}
+                          continuation: {type: string, minLength: 1}
+                          unsupported_behavior: {type: string, minLength: 1}
+                          cancellation_cleanup: {type: string, minLength: 1}
+                          compatibility: {type: string, minLength: 1}
+                          negative_boundaries: {type: string, minLength: 1}
+                      capability_matrix:
+                        type: array
+                        items:
+                          type: object
+                          required: [capability, behavior, evidence]
+                          additionalProperties: false
+                          properties:
+                            capability: {type: string, minLength: 1}
+                            behavior: {type: string, enum: [support, reject, fallback]}
+                            evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                            error: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [merge_behavior_scenario]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              design: {type: reference, value: partial_semantic_design}
+              scenario: {type: reference, value: behavior_scenario_result}
+            returns:
+              type: object
+              required: [kind, description, acceptance_criterion, expected_test, behavior_scenario]
+              properties:
+                kind: {type: string}
+                description: {type: string}
+                acceptance_criterion: {type: string}
+                expected_test: {type: string}
+                behavior_scenario: {type: object}
+            bind: semantic_design
   - operation:
       tool: internal
       command: [compile_canonical_feature_design]

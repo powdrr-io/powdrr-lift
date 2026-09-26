@@ -10,7 +10,11 @@ from powdrr_lift.core.semantic_contract import (
     BoundSourceExtraction,
     SemanticContractError,
 )
-from powdrr_lift.core.semantic_decision import SemanticDecision
+from powdrr_lift.core.semantic_decision import (
+    DECISION_VALUES,
+    UNRESOLVED_REASON_CODES,
+    SemanticDecision,
+)
 from powdrr_lift.core.semantic_faithfulness import (
     FaithfulnessError,
     bind_field_entailment_reviews,
@@ -22,6 +26,7 @@ from powdrr_lift.workrr.command_catalog import (
     feature_command_catalog,
 )
 from powdrr_lift.workrr.semantic_contract_compiler import (
+    CLASSIFIER_DEFINITIONS,
     bind_behavior_family_decision,
     bind_source_extractions,
     bind_source_semantic_decisions,
@@ -33,6 +38,58 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
 )
 
 NOW = "2026-09-25T00:00:00Z"
+
+
+def test_every_source_classifier_has_twenty_examples_and_label_coverage() -> None:
+    assert set(CLASSIFIER_DEFINITIONS) == {
+        "disposition",
+        "polarity",
+        "quantifier",
+        "requirement_strength",
+        "behavior_family",
+        "has_precondition",
+        "has_exception",
+        "has_explicit_result",
+        "temporal_scope",
+        "source_predicate",
+        "nonactionable_exclusion_safety",
+    }
+    for kind, definition in CLASSIFIER_DEFINITIONS.items():
+        assert len(definition.examples) >= 20, kind
+        assert DECISION_VALUES[kind] <= {
+            example.value
+            for example in definition.examples
+            if example.value is not None
+        }, kind
+        assert all(
+            example.value in DECISION_VALUES[kind]
+            if example.value is not None
+            else example.unresolved_reason in UNRESOLVED_REASON_CODES
+            for example in definition.examples
+        ), kind
+
+
+def test_behavior_family_examples_show_other_and_when_to_abstain() -> None:
+    clause = _clause(
+        "States lack built-in data ownership, forcing manual variable management."
+    )
+    decisions = _bind_source_decisions(clause)
+    extractions = bind_source_extractions(
+        requests=prepare_source_extractions(clause, decisions),
+        provider_results=[
+            {"quote": "States"},
+            {"quote": "forcing manual variable management"},
+        ],
+        created_at=NOW,
+    )
+    request = prepare_behavior_family_decision(clause, extractions[1])
+    examples_instruction = request["instructions"][-1]
+
+    assert "forcing manual variable management without scoping or lifecycle" in (
+        examples_instruction
+    )
+    assert '"value": "other"' in examples_instruction
+    assert '"status": "unresolved"' in examples_instruction
 
 
 def _clause(text: str = "All data should pickle.") -> dict[str, Any]:

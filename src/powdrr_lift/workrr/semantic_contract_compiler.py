@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -41,9 +42,18 @@ SOURCE_EXTRACTOR_REVISION = "source-extractor-v1"
 
 
 @dataclass(frozen=True, slots=True)
+class ClassificationExample:
+    proposition: str
+    value: str | None
+    context: str | None = None
+    unresolved_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ClassifierDefinition:
     question: str
     instructions: tuple[str, ...]
+    examples: tuple[ClassificationExample, ...] = ()
 
 
 CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
@@ -56,10 +66,40 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "with no product semantics.",
             "A product prohibition is non_goal, not nonactionable; a universal "
             "product rule is invariant.",
-            "Examples: 'Users can export reports' is feature; 'Every response has "
-            "an ID' is invariant.",
-            "Examples: 'Do not add retries' is non_goal; 'Open a pull request' is "
-            "nonactionable.",
+        ),
+        (
+            ClassificationExample("A Report is a domain record.", "entity"),
+            ClassificationExample("The ExportJob represents one export.", "entity"),
+            ClassificationExample("Users can export reports.", "feature"),
+            ClassificationExample("The service creates a report.", "feature"),
+            ClassificationExample("Expose get_state_data(state).", "interface"),
+            ClassificationExample("Callbacks receive state_data.", "interface"),
+            ClassificationExample("Every response has an ID.", "invariant"),
+            ClassificationExample("State data is isolated per machine.", "invariant"),
+            ClassificationExample("Prefer immutable defaults.", "guidance"),
+            ClassificationExample("Document lifecycle behavior clearly.", "guidance"),
+            ClassificationExample("Do not add CSV export.", "non_goal"),
+            ClassificationExample("Keep retries out of this feature.", "non_goal"),
+            ClassificationExample(
+                "Open a pull request when finished.", "nonactionable"
+            ),
+            ClassificationExample(
+                "Run the unit tests before submitting.", "nonactionable"
+            ),
+            ClassificationExample("A State owns its declared data.", "feature"),
+            ClassificationExample("The library provides DataVar.", "entity"),
+            ClassificationExample(
+                "The setter raises InvalidDefinition on bad keys.", "feature"
+            ),
+            ClassificationExample(
+                "Do not change the public callback signature.", "non_goal"
+            ),
+            ClassificationExample(
+                "All active states reset data on re-entry.", "invariant"
+            ),
+            ClassificationExample(
+                "Please keep the patch on the current branch.", "nonactionable"
+            ),
         ),
     ),
     "polarity": ClassifierDefinition(
@@ -68,10 +108,42 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose required, prohibited, permitted, or descriptive from source "
             "wording only.",
-            "Examples: 'All data should pickle' is required; 'Do not add retries' "
-            "is prohibited.",
-            "Example: 'Clients may omit the field' is permitted; 'The exporter is "
-            "synchronous' is descriptive.",
+        ),
+        (
+            ClassificationExample("The API must return a report.", "required"),
+            ClassificationExample("All state data should survive pickle.", "required"),
+            ClassificationExample(
+                "The setter is required to reject unknown keys.", "required"
+            ),
+            ClassificationExample("The callback shall receive state_data.", "required"),
+            ClassificationExample("Re-entry resets the declared defaults.", "required"),
+            ClassificationExample("Do not add automatic retries.", "prohibited"),
+            ClassificationExample(
+                "The endpoint must not expose secrets.", "prohibited"
+            ),
+            ClassificationExample("Clients shall not mutate snapshots.", "prohibited"),
+            ClassificationExample(
+                "Never share state data across instances.", "prohibited"
+            ),
+            ClassificationExample("Archived reports cannot be exported.", "prohibited"),
+            ClassificationExample("Clients may omit an optional field.", "permitted"),
+            ClassificationExample(
+                "A caller can choose either output format.", "permitted"
+            ),
+            ClassificationExample("The API allows empty labels.", "permitted"),
+            ClassificationExample(
+                "Users are allowed to cancel an export.", "permitted"
+            ),
+            ClassificationExample("A callback may return None.", "permitted"),
+            ClassificationExample("The exporter is synchronous.", "descriptive"),
+            ClassificationExample("The package currently uses SQLite.", "descriptive"),
+            ClassificationExample("The state has a name attribute.", "descriptive"),
+            ClassificationExample(
+                "The existing callback accepts event_data.", "descriptive"
+            ),
+            ClassificationExample(
+                "The default timeout is five seconds.", "descriptive"
+            ),
         ),
     ),
     "quantifier": ClassifierDefinition(
@@ -79,9 +151,30 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose one, some, every, or unspecified; do not infer universal "
             "coverage from normative tone.",
-            "Examples: 'Every active report' is every; 'Some reports' is some.",
-            "Example: 'Reports support export' is unspecified unless accepted "
-            "context states otherwise.",
+        ),
+        (
+            ClassificationExample("One active report is selected.", "one"),
+            ClassificationExample("Exactly one callback receives the value.", "one"),
+            ClassificationExample("A single state owns this data.", "one"),
+            ClassificationExample("Only one matching record is returned.", "one"),
+            ClassificationExample("The selected report is exported.", "one"),
+            ClassificationExample("Some reports can be archived.", "some"),
+            ClassificationExample("A subset of states declares data.", "some"),
+            ClassificationExample("Certain callbacks receive snapshots.", "some"),
+            ClassificationExample("At least one user can cancel.", "some"),
+            ClassificationExample("Several matching records are returned.", "some"),
+            ClassificationExample("Every active report is exportable.", "every"),
+            ClassificationExample(
+                "All state instances receive fresh defaults.", "every"
+            ),
+            ClassificationExample("Each callback sees the active state data.", "every"),
+            ClassificationExample("For each key, the setter checks its type.", "every"),
+            ClassificationExample("All saved descendants are restored.", "every"),
+            ClassificationExample("Reports support export.", "unspecified"),
+            ClassificationExample("The API returns a snapshot.", "unspecified"),
+            ClassificationExample("Callbacks receive event_data.", "unspecified"),
+            ClassificationExample("Data is initialized on entry.", "unspecified"),
+            ClassificationExample("The endpoint accepts JSON.", "unspecified"),
         ),
     ),
     "requirement_strength": ClassifierDefinition(
@@ -91,18 +184,71 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "modal.",
             "Preserve should separately from must even when both express required "
             "product behavior.",
-            "Examples: 'should pickle' is should; 'must have IDs' is must; 'may "
-            "omit' is may.",
+        ),
+        (
+            ClassificationExample("The method must return a snapshot.", "must"),
+            ClassificationExample("Keys must be strings.", "must"),
+            ClassificationExample("The callback must receive state_data.", "must"),
+            ClassificationExample("The API must reject undeclared keys.", "must"),
+            ClassificationExample(
+                "The state should reset defaults on re-entry.", "should"
+            ),
+            ClassificationExample("State data should survive pickle.", "should"),
+            ClassificationExample("The diagram should show data variables.", "should"),
+            ClassificationExample(
+                "A history snapshot should preserve child data.", "should"
+            ),
+            ClassificationExample("Clients may omit the optional label.", "may"),
+            ClassificationExample("The caller may cancel an export.", "may"),
+            ClassificationExample("A callback may return a value.", "may"),
+            ClassificationExample("The setter may accept None.", "may"),
+            ClassificationExample("The exporter is synchronous.", "descriptive"),
+            ClassificationExample("The package currently uses SQLite.", "descriptive"),
+            ClassificationExample("The state has a name attribute.", "descriptive"),
+            ClassificationExample("Callbacks receive event_data today.", "descriptive"),
+            ClassificationExample(
+                "State data is available to callbacks.", "unspecified"
+            ),
+            ClassificationExample("The endpoint returns a snapshot.", "unspecified"),
+            ClassificationExample("Reports support export.", "unspecified"),
+            ClassificationExample("The data mapping contains defaults.", "unspecified"),
         ),
     ),
     "has_precondition": ClassifierDefinition(
         "Does this exact proposition explicitly state a condition that must hold "
         "before or while the behavior applies?",
-        (
-            "Choose present or absent; do not extract or invent the condition.",
-            "Example: 'Every active report can be exported' has a precondition: "
-            "active.",
-            "Example: 'Users can export reports' has no explicit precondition.",
+        ("Choose present or absent; do not extract or invent the condition.",),
+        tuple(
+            [
+                ClassificationExample(text, "present")
+                for text in (
+                    "Active reports can be exported.",
+                    "When a state is entered, defaults are copied.",
+                    "If the key is declared, the setter accepts it.",
+                    "While the machine is active, data can be read.",
+                    "For authenticated users, the endpoint returns data.",
+                    "After validation succeeds, the export starts.",
+                    "Unless cancelled, the stream continues.",
+                    "Given a saved snapshot, history restores values.",
+                    "On a valid transition, callbacks receive state_data.",
+                    "Only for compound states, the metaclass accepts data.",
+                )
+            ]
+            + [
+                ClassificationExample(text, "absent")
+                for text in (
+                    "Users can export reports.",
+                    "The endpoint returns CSV.",
+                    "Every state has a name.",
+                    "The setter validates the key.",
+                    "Callbacks receive state_data.",
+                    "The diagram displays declared variables.",
+                    "Data survives pickle.",
+                    "The API creates a snapshot.",
+                    "The event is emitted after transition.",
+                    "Reports support export.",
+                )
+            ]
         ),
     ),
     "has_exception": ClassifierDefinition(
@@ -111,19 +257,75 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose present or absent; do not treat an ordinary condition as an "
             "exception.",
-            "Example: 'All reports except archived reports can be exported' has "
-            "an exception.",
-            "Example: 'Active reports can be exported' has no explicit exception.",
+        ),
+        tuple(
+            [
+                ClassificationExample(text, "present")
+                for text in (
+                    "All reports except archived reports can be exported.",
+                    "Export reports unless they are locked.",
+                    "Every state, other than the final state, receives defaults.",
+                    "The setter accepts any key except reserved names.",
+                    "Callbacks run for all transitions excluding resets.",
+                    "Data is copied unless the value is immutable.",
+                    "All users may cancel, save administrators.",
+                    "The API returns CSV but not for archived records.",
+                    "Every child restores data, except direct children.",
+                    "The export runs on entry, except during replay.",
+                )
+            ]
+            + [
+                ClassificationExample(text, "absent")
+                for text in (
+                    "Active reports can be exported.",
+                    "Reports created after login can be exported.",
+                    "When a state is active, its data is readable.",
+                    "The endpoint accepts JSON.",
+                    "Callbacks receive state_data on entry.",
+                    "The setter validates declared keys.",
+                    "All active states reset data.",
+                    "Users can export reports.",
+                    "Data persists while the state is active.",
+                    "The event runs after validation.",
+                )
+            ]
         ),
     ),
     "has_explicit_result": ClassifierDefinition(
         "Does this exact proposition explicitly state the observable result of the "
         "behavior?",
-        (
-            "Choose present only when the result itself appears in the proposition.",
-            "Example: 'The endpoint returns CSV' has an explicit result: CSV.",
-            "Example: 'All data should pickle' does not state what successful "
-            "pickling preserves.",
+        ("Choose present only when the result itself appears in the proposition.",),
+        tuple(
+            [
+                ClassificationExample(text, "present")
+                for text in (
+                    "The endpoint returns CSV.",
+                    "The setter raises InvalidDefinition for unknown keys.",
+                    "A successful export creates a downloadable file.",
+                    "The callback emits a StateChanged event.",
+                    "On failure, the API returns status 422.",
+                    "The method returns None when the state is inactive.",
+                    "The operation yields a snapshot mapping.",
+                    "The parser produces a literal Python value.",
+                    "The transition records old and new data values.",
+                    "The diagram displays each declared data key.",
+                )
+            ]
+            + [
+                ClassificationExample(text, "absent")
+                for text in (
+                    "All data should pickle.",
+                    "Users can export reports.",
+                    "The setter validates declared keys.",
+                    "The callback receives state_data.",
+                    "Data is reset on re-entry.",
+                    "The endpoint supports JSON.",
+                    "History restores child state data.",
+                    "The package provides DataVar.",
+                    "The renderer annotates states.",
+                    "Retries are disabled by default.",
+                )
+            ]
         ),
     ),
     "temporal_scope": ClassifierDefinition(
@@ -131,8 +333,54 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose current, future, current_and_future, event_bound, or unspecified.",
             "Do not infer future scope from every or all.",
-            "Examples: 'On entry' is event_bound; a clause with no temporal wording "
-            "is unspecified.",
+        ),
+        (
+            ClassificationExample(
+                "In the current release, exports return CSV.", "current"
+            ),
+            ClassificationExample("This version accepts string keys.", "current"),
+            ClassificationExample(
+                "Currently, callbacks receive event_data.", "current"
+            ),
+            ClassificationExample("The present API exposes get_state_data.", "current"),
+            ClassificationExample("In a future release, exports return CSV.", "future"),
+            ClassificationExample(
+                "Starting next version, keys accept integers.", "future"
+            ),
+            ClassificationExample("The next release will expose DataVar.", "future"),
+            ClassificationExample(
+                "From version 3 onward, snapshots are immutable.", "future"
+            ),
+            ClassificationExample(
+                "Now and in future releases, keys are strings.", "current_and_future"
+            ),
+            ClassificationExample(
+                "The API continues to return CSV in later versions.",
+                "current_and_future",
+            ),
+            ClassificationExample(
+                "This behavior applies today and going forward.", "current_and_future"
+            ),
+            ClassificationExample(
+                "Both current and future releases preserve pickle.",
+                "current_and_future",
+            ),
+            ClassificationExample(
+                "On state entry, defaults are copied.", "event_bound"
+            ),
+            ClassificationExample(
+                "Whenever a transition exits, data is removed.", "event_bound"
+            ),
+            ClassificationExample(
+                "At each macrostep boundary, changes are cleared.", "event_bound"
+            ),
+            ClassificationExample(
+                "When history is recalled, saved data is restored.", "event_bound"
+            ),
+            ClassificationExample("The endpoint returns CSV.", "unspecified"),
+            ClassificationExample("Every active state has data.", "unspecified"),
+            ClassificationExample("The setter rejects unknown keys.", "unspecified"),
+            ClassificationExample("Callbacks receive a snapshot.", "unspecified"),
         ),
     ),
     "source_predicate": ClassifierDefinition(
@@ -142,8 +390,66 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "Choose explicit, implied_by_registered_term, or not_stated.",
             "Use implied_by_registered_term only when supplied accepted context "
             "defines the term.",
-            "Example: 'returns CSV' is explicit; 'should pickle' is not_stated "
-            "without an accepted pickle definition.",
+        ),
+        (
+            ClassificationExample("The endpoint returns CSV.", "explicit"),
+            ClassificationExample(
+                "The setter raises InvalidDefinition on bad keys.", "explicit"
+            ),
+            ClassificationExample("The callback emits StateChanged.", "explicit"),
+            ClassificationExample("The method returns None when inactive.", "explicit"),
+            ClassificationExample(
+                "A valid export creates a downloadable file.", "explicit"
+            ),
+            ClassificationExample("The parser produces a Python integer.", "explicit"),
+            ClassificationExample(
+                "The operation yields a mapping snapshot.", "explicit"
+            ),
+            ClassificationExample(
+                "The report is pickleable.",
+                "implied_by_registered_term",
+                "Accepted context defines pickleable as a successful "
+                "pickle round trip.",
+            ),
+            ClassificationExample(
+                "The record is JSON-serializable.",
+                "implied_by_registered_term",
+                "Accepted context defines JSON-serializable as encoding and "
+                "decoding to an equivalent value.",
+            ),
+            ClassificationExample(
+                "The value is iterable.",
+                "implied_by_registered_term",
+                "Accepted context defines iterable as supporting iteration.",
+            ),
+            ClassificationExample(
+                "The path is readable.",
+                "implied_by_registered_term",
+                "Accepted context defines readable as a successful read operation.",
+            ),
+            ClassificationExample(
+                "The field is optional.",
+                "implied_by_registered_term",
+                "Accepted context defines optional as omission being valid.",
+            ),
+            ClassificationExample(
+                "The result is idempotent.",
+                "implied_by_registered_term",
+                "Accepted context defines idempotent as repeated calls "
+                "preserving the same observable state.",
+            ),
+            ClassificationExample(
+                "The operation is reversible.",
+                "implied_by_registered_term",
+                "Accepted context defines reversible as an inverse operation "
+                "restoring the original state.",
+            ),
+            ClassificationExample("All data should pickle.", "not_stated"),
+            ClassificationExample("Users can export reports.", "not_stated"),
+            ClassificationExample("The setter validates declared keys.", "not_stated"),
+            ClassificationExample("Callbacks receive state_data.", "not_stated"),
+            ClassificationExample("The state resets on re-entry.", "not_stated"),
+            ClassificationExample("The diagram displays data variables.", "not_stated"),
         ),
     ),
     "nonactionable_exclusion_safety": ClassifierDefinition(
@@ -156,8 +462,60 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "interface, invariant, or prohibition.",
             "Choose mixed when process instructions and product semantics appear in "
             "the same proposition.",
-            "Examples: 'Open a PR' is process_only; 'Do not add retries' is "
-            "product_semantics_present.",
+        ),
+        (
+            ClassificationExample("Open a pull request.", "process_only"),
+            ClassificationExample("Run pytest before submitting.", "process_only"),
+            ClassificationExample(
+                "Commit the changes on a feature branch.", "process_only"
+            ),
+            ClassificationExample("Update the changelog for this PR.", "process_only"),
+            ClassificationExample("Use a dedicated git worktree.", "process_only"),
+            ClassificationExample(
+                "Send the review link when finished.", "process_only"
+            ),
+            ClassificationExample(
+                "Do not add retries to exports.", "product_semantics_present"
+            ),
+            ClassificationExample(
+                "Every active state owns isolated data.", "product_semantics_present"
+            ),
+            ClassificationExample(
+                "The setter raises InvalidDefinition on bad keys.",
+                "product_semantics_present",
+            ),
+            ClassificationExample(
+                "Callbacks receive state_data.", "product_semantics_present"
+            ),
+            ClassificationExample(
+                "Data resets on re-entry.", "product_semantics_present"
+            ),
+            ClassificationExample(
+                "The endpoint returns CSV.", "product_semantics_present"
+            ),
+            ClassificationExample(
+                "Run pytest and preserve the CSV output format.", "mixed"
+            ),
+            ClassificationExample("Open a PR and do not add retries.", "mixed"),
+            ClassificationExample(
+                "Commit the change and keep state data instance-local.", "mixed"
+            ),
+            ClassificationExample(
+                "Use a feature branch; the callback must receive state_data.", "mixed"
+            ),
+            ClassificationExample(
+                "Update the changelog and keep the endpoint backward-compatible.",
+                "mixed",
+            ),
+            ClassificationExample(
+                "Send the review link and preserve the existing error type.", "mixed"
+            ),
+            ClassificationExample(
+                "Run the tests; archived reports must remain unavailable.", "mixed"
+            ),
+            ClassificationExample(
+                "Create a PR, but do not expose secrets in its output.", "mixed"
+            ),
         ),
     ),
     "behavior_family": ClassifierDefinition(
@@ -165,10 +523,65 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose only from the supplied behavior-family labels.",
             "Classify the quoted behavior, not a broader implementation you imagine.",
-            "Examples: 'pickle' is serialize; 'load a saved report' is retrieve; "
-            "'add retries' is retry.",
-            "Use other for a supported but uncatalogued behavior and unresolved when "
-            "the phrase is ambiguous.",
+            "Use other when the requested behavior is clear but no registered family "
+            "fits; use unresolved only when the source phrase itself is ambiguous.",
+        ),
+        (
+            ClassificationExample("Create a new report.", "create"),
+            ClassificationExample("Read the current report contents.", "read"),
+            ClassificationExample("Change the report title.", "update"),
+            ClassificationExample("Remove an expired report.", "delete"),
+            ClassificationExample("List all active reports.", "list"),
+            ClassificationExample("Find reports matching a query.", "search"),
+            ClassificationExample("Reject keys that are not declared.", "validate"),
+            ClassificationExample(
+                "Convert the value into a normalized form.", "transform"
+            ),
+            ClassificationExample(
+                "Serialize the state snapshot with pickle.", "serialize"
+            ),
+            ClassificationExample(
+                "Deserialize the saved pickle snapshot.", "deserialize"
+            ),
+            ClassificationExample(
+                "Pickle and restore the value without changing it.", "round_trip"
+            ),
+            ClassificationExample(
+                "Persist state data across process restarts.", "persist"
+            ),
+            ClassificationExample("Retrieve the previously saved report.", "retrieve"),
+            ClassificationExample(
+                "Compare the current and saved revisions.", "compare"
+            ),
+            ClassificationExample("Invoke the callback for the transition.", "invoke"),
+            ClassificationExample("Emit a StateChanged event.", "emit"),
+            ClassificationExample("Receive events from the message queue.", "receive"),
+            ClassificationExample(
+                "Authorize access using the user's role.", "authorize"
+            ),
+            ClassificationExample(
+                "Authenticate the caller's credentials.", "authenticate"
+            ),
+            ClassificationExample(
+                "Retry a request after a transient failure.", "retry"
+            ),
+            ClassificationExample("Render state data in the diagram.", "render"),
+            ClassificationExample(
+                "Configure the machine's default timeout.", "configure"
+            ),
+            ClassificationExample(
+                "States lack built-in data ownership, forcing manual variable "
+                "management without scoping or lifecycle.",
+                "other",
+            ),
+            ClassificationExample(
+                "Make state management better.",
+                None,
+                unresolved_reason="source_ambiguous",
+            ),
+            ClassificationExample(
+                "Improve it.", None, unresolved_reason="source_underspecified"
+            ),
         ),
     ),
 }
@@ -479,10 +892,34 @@ def _render_evidence_case(contract: PartialSemanticContract) -> str:
 def _classifier_request(
     spec: SemanticDecisionSpec, definition: ClassifierDefinition
 ) -> dict[str, Any]:
+    instructions = list(definition.instructions)
+    if definition.examples:
+        examples = []
+        for example in definition.examples:
+            if example.value is not None:
+                result = {
+                    "status": "resolved",
+                    "value": example.value,
+                    "reason_code": None,
+                }
+            else:
+                result = {
+                    "status": "unresolved",
+                    "value": None,
+                    "reason_code": example.unresolved_reason,
+                }
+            example_text = f"{example.proposition!r} => {json.dumps(result)}"
+            if example.context is not None:
+                example_text += f" (accepted context: {example.context})"
+            examples.append(example_text)
+        instructions.append(
+            "Worked examples (source proposition => exact result JSON):\n- "
+            + "\n- ".join(examples)
+        )
     return {
         "spec": spec.to_data(),
         "question": definition.question,
-        "instructions": list(definition.instructions),
+        "instructions": instructions,
         "allowed_values": sorted(DECISION_VALUES[spec.decision_kind]),
         "subject_text": spec.proposition_text,
     }

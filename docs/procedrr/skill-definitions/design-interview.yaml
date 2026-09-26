@@ -241,23 +241,24 @@ steps:
             bind: semantic_decision_plan
         - for_each:
             snapshot: {name: semantic_decision_plan.pending_specs, max_items: 16}
-            item_binding: semantic_decision_request
-            collect: {binding: semantic_decision_results, mode: list, value: semantic_decision_result}
+            item_binding: root_decision_request
+            collect: {binding: root_decision_results, mode: list, value: root_decision_result}
             body:
               - judge:
                   kind: classify_one
                   provider: planning
-                  question: Resolve only the one semantic classification specified in this request.
-                  subject: semantic_decision_request.subject_text
+                  question: Decide the root role of this exact instruction clause before classifying any details.
+                  subject: root_decision_request.subject_text
                   prompt_system: Return only the declared JSON object.
                   instructions:
                     - Follow the request's question, instructions, and allowed_values exactly.
+                    - This is the root of a decision tree. Do not classify polarity, strength, behavior family, or modifiers here.
                     - Return resolved with exactly one allowed value when the source supports it.
                     - Return unresolved with a closed reason_code when the source does not support one value.
                     - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.
-                  context: [semantic_decision_request]
+                  context: [root_decision_request]
                   output:
-                    name: semantic_decision_result
+                    name: root_decision_result
                     schema:
                       type: object
                       required: [status, value, reason_code]
@@ -266,7 +267,7 @@ steps:
                         status: {type: string, enum: [resolved, unresolved]}
                         value:
                           type: [string, 'null']
-                          enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
+                          enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
                         reason_code:
                           type: [string, 'null']
                           enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
@@ -277,7 +278,67 @@ steps:
             parameters:
               clause: {type: reference, value: instruction_clause}
               plan: {type: reference, value: semantic_decision_plan}
-              results: {type: reference, value: semantic_decision_results}
+              results: {type: reference, value: root_decision_results}
+            returns:
+              type: object
+              required: [path, decisions]
+              properties:
+                path: {type: string, minLength: 1}
+                decisions: {type: array, minItems: 1}
+            bind: bound_root_decision
+        - operation:
+            tool: internal
+            command: [prepare_dependent_source_semantic_decisions]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              decisions: {type: reference, value: bound_root_decision.decisions}
+            returns:
+              type: object
+              required: [resolved_decisions, pending_specs]
+              additionalProperties: false
+              properties:
+                resolved_decisions: {type: array}
+                pending_specs: {type: array}
+            bind: dependent_semantic_decision_plan
+        - for_each:
+            snapshot: {name: dependent_semantic_decision_plan.pending_specs, max_items: 16}
+            item_binding: dependent_decision_request
+            collect: {binding: dependent_decision_results, mode: list, value: dependent_decision_result}
+            body:
+              - judge:
+                  kind: classify_one
+                  provider: planning
+                  question: Resolve this child decision only within the already-selected root branch.
+                  subject: dependent_decision_request.subject_text
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Follow the request's question, instructions, allowed_values, and parent decision exactly.
+                    - Never select a child value that contradicts the parent branch; abstain when no child value fits.
+                    - Return resolved with exactly one allowed value or unresolved with one closed reason_code.
+                    - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.
+                  context: [dependent_decision_request]
+                  output:
+                    name: dependent_decision_result
+                    schema:
+                      type: object
+                      required: [status, value, reason_code]
+                      additionalProperties: false
+                      properties:
+                        status: {type: string, enum: [resolved, unresolved]}
+                        value:
+                          type: [string, 'null']
+                          enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
+                        reason_code:
+                          type: [string, 'null']
+                          enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
+                  validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [bind_source_semantic_decisions]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              plan: {type: reference, value: dependent_semantic_decision_plan}
+              results: {type: reference, value: dependent_decision_results}
             returns:
               type: object
               required: [path, decisions]
@@ -344,6 +405,7 @@ steps:
             parameters:
               clause: {type: reference, value: instruction_clause}
               extractions: {type: reference, value: bound_source_extractions.extractions}
+              decisions: {type: reference, value: bound_semantic_decisions.decisions}
             returns:
               type: object
               required: [spec, question, instructions, allowed_values, subject_text]
@@ -416,7 +478,7 @@ steps:
               type: object
               required: [requests]
               properties:
-                requests: {type: array, minItems: 1}
+                requests: {type: array, minItems: 0}
             bind: field_entailment_plan
         - for_each:
             snapshot: {name: field_entailment_plan.requests, max_items: 16}
@@ -458,7 +520,7 @@ steps:
               type: object
               required: [reviews]
               properties:
-                reviews: {type: array, minItems: 1}
+                reviews: {type: array, minItems: 0}
             bind: bound_field_entailment_reviews
         - operation:
             tool: internal
@@ -489,6 +551,12 @@ steps:
               - Keep error shape and location separate from whether later work continues; nested errors must be represented explicitly when relevant.
               - For APIs, adapters, commands, integrations, and runtime extensions, include each supported/rejected/unknown context in capability_matrix with executable evidence and the defined error for rejected contexts. Return an empty list only when this behavior change has no capability boundary.
               - Do not return selectors, IDs, evidence paths, validator commands, or extra fields; Powdrr binds those from the compiled test contract.
+            prompt_rules:
+              - when: {binding: partial_semantic_design.partial_contract.disposition, equals: context}
+                instructions:
+                  - This clause is background context only and must not create an implementation obligation.
+                  - Return status resolved, list no unresolved dimensions, and set every dimension to "not_applicable (context only)".
+                  - Set given to "The source clause is context only", when to "The feature design is compiled", and then to "No implementation obligation is generated".
             context: [instruction_clause, partial_semantic_design, source_faithfulness]
             output:
               name: behavior_scenario_result

@@ -1270,9 +1270,8 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
         source_values = iter(
             (
                 "feature",
-                "required",
                 "unspecified",
-                "unspecified",
+                "must",
                 "absent",
                 "absent",
                 "absent",
@@ -1289,7 +1288,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "one semantic classification" in question:
+            if "root role" in question or "child decision" in question:
                 return {
                     "status": "resolved",
                     "value": next(self.source_values),

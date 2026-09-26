@@ -477,7 +477,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 "feature",
                 "required",
                 "unspecified",
-                "unspecified",
+                "must",
                 "absent",
                 "absent",
                 "absent",
@@ -494,7 +494,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "one semantic classification" in question:
+            if "root role" in question or "child decision" in question:
                 return {
                     "status": "resolved",
                     "value": next(self.source_values),
@@ -578,10 +578,20 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "resolved_decisions": [],
                     "pending_specs": [
                         {
-                            "kind": kind,
+                            "spec": {"decision_kind": "disposition"},
                             "subject_text": "Add a thing",
                         }
-                        for kind in range(10)
+                    ],
+                }
+            if command[0] == "prepare_dependent_source_semantic_decisions":
+                return {
+                    "resolved_decisions": [{"decision_kind": "disposition"}],
+                    "pending_specs": [
+                        {
+                            "spec": {"decision_kind": f"child-{kind}"},
+                            "subject_text": "Add a thing",
+                        }
+                        for kind in range(9)
                     ],
                 }
             if command[0] == "bind_source_semantic_decisions":
@@ -626,6 +636,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "source_ref": "instruction-001",
                         "source_fingerprint": "sha256:clause",
                         "proposition_text": "Add a thing",
+                        "disposition": "feature",
                     },
                 }
             if command[0] == "prepare_field_entailment_reviews":

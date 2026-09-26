@@ -133,6 +133,7 @@ class FeatureEndpointConfig:
     cleanup_temporary_artifacts: bool = False
     planning_client: WorkflowLLMClient | None = None
     task_id: str | None = None
+    design_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,7 +299,7 @@ def run_feature_in_place(
             output_root=output_root,
             branch=branch,
         )
-        if config.cleanup_temporary_artifacts:
+        if config.cleanup_temporary_artifacts and not config.design_only:
             _remove_temporary_feature_artifacts(
                 runner,
                 root,
@@ -324,7 +325,11 @@ def _execute_procedrr_flow(
 ) -> FeatureEndpointResult:
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {"task_id": config.task_id or config.work_item_name}
-    flow_path = _validate_procedrr_flow(worktree)
+    flow_path = (
+        _validate_design_interview_flow(worktree)
+        if config.design_only
+        else _validate_procedrr_flow(worktree)
+    )
     command_catalog = feature_command_catalog()
     command_runtime = FeatureCommandRuntime(
         config=config,
@@ -474,11 +479,21 @@ def _execute_procedrr_flow(
             state, branch, worktree, "review_failed", failure=failure
         )
     else:
+        if config.design_only:
+            canonical_path = state.get("canonical_feature_design_path")
+            if isinstance(canonical_path, Path):
+                state["plan_path"] = canonical_path
         result = _feature_endpoint_result(
             state,
             branch,
             worktree,
-            "pr_opened" if state.get("pull_request_url") else "completed",
+            (
+                "design_generated"
+                if config.design_only
+                else "pr_opened"
+                if state.get("pull_request_url")
+                else "completed"
+            ),
         )
     _write_run_result(output_root, result)
     return result
@@ -3892,13 +3907,60 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     return path
 
 
+def _validate_design_interview_flow(worktree: Path) -> Path:
+    repository_path = (
+        worktree / "docs" / "procedrr" / "skill-definitions" / "design-interview.yaml"
+    )
+    path = repository_path
+    if not path.is_file():
+        package_data_path = (
+            Path(__file__).resolve().parents[2] / "design-interview.yaml"
+        )
+        source_tree_path = (
+            Path(__file__).resolve().parents[3]
+            / "docs"
+            / "procedrr"
+            / "skill-definitions"
+            / "design-interview.yaml"
+        )
+        path = next(
+            (
+                candidate
+                for candidate in (package_data_path, source_tree_path)
+                if candidate.is_file()
+            ),
+            package_data_path,
+        )
+    try:
+        parse_and_validate(
+            path.read_text(encoding="utf-8"),
+            command_catalog=feature_command_catalog(),
+        )
+    except (OSError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"Shared design-interview Procedrr definition is invalid: {path}: {error}"
+        ) from error
+    return path
+
+
 def _structrr_taxonomy_path(worktree: Path) -> Path:
     repository_path = worktree / "software_development_entity_taxonomy.md"
     if repository_path.is_file():
         return repository_path
-    return (
+    package_data_path = (
         Path(__file__).resolve().parents[2] / "software_development_entity_taxonomy.md"
-    )  # noqa: E501
+    )
+    source_tree_path = (
+        Path(__file__).resolve().parents[3] / "software_development_entity_taxonomy.md"
+    )
+    return next(
+        (
+            candidate
+            for candidate in (package_data_path, source_tree_path)
+            if candidate.is_file()
+        ),
+        package_data_path,
+    )
 
 
 def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:

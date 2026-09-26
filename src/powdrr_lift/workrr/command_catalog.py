@@ -56,6 +56,7 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     compile_source_contract,
     finalize_source_faithfulness,
     prepare_behavior_family_decision,
+    prepare_dependent_source_semantic_decisions,
     prepare_field_entailment_reviews,
     prepare_source_extractions,
     prepare_source_semantic_decisions,
@@ -128,6 +129,16 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("prepare_source_semantic_decisions"),
         ),
+        "prepare_dependent_source_semantic_decisions": CommandSpec(
+            name="prepare_dependent_source_semantic_decisions",
+            input_schema=object_schema(
+                {"clause": {}, "decisions": {}},
+                required=("clause", "decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_dependent_source_semantic_decisions"),
+        ),
         "bind_source_semantic_decisions": CommandSpec(
             name="bind_source_semantic_decisions",
             input_schema=object_schema(
@@ -161,8 +172,8 @@ def feature_command_catalog(
         "prepare_behavior_family_decision": CommandSpec(
             name="prepare_behavior_family_decision",
             input_schema=object_schema(
-                {"clause": {}, "extractions": {}},
-                required=("clause", "extractions"),
+                {"clause": {}, "extractions": {}, "decisions": {}},
+                required=("clause", "extractions", "decisions"),
                 additional_properties=False,
             ),
             output_schema={},
@@ -967,6 +978,14 @@ class FeatureCommandRuntime:
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
+        def prepare_dependent_source_semantic_decisions_operation() -> Any:
+            try:
+                return prepare_dependent_source_semantic_decisions(
+                    semantic_clause(), semantic_decisions(parameters.get("decisions"))
+                )
+            except (SemanticContractError, SemanticDecisionError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
         def build_semantic_repository_inventory_operation() -> Any:
             try:
                 inventory = build_inventory(
@@ -1113,7 +1132,11 @@ class FeatureCommandRuntime:
                     "behavior-family classification requires one behavior extraction"
                 )
             try:
-                return prepare_behavior_family_decision(semantic_clause(), behaviors[0])
+                return prepare_behavior_family_decision(
+                    semantic_clause(),
+                    behaviors[0],
+                    semantic_decisions(parameters.get("decisions")),
+                )
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
@@ -1398,6 +1421,9 @@ class FeatureCommandRuntime:
                 ),
                 "prepare_source_semantic_decisions": bind_handler(
                     prepare_source_semantic_decisions_operation
+                ),
+                "prepare_dependent_source_semantic_decisions": bind_handler(
+                    prepare_dependent_source_semantic_decisions_operation
                 ),
                 "bind_source_semantic_decisions": bind_handler(
                     bind_source_semantic_decisions_operation

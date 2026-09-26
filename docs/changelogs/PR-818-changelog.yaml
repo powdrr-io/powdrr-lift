@@ -1,0 +1,126 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 818
+title: Add parent-conditioned semantic decision tree and design-only evaluation
+intent:
+  problem: Independent semantic classifiers can contradict one another, and evaluating a design prompt currently requires entering the coding workflow.
+  goal: Resolve a root disposition first, constrain dependent decisions to its branch, and allow isolated design generation without launching a coding agent.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 244, end_line: 620}
+    summary: Stage source classification behind a root disposition and add parent-aware branches for context, product, and non-goal clauses.
+    rationale: Prevent inconsistent child decisions and avoid treating background context as an implementation obligation.
+    related: {entities: [semantic-decision-tree, design-only-evaluation], invariants: [child-decisions-respect-parent-branch]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1, end_line: 1160}
+    summary: Add staged root and dependent classifiers, deterministic branch constraints, cross-decision validation, and context-safe contract review.
+    rationale: Make semantic decisions conditional on already resolved parent choices.
+    related: {entities: [semantic-decision-tree], invariants: [child-decisions-respect-parent-branch]}
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 1, end_line: 500}
+    summary: Allow context as a source disposition.
+    rationale: Represent non-obligation background clauses explicitly.
+    related: {entities: [semantic-decision-tree], invariants: [context-does-not-create-obligation]}
+  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    type: modified
+    span: {start_line: 1, end_line: 300}
+    summary: Treat context clauses as requiring no field-entailment review and avoid re-reviewing tree-governed decisions.
+    rationale: Prevent downstream checks from contradicting validated parent decisions.
+    related: {entities: [semantic-decision-tree], invariants: [child-decisions-respect-parent-branch]}
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 1, end_line: 100}
+    summary: Register context as a non-actionable semantic kind.
+    rationale: Keep background clauses out of implementation obligations.
+    related: {entities: [semantic-decision-tree], invariants: [context-does-not-create-obligation]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1, end_line: 1900}
+    summary: Expose the dependent-classifier operation and pass resolved tree decisions to family classification.
+    rationale: Execute the staged decision tree through the design workflow.
+    related: {entities: [semantic-decision-tree], invariants: [child-decisions-respect-parent-branch]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 1, end_line: 5300}
+    summary: Add a design-only execution path that runs classification and evaluation without invoking a coding agent.
+    rationale: Enable isolated live evaluation of generated task designs.
+    related: {entities: [design-only-evaluation], invariants: [design-only-does-not-launch-coder]}
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1470, end_line: 4650}
+    summary: Add the harbor-feature --design-only option and report generated design output.
+    rationale: Provide a user-facing entry point for isolated prompt evaluation.
+    related: {entities: [design-only-evaluation], invariants: [design-only-does-not-launch-coder]}
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 210, end_line: 240}
+    summary: Forward the design-only environment setting to the CLI.
+    rationale: Preserve isolated evaluation when launched through Harbor.
+    related: {entities: [design-only-evaluation], invariants: [design-only-does-not-launch-coder]}
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1, end_line: 520}
+    summary: Test root-first classification, branch constraints, context defaults, and inconsistent-decision rejection.
+    rationale: Protect decision-tree invariants and deterministic resolutions.
+    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1260, end_line: 1400}
+    summary: Update the end-to-end design fixture for deterministic parent-conditioned decisions.
+    rationale: Keep the design compilation test aligned with the staged classifier.
+    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 620, end_line: 680}
+    summary: Verify the staged decision operations in the design interview definition.
+    rationale: Ensure the workflow binds parent results before child classification.
+    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 470, end_line: 650}
+    summary: Update evaluator activation and response fixtures for staged semantic classification.
+    rationale: Verify the complete prompt-driven decision sequence.
+    related: {entities: [semantic-decision-tree-tests], invariants: [child-decisions-respect-parent-branch]}
+entities:
+  - id: semantic-decision-tree
+    type: Module
+    action: modified
+  - id: design-only-evaluation
+    type: Command-line flag
+    action: added
+  - id: semantic-decision-tree-tests
+    type: Test suite
+    action: modified
+entity_relationships:
+  - id: child-classifiers-follow-root-disposition
+    source: semantic-decision-tree
+    target: design-interview
+    relationship: constrains
+    description: Source child decisions are generated and validated only after the disposition root resolves.
+    rationale: Avoid incompatible classifications from independent prompts.
+    action: added
+  - id: design-only-runs-design-interview
+    source: design-only-evaluation
+    target: design-interview
+    relationship: invokes
+    description: The command runs the design interview and its evaluators without starting a coding agent.
+    rationale: Allow safe isolated testing of generated designs.
+    action: added
+invariants:
+  - id: child-decisions-respect-parent-branch
+    action: added
+    description: A resolved disposition constrains applicable child values, and incompatible semantic decisions are rejected.
+    rationale: Keep the compiled semantic contract internally consistent.
+  - id: context-does-not-create-obligation
+    action: added
+    description: Clauses classified as context do not become actionable feature obligations.
+    rationale: Preserve background information without inventing requested behavior.
+  - id: design-only-does-not-launch-coder
+    action: added
+    description: Design-only execution stops after design evaluation and does not invoke a coding agent.
+    rationale: Isolate prompt quality evaluation from implementation behavior.
+guidance: []

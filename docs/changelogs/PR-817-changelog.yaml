@@ -1,0 +1,154 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 817
+title: Add worked examples to semantic classifiers
+intent:
+  problem: Semantic classifier prompts expose allowed labels but provide too few examples to distinguish them reliably.
+  goal: Give every source semantic classifier at least twenty labeled examples, covering each allowed label and demonstrating abstention boundaries where appropriate.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Add JSON rendering for exact classifier-result examples.
+    rationale: Show few-shot results in the same shape the judge must return.
+    related: {entities: [classifier-example-prompt], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 44, end_line: 51}
+    summary: Add a structured classification-example record and attach examples to classifier definitions.
+    rationale: Keep proposition, label, accepted context, and unresolved reason explicit and testable.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 56, end_line: 56}
+    summary: Store worked examples on each classifier definition.
+    rationale: Bind guidance data directly to the decision it explains.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 69, end_line: 102}
+    summary: Add twenty disposition examples across entity, feature, interface, invariant, guidance, non-goal, and process-only cases.
+    rationale: Demonstrate semantic boundaries among all disposition labels.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 111, end_line: 146}
+    summary: Add twenty polarity examples for required, prohibited, permitted, and descriptive wording.
+    rationale: Ground polarity choices in varied source wording.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 154, end_line: 177}
+    summary: Add twenty quantifier examples covering one, some, every, and unspecified.
+    rationale: Prevent universal coverage from being inferred from normative tone.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 187, end_line: 214}
+    summary: Add twenty normative-strength examples for must, should, may, descriptive, and unspecified.
+    rationale: Show the distinction between requirement strength and behavioral polarity.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 220, end_line: 251}
+    summary: Add twenty balanced precondition-presence examples.
+    rationale: Teach the classifier to distinguish explicit conditions from ordinary behavior statements.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 260, end_line: 291}
+    summary: Add twenty balanced exception-presence examples.
+    rationale: Distinguish exception clauses from ordinary preconditions.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 297, end_line: 328}
+    summary: Add twenty examples that distinguish explicit results from unstated success predicates.
+    rationale: Avoid inventing an observable result from a behavior request alone.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 336, end_line: 383}
+    summary: Add twenty temporal-scope examples across current, future, combined, event-bound, and unspecified scope.
+    rationale: Demonstrate explicit time wording without conflating it with quantification.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 393, end_line: 452}
+    summary: Add twenty source-predicate examples, including accepted-context examples for registered terms.
+    rationale: Ground explicit, context-implied, and unstated success predicates.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 465, end_line: 518}
+    summary: Add twenty examples for process-only, product-semantic, and mixed propositions.
+    rationale: Protect product requirements when process instructions share a sentence.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 526, end_line: 584}
+    summary: Cover all 23 behavior-family labels, the reported state-data phrase as other, and explicit ambiguous/underspecified abstentions.
+    rationale: Help the classifier select other for clear uncatalogued behavior instead of aborting on ambiguity.
+    related: {entities: [classification-example], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 895, end_line: 918}
+    summary: Render structured examples as exact resolved or unresolved result JSON in classifier requests.
+    rationale: Align few-shot outputs with the judge response schema.
+    related: {entities: [classifier-example-prompt], invariants: [classifier-examples-cover-labels]}
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 922, end_line: 922}
+    summary: Include rendered worked examples in classifier instructions.
+    rationale: Make examples available to the planning model for each classification request.
+    related: {entities: [classifier-example-prompt], invariants: [classifier-examples-cover-labels]}
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 13, end_line: 17}
+    summary: Import allowed-label and unresolved-reason registries for example validation.
+    rationale: Check the example corpus against canonical decision contracts.
+    related: {entities: [classifier-example-tests], invariants: [classifier-examples-cover-labels]}
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Expose classifier definitions to the invariant test.
+    rationale: Validate every source classifier from one shared registry.
+    related: {entities: [classifier-example-tests], invariants: [classifier-examples-cover-labels]}
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 43, end_line: 94}
+    summary: Require at least twenty examples and full allowed-label coverage per classifier, and pin the prior DeepSWE failure to other with a separate abstention example.
+    rationale: Prevent sparse or invalid few-shot guidance from regressing.
+    related: {entities: [classifier-example-tests], invariants: [classifier-examples-cover-labels]}
+entities:
+  - id: classification-example
+    type: Class
+    action: added
+  - id: classifier-example-prompt
+    type: Function
+    action: added
+  - id: classifier-example-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: classifier-prompt-renders-examples
+    source: classification-example
+    target: classifier-example-prompt
+    relationship: invokes
+    description: Classifier requests render labeled examples into model instructions.
+    rationale: Make examples part of the decision context rather than passive documentation.
+    action: added
+  - id: classifier-tests-verify-examples
+    source: classifier-example-tests
+    target: classification-example
+    relationship: verifies
+    description: Tests enforce the per-decision example minimum and output-label coverage.
+    rationale: Keep classifier examples comprehensive as decision labels evolve.
+    action: added
+invariants:
+  - id: classifier-examples-cover-labels
+    action: added
+    description: Every source semantic classifier has at least twenty worked examples and at least one resolved example for each allowed label; unresolved examples use a registered reason code.
+    rationale: Give the LLM concrete positive and boundary guidance for every classification decision.
+guidance: []

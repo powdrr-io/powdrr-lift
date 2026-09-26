@@ -27,6 +27,10 @@ from powdrr_lift.structrr.bootstrap import (
     validate_bootstrap_document,
     validate_bootstrap_sections,
 )
+from powdrr_lift.structrr.intent_lineage import (
+    INTENT_LINEAGE_HISTORY_SCHEMA,
+    audit_intent_lineage,
+)
 from powdrr_lift.structrr.proposal import (
     PROPOSAL_REVISION_SCHEMA_VERSION,
     ProposalOperation,
@@ -72,6 +76,8 @@ __all__ = [
     "active_intent_section",
     "resolve_active_intent",
     "validate_active_intent_section",
+    "INTENT_LINEAGE_HISTORY_SCHEMA",
+    "audit_intent_lineage",
     "StructrrChange",
     "StructrrRebaseReport",
     "StructrrRemapping",

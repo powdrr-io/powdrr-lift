@@ -1,15 +1,15 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 816
-title: Compile lossless behavior scenarios and structured repair failures
+title: Author lossless behavior contracts and structured repair failures
 intent:
-  problem: Acceptance prose can omit behavior dimensions, while validation and verifier failures lack a common evidence-rich repair shape.
-  goal: Compile explicit behavior scenarios into a concise worker contract and normalize validation failures for bounded repair.
+  problem: Design interviews and acceptance prose can omit behavior dimensions, while validation and verifier failures lack a common evidence-rich repair shape.
+  goal: Author explicit behavior scenarios during design, propagate them to a concise worker contract, and normalize validation failures for bounded repair.
 human-decisions: []
 structured_files: []
 files:
   - path: src/powdrr_lift/core/behavior_contract.py
     type: added
-    span: {start_line: 1, end_line: 192}
+    span: {start_line: 1, end_line: 211}
     summary: Validate typed behavior scenarios and capability matrices, reject omitted dimensions, and render behavior contracts as a concise matrix.
     rationale: Make success, error, continuation, unsupported, cleanup, compatibility, negative-boundary, and evidence requirements explicit before worker handoff.
     related:
@@ -129,12 +129,234 @@ files:
     related: {entities: [validation-failure-normalizer], invariants: [repair-failures-share-one-schema]}
   - path: tests/test_behavior_contract.py
     type: added
-    span: {start_line: 1, end_line: 129}
+    span: {start_line: 1, end_line: 130}
     summary: Test explicit behavior dimensions, concise prompt projection, capability evidence, packet round-tripping, and normalized repair failures.
     rationale: Protect fail-closed compilation and the worker-facing contract from omissions and duplication.
     related:
       entities: [behavior-contract-tests]
       invariants: [behavior-dimensions-are-explicit, behavior-prompt-matches-contract, repair-failures-share-one-schema]
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 58, end_line: 58}
+    summary: Require a behavior scenario in each compiled test contract.
+    rationale: Make the contract part of the standard design output.
+    related: {entities: [behavior-scenario-interview], invariants: [behavior-dimensions-are-explicit]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 71, end_line: 106}
+    summary: Define the strict nested scenario and capability-matrix schema.
+    rationale: Reject incomplete or unstructured scenario output.
+    related: {entities: [behavior-scenario-interview], invariants: [behavior-dimensions-are-explicit, capability-cases-have-evidence]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 409, end_line: 409}
+    summary: Preserve the partial design separately until behavior is collected.
+    rationale: Avoid binding the incomplete design as the final contract.
+    related: {entities: [behavior-scenario-interview], invariants: [behavior-dimensions-are-explicit]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 414, end_line: 414}
+    summary: Bind field review to the partial design contract.
+    rationale: Keep evidence review aligned with the staged design.
+    related: {entities: [behavior-scenario-interview], invariants: [behavior-dimensions-are-explicit]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 467, end_line: 467}
+    summary: Bind faithfulness review to the partial design contract.
+    rationale: Review source entailment before scenario compilation.
+    related: {entities: [behavior-scenario-interview], invariants: [behavior-dimensions-are-explicit]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 477, end_line: 553}
+    summary: Collect a lossless behavior scenario and merge it into the canonical semantic design.
+    rationale: Clarify unresolved dimensions instead of guessing and carry the resolved contract downstream.
+    related: {entities: [behavior-scenario-interview], invariants: [behavior-dimensions-are-explicit, capability-cases-have-evidence]}
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 57, end_line: 57}
+    summary: Add an optional typed scenario to design projections.
+    rationale: Keep scenario data attached to its source obligation.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 68, end_line: 68}
+    summary: Serialize the scenario when present.
+    rationale: Preserve the projection through canonical plan generation.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 76, end_line: 77}
+    summary: Keep projection serialization explicitly typed.
+    rationale: Allow the nested scenario mapping in the design record.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 268, end_line: 272}
+    summary: Extract behavior scenarios from semantic design results.
+    rationale: Retain interview-authored behavior in canonical projections.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 11, end_line: 11}
+    summary: Use the behavior scenario compiler in command bindings.
+    rationale: Apply shared validation to interview output.
+    related: {entities: [behavior-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 325, end_line: 334}
+    summary: Register the behavior-scenario merge operation.
+    rationale: Make typed behavior compilation part of the canonical flow.
+    related: {entities: [behavior-scenario-binder], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 895, end_line: 897}
+    summary: Dispatch scenario binding through the catalog runtime.
+    rationale: Connect the interview operation to the validated compiler.
+    related: {entities: [behavior-scenario-binder], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1249, end_line: 1256}
+    summary: Associate collected scenarios with their exact source clauses.
+    rationale: Prevent cross-obligation scenario assignment.
+    related: {entities: [behavior-scenario-binder], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1275, end_line: 1275}
+    summary: Attach the scenario to each semantic test case.
+    rationale: Preserve typed behavior in generated verification contracts.
+    related: {entities: [behavior-scenario-binder], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1279, end_line: 1286}
+    summary: Reject actionable obligations missing a typed scenario.
+    rationale: Fail closed before worker handoff.
+    related: {entities: [behavior-scenario-binder], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1448, end_line: 1450}
+    summary: Register the scenario merge handler.
+    rationale: Expose the operation to the Procedrr executor.
+    related: {entities: [behavior-scenario-binder], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1820, end_line: 1860}
+    summary: Validate scenario resolution and bind stable IDs, evidence, and validator details.
+    rationale: Keep interview output compiler-owned and replayable.
+    related: {entities: [behavior-scenario-binder], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 1009, end_line: 1012}
+    summary: Prevent legacy untyped tests from covering actionable obligations.
+    rationale: Require coverage to carry a lossless behavior contract.
+    related: {entities: [feature-test-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 1044, end_line: 1048}
+    summary: Require a scenario when deriving a new test contract.
+    rationale: Ensure every generated executable test has explicit behavior.
+    related: {entities: [feature-test-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 1064, end_line: 1064}
+    summary: Attach scenarios to derived required tests.
+    rationale: Preserve scenario data into implementation planning.
+    related: {entities: [feature-test-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3427, end_line: 3432}
+    summary: Fail plan synthesis when an obligation lacks its scenario.
+    rationale: Keep Structrr plans behavior-complete.
+    related: {entities: [feature-test-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3488, end_line: 3488}
+    summary: Carry scenario data into synthesized test cases.
+    rationale: Bind plan evidence to the same behavior contract.
+    related: {entities: [feature-test-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3714, end_line: 3714}
+    summary: Permit typed behavior scenarios in test-contract edits.
+    rationale: Accept canonical scenario-bearing test data.
+    related: {entities: [feature-test-contract-compiler], invariants: [behavior-prompt-matches-contract]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3734, end_line: 3742}
+    summary: Validate scenarios attached to generated test cases.
+    rationale: Reject malformed behavior before worker prompts are built.
+    related: {entities: [feature-test-contract-compiler], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 81, end_line: 103}
+    summary: Add reusable complete scenario fixtures and evaluator imports.
+    rationale: Exercise typed scenario propagation in feature-flow tests.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 413, end_line: 413}
+    summary: Cover scenario propagation into compiled feature obligations.
+    rationale: Guard source-to-plan traceability.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-prompt-matches-contract]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 499, end_line: 499}
+    summary: Cover both accepted LLM design result shapes with scenarios.
+    rationale: Keep compatibility paths behavior-complete.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 861, end_line: 861}
+    summary: Add typed scenarios to generated-intent contract coverage.
+    rationale: Ensure generated design intents retain executable evidence.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-prompt-matches-contract]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 905, end_line: 905}
+    summary: Exercise typed-scenario retention on existing test contracts.
+    rationale: Preserve behavior requirements while matching inventory selectors.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1315, end_line: 1335}
+    summary: Exercise the scenario judge in the real collected-test design flow.
+    rationale: Verify interview output reaches canonical proposal compilation.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 101, end_line: 121}
+    summary: Teach the deterministic planner to return a typed scenario.
+    rationale: Keep full feature-flow tests representative of the new interview.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 720, end_line: 721}
+    summary: Assert the worker prompt uses the behavior-contract matrix.
+    rationale: Verify the intended prompting style in the end-to-end flow.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-prompt-matches-contract]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 520, end_line: 540}
+    summary: Return a typed scenario from the evaluator's scenario judge.
+    rationale: Exercise the new interview step with a deterministic provider.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 672, end_line: 722}
+    summary: Include merged scenario data in canonical test output.
+    rationale: Verify end-to-end binding from judge result to canonical design.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-prompt-matches-contract]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 724, end_line: 724}
+    summary: Update the deterministic executor's merge-operation fallback.
+    rationale: Keep evaluator execution aligned with the added command.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 738, end_line: 738}
+    summary: Account for the additional scenario-authoring judge activation.
+    rationale: Assert the complete design interview execution count.
+    related: {entities: [behavior-contract-tests], invariants: [behavior-dimensions-are-explicit]}
 entities:
   - id: behavior-contract-compiler
     type: Module
@@ -147,6 +369,15 @@ entities:
     action: added
   - id: behavior-contract-tests
     type: Test suite
+    action: added
+  - id: behavior-scenario-interview
+    type: Skill
+    action: added
+  - id: behavior-scenario-binder
+    type: Function
+    action: added
+  - id: feature-test-contract-compiler
+    type: Function
     action: added
 entity_relationships:
   - id: implementation-packet-renders-behavior-contract

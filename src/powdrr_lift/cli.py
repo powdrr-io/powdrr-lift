@@ -1469,6 +1469,14 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument("--planning-api-key")
     harbor_feature_parser.add_argument("--planning-base-url")
     harbor_feature_parser.add_argument("--output-root", type=Path)
+    harbor_feature_parser.add_argument(
+        "--design-only",
+        action="store_true",
+        help=(
+            "Run instruction classification and prompt evaluation "
+            "without a coding agent."
+        ),
+    )
     harbor_feature_parser.add_argument("--json", action="store_true")
     harbor_feature_parser.set_defaults(func=_run_harbor_feature)
 
@@ -4616,6 +4624,7 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             cleanup_temporary_artifacts=True,
             planning_client=planning_client,
             task_id=args.task_id or args.work_item_name,
+            design_only=args.design_only,
         )
     )
     if args.json:
@@ -4623,8 +4632,12 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
     else:
         print(f"Harbor feature run {result.status}")
         print(f"Worktree: {result.worktree}")
-        print(f"Review passed: {result.review['passed']}")
-    return 0 if result.status == "completed" else 1
+        if args.design_only:
+            print("Design compilation: passed; implementation review: not run")
+            print(f"Generated design: {result.plan_path}")
+        else:
+            print(f"Review passed: {result.review['passed']}")
+    return 0 if result.status in {"completed", "design_generated"} else 1
 
 
 def _extract_workflow_responses(args: argparse.Namespace) -> int:

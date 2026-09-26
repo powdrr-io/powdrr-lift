@@ -25,6 +25,7 @@ DECISION_VALUES: dict[str, frozenset[str]] = {
             "guidance",
             "non_goal",
             "nonactionable",
+            "context",
         }
     ),
     "polarity": frozenset({"required", "prohibited", "permitted", "descriptive"}),

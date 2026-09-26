@@ -25,7 +25,7 @@ class FeatureObligationError(ValueError):
 ACTIONABLE_KINDS = frozenset(
     {"entity", "feature", "interface", "invariant", "guidance", "non_goal"}
 )
-SEMANTIC_KINDS = ACTIONABLE_KINDS | {"nonactionable"}
+SEMANTIC_KINDS = ACTIONABLE_KINDS | {"nonactionable", "context"}
 
 # These instructions belong to the surrounding delivery workflow.  They are
 # deliberately recognized by the compiler as a safety net: a model that

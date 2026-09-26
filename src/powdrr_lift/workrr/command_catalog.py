@@ -56,6 +56,7 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     compile_source_contract,
     finalize_source_faithfulness,
     prepare_behavior_family_decision,
+    prepare_dependent_source_semantic_decisions,
     prepare_field_entailment_reviews,
     prepare_source_extractions,
     prepare_source_semantic_decisions,
@@ -128,6 +129,16 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("prepare_source_semantic_decisions"),
         ),
+        "prepare_dependent_source_semantic_decisions": CommandSpec(
+            name="prepare_dependent_source_semantic_decisions",
+            input_schema=object_schema(
+                {"clause": {}, "decisions": {}},
+                required=("clause", "decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_dependent_source_semantic_decisions"),
+        ),
         "bind_source_semantic_decisions": CommandSpec(
             name="bind_source_semantic_decisions",
             input_schema=object_schema(
@@ -161,8 +172,8 @@ def feature_command_catalog(
         "prepare_behavior_family_decision": CommandSpec(
             name="prepare_behavior_family_decision",
             input_schema=object_schema(
-                {"clause": {}, "extractions": {}},
-                required=("clause", "extractions"),
+                {"clause": {}, "extractions": {}, "decisions": {}},
+                required=("clause", "extractions", "decisions"),
                 additional_properties=False,
             ),
             output_schema={},
@@ -893,7 +904,12 @@ class FeatureCommandRuntime:
             return _merge_semantic_design_values(parameters)
 
         def merge_behavior_scenario_operation() -> Any:
-            return _merge_behavior_scenario_values(parameters)
+            return _merge_behavior_scenario_values(
+                parameters,
+                allow_clarification=bool(
+                    config is not None and getattr(config, "design_only", False)
+                ),
+            )
 
         def semantic_artifact_directory(clause: Mapping[str, Any]) -> Path:
             clause_id = clause.get("clause_id")
@@ -965,6 +981,14 @@ class FeatureCommandRuntime:
             try:
                 return prepare_source_semantic_decisions(semantic_clause())
             except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def prepare_dependent_source_semantic_decisions_operation() -> Any:
+            try:
+                return prepare_dependent_source_semantic_decisions(
+                    semantic_clause(), semantic_decisions(parameters.get("decisions"))
+                )
+            except (SemanticContractError, SemanticDecisionError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
         def build_semantic_repository_inventory_operation() -> Any:
@@ -1113,7 +1137,11 @@ class FeatureCommandRuntime:
                     "behavior-family classification requires one behavior extraction"
                 )
             try:
-                return prepare_behavior_family_decision(semantic_clause(), behaviors[0])
+                return prepare_behavior_family_decision(
+                    semantic_clause(),
+                    behaviors[0],
+                    semantic_decisions(parameters.get("decisions")),
+                )
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
@@ -1287,6 +1315,7 @@ class FeatureCommandRuntime:
             required_test_cases = feature_endpoint._compile_required_test_case_edits(
                 semantic_cases,
                 tuple(state.get("provider_inventory", ())),
+                validation_profiles=tuple(state.get("validation_profiles", ())),
                 include_existing_name_hint=True,
             )
             verification_contracts = []
@@ -1398,6 +1427,9 @@ class FeatureCommandRuntime:
                 ),
                 "prepare_source_semantic_decisions": bind_handler(
                     prepare_source_semantic_decisions_operation
+                ),
+                "prepare_dependent_source_semantic_decisions": bind_handler(
+                    prepare_dependent_source_semantic_decisions_operation
                 ),
                 "bind_source_semantic_decisions": bind_handler(
                     bind_source_semantic_decisions_operation
@@ -1818,9 +1850,9 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
 
 
 def _merge_behavior_scenario_values(
-    parameters: Mapping[str, Any],
+    parameters: Mapping[str, Any], *, allow_clarification: bool = False
 ) -> dict[str, Any]:
-    """Bind one fully resolved authored scenario to its clause and test evidence."""
+    """Bind a resolved scenario, or a visibly provisional design-only draft."""
     clause = parameters.get("clause")
     design = parameters.get("design")
     result = parameters.get("scenario")
@@ -1828,15 +1860,49 @@ def _merge_behavior_scenario_values(
         raise PowdrrExecutionError("behavior scenario is missing its source design")
     if not isinstance(result, Mapping):
         raise PowdrrExecutionError("behavior scenario response is malformed")
-    if result.get("status") != "resolved":
-        unresolved = result.get("unresolved_dimensions", [])
+    raw_scenario = result.get("scenario")
+    if not isinstance(raw_scenario, Mapping):
+        raise PowdrrExecutionError("behavior scenario has no scenario object")
+    status = result.get("status")
+    unresolved = result.get("unresolved_dimensions", [])
+    if status not in {"resolved", "needs_clarification"} or not isinstance(
+        unresolved, list
+    ):
+        raise PowdrrExecutionError("behavior scenario status is malformed")
+    if (status == "resolved") != (not unresolved):
+        raise PowdrrExecutionError(
+            "behavior scenario status conflicts with unresolved_dimensions"
+        )
+    if status == "needs_clarification" and not allow_clarification:
         raise PowdrrExecutionError(
             "behavior scenario needs clarification before implementation: "
             + ", ".join(str(item) for item in unresolved)
         )
-    raw_scenario = result.get("scenario")
-    if not isinstance(raw_scenario, Mapping):
-        raise PowdrrExecutionError("resolved behavior scenario has no scenario object")
+    if status == "needs_clarification":
+        from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
+
+        if not all(item in BEHAVIOR_DIMENSIONS for item in unresolved):
+            raise PowdrrExecutionError(
+                "behavior scenario names an unsupported unresolved dimension"
+            )
+        draft_scenario = dict(raw_scenario)
+        dimensions = draft_scenario.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise PowdrrExecutionError(
+                "provisional behavior scenario has no dimensions"
+            )
+        draft_dimensions = dict(dimensions)
+        for name in unresolved:
+            draft_dimensions[name] = (
+                f"NEEDS CLARIFICATION: the task specification does not resolve {name}."
+            )
+        draft_scenario["dimensions"] = draft_dimensions
+        draft_scenario["then"] = (
+            str(draft_scenario.get("then", ""))
+            + " This design is provisional; resolve the marked dimensions "
+            "before implementation."
+        ).strip()
+        raw_scenario = draft_scenario
     clause_id = clause.get("clause_id")
     evidence = design.get("expected_test")
     if not isinstance(clause_id, str) or not clause_id.strip():

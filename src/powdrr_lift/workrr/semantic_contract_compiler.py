@@ -37,7 +37,7 @@ from powdrr_lift.workrr.semantic_classifier import (
     resolve_deterministic_source_decision,
 )
 
-SOURCE_CLASSIFIER_REVISION = "source-classifier-v1"
+SOURCE_CLASSIFIER_REVISION = "source-classifier-v2-decision-tree"
 SOURCE_EXTRACTOR_REVISION = "source-extractor-v1"
 
 
@@ -61,7 +61,8 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         "Which one disposition describes this exact proposition?",
         (
             "Classify product meaning as entity, feature, interface, invariant, "
-            "guidance, or non_goal.",
+            "guidance, or non_goal; choose context for a problem statement or "
+            "background fact that introduces no requested behavior.",
             "Use nonactionable only for delivery, tooling, or process instructions "
             "with no product semantics.",
             "A product prohibition is non_goal, not nonactionable; a universal "
@@ -99,6 +100,14 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             ),
             ClassificationExample(
                 "Please keep the patch on the current branch.", "nonactionable"
+            ),
+            ClassificationExample(
+                "States lack built-in data ownership, forcing manual variable "
+                "management without scoping or lifecycle.",
+                "context",
+            ),
+            ClassificationExample(
+                "Without a lifecycle, callers manage values manually.", "context"
             ),
         ),
     ),
@@ -570,9 +579,12 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
                 "Configure the machine's default timeout.", "configure"
             ),
             ClassificationExample(
-                "States lack built-in data ownership, forcing manual variable "
-                "management without scoping or lifecycle.",
+                "DataVar and DataChangeInfo are importable from the package.",
                 "other",
+            ),
+            ClassificationExample("Export StateData from the public module.", "other"),
+            ClassificationExample(
+                "Keep values scoped to the active invocation only.", "other"
             ),
             ClassificationExample(
                 "Make state management better.",
@@ -650,24 +662,127 @@ EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
 def prepare_source_semantic_decisions(
     clause: Mapping[str, Any], *, created_at: str | None = None
 ) -> dict[str, Any]:
-    """Prepare unresolved classifier work and bind safe lexical resolutions."""
+    """Prepare the root disposition choice before dependent classifications."""
     clause_id, text, source_fingerprint = _clause_fields(clause)
+    spec = _decision_spec(clause_id, text, source_fingerprint, "disposition")
+    return {
+        "resolved_decisions": [],
+        "pending_specs": [
+            _classifier_request(spec, CLASSIFIER_DEFINITIONS["disposition"])
+        ],
+    }
+
+
+def prepare_dependent_source_semantic_decisions(
+    clause: Mapping[str, Any],
+    root_decisions: Sequence[SemanticDecision | Mapping[str, Any]],
+    *,
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    """Create only decision-tree children applicable to the root disposition."""
+    clause_id, text, source_fingerprint = _clause_fields(clause)
+    roots = [
+        item if isinstance(item, SemanticDecision) else SemanticDecision.from_data(item)
+        for item in root_decisions
+    ]
+    if len(roots) != 1 or roots[0].decision_kind != "disposition":
+        raise SemanticContractError(
+            "decision tree requires exactly one disposition root"
+        )
+    root = roots[0]
+    if root.result.status != "resolved" or root.result.value is None:
+        raise SemanticContractError("decision tree root must be resolved")
     timestamp = created_at or _created_at()
-    resolved: list[dict[str, Any]] = []
+    resolved = [root.to_data()]
     pending: list[dict[str, Any]] = []
-    for kind in SOURCE_DECISION_KINDS:
-        spec = _decision_spec(clause_id, text, source_fingerprint, kind)
-        deterministic = resolve_deterministic_source_decision(kind, text)
-        if deterministic is not None:
-            decision = spec.bind(
-                provider=SemanticDecisionProvider(kind="deterministic-rule"),
-                provider_result={"status": "resolved", "value": deterministic.value},
-                evidence_refs=(f"source-proposition:{clause_id}",),
-                created_at=timestamp,
+    if root.result.value in {"context", "nonactionable"}:
+        defaults = {
+            "polarity": "descriptive",
+            "quantifier": "unspecified",
+            "requirement_strength": "descriptive",
+            "has_precondition": "absent",
+            "has_exception": "absent",
+            "has_explicit_result": "absent",
+            "temporal_scope": "unspecified",
+            "source_predicate": "not_stated",
+        }
+        for kind, value in defaults.items():
+            spec = _decision_spec(clause_id, text, source_fingerprint, kind)
+            resolved.append(
+                spec.bind(
+                    provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                    provider_result={"status": "resolved", "value": value},
+                    evidence_refs=(f"source-proposition:{clause_id}",),
+                    created_at=timestamp,
+                ).to_data()
             )
-            resolved.append(decision.to_data())
+        if root.result.value == "context":
+            spec = _decision_spec(
+                clause_id, text, source_fingerprint, "nonactionable_exclusion_safety"
+            )
+            resolved.append(
+                spec.bind(
+                    provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                    provider_result={
+                        "status": "resolved",
+                        "value": "product_semantics_present",
+                    },
+                    evidence_refs=(f"source-proposition:{clause_id}",),
+                    created_at=timestamp,
+                ).to_data()
+            )
         else:
-            pending.append(_classifier_request(spec, CLASSIFIER_DEFINITIONS[kind]))
+            spec = _decision_spec(
+                clause_id, text, source_fingerprint, "nonactionable_exclusion_safety"
+            )
+            request = _classifier_request(
+                spec, CLASSIFIER_DEFINITIONS["nonactionable_exclusion_safety"]
+            )
+            request["allowed_values"] = ["process_only"]
+            request["instructions"].append(
+                "Independently verify that this exact clause contains no product "
+                "behavior or product non-goal."
+            )
+            pending.append(request)
+    else:
+        for kind in SOURCE_DECISION_KINDS:
+            if kind == "disposition":
+                continue
+            spec = _decision_spec(clause_id, text, source_fingerprint, kind)
+            deterministic = resolve_deterministic_source_decision(kind, text)
+            deterministic_value: str | None
+            if (
+                deterministic is None
+                and kind == "polarity"
+                and root.result.value in {"feature", "interface", "invariant"}
+                and not any(
+                    marker in text.casefold()
+                    for marker in ("currently", "currently does", "already", "existing")
+                )
+            ):
+                deterministic_value = "required"
+            else:
+                deterministic_value = deterministic.value if deterministic else None
+            if deterministic_value is not None:
+                decision = spec.bind(
+                    provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                    provider_result={
+                        "status": "resolved",
+                        "value": deterministic_value,
+                    },
+                    evidence_refs=(f"source-proposition:{clause_id}",),
+                    created_at=timestamp,
+                )
+                resolved.append(decision.to_data())
+            else:
+                request = _classifier_request(spec, CLASSIFIER_DEFINITIONS[kind])
+                if root.result.value == "non_goal" and kind == "polarity":
+                    request["allowed_values"] = ["prohibited"]
+                request["instructions"].append(
+                    f"The already-resolved root disposition is {root.result.value!r}; "
+                    "do not choose a result that contradicts that branch."
+                )
+                pending.append(request)
     return {"resolved_decisions": resolved, "pending_specs": pending}
 
 
@@ -695,9 +810,61 @@ def bind_source_semantic_decisions(
                 created_at=timestamp,
             )
         )
-    return sorted(
+    ordered = sorted(
         decisions, key=lambda item: SOURCE_DECISION_KINDS.index(item.decision_kind)
     )
+    if len(ordered) > 1:
+        _validate_decision_tree(ordered)
+    return ordered
+
+
+def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
+    values = {item.decision_kind: item.result.value for item in decisions}
+    disposition = values.get("disposition")
+    if disposition == "context":
+        if values.get("polarity") != "descriptive":
+            raise SemanticContractError("context branch must remain descriptive")
+        if values.get("requirement_strength") != "descriptive":
+            raise SemanticContractError(
+                "context branch cannot carry requirement strength"
+            )
+        if any(
+            values.get(kind) != "absent"
+            for kind in ("has_precondition", "has_exception", "has_explicit_result")
+        ):
+            raise SemanticContractError(
+                "context branch cannot contain requirement modifiers"
+            )
+        return
+    safety = values.get("nonactionable_exclusion_safety")
+    if disposition == "nonactionable" and safety != "process_only":
+        raise SemanticContractError(
+            "nonactionable branch requires process-only evidence"
+        )
+    if disposition != "nonactionable" and safety == "process_only":
+        raise SemanticContractError(
+            "product branch conflicts with process-only evidence"
+        )
+    if disposition == "non_goal" and values.get("polarity") != "prohibited":
+        raise SemanticContractError("non-goal branch requires prohibited polarity")
+    polarity = values.get("polarity")
+    strength = values.get("requirement_strength")
+    if polarity == "descriptive" and strength in {"must", "should", "may"}:
+        raise SemanticContractError(
+            "descriptive polarity conflicts with normative strength"
+        )
+    if strength in {"must", "should"} and polarity not in {"required", "prohibited"}:
+        raise SemanticContractError(
+            "normative strength conflicts with non-normative polarity"
+        )
+    if polarity == "prohibited" and strength == "may":
+        raise SemanticContractError(
+            "prohibited polarity conflicts with permissive strength"
+        )
+    if polarity == "permitted" and strength in {"must", "should"}:
+        raise SemanticContractError(
+            "permitted polarity conflicts with mandatory strength"
+        )
 
 
 def prepare_source_extractions(
@@ -760,7 +927,9 @@ def bind_source_extractions(
 
 
 def prepare_behavior_family_decision(
-    clause: Mapping[str, Any], behavior: BoundSourceExtraction
+    clause: Mapping[str, Any],
+    behavior: BoundSourceExtraction,
+    decisions: Sequence[SemanticDecision | Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     clause_id, text, source_fingerprint = _clause_fields(clause)
     if behavior.subject_ref != clause_id or behavior.extraction_kind != "behavior":
@@ -776,6 +945,29 @@ def prepare_behavior_family_decision(
     )
     request = _classifier_request(spec, CLASSIFIER_DEFINITIONS["behavior_family"])
     request["subject_text"] = behavior.span.text
+    root = next(
+        (
+            item
+            if isinstance(item, SemanticDecision)
+            else SemanticDecision.from_data(item)
+            for item in decisions
+            if (
+                item.decision_kind
+                if isinstance(item, SemanticDecision)
+                else item.get("decision_kind")
+            )
+            == "disposition"
+        ),
+        None,
+    )
+    if root is not None and root.result.value in {"context", "nonactionable"}:
+        disposition = root.result.value
+        request["instructions"] = [
+            f"The root decision classified the clause as {disposition}, "
+            "not a product obligation.",
+            "Use other only as a non-actionable placeholder; do not infer behavior.",
+        ]
+        request["allowed_values"] = ["other"]
     return request
 
 
@@ -805,11 +997,13 @@ def compile_source_contract(
     behavior_family: SemanticDecision,
 ) -> PartialSemanticContract:
     clause_id, text, source_fingerprint = _clause_fields(clause)
+    all_decisions = (*decisions, behavior_family)
+    _validate_decision_tree(all_decisions)
     return compile_partial_semantic_contract(
         source_ref=clause_id,
         source_fingerprint=source_fingerprint,
         proposition_text=text,
-        decisions=(*decisions, behavior_family),
+        decisions=all_decisions,
         extractions=extractions,
     )
 
@@ -834,7 +1028,22 @@ def project_partial_contract_to_legacy_design(
 def prepare_field_entailment_reviews(
     contract: PartialSemanticContract,
 ) -> list[dict[str, Any]]:
-    return prepare_field_reviews(contract)
+    requests = prepare_field_reviews(contract)
+    context = {
+        "disposition": contract.disposition,
+        "polarity": contract.polarity,
+        "requirement_strength": contract.requirement_strength,
+        "scope": "Evaluate entailment only within the resolved decision-tree branch.",
+    }
+    for request in requests:
+        request["decision_tree_context"] = context
+        request.setdefault("instructions", []).append(
+            "The supplied parent decisions are already resolved. Assess whether "
+            "the source entails this field inside that branch; do not contradict "
+            "the branch by reclassifying the source as descriptive/current-state "
+            "unless it explicitly says it describes existing behavior."
+        )
+    return requests
 
 
 def bind_field_entailment_reviews(
@@ -967,6 +1176,7 @@ __all__ = [
     "bind_source_semantic_decisions",
     "compile_source_contract",
     "prepare_behavior_family_decision",
+    "prepare_dependent_source_semantic_decisions",
     "prepare_field_entailment_reviews",
     "prepare_source_extractions",
     "prepare_source_semantic_decisions",

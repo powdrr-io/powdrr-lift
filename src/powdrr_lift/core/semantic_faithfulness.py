@@ -17,13 +17,8 @@ from powdrr_lift.core.semantic_decision import (
 
 FAITHFULNESS_REVISION = "source-faithfulness-v1"
 REVIEWABLE_FIELDS = (
-    "disposition",
-    "polarity",
-    "quantifier",
-    "requirement_strength",
     "behavior_family",
     "temporal_scope",
-    "source_predicate",
     "subject",
     "behavior",
     "preconditions",
@@ -39,6 +34,7 @@ REQUIRED_FIELDS = {
     "guidance": ("subject", "behavior"),
     "non_goal": ("polarity", "subject", "behavior"),
     "nonactionable": (),
+    "context": (),
 }
 
 
@@ -142,6 +138,8 @@ def prepare_field_entailment_reviews(
     contract: PartialSemanticContract,
 ) -> list[dict[str, Any]]:
     """Prepare one bounded C10 request for each meaning-bearing field."""
+    if contract.disposition == "context":
+        return []
     values = _field_values(contract)
     requests: list[dict[str, Any]] = []
     for field in REVIEWABLE_FIELDS:

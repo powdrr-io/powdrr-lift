@@ -36,6 +36,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 )
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
+    _merge_behavior_scenario_values,
     _merge_semantic_design_values,
     feature_command_catalog,
 )
@@ -50,6 +51,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _compile_code_task_preconditions,
     _compile_feature_obligations,
     _compile_obligation_verification_plans,
+    _compile_required_test_case_edits,
     _create_pr_changelog,
     _derive_feature_test_contracts,
     _ensure_current_baseline,
@@ -135,6 +137,63 @@ def test_merge_semantic_design_accepts_trace_only_nonactionable_clause() -> None
     )
 
     assert design["kind"] == "nonactionable"
+
+
+def test_design_only_preserves_unresolved_scenario_dimensions_as_draft_questions() -> (
+    None
+):
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior"],
+            "scenario": {
+                "subject": "State",
+                "given": "a state declaration",
+                "when": "the declaration is evaluated",
+                "then": "the design remains provisional",
+                "dimensions": {
+                    "normal_result": "the declaration is accepted",
+                    "error_behavior": "not_applicable",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "capability_matrix": [],
+            },
+        },
+    }
+
+    with pytest.raises(PowdrrExecutionError, match="needs clarification"):
+        _merge_behavior_scenario_values(parameters)
+
+    draft = _merge_behavior_scenario_values(parameters, allow_clarification=True)
+
+    assert draft["behavior_scenario"]["dimensions"]["error_behavior"].startswith(
+        "NEEDS CLARIFICATION:"
+    )
+    assert "provisional" in draft["behavior_scenario"]["then"]
+
+
+def test_new_design_test_case_uses_explicitly_provisional_pytest_profile() -> None:
+    compiled = _compile_required_test_case_edits(
+        [
+            {
+                "id": "test:obligation:instruction-001",
+                "description": "Verify the design obligation.",
+                "intent_refs": ["intent:obligation:instruction-001"],
+                "expected_outcome": "The behavior is observed.",
+                "test_selection": "new",
+            }
+        ],
+        (),
+        include_existing_name_hint=True,
+    )
+
+    assert compiled[0]["profile"] == "pytest-provisional"
 
 
 def test_workrr_feature_cli_builds_endpoint_config(
@@ -1270,9 +1329,8 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
         source_values = iter(
             (
                 "feature",
-                "required",
                 "unspecified",
-                "unspecified",
+                "must",
                 "absent",
                 "absent",
                 "absent",
@@ -1289,7 +1347,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "one semantic classification" in question:
+            if "root role" in question or "child decision" in question:
                 return {
                     "status": "resolved",
                     "value": next(self.source_values),

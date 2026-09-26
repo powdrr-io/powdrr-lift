@@ -220,6 +220,8 @@ class PowdrrAgent(BaseInstalledAgent):
         output_root = self._get_env("POWDRR_OUTPUT_ROOT")
         if output_root:
             command.extend(("--output-root", output_root))
+        if self._get_env("POWDRR_DESIGN_ONLY", "").casefold() in {"1", "true", "yes"}:
+            command.append("--design-only")
 
         provider_env = {
             key: value

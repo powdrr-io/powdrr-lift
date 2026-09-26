@@ -633,11 +633,15 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     split_body = document["steps"][3]["for_each"]["body"]
     split_judge = split_body[0]["judge"]
     body = document["steps"][5]["for_each"]["body"]
-    classifier_loop = body[1]["for_each"]
+    root_loop = body[1]["for_each"]
+    root_judge = root_loop["body"][0]["judge"]
+    dependent_operation = body[3]["operation"]
+    classifier_loop = body[4]["for_each"]
     classifier_judge = classifier_loop["body"][0]["judge"]
-    extractor_loop = body[4]["for_each"]
+    extractor_loop = body[7]["for_each"]
     extractor_judge = extractor_loop["body"][0]["judge"]
-    behavior_judge = body[7]["judge"]
+    behavior_judge = body[10]["judge"]
+    scenario_judge = body[16]["judge"]
 
     assert atomicity_judge["question"] == (
         "Does this one instruction clause contain more than one independently "
@@ -651,18 +655,27 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     assert split_judge["output"]["schema"]["required"] == ["statements"]
 
     assert classifier_loop["snapshot"]["max_items"] == 16
+    assert root_judge["question"].startswith("Decide the root role")
+    assert dependent_operation["command"] == [
+        "prepare_dependent_source_semantic_decisions"
+    ]
     assert classifier_judge["output"]["schema"]["required"] == [
         "status",
         "value",
         "reason_code",
     ]
-    assert classifier_judge["context"] == ["semantic_decision_request"]
+    assert classifier_judge["context"] == ["dependent_decision_request"]
     assert extractor_loop["snapshot"]["max_items"] == 5
     assert extractor_judge["output"]["schema"]["required"] == [
         "quote",
         "occurrence",
     ]
     assert behavior_judge["output"]["name"] == "behavior_family_result"
+    assert "atomic_instruction_ledger" in scenario_judge["context"]
+    assert any(
+        "complete atomic instruction ledger" in item
+        for item in scenario_judge["instructions"]
+    )
     flow_text = str(body)
     assert "semantic_obligation" not in flow_text
     assert "semantic_acceptance" not in flow_text

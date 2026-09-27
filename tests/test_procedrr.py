@@ -676,6 +676,10 @@ def test_design_interview_uses_single_field_source_classification() -> None:
         "complete atomic instruction ledger" in item
         for item in scenario_judge["instructions"]
     )
+    assert any(
+        "Use reject only when the operation explicitly fails" in item
+        for item in scenario_judge["instructions"]
+    )
     flow_text = str(body)
     assert "semantic_obligation" not in flow_text
     assert "semantic_acceptance" not in flow_text

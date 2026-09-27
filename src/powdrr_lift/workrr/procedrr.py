@@ -257,6 +257,7 @@ def _is_retryable_provider_failure(error: Exception) -> bool:
             "timed out",
             "timeout",
             "streaming response did not include any events",
+            "streaming response ended before a completion marker",
         )
     )
 

@@ -208,6 +208,62 @@ def test_design_only_preserves_unresolved_scenario_dimensions_as_draft_questions
     assert "provisional" in draft["behavior_scenario"]["then"]
 
 
+def test_prompt_capture_preserves_unresolved_scenarios_as_provisional(
+    tmp_path: Path,
+) -> None:
+    runtime = FeatureCommandRuntime(
+        config=SimpleNamespace(
+            design_only=False,
+            capture_worker_prompts_only=True,
+        ),
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="feature/test",
+        slug="prompt-capture",
+        state={},
+        catalog=feature_command_catalog(),
+    )
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior", "negative_boundaries"],
+            "scenario": {
+                "subject": "SCXML data parsing",
+                "given": "an SCXML data element",
+                "when": "its expression is parsed",
+                "then": "literal data is parsed",
+                "dimensions": {
+                    "normal_result": "literal data is parsed",
+                    "error_behavior": "needs clarification",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "needs clarification",
+                },
+                "capability_matrix": [],
+            },
+        },
+    }
+
+    draft = runtime.dispatch(
+        "merge_behavior_scenario",
+        ["merge_behavior_scenario"],
+        parameters,
+    )
+
+    assert draft["behavior_scenario"]["dimensions"]["error_behavior"].startswith(
+        "NEEDS CLARIFICATION:"
+    )
+    assert draft["behavior_scenario"]["dimensions"]["negative_boundaries"].startswith(
+        "NEEDS CLARIFICATION:"
+    )
+    assert "provisional" in draft["behavior_scenario"]["then"]
+
+
 def test_new_design_test_case_uses_explicitly_provisional_pytest_profile() -> None:
     compiled = _compile_required_test_case_edits(
         [

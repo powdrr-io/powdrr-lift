@@ -1,0 +1,86 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 823
+title: Improve Procedrr resilience to ambiguous capability outputs and truncated streams
+intent:
+  problem: DeepSWE prompt capture exposed ambiguous capability-matrix guidance, legitimate unresolved dimensions that stopped non-executing capture, and truncated provider streams.
+  goal: Clarify rejection versus fallback, preserve unresolved design dimensions as explicit provisional notes during prompt capture, and retry transient incomplete OpenAI-compatible streams with bounded backoff.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 589, end_line: 600}
+    summary: Clarify rejection versus fallback and require null reason codes for resolved entailment decisions.
+    rationale: Prevent valid partial outcomes from being misrepresented as errors and keep provider results aligned with the semantic decision schema.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 347, end_line: 347}
+    summary: Treat streams that end before a completion marker as retryable provider failures.
+    rationale: Apply existing bounded exponential backoff to transient truncated responses.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 910, end_line: 914}
+    summary: Permit unresolved behavior dimensions as explicit provisional details in prompt-capture-only mode.
+    rationale: Let non-executing prompt evaluation inspect the handoff without turning ambiguity into an unstated assumption.
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 679, end_line: 682}
+    summary: Assert the design-interview scenario instructions distinguish explicit rejection.
+    rationale: Keep capability classification guidance covered by the workflow definition tests.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 113, end_line: 146}
+    summary: Verify truncated stream failures retry with bounded exponential backoff.
+    rationale: Ensure incomplete responses can recover without disabling retry limits.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 211, end_line: 266}
+    summary: Verify prompt capture preserves unresolved behavior dimensions as provisional markers.
+    rationale: Ensure capture can reach the worker boundary while exposing ambiguity honestly.
+entities:
+  - id: design-interview-skill
+    type: Skill
+    action: added
+  - id: procedrr-provider-retry-classifier
+    type: Function
+    action: added
+  - id: procedrr-provider-retry-tests
+    type: Test suite
+    action: added
+  - id: prompt-capture-provisional-design
+    type: Capability
+    action: added
+entity_relationships:
+  - id: provider-retry-tests-cover-truncated-streams
+    source: procedrr-provider-retry-tests
+    target: procedrr-provider-retry-classifier
+    relationship: tests
+    description: Tests verify incomplete streams retry twice and then succeed under the configured retry budget.
+    rationale: Preserve bounded recovery for this transient provider failure.
+    action: added
+invariants:
+  - id: rejected-capabilities-require-specified-errors
+    action: added
+    description: A behavior scenario uses reject only when the accepted specification defines an error for that context; valid partial or default outcomes use fallback.
+    rationale: Preserve the distinction between unsupported outcomes and operation failure.
+  - id: resolved-entailment-has-no-reason-code
+    action: added
+    description: Field-entailment results use a null reason code when resolved and a listed reason code only when unresolved.
+    rationale: Keep generated faithfulness decisions valid under the semantic decision contract.
+  - id: incomplete-provider-streams-use-bounded-retries
+    action: added
+    description: OpenAI-compatible streams ending before a completion marker are retried through the existing bounded exponential-backoff policy.
+    rationale: Recover transient truncation without allowing unbounded provider calls.
+  - id: prompt-capture-does-not-hide-unresolved-dimensions
+    action: added
+    description: Prompt-capture-only may continue with explicitly marked provisional behavior scenarios, while normal implementation mode still requires clarification to be resolved.
+    rationale: Keep evaluation captures useful without silently accepting underspecified product behavior.
+guidance:
+  - id: classify-partial-results-as-fallback
+    action: added
+    description: Describe shallow or partial behavior as fallback unless the specification explicitly says the operation raises an error.
+    rationale: Keep design scenarios grounded in specified outcomes rather than invented errors.
+  - id: capture-unresolved-details-provisionally
+    action: added
+    description: Use prompt-capture-only for non-executing analysis of worker instructions when a task includes unresolved behavior dimensions.
+    rationale: Preserve the uncertainty in captured prompts for downstream quality evaluation.

@@ -496,6 +496,7 @@ steps:
                     - Return entailed only when the source supports it without added meaning.
                     - Return contradicted when the source rules it out, or not_stated when it does not say enough.
                     - Never rewrite the candidate, repair it, or return explanations or extra fields.
+                    - Set reason_code to null when status is resolved; use a listed reason code only when status is unresolved.
                   context: [field_entailment_request]
                   output:
                     name: field_entailment_result
@@ -586,7 +587,18 @@ steps:
               - For each dimension, write a concrete requirement or the exact value not_applicable when that dimension genuinely does not apply.
               - Never use not_applicable merely because the source is silent. If a dimension can materially affect behavior and the source does not resolve it, return needs_clarification and list that dimension.
               - Keep error shape and location separate from whether later work continues; nested errors must be represented explicitly when relevant.
-              - For APIs, adapters, commands, integrations, and runtime extensions, include each supported/rejected/unknown context in capability_matrix with executable evidence and the defined error for rejected contexts. Return an empty list only when this behavior change has no capability boundary.
+              - >-
+                For APIs, adapters, commands, integrations, and runtime extensions,
+                include each supported, explicitly rejected, or fallback context in
+                capability_matrix with executable evidence. Use reject only when
+                the operation explicitly fails for that context, and include the
+                exact error defined by the accepted specification. Use fallback
+                when the operation remains valid but applies a defined reduced,
+                default, or alternate behavior; describe that behavior rather than
+                inventing an error. In particular, a shallow or partial result is
+                not a rejection unless the specification says it raises an error.
+                Return an empty list only when this behavior change has no
+                capability boundary.
               - Do not return selectors, IDs, evidence paths, validator commands, or extra fields; Powdrr binds those from the compiled test contract.
             prompt_rules:
               - when: {binding: partial_semantic_design.partial_contract.disposition, equals: context}

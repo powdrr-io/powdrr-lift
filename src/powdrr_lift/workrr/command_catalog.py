@@ -907,7 +907,11 @@ class FeatureCommandRuntime:
             return _merge_behavior_scenario_values(
                 parameters,
                 allow_clarification=bool(
-                    config is not None and getattr(config, "design_only", False)
+                    config is not None
+                    and (
+                        getattr(config, "design_only", False)
+                        or getattr(config, "capture_worker_prompts_only", False)
+                    )
                 ),
             )
 

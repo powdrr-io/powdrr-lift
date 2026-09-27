@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ import yaml
 from powdrr_lift.workrr.deepswe_design_evaluation import (
     DeepSWEEvaluationError,
     evaluate_deepswe_design,
+    evaluate_deepswe_worker_prompt,
 )
 
 
@@ -29,7 +31,9 @@ class FakeJudge:
     ) -> dict[str, str]:
         self.calls.append(messages)
         payload = json.loads(messages[1]["content"])
-        candidate_text = payload["candidate_design_projection"]
+        candidate_text = payload.get("candidate_design_projection") or "\n".join(
+            item["prompt"] for item in payload["candidate_worker_prompts"]
+        )
         quote = self.quote or (
             "Adds value"
             if "Adds value" in candidate_text
@@ -127,6 +131,7 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
                     {
                         "id": "process-only",
                         "importance": "important",
+                        "worker_prompt_expectation": "absent",
                         "instruction_excerpt": (
                             "A branch and commit are process instructions."
                         ),
@@ -141,6 +146,86 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
         encoding="utf-8",
     )
     return task_dir, run_dir, rubric_path
+
+
+def _capture_prompt_artifacts(run_dir: Path, prompt: str) -> None:
+    (run_dir / "run-metadata.json").write_text(
+        json.dumps({"task_id": "demo-task"}), encoding="utf-8"
+    )
+    artifacts = run_dir / "artifacts"
+    prompts_dir = artifacts / "prompts"
+    requests_dir = artifacts / "requests"
+    prompts_dir.mkdir(parents=True)
+    requests_dir.mkdir(parents=True)
+    request_id = "demo-task-implementation-1"
+    attempt_id = "demo-task-prompt-capture-1"
+    prompt_path = prompts_dir / f"{attempt_id}.txt"
+    prompt_path.write_text(prompt, encoding="utf-8")
+    digest = "sha256:" + hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    (requests_dir / f"{request_id}.json").write_text(
+        json.dumps({"request_id": request_id, "prompt": prompt}), encoding="utf-8"
+    )
+    (prompts_dir / "index.json").write_text(
+        json.dumps(
+            [
+                {
+                    "attempt_id": attempt_id,
+                    "request_id": request_id,
+                    "provider": "minisweagent",
+                    "prompt_path": f"prompts/{attempt_id}.txt",
+                    "prompt_sha256": digest,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_worker_prompt_evaluation_checks_exact_captured_prompt_and_references(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    _capture_prompt_artifacts(
+        run_dir,
+        "Product contract:\nAdds value\nValidation contract:\n"
+        "Add a focused test proving Adds value",
+    )
+
+    judge = FakeJudge()
+    report = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=judge,
+        rubric_path=rubric_path,
+        judge_id="fake/judge",
+    )
+
+    assert report["schema_version"] == "deepswe-worker-prompt-evaluation-v1"
+    assert report["summary"]["passed"] is True
+    assert report["findings"][0]["decision"] == "supported"
+    assert report["findings"][0]["evidence_quote"] == "Adds value"
+    assert len(judge.calls) == 1
+    assert report["findings"][1]["decision"] == "supported"
+    assert report["findings"][1]["evidence_quote"] == ""
+
+
+def test_worker_prompt_evaluation_rejects_stale_capture_fingerprint(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    _capture_prompt_artifacts(run_dir, "Adds value")
+    index_path = run_dir / "artifacts" / "prompts" / "index.json"
+    records = json.loads(index_path.read_text(encoding="utf-8"))
+    records[0]["prompt_sha256"] = "sha256:stale"
+    index_path.write_text(json.dumps(records), encoding="utf-8")
+
+    with pytest.raises(DeepSWEEvaluationError, match="fingerprint does not match"):
+        evaluate_deepswe_worker_prompt(
+            task_dir=task_dir,
+            run_dir=run_dir,
+            judge=FakeJudge(),
+            rubric_path=rubric_path,
+        )
 
 
 def test_evaluation_uses_task_references_and_requires_candidate_evidence(

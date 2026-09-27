@@ -27,6 +27,7 @@ from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
+    CodingAgentAttemptStore,
     CodingAgentStatus,
     ImplementationRequest,
 )
@@ -46,6 +47,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
     _compile_code_task_preconditions,
@@ -69,6 +71,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
     _validate_required_test_cases,
+    _worker_prompt_capture_flow_source,
     _worktree_state_fingerprint,
     _write_structrr_plan,
     _write_structrr_plan_from_obligations,
@@ -124,6 +127,33 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
     replay = _load_procedrr_replay_responses(event_path)
 
     assert replay == {WorkrrProcedrrClient.replay_key(messages): {"multiple": True}}
+
+
+def test_worker_prompt_capture_trims_real_implement_feature_at_worker_boundary() -> (
+    None
+):
+    source = Path("docs/procedrr/skill-definitions/implement-feature.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    captured_source = _worker_prompt_capture_flow_source(source)
+    parse_and_validate(captured_source, command_catalog=feature_command_catalog())
+    document = yaml.safe_load(captured_source)
+    steps = document["steps"]
+    task_loop = next(
+        step["for_each"]
+        for step in steps
+        if "for_each" in step and step["for_each"].get("item_binding") == "code_task"
+    )
+    commands = [
+        operation.get("command")
+        for item in task_loop["body"]
+        if isinstance((operation := item.get("operation")), Mapping)
+    ]
+
+    assert ["run_code_task_agent"] in commands
+    assert ["compile_code_task_postconditions"] not in commands
+    assert steps[-1] == {"terminal": "succeeded"}
 
 
 def test_merge_semantic_design_accepts_trace_only_nonactionable_clause() -> None:
@@ -1911,6 +1941,55 @@ def test_code_task_agent_continues_after_timed_out_attempt(
         "Continue the existing implementation"
         in calls[1]["repair_issue"]["instruction"]
     )
+
+
+def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(
+    tmp_path: Path,
+) -> None:
+    class Provider:
+        provider_name = "minisweagent"
+
+        def prepare_request(
+            self, request: ImplementationRequest
+        ) -> ImplementationRequest:
+            return replace(request, prompt=f"PREFIX\n\n{request.prompt}\n\nSUFFIX")
+
+        def run(self, *_: Any, **__: Any) -> subprocess.CompletedProcess[str]:
+            pytest.fail("prompt capture must not invoke the coding agent")
+
+    request = ImplementationRequest(
+        request_id="feature-task-implementation-1",
+        objective="Implement the feature",
+        prompt="Actual worker contract",
+        base_commit="base",
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src",),
+        acceptance_criteria=("Behavior is correct",),
+        validation_profiles=("pytest",),
+    )
+    output_root = tmp_path / "run"
+    request_path = output_root / "implementation-request.json"
+    operation_request_path = output_root / "requests" / "task.json"
+    state: dict[str, Any] = {}
+
+    result = _capture_worker_prompt(
+        request,
+        provider=Provider(),
+        attempt_store=CodingAgentAttemptStore(output_root / "artifacts"),
+        state=state,
+        request_path=request_path,
+        operation_request_path=operation_request_path,
+        slug="feature",
+        unit_id="task",
+    )
+
+    assert result["attempt"]["status"] == "prompt_captured"
+    assert state["prompt_capture_count"] == 1
+    assert result["prompt_path"].read_text(encoding="utf-8") == (
+        "PREFIX\n\nActual worker contract\n\nSUFFIX"
+    )
+    saved_request = json.loads(operation_request_path.read_text(encoding="utf-8"))
+    assert saved_request["prompt"] == result["prompt_path"].read_text(encoding="utf-8")
 
 
 def test_code_task_agent_forwards_canonical_design_obligations(

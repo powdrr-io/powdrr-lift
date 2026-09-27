@@ -173,6 +173,7 @@ from powdrr_lift.workrr.deepswe_design_evaluation import (
     DEFAULT_STATE_DATA_RUBRIC,
     DeepSWEEvaluationError,
     evaluate_deepswe_design,
+    evaluate_deepswe_worker_prompt,
 )
 from powdrr_lift.workrr.definition_comparison import (
     WorkflowComparisonError,
@@ -1474,12 +1475,21 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument("--planning-api-key")
     harbor_feature_parser.add_argument("--planning-base-url")
     harbor_feature_parser.add_argument("--output-root", type=Path)
-    harbor_feature_parser.add_argument(
+    harbor_run_mode = harbor_feature_parser.add_mutually_exclusive_group()
+    harbor_run_mode.add_argument(
         "--design-only",
         action="store_true",
         help=(
             "Run instruction classification and prompt evaluation "
             "without a coding agent."
+        ),
+    )
+    harbor_run_mode.add_argument(
+        "--capture-worker-prompts-only",
+        action="store_true",
+        help=(
+            "Run implement-feature through accepted code-task preconditions, "
+            "persist provider-ready worker prompts, and stop before coding."
         ),
     )
     harbor_feature_parser.add_argument("--json", action="store_true")
@@ -1506,6 +1516,28 @@ def build_parser() -> argparse.ArgumentParser:
     deepswe_design_eval_parser.add_argument("--judge-base-url")
     deepswe_design_eval_parser.add_argument("--json", action="store_true")
     deepswe_design_eval_parser.set_defaults(func=_run_deepswe_design_evaluation)
+
+    deepswe_prompt_eval_parser = subparsers.add_parser(
+        "evaluate-deepswe-prompt",
+        help=(
+            "Evaluate captured worker prompts against a DeepSWE reference "
+            "solution and verifier tests."
+        ),
+    )
+    deepswe_prompt_eval_parser.add_argument("--task-dir", required=True, type=Path)
+    deepswe_prompt_eval_parser.add_argument("--run-dir", required=True, type=Path)
+    deepswe_prompt_eval_parser.add_argument(
+        "--rubric", type=Path, default=DEFAULT_STATE_DATA_RUBRIC
+    )
+    deepswe_prompt_eval_parser.add_argument("--report", type=Path)
+    deepswe_prompt_eval_parser.add_argument(
+        "--judge-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    deepswe_prompt_eval_parser.add_argument("--judge-model")
+    deepswe_prompt_eval_parser.add_argument("--judge-api-key")
+    deepswe_prompt_eval_parser.add_argument("--judge-base-url")
+    deepswe_prompt_eval_parser.add_argument("--json", action="store_true")
+    deepswe_prompt_eval_parser.set_defaults(func=_run_deepswe_prompt_evaluation)
 
     extract_responses_parser = subparsers.add_parser(
         "extract-workflow-responses",
@@ -4652,6 +4684,7 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             planning_client=planning_client,
             task_id=args.task_id or args.work_item_name,
             design_only=args.design_only,
+            capture_worker_prompts_only=args.capture_worker_prompts_only,
         )
     )
     if args.json:
@@ -4662,9 +4695,16 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
         if args.design_only:
             print("Design compilation: passed; implementation review: not run")
             print(f"Generated design: {result.plan_path}")
+        elif args.capture_worker_prompts_only:
+            print("Worker prompt compilation: passed; coding agent: not run")
+            print(f"Latest request: {result.request_path}")
         else:
             print(f"Review passed: {result.review['passed']}")
-    return 0 if result.status in {"completed", "design_generated"} else 1
+    return (
+        0
+        if result.status in {"completed", "design_generated", "prompt_captured"}
+        else 1
+    )
 
 
 def _run_deepswe_design_evaluation(args: argparse.Namespace) -> int:
@@ -4705,6 +4745,52 @@ def _run_deepswe_design_evaluation(args: argparse.Namespace) -> int:
         summary = report["summary"]
         print(
             f"DeepSWE design evaluation {report['task_id']}: "
+            f"{summary['supported_count']}/{summary['criterion_count']} supported; "
+            f"weighted coverage {summary['weighted_coverage']:.1%}; "
+            f"critical failures {len(summary['critical_failures'])}."
+        )
+        print(f"Report: {report_path}")
+    return 0 if report["summary"]["passed"] else 1
+
+
+def _run_deepswe_prompt_evaluation(args: argparse.Namespace) -> int:
+    provider = resolve_workflow_provider(args.judge_provider)
+    mapping = default_llm_mappings(provider)["standard_reasoning"]
+    try:
+        credentials = resolve_provider_credentials(
+            mapping.provider,
+            args.judge_api_key,
+            args.judge_base_url,
+        )
+        model = args.judge_model or mapping.model
+        judge = build_workflow_client(
+            credentials,
+            model=model,
+            model_cache_dir=args.run_dir / ".models",
+            progress_stream=sys.stderr,
+        )
+        report = evaluate_deepswe_worker_prompt(
+            task_dir=args.task_dir,
+            run_dir=args.run_dir,
+            judge=judge,
+            rubric_path=args.rubric,
+            judge_id=f"{mapping.provider}/{model}",
+        )
+    except (DeepSWEEvaluationError, PowdrrExecutionError) as error:
+        print(f"DeepSWE prompt evaluation failed: {error}", file=sys.stderr)
+        return 1
+    report_path = args.report or args.run_dir / "prompt-quality-evaluation.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    else:
+        summary = report["summary"]
+        print(
+            f"DeepSWE worker-prompt evaluation {report['task_id']}: "
             f"{summary['supported_count']}/{summary['criterion_count']} supported; "
             f"weighted coverage {summary['weighted_coverage']:.1%}; "
             f"critical failures {len(summary['critical_failures'])}."

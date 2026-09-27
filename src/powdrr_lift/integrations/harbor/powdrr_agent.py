@@ -222,6 +222,12 @@ class PowdrrAgent(BaseInstalledAgent):
             command.extend(("--output-root", output_root))
         if self._get_env("POWDRR_DESIGN_ONLY", "").casefold() in {"1", "true", "yes"}:
             command.append("--design-only")
+        if self._get_env("POWDRR_CAPTURE_WORKER_PROMPTS_ONLY", "").casefold() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            command.append("--capture-worker-prompts-only")
 
         provider_env = {
             key: value

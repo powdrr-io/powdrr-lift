@@ -1,0 +1,244 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 820
+title: Capture and evaluate DeepSWE worker prompts
+intent:
+  problem: Design-only evaluation stops before the full implement-feature flow produces task-specific worker prompts, leaving the final instructions-to-prompt handoff unmeasured.
+  goal: Capture provider-ready worker prompts without invoking a coding agent, then compare their behavior coverage against the DeepSWE instruction, reference solution, and verifier tests.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/evaluations/deepswe-design-evaluation.md
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Clarify that the existing evaluator grades designs and document the prompt-only capture/evaluation sequence.
+    rationale: Make the two measured stages and their limitations reproducible.
+  - path: docs/evaluations/deepswe-design-evaluation.md
+    type: modified
+    span: {start_line: 39, end_line: 70}
+    summary: Add usage, provenance checks, and scope for worker-prompt evaluation.
+    rationale: Explain how to collect and interpret exact provider-ready prompts.
+  - path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+    type: modified
+    span: {start_line: 162, end_line: 162}
+    summary: Mark delivery instructions as expected to be absent from worker prompts.
+    rationale: Make non-product workflow directions measurable at the final handoff.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 176, end_line: 176}
+    summary: Import the worker-prompt evaluator.
+    rationale: Expose prompt scoring through the command-line interface.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1478, end_line: 1479}
+    summary: Add mutually exclusive Harbor design-only and worker-prompt capture modes.
+    rationale: Permit full task planning and prompt compilation without coding.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1487, end_line: 1494}
+    summary: Add the Harbor prompt-capture-only option.
+    rationale: Capture provider-ready requests while skipping code execution.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1520, end_line: 1541}
+    summary: Add the evaluate-deepswe-prompt command and judge options.
+    rationale: Grade saved worker prompts against task references.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4687, end_line: 4687}
+    summary: Wire prompt capture into Harbor execution and report its no-worker status.
+    rationale: Treat a successful capture as a completed evaluation-stage run.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4698, end_line: 4700}
+    summary: Report prompt-only mode without claiming implementation review.
+    rationale: Distinguish prompt compilation from implementation.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4703, end_line: 4707}
+    summary: Treat successful prompt capture as a successful CLI run.
+    rationale: Let benchmark harnesses collect prompt artifacts without worker execution.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4749, end_line: 4794}
+    summary: Build the judge, write the prompt-quality report, and fail for unsupported critical criteria.
+    rationale: Make worker-prompt scoring scriptable and inspectable.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 225, end_line: 230}
+    summary: Forward the prompt-capture-only environment option to the Harbor command.
+    rationale: Enable capture in isolated DeepSWE task runs.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 296, end_line: 655}
+    summary: Validate saved request/prompt provenance and grade prompts against task-grounded criteria.
+    rationale: Measure semantic behavior coverage at the worker handoff without feeding references into generation.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 827, end_line: 831}
+    summary: Export the worker-prompt evaluator.
+    rationale: Make the new evaluator available to the CLI.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 137, end_line: 137}
+    summary: Add the worker-prompt capture run mode to endpoint configuration.
+    rationale: Select prompt serialization without starting the worker.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 303, end_line: 307}
+    summary: Preserve temporary files for prompt-only capture runs.
+    rationale: Keep captured artifacts available for downstream evaluation.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 331, end_line: 332}
+    summary: Reject simultaneous design-only and prompt-capture modes.
+    rationale: Ensure each run has one explicit stopping boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 337, end_line: 337}
+    summary: Track worker-prompt capture in run state.
+    rationale: Let the shared flow runtime select its capture boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 355, end_line: 358}
+    summary: Run the real implement-feature procedure prefix and stop at its worker boundary.
+    rationale: Preserve production planning and precondition behavior while omitting coding.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 503, end_line: 508}
+    summary: Report successful prompt compilation as a distinct terminal run status.
+    rationale: Distinguish prompt capture from design-only and completed coding runs.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 516, end_line: 517}
+    summary: Return a distinct prompt-captured status.
+    rationale: Identify successful capture without claiming implementation completion.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2308, end_line: 2322}
+    summary: Persist provider-prepared request and exact prompt artifacts without invoking the coding agent.
+    rationale: Capture the same final handoff that a worker would receive.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2359, end_line: 2375}
+    summary: Return a successful prompt-capture result without an implementation attempt.
+    rationale: Stop the flow cleanly at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2392, end_line: 2427}
+    summary: Serialize the provider-ready request and exact prompt as capture artifacts.
+    rationale: Keep the saved request paired with the text sent to a worker.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4011, end_line: 4061}
+    summary: Trim the loaded implement-feature flow after worker-request generation.
+    rationale: Reuse the real procedure definition rather than duplicating its planning steps.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Extend evaluator test support for captured worker prompts.
+    rationale: Verify the prompt evaluator with deterministic judge responses.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Import the worker-prompt evaluator into its unit tests.
+    rationale: Exercise the new scoring path directly.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 34, end_line: 36}
+    summary: Allow the deterministic judge fixture to inspect worker prompts.
+    rationale: Test supported prompt criteria without external model calls.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 134, end_line: 134}
+    summary: Mark process-only instructions as absent from worker prompt expectations.
+    rationale: Verify absence is handled as a positive explicit criterion.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 151, end_line: 230}
+    summary: Test prompt/request fingerprints, task references, positive quotes, and explicit absence criteria.
+    rationale: Reject stale artifacts and unsupported prompt-quality claims.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 30, end_line: 30}
+    summary: Import prompt-capture helpers for endpoint tests.
+    rationale: Keep tests focused on production request serialization behavior.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 50, end_line: 50}
+    summary: Import the prompt capture flow transformer.
+    rationale: Verify that capture stops at the worker boundary.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 74, end_line: 74}
+    summary: Import the capture helper for its persistence test.
+    rationale: Assert provider-ready artifacts without starting a provider.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 132, end_line: 158}
+    summary: Verify capture mode derives a valid flow from implement-feature and stops at the worker boundary.
+    rationale: Guard the real procedure path against accidental coding or flow drift.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1946, end_line: 1994}
+    summary: Verify exact provider-ready prompt persistence without a provider run.
+    rationale: Ensure capture does not execute the coding agent and preserves prompt tailoring.
+entities:
+  - id: deepswe-worker-prompt-evaluator
+    type: Tool
+    action: added
+  - id: deepswe-worker-prompt-subcommand
+    type: Subcommand
+    action: added
+  - id: harbor-worker-prompt-capture-flag
+    type: Command-line flag
+    action: added
+  - id: deepswe-worker-prompt-evaluation-tests
+    type: Test suite
+    action: added
+  - id: state-data-design-rubric
+    type: Configuration file
+    action: modified
+entity_relationships:
+  - id: prompt-command-invokes-evaluator
+    source: deepswe-worker-prompt-subcommand
+    target: deepswe-worker-prompt-evaluator
+    relationship: invokes
+    description: The CLI grades provider-ready worker prompts and persists a quality report.
+    rationale: Provide a repeatable entry point for the final instruction-to-prompt stage.
+    action: added
+  - id: harbor-capture-flag-stops-before-worker
+    source: harbor-worker-prompt-capture-flag
+    target: deepswe-worker-prompt-evaluator
+    relationship: enables
+    description: The Harbor run compiles worker requests through implement-feature and captures their prompts without invoking a coding agent.
+    rationale: Evaluate the real handoff while preserving the benchmark agent boundary.
+    action: added
+  - id: worker-prompt-evaluator-uses-rubric
+    source: deepswe-worker-prompt-evaluator
+    target: state-data-design-rubric
+    relationship: uses
+    description: Prompt criteria use solution and verifier anchors plus an explicit absence rule for delivery instructions.
+    rationale: Ground prompt-quality judgments in the benchmark task.
+    action: added
+invariants:
+  - id: prompt-capture-never-runs-worker
+    action: added
+    description: Prompt-capture-only executes the implement-feature prefix through request generation and never calls the coding-agent provider.
+    rationale: Keep prompt evaluation separate from coding performance.
+  - id: prompt-request-artifacts-match
+    action: added
+    description: Captured prompt hashes and request IDs must match the corresponding serialized provider-ready implementation requests.
+    rationale: Ensure the evaluated text is the prompt actually prepared for a worker.
+  - id: ground-truth-is-evaluator-only
+    action: added
+    description: DeepSWE solution and verifier references are read only by the post-generation evaluator.
+    rationale: Prevent benchmark answers from leaking into prompt generation.
+  - id: prompt-positive-findings-require-quotes
+    action: added
+    description: Positive semantic judgments require exact candidate-prompt quotes, while explicit absence criteria use a deterministic absence check.
+    rationale: Keep prompt-quality findings auditable.
+guidance:
+  - id: capture-then-evaluate-worker-prompts
+    action: added
+    description: Run Harbor with POWDRR_CAPTURE_WORKER_PROMPTS_ONLY=1, then call evaluate-deepswe-prompt with the task directory and run artifact directory.
+    rationale: Measure final worker handoff quality without starting the worker.

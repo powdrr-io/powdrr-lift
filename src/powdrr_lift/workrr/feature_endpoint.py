@@ -134,6 +134,7 @@ class FeatureEndpointConfig:
     planning_client: WorkflowLLMClient | None = None
     task_id: str | None = None
     design_only: bool = False
+    capture_worker_prompts_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,7 +300,11 @@ def run_feature_in_place(
             output_root=output_root,
             branch=branch,
         )
-        if config.cleanup_temporary_artifacts and not config.design_only:
+        if (
+            config.cleanup_temporary_artifacts
+            and not config.design_only
+            and not config.capture_worker_prompts_only
+        ):
             _remove_temporary_feature_artifacts(
                 runner,
                 root,
@@ -323,10 +328,13 @@ def _execute_procedrr_flow(
     output_root: Path,
     branch: str,
 ) -> FeatureEndpointResult:
+    if config.design_only and config.capture_worker_prompts_only:
+        raise ValueError("design-only and worker-prompt capture modes are exclusive")
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {
         "task_id": config.task_id or config.work_item_name,
         "design_only": config.design_only,
+        "capture_worker_prompts_only": config.capture_worker_prompts_only,
     }
     flow_path = (
         _validate_design_interview_flow(worktree)
@@ -344,9 +352,10 @@ def _execute_procedrr_flow(
         state=state,
         catalog=command_catalog,
     )
-    flow = parse_and_validate(
-        flow_path.read_text(encoding="utf-8"), command_catalog=command_catalog
-    )
+    flow_source = flow_path.read_text(encoding="utf-8")
+    if config.capture_worker_prompts_only:
+        flow_source = _worker_prompt_capture_flow_source(flow_source)
+    flow = parse_and_validate(flow_source, command_catalog=command_catalog)
     procedrr_event_path = output_root / "procedrr-events.jsonl"
     procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
     replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
@@ -491,6 +500,12 @@ def _execute_procedrr_flow(
                 "scope": "design compilation",
                 "implementation_review": "not_run",
             }
+        elif config.capture_worker_prompts_only:
+            state["review"] = {
+                "passed": True,
+                "scope": "worker prompt compilation",
+                "implementation_review": "not_run",
+            }
         result = _feature_endpoint_result(
             state,
             branch,
@@ -498,6 +513,8 @@ def _execute_procedrr_flow(
             (
                 "design_generated"
                 if config.design_only
+                else "prompt_captured"
+                if config.capture_worker_prompts_only
                 else "pr_opened"
                 if state.get("pull_request_url")
                 else "completed"
@@ -2288,6 +2305,21 @@ def _run_code_agent_phase(
         operation_request_path = output_root / "requests" / f"{unit.unit_id}.json"
         operation_request_path.parent.mkdir(parents=True, exist_ok=True)
         operation_request_path.write_text(request.to_json(), encoding="utf-8")
+        if config.capture_worker_prompts_only:
+            capture = _capture_worker_prompt(
+                request,
+                provider=provider,
+                attempt_store=attempt_store,
+                state=state,
+                request_path=request_path,
+                operation_request_path=operation_request_path,
+                slug=slug,
+                unit_id=unit.unit_id,
+            )
+            state.update(capture.pop("state"))
+            state["request"] = capture.pop("request")
+            state["latest_worker_prompt_path"] = capture["prompt_path"]
+            continue
         before_paths = _changed_paths(runner, worktree)
         before_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
@@ -2324,6 +2356,23 @@ def _run_code_agent_phase(
         state.setdefault("operation_checkpoint_paths", []).append(checkpoint_path)
         if not checkpoint["passed"]:
             break
+    if config.capture_worker_prompts_only:
+        captured_request = state.get("request")
+        prompt_path = state.get("latest_worker_prompt_path")
+        if not isinstance(captured_request, ImplementationRequest) or not isinstance(
+            prompt_path, Path
+        ):
+            return {
+                "request_id": f"{slug}-no-code-task",
+                "attempt": {"status": "no_worker_prompt_required"},
+            }
+        return {
+            "request_id": captured_request.request_id,
+            "attempt": {
+                "status": "prompt_captured",
+                "prompt_path": str(prompt_path),
+            },
+        }
     request = requests[-1]
     attempt = attempts[-1]
     state.update(
@@ -2337,6 +2386,42 @@ def _run_code_agent_phase(
         "request_id": request.request_id,
         "attempt": attempt.to_data(),
         "attempts": [item.to_data() for item in attempts],
+    }
+
+
+def _capture_worker_prompt(
+    request: ImplementationRequest,
+    *,
+    provider: Any,
+    attempt_store: CodingAgentAttemptStore,
+    state: dict[str, Any],
+    request_path: Path,
+    operation_request_path: Path,
+    slug: str,
+    unit_id: str,
+) -> dict[str, Any]:
+    """Persist the same provider-ready request and prompt without invoking it."""
+    prepare_request = getattr(provider, "prepare_request", None)
+    if callable(prepare_request):
+        request = prepare_request(request)
+    serialized_request = request.to_json()
+    request_path.parent.mkdir(parents=True, exist_ok=True)
+    operation_request_path.parent.mkdir(parents=True, exist_ok=True)
+    request_path.write_text(serialized_request, encoding="utf-8")
+    operation_request_path.write_text(serialized_request, encoding="utf-8")
+    capture_number = int(state.get("prompt_capture_count", 0)) + 1
+    state["prompt_capture_count"] = capture_number
+    attempt_id = f"{slug}-{unit_id}-prompt-capture-{capture_number}"
+    attempt_store.save_request(request)
+    prompt_path = attempt_store.save_prompt(
+        request, attempt_id=attempt_id, provider=provider.provider_name
+    )
+    return {
+        "request_id": request.request_id,
+        "attempt": {"status": "prompt_captured", "prompt_path": str(prompt_path)},
+        "prompt_path": prompt_path,
+        "request": request,
+        "state": {"request_path": request_path},
     }
 
 
@@ -3921,6 +4006,57 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
             f"Shared feature Procedrr definition is invalid: {path}: {error}"
         ) from error
     return path
+
+
+def _worker_prompt_capture_flow_source(source: str) -> str:
+    """Keep implement-feature's real planning path and stop at worker handoff."""
+    try:
+        document = yaml.safe_load(source)
+    except yaml.YAMLError as error:
+        raise PowdrrExecutionError(
+            f"could not load implement-feature flow for prompt capture: {error}"
+        ) from error
+    steps = document.get("steps") if isinstance(document, Mapping) else None
+    if not isinstance(steps, list):
+        raise PowdrrExecutionError("implement-feature flow has no steps")
+    task_loop_index: int | None = None
+    task_loop: Mapping[str, Any] | None = None
+    for index, step in enumerate(steps):
+        declaration = step.get("for_each") if isinstance(step, Mapping) else None
+        if (
+            isinstance(declaration, Mapping)
+            and declaration.get("item_binding") == "code_task"
+        ):
+            task_loop_index = index
+            task_loop = declaration
+            break
+    if task_loop_index is None or task_loop is None:
+        raise PowdrrExecutionError(
+            "implement-feature flow has no code-task execution boundary"
+        )
+    body = task_loop.get("body")
+    if not isinstance(body, list):
+        raise PowdrrExecutionError("code-task execution body is malformed")
+    capture_index: int | None = None
+    for index, step in enumerate(body):
+        operation = step.get("operation") if isinstance(step, Mapping) else None
+        command = operation.get("command") if isinstance(operation, Mapping) else None
+        if isinstance(command, list) and command == ["run_code_task_agent"]:
+            capture_index = index
+            break
+    if capture_index is None:
+        raise PowdrrExecutionError(
+            "implement-feature flow has no worker invocation boundary"
+        )
+    trimmed_loop = dict(task_loop)
+    trimmed_loop["body"] = body[: capture_index + 1]
+    trimmed_step = {"for_each": trimmed_loop}
+    document["steps"] = [
+        *steps[:task_loop_index],
+        trimmed_step,
+        {"terminal": "succeeded"},
+    ]
+    return yaml.safe_dump(document, sort_keys=False)
 
 
 def _validate_design_interview_flow(worktree: Path) -> Path:

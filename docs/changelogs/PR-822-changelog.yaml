@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 821
+change_id: 822
 title: Audit dead paths and design Procedrr-only workflow migration
 intent:
   problem: Workflow chat and durable task execution still use a parallel legacy skill-definition interpreter, while static analysis also identified dead code and unreachable branches.

@@ -1,0 +1,61 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 823
+title: Improve Procedrr resilience to ambiguous capability outputs and truncated streams
+intent:
+  problem: DeepSWE prompt capture exposed ambiguous capability-matrix guidance and truncated provider streams that can stop the design procedure before worker prompts are saved.
+  goal: Clarify how scenarios distinguish explicit rejection from non-error fallback and retry transient incomplete OpenAI-compatible streams with bounded backoff.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 589, end_line: 600}
+    summary: Define rejection as an explicit error and use fallback for valid reduced or default behavior.
+    rationale: Prevent shallow or partial outcomes from being misrepresented as rejected operations.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 347, end_line: 347}
+    summary: Treat streams that end before a completion marker as retryable provider failures.
+    rationale: Apply existing bounded exponential backoff to transient truncated responses.
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 679, end_line: 682}
+    summary: Assert the design-interview scenario instructions distinguish explicit rejection.
+    rationale: Keep capability classification guidance covered by the workflow definition tests.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 113, end_line: 146}
+    summary: Verify truncated stream failures retry with bounded exponential backoff.
+    rationale: Ensure incomplete responses can recover without disabling retry limits.
+entities:
+  - id: design-interview-skill
+    type: Skill
+    action: added
+  - id: procedrr-provider-retry-classifier
+    type: Function
+    action: added
+  - id: procedrr-provider-retry-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: provider-retry-tests-cover-truncated-streams
+    source: procedrr-provider-retry-tests
+    target: procedrr-provider-retry-classifier
+    relationship: tests
+    description: Tests verify incomplete streams retry twice and then succeed under the configured retry budget.
+    rationale: Preserve bounded recovery for this transient provider failure.
+    action: added
+invariants:
+  - id: rejected-capabilities-require-specified-errors
+    action: added
+    description: A behavior scenario uses reject only when the accepted specification defines an error for that context; valid partial or default outcomes use fallback.
+    rationale: Preserve the distinction between unsupported outcomes and operation failure.
+  - id: incomplete-provider-streams-use-bounded-retries
+    action: added
+    description: OpenAI-compatible streams ending before a completion marker are retried through the existing bounded exponential-backoff policy.
+    rationale: Recover transient truncation without allowing unbounded provider calls.
+guidance:
+  - id: classify-partial-results-as-fallback
+    action: added
+    description: Describe shallow or partial behavior as fallback unless the specification explicitly says the operation raises an error.
+    rationale: Keep design scenarios grounded in specified outcomes rather than invented errors.

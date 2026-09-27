@@ -10,8 +10,8 @@ files:
   - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
     span: {start_line: 589, end_line: 600}
-    summary: Define rejection as an explicit error and use fallback for valid reduced or default behavior.
-    rationale: Prevent shallow or partial outcomes from being misrepresented as rejected operations.
+    summary: Clarify rejection versus fallback and require null reason codes for resolved entailment decisions.
+    rationale: Prevent valid partial outcomes from being misrepresented as errors and keep provider results aligned with the semantic decision schema.
   - path: src/powdrr_lift/workrr/procedrr.py
     type: modified
     span: {start_line: 347, end_line: 347}
@@ -63,6 +63,10 @@ invariants:
     action: added
     description: A behavior scenario uses reject only when the accepted specification defines an error for that context; valid partial or default outcomes use fallback.
     rationale: Preserve the distinction between unsupported outcomes and operation failure.
+  - id: resolved-entailment-has-no-reason-code
+    action: added
+    description: Field-entailment results use a null reason code when resolved and a listed reason code only when unresolved.
+    rationale: Keep generated faithfulness decisions valid under the semantic decision contract.
   - id: incomplete-provider-streams-use-bounded-retries
     action: added
     description: OpenAI-compatible streams ending before a completion marker are retried through the existing bounded exponential-backoff policy.

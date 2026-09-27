@@ -6,6 +6,8 @@ import shlex
 from pathlib import PurePosixPath
 from typing import Any
 
+from powdrr_lift.integrations.harbor._env import env_flag_is_enabled
+
 try:
     from pier.agents.installed.base import (  # type: ignore[import-not-found]
         BaseInstalledAgent,
@@ -220,13 +222,9 @@ class PowdrrAgent(BaseInstalledAgent):
         output_root = self._get_env("POWDRR_OUTPUT_ROOT")
         if output_root:
             command.extend(("--output-root", output_root))
-        if self._get_env("POWDRR_DESIGN_ONLY", "").casefold() in {"1", "true", "yes"}:
+        if env_flag_is_enabled(self._get_env("POWDRR_DESIGN_ONLY")):
             command.append("--design-only")
-        if self._get_env("POWDRR_CAPTURE_WORKER_PROMPTS_ONLY", "").casefold() in {
-            "1",
-            "true",
-            "yes",
-        }:
+        if env_flag_is_enabled(self._get_env("POWDRR_CAPTURE_WORKER_PROMPTS_ONLY")):
             command.append("--capture-worker-prompts-only")
 
         provider_env = {

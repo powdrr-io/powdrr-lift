@@ -454,10 +454,6 @@ def _collect_entity_ids(
                 "one current requirement or approach id in quotes."
             ),
             unknown_reference_code="unknown_entity_rationale_reference",
-            unknown_reference_message=(
-                "Entity rationale references must point to current requirement "
-                "or approach ids from the work item system specification."
-            ),
         )
         entity_ids.add(entity_id)
 
@@ -618,11 +614,6 @@ def _collect_relationship_ids(
                 "quotes."
             ),
             unknown_reference_code="unknown_relationship_rationale_reference",
-            unknown_reference_message=(
-                "Entity relationship rationale references must point to current "
-                "requirement or approach ids from the work item system "
-                "specification."
-            ),
         )
         relationship_ids.add(relationship_id)
 
@@ -771,7 +762,6 @@ def _validate_rationale_references(
     missing_reference_code: str,
     missing_reference_message: str,
     unknown_reference_code: str,
-    unknown_reference_message: str,
 ) -> None:
     if rationale is None:
         if require_reference:

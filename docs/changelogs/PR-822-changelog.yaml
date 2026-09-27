@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 822
+title: Audit dead paths and design Procedrr-only workflow migration
+intent:
+  problem: Workflow chat and durable task execution still use a parallel legacy skill-definition interpreter, while static analysis also identified dead code and unreachable branches.
+  goal: Define a safe migration to Procedrr-only execution and remove independently verified dead paths without dropping workflow or task capabilities.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/design/procedrr-only-workflow-runtime.md
+    type: added
+    span: {start_line: 1, end_line: 132}
+    summary: "Specify the staged migration of workflow-chat and durable task execution to Procedrr as their sole process language."
+    rationale: "Prevent legacy control-flow expansion while preserving user interaction and durable task lifecycle behavior."
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span: {start_line: 457, end_line: 460}
+    summary: "Remove unused rationale-validation message parameters."
+    rationale: "Avoid accepting caller-supplied messages that are never used by validation."
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span: {start_line: 621, end_line: 625}
+    summary: "Remove unused rationale-validation message parameters."
+    rationale: "Avoid accepting caller-supplied messages that are never used by validation."
+  - path: src/powdrr_lift/core/architecture_specification.py
+    type: modified
+    span: {start_line: 774, end_line: 774}
+    summary: "Remove unused rationale-validation message parameters."
+    rationale: "Avoid accepting caller-supplied messages that are never used by validation."
+  - path: src/powdrr_lift/workrr/chat_transport.py
+    type: modified
+    span: {start_line: 145, end_line: 157}
+    summary: "Remove unreachable retry logic and restore the intended backup-model diagnostic branch."
+    rationale: "Keep failure handling aligned with reachable retry and fallback behavior."
+  - path: src/powdrr_lift/workrr/chat_transport.py
+    type: modified
+    span: {start_line: 574, end_line: 588}
+    summary: "Remove unreachable retry logic and restore the intended backup-model diagnostic branch."
+    rationale: "Keep failure handling aligned with reachable retry and fallback behavior."
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 6, end_line: 7}
+    summary: "Remove the unused legacy OpenCode review client."
+    rationale: "Keep the Procedrr transport module limited to active schema-aware transport behavior."
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: "Remove the unused legacy OpenCode review client."
+    rationale: "Keep the Procedrr transport module limited to active schema-aware transport behavior."
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 24, end_line: 108}
+    summary: "Remove the unused legacy OpenCode review client."
+    rationale: "Keep the Procedrr transport module limited to active schema-aware transport behavior."
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 352, end_line: 352}
+    summary: "Remove the unused legacy OpenCode review client."
+    rationale: "Keep the Procedrr transport module limited to active schema-aware transport behavior."
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 42, end_line: 43}
+    summary: "Update source-symbol spans after deleting the unused client."
+    rationale: "Keep the Structrr source inventory fixture accurate."
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 49, end_line: 50}
+    summary: "Update source-symbol spans after deleting the unused client."
+    rationale: "Keep the Structrr source inventory fixture accurate."
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

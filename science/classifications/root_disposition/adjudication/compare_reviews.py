@@ -13,6 +13,7 @@ LABELS = (
     "context",
     "entity",
     "feature",
+    "formatting_artifact",
     "guidance",
     "interface",
     "invariant",

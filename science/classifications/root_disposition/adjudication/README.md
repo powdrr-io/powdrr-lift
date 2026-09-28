@@ -45,6 +45,9 @@ classify its polarity, strength, quantifier, or implementation details here.
 - `nonactionable`: concerns only process, delivery, repository handling, or
   tools, with no product semantics. Example: “Run the unit tests before
   submitting.”
+- `formatting_artifact`: is an incomplete extraction fragment or structural
+  debris that does not express a proposition, such as an isolated list number
+  or heading stub. This is distinct from a meaningful process instruction.
 - `context`: gives background, motivation, or a problem statement without
   requesting or defining product behavior. Example: “Without a lifecycle,
   callers manage values manually.”

@@ -27,6 +27,7 @@ def _scenario() -> dict[str, Any]:
         "given": {"result": "nested error with source location"},
         "when": "process this record followed by a valid record",
         "then": {"errors": "preserved with location", "later_record": "processed"},
+        "related_requirements": [],
         "dimensions": {name: "not_applicable" for name in BEHAVIOR_DIMENSIONS},
         "evidence": ["tests/test_processor.py::test_nested_error_and_continuation"],
         "validator": (
@@ -56,6 +57,7 @@ def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     assert "Given result: nested error with source location" in rendered
     assert "when process this record followed by a valid record" in rendered
     assert "expect errors: preserved with location; later_record: processed" in rendered
+    assert "Related requirement:" not in rendered
     assert "nested_errors: preserve locations" not in rendered
     assert "later_records: continue" not in rendered
     assert "not_applicable" not in rendered
@@ -192,6 +194,30 @@ def test_worker_check_includes_defaults_capabilities_and_execution_paths() -> No
     )
     assert "Capabilities: reject invalid records with InvalidRecord" in rendered
     assert "Do not treat a passing test on one execution path" in rendered
+
+
+def test_worker_check_preserves_explicit_cross_requirement_relationships() -> None:
+    scenario = _scenario()
+    scenario["related_requirements"] = [
+        "The public operation exposes this result through the existing adapter."
+    ]
+    packet = compile_implementation_packet(
+        objective="implement the operation",
+        obligations=("implement the operation",),
+        required_tests=({"description": "exercise the adapter"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+
+    assert (
+        "Related requirement: The public operation exposes this result through "
+        "the existing adapter."
+    ) in rendered
+    restored = type(packet).from_data(packet.to_data())
+    assert restored.render() == rendered
 
 
 def test_normative_assumption_cannot_claim_not_applicable_as_a_default() -> None:

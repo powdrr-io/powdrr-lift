@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -138,35 +137,59 @@ def compile_behavior_scenarios(
 
 
 def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
-    """Render the behavior contract once, without duplicate prose sections."""
-    rows = []
-    for item in scenarios:
-        rows.append(
-            "- "
-            + json.dumps(
-                {
-                    "scenario": item.scenario_id,
-                    "subject": item.subject,
-                    "given": item.given,
-                    "when": item.when,
-                    "then": item.then,
-                    **item.dimensions,
-                    "validator": item.validator,
-                    "evidence": list(item.evidence),
-                    "capability_matrix": [
-                        dict(value) for value in item.capability_matrix
-                    ],
-                    "assumptions": [dict(value) for value in item.assumptions],
-                },
-                sort_keys=True,
-                ensure_ascii=False,
-            )
+    """Turn typed scenarios into concrete checks for a coding worker.
+
+    Provenance and applicability markers remain in the serialized packet. The
+    worker needs observable behavior and meaningful boundaries, in reading
+    order, rather than a JSON dump of the entire contract schema.
+    """
+    lines = [
+        "Required behavior checks:",
+        "Implement every case. First trace the affected code paths, including "
+        "synchronous and asynchronous implementations and named integrations. "
+        "Add focused tests for the listed cases and applicable paths. Run the "
+        "tests before reporting completion.",
+        "",
+    ]
+    for index, item in enumerate(scenarios, start=1):
+        detail = (
+            f"{index}. [{item.scenario_id}] {item.subject}: "
+            f"Given {_worker_text(item.given)}; "
+            f"when {item.when}; "
+            f"expect {_worker_text(item.then)}."
         )
-    return (
-        "Behavior contract matrix (implement and verify each row exactly once):\n"
-        + "\n".join(rows)
-        + "\nRun the focused required tests after implementation."
+        capabilities = [
+            f"{value['behavior']} {value['capability']}"
+            + (f" with {value['error']}" if value["behavior"] == "reject" else "")
+            for value in item.capability_matrix
+        ]
+        if capabilities:
+            detail += " Capabilities: " + "; ".join(capabilities) + "."
+        lines.append(detail)
+    assumptions = [
+        (item.scenario_id, value["dimension"], value["resolution"])
+        for item in scenarios
+        for value in item.assumptions
+        if value["dimension"]
+        in {"error_behavior", "negative_boundaries", "unsupported_behavior"}
+    ]
+    if assumptions:
+        lines.extend(("", "Defaults for behavior the source leaves unspecified:"))
+        for scenario_id, dimension, resolution in assumptions:
+            lines.append(f"- [{scenario_id}] {dimension}: {resolution}")
+    lines.append(
+        "Do not treat a passing test on one execution path as proof for another."
     )
+    return "\n".join(lines)
+
+
+def _worker_text(value: Any) -> str:
+    """Render structured outcomes as readable prose without schema syntax."""
+    if isinstance(value, Mapping):
+        return "; ".join(f"{key}: {_worker_text(item)}" for key, item in value.items())
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return "; ".join(_worker_text(item) for item in value)
+    return str(value)
 
 
 def validate_capability_matrix(

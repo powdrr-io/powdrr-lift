@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -303,7 +302,14 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
     "has_explicit_result": ClassifierDefinition(
         "Does this exact proposition explicitly state the observable result of the "
         "behavior?",
-        ("Choose present only when the result itself appears in the proposition.",),
+        (
+            "Choose present only when the proposition itself names an observable "
+            "outcome, returned value, state change, emitted item, or other effect.",
+            "Choose absent when the proposition only names an action, capability, "
+            "or availability without specifying its outcome.",
+            "Do not require a particular verb or output format; recognize the result "
+            "from the proposition's meaning, and do not infer unstated details.",
+        ),
         tuple(
             [
                 ClassificationExample(text, "present")
@@ -622,43 +628,36 @@ EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Return an exact case-sensitive substring, not a paraphrase.",
             "Do not return only a determiner or quantifier such as all, every, a, "
-            "or the.",
-            "Examples: 'All data should pickle' returns 'data'; 'Users can export "
-            "reports' returns 'Users'.",
+            "or the. Include the smallest noun phrase that identifies the subject.",
         ),
     ),
     "behavior": ClassifierDefinition(
         "Copy the smallest exact phrase naming the behavior, state, or prohibition.",
         (
             "Return an exact case-sensitive substring, not a paraphrase.",
-            "Keep meaning-bearing result modifiers in the behavior phrase.",
-            "Examples: return 'pickle', 'export reports as CSV', or 'add retries "
-            "to report exports'.",
+            "Keep meaning-bearing conditions and stated outcome modifiers in the "
+            "behavior phrase; do not add unstated steps or results.",
         ),
     ),
     "precondition": ClassifierDefinition(
         "Copy the smallest exact phrase stating the behavior's precondition.",
         (
             "Return an exact case-sensitive substring and include the complete "
-            "condition.",
-            "Example: 'Every active report can be exported' returns 'active'.",
+            "condition that must hold for the behavior to apply.",
         ),
     ),
     "exception": ClassifierDefinition(
         "Copy the smallest exact phrase stating the exception.",
         (
-            "Return an exact case-sensitive substring and include the exception "
-            "boundary.",
-            "Example: 'All reports except archived reports' returns 'except archived "
-            "reports'.",
+            "Return an exact case-sensitive substring and include the complete "
+            "exception boundary.",
         ),
     ),
     "explicit_result": ClassifierDefinition(
         "Copy the smallest exact phrase stating the behavior's observable result.",
         (
-            "Return an exact case-sensitive substring; do not invent an unstated "
-            "success predicate.",
-            "Example: 'The endpoint returns CSV' returns 'CSV'.",
+            "Return an exact case-sensitive substring naming the stated outcome; "
+            "do not invent an unstated success predicate.",
         ),
     ),
 }
@@ -1116,30 +1115,8 @@ def _render_evidence_case(contract: PartialSemanticContract) -> str:
 def _classifier_request(
     spec: SemanticDecisionSpec, definition: ClassifierDefinition
 ) -> dict[str, Any]:
+    """Build a source-only classifier request without task-specific exemplars."""
     instructions = list(definition.instructions)
-    if definition.examples:
-        examples = []
-        for example in definition.examples:
-            if example.value is not None:
-                result = {
-                    "status": "resolved",
-                    "value": example.value,
-                    "reason_code": None,
-                }
-            else:
-                result = {
-                    "status": "unresolved",
-                    "value": None,
-                    "reason_code": example.unresolved_reason,
-                }
-            example_text = f"{example.proposition!r} => {json.dumps(result)}"
-            if example.context is not None:
-                example_text += f" (accepted context: {example.context})"
-            examples.append(example_text)
-        instructions.append(
-            "Worked examples (source proposition => exact result JSON):\n- "
-            + "\n- ".join(examples)
-        )
     return {
         "spec": spec.to_data(),
         "question": definition.question,

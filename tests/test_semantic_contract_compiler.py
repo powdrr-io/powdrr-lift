@@ -12,7 +12,6 @@ from powdrr_lift.core.semantic_contract import (
 )
 from powdrr_lift.core.semantic_decision import (
     DECISION_VALUES,
-    UNRESOLVED_REASON_CODES,
     SemanticDecision,
 )
 from powdrr_lift.core.semantic_faithfulness import (
@@ -41,7 +40,7 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
 NOW = "2026-09-25T00:00:00Z"
 
 
-def test_every_source_classifier_has_twenty_examples_and_label_coverage() -> None:
+def test_every_source_classifier_has_a_question_and_decision_rules() -> None:
     assert set(CLASSIFIER_DEFINITIONS) == {
         "disposition",
         "polarity",
@@ -56,35 +55,40 @@ def test_every_source_classifier_has_twenty_examples_and_label_coverage() -> Non
         "nonactionable_exclusion_safety",
     }
     for kind, definition in CLASSIFIER_DEFINITIONS.items():
-        assert len(definition.examples) >= 20, kind
-        assert DECISION_VALUES[kind] <= {
-            example.value
-            for example in definition.examples
-            if example.value is not None
-        }, kind
-        assert all(
-            example.value in DECISION_VALUES[kind]
-            if example.value is not None
-            else example.unresolved_reason in UNRESOLVED_REASON_CODES
-            for example in definition.examples
-        ), kind
+        assert definition.question, kind
+        assert definition.instructions, kind
+        assert DECISION_VALUES[kind]
 
 
-def test_behavior_family_classifies_public_api_availability_as_other() -> None:
-    assert any(
-        example.proposition
-        == "DataVar and DataChangeInfo are importable from the package."
-        and example.value == "other"
-        for example in CLASSIFIER_DEFINITIONS["behavior_family"].examples
+def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
+    clause = _clause("Deferred fields merge into parent objects at the given path.")
+    root_request = prepare_source_semantic_decisions(clause, created_at=NOW)[
+        "pending_specs"
+    ][0]
+    root = bind_source_semantic_decisions(
+        resolved_decisions=[],
+        pending_specs=[root_request],
+        provider_results=[{"status": "resolved", "value": "feature"}],
+        created_at=NOW,
+    )
+    child_requests = prepare_dependent_source_semantic_decisions(
+        clause, root, created_at=NOW
+    )["pending_specs"]
+
+    all_instructions = " ".join(
+        " ".join(request["instructions"]) for request in [root_request, *child_requests]
     )
 
-
-def test_behavior_family_classifies_invalid_declaration_errors_as_validation() -> None:
-    assert any(
-        example.proposition == "Invalid declarations raise InvalidDefinition."
-        and example.value == "validate"
-        for example in CLASSIFIER_DEFINITIONS["behavior_family"].examples
+    assert "Worked examples" not in all_instructions
+    assert "DataVar" not in all_instructions
+    assert "state data" not in all_instructions
+    result_rules = next(
+        request["instructions"]
+        for request in child_requests
+        if request["spec"]["decision_kind"] == "has_explicit_result"
     )
+    assert any("state change" in rule for rule in result_rules)
+    assert any("observable" in rule for rule in result_rules)
 
 
 def test_background_clause_takes_context_branch_before_child_classifiers() -> None:
@@ -94,10 +98,6 @@ def test_background_clause_takes_context_branch_before_child_classifiers() -> No
     )
     root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
     assert root_plan["pending_specs"][0]["spec"]["decision_kind"] == "disposition"
-    assert any(
-        item.value == "context" and item.proposition == clause["text"]
-        for item in CLASSIFIER_DEFINITIONS["disposition"].examples
-    )
     root = bind_source_semantic_decisions(
         resolved_decisions=[],
         pending_specs=root_plan["pending_specs"],

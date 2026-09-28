@@ -532,6 +532,8 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose only from the supplied behavior-family labels.",
             "Classify the quoted behavior, not a broader implementation you imagine.",
+            "Use validate for enforcing declared constraints or rejecting invalid "
+            "declarations, even when the stated result is raising an exception.",
             "Use other when the requested behavior is clear but no registered family "
             "fits; use unresolved only when the source phrase itself is ambiguous.",
         ),
@@ -543,6 +545,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             ClassificationExample("List all active reports.", "list"),
             ClassificationExample("Find reports matching a query.", "search"),
             ClassificationExample("Reject keys that are not declared.", "validate"),
+            ClassificationExample(
+                "Invalid declarations raise InvalidDefinition.", "validate"
+            ),
             ClassificationExample(
                 "Convert the value into a normalized form.", "transform"
             ),

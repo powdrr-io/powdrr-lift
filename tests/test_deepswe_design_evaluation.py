@@ -161,7 +161,7 @@ def _capture_prompt_artifacts(run_dir: Path, prompt: str) -> None:
     attempt_id = "demo-task-prompt-capture-1"
     prompt_path = prompts_dir / f"{attempt_id}.txt"
     prompt_path.write_text(prompt, encoding="utf-8")
-    digest = "sha256:" + hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     (requests_dir / f"{request_id}.json").write_text(
         json.dumps({"request_id": request_id, "prompt": prompt}), encoding="utf-8"
     )
@@ -216,7 +216,7 @@ def test_worker_prompt_evaluation_rejects_stale_capture_fingerprint(
     _capture_prompt_artifacts(run_dir, "Adds value")
     index_path = run_dir / "artifacts" / "prompts" / "index.json"
     records = json.loads(index_path.read_text(encoding="utf-8"))
-    records[0]["prompt_sha256"] = "sha256:stale"
+    records[0]["prompt_sha256"] = "stale"
     index_path.write_text(json.dumps(records), encoding="utf-8")
 
     with pytest.raises(DeepSWEEvaluationError, match="fingerprint does not match"):
@@ -226,6 +226,38 @@ def test_worker_prompt_evaluation_rejects_stale_capture_fingerprint(
             judge=FakeJudge(),
             rubric_path=rubric_path,
         )
+
+
+def test_worker_prompt_evaluation_accepts_retry_attempts_for_same_request(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    _capture_prompt_artifacts(run_dir, "Initial prompt")
+    prompts_dir = run_dir / "artifacts" / "prompts"
+    retry_prompt = "Revised prompt"
+    retry_path = prompts_dir / "demo-task-prompt-capture-2.txt"
+    retry_path.write_text(retry_prompt, encoding="utf-8")
+    index_path = prompts_dir / "index.json"
+    records = json.loads(index_path.read_text(encoding="utf-8"))
+    records.append(
+        {
+            **records[0],
+            "attempt_id": "demo-task-prompt-capture-2",
+            "prompt_path": "prompts/demo-task-prompt-capture-2.txt",
+            "prompt_sha256": hashlib.sha256(retry_prompt.encode("utf-8")).hexdigest(),
+        }
+    )
+    index_path.write_text(json.dumps(records), encoding="utf-8")
+
+    report = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=FakeJudge(),
+        rubric_path=rubric_path,
+        judge_id="fake/judge",
+    )
+
+    assert len(report["worker_prompts"]) == 2
 
 
 def test_evaluation_uses_task_references_and_requires_candidate_evidence(

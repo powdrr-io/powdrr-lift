@@ -1267,6 +1267,20 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [run_code_task_agent]" in flow
 
 
+def test_feature_flow_falls_back_to_source_tree_for_external_target(
+    tmp_path: Path,
+) -> None:
+    validated = _validate_procedrr_flow(tmp_path)
+
+    assert validated == (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "procedrr"
+        / "skill-definitions"
+        / "implement-feature.yaml"
+    )
+
+
 def test_required_test_obligation_compiles_against_discovered_inventory() -> None:
     result = _aggregate_category_edits(
         {
@@ -1999,6 +2013,42 @@ def test_code_task_agent_continues_after_timed_out_attempt(
     )
 
 
+def test_prompt_capture_does_not_enter_coding_attempt_recovery_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[Mapping[str, Any]] = []
+
+    def capture_phase(*_: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(dict(kwargs["parameters"]))
+        return {
+            "attempt": {"status": "prompt_captured"},
+            "request_id": "request-1",
+        }
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", capture_phase
+    )
+    result = _run_code_task_agent(
+        {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
+        config=SimpleNamespace(
+            capture_worker_prompts_only=True,
+            feature_description="Implement the feature.",
+            work_item_name="feature",
+        ),
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        branch="feature",
+        slug="feature",
+        state={},
+    )
+
+    assert result["attempt"]["status"] == "prompt_captured"
+    assert result["continuations"] == 0
+    assert len(calls) == 1
+    assert "repair_issue" not in calls[0]
+
+
 def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(
     tmp_path: Path,
 ) -> None:
@@ -2477,6 +2527,115 @@ def test_code_task_plan_coalesces_product_obligations_into_one_worker_task(
     assert "second behavior" in task["objective"]
     assert "first contract test" in task["validator"]["evidence_case"]
     assert "second contract test" in task["validator"]["evidence_case"]
+
+
+def test_code_task_plan_uses_verbatim_source_when_compiled_oracle_is_generic(
+    tmp_path: Path,
+) -> None:
+    source_requirement = "On entry, data initializes as a fresh copy of the defaults."
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {"failing_cases": [{"obligation_id": "lifecycle"}]},
+            "verification_plans": [
+                {
+                    "obligation_id": "lifecycle",
+                    "kind": "feature",
+                    "operation": "create: initializes as a fresh copy of defaults",
+                    "oracle": "the requested behavior is observed",
+                    "acceptance_criterion": (
+                        "The requested behavior is observed for the resolved "
+                        "population."
+                    ),
+                    "evidence_case": f"Source instruction-003: {source_requirement}",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("src",)),
+    )
+
+    task = result["tasks"][0]
+    assert source_requirement in task["objective"]
+    assert "requested behavior is observed" not in task["objective"].casefold()
+    assert any(source_requirement in item for item in task["acceptance_criteria"])
+    assert all(
+        "requested behavior is observed" not in item.casefold()
+        for item in task["acceptance_criteria"]
+    )
+
+
+def test_code_task_objective_restores_exact_selected_source_spans(
+    tmp_path: Path,
+) -> None:
+    lifecycle = (
+        "On entry, data initializes as a fresh copy of the defaults. "
+        "On exit, data is removed. "
+        "Re-entering a state resets data to the original defaults."
+    )
+    datavar = (
+        "DataVar can replace plain defaults in the data dict, supporting "
+        "optional type enforcement and factory callables."
+    )
+    validation = (
+        "Invalid declarations raise InvalidDefinition -- data requires dict "
+        "with string keys, DataVar rejects simultaneous default and factory."
+    )
+    workflow = "IMPORTANT: create a branch from main and commit everything."
+    source_text = f"{lifecycle} {datavar} {validation} {workflow}"
+    clause_texts = {
+        "instruction-003": lifecycle.split(" On exit", 1)[0],
+        "instruction-004": "On exit, data is removed.",
+        "instruction-005": "Re-entering a state resets data to the original defaults.",
+        "instruction-007": datavar,
+        "instruction-008": datavar,
+        "instruction-009": datavar,
+        "instruction-031": validation,
+        "instruction-032": validation,
+        "instruction-033": validation,
+        "instruction-038": workflow,
+    }
+    clauses = []
+    for clause_id, text in clause_texts.items():
+        start = source_text.index(text)
+        clauses.append(
+            {
+                "clause_id": clause_id,
+                "source_span": {"start": start, "end": start + len(text)},
+            }
+        )
+    (tmp_path / "instruction-ledger.json").write_text(
+        json.dumps({"source": {"text": source_text}, "clauses": clauses}),
+        encoding="utf-8",
+    )
+    obligation_refs = tuple(clause_texts)[:-1]
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {
+                "failing_cases": [{"obligation_id": item} for item in obligation_refs]
+            },
+            "verification_plans": [
+                {
+                    "obligation_id": item,
+                    "kind": "feature",
+                    "contract_refs": [f"test:obligation:{item}"],
+                    "operation": "implement the requested behavior",
+                    "oracle": "the requested behavior is observed",
+                    "acceptance_criterion": "the requested behavior is observed",
+                    "evidence_case": f"Source {item}: {clause_texts[item]}",
+                }
+                for item in obligation_refs
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("src",)),
+    )
+
+    objective = result["tasks"][0]["objective"]
+
+    assert lifecycle in objective
+    assert datavar in objective
+    assert validation in objective
+    assert workflow not in objective
 
 
 def test_code_task_plan_never_compiles_non_product_obligations(

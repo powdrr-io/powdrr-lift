@@ -13,15 +13,6 @@ from powdrr_lift.core.behavior_contract import (
 )
 
 
-def _worker_objective(text: str) -> str:
-    """Remove source-level repository workflow instructions from the objective."""
-    # Branching, committing, and PR instructions belong to Workrr. They are
-    # frequently present in task descriptions, but must not compete with the
-    # worker policy rendered by the request compiler.
-    objective, separator, _process_instructions = text.partition("\nIMPORTANT:")
-    return (objective if separator else text).strip()
-
-
 @dataclass(frozen=True, slots=True)
 class RepositoryContextPacket:
     """Stable repository facts supplied to a coding worker."""
@@ -75,7 +66,7 @@ class ImplementationPacket:
         acceptance_criteria: Sequence[str],
     ) -> ImplementationPacket:
         """Return a worker packet scoped to one compiled code task."""
-        task_objective = _worker_objective(objective).strip()
+        task_objective = objective.strip()
         if not task_objective:
             raise ValueError("task packet objective must not be empty")
         tests = tuple(
@@ -142,7 +133,7 @@ class ImplementationPacket:
         ):
             raise ValueError("implementation packet behavior scenarios are malformed")
         packet = cls(
-            objective=_worker_objective(str(raw.get("objective", ""))),
+            objective=str(raw.get("objective", "")).strip(),
             obligations=obligations,
             required_tests=tests,
             repository=RepositoryContextPacket(
@@ -230,7 +221,7 @@ def compile_implementation_packet(
         if isinstance(item.get("behavior_scenario"), Mapping)
     )
     return ImplementationPacket(
-        objective=_worker_objective(objective),
+        objective=objective.strip(),
         obligations=normalized_obligations,
         required_tests=tuple(normalized_tests),
         repository=RepositoryContextPacket(

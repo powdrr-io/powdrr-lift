@@ -96,6 +96,39 @@ def test_capability_matrix_requires_evidence_and_rejection_error() -> None:
         )
 
 
+def test_behavior_scenario_serializes_capability_evidence_as_json_array() -> None:
+    scenario = _scenario()
+    scenario["capability_matrix"] = [
+        {
+            "capability": "unsupported declaration",
+            "behavior": "reject",
+            "evidence": ["instruction-1: invalid declarations raise an error"],
+            "error": "InvalidDefinition",
+        }
+    ]
+
+    compiled = compile_behavior_scenarios((scenario,))[0]
+
+    assert compiled.to_data()["capability_matrix"][0]["evidence"] == [
+        "instruction-1: invalid declarations raise an error"
+    ]
+
+
+def test_non_rejecting_capabilities_do_not_emit_irrelevant_error_values() -> None:
+    matrix = validate_capability_matrix(
+        [
+            {
+                "capability": "ordinary mapping",
+                "behavior": "support",
+                "evidence": ["source requires a data mapping"],
+                "error": "./././",
+            }
+        ]
+    )
+
+    assert "error" not in matrix[0]
+
+
 def test_validation_report_exposes_structured_repair_failures() -> None:
     report = ValidationReport(
         attempt_id="attempt-1",

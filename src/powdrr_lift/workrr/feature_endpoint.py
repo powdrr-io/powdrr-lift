@@ -2258,10 +2258,21 @@ def _run_code_agent_phase(
         provider.session_id = None
     for index, unit in enumerate(request_units, start=1):
         worker_packet = implementation_packet
-        if isinstance(code_task, Mapping) and not repair_mode:
+        if isinstance(code_task, Mapping):
+            task_objective = str(code_task.get("objective", unit.objective)).strip()
+            task_acceptance = code_task.get("acceptance_criteria")
+            acceptance_criteria = (
+                tuple(
+                    str(item).strip()
+                    for item in task_acceptance
+                    if isinstance(item, str) and item.strip()
+                )
+                if isinstance(task_acceptance, (list, tuple))
+                else unit.acceptance_criteria
+            )
             worker_packet = implementation_packet.for_task(
-                objective=unit.objective,
-                acceptance_criteria=unit.acceptance_criteria,
+                objective=task_objective,
+                acceptance_criteria=acceptance_criteria,
             )
         request = ImplementationRequest.from_execution_unit(
             unit,
@@ -2282,9 +2293,14 @@ def _run_code_agent_phase(
             if isinstance(repair_issue, Mapping):
                 repair_request = request.repair_prompt(repair_issue)
             fallback_context = ""
+            repair_feature_context = (
+                ""
+                if isinstance(code_task, Mapping)
+                else f"Feature: {feature_description}\n"
+            )
             fallback_context = (
                 f"Work item: {work_item_name}\n"
-                f"Feature: {feature_description}\n"
+                f"{repair_feature_context}"
                 "This is a fresh repair session; use the existing worktree and "
                 "repair only the reported issue. Do not re-plan the feature or "
                 "revisit unrelated changes.\n\n"
@@ -2305,7 +2321,7 @@ def _run_code_agent_phase(
         operation_request_path = output_root / "requests" / f"{unit.unit_id}.json"
         operation_request_path.parent.mkdir(parents=True, exist_ok=True)
         operation_request_path.write_text(request.to_json(), encoding="utf-8")
-        if config.capture_worker_prompts_only:
+        if getattr(config, "capture_worker_prompts_only", False):
             capture = _capture_worker_prompt(
                 request,
                 provider=provider,
@@ -3995,7 +4011,24 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     )
     path = repository_path
     if not path.is_file():
-        path = Path(__file__).resolve().parents[2] / "implement-feature.yaml"
+        package_data_path = (
+            Path(__file__).resolve().parents[2] / "implement-feature.yaml"
+        )
+        source_tree_path = (
+            Path(__file__).resolve().parents[3]
+            / "docs"
+            / "procedrr"
+            / "skill-definitions"
+            / "implement-feature.yaml"
+        )
+        path = next(
+            (
+                candidate
+                for candidate in (package_data_path, source_tree_path)
+                if candidate.is_file()
+            ),
+            package_data_path,
+        )
     try:
         parse_and_validate(
             path.read_text(encoding="utf-8"),
@@ -4623,7 +4656,12 @@ def _compile_code_task_plan(
         evidence_case = str(source.get("evidence_case", "")).strip()
         operation = str(source.get("operation", "")).strip()
         oracle = str(source.get("oracle", "")).strip()
-        objective_basis = oracle or operation
+        source_requirement = _source_requirement_from_evidence(evidence_case)
+        objective_basis = (
+            source_requirement or _specific_operation_text(operation)
+            if _is_generic_contract_text(oracle)
+            else oracle
+        ) or _specific_operation_text(operation)
         if _is_repository_workflow_objective(
             operation
         ) or _is_repository_workflow_objective(oracle):
@@ -4643,8 +4681,20 @@ def _compile_code_task_plan(
         acceptance_criteria = [
             item
             for item in (
-                acceptance_criterion,
-                f"The implementation must {oracle}." if oracle else "",
+                acceptance_criterion
+                if not _is_generic_contract_text(acceptance_criterion)
+                else "",
+                (
+                    f"The implementation must {oracle}."
+                    if oracle and not _is_generic_contract_text(oracle)
+                    else ""
+                ),
+                (
+                    "The implementation must satisfy this source requirement: "
+                    f"{source_requirement}"
+                    if _is_generic_contract_text(oracle) and source_requirement
+                    else ""
+                ),
                 f"The focused validator must pass: {evidence_case}."
                 if evidence_case
                 else "",
@@ -4672,6 +4722,9 @@ def _compile_code_task_plan(
                 "task_id": f"code-task-{index:03d}",
                 "objective": objective,
                 "obligation_refs": [obligation_id] if obligation_id else [],
+                "source_clause_refs": _instruction_refs_from_contract(
+                    source.get("contract_refs", ())
+                ),
                 "allowed_paths": list(getattr(config, "allowed_paths", ())),
                 "validation_profiles": ["pytest"],
                 "acceptance_criteria": acceptance_criteria,
@@ -4709,6 +4762,13 @@ def _compile_code_task_plan(
                         for reference in item["obligation_refs"]
                     )
                 ),
+                "source_clause_refs": list(
+                    dict.fromkeys(
+                        reference
+                        for item in tasks
+                        for reference in item.get("source_clause_refs", ())
+                    )
+                ),
                 "acceptance_criteria": list(
                     dict.fromkeys(
                         criterion
@@ -4725,6 +4785,15 @@ def _compile_code_task_plan(
                 "execution_mode": "cohesive",
             }
         ]
+    for task in tasks:
+        verbatim_source = _verbatim_source_requirements(
+            output_root, task.get("source_clause_refs", ())
+        )
+        if verbatim_source:
+            task["objective"] = (
+                "Implement the product behavior described in these source "
+                f"requirements:\n{verbatim_source}"
+            )
     decisions = [
         {
             "decision_id": "task-plan:scope",
@@ -4756,6 +4825,79 @@ def _compile_code_task_plan(
         output_root, "code-task-plan.json", document
     )
     return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _is_generic_contract_text(value: str) -> bool:
+    normalized = " ".join(value.casefold().strip().rstrip(".").split())
+    return normalized.startswith("the requested behavior is observed")
+
+
+def _specific_operation_text(operation: str) -> str:
+    _, separator, detail = operation.partition(":")
+    return detail.strip() if separator else operation
+
+
+def _source_requirement_from_evidence(evidence_case: str) -> str:
+    if evidence_case.casefold().startswith("source "):
+        _, separator, source_text = evidence_case.partition(":")
+        if separator and source_text.strip():
+            return source_text.strip()
+    return ""
+
+
+def _instruction_refs_from_contract(contract_refs: Any) -> list[str]:
+    if not isinstance(contract_refs, (list, tuple)):
+        return []
+    refs = []
+    for contract_ref in contract_refs:
+        if not isinstance(contract_ref, str):
+            continue
+        instruction_ref = contract_ref.rsplit(":", 1)[-1]
+        if instruction_ref.startswith("instruction-"):
+            refs.append(instruction_ref)
+    return list(dict.fromkeys(refs))
+
+
+def _verbatim_source_requirements(output_root: Path, source_clause_refs: Any) -> str:
+    """Recover exact source sentences for compiled product obligations."""
+    ledger_path = output_root / "instruction-ledger.json"
+    try:
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not isinstance(ledger, Mapping):
+        return ""
+    source = ledger.get("source")
+    clauses = ledger.get("clauses")
+    if (
+        not isinstance(source, Mapping)
+        or not isinstance(source.get("text"), str)
+        or not isinstance(clauses, list)
+        or not isinstance(source_clause_refs, (list, tuple))
+    ):
+        return ""
+    selected_refs = {str(item) for item in source_clause_refs}
+    spans: dict[tuple[int, int], None] = {}
+    for clause in clauses:
+        if (
+            not isinstance(clause, Mapping)
+            or clause.get("clause_id") not in selected_refs
+        ):
+            continue
+        span = clause.get("source_span")
+        if not isinstance(span, Mapping):
+            continue
+        start = span.get("start")
+        end = span.get("end")
+        if (
+            isinstance(start, int)
+            and not isinstance(start, bool)
+            and isinstance(end, int)
+            and not isinstance(end, bool)
+            and 0 <= start < end <= len(source["text"])
+        ):
+            spans[(start, end)] = None
+    return " ".join(source["text"][start:end] for start, end in sorted(spans))
 
 
 def _evaluate_deterministic_decision(parameters: Mapping[str, Any]) -> dict[str, str]:
@@ -4998,6 +5140,8 @@ def _run_code_task_agent(
             parameters=current_parameters,
         )
         attempt_results.append(result)
+        if getattr(config, "capture_worker_prompts_only", False):
+            return {**result, "continuations": continuation}
         attempt = result.get("attempt")
         checkpoints = state.get("operation_checkpoints", ())
         checkpoint = checkpoints[-1] if checkpoints else None

@@ -217,13 +217,14 @@ def _label_task(
     *,
     provider: str,
     model: str,
+    clause_workers: int = 4,
 ) -> dict[str, Any]:
     task_id = str(task["task_id"])
     work_item_name = f"deepswe-{task_id}"
     instruction = str(task["instruction"])
     ledger = compile_instruction_ledger(work_item_name, instruction)
-    atomicity: dict[str, dict[str, Any]] = {}
-    for clause in ledger.clauses:
+
+    def label_atomicity(clause: Any) -> tuple[str, dict[str, Any]]:
         answer = _call_judge(
             client,
             question=(
@@ -249,12 +250,15 @@ def _label_task(
                 schema=_split_schema(),
             )
             decision["statements"] = split["statements"]
-        atomicity[clause.clause_id] = decision
+        return clause.clause_id, decision
+
+    with ThreadPoolExecutor(max_workers=clause_workers) as executor:
+        atomicity = dict(executor.map(label_atomicity, ledger.clauses))
     atomic_ledger = apply_atomicity_decisions(ledger, atomicity)
 
-    root_records = []
     source_clauses = ledger.to_data()["clauses"]
-    for clause in atomic_ledger.clauses:
+
+    def label_root(clause: Any) -> dict[str, Any]:
         clause_data = clause.to_data()
         request_plan = prepare_source_semantic_decisions(clause_data)
         if request_plan["resolved_decisions"]:
@@ -345,16 +349,17 @@ def _label_task(
             provider_results=[response],
         )
         root = next(item for item in bound if item.decision_kind == "disposition")
-        root_records.append(
-            {
-                "clause": clause_data,
-                "decision": root.to_data(),
-                "spec": request["spec"],
-                "teacher_response": response,
-                "confidence": None,
-                "context_refinement": context_refinement,
-            }
-        )
+        return {
+            "clause": clause_data,
+            "decision": root.to_data(),
+            "spec": request["spec"],
+            "teacher_response": response,
+            "confidence": None,
+            "context_refinement": context_refinement,
+        }
+
+    with ThreadPoolExecutor(max_workers=clause_workers) as executor:
+        root_records = list(executor.map(label_root, atomic_ledger.clauses))
     return {
         "schema_version": "root-disposition-task-run-v1",
         "task_id": task_id,
@@ -522,11 +527,23 @@ def main() -> int:
     parser.add_argument("--task-id", action="append", dest="task_ids")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument(
+        "--clause-workers",
+        type=int,
+        help=(
+            "Concurrent independent classification requests per task "
+            "(default: 4; local provider: 1)."
+        ),
+    )
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
     if args.workers < 1 or args.workers > 8:
         parser.error("--workers must be between 1 and 8")
+    if args.clause_workers is not None and (
+        args.clause_workers < 1 or args.clause_workers > 8
+    ):
+        parser.error("--clause-workers must be between 1 and 8")
     tasks = _read_python_tasks(
         args.tasks_dir.resolve(), set(args.task_ids) if args.task_ids else None
     )
@@ -537,6 +554,11 @@ def main() -> int:
 
     mapping = default_llm_mappings(args.provider)["standard_reasoning"]
     credentials = resolve_provider_credentials(mapping.provider)
+    clause_workers = args.clause_workers or (
+        1 if credentials.provider == "local" else 4
+    )
+    if credentials.provider == "local" and clause_workers != 1:
+        parser.error("--clause-workers must be 1 for the local provider")
     task_runs_dir = args.output_dir / "task_runs"
 
     def process_task(task: Mapping[str, Any]) -> tuple[str, int, str | None]:
@@ -560,6 +582,7 @@ def main() -> int:
                 task_client,
                 provider=credentials.provider,
                 model=args.model or mapping.model,
+                clause_workers=clause_workers,
             )
         except Exception as error:  # noqa: BLE001 - preserve per-task failures
             _write_json(

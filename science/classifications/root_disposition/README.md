@@ -22,8 +22,12 @@ uv run python science/classifications/root_disposition/build_dataset.py \
   --provider deepinfra-cheap
 ```
 
-Use `--task-id` to run one task or `--limit` for a small pilot. Completed task
-artifacts are resumable. Each task artifact includes the original instruction,
+Use `--task-id` to run one task or `--limit` for a small pilot. The harness runs
+independent clause-level atomicity and root-disposition requests concurrently
+(`--clause-workers`, default 4 for hosted providers and 1 for the local provider);
+`--workers` controls concurrent tasks. The local provider requires serial
+requests because it shares one in-process model instance. Completed task artifacts
+are resumable. Each task artifact includes the original instruction,
 deterministic sentence ledger, atomicity decisions, atomic ledger, and bound
 root decisions with the teacher responses. The consolidated
 `root_disposition.jsonl` contains one example per atomic clause with

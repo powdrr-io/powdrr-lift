@@ -1,0 +1,324 @@
+{
+  "artifact_dir": "science/classifications/root_disposition/artifacts/minilm-root-disposition",
+  "confidence": {
+    "calibrated_on": "validation teacher agreement",
+    "meaning": "Calibrated agreement with LLM teacher labels only; not calibrated probability of human correctness.",
+    "minimum_abstention_threshold": null,
+    "temperature": 0.81,
+    "test_teacher_agreement_calibration": {
+      "brier": 0.6889952275540078,
+      "ece": 0.07111796886409254,
+      "n": 219,
+      "risk_coverage": [
+        {
+          "accepted": 171,
+          "accuracy_on_accepted": 0.52046783625731,
+          "coverage": 0.7808219178082192,
+          "threshold": 0.4
+        },
+        {
+          "accepted": 95,
+          "accuracy_on_accepted": 0.5789473684210527,
+          "coverage": 0.4337899543378995,
+          "threshold": 0.5
+        },
+        {
+          "accepted": 73,
+          "accuracy_on_accepted": 0.6164383561643836,
+          "coverage": 0.3333333333333333,
+          "threshold": 0.6
+        },
+        {
+          "accepted": 0,
+          "accuracy_on_accepted": null,
+          "coverage": 0.0,
+          "threshold": 0.7
+        },
+        {
+          "accepted": 0,
+          "accuracy_on_accepted": null,
+          "coverage": 0.0,
+          "threshold": 0.8
+        },
+        {
+          "accepted": 0,
+          "accuracy_on_accepted": null,
+          "coverage": 0.0,
+          "threshold": 0.9
+        }
+      ]
+    }
+  },
+  "counts": {
+    "examples_total_resolved": 1591,
+    "labels": {
+      "context": 90,
+      "entity": 41,
+      "feature": 731,
+      "guidance": 49,
+      "interface": 225,
+      "invariant": 341,
+      "non_goal": 22,
+      "nonactionable": 92
+    },
+    "test": 219,
+    "train": 1257,
+    "validation": 115
+  },
+  "dataset_sha256": "37119e6a67403bed86b44cb969030a28c1d9386d727bc9864cee8be42d03b720",
+  "device": "mps",
+  "labels": [
+    "context",
+    "entity",
+    "feature",
+    "guidance",
+    "interface",
+    "invariant",
+    "non_goal",
+    "nonactionable"
+  ],
+  "model": "microsoft/MiniLM-L12-H384-uncased",
+  "model_revision": "44acabbec0ef496f6dbc93adadea57f376b7c0ec",
+  "schema_version": "root-disposition-training-report-v1",
+  "seed": 41,
+  "split": {
+    "labels_missing_from_train": [],
+    "seed": 41,
+    "single_family_labels_kept_in_train": [],
+    "split_unit": "DeepSWE repository family",
+    "test_labels_unseen_in_train": [],
+    "test_source_family_ids": [
+      "family:deepswe-repository:https://github.com/celery/kombu",
+      "family:deepswe-repository:https://github.com/python-attrs/cattrs",
+      "family:deepswe-repository:https://github.com/tconbeer/sqlfmt"
+    ],
+    "test_task_ids": [
+      "cattrs-partial-structuring-recovery",
+      "kombu-single-active-consumer-priority",
+      "kombu-virtual-queue-dead-lettering",
+      "sqlfmt-create-table-ddl-formatting"
+    ],
+    "train_source_family_ids": [
+      "family:deepswe-repository:https://github.com/aio-libs/aiomonitor",
+      "family:deepswe-repository:https://github.com/dateutil/dateutil",
+      "family:deepswe-repository:https://github.com/encode/httpx",
+      "family:deepswe-repository:https://github.com/fastapi/fastapi",
+      "family:deepswe-repository:https://github.com/fgmacedo/python-statemachine",
+      "family:deepswe-repository:https://github.com/gallopsled/pwntools",
+      "family:deepswe-repository:https://github.com/google/mobly",
+      "family:deepswe-repository:https://github.com/graphql-python/gql",
+      "family:deepswe-repository:https://github.com/ipython/ipython",
+      "family:deepswe-repository:https://github.com/jendrikseipp/vulture",
+      "family:deepswe-repository:https://github.com/jkwill87/mnamer",
+      "family:deepswe-repository:https://github.com/langchain-ai/langchain",
+      "family:deepswe-repository:https://github.com/narwhals-dev/narwhals",
+      "family:deepswe-repository:https://github.com/nidhaloff/igel",
+      "family:deepswe-repository:https://github.com/numba/numba",
+      "family:deepswe-repository:https://github.com/pmndrs/koota",
+      "family:deepswe-repository:https://github.com/pycqa/bandit",
+      "family:deepswe-repository:https://github.com/python-poetry/tomlkit",
+      "family:deepswe-repository:https://github.com/reagento/adaptix",
+      "family:deepswe-repository:https://github.com/simonw/sqlite-utils",
+      "family:deepswe-repository:https://github.com/skrub-data/skrub",
+      "family:deepswe-repository:https://github.com/textualize/textual"
+    ],
+    "train_task_ids": [
+      "adaptix-name-mapping-aliases",
+      "aiomonitor-task-snapshots-diff",
+      "bandit-incremental-cache-control",
+      "bandit-interprocedural-taint-checks",
+      "bandit-structured-nosec-directives",
+      "dateutil-rfc5545-timezone-interop",
+      "fastapi-deprecation-response-headers",
+      "fastapi-implicit-head-options",
+      "gql-incremental-graphql-delivery",
+      "httpx-multipart-response-parsing",
+      "httpx-streaming-json-iteration",
+      "igel-persist-feature-schema",
+      "ipython-session-bundle-replay",
+      "koota-entity-snapshot-rollback",
+      "langchain-request-coalescing",
+      "mnamer-daemon-watch-lifecycle",
+      "mobly-grouped-test-barriers",
+      "narwhals-rolling-window-suite",
+      "numba-stencil-boundary-modes",
+      "powdrr-langchain-request-coalescing",
+      "pwntools-tube-multiplexing",
+      "python-statemachine-state-data-scoping",
+      "skrub-duration-encoding",
+      "sqlite-utils-safe-import-checkpoints",
+      "textual-kitty-key-phases",
+      "textual-richlog-follow-state",
+      "tomlkit-toml-table-converters",
+      "vulture-persistent-analysis-cache"
+    ],
+    "validation_labels_unseen_in_train": [],
+    "validation_source_family_ids": [
+      "family:deepswe-repository:https://github.com/dry-python/returns",
+      "family:deepswe-repository:https://github.com/fatal1ty/mashumaro",
+      "family:deepswe-repository:https://github.com/psd-tools/psd-tools"
+    ],
+    "validation_task_ids": [
+      "mashumaro-flattened-dataclass-fields",
+      "psd-tools-blend-range-api",
+      "returns-validated-error-accumulation"
+    ]
+  },
+  "teacher_label_status": "silver_unadjudicated",
+  "test": {
+    "epoch": 5.0,
+    "eval_accuracy": 0.5114155251141552,
+    "eval_loss": 1.5743603706359863,
+    "eval_macro_f1": 0.2005195041494168,
+    "eval_runtime": 1.1804,
+    "eval_samples_per_second": 185.534,
+    "eval_steps_per_second": 11.861
+  },
+  "test_classification_report": {
+    "accuracy": 0.5114155251141552,
+    "confusion_matrix": {
+      "context": {
+        "context": 0,
+        "entity": 0,
+        "feature": 8,
+        "guidance": 0,
+        "interface": 0,
+        "invariant": 2,
+        "non_goal": 0,
+        "nonactionable": 0
+      },
+      "entity": {
+        "context": 0,
+        "entity": 0,
+        "feature": 6,
+        "guidance": 0,
+        "interface": 2,
+        "invariant": 8,
+        "non_goal": 0,
+        "nonactionable": 0
+      },
+      "feature": {
+        "context": 0,
+        "entity": 0,
+        "feature": 75,
+        "guidance": 0,
+        "interface": 2,
+        "invariant": 8,
+        "non_goal": 0,
+        "nonactionable": 0
+      },
+      "guidance": {
+        "context": 0,
+        "entity": 0,
+        "feature": 7,
+        "guidance": 0,
+        "interface": 0,
+        "invariant": 8,
+        "non_goal": 0,
+        "nonactionable": 0
+      },
+      "interface": {
+        "context": 0,
+        "entity": 0,
+        "feature": 26,
+        "guidance": 0,
+        "interface": 13,
+        "invariant": 0,
+        "non_goal": 0,
+        "nonactionable": 0
+      },
+      "invariant": {
+        "context": 0,
+        "entity": 0,
+        "feature": 17,
+        "guidance": 0,
+        "interface": 0,
+        "invariant": 24,
+        "non_goal": 0,
+        "nonactionable": 0
+      },
+      "non_goal": {
+        "context": 0,
+        "entity": 0,
+        "feature": 3,
+        "guidance": 0,
+        "interface": 0,
+        "invariant": 2,
+        "non_goal": 0,
+        "nonactionable": 0
+      },
+      "nonactionable": {
+        "context": 0,
+        "entity": 0,
+        "feature": 2,
+        "guidance": 0,
+        "interface": 0,
+        "invariant": 6,
+        "non_goal": 0,
+        "nonactionable": 0
+      }
+    },
+    "macro_f1": 0.2005195041494168,
+    "majority_baseline_accuracy": 0.3881278538812785,
+    "per_label": {
+      "context": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 10
+      },
+      "entity": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 16
+      },
+      "feature": {
+        "f1": 0.6550218340611353,
+        "precision": 0.5208333333333334,
+        "recall": 0.8823529411764706,
+        "support": 85
+      },
+      "guidance": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 15
+      },
+      "interface": {
+        "f1": 0.4642857142857143,
+        "precision": 0.7647058823529411,
+        "recall": 0.3333333333333333,
+        "support": 39
+      },
+      "invariant": {
+        "f1": 0.48484848484848475,
+        "precision": 0.41379310344827586,
+        "recall": 0.5853658536585366,
+        "support": 41
+      },
+      "non_goal": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 5
+      },
+      "nonactionable": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 8
+      }
+    },
+    "weighted_f1": 0.42768395721975905
+  },
+  "validation": {
+    "epoch": 5.0,
+    "eval_accuracy": 0.5391304347826087,
+    "eval_loss": 1.456459403038025,
+    "eval_macro_f1": 0.17436594202898548,
+    "eval_runtime": 0.2733,
+    "eval_samples_per_second": 420.823,
+    "eval_steps_per_second": 29.275
+  }
+}

@@ -526,6 +526,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "given": "the declared feature input",
                         "when": "the feature is invoked",
                         "then": "the acceptance result is observed",
+                        "related_requirements": [],
                         "dimensions": {
                             "normal_result": ("the acceptance result is observed"),
                             "error_behavior": "not_applicable",

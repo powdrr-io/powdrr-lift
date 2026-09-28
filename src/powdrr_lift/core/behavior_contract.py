@@ -42,6 +42,7 @@ class BehaviorScenario:
     dimensions: Mapping[str, Any]
     evidence: tuple[str, ...]
     validator: str
+    related_requirements: tuple[str, ...] = ()
     capability_matrix: tuple[Mapping[str, Any], ...] = ()
     assumptions: tuple[Mapping[str, str], ...] = ()
     schema_version: str = "behavior-scenario-v1"
@@ -57,6 +58,7 @@ class BehaviorScenario:
             "dimensions": {name: self.dimensions[name] for name in BEHAVIOR_DIMENSIONS},
             "evidence": list(self.evidence),
             "validator": self.validator,
+            "related_requirements": list(self.related_requirements),
             "capability_matrix": [
                 {**dict(item), "evidence": list(item["evidence"])}
                 for item in self.capability_matrix
@@ -106,6 +108,17 @@ def compile_behavior_scenarios(
             )
         evidence = _texts(item.get("evidence"), f"scenario {scenario_id} evidence")
         validator = _text(item.get("validator"), f"scenario {scenario_id} validator")
+        raw_relationships = item.get("related_requirements", [])
+        if not isinstance(raw_relationships, Sequence) or isinstance(
+            raw_relationships, (str, bytes)
+        ):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} related_requirements must be a list"
+            )
+        related_requirements = tuple(
+            _text(value, f"scenario {scenario_id} related requirement")
+            for value in raw_relationships
+        )
         raw_capabilities = item.get("capability_matrix", [])
         if (
             not isinstance(raw_capabilities, Sequence)
@@ -129,6 +142,7 @@ def compile_behavior_scenarios(
                 dimensions=dimensions,
                 evidence=evidence,
                 validator=validator,
+                related_requirements=related_requirements,
                 capability_matrix=capabilities,
                 assumptions=assumptions,
             )
@@ -166,6 +180,8 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         if capabilities:
             detail += " Capabilities: " + "; ".join(capabilities) + "."
         lines.append(detail)
+        for relationship in item.related_requirements:
+            lines.append(f"   Related requirement: {relationship}")
     assumptions = [
         (item.scenario_id, value["dimension"], value["resolution"])
         for item in scenarios

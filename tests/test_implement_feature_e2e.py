@@ -107,6 +107,7 @@ class DeterministicPlanningClient:
                     "given": "the declared inputs and supported context",
                     "when": "the requested operation is performed",
                     "then": "the stated acceptance outcome is observed",
+                    "related_requirements": [],
                     "dimensions": {
                         "normal_result": "the stated acceptance outcome is observed",
                         "error_behavior": "not_applicable",

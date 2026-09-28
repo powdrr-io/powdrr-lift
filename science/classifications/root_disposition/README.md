@@ -32,6 +32,17 @@ repository stay in the same split. These task runs, the source instructions,
 and the consolidated dataset are checked in, so retraining from these labels
 does not call an LLM.
 
+When the isolated root pass returns `source_ambiguous` or
+`source_underspecified`, the harness retries once with the containing source
+sentence and its immediate neighbors. The task artifact records this under
+`context_refinement` (including `needs_context`, the trigger, context level,
+context text, and both responses); it is workflow metadata, not a disposition
+label. The consolidated examples retain the context status and local context,
+and the fine-tuning and prediction scripts serialize that context alongside
+the proposition. This first version only retries explicit
+ambiguity/underspecification abstentions, so it does not catch
+context-dependent cases that the first pass labels confidently.
+
 The training entry point fine-tunes `microsoft/MiniLM-L12-H384-uncased` with
 Hugging Face Transformers. It groups train/validation/test partitions by
 DeepSWE repository family so tasks from one repository cannot leak across

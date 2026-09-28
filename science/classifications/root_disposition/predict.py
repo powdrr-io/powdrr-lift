@@ -11,6 +11,8 @@ from typing import Any
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from powdrr_lift.core.classifier_input import format_classifier_input
+
 
 def classify(
     text: str,
@@ -18,6 +20,7 @@ def classify(
     model_dir: Path,
     report_path: Path,
     minimum_confidence: float,
+    context: str | None = None,
 ) -> dict[str, Any]:
     if not text.strip():
         raise ValueError("text must not be empty")
@@ -26,7 +29,13 @@ def classify(
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(model_dir)
     model.eval()
-    encoded = tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
+    local_context = {"surrounding_text": context} if context else None
+    encoded = tokenizer(
+        format_classifier_input(text, local_context),
+        return_tensors="pt",
+        truncation=True,
+        max_length=256,
+    )
     with torch.inference_mode():
         logits = model(**encoded).logits[0] / temperature
         probabilities = torch.softmax(logits, dim=-1)
@@ -52,6 +61,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("text")
     parser.add_argument(
+        "--context",
+        help="Optional local source context used when a context retry was needed.",
+    )
+    parser.add_argument(
         "--model-dir",
         type=Path,
         default=Path(__file__).parent / "artifacts/minilm-root-disposition/model",
@@ -72,6 +85,7 @@ def main() -> int:
                 model_dir=args.model_dir,
                 report_path=args.report,
                 minimum_confidence=args.minimum_confidence,
+                context=args.context,
             ),
             indent=2,
             sort_keys=True,

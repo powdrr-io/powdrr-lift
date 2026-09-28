@@ -24,17 +24,17 @@ files:
     rationale: Preserve clarification-first behavior by default.
   - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 619, end_line: 632}
+    span: {start_line: 619, end_line: 636}
     summary: Specify normative-default and ask-mode interview behavior.
     rationale: Keep source requirements distinct from conservative assumptions.
   - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 643, end_line: 643}
+    span: {start_line: 647, end_line: 647}
     summary: Pass policy into the scenario interview.
     rationale: Ensure the model receives the selected mode.
   - path: docs/procedrr/skill-definitions/design-interview.yaml
     type: modified
-    span: {start_line: 676, end_line: 688}
+    span: {start_line: 680, end_line: 692}
     summary: Add assumptions to the scenario output schema.
     rationale: Validate structured provenance fields.
   - path: docs/procedrr/skill-definitions/implement-feature.yaml

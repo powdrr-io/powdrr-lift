@@ -619,7 +619,11 @@ steps:
               - when: {binding: clarification_policy, equals: normative_defaults}
                 instructions:
                   - Keep status as needs_clarification and list every materially applicable dimension the source leaves unresolved; do not pretend an assumption came from the user or source.
+                  - Treat defaults as narrow gap-filling, not permission to expand the specification. Mark a dimension unresolved only when its answer could materially change implementation of this clause; otherwise preserve its concrete requirement or mark it not_applicable.
+                  - Do not invent hypothetical cancellation, unsupported-input, failure, compatibility, or continuation cases that the clause does not imply. Reuse constraints already established by the source and accepted design instead of reopening them as uncertainty.
                   - For every unresolved dimension, provide exactly one scenario.assumptions entry with a concrete resolution, rationale, basis, basis_reference, and confidence.
+                  - Each resolution must select one definite behavior; do not say behavior is undefined, may take either of several outcomes, or leave the implementation choice open.
+                  - A default must preserve and remain consistent with every explicit source requirement. Never let a fallback, edge-case policy, or conservative default weaken or contradict required behavior.
                   - Keep unresolved_dimensions exactly consistent with dimensions. List a dimension only when its value says the source leaves it unresolved; exclude every dimension with a concrete requirement or not_applicable value.
                   - Do not list a dimension as unresolved merely because a conservative assumption is being recorded. The unresolved_dimensions list is the exact set of dimensions requiring assumptions, and every listed dimension must have one matching assumption.
                   - For each listed unresolved dimension, set its dimensions value to "unresolved by source" and provide exactly one assumption for that same dimension; do not create assumptions for dimensions already resolved by the source or marked not_applicable.

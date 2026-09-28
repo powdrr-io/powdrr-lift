@@ -96,7 +96,7 @@ class DeterministicPlanningClient:
 
         if required == {"multiple"}:
             return {"multiple": False}
-        if required == {"statements"}:
+        if required == {"statements", "validation_groups"}:
             raise AssertionError("a non-multiple clause must not be split")
         if required == {"status", "unresolved_dimensions", "scenario"}:
             return {
@@ -126,6 +126,9 @@ class DeterministicPlanningClient:
             proposition = str(_find_json_value(text, "proposition_text") or text)
             lowered = proposition.casefold()
             process_only = "new branch" in lowered or "commit everything" in lowered
+            if decision_kind == "routing":
+                route = "exclude" if process_only else "include"
+                return {"status": "resolved", "value": route, "reason_code": None}
             values = {
                 "disposition": (
                     "nonactionable"
@@ -473,14 +476,15 @@ class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
         text = "\n".join(message.get("content", "") for message in messages)
         if required == {"multiple"}:
             return {"multiple": "set_state_data(state, key, value)" in text}
-        if required == {"statements"}:
+        if required == {"statements", "validation_groups"}:
             return {
                 "statements": [
                     "set_state_data rejects an inactive state.",
                     "set_state_data rejects an undeclared key.",
                     "set_state_data enforces the declared DataVar type constraint.",
                     "An invalid set_state_data call raises InvalidDefinition.",
-                ]
+                ],
+                "validation_groups": [],
             }
         return super().complete_json(messages, response_schema=response_schema)
 

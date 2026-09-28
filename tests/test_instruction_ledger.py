@@ -83,6 +83,33 @@ def test_atomicity_split_gets_compiler_owned_ids() -> None:
     ]
 
 
+def test_atomicity_split_preserves_joint_validation_relationships() -> None:
+    ledger = compile_instruction_ledger(
+        "feature", "For each valid request, return 200 and include its account ID."
+    )
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [
+                    "For each valid request, return status 200.",
+                    "For each valid request, include its account ID.",
+                ],
+                "validation_groups": [{"members": [1, 2], "relation": "all_together"}],
+            }
+        },
+    )
+
+    assert [item.validation_group_id for item in split.clauses] == [
+        "validation:instruction-001:1",
+        "validation:instruction-001:1",
+    ]
+    assert {item.validation_relation for item in split.clauses} == {"all_together"}
+    restored = InstructionLedger.from_data(split.to_data())
+    assert restored.fingerprint == split.fingerprint
+
+
 def test_atomicity_rejects_model_authored_structural_fields() -> None:
     ledger = compile_instruction_ledger("feature", "Data is fresh.")
 

@@ -55,6 +55,8 @@ class InstructionClause:
     text: str
     source_span: tuple[int, int]
     parent_clause_id: str | None = None
+    validation_group_id: str | None = None
+    validation_relation: str = "independent"
     derivation: str = "deterministic-sentence-v1"
 
     def __post_init__(self) -> None:
@@ -69,6 +71,18 @@ class InstructionClause:
         start, end = self.source_span
         if start < 0 or end <= start:
             raise InstructionLedgerError("clause source span must be non-empty")
+        if self.validation_relation not in {
+            "independent",
+            "all_together",
+            "ordered",
+            "alternatives",
+            "conditional",
+        }:
+            raise InstructionLedgerError("clause validation relation is invalid")
+        if self.validation_relation != "independent" and not self.validation_group_id:
+            raise InstructionLedgerError(
+                "related clauses require a validation group ID"
+            )
 
     @property
     def fingerprint(self) -> str:
@@ -88,6 +102,9 @@ class InstructionClause:
             "parent_clause_id": self.parent_clause_id,
             "derivation": self.derivation,
         }
+        if self.validation_group_id is not None:
+            data["validation_group_id"] = self.validation_group_id
+            data["validation_relation"] = self.validation_relation
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
@@ -144,6 +161,10 @@ class InstructionLedger:
                         _required_int(span, "end"),
                     ),
                     parent_clause_id=_optional_string(item, "parent_clause_id"),
+                    validation_group_id=_optional_string(item, "validation_group_id"),
+                    validation_relation=str(
+                        item.get("validation_relation", "independent")
+                    ),
                     derivation=_required_string(item, "derivation"),
                 )
             )
@@ -186,7 +207,7 @@ class AtomicityDecision:
 
     @classmethod
     def from_data(cls, raw: dict[str, Any]) -> AtomicityDecision:
-        if set(raw) - {"multiple", "statements"} or not isinstance(
+        if set(raw) - {"multiple", "statements", "validation_groups"} or not isinstance(
             raw.get("multiple"), bool
         ):
             raise InstructionLedgerError(
@@ -248,6 +269,22 @@ def apply_atomicity_decisions(
                 f"2-{MAX_ATOMIC_SPLIT_CHILDREN} statements"
             )
         for statement in statements:
+            statement_ordinal = (
+                len(
+                    [
+                        item
+                        for item in output
+                        if item.parent_clause_id == f"candidate:{clause.clause_id}"
+                    ]
+                )
+                + 1
+            )
+            group_id, relation = _atomic_validation_group(
+                raw.get("validation_groups", []),
+                statement_ordinal,
+                len(statements),
+                clause.clause_id,
+            )
             output.append(
                 InstructionClause(
                     clause_id=f"pending-{len(output) + 1}",
@@ -256,6 +293,8 @@ def apply_atomicity_decisions(
                     text=statement.strip(),
                     source_span=clause.source_span,
                     parent_clause_id=f"candidate:{clause.clause_id}",
+                    validation_group_id=group_id,
+                    validation_relation=relation,
                     derivation="bounded-atomicity-v1",
                 )
             )
@@ -267,6 +306,8 @@ def apply_atomicity_decisions(
             text=clause.text,
             source_span=clause.source_span,
             parent_clause_id=clause.parent_clause_id,
+            validation_group_id=clause.validation_group_id,
+            validation_relation=clause.validation_relation,
             derivation=clause.derivation,
         )
         for index, clause in enumerate(output, start=1)
@@ -274,6 +315,61 @@ def apply_atomicity_decisions(
     result = InstructionLedger(source=ledger.source, clauses=renumbered)
     result.validate()
     return result
+
+
+def _atomic_validation_group(
+    raw_groups: Any, statement_ordinal: int, statement_count: int, parent_id: str
+) -> tuple[str | None, str]:
+    if raw_groups is None:
+        raw_groups = []
+    if not isinstance(raw_groups, list):
+        raise InstructionLedgerError("validation_groups must be a list")
+    matching: list[tuple[int, str]] = []
+    occupied: set[int] = set()
+    for group_index, group in enumerate(raw_groups, start=1):
+        if isinstance(group, str):
+            try:
+                members_part, relation = group.split(";relation=", maxsplit=1)
+                members_text = members_part.removeprefix("members=")
+                group = {
+                    "members": [int(item) for item in members_text.split(",")],
+                    "relation": relation,
+                }
+            except (ValueError, TypeError) as exc:
+                raise InstructionLedgerError(
+                    "validation group string is malformed"
+                ) from exc
+        if not isinstance(group, dict) or set(group) != {"members", "relation"}:
+            raise InstructionLedgerError(
+                "validation group must contain members and relation"
+            )
+        members = group.get("members")
+        relation_value = group.get("relation")
+        if (
+            not isinstance(members, list)
+            or len(members) < 2
+            or not all(
+                isinstance(value, int)
+                and not isinstance(value, bool)
+                and 1 <= value <= statement_count
+                for value in members
+            )
+            or len(set(members)) != len(members)
+            or relation_value
+            not in {"all_together", "ordered", "alternatives", "conditional"}
+        ):
+            raise InstructionLedgerError("validation group is invalid")
+        if occupied.intersection(members):
+            raise InstructionLedgerError("validation groups overlap")
+        occupied.update(members)
+        if statement_ordinal in members:
+            matching.append((group_index, str(relation_value)))
+    if len(matching) > 1:
+        raise InstructionLedgerError("statement belongs to multiple validation groups")
+    if not matching:
+        return None, "independent"
+    group_index, relation = matching[0]
+    return f"validation:{parent_id}:{group_index}", relation
 
 
 def _normalize_with_offsets(text: str) -> tuple[str, list[int]]:

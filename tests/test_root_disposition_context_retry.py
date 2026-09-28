@@ -25,7 +25,7 @@ def test_underspecified_root_retries_with_local_context_and_records_trace(
 ) -> None:
     root_responses = iter(
         [
-            {"status": "resolved", "value": "feature", "reason_code": None},
+            {"status": "resolved", "value": "include", "reason_code": None},
             {
                 "status": "unresolved",
                 "value": None,
@@ -47,7 +47,7 @@ def test_underspecified_root_retries_with_local_context_and_records_trace(
         if context_name == "root_decision_request":
             return next(root_responses)
         assert context_name == "context_assisted_root_decision_request"
-        return {"status": "resolved", "value": "feature", "reason_code": None}
+        return {"status": "resolved", "value": "include", "reason_code": None}
 
     monkeypatch.setattr(build_dataset, "_call_judge", fake_call_judge)
     task = {
@@ -81,7 +81,7 @@ def test_underspecified_root_retries_with_local_context_and_records_trace(
         second["context_refinement"]["initial_teacher_response"]["reason_code"]
         == "source_underspecified"
     )
-    assert second["teacher_response"]["value"] == "feature"
+    assert second["teacher_response"]["value"] == "include"
 
     example = build_dataset._example(task_run, second)
     assert example["inputs"]["context_level"] == "containing_and_adjacent_sentences"
@@ -124,7 +124,7 @@ def test_independent_clause_requests_run_concurrently_in_stable_order(
         if context_name == "atomicity_clause":
             return {"multiple": False}
         assert context_name == "root_decision_request"
-        return {"status": "resolved", "value": "feature", "reason_code": None}
+        return {"status": "resolved", "value": "include", "reason_code": None}
 
     monkeypatch.setattr(build_dataset, "_call_judge", fake_call_judge)
     sentences = [

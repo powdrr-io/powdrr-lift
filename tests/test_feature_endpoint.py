@@ -1565,6 +1565,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     class PlanningLLM:
         source_values = iter(
             (
+                "include",
                 "feature",
                 "unspecified",
                 "must",
@@ -1584,7 +1585,10 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "root role" in question or "child decision" in question:
+            if (
+                "route this exact instruction clause" in question
+                or "child decision" in question
+            ):
                 return {
                     "status": "resolved",
                     "value": next(self.source_values),

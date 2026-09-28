@@ -474,6 +474,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     class DesignInterviewLLM:
         source_values = iter(
             (
+                "include",
                 "feature",
                 "required",
                 "unspecified",
@@ -494,7 +495,10 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "root role" in question or "child decision" in question:
+            if (
+                "route this exact instruction clause" in question
+                or "child decision" in question
+            ):
                 return {
                     "status": "resolved",
                     "value": next(self.source_values),
@@ -631,11 +635,12 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "partial_contract_path": "partial-contract.json",
                     "partial_contract_fingerprint": "sha256:contract",
                     "partial_contract": {
-                        "schema_version": "partial-semantic-contract-v1",
+                        "schema_version": "partial-semantic-contract-v2",
                         "contract_id": "contract:instruction-001",
                         "source_ref": "instruction-001",
                         "source_fingerprint": "sha256:clause",
                         "proposition_text": "Add a thing",
+                        "routing": "include",
                         "disposition": "feature",
                     },
                 }
@@ -826,8 +831,14 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
     }
     assert judge_values["atomicity_decision"] == {"multiple": True}
     statements = judge_values["atomicity_split"]["statements"]
+    groups = judge_values["atomicity_split"]["validation_groups"]
     assert len(statements) >= 2
     assert all(statement.strip() for statement in statements)
+    assert all(
+        set(group) == {"members", "relation"}
+        and all(1 <= member <= len(statements) for member in group["members"])
+        for group in groups
+    )
     assert len(result.bindings["feature_design"]["obligations"]) == len(statements)
 
 

@@ -45,6 +45,9 @@ class BehaviorScenario:
     capability_matrix: tuple[Mapping[str, Any], ...] = ()
     assumptions: tuple[Mapping[str, str], ...] = ()
     schema_version: str = "behavior-scenario-v1"
+    validation_group_id: str | None = None
+    validation_relation: str = "independent"
+    routing: str = "include"
 
     def to_data(self) -> dict[str, Any]:
         data = {
@@ -57,6 +60,7 @@ class BehaviorScenario:
             "dimensions": {name: self.dimensions[name] for name in BEHAVIOR_DIMENSIONS},
             "evidence": list(self.evidence),
             "validator": self.validator,
+            "routing": self.routing,
             "capability_matrix": [
                 {**dict(item), "evidence": list(item["evidence"])}
                 for item in self.capability_matrix
@@ -64,6 +68,9 @@ class BehaviorScenario:
         }
         if self.assumptions:
             data["assumptions"] = [dict(item) for item in self.assumptions]
+        if self.validation_group_id is not None:
+            data["validation_group_id"] = self.validation_group_id
+            data["validation_relation"] = self.validation_relation
         return data
 
 
@@ -119,6 +126,34 @@ def compile_behavior_scenarios(
             validate_capability_matrix(raw_capabilities) if raw_capabilities else ()
         )
         assumptions = validate_normative_assumptions(item.get("assumptions", []))
+        validation_group_id = item.get("validation_group_id")
+        validation_relation = item.get("validation_relation", "independent")
+        routing = item.get("routing", "include")
+        if validation_group_id is not None and not isinstance(validation_group_id, str):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} validation_group_id must be a string"
+            )
+        if validation_relation not in {
+            "independent",
+            "all_together",
+            "ordered",
+            "alternatives",
+            "conditional",
+        }:
+            raise BehaviorContractError(
+                f"scenario {scenario_id} validation_relation is invalid"
+            )
+        if validation_relation != "independent" and not validation_group_id:
+            raise BehaviorContractError(
+                f"scenario {scenario_id} related validation requires a group ID"
+            )
+        if routing not in {
+            "include",
+            "include_prohibition",
+            "exclude",
+            "unclear",
+        }:
+            raise BehaviorContractError(f"scenario {scenario_id} routing is invalid")
         scenarios.append(
             BehaviorScenario(
                 scenario_id=scenario_id,
@@ -131,6 +166,9 @@ def compile_behavior_scenarios(
                 validator=validator,
                 capability_matrix=capabilities,
                 assumptions=assumptions,
+                validation_group_id=validation_group_id,
+                validation_relation=str(validation_relation),
+                routing=str(routing),
             )
         )
     return tuple(scenarios)
@@ -145,13 +183,19 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
     """
     lines = [
         "Required behavior checks:",
-        "Implement every case. First trace the affected code paths, including "
-        "synchronous and asynchronous implementations and named integrations. "
-        "Add focused tests for the listed cases and applicable paths. Run the "
-        "tests before reporting completion.",
+        "For Include and IncludeProhibition routes, implement the listed "
+        "behavior. For Unclear routes, resolve the route review below before "
+        "treating the candidate behavior as required. First trace the affected "
+        "code paths, including synchronous and asynchronous implementations "
+        "and named integrations. Add focused tests for accepted cases and "
+        "applicable paths. Run the tests before reporting completion.",
         "",
     ]
-    for index, item in enumerate(scenarios, start=1):
+    implementation_scenarios = [
+        item for item in scenarios if item.routing in {"include", "include_prohibition"}
+    ]
+    unclear_scenarios = [item for item in scenarios if item.routing == "unclear"]
+    for index, item in enumerate(implementation_scenarios, start=1):
         detail = (
             f"{index}. [{item.scenario_id}] {item.subject}: "
             f"Given {_worker_text(item.given)}; "
@@ -166,6 +210,44 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         if capabilities:
             detail += " Capabilities: " + "; ".join(capabilities) + "."
         lines.append(detail)
+    related_groups: dict[tuple[str, str], list[str]] = {}
+    for item in scenarios:
+        if item.validation_group_id is not None:
+            related_groups.setdefault(
+                (item.validation_group_id, item.validation_relation), []
+            ).append(item.scenario_id)
+    if related_groups:
+        lines.extend(("", "Relationships between checks:"))
+        for (group_id, relation), scenario_ids in related_groups.items():
+            explanations = {
+                "all_together": "all checks must pass in the same scenario",
+                "ordered": "checks must pass in this order",
+                "alternatives": "the source allows these alternative outcomes",
+                "conditional": "preserve the condition for each branch",
+            }
+            lines.append(
+                f"- [{group_id}] {explanations[relation]}: {', '.join(scenario_ids)}."
+            )
+    if unclear_scenarios:
+        lines.extend(
+            (
+                "",
+                "Headless route review before implementation:",
+                "Inspect repository code, tests, and documentation for evidence "
+                "that resolves each unclear source route. Treat the extracted "
+                "behavior below as a candidate, not an accepted requirement. "
+                "Implement it only if repository evidence supports Include or "
+                "IncludeProhibition; otherwise exclude it. If evidence remains "
+                "insufficient, stop and report the clause as unresolved.",
+            )
+        )
+        for item in unclear_scenarios:
+            lines.append(
+                f"- [{item.scenario_id}] source route unclear; source evidence: "
+                f"{', '.join(item.evidence)}. Candidate: {item.subject}; "
+                f"given {_worker_text(item.given)}, when {item.when}, "
+                f"expect {_worker_text(item.then)}."
+            )
     assumptions = [
         (item.scenario_id, value["dimension"], value["resolution"])
         for item in scenarios

@@ -347,7 +347,7 @@ def test_normative_defaults_fail_closed_if_an_unresolved_dimension_is_uncovered(
 
 
 def test_scenario_consistency_updates_only_rewrite_existing_defaults() -> None:
-    decisions = [
+    decisions: list[dict[str, Any]] = [
         {
             "behavior_scenario": {
                 "scenario_id": "scenario:one",

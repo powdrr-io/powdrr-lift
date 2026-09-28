@@ -58,7 +58,9 @@ class ClauseDataset(Dataset[dict[str, torch.Tensor]]):
 
 def _load_examples(path: Path) -> list[dict[str, Any]]:
     rows = []
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
         if not line.strip():
             continue
         row = json.loads(line)
@@ -75,7 +77,9 @@ def _load_examples(path: Path) -> list[dict[str, Any]]:
 
 def _split_by_source_family(
     rows: list[dict[str, Any]], seed: int
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+) -> tuple[
+    list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]
+]:
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     label_families: dict[str, set[str]] = defaultdict(set)
     family_tasks: dict[str, set[str]] = defaultdict(set)
@@ -101,7 +105,9 @@ def _split_by_source_family(
         for source_families in label_families.values()
         if len(source_families) == 1
     }
-    movable = [family_id for family_id in family_ids if family_id not in rare_label_families]
+    movable = [
+        family_id for family_id in family_ids if family_id not in rare_label_families
+    ]
     rng = random.Random(seed)
     rng.shuffle(movable)
     eval_count = max(2, round(len(movable) * 0.2))
@@ -162,12 +168,16 @@ def _classification_report(
     weighted_f1 = 0.0
     confusion: dict[str, dict[str, int]] = {}
     for target_id, target_name in enumerate(label_names):
-        true_positive = int(np.sum((target_ids == target_id) & (predicted_ids == target_id)))
+        true_positive = int(
+            np.sum((target_ids == target_id) & (predicted_ids == target_id))
+        )
         actual_count = int(np.sum(target_ids == target_id))
         predicted_count = int(np.sum(predicted_ids == target_id))
         precision = true_positive / predicted_count if predicted_count else 0.0
         recall = true_positive / actual_count if actual_count else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        f1 = (
+            2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        )
         per_label[target_name] = {
             "support": actual_count,
             "precision": precision,
@@ -184,7 +194,9 @@ def _classification_report(
         }
     support_total = int(len(target_ids))
     return {
-        "accuracy": float(np.mean(predicted_ids == target_ids)) if support_total else 0.0,
+        "accuracy": float(np.mean(predicted_ids == target_ids))
+        if support_total
+        else 0.0,
         "macro_f1": float(np.mean(f1_values)) if f1_values else 0.0,
         "weighted_f1": weighted_f1 / support_total if support_total else 0.0,
         "majority_baseline_accuracy": (
@@ -292,7 +304,8 @@ def main() -> int:
         raise ValueError(f"need at least two disposition labels in training: {labels}")
     if not validation_rows or not test_rows:
         raise ValueError(
-            "task-grouped split produced an empty validation or test set; add source tasks"
+            "repository-family split produced an empty validation or test set; "
+            "add source families"
         )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -344,7 +357,9 @@ def main() -> int:
     )
     trainer.train()
     validation_output = trainer.predict(validation_dataset)
-    temperature = _fit_temperature(validation_output.predictions, validation_output.label_ids)
+    temperature = _fit_temperature(
+        validation_output.predictions, validation_output.label_ids
+    )
     test_output = trainer.predict(test_dataset)
     trainer.save_model(str(args.output_dir / "model"))
     tokenizer.save_pretrained(args.output_dir / "model")
@@ -357,7 +372,11 @@ def main() -> int:
         "seed": args.seed,
         "dataset_sha256": hashlib.sha256(args.dataset.read_bytes()).hexdigest(),
         "artifact_dir": str(args.output_dir),
-        "device": "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu",
+        "device": "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu",
         "counts": {
             "examples_total_resolved": len(rows),
             "train": len(train_rows),
@@ -391,7 +410,14 @@ def main() -> int:
         report_text, encoding="utf-8"
     )
     (args.output_dir / "labels.json").write_text(
-        json.dumps({"label_to_id": label_to_id, "id_to_label": {v: k for k, v in label_to_id.items()}}, indent=2, sort_keys=True)
+        json.dumps(
+            {
+                "label_to_id": label_to_id,
+                "id_to_label": {v: k for k, v in label_to_id.items()},
+            },
+            indent=2,
+            sort_keys=True,
+        )
         + "\n",
         encoding="utf-8",
     )

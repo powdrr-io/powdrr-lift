@@ -14,8 +14,8 @@ import hashlib
 import json
 import sys
 import tomllib
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,12 +25,12 @@ from powdrr_lift.core.instruction_ledger import (
     compile_instruction_ledger,
 )
 from powdrr_lift.core.semantic_decision import DECISION_VALUES
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_config import default_llm_mappings
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,
 )
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_source_semantic_decisions,
     prepare_source_semantic_decisions,
@@ -157,7 +157,9 @@ def _split_schema() -> dict[str, Any]:
     }
 
 
-def _read_python_tasks(tasks_dir: Path, task_ids: set[str] | None) -> list[dict[str, Any]]:
+def _read_python_tasks(
+    tasks_dir: Path, task_ids: set[str] | None
+) -> list[dict[str, Any]]:
     tasks: list[dict[str, Any]] = []
     for metadata_path in sorted(tasks_dir.glob("*/task.toml")):
         try:
@@ -188,7 +190,9 @@ def _read_python_tasks(tasks_dir: Path, task_ids: set[str] | None) -> list[dict[
         found = {item["task_id"] for item in tasks}
         missing = task_ids - found
         if missing:
-            raise ValueError(f"requested task IDs are not Python tasks: {sorted(missing)}")
+            raise ValueError(
+                f"requested task IDs are not Python tasks: {sorted(missing)}"
+            )
     return tasks
 
 
@@ -249,7 +253,9 @@ def _label_task(
         clause_data = clause.to_data()
         request_plan = prepare_source_semantic_decisions(clause_data)
         if request_plan["resolved_decisions"]:
-            raise ValueError("root classifier unexpectedly returned pre-resolved labels")
+            raise ValueError(
+                "root classifier unexpectedly returned pre-resolved labels"
+            )
         if len(request_plan["pending_specs"]) != 1:
             raise ValueError("root classifier must produce exactly one pending request")
         request = request_plan["pending_specs"][0]
@@ -257,7 +263,8 @@ def _label_task(
             "Follow the request's question, instructions, and allowed_values exactly.",
             "This is the root of a decision tree. Do not classify polarity, strength, "
             "behavior family, or modifiers here.",
-            "Return resolved with exactly one allowed value when the source supports it.",
+            "Return resolved with exactly one allowed value when the source "
+            "supports it.",
             "Return unresolved with a closed reason_code when the source does not "
             "support one value.",
             "Never return IDs, evidence, provenance, source spans, explanations, "
@@ -384,14 +391,15 @@ def _consolidate(output_dir: Path, tasks_dir: Path) -> int:
             else None
         )
         run["repository_url"] = repository_url
-        run["source_family_id"] = _repository_family(repository_url, str(run["task_id"]))
+        run["source_family_id"] = _repository_family(
+            repository_url, str(run["task_id"])
+        )
         _write_json(path, run)
         examples.extend(_example(run, record) for record in run["root_dispositions"])
     examples_path = output_dir / "root_disposition.jsonl"
     examples_path.parent.mkdir(parents=True, exist_ok=True)
     text = "".join(
-        json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n"
-        for item in examples
+        json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n" for item in examples
     )
     examples_path.write_text(text, encoding="utf-8")
     manifest = {
@@ -423,7 +431,15 @@ def main() -> int:
     )
     parser.add_argument(
         "--provider",
-        choices=("deepinfra", "deepinfra-cheap", "openai", "anthropic", "zai", "openrouter", "local"),
+        choices=(
+            "deepinfra",
+            "deepinfra-cheap",
+            "openai",
+            "anthropic",
+            "zai",
+            "openrouter",
+            "local",
+        ),
         default="deepinfra-cheap",
     )
     parser.add_argument("--model")
@@ -493,7 +509,9 @@ def main() -> int:
                 print(f"[{index}/{len(tasks)}] reused {task_id}", file=sys.stderr)
             elif error is not None:
                 failures.append(task_id)
-                print(f"[{index}/{len(tasks)}] failed {task_id}: {error}", file=sys.stderr)
+                print(
+                    f"[{index}/{len(tasks)}] failed {task_id}: {error}", file=sys.stderr
+                )
             else:
                 print(
                     f"[{index}/{len(tasks)}] saved {label_count} labels for {task_id}",

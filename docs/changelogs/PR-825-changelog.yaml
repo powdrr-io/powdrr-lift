@@ -1,0 +1,235 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 825
+title: Add normative clarification defaults policy
+intent:
+  problem: Unattended benchmark runs cannot answer clarification questions, while silently guessing would hide ambiguity and weaken source-faithful designs.
+  goal: Preserve explicit human clarification as the default while allowing unattended runs to proceed with recorded, validated, provenance-aware conservative defaults.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Add the clarification policy input.
+    rationale: Let the interview select human clarification or recorded defaults.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 108, end_line: 120}
+    summary: Define the assumption provenance schema.
+    rationale: Make defaults explicit and auditable.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 617, end_line: 617}
+    summary: Require empty assumptions outside normative-default mode.
+    rationale: Preserve clarification-first behavior by default.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 619, end_line: 632}
+    summary: Specify normative-default and ask-mode interview behavior.
+    rationale: Keep source requirements distinct from conservative assumptions.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 643, end_line: 643}
+    summary: Pass policy into the scenario interview.
+    rationale: Ensure the model receives the selected mode.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 676, end_line: 688}
+    summary: Add assumptions to the scenario output schema.
+    rationale: Validate structured provenance fields.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Accept clarification policy in feature workflow.
+    rationale: Expose the choice to callers.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 34, end_line: 34}
+    summary: Forward policy to the design interview.
+    rationale: Keep policy intact through prompt generation.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1427, end_line: 1435}
+    summary: Add the policy option to workrr-feature.
+    rationale: Keep normative defaults explicit and opt-in.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1458, end_line: 1466}
+    summary: Add the policy option to harbor-feature.
+    rationale: Enable unattended benchmark configuration.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4643, end_line: 4643}
+    summary: Forward the workrr CLI policy.
+    rationale: Apply the caller's selected mode.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4707, end_line: 4707}
+    summary: Forward the Harbor CLI policy.
+    rationale: Apply the caller's selected mode.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 19, end_line: 27}
+    summary: Define allowed assumption provenance bases.
+    rationale: Constrain recorded defaults to known basis categories.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 47, end_line: 47}
+    summary: Store assumptions on behavior scenarios.
+    rationale: Carry provenance with the contract.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 51, end_line: 51}
+    summary: Serialize scenario data conditionally.
+    rationale: Preserve compatibility when assumptions are absent.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 66, end_line: 68}
+    summary: Serialize non-empty assumptions.
+    rationale: Include auditable defaults in compiled contracts.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 122, end_line: 122}
+    summary: Validate assumptions while compiling scenarios.
+    rationale: Reject malformed provenance early.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 134, end_line: 134}
+    summary: Attach validated assumptions to scenarios.
+    rationale: Preserve validated provenance downstream.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 159, end_line: 159}
+    summary: Render assumptions in the behavior matrix.
+    rationale: Make defaults visible to implementation agents.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 204, end_line: 260}
+    summary: Validate assumption shape, coverage, basis, and confidence.
+    rationale: Fail closed unless every unresolved dimension has one auditable default.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 265, end_line: 271}
+    summary: Reject not-applicable as a default resolution.
+    rationale: Keep non-applicable dimensions out of assumptions.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 289, end_line: 289}
+    summary: Export the assumption basis constants.
+    rationale: Provide the supported provenance categories.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 295, end_line: 295}
+    summary: Export normative assumption validation.
+    rationale: Reuse the shared validation logic.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 229, end_line: 231}
+    summary: Forward clarification policy from Harbor environment.
+    rationale: Keep benchmark invocation configuration consistent.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 11, end_line: 15}
+    summary: Import shared dimensions and assumption validation.
+    rationale: Reuse contract-level validation.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 913, end_line: 917}
+    summary: Pass policy into feature execution.
+    rationale: Ensure runtime honors the selected mode.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1354, end_line: 1374}
+    summary: Persist normative assumptions as an output artifact.
+    rationale: Keep benchmark defaults independently reviewable.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1398, end_line: 1398}
+    summary: Record the assumption artifact path.
+    rationale: Make the artifact discoverable from execution state.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1886, end_line: 1887}
+    summary: Detect not-applicable resolutions.
+    rationale: Normalize model output without treating it as a behavior choice.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1887, end_line: 1895}
+    summary: Recognize not-applicable resolution markers.
+    rationale: Keep marker interpretation consistent during scenario merging.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1897, end_line: 1900}
+    summary: Add clarification policy to scenario merging.
+    rationale: Select policy-specific resolution behavior.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1902, end_line: 1906}
+    summary: Validate the selected policy.
+    rationale: Reject unsupported policy values.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1927, end_line: 1997}
+    summary: Resolve clarifications with concrete recorded defaults.
+    rationale: Preserve non-applicable dimensions and require complete assumption coverage.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2002, end_line: 2046}
+    summary: Validate resolved assumptions and normalize dimensions.
+    rationale: Prevent mismatch between behavior dimensions and recorded defaults.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 138, end_line: 138}
+    summary: Add policy to feature endpoint configuration.
+    rationale: Keep the behavior opt-in.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 334, end_line: 335}
+    summary: Validate endpoint policy values.
+    rationale: Fail early for unsupported modes.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 481, end_line: 481}
+    summary: Pass policy into Procedrr inputs.
+    rationale: Preserve mode selection through workflow execution.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 989, end_line: 998}
+    summary: Resolve process-only behavior family deterministically.
+    rationale: Avoid unnecessary model ambiguity for schema placeholders.
+  - path: tests/test_behavior_contract.py
+    type: modified
+    span: {start_line: 117, end_line: 160}
+    summary: Test provenance serialization and invalid not-applicable defaults.
+    rationale: Guard the contract behavior and validation boundary.
+  - path: tests/test_cli.py
+    type: modified
+    span: {start_line: 19, end_line: 28}
+    summary: Test CLI exposure of normative defaults.
+    rationale: Keep the opt-in public interface discoverable.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 211, end_line: 347}
+    summary: Test defaults, non-applicable normalization, and fail-closed coverage.
+    rationale: Protect correct policy-specific behavior.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1661, end_line: 1665}
+    summary: Pass policy in the end-to-end workflow test.
+    rationale: Keep the test aligned with required interview inputs.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1675, end_line: 1680}
+    summary: Assert assumptions artifact persistence.
+    rationale: Verify saved provenance is accessible.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 746, end_line: 746}
+    summary: Supply policy in design interview evaluator test.
+    rationale: Keep evaluator fixture aligned with required inputs.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 144, end_line: 169}
+    summary: Test deterministic process-only behavior family resolution.
+    rationale: Ensure non-product clauses do not trigger model clarification.
+entities: []

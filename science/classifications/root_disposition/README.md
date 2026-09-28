@@ -63,6 +63,26 @@ independently and a reviewer resolves disagreements. See
 [`adjudication/README.md`](adjudication/README.md) before distributing the
 blinded sheets.
 
+## Jev comparison
+
+`compare_jev.py` runs the same root-disposition choice over the completed
+human review sheet and compares Jev with the teacher LLM labels and that
+reviewer's labels. Set `TYPESAFEAI_API_KEY` (or the official SDK environment
+variable `TYPESAFE_API_KEY`) and run:
+
+```bash
+uv run python science/classifications/root_disposition/compare_jev.py \
+  --annotator a --resume
+```
+
+The script writes resumable per-example predictions and an aggregate report to
+`jev-comparison/`. The first run uses the held-out 125-example review batch.
+Human agreement is preliminary: annotator A has completed their sheet, but
+annotator B and final adjudication are still pending. Since the production
+disposition schema has no `formatting_artifact` value, those reviewer labels
+are normalized to `unresolved` for the comparison. Jev uses `jev-latest`, so
+the provider may update the underlying model version over time.
+
 Install the optional training dependencies and fine-tune:
 
 ```bash

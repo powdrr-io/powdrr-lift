@@ -1,0 +1,22 @@
+{
+  "id_to_label": {
+    "0": "context",
+    "1": "entity",
+    "2": "feature",
+    "3": "guidance",
+    "4": "interface",
+    "5": "invariant",
+    "6": "non_goal",
+    "7": "nonactionable"
+  },
+  "label_to_id": {
+    "context": 0,
+    "entity": 1,
+    "feature": 2,
+    "guidance": 3,
+    "interface": 4,
+    "invariant": 5,
+    "non_goal": 6,
+    "nonactionable": 7
+  }
+}

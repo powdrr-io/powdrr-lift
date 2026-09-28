@@ -208,6 +208,143 @@ def test_design_only_preserves_unresolved_scenario_dimensions_as_draft_questions
     assert "provisional" in draft["behavior_scenario"]["then"]
 
 
+def test_normative_defaults_resolve_and_record_each_unresolved_dimension() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior"],
+            "scenario": {
+                "subject": "SCXML data parsing",
+                "given": "an SCXML data element with a malformed literal",
+                "when": "its expression is parsed",
+                "then": "the literal parsing behavior is applied",
+                "dimensions": {
+                    "normal_result": "valid literals are parsed",
+                    "error_behavior": "unresolved by source",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "unresolved by source",
+                },
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "error_behavior",
+                        "resolution": "Propagate the native literal parser error.",
+                        "rationale": "Avoid masking the parser's error details.",
+                        "basis": "language_or_framework_default",
+                        "basis_reference": "Python ast.literal_eval behavior",
+                        "confidence": "medium",
+                    }
+                ],
+            },
+        },
+    }
+
+    resolved = _merge_behavior_scenario_values(
+        parameters, clarification_policy="normative_defaults"
+    )["behavior_scenario"]
+
+    assert resolved["dimensions"]["error_behavior"] == (
+        "ASSUMED DEFAULT: Propagate the native literal parser error."
+    )
+    assert resolved["assumptions"][0]["confidence"] == "medium"
+    assert "NEEDS CLARIFICATION" not in resolved["then"]
+
+
+def test_normative_defaults_keep_not_applicable_dimensions_out_of_assumptions() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior", "cancellation_cleanup"],
+            "scenario": {
+                "subject": "a synchronous operation",
+                "given": "a valid operation input",
+                "when": "the operation runs",
+                "then": "the operation completes",
+                "dimensions": {
+                    "normal_result": "the operation completes",
+                    "error_behavior": "unresolved by source",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "error_behavior",
+                        "resolution": "Propagate the operation's native error.",
+                        "rationale": "Avoid masking the underlying failure.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    },
+                    {
+                        "dimension": "cancellation_cleanup",
+                        "resolution": "not_applicable",
+                        "rationale": "The operation is synchronous.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No cancellation source applies.",
+                        "confidence": "high",
+                    },
+                ],
+            },
+        },
+    }
+
+    resolved = _merge_behavior_scenario_values(
+        parameters, clarification_policy="normative_defaults"
+    )["behavior_scenario"]
+
+    assert resolved["dimensions"]["error_behavior"] == (
+        "ASSUMED DEFAULT: Propagate the operation's native error."
+    )
+    assert resolved["dimensions"]["cancellation_cleanup"] == "not_applicable"
+    assert [item["dimension"] for item in resolved["assumptions"]] == ["error_behavior"]
+
+
+def test_normative_defaults_fail_closed_if_an_unresolved_dimension_is_uncovered() -> (
+    None
+):
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior", "negative_boundaries"],
+            "scenario": {
+                "subject": "SCXML data parsing",
+                "given": "an SCXML data element",
+                "when": "its expression is parsed",
+                "then": "a literal value is produced",
+                "dimensions": {
+                    "normal_result": "valid literals are parsed",
+                    "error_behavior": "unresolved",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "unresolved",
+                },
+                "capability_matrix": [],
+                "assumptions": [],
+            },
+        },
+    }
+
+    with pytest.raises(PowdrrExecutionError, match="resolve every clarification"):
+        _merge_behavior_scenario_values(
+            parameters, clarification_policy="normative_defaults"
+        )
+
+
 def test_prompt_capture_preserves_unresolved_scenarios_as_provisional(
     tmp_path: Path,
 ) -> None:
@@ -1521,7 +1658,11 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
 
     result = Evaluator(PlanningLLM(), execute).evaluate(
         flow,
-        {"work_item_name": "demo", "feature_description": "Add the feature."},
+        {
+            "work_item_name": "demo",
+            "feature_description": "Add the feature.",
+            "clarification_policy": "ask",
+        },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
     partial = tmp_path / "semantic-contracts/instruction-001/partial-contract.json"
@@ -1531,6 +1672,12 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     projection = canonical["projections"][0]
     assert projection["description"] == "feature Add."
     assert projection["expected_test"] == "Test Add for feature."
+    assumptions = json.loads((tmp_path / "normative-assumptions.json").read_text())
+    assert assumptions == {
+        "assumptions": [],
+        "policy": "ask",
+        "schema_version": "normative-assumptions-v1",
+    }
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(

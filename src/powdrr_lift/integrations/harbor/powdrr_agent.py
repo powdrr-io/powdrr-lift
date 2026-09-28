@@ -226,6 +226,9 @@ class PowdrrAgent(BaseInstalledAgent):
             command.append("--design-only")
         if env_flag_is_enabled(self._get_env("POWDRR_CAPTURE_WORKER_PROMPTS_ONLY")):
             command.append("--capture-worker-prompts-only")
+        clarification_policy = self._get_env("POWDRR_CLARIFICATION_POLICY")
+        if clarification_policy:
+            command.extend(("--clarification-policy", clarification_policy))
 
         provider_env = {
             key: value

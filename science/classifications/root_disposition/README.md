@@ -35,10 +35,18 @@ does not call an LLM.
 The training entry point fine-tunes `microsoft/MiniLM-L12-H384-uncased` with
 Hugging Face Transformers. It groups train/validation/test partitions by
 DeepSWE repository family so tasks from one repository cannot leak across
-partitions, and reports coverage and metrics. This dataset is a feasibility
-pilot, not evidence that the model is ready to replace the LLM. Its calibrated
-scores estimate agreement with the unadjudicated teacher labels, not human
-correctness.
+partitions. Repository families reserved by the human annotation packet stay
+out of training on future runs. It reports coverage and metrics. This dataset
+is a feasibility pilot, not evidence that the model is ready to replace the
+LLM. Its calibrated scores estimate agreement with the unadjudicated teacher
+labels, not human correctness.
+
+The `adjudication/` directory contains the rubric and a deterministic,
+125-example double-label packet drawn from the pilot's held-out repository
+families. The packet remains unadjudicated until two human reviewers label it
+independently and a reviewer resolves disagreements. See
+[`adjudication/README.md`](adjudication/README.md) before distributing the
+blinded sheets.
 
 Install the optional training dependencies and fine-tune:
 

@@ -1,0 +1,7 @@
+{
+  "source_family_ids": [
+    "family:deepswe-repository:https://github.com/celery/kombu",
+    "family:deepswe-repository:https://github.com/python-attrs/cattrs",
+    "family:deepswe-repository:https://github.com/tconbeer/sqlfmt"
+  ]
+}

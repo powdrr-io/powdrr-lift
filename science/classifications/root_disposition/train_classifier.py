@@ -76,7 +76,9 @@ def _load_examples(path: Path) -> list[dict[str, Any]]:
 
 
 def _split_by_source_family(
-    rows: list[dict[str, Any]], seed: int
+    rows: list[dict[str, Any]],
+    seed: int,
+    reserved_test_families: set[str] | None = None,
 ) -> tuple[
     list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]
 ]:
@@ -105,14 +107,30 @@ def _split_by_source_family(
         for source_families in label_families.values()
         if len(source_families) == 1
     }
+    reserved_test_families = reserved_test_families or set()
+    unknown_reserved_families = reserved_test_families - set(family_ids)
+    if unknown_reserved_families:
+        raise ValueError(
+            "reserved test families are missing from this dataset: "
+            f"{sorted(unknown_reserved_families)}"
+        )
+    rare_reserved_families = reserved_test_families & rare_label_families
+    if rare_reserved_families:
+        raise ValueError(
+            "reserved test families contain labels unavailable for training: "
+            f"{sorted(rare_reserved_families)}"
+        )
     movable = [
-        family_id for family_id in family_ids if family_id not in rare_label_families
+        family_id
+        for family_id in family_ids
+        if family_id not in rare_label_families
+        and family_id not in reserved_test_families
     ]
     rng = random.Random(seed)
     rng.shuffle(movable)
     eval_count = max(2, round(len(movable) * 0.2))
     eval_count = min(eval_count, max(0, len(movable) - 2))
-    test_ids = set(movable[: eval_count // 2])
+    test_ids = reserved_test_families | set(movable[: eval_count // 2])
     validation_ids = set(movable[eval_count // 2 : eval_count])
     train_ids = set(family_ids) - test_ids - validation_ids
 
@@ -130,6 +148,7 @@ def _split_by_source_family(
     metadata = {
         "seed": seed,
         "split_unit": "DeepSWE repository family",
+        "reserved_test_source_family_ids": sorted(reserved_test_families),
         "train_source_family_ids": sorted(train_ids),
         "validation_source_family_ids": sorted(validation_ids),
         "test_source_family_ids": sorted(test_ids),
@@ -282,6 +301,12 @@ def main() -> int:
         type=Path,
         default=Path(__file__).parent / "artifacts/minilm-root-disposition",
     )
+    parser.add_argument(
+        "--reserved-test-families",
+        type=Path,
+        default=Path(__file__).parent / "adjudication/holdout-families.json",
+        help="JSON file with source_family_ids that must never enter training",
+    )
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--revision", default=DEFAULT_MODEL_REVISION)
     parser.add_argument("--seed", type=int, default=41)
@@ -291,8 +316,13 @@ def main() -> int:
     args = parser.parse_args()
 
     rows = _load_examples(args.dataset)
+    reserved_test_families = set(
+        json.loads(args.reserved_test_families.read_text(encoding="utf-8"))[
+            "source_family_ids"
+        ]
+    )
     train_rows, validation_rows, test_rows, split = _split_by_source_family(
-        rows, args.seed
+        rows, args.seed, reserved_test_families
     )
     labels = sorted({row["labels"]["class"] for row in train_rows})
     label_to_id = {label: index for index, label in enumerate(labels)}

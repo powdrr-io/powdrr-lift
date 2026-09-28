@@ -228,12 +228,15 @@ def validate_normative_assumptions(
             raise BehaviorContractError(
                 f"assumption {dimension} has invalid confidence"
             )
+        resolution = _text(item.get("resolution"), f"assumption {index} resolution")
+        if _is_not_applicable(resolution):
+            raise BehaviorContractError(
+                f"assumption {dimension} cannot resolve to not_applicable"
+            )
         result.append(
             {
                 "dimension": dimension,
-                "resolution": _text(
-                    item.get("resolution"), f"assumption {index} resolution"
-                ),
+                "resolution": resolution,
                 "rationale": _text(
                     item.get("rationale"), f"assumption {index} rationale"
                 ),
@@ -257,6 +260,13 @@ def validate_normative_assumptions(
 
 def _is_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def _is_not_applicable(value: str) -> bool:
+    normalized = value.strip().casefold()
+    return normalized == "not_applicable" or normalized.startswith(
+        ("not_applicable ", "not_applicable-", "not_applicable—", "not_applicable:")
+    )
 
 
 def _text(value: Any, label: str) -> str:

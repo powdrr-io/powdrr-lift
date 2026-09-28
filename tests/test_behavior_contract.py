@@ -141,6 +141,23 @@ def test_behavior_scenario_preserves_normative_assumption_provenance() -> None:
     assert '"basis_reference": "Python ast.literal_eval behavior"' in packet.render()
 
 
+def test_normative_assumption_cannot_claim_not_applicable_as_a_default() -> None:
+    scenario = _scenario()
+    scenario["assumptions"] = [
+        {
+            "dimension": "cancellation_cleanup",
+            "resolution": "not_applicable",
+            "rationale": "The operation is synchronous.",
+            "basis": "conservative_default",
+            "basis_reference": "No cancellation source applies.",
+            "confidence": "high",
+        }
+    ]
+
+    with pytest.raises(BehaviorContractError, match="cannot resolve to not_applicable"):
+        compile_behavior_scenarios((scenario,))
+
+
 def test_non_rejecting_capabilities_do_not_emit_irrelevant_error_values() -> None:
     matrix = validate_capability_matrix(
         [

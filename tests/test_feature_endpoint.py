@@ -255,6 +255,61 @@ def test_normative_defaults_resolve_and_record_each_unresolved_dimension() -> No
     assert "NEEDS CLARIFICATION" not in resolved["then"]
 
 
+def test_normative_defaults_keep_not_applicable_dimensions_out_of_assumptions() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior", "cancellation_cleanup"],
+            "scenario": {
+                "subject": "a synchronous operation",
+                "given": "a valid operation input",
+                "when": "the operation runs",
+                "then": "the operation completes",
+                "dimensions": {
+                    "normal_result": "the operation completes",
+                    "error_behavior": "unresolved by source",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "error_behavior",
+                        "resolution": "Propagate the operation's native error.",
+                        "rationale": "Avoid masking the underlying failure.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    },
+                    {
+                        "dimension": "cancellation_cleanup",
+                        "resolution": "not_applicable",
+                        "rationale": "The operation is synchronous.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No cancellation source applies.",
+                        "confidence": "high",
+                    },
+                ],
+            },
+        },
+    }
+
+    resolved = _merge_behavior_scenario_values(
+        parameters, clarification_policy="normative_defaults"
+    )["behavior_scenario"]
+
+    assert resolved["dimensions"]["error_behavior"] == (
+        "ASSUMED DEFAULT: Propagate the operation's native error."
+    )
+    assert resolved["dimensions"]["cancellation_cleanup"] == "not_applicable"
+    assert [item["dimension"] for item in resolved["assumptions"]] == ["error_behavior"]
+
+
 def test_normative_defaults_fail_closed_if_an_unresolved_dimension_is_uncovered() -> (
     None
 ):

@@ -1884,6 +1884,15 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
     }
 
 
+def _is_not_applicable_resolution(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip().casefold()
+    return normalized == "not_applicable" or normalized.startswith(
+        ("not_applicable ", "not_applicable-", "not_applicable—", "not_applicable:")
+    )
+
+
 def _merge_behavior_scenario_values(
     parameters: Mapping[str, Any],
     *,
@@ -1918,29 +1927,72 @@ def _merge_behavior_scenario_values(
     raw_scenario = dict(raw_scenario)
     assumptions = raw_scenario.get("assumptions", [])
     if status == "needs_clarification" and clarification_policy == "normative_defaults":
+        dimensions = raw_scenario.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise PowdrrExecutionError("behavior scenario has no dimensions")
+        if not all(item in BEHAVIOR_DIMENSIONS for item in unresolved):
+            raise PowdrrExecutionError(
+                "behavior scenario names an unsupported unresolved dimension"
+            )
+        if not isinstance(assumptions, list):
+            raise PowdrrExecutionError("normative assumptions must be a list")
+        not_applicable_dimensions = {
+            str(item.get("dimension"))
+            for item in assumptions
+            if isinstance(item, Mapping)
+            and isinstance(item.get("dimension"), str)
+            and item.get("dimension") in BEHAVIOR_DIMENSIONS
+            and _is_not_applicable_resolution(item.get("resolution"))
+        }
+        concrete_assumption_dimensions = {
+            str(item.get("dimension"))
+            for item in assumptions
+            if isinstance(item, Mapping)
+            and isinstance(item.get("dimension"), str)
+            and item.get("dimension") not in not_applicable_dimensions
+        }
+        not_applicable_dimensions.update(
+            dimension
+            for dimension in unresolved
+            if dimension not in concrete_assumption_dimensions
+            and _is_not_applicable_resolution(dimensions.get(dimension))
+        )
+        effective_unresolved = [
+            dimension
+            for dimension in unresolved
+            if dimension not in not_applicable_dimensions
+        ]
+        effective_assumptions = [
+            item
+            for item in assumptions
+            if not (
+                isinstance(item, Mapping)
+                and item.get("dimension") in not_applicable_dimensions
+            )
+        ]
         try:
             resolved_assumptions = validate_normative_assumptions(
-                assumptions, expected_dimensions=unresolved
+                effective_assumptions, expected_dimensions=effective_unresolved
             )
         except ValueError as error:
             raise PowdrrExecutionError(
                 f"normative defaults did not resolve every clarification: {error}"
             ) from error
-        dimensions = raw_scenario.get("dimensions")
-        if not isinstance(dimensions, Mapping):
-            raise PowdrrExecutionError("behavior scenario has no dimensions")
         resolved_dimensions = dict(dimensions)
+        for dimension in not_applicable_dimensions:
+            resolved_dimensions[dimension] = "not_applicable"
         for assumption in resolved_assumptions:
             resolved_dimensions[assumption["dimension"]] = (
                 "ASSUMED DEFAULT: " + assumption["resolution"]
             )
         raw_scenario["dimensions"] = resolved_dimensions
         raw_scenario["assumptions"] = list(resolved_assumptions)
-        raw_scenario["then"] = (
-            str(raw_scenario.get("then", ""))
-            + " Unspecified behavior was resolved using the recorded "
-            "normative defaults."
-        ).strip()
+        if resolved_assumptions:
+            raw_scenario["then"] = (
+                str(raw_scenario.get("then", ""))
+                + " Unspecified behavior was resolved using the recorded "
+                "normative defaults."
+            ).strip()
         status = "resolved"
     elif status == "needs_clarification" and not allow_clarification:
         raise PowdrrExecutionError(
@@ -1953,8 +2005,26 @@ def _merge_behavior_scenario_values(
             "clarification_policy is 'ask'"
         )
     elif status == "resolved" and clarification_policy == "normative_defaults":
+        if not isinstance(assumptions, list):
+            raise PowdrrExecutionError("normative assumptions must be a list")
+        not_applicable_dimensions = {
+            str(item.get("dimension"))
+            for item in assumptions
+            if isinstance(item, Mapping)
+            and isinstance(item.get("dimension"), str)
+            and item.get("dimension") in BEHAVIOR_DIMENSIONS
+            and _is_not_applicable_resolution(item.get("resolution"))
+        }
+        effective_assumptions = [
+            item
+            for item in assumptions
+            if not (
+                isinstance(item, Mapping)
+                and item.get("dimension") in not_applicable_dimensions
+            )
+        ]
         try:
-            resolved_assumptions = validate_normative_assumptions(assumptions)
+            resolved_assumptions = validate_normative_assumptions(effective_assumptions)
         except ValueError as error:
             raise PowdrrExecutionError(
                 f"normative assumptions are malformed: {error}"
@@ -1962,6 +2032,10 @@ def _merge_behavior_scenario_values(
         dimensions = raw_scenario.get("dimensions")
         if not isinstance(dimensions, Mapping):
             raise PowdrrExecutionError("behavior scenario has no dimensions")
+        resolved_dimensions = dict(dimensions)
+        for dimension in not_applicable_dimensions:
+            if dimension in BEHAVIOR_DIMENSIONS:
+                resolved_dimensions[dimension] = "not_applicable"
         for assumption in resolved_assumptions:
             expected = "ASSUMED DEFAULT: " + assumption["resolution"]
             if dimensions.get(assumption["dimension"]) != expected:
@@ -1969,6 +2043,7 @@ def _merge_behavior_scenario_values(
                     "assumption resolution does not match its behavior dimension"
                 )
         raw_scenario["assumptions"] = list(resolved_assumptions)
+        raw_scenario["dimensions"] = resolved_dimensions
     if status == "needs_clarification":
         if not all(item in BEHAVIOR_DIMENSIONS for item in unresolved):
             raise PowdrrExecutionError(

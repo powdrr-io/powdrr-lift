@@ -114,6 +114,33 @@ def test_behavior_scenario_serializes_capability_evidence_as_json_array() -> Non
     ]
 
 
+def test_behavior_scenario_preserves_normative_assumption_provenance() -> None:
+    scenario = _scenario()
+    scenario["assumptions"] = [
+        {
+            "dimension": "error_behavior",
+            "resolution": "Propagate the parser's native literal error.",
+            "rationale": "Preserves the underlying parser failure without masking it.",
+            "basis": "language_or_framework_default",
+            "basis_reference": "Python ast.literal_eval behavior",
+            "confidence": "medium",
+        }
+    ]
+
+    compiled = compile_behavior_scenarios((scenario,))[0]
+
+    assert compiled.to_data()["assumptions"] == scenario["assumptions"]
+    packet = compile_implementation_packet(
+        objective="parse literal expressions",
+        obligations=("parse supported literal values",),
+        required_tests=({"description": "invalid literal handling"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+    assert '"basis_reference": "Python ast.literal_eval behavior"' in packet.render()
+
+
 def test_non_rejecting_capabilities_do_not_emit_irrelevant_error_values() -> None:
     matrix = validate_capability_matrix(
         [

@@ -10,6 +10,7 @@ description: >-
 inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
+  - {name: clarification_policy, type: string, required: true}
 outputs:
   feature_design:
     type: object
@@ -104,6 +105,19 @@ outputs:
                       behavior: {type: string, enum: [support, reject, fallback]}
                       evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
                       error: {type: string, minLength: 1}
+                assumptions:
+                  type: array
+                  items:
+                    type: object
+                    required: [dimension, resolution, rationale, basis, basis_reference, confidence]
+                    additionalProperties: false
+                    properties:
+                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                      resolution: {type: string, minLength: 1}
+                      rationale: {type: string, minLength: 1}
+                      basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
+                      basis_reference: {type: string, minLength: 1}
+                      confidence: {type: string, enum: [high, medium, low]}
 steps:
   - operation:
       tool: internal
@@ -600,7 +614,18 @@ steps:
                 Return an empty list only when this behavior change has no
                 capability boundary.
               - Do not return selectors, IDs, evidence paths, validator commands, or extra fields; Powdrr binds those from the compiled test contract.
+              - Return scenario.assumptions as an empty list unless clarification_policy is normative_defaults.
             prompt_rules:
+              - when: {binding: clarification_policy, equals: normative_defaults}
+                instructions:
+                  - Keep status as needs_clarification and list every materially applicable dimension the source leaves unresolved; do not pretend an assumption came from the user or source.
+                  - For every unresolved dimension, provide exactly one scenario.assumptions entry with a concrete resolution, rationale, basis, basis_reference, and confidence.
+                  - Prefer evidence in the source and accepted design, then repository conventions only when the supplied context supports them, then an identifiable official standard or ecosystem convention, then an established language or framework default, and finally a conservative interoperable default.
+                  - Never fabricate a normative citation. If no identifiable source is available, use conservative_default and state that no specific normative source was identified in basis_reference.
+                  - State confidence honestly; low confidence is allowed but must still choose a concrete, conservative default for the benchmark run.
+              - when: {binding: clarification_policy, equals: ask}
+                instructions:
+                  - Do not resolve uncertainty with assumptions. Leave scenario.assumptions empty and report materially unresolved dimensions for human clarification.
               - when: {binding: partial_semantic_design.partial_contract.disposition, equals: context}
                 instructions:
                   - This clause is background context only and must not create an implementation obligation.
@@ -611,7 +636,7 @@ steps:
                   - This clause is delivery-process metadata only and must not create a product obligation.
                   - Return status resolved, list no unresolved dimensions, and set every dimension to "not_applicable (process metadata only)".
                   - Set given to "The delivery instruction is recorded", when to "The feature design is compiled", and then to "No product implementation obligation is generated".
-            context: [instruction_clause, atomic_instruction_ledger, partial_semantic_design, source_faithfulness]
+            context: [instruction_clause, atomic_instruction_ledger, partial_semantic_design, source_faithfulness, clarification_policy]
             output:
               name: behavior_scenario_result
               schema:
@@ -644,6 +669,19 @@ steps:
                           cancellation_cleanup: {type: string, minLength: 1}
                           compatibility: {type: string, minLength: 1}
                           negative_boundaries: {type: string, minLength: 1}
+                      assumptions:
+                        type: array
+                        items:
+                          type: object
+                          required: [dimension, resolution, rationale, basis, basis_reference, confidence]
+                          additionalProperties: false
+                          properties:
+                            dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                            resolution: {type: string, minLength: 1}
+                            rationale: {type: string, minLength: 1}
+                            basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
+                            basis_reference: {type: string, minLength: 1}
+                            confidence: {type: string, enum: [high, medium, low]}
                       capability_matrix:
                         type: array
                         items:

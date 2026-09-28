@@ -1424,6 +1424,15 @@ def build_parser() -> argparse.ArgumentParser:
     workrr_feature_parser.add_argument("--planning-api-key")
     workrr_feature_parser.add_argument("--planning-base-url")
     workrr_feature_parser.add_argument("--task-id")
+    workrr_feature_parser.add_argument(
+        "--clarification-policy",
+        choices=("ask", "normative_defaults"),
+        default="ask",
+        help=(
+            "Resolve underspecified behavior by asking (default), or use explicit "
+            "recorded normative defaults for unattended runs."
+        ),
+    )
     workrr_feature_parser.add_argument("--output-root", type=Path)
     workrr_feature_parser.add_argument(
         "--no-open-pr",
@@ -1445,6 +1454,15 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument("--work-item-name", required=True)
     harbor_feature_parser.add_argument(
         "--task-id", help="Stable benchmark/task identifier propagated to run metadata."
+    )
+    harbor_feature_parser.add_argument(
+        "--clarification-policy",
+        choices=("ask", "normative_defaults"),
+        default="ask",
+        help=(
+            "Resolve underspecified behavior by asking (default), or use explicit "
+            "recorded normative defaults for unattended benchmark runs."
+        ),
     )
     harbor_feature_parser.add_argument("--repo-root", type=Path)
     harbor_feature_parser.add_argument(
@@ -4622,6 +4640,7 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             open_pr=not args.no_open_pr,
             planning_client=planning_client,
             task_id=args.task_id or args.work_item_name,
+            clarification_policy=args.clarification_policy,
         )
     )
     if args.json:
@@ -4685,6 +4704,7 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             task_id=args.task_id or args.work_item_name,
             design_only=args.design_only,
             capture_worker_prompts_only=args.capture_worker_prompts_only,
+            clarification_policy=args.clarification_policy,
         )
     )
     if args.json:

@@ -8,7 +8,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
-from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
+from powdrr_lift.core.behavior_contract import (
+    BEHAVIOR_DIMENSIONS,
+    compile_behavior_scenarios,
+    validate_normative_assumptions,
+)
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.feature_obligation import (
     SEMANTIC_KINDS,
@@ -906,6 +910,11 @@ class FeatureCommandRuntime:
         def merge_behavior_scenario_operation() -> Any:
             return _merge_behavior_scenario_values(
                 parameters,
+                clarification_policy=(
+                    getattr(config, "clarification_policy", "ask")
+                    if config is not None
+                    else "ask"
+                ),
                 allow_clarification=bool(
                     config is not None
                     and (
@@ -1342,6 +1351,27 @@ class FeatureCommandRuntime:
                 json.dumps(canonical_document, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            normative_assumptions = [
+                {"clause_id": clause_id, **dict(assumption)}
+                for clause_id, scenario in scenarios_by_clause_id.items()
+                if isinstance(scenario, Mapping)
+                for assumption in scenario.get("assumptions", ())
+                if isinstance(assumption, Mapping)
+            ]
+            assumptions_path = output_root / "normative-assumptions.json"
+            assumptions_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "normative-assumptions-v1",
+                        "policy": getattr(config, "clarification_policy", "ask"),
+                        "assumptions": normative_assumptions,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             compatibility_packets = {
                 "packets": [
                     {
@@ -1365,6 +1395,7 @@ class FeatureCommandRuntime:
             )
             state["canonical_feature_design_path"] = path
             state["feature_obligations_path"] = path
+            state["normative_assumptions_path"] = assumptions_path
             return {
                 "path": str(path),
                 "fingerprint": content_fingerprint(canonical_document),
@@ -1854,9 +1885,16 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
 
 
 def _merge_behavior_scenario_values(
-    parameters: Mapping[str, Any], *, allow_clarification: bool = False
+    parameters: Mapping[str, Any],
+    *,
+    allow_clarification: bool = False,
+    clarification_policy: str = "ask",
 ) -> dict[str, Any]:
-    """Bind a resolved scenario, or a visibly provisional design-only draft."""
+    """Bind a resolved scenario, a provisional draft, or recorded defaults."""
+    if clarification_policy not in {"ask", "normative_defaults"}:
+        raise PowdrrExecutionError(
+            "clarification_policy must be 'ask' or 'normative_defaults'"
+        )
     clause = parameters.get("clause")
     design = parameters.get("design")
     result = parameters.get("scenario")
@@ -1877,14 +1915,61 @@ def _merge_behavior_scenario_values(
         raise PowdrrExecutionError(
             "behavior scenario status conflicts with unresolved_dimensions"
         )
-    if status == "needs_clarification" and not allow_clarification:
+    raw_scenario = dict(raw_scenario)
+    assumptions = raw_scenario.get("assumptions", [])
+    if status == "needs_clarification" and clarification_policy == "normative_defaults":
+        try:
+            resolved_assumptions = validate_normative_assumptions(
+                assumptions, expected_dimensions=unresolved
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"normative defaults did not resolve every clarification: {error}"
+            ) from error
+        dimensions = raw_scenario.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise PowdrrExecutionError("behavior scenario has no dimensions")
+        resolved_dimensions = dict(dimensions)
+        for assumption in resolved_assumptions:
+            resolved_dimensions[assumption["dimension"]] = (
+                "ASSUMED DEFAULT: " + assumption["resolution"]
+            )
+        raw_scenario["dimensions"] = resolved_dimensions
+        raw_scenario["assumptions"] = list(resolved_assumptions)
+        raw_scenario["then"] = (
+            str(raw_scenario.get("then", ""))
+            + " Unspecified behavior was resolved using the recorded "
+            "normative defaults."
+        ).strip()
+        status = "resolved"
+    elif status == "needs_clarification" and not allow_clarification:
         raise PowdrrExecutionError(
             "behavior scenario needs clarification before implementation: "
             + ", ".join(str(item) for item in unresolved)
         )
+    elif assumptions and clarification_policy != "normative_defaults":
+        raise PowdrrExecutionError(
+            "behavior scenario contains normative assumptions, but "
+            "clarification_policy is 'ask'"
+        )
+    elif status == "resolved" and clarification_policy == "normative_defaults":
+        try:
+            resolved_assumptions = validate_normative_assumptions(assumptions)
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"normative assumptions are malformed: {error}"
+            ) from error
+        dimensions = raw_scenario.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise PowdrrExecutionError("behavior scenario has no dimensions")
+        for assumption in resolved_assumptions:
+            expected = "ASSUMED DEFAULT: " + assumption["resolution"]
+            if dimensions.get(assumption["dimension"]) != expected:
+                raise PowdrrExecutionError(
+                    "assumption resolution does not match its behavior dimension"
+                )
+        raw_scenario["assumptions"] = list(resolved_assumptions)
     if status == "needs_clarification":
-        from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
-
         if not all(item in BEHAVIOR_DIMENSIONS for item in unresolved):
             raise PowdrrExecutionError(
                 "behavior scenario names an unsupported unresolved dimension"

@@ -16,6 +16,15 @@ BEHAVIOR_DIMENSIONS = (
     "compatibility",
     "negative_boundaries",
 )
+ASSUMPTION_BASES = frozenset(
+    {
+        "repository_convention",
+        "industry_standard",
+        "ecosystem_convention",
+        "language_or_framework_default",
+        "conservative_default",
+    }
+)
 
 
 class BehaviorContractError(ValueError):
@@ -35,10 +44,11 @@ class BehaviorScenario:
     evidence: tuple[str, ...]
     validator: str
     capability_matrix: tuple[Mapping[str, Any], ...] = ()
+    assumptions: tuple[Mapping[str, str], ...] = ()
     schema_version: str = "behavior-scenario-v1"
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data = {
             "schema_version": self.schema_version,
             "scenario_id": self.scenario_id,
             "subject": self.subject,
@@ -53,6 +63,9 @@ class BehaviorScenario:
                 for item in self.capability_matrix
             ],
         }
+        if self.assumptions:
+            data["assumptions"] = [dict(item) for item in self.assumptions]
+        return data
 
 
 def compile_behavior_scenarios(
@@ -106,6 +119,7 @@ def compile_behavior_scenarios(
         capabilities = (
             validate_capability_matrix(raw_capabilities) if raw_capabilities else ()
         )
+        assumptions = validate_normative_assumptions(item.get("assumptions", []))
         scenarios.append(
             BehaviorScenario(
                 scenario_id=scenario_id,
@@ -117,6 +131,7 @@ def compile_behavior_scenarios(
                 evidence=evidence,
                 validator=validator,
                 capability_matrix=capabilities,
+                assumptions=assumptions,
             )
         )
     return tuple(scenarios)
@@ -141,6 +156,7 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                     "capability_matrix": [
                         dict(value) for value in item.capability_matrix
                     ],
+                    "assumptions": [dict(value) for value in item.assumptions],
                 },
                 sort_keys=True,
                 ensure_ascii=False,
@@ -185,6 +201,60 @@ def validate_capability_matrix(
     return tuple(result)
 
 
+def validate_normative_assumptions(
+    raw: Any, *, expected_dimensions: Sequence[str] | None = None
+) -> tuple[dict[str, str], ...]:
+    """Validate explicit, auditable defaults used to resolve ambiguity."""
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        raise BehaviorContractError("assumptions must be a list")
+    result: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, Mapping):
+            raise BehaviorContractError(f"assumption {index} must be an object")
+        dimension = _text(item.get("dimension"), f"assumption {index} dimension")
+        if dimension not in BEHAVIOR_DIMENSIONS:
+            raise BehaviorContractError(
+                f"assumption {index} names unsupported dimension {dimension!r}"
+            )
+        if dimension in seen:
+            raise BehaviorContractError(f"duplicate assumption for {dimension}")
+        seen.add(dimension)
+        basis = _text(item.get("basis"), f"assumption {index} basis")
+        if basis not in ASSUMPTION_BASES:
+            raise BehaviorContractError(f"assumption {dimension} has invalid basis")
+        confidence = _text(item.get("confidence"), f"assumption {index} confidence")
+        if confidence not in {"high", "medium", "low"}:
+            raise BehaviorContractError(
+                f"assumption {dimension} has invalid confidence"
+            )
+        result.append(
+            {
+                "dimension": dimension,
+                "resolution": _text(
+                    item.get("resolution"), f"assumption {index} resolution"
+                ),
+                "rationale": _text(
+                    item.get("rationale"), f"assumption {index} rationale"
+                ),
+                "basis": basis,
+                "basis_reference": _text(
+                    item.get("basis_reference"), f"assumption {index} basis_reference"
+                ),
+                "confidence": confidence,
+            }
+        )
+    if expected_dimensions is not None and seen != set(expected_dimensions):
+        missing = sorted(set(expected_dimensions) - seen)
+        extra = sorted(seen - set(expected_dimensions))
+        raise BehaviorContractError(
+            "assumptions must cover every unresolved dimension exactly once"
+            + (f"; missing: {', '.join(missing)}" if missing else "")
+            + (f"; unexpected: {', '.join(extra)}" if extra else "")
+        )
+    return tuple(result)
+
+
 def _is_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
@@ -206,9 +276,11 @@ def _texts(value: Any, label: str) -> tuple[str, ...]:
 
 __all__ = [
     "BEHAVIOR_DIMENSIONS",
+    "ASSUMPTION_BASES",
     "BehaviorContractError",
     "BehaviorScenario",
     "compile_behavior_scenarios",
     "render_behavior_matrix",
     "validate_capability_matrix",
+    "validate_normative_assumptions",
 ]

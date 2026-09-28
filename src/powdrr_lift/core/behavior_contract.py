@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -138,35 +137,83 @@ def compile_behavior_scenarios(
 
 
 def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
-    """Render the behavior contract once, without duplicate prose sections."""
-    rows = []
-    for item in scenarios:
-        rows.append(
-            "- "
-            + json.dumps(
-                {
-                    "scenario": item.scenario_id,
-                    "subject": item.subject,
-                    "given": item.given,
-                    "when": item.when,
-                    "then": item.then,
-                    **item.dimensions,
-                    "validator": item.validator,
-                    "evidence": list(item.evidence),
-                    "capability_matrix": [
-                        dict(value) for value in item.capability_matrix
-                    ],
-                    "assumptions": [dict(value) for value in item.assumptions],
-                },
-                sort_keys=True,
-                ensure_ascii=False,
+    """Turn typed scenarios into concrete checks for a coding worker.
+
+    Provenance and applicability markers remain in the serialized packet. The
+    worker needs observable behavior and meaningful boundaries, in reading
+    order, rather than a JSON dump of the entire contract schema.
+    """
+    lines = [
+        "Required behavior checks:",
+        "Implement every numbered case and add focused tests for its observable "
+        "result and boundaries. Inspect the repository for every execution "
+        "path that supports the behavior (for example, synchronous and "
+        "asynchronous engines) and test each applicable path. Include "
+        "integrations and inactive or empty states when a case calls for them.",
+        "",
+    ]
+    labels = {
+        "normal_result": "Result details",
+        "error_behavior": "Errors",
+        "continuation": "Afterward",
+        "unsupported_behavior": "Unsupported cases",
+        "cancellation_cleanup": "Cleanup",
+        "compatibility": "Existing behavior",
+        "negative_boundaries": "Boundary",
+    }
+    for index, item in enumerate(scenarios, start=1):
+        lines.extend(
+            (
+                f"{index}. {item.subject} [{item.scenario_id}]",
+                f"   Given: {_worker_text(item.given)}",
+                f"   When: {item.when}",
+                f"   Expect: {_worker_text(item.then)}",
             )
         )
-    return (
-        "Behavior contract matrix (implement and verify each row exactly once):\n"
-        + "\n".join(rows)
-        + "\nRun the focused required tests after implementation."
+        for name in BEHAVIOR_DIMENSIONS:
+            value = item.dimensions[name]
+            if isinstance(value, str) and _is_not_applicable(value):
+                continue
+            detail = _worker_text(value)
+            if name == "normal_result" and _repeats_expectation(detail, item.then):
+                continue
+            lines.append(f"   {labels[name]}: {detail}")
+        for assumption in item.assumptions:
+            resolution = assumption["resolution"]
+            dimension = assumption["dimension"]
+            if (
+                resolution.casefold()
+                not in _worker_text(item.dimensions[dimension]).casefold()
+            ):
+                lines.append(
+                    f"   Default for {labels[dimension].lower()}: {resolution}"
+                )
+        for capability in item.capability_matrix:
+            detail = f"{capability['behavior']} {capability['capability']}"
+            if capability["behavior"] == "reject":
+                detail += f" with {capability['error']}"
+            lines.append(f"   Capability: {detail}")
+        lines.append("")
+    lines.append(
+        "Run the focused required tests after implementation. Check every "
+        "applicable execution path before claiming the feature is complete."
     )
+    return "\n".join(lines)
+
+
+def _worker_text(value: Any) -> str:
+    """Render structured outcomes as readable prose without schema syntax."""
+    if isinstance(value, Mapping):
+        return "; ".join(f"{key}: {_worker_text(item)}" for key, item in value.items())
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return "; ".join(_worker_text(item) for item in value)
+    return str(value)
+
+
+def _repeats_expectation(detail: str, expectation: Any) -> bool:
+    expected = _worker_text(expectation).strip().casefold().rstrip(".")
+    actual = detail.strip().casefold().rstrip(".")
+    return actual == expected or actual in expected
 
 
 def validate_capability_matrix(

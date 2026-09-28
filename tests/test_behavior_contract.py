@@ -36,7 +36,7 @@ def _scenario() -> dict[str, Any]:
     }
 
 
-def test_behavior_scenario_is_rendered_once_as_a_behavior_matrix() -> None:
+def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     scenario = _scenario()
     scenario["dimensions"] = {
         **scenario["dimensions"],
@@ -53,8 +53,15 @@ def test_behavior_scenario_is_rendered_once_as_a_behavior_matrix() -> None:
     )
     rendered = packet.render()
     assert rendered.count("nested-error-continues") == 1
-    assert '"nested_errors": "preserve locations"' in rendered
-    assert "Required behavioral tests:" not in rendered
+    assert "Given: result: nested error with source location" in rendered
+    assert "When: process this record followed by a valid record" in rendered
+    assert (
+        "Expect: errors: preserved with location; later_record: processed" in rendered
+    )
+    assert "Errors: nested_errors: preserve locations" in rendered
+    assert "Afterward: later_records: continue" in rendered
+    assert "not_applicable" not in rendered
+    assert '"scenario"' not in rendered
     restored = type(packet).from_data(packet.to_data())
     assert restored.render() == rendered
 
@@ -138,7 +145,44 @@ def test_behavior_scenario_preserves_normative_assumption_provenance() -> None:
         validation_profiles=("pytest",),
         behavior_scenarios=(scenario,),
     )
-    assert '"basis_reference": "Python ast.literal_eval behavior"' in packet.render()
+    assert packet.behavior_scenarios[0].assumptions[0]["basis_reference"] == (
+        "Python ast.literal_eval behavior"
+    )
+    assert "Default for errors: Propagate the parser's native literal error." in (
+        packet.render()
+    )
+
+
+def test_worker_check_includes_meaningful_boundaries_and_execution_paths() -> None:
+    scenario = _scenario()
+    scenario["dimensions"] = {
+        **scenario["dimensions"],
+        "normal_result": "The later record is processed.",
+        "negative_boundaries": "An invalid record does not abort the batch.",
+    }
+    scenario["capability_matrix"] = [
+        {
+            "capability": "invalid records",
+            "behavior": "reject",
+            "error": "InvalidRecord",
+            "evidence": ["test invalid input"],
+        }
+    ]
+    packet = compile_implementation_packet(
+        objective="process records",
+        obligations=("process records",),
+        required_tests=({"description": "process records"},),
+        allowed_paths=("src/",),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+    assert "synchronous and asynchronous engines" in rendered
+    assert "Result details: The later record is processed." in rendered
+    assert "Boundary: An invalid record does not abort the batch." in rendered
+    assert "Capability: reject invalid records with InvalidRecord" in rendered
+    assert "Check every applicable execution path" in rendered
 
 
 def test_normative_assumption_cannot_claim_not_applicable_as_a_default() -> None:

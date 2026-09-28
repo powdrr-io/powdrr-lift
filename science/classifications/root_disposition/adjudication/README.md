@@ -1,10 +1,10 @@
 # Root disposition double-label batch
 
-This is a **human annotation packet**, not a completed gold set. Two independent
-reviewers must label the same 125 examples. The packet is stratified by the
-existing LLM label and sampled only from the pilot model's three held-out
-repository families. That keeps the batch useful for evaluating the pilot
-without putting its source repositories into training.
+This is a **human annotation packet**, not a completed gold set. Annotator A
+provided the first human review; annotator B is the assistant-model second
+review requested for this pilot. The packet is stratified by the existing LLM
+label and sampled only from the pilot model's three held-out repository
+families.
 
 ## Reviewer instructions
 
@@ -77,15 +77,19 @@ classify its polarity, strength, quantifier, or implementation details here.
 When both sheets are complete, run the comparison utility:
 
 ```bash
-uv run python science/classifications/root_disposition/adjudication/compare_reviews.py
+uv run python science/classifications/root_disposition/adjudication/compare_reviews.py \
+  --reviewer-b-kind assistant_model
 ```
 
 It validates both sheets, reports raw agreement and Cohen's kappa, fills
 `adjudication.jsonl` for resolved labels where both reviewers agree, and writes
 `adjudication-worklist.jsonl` for every disagreement or `unresolved` response.
-A third reviewer should resolve each worklist item and record the final label,
+An adjudicator should resolve each worklist item and record the final label,
 reason if unresolved, rationale, and their reviewer ID in both the worklist and
-`adjudication.jsonl`. Do not overwrite the original reviewer answers. The
+`adjudication.jsonl`. Agreement from an assistant-model reviewer does not
+complete the gold set; the report keeps `gold_set_complete` false. Items with a
+`NONBLIND` annotator-B note also remain in the worklist when labels agree. Do
+not overwrite the original reviewer answers. The
 `selection_key.jsonl` maps opaque review IDs to source rows and prior teacher
 labels; keep it with the coordinator and do not give it to reviewers.
 

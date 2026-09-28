@@ -1,0 +1,226 @@
+{
+  "agreements": 51,
+  "cohen_kappa": 0.3219469286028442,
+  "confusion_matrix": {
+    "context": {
+      "context": 0,
+      "entity": 1,
+      "feature": 0,
+      "formatting_artifact": 0,
+      "guidance": 0,
+      "interface": 0,
+      "invariant": 2,
+      "non_goal": 0,
+      "nonactionable": 0,
+      "unresolved": 0
+    },
+    "entity": {
+      "context": 0,
+      "entity": 2,
+      "feature": 0,
+      "formatting_artifact": 0,
+      "guidance": 0,
+      "interface": 8,
+      "invariant": 1,
+      "non_goal": 0,
+      "nonactionable": 0,
+      "unresolved": 0
+    },
+    "feature": {
+      "context": 0,
+      "entity": 4,
+      "feature": 4,
+      "formatting_artifact": 2,
+      "guidance": 0,
+      "interface": 10,
+      "invariant": 20,
+      "non_goal": 0,
+      "nonactionable": 0,
+      "unresolved": 0
+    },
+    "formatting_artifact": {
+      "context": 0,
+      "entity": 0,
+      "feature": 0,
+      "formatting_artifact": 9,
+      "guidance": 0,
+      "interface": 0,
+      "invariant": 0,
+      "non_goal": 0,
+      "nonactionable": 0,
+      "unresolved": 0
+    },
+    "guidance": {
+      "context": 0,
+      "entity": 0,
+      "feature": 1,
+      "formatting_artifact": 1,
+      "guidance": 0,
+      "interface": 0,
+      "invariant": 12,
+      "non_goal": 0,
+      "nonactionable": 0,
+      "unresolved": 1
+    },
+    "interface": {
+      "context": 0,
+      "entity": 1,
+      "feature": 2,
+      "formatting_artifact": 0,
+      "guidance": 0,
+      "interface": 22,
+      "invariant": 0,
+      "non_goal": 0,
+      "nonactionable": 0,
+      "unresolved": 0
+    },
+    "invariant": {
+      "context": 0,
+      "entity": 1,
+      "feature": 1,
+      "formatting_artifact": 0,
+      "guidance": 0,
+      "interface": 1,
+      "invariant": 3,
+      "non_goal": 1,
+      "nonactionable": 0,
+      "unresolved": 1
+    },
+    "non_goal": {
+      "context": 0,
+      "entity": 0,
+      "feature": 0,
+      "formatting_artifact": 0,
+      "guidance": 0,
+      "interface": 0,
+      "invariant": 0,
+      "non_goal": 2,
+      "nonactionable": 0,
+      "unresolved": 0
+    },
+    "nonactionable": {
+      "context": 0,
+      "entity": 0,
+      "feature": 0,
+      "formatting_artifact": 0,
+      "guidance": 0,
+      "interface": 0,
+      "invariant": 0,
+      "non_goal": 0,
+      "nonactionable": 6,
+      "unresolved": 1
+    },
+    "unresolved": {
+      "context": 0,
+      "entity": 0,
+      "feature": 1,
+      "formatting_artifact": 1,
+      "guidance": 0,
+      "interface": 0,
+      "invariant": 0,
+      "non_goal": 0,
+      "nonactionable": 0,
+      "unresolved": 3
+    }
+  },
+  "gold_set_complete": false,
+  "item_count": 125,
+  "label_marginals": {
+    "context": {
+      "reviewer_a": 3,
+      "reviewer_b": 0
+    },
+    "entity": {
+      "reviewer_a": 11,
+      "reviewer_b": 9
+    },
+    "feature": {
+      "reviewer_a": 40,
+      "reviewer_b": 9
+    },
+    "formatting_artifact": {
+      "reviewer_a": 9,
+      "reviewer_b": 13
+    },
+    "guidance": {
+      "reviewer_a": 15,
+      "reviewer_b": 0
+    },
+    "interface": {
+      "reviewer_a": 25,
+      "reviewer_b": 41
+    },
+    "invariant": {
+      "reviewer_a": 8,
+      "reviewer_b": 38
+    },
+    "non_goal": {
+      "reviewer_a": 2,
+      "reviewer_b": 3
+    },
+    "nonactionable": {
+      "reviewer_a": 7,
+      "reviewer_b": 6
+    },
+    "unresolved": {
+      "reviewer_a": 5,
+      "reviewer_b": 6
+    }
+  },
+  "needs_adjudication": 81,
+  "raw_agreement": 0.408,
+  "reviewer_a_agreement_by_label": {
+    "context": {
+      "agreement_rate": 0.0,
+      "agreements": 0,
+      "items": 3
+    },
+    "entity": {
+      "agreement_rate": 0.18181818181818182,
+      "agreements": 2,
+      "items": 11
+    },
+    "feature": {
+      "agreement_rate": 0.1,
+      "agreements": 4,
+      "items": 40
+    },
+    "formatting_artifact": {
+      "agreement_rate": 1.0,
+      "agreements": 9,
+      "items": 9
+    },
+    "guidance": {
+      "agreement_rate": 0.0,
+      "agreements": 0,
+      "items": 15
+    },
+    "interface": {
+      "agreement_rate": 0.88,
+      "agreements": 22,
+      "items": 25
+    },
+    "invariant": {
+      "agreement_rate": 0.375,
+      "agreements": 3,
+      "items": 8
+    },
+    "non_goal": {
+      "agreement_rate": 1.0,
+      "agreements": 2,
+      "items": 2
+    },
+    "nonactionable": {
+      "agreement_rate": 0.8571428571428571,
+      "agreements": 6,
+      "items": 7
+    },
+    "unresolved": {
+      "agreement_rate": 0.6,
+      "agreements": 3,
+      "items": 5
+    }
+  },
+  "reviewer_b_kind": "assistant_model",
+  "schema_version": "root-disposition-interannotator-report-v2"
+}

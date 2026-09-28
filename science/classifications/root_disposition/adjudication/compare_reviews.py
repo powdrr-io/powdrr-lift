@@ -102,6 +102,12 @@ def main() -> int:
         default=ROOT
         / "science/classifications/root_disposition/data/root_disposition.jsonl",
     )
+    parser.add_argument(
+        "--reviewer-b-kind",
+        choices=("human", "assistant_model"),
+        default="human",
+        help="Record whether annotator B is a human reviewer or assistant model.",
+    )
     args = parser.parse_args()
 
     key_rows = _read_jsonl(args.batch_dir / "selection_key.jsonl")
@@ -158,9 +164,15 @@ def main() -> int:
         if label_a == label_b:
             agreements += 1
             per_label[label_a]["agreements"] += 1
-        needs_adjudication = (
-            label_a != label_b or label_a == "unresolved" or label_b == "unresolved"
-        )
+        reviewer_b_not_blind = "NONBLIND:" in (right.get("notes") or "")
+        review_reasons = []
+        if label_a != label_b:
+            review_reasons.append("reviewer_disagreement")
+        if label_a == "unresolved" or label_b == "unresolved":
+            review_reasons.append("unresolved_label")
+        if reviewer_b_not_blind:
+            review_reasons.append("reviewer_b_not_blind")
+        needs_adjudication = bool(review_reasons)
         final_label = label_a if not needs_adjudication else None
         adjudication_rows.append(
             {
@@ -195,18 +207,20 @@ def main() -> int:
                     "unresolved_reason": None,
                     "rationale": None,
                     "adjudicator": None,
+                    "review_reasons": review_reasons,
                 }
             )
 
     total = len(expected_ids)
     report = {
-        "schema_version": "root-disposition-interannotator-report-v1",
+        "schema_version": "root-disposition-interannotator-report-v2",
+        "reviewer_b_kind": args.reviewer_b_kind,
         "item_count": total,
         "agreements": agreements,
         "raw_agreement": agreements / total if total else None,
         "cohen_kappa": _cohen_kappa(counts_a, counts_b, total, agreements),
         "needs_adjudication": len(worklist),
-        "gold_set_complete": not worklist,
+        "gold_set_complete": not worklist and args.reviewer_b_kind == "human",
         "label_marginals": {
             label: {"reviewer_a": counts_a[label], "reviewer_b": counts_b[label]}
             for label in LABELS

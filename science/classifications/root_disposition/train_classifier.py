@@ -22,6 +22,8 @@ from transformers import (
     TrainingArguments,
 )
 
+from powdrr_lift.core.classifier_input import format_classifier_input
+
 DEFAULT_MODEL = "microsoft/MiniLM-L12-H384-uncased"
 DEFAULT_MODEL_REVISION = "44acabbec0ef496f6dbc93adadea57f376b7c0ec"
 
@@ -36,7 +38,13 @@ class ClauseDataset(Dataset[dict[str, torch.Tensor]]):
     ) -> None:
         self.rows = rows
         self.encodings = tokenizer(
-            [row["inputs"]["proposition"] for row in rows],
+            [
+                format_classifier_input(
+                    row["inputs"]["proposition"],
+                    row["inputs"].get("local_context"),
+                )
+                for row in rows
+            ],
             truncation=True,
             padding=True,
             max_length=max_length,

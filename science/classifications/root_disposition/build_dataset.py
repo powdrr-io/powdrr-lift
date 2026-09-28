@@ -20,6 +20,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.core.instruction_context import (
+    context_retry_reason,
+    local_instruction_context,
+)
 from powdrr_lift.core.instruction_ledger import (
     apply_atomicity_decisions,
     compile_instruction_ledger,
@@ -249,6 +253,7 @@ def _label_task(
     atomic_ledger = apply_atomicity_decisions(ledger, atomicity)
 
     root_records = []
+    source_clauses = ledger.to_data()["clauses"]
     for clause in atomic_ledger.clauses:
         clause_data = clause.to_data()
         request_plan = prepare_source_semantic_decisions(clause_data)
@@ -279,6 +284,61 @@ def _label_task(
             context_value=request,
             schema=_json_schema_for_root(),
         )
+        initial_response = response
+        context_reason = context_retry_reason(initial_response)
+        local_context = (
+            local_instruction_context(instruction, source_clauses, clause_data)
+            if context_reason is not None
+            else None
+        )
+        context_refinement: dict[str, Any] = {
+            "needs_context": context_reason is not None,
+            "status": "not_triggered",
+            "trigger_reason": context_reason,
+            "context_level": "proposition_only",
+            "local_context": None,
+            "initial_teacher_response": initial_response,
+            "teacher_response": None,
+        }
+        if context_reason is not None and local_context is None:
+            context_refinement["status"] = "context_unavailable"
+        elif context_reason is not None:
+            context_retry_instructions = [
+                *root_instructions,
+                "This is a context-assisted retry after an initial "
+                "source_underspecified or source_ambiguous result.",
+                "Use the local source context only to resolve references or "
+                "recover the meaning of this proposition.",
+                "Do not import additional requirements from neighboring "
+                "sentences. If this proposition remains unclear, return unresolved.",
+            ]
+            retry_response = _call_judge(
+                client,
+                question=(
+                    "Re-evaluate the same proposition using its local source "
+                    "context. What disposition does it support?"
+                ),
+                instructions=context_retry_instructions,
+                context_name="context_assisted_root_decision_request",
+                context_value={
+                    "request": request,
+                    "local_source_context": local_context,
+                },
+                schema=_json_schema_for_root(),
+            )
+            response = retry_response
+            context_refinement.update(
+                {
+                    "status": (
+                        "resolved_with_context"
+                        if retry_response["status"] == "resolved"
+                        else "unresolved_after_context"
+                    ),
+                    "context_level": "containing_and_adjacent_sentences",
+                    "local_context": local_context,
+                    "teacher_response": retry_response,
+                }
+            )
         bound = bind_source_semantic_decisions(
             resolved_decisions=request_plan["resolved_decisions"],
             pending_specs=[request],
@@ -292,6 +352,7 @@ def _label_task(
                 "spec": request["spec"],
                 "teacher_response": response,
                 "confidence": None,
+                "context_refinement": context_refinement,
             }
         )
     return {
@@ -331,6 +392,21 @@ def _example(task_run: Mapping[str, Any], record: Mapping[str, Any]) -> dict[str
         "inputs": {
             "proposition": proposition,
             "parent_context": clause.get("parent_clause_id"),
+            "local_context": record.get("context_refinement", {}).get("local_context"),
+            "context_level": record.get("context_refinement", {}).get(
+                "context_level", "proposition_only"
+            ),
+            "context_refinement": {
+                "needs_context": record.get("context_refinement", {}).get(
+                    "needs_context"
+                ),
+                "status": record.get("context_refinement", {}).get(
+                    "status", "not_recorded"
+                ),
+                "trigger_reason": record.get("context_refinement", {}).get(
+                    "trigger_reason"
+                ),
+            },
             "left_text": None,
             "right_text": None,
             "candidate_evidence": None,

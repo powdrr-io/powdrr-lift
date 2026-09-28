@@ -184,8 +184,9 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
     lines = [
         "Required behavior checks:",
         "For Include and IncludeProhibition routes, implement the listed "
-        "behavior. For Unclear routes, resolve the route review below before "
-        "treating the candidate behavior as required. First trace the affected "
+        "behavior. For Unclear routes, review repository evidence, then make "
+        "a best-supported conservative choice and continue even if uncertainty "
+        "remains. First trace the affected "
         "code paths, including synchronous and asynchronous implementations "
         "and named integrations. Add focused tests for accepted cases and "
         "applicable paths. Run the tests before reporting completion.",
@@ -234,11 +235,13 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                 "",
                 "Headless route review before implementation:",
                 "Inspect repository code, tests, and documentation for evidence "
-                "that resolves each unclear source route. Treat the extracted "
-                "behavior below as a candidate, not an accepted requirement. "
-                "Implement it only if repository evidence supports Include or "
-                "IncludeProhibition; otherwise exclude it. If evidence remains "
-                "insufficient, stop and report the clause as unresolved.",
+                "that informs each unclear source route. Treat the extracted "
+                "behavior below as a candidate. If repository evidence resolves "
+                "the route, follow it. If evidence remains insufficient, choose "
+                "the most conservative, backward-compatible interpretation "
+                "supported by the candidate and surrounding code, record that "
+                "assumption, and continue the benchmark task. Do not stop or "
+                "leave the task incomplete because the route remains unclear.",
             )
         )
         for item in unclear_scenarios:

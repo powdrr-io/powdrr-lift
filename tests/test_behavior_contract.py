@@ -92,6 +92,25 @@ def test_worker_prompt_preserves_joint_validation_groups() -> None:
     assert "status-200, contains-account-id" in rendered
 
 
+def test_unclear_routes_continue_with_conservative_headless_assumption() -> None:
+    scenario = _scenario()
+    scenario["routing"] = "unclear"
+    packet = compile_implementation_packet(
+        objective="implement the benchmark task",
+        obligations=("candidate behavior",),
+        required_tests=({"description": "candidate behavior"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+    assert "best-supported conservative choice" in rendered
+    assert "continue even if uncertainty remains" in rendered
+    assert "record that assumption" in rendered
+    assert "Do not stop or leave the task incomplete" in rendered
+
+
 def test_behavior_scenario_rejects_an_omitted_dimension() -> None:
     scenario = _scenario()
     scenario["dimensions"] = {"normal_result": "not_applicable"}

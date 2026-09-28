@@ -666,9 +666,9 @@ steps:
                   - Set given to "The source clause is excluded", when to "The feature design is compiled", and then to "No implementation obligation is generated".
               - when: {binding: partial_semantic_design.partial_contract.routing, equals: unclear}
                 instructions:
-                  - This scenario is a candidate for headless route review, not an accepted implementation obligation.
-                  - Record the best-supported candidate behavior from the source, but do not resolve the route by inventing missing product meaning.
-                  - The worker packet will ask the coding agent to inspect repository evidence and either resolve the route or report it unresolved.
+                  - This scenario is a candidate for headless route review; the benchmark task must continue even if the route remains unclear.
+                  - Record the best-supported candidate behavior from the source and do not invent missing product meaning.
+                  - The worker packet will ask the coding agent to inspect repository evidence, choose the most conservative backward-compatible interpretation if evidence is inconclusive, record that assumption, and continue.
               - when: {binding: partial_semantic_design.partial_contract.disposition, equals: nonactionable}
                 instructions:
                   - This clause is delivery-process metadata only and must not create a product obligation.

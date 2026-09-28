@@ -61,7 +61,7 @@ def test_every_source_classifier_has_a_question_and_decision_rules() -> None:
 
 
 def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
-    clause = _clause("Deferred fields merge into parent objects at the given path.")
+    clause = _clause("Archived records retain their original field values.")
     root_request = prepare_source_semantic_decisions(clause, created_at=NOW)[
         "pending_specs"
     ][0]
@@ -94,6 +94,12 @@ def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     )
     assert any("state change" in rule for rule in result_rules)
     assert any("observable" in rule for rule in result_rules)
+    exception_rules = next(
+        request["instructions"]
+        for request in child_requests
+        if request["spec"]["decision_kind"] == "has_exception"
+    )
+    assert any("negative contrast" in rule for rule in exception_rules)
 
 
 def test_background_clause_takes_context_branch_before_child_classifiers() -> None:
@@ -120,6 +126,65 @@ def test_background_clause_takes_context_branch_before_child_classifiers() -> No
     assert child_values["polarity"] == "descriptive"
     assert child_values["requirement_strength"] == "descriptive"
     assert child_values["source_predicate"] == "not_stated"
+
+
+def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> None:
+    clause = _clause("A report preserves its original fields.")
+    root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=[],
+        pending_specs=root_plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "invariant"}],
+        created_at=NOW,
+    )
+    child_plan = prepare_dependent_source_semantic_decisions(
+        clause, root, created_at=NOW
+    )
+    unresolved_values = {
+        "has_precondition": None,
+        "has_exception": None,
+        "has_explicit_result": None,
+        "source_predicate": None,
+        "nonactionable_exclusion_safety": None,
+    }
+    results = [
+        {
+            "status": "unresolved" if value is None else "resolved",
+            "value": value,
+            "reason_code": "source_underspecified" if value is None else None,
+        }
+        for value in (
+            unresolved_values[request["spec"]["decision_kind"]]
+            for request in child_plan["pending_specs"]
+        )
+    ]
+
+    decisions = bind_source_semantic_decisions(
+        resolved_decisions=child_plan["resolved_decisions"],
+        pending_specs=child_plan["pending_specs"],
+        provider_results=results,
+        clarification_policy="normative_defaults",
+        created_at=NOW,
+    )
+    by_kind = {item.decision_kind: item for item in decisions}
+
+    assert by_kind["has_precondition"].result.value == "absent"
+    assert by_kind["has_exception"].result.value == "absent"
+    assert by_kind["has_explicit_result"].result.value == "absent"
+    assert by_kind["source_predicate"].result.value == "explicit"
+    assert (
+        by_kind["nonactionable_exclusion_safety"].result.value
+        == "product_semantics_present"
+    )
+    for kind in (
+        "has_precondition",
+        "has_exception",
+        "has_explicit_result",
+        "source_predicate",
+        "nonactionable_exclusion_safety",
+    ):
+        assert by_kind[kind].provider.kind == "deterministic-rule"
+        assert f"normative-default:{kind}:" in " ".join(by_kind[kind].evidence_refs)
 
 
 def test_nonactionable_clause_takes_process_only_branch() -> None:
@@ -274,6 +339,43 @@ def test_pipeline_compiles_source_anchored_partial_contract() -> None:
     }
     assert "description" not in data
     assert "acceptance_criterion" not in data
+
+
+def test_explicit_behavior_falls_back_to_other_when_no_family_fits() -> None:
+    clause = _clause("The operation exposes a result mapping.")
+    decisions = _bind_source_decisions(
+        clause,
+        disposition="feature",
+        overrides={"source_predicate": "explicit"},
+    )
+    extraction_requests = prepare_source_extractions(clause, decisions)
+    quotes = {
+        "subject": "operation",
+        "behavior": "exposes a result mapping",
+        "precondition": "operation",
+        "exception": "operation",
+        "explicit_result": "a result mapping",
+    }
+    extractions = bind_source_extractions(
+        requests=extraction_requests,
+        provider_results=[
+            {"quote": quotes[request["spec"]["extraction_kind"]]}
+            for request in extraction_requests
+        ],
+        created_at=NOW,
+    )
+
+    request = prepare_behavior_family_decision(clause, extractions[1], decisions)
+    family = bind_behavior_family_decision(
+        request,
+        {"status": "unresolved", "value": None, "reason_code": "source_ambiguous"},
+        created_at=NOW,
+    )
+
+    assert request["fallback_to_other_if_unresolved"] is True
+    assert family.result.status == "resolved"
+    assert family.result.value == "other"
+    assert family.provider.kind == "deterministic-rule"
 
 
 def test_legacy_projection_copies_source_instead_of_paraphrasing() -> None:

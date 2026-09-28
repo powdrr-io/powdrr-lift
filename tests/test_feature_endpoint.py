@@ -37,6 +37,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 )
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
+    _apply_scenario_consistency_updates,
     _merge_behavior_scenario_values,
     _merge_semantic_design_values,
     feature_command_catalog,
@@ -342,6 +343,68 @@ def test_normative_defaults_fail_closed_if_an_unresolved_dimension_is_uncovered(
     with pytest.raises(PowdrrExecutionError, match="resolve every clarification"):
         _merge_behavior_scenario_values(
             parameters, clarification_policy="normative_defaults"
+        )
+
+
+def test_scenario_consistency_updates_only_rewrite_existing_defaults() -> None:
+    decisions = [
+        {
+            "behavior_scenario": {
+                "scenario_id": "scenario:one",
+                "subject": "items",
+                "given": "a shared list",
+                "when": "an item fails",
+                "then": "later items are processed",
+                "dimensions": {"continuation": "ASSUMED DEFAULT: stop"},
+                "assumptions": [
+                    {
+                        "dimension": "continuation",
+                        "resolution": "stop",
+                        "rationale": "Initial default.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    }
+                ],
+            }
+        }
+    ]
+    review = {
+        "consistency_review": {
+            "updates": [
+                {
+                    "subject": "items",
+                    "given": "a shared list",
+                    "when": "an item fails",
+                    "then": "later items are processed",
+                    "dimension": "continuation",
+                    "previous_resolution": "stop",
+                    "resolution": "continue",
+                    "rationale": "Keep related scenarios consistent.",
+                    "basis": "conservative_default",
+                    "basis_reference": "No specific normative source identified.",
+                    "confidence": "low",
+                }
+            ]
+        }
+    }
+
+    updated = _apply_scenario_consistency_updates(
+        decisions, review, clarification_policy="normative_defaults"
+    )
+
+    scenario = updated[0]["behavior_scenario"]
+    assert scenario["dimensions"]["continuation"] == "ASSUMED DEFAULT: continue"
+    assert scenario["assumptions"][0]["resolution"] == "continue"
+    assert decisions[0]["behavior_scenario"]["assumptions"][0]["resolution"] == "stop"
+
+
+def test_scenario_consistency_cannot_add_defaults_under_ask_policy() -> None:
+    with pytest.raises(PowdrrExecutionError, match="under ask policy"):
+        _apply_scenario_consistency_updates(
+            [{}],
+            {"consistency_review": {"updates": [{"dimension": "continuation"}]}},
+            clarification_policy="ask",
         )
 
 
@@ -1566,12 +1629,9 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
         source_values = iter(
             (
                 "feature",
-                "unspecified",
-                "must",
                 "absent",
                 "absent",
                 "absent",
-                "unspecified",
                 "not_stated",
                 "product_semantics_present",
             )
@@ -1629,6 +1689,8 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                         "capability_matrix": [],
                     },
                 }
+            if "recorded defaults coherent" in question:
+                return {"consistency_review": {"updates": []}}
             raise AssertionError(question)
 
     catalog = feature_command_catalog()

@@ -275,6 +275,11 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose present or absent; do not treat an ordinary condition as an "
             "exception.",
+            "An exception is an explicit carve-out from an otherwise included set "
+            "or behavior. A negative contrast that states what the behavior is not "
+            "does not by itself create an exception. Choose absent when no carve-out "
+            "is stated; reserve unresolved for wording whose meaning cannot be "
+            "determined.",
         ),
         tuple(
             [
@@ -319,6 +324,10 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "or availability without specifying its outcome.",
             "Do not require a particular verb or output format; recognize the result "
             "from the proposition's meaning, and do not infer unstated details.",
+            "A stated invariant or property is a result when it specifies an "
+            "observable state or value. Choose absent, rather than unresolved, when "
+            "the proposition does not state a distinct outcome; reserve unresolved "
+            "for text whose meaning cannot be determined.",
         ),
         tuple(
             [
@@ -418,6 +427,16 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "Choose explicit, implied_by_registered_term, or not_stated.",
             "Use implied_by_registered_term only when supplied accepted context "
             "defines the term.",
+            "Choose explicit when the proposition states what an operation, "
+            "component, or value does, produces, changes, or exposes. A named "
+            "capability alone is not explicit when its behavior is left open.",
+            "An asserted or requested behavior can be explicit even when some "
+            "implementation details or edge cases are unspecified. Use not_stated "
+            "when the proposition does not assert or require a behavior at all; "
+            "reserve unresolved for wording whose predicate cannot be identified.",
+            "When a product requirement names a capability and the behavior it "
+            "requires, classify that stated requirement as explicit; do not demand "
+            "complete acceptance criteria before resolving this decision.",
         ),
         (
             ClassificationExample("The endpoint returns CSV.", "explicit"),
@@ -808,8 +827,11 @@ def bind_source_semantic_decisions(
     resolved_decisions: Sequence[Mapping[str, Any]],
     pending_specs: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    clarification_policy: str = "ask",
     created_at: str | None = None,
 ) -> list[SemanticDecision]:
+    if clarification_policy not in {"ask", "normative_defaults"}:
+        raise SemanticContractError("clarification policy is invalid")
     if len(pending_specs) != len(provider_results):
         raise SemanticContractError("semantic classifier result count is invalid")
     decisions = [SemanticDecision.from_data(item) for item in resolved_decisions]
@@ -819,11 +841,23 @@ def bind_source_semantic_decisions(
         if not isinstance(spec_raw, Mapping):
             raise SemanticContractError("semantic classifier request has no spec")
         spec = SemanticDecisionSpec.from_data(spec_raw)
+        provider = SemanticDecisionProvider(kind="planning-llm")
+        provider_result = result
+        evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
+        if clarification_policy == "normative_defaults":
+            fallback = _normative_source_decision_default(spec, decisions)
+            if result.get("status") == "unresolved" and fallback is not None:
+                provider = SemanticDecisionProvider(kind="deterministic-rule")
+                provider_result = {"status": "resolved", "value": fallback}
+                evidence_refs = (
+                    *evidence_refs,
+                    f"normative-default:{spec.decision_kind}:{fallback}",
+                )
         decisions.append(
             spec.bind(
-                provider=SemanticDecisionProvider(kind="planning-llm"),
-                provider_result=result,
-                evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+                provider=provider,
+                provider_result=provider_result,
+                evidence_refs=evidence_refs,
                 created_at=timestamp,
             )
         )
@@ -833,6 +867,40 @@ def bind_source_semantic_decisions(
     if len(ordered) > 1:
         _validate_decision_tree(ordered)
     return ordered
+
+
+def _normative_source_decision_default(
+    spec: SemanticDecisionSpec, decisions: Sequence[SemanticDecision]
+) -> str | None:
+    """Default non-core modifiers without guessing a task's product behavior."""
+    values = {item.decision_kind: item.result.value for item in decisions}
+    root = values.get("disposition")
+    if spec.decision_kind in {
+        "has_precondition",
+        "has_exception",
+        "has_explicit_result",
+    }:
+        return "absent"
+    if spec.decision_kind == "source_predicate" and root in {
+        "feature",
+        "interface",
+        "invariant",
+        "non_goal",
+    }:
+        return "explicit"
+    if spec.decision_kind == "nonactionable_exclusion_safety" and root in {
+        "feature",
+        "interface",
+        "invariant",
+        "non_goal",
+    }:
+        return "product_semantics_present"
+    if spec.decision_kind == "polarity":
+        if root == "non_goal":
+            return "prohibited"
+        if root in {"feature", "interface", "invariant"}:
+            return "required"
+    return None
 
 
 def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
@@ -962,6 +1030,23 @@ def prepare_behavior_family_decision(
     )
     request = _classifier_request(spec, CLASSIFIER_DEFINITIONS["behavior_family"])
     request["subject_text"] = behavior.span.text
+    decision_values = {
+        item.decision_kind: item.result.value
+        for item in (
+            value
+            if isinstance(value, SemanticDecision)
+            else SemanticDecision.from_data(value)
+            for value in decisions
+        )
+    }
+    explicitly_stated_behavior = decision_values.get("source_predicate") == "explicit"
+    if explicitly_stated_behavior:
+        request["fallback_to_other_if_unresolved"] = True
+        request["instructions"].append(
+            "The source explicitly states this behavior. If no registered "
+            "behavior-family label fits, choose other and preserve the exact "
+            "source phrase; do not treat a missing taxonomy label as ambiguity."
+        )
     root = next(
         (
             item
@@ -1002,6 +1087,17 @@ def bind_behavior_family_decision(
         # Context and process-only clauses use "other" as a schema placeholder;
         # no model judgment is needed to classify a clause that creates no
         # product behavior obligation.
+        return spec.bind(
+            provider=SemanticDecisionProvider(kind="deterministic-rule"),
+            provider_result={"status": "resolved", "value": "other"},
+            evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+            created_at=created_at or _created_at(),
+        )
+    if (
+        request.get("fallback_to_other_if_unresolved") is True
+        and provider_result.get("status") == "unresolved"
+        and "other" in request.get("allowed_values", ())
+    ):
         return spec.bind(
             provider=SemanticDecisionProvider(kind="deterministic-rule"),
             provider_result={"status": "resolved", "value": "other"},

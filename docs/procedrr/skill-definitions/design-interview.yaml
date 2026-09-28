@@ -194,6 +194,18 @@ steps:
             instructions:
               - Return an ordered list of 2 to 8 short statements, and nothing else.
               - Each statement must express exactly one behavior, API result, constraint, lifecycle event, error condition, or prohibition that can be verified separately.
+              - >-
+                Make every statement independently understandable: repeat the
+                source subject and governing action when needed; never emit a
+                fragment that depends on a neighboring statement for its meaning.
+              - >-
+                Preserve the source relationships among subjects, actions,
+                conditions, and outcomes. Do not turn a coordinated value or
+                modifier into a new subject or action.
+              - >-
+                If a source element cannot be separated without changing or
+                obscuring its meaning, keep it with the smallest requirement
+                that governs it rather than forcing a shorter fragment.
               - Preserve every concrete API name, value, condition, constraint, and required error from the source clause.
               - Do not add requirements, choose implementation details, weaken a requirement, or infer an opposite behavior.
               - Do not return IDs, references, selectors, hashes, fingerprints, source spans, or parent fields; Powdrr assigns structure.
@@ -695,12 +707,60 @@ steps:
                 expected_test: {type: string}
                 behavior_scenario: {type: object}
             bind: semantic_design
+  - judge:
+      kind: construct_one
+      provider: planning
+      question: Are the recorded defaults coherent across related behavior scenarios?
+      subject: work_item_name
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Review the complete source ledger and all compiled behavior scenarios together before any worker prompt is created.
+        - Compare assumptions only where scenarios govern the same behavior or explicitly relate to one another; a shared dimension name alone does not make two defaults conflict.
+        - Preserve every source-supported requirement and every dimension resolved by the source. This review may update only an existing normative assumption, never a source-grounded result or scenario obligation.
+        - If related assumptions prescribe incompatible outcomes for the same behavior, revise the minimum set of assumptions to one concrete outcome consistent with every applicable source requirement and linked scenario.
+        - Do not add speculative cases or new requirements. If a conflict has no identifiable normative answer, choose one conservative interoperable outcome and record the basis and low confidence rather than leaving competing defaults.
+        - Under clarification_policy ask, return no updates; do not invent or reconcile assumptions on the user's behalf.
+        - For each changed assumption, quote the target scenario's subject, given, when, then, dimension, and previous resolution exactly so the compiler can bind the update without model-generated IDs.
+        - Return an empty updates list when the recorded assumptions are already coherent.
+      context: [work_item_name, atomic_instruction_ledger, semantic_designs, clarification_policy]
+      output:
+        name: scenario_consistency_review
+        schema:
+          type: object
+          required: [consistency_review]
+          additionalProperties: false
+          properties:
+            consistency_review:
+              type: object
+              required: [updates]
+              additionalProperties: false
+              properties:
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    required: [subject, given, when, then, dimension, previous_resolution, resolution, rationale, basis, basis_reference, confidence]
+                    additionalProperties: false
+                    properties:
+                      subject: {type: string, minLength: 1}
+                      given: {type: string, minLength: 1}
+                      when: {type: string, minLength: 1}
+                      then: {type: string, minLength: 1}
+                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                      previous_resolution: {type: string, minLength: 1}
+                      resolution: {type: string, minLength: 1}
+                      rationale: {type: string, minLength: 1}
+                      basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
+                      basis_reference: {type: string, minLength: 1}
+                      confidence: {type: string, enum: [high, medium, low]}
+      validation: {kind: json_schema}
   - operation:
       tool: internal
       command: [compile_canonical_feature_design]
       parameters:
         work_item_name: {type: reference, value: work_item_name}
         design_decisions: {type: reference, value: semantic_designs}
+        scenario_consistency_review: {type: reference, value: scenario_consistency_review}
       returns:
         type: object
         required: [path, fingerprint, obligations, verification_contracts, required_test_cases]

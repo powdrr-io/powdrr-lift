@@ -94,6 +94,8 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"consistency_review"}:
+            return {"consistency_review": {"updates": []}}
         if required == {"multiple"}:
             return {"multiple": False}
         if required == {"statements"}:

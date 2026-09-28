@@ -22,7 +22,8 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[3]
 BATCH_DIR = Path(__file__).resolve().parent / "adjudication"
-DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "jev-comparison"
+DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "jev-comparison-v2"
+PROMPT_REVISION = "root-disposition-rubric-examples-v2"
 API_URL = "https://api.typesafe.ai/v1/systemone"
 MODEL = "jev-latest"
 LABELS = (
@@ -40,26 +41,35 @@ CRITERIA = {
     "entity": (
         "Names or defines a product concept, domain object, actor, type, or component."
     ),
-    "feature": "Describes a concrete product capability or behavior.",
+    "feature": (
+        "Describes a product capability or behavior. This is the default for "
+        "a concrete product action that is not mainly an API contract or a "
+        "rule that must hold across a population."
+    ),
     "interface": (
-        "Specifies an externally visible boundary contract, API shape, or "
-        "caller communication."
+        "Specifies an externally visible boundary contract: public API shape, "
+        "signatures, inputs, outputs, callbacks, or how callers and the "
+        "product communicate."
     ),
     "invariant": (
-        "States a rule or property that must hold generally across cases or "
-        "a lifecycle."
+        "States a rule or property expected to hold generally across a population, "
+        "operations, or lifecycle. Do not choose this only because the text says "
+        "'all', 'every', or 'always'."
     ),
     "guidance": (
-        "Expresses a preference or recommendation without establishing "
-        "definite behavior."
+        "Expresses a preference or recommendation without establishing definite "
+        "product behavior. Words such as 'should' alone do not decide this label."
     ),
-    "non_goal": "Explicitly excludes or prohibits product behavior.",
+    "non_goal": (
+        "Explicitly excludes or prohibits product behavior. Product meaning "
+        "takes precedence over delivery wording."
+    ),
     "nonactionable": (
-        "Concerns only process, delivery, repository handling, or tools, "
-        "with no product semantics."
+        "Concerns only process, delivery, repository handling, or tools, with "
+        "no product semantics."
     ),
     "context": (
-        "Gives background, motivation, or a problem statement without "
+        "Gives factual background, motivation, or a problem statement without "
         "requesting or defining product behavior."
     ),
     "unresolved": (
@@ -68,6 +78,38 @@ CRITERIA = {
         "or structural debris."
     ),
 }
+BOUNDARY_RULES_AND_EXAMPLES = "\n".join(
+    (
+        "Apply these boundary rules:",
+        "- Desired behavior can be phrased as a statement, not an imperative.",
+        "- Classify the exact proposition in isolation; do not infer context.",
+        "- Do not classify polarity, strength, quantifier, or implementation details.",
+        "- Prefer interface for an external contract; feature for product behavior.",
+        "- Invariant means a general property expected to hold across cases.",
+        "  The words all, every, and always do not establish an invariant alone.",
+        "- Guidance is a preference without definite behavior.",
+        "  Should alone does not decide this label.",
+        "- Context explains a problem; feature asks for product behavior or change.",
+        "- Product meaning takes precedence over delivery wording.",
+        "  A callback restriction is non_goal; a pull request is nonactionable.",
+        "- formatting_artifact is a reviewer-only label mapped to unresolved here.",
+        "",
+        "Synthetic examples authored from the rubric, not the review batch:",
+        "- Users can export reports. -> feature.",
+        "- Every response has an ID. -> invariant.",
+        "- Expose get_state_data(state). -> interface.",
+        "- Callers can retrieve current state data. -> feature.",
+        "- Prefer immutable defaults. -> guidance.",
+        "- Defaults stay immutable throughout each request. -> invariant.",
+        "- Without a lifecycle, callers manage values manually. -> context.",
+        "- The system resets state data when a state is entered. -> feature.",
+        "- Do not add CSV export. -> non_goal.",
+        "- Run the unit tests before submitting. -> nonactionable.",
+        "- 2. -> unresolved (incomplete extraction fragment).",
+        "",
+        "Choose one label. Use unresolved if no single label is defensible.",
+    )
+)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -85,12 +127,7 @@ def request_jev(proposition: str, api_key: str, *, timeout: float) -> dict[str, 
         "questions": {
             "disposition": {
                 "type": "choice",
-                "instructions": (
-                    "Classify the exact proposition in isolation using the given "
-                    "criteria. Do not infer unstated context. Choose unresolved "
-                    "when no single label is defensible or the text is only "
-                    "an incomplete extraction fragment."
-                ),
+                "instructions": BOUNDARY_RULES_AND_EXAMPLES,
                 "criteria": CRITERIA,
             }
         },
@@ -155,6 +192,34 @@ def score(
             for gold, counts in sorted(matrix.items())
         },
     }
+
+
+def confidence_policy_analysis(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Measure selective Jev and Jev-with-teacher-fallback agreement."""
+    results: dict[str, Any] = {}
+    for threshold in (0.5, 0.6, 0.7, 0.8, 0.9):
+        accepted = [row for row in rows if float(row["confidence"]) >= threshold]
+        hybrid_correct = sum(
+            (
+                row["jev_label"]
+                if float(row["confidence"]) >= threshold
+                else row["teacher_label"]
+            )
+            == row["human_label"]
+            for row in rows
+        )
+        results[f"{threshold:.1f}"] = {
+            "accepted_count": len(accepted),
+            "coverage": len(accepted) / len(rows),
+            "jev_accuracy_on_accepted": (
+                sum(row["jev_label"] == row["human_label"] for row in accepted)
+                / len(accepted)
+                if accepted
+                else None
+            ),
+            "teacher_fallback_hybrid_accuracy": hybrid_correct / len(rows),
+        }
+    return results
 
 
 def main() -> int:
@@ -240,7 +305,13 @@ def main() -> int:
         )
 
     report = {
-        "schema_version": "jev-root-disposition-comparison-v1",
+        "schema_version": "jev-root-disposition-comparison-v2",
+        "prompt_revision": PROMPT_REVISION,
+        "evaluation_status": "exploratory_same_batch_after_prompt_revision",
+        "prompt_development": (
+            "The revision uses the full written rubric and synthetic examples. "
+            "Its boundaries were informed by disagreements in the baseline batch."
+        ),
         "generated_at": datetime.now(UTC).isoformat(),
         "model": MODEL,
         "endpoint": API_URL,
@@ -259,6 +330,12 @@ def main() -> int:
             "jev_vs_human": score(results, "jev_label", "human_label"),
             "teacher_llm_vs_human": score(results, "teacher_label", "human_label"),
         },
+        "confidence_policy_analysis": confidence_policy_analysis(results),
+        "confidence_policy_note": (
+            "Threshold results are exploratory on a previously inspected batch; "
+            "do not use them as a production threshold without a fresh "
+            "human-labeled evaluation."
+        ),
         "label_counts": {
             source: dict(sorted(Counter(row[field] for row in results).items()))
             for source, field in (

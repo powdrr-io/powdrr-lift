@@ -67,21 +67,32 @@ blinded sheets.
 
 `compare_jev.py` runs the same root-disposition choice over the completed
 human review sheet and compares Jev with the teacher LLM labels and that
-reviewer's labels. Set `TYPESAFEAI_API_KEY` (or the official SDK environment
-variable `TYPESAFE_API_KEY`) and run:
+reviewer's labels. It uses the full annotation rubric, boundary rules, and
+synthetic contrastive examples. Set `TYPESAFEAI_API_KEY` (or the official SDK
+environment variable `TYPESAFE_API_KEY`) and run:
 
 ```bash
 uv run python science/classifications/root_disposition/compare_jev.py \
   --annotator a --resume
 ```
 
-The script writes resumable per-example predictions and an aggregate report to
-`jev-comparison/`. The first run uses the held-out 125-example review batch.
+The baseline predictions and report are in `jev-comparison/`; the revised
+prompt run is in `jev-comparison-v2/`. Both use the same 125 examples. The v2
+run is exploratory because its prompt revision was informed by baseline
+disagreements. It did not increase overall agreement with annotator A (44.8%
+for both versions); agreement with the teacher LLM moved from 56.0% to 60.0%.
+It reports selective accuracy and a simulated teacher fallback at confidence
+thresholds from 0.5 to 0.9. On this previously inspected batch, the 0.9 policy
+used Jev on 37 examples and the LLM on 88, agreeing with the reviewer on 60.8%
+overall. Treat that result as exploratory, not a production threshold.
+
 Human agreement is preliminary: annotator A has completed their sheet, but
 annotator B and final adjudication are still pending. Since the production
 disposition schema has no `formatting_artifact` value, those reviewer labels
 are normalized to `unresolved` for the comparison. Jev uses `jev-latest`, so
-the provider may update the underlying model version over time.
+the provider may update the underlying model version over time. A separate
+human-labeled development set is needed to tune examples or thresholds and a
+fresh human-labeled holdout is needed for an independent evaluation.
 
 Install the optional training dependencies and fine-tune:
 

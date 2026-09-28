@@ -530,6 +530,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "given": "the declared feature input",
                         "when": "the feature is invoked",
                         "then": "the acceptance result is observed",
+                        "related_requirements": [],
                         "dimensions": {
                             "normal_result": ("the acceptance result is observed"),
                             "error_behavior": "not_applicable",
@@ -542,6 +543,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "capability_matrix": [],
                     },
                 }
+            if "recorded defaults coherent" in question:
+                return {"consistency_review": {"updates": []}}
             raise AssertionError(question)
 
     llm = DesignInterviewLLM()
@@ -752,7 +755,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 16
+    assert result.llm_activations == 17
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events

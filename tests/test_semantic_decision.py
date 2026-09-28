@@ -179,9 +179,19 @@ def test_modifier_presence_decisions_are_independent() -> None:
         ("polarity", "All data should pickle.", "required"),
         ("quantifier", "Every active report can be exported.", "every"),
         ("quantifier", "Some reports can be exported.", "some"),
+        ("quantifier", "Exactly one result is returned.", "one"),
+        ("quantifier", "The operation supports incremental delivery.", "unspecified"),
         ("requirement_strength", "All data should pickle.", "should"),
         ("requirement_strength", "Responses must have IDs.", "must"),
         ("requirement_strength", "Clients may omit the field.", "may"),
+        ("requirement_strength", "Add an operation.", "unspecified"),
+        ("temporal_scope", "The operation returns a result.", "unspecified"),
+        ("temporal_scope", "The operation will return a result.", "future"),
+        (
+            "temporal_scope",
+            "When the operation runs, it returns a result.",
+            "event_bound",
+        ),
     ],
 )
 def test_deterministic_rules_resolve_only_explicit_lexical_cases(
@@ -191,14 +201,18 @@ def test_deterministic_rules_resolve_only_explicit_lexical_cases(
 
     assert result is not None
     assert result.value == expected
-    assert result.evidence in source.casefold()
+    if expected == "unspecified":
+        assert result.evidence.startswith("no explicit")
+    else:
+        assert result.evidence in source.casefold()
 
 
-def test_deterministic_rules_fall_through_instead_of_guessing() -> None:
-    assert (
-        resolve_deterministic_source_decision("quantifier", "Reports support export.")
-        is None
+def test_deterministic_rules_leave_unregistered_decisions_to_the_provider() -> None:
+    quantifier = resolve_deterministic_source_decision(
+        "quantifier", "Reports support export."
     )
+    assert quantifier is not None
+    assert quantifier.value == "unspecified"
     assert (
         resolve_deterministic_source_decision("disposition", "Open a pull request.")
         is None

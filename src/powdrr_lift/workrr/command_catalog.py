@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
@@ -350,8 +351,16 @@ def feature_command_catalog(
         "compile_canonical_feature_design": CommandSpec(
             name="compile_canonical_feature_design",
             input_schema=object_schema(
-                {"work_item_name": {}, "design_decisions": {}},
-                required=("work_item_name", "design_decisions"),
+                {
+                    "work_item_name": {},
+                    "design_decisions": {},
+                    "scenario_consistency_review": {},
+                },
+                required=(
+                    "work_item_name",
+                    "design_decisions",
+                    "scenario_consistency_review",
+                ),
                 additional_properties=False,
             ),
             output_schema={},
@@ -1103,6 +1112,7 @@ class FeatureCommandRuntime:
                     resolved_decisions=resolved,
                     pending_specs=pending,
                     provider_results=raw_results,
+                    clarification_policy=getattr(config, "clarification_policy", "ask"),
                 )
             except (SemanticContractError, SemanticDecisionError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
@@ -1259,6 +1269,20 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "canonical design decisions are missing or malformed"
                 )
+            consistency_review = parameters.get("scenario_consistency_review")
+            if not isinstance(consistency_review, Mapping):
+                raise PowdrrExecutionError(
+                    "scenario consistency review is missing or malformed"
+                )
+            raw_design_decisions = _apply_scenario_consistency_updates(
+                raw_design_decisions,
+                consistency_review,
+                clarification_policy=getattr(config, "clarification_policy", "ask"),
+            )
+            (output_root / "scenario-consistency-review.json").write_text(
+                json.dumps(dict(consistency_review), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
             work_item_name = feature_endpoint._require_flow_text(
                 parameters, "work_item_name"
             )
@@ -1892,6 +1916,98 @@ def _is_not_applicable_resolution(value: Any) -> bool:
     return normalized == "not_applicable" or normalized.startswith(
         ("not_applicable ", "not_applicable-", "not_applicable—", "not_applicable:")
     )
+
+
+def _apply_scenario_consistency_updates(
+    design_decisions: list[Any],
+    review: Mapping[str, Any],
+    *,
+    clarification_policy: str,
+) -> list[dict[str, Any]]:
+    """Apply review edits only to recorded defaults, never source requirements."""
+    if clarification_policy not in {"ask", "normative_defaults"}:
+        raise PowdrrExecutionError("clarification_policy is invalid")
+    consistency_review = review.get("consistency_review")
+    if not isinstance(consistency_review, Mapping):
+        raise PowdrrExecutionError("scenario consistency review is malformed")
+    updates = consistency_review.get("updates")
+    if not isinstance(updates, list) or any(
+        not isinstance(update, Mapping) for update in updates
+    ):
+        raise PowdrrExecutionError("scenario consistency updates are malformed")
+    if clarification_policy == "ask" and updates:
+        raise PowdrrExecutionError(
+            "scenario consistency review cannot add defaults under ask policy"
+        )
+
+    decisions = copy.deepcopy(design_decisions)
+    changed_targets: set[tuple[str, ...]] = set()
+    for raw_update in updates:
+        assert isinstance(raw_update, Mapping)
+        dimension = raw_update.get("dimension")
+        previous_resolution = raw_update.get("previous_resolution")
+        selector_values = [
+            raw_update.get(key) for key in ("subject", "given", "when", "then")
+        ]
+        if not isinstance(dimension, str) or not isinstance(previous_resolution, str):
+            raise PowdrrExecutionError(
+                "scenario consistency update has no dimension or prior resolution"
+            )
+        if not all(isinstance(item, str) and item.strip() for item in selector_values):
+            raise PowdrrExecutionError(
+                "scenario consistency update has no exact scenario selector"
+            )
+        selector = tuple(cast(str, item) for item in selector_values)
+        selector_key = (*selector, dimension, previous_resolution)
+        if selector_key in changed_targets:
+            raise PowdrrExecutionError(
+                "scenario consistency review repeats an assumption target"
+            )
+        changed_targets.add(selector_key)
+
+        candidate = dict(raw_update)
+        for key in ("subject", "given", "when", "then", "previous_resolution"):
+            candidate.pop(key, None)
+        try:
+            validated = validate_normative_assumptions([candidate])[0]
+        except (ValueError, IndexError) as error:
+            raise PowdrrExecutionError(
+                f"scenario consistency update is invalid: {error}"
+            ) from error
+
+        targets: list[tuple[dict[str, Any], list[Any], dict[str, Any], int]] = []
+        for decision in decisions:
+            if not isinstance(decision, dict):
+                continue
+            scenario = decision.get("behavior_scenario")
+            if not isinstance(scenario, dict):
+                continue
+            if (
+                tuple(scenario.get(key) for key in ("subject", "given", "when", "then"))
+                != selector
+            ):
+                continue
+            assumptions = scenario.get("assumptions")
+            dimensions = scenario.get("dimensions")
+            if not isinstance(assumptions, list) or not isinstance(dimensions, dict):
+                continue
+            for index, assumption in enumerate(assumptions):
+                if (
+                    isinstance(assumption, Mapping)
+                    and assumption.get("dimension") == dimension
+                    and assumption.get("resolution") == previous_resolution
+                    and dimensions.get(dimension)
+                    == "ASSUMED DEFAULT: " + previous_resolution
+                ):
+                    targets.append((scenario, assumptions, dimensions, index))
+        if not targets:
+            raise PowdrrExecutionError(
+                "scenario consistency update did not match an existing default"
+            )
+        for _scenario, assumptions, dimensions, index in targets:
+            assumptions[index] = validated
+            dimensions[dimension] = "ASSUMED DEFAULT: " + validated["resolution"]
+    return decisions
 
 
 def _merge_behavior_scenario_values(

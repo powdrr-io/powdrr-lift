@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -185,6 +184,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose one, some, every, or unspecified; do not infer universal "
             "coverage from normative tone.",
+            "Use unspecified when the proposition does not explicitly state how "
+            "many subjects or what proportion are covered; do not infer one from "
+            "singular grammar.",
         ),
         (
             ClassificationExample("One active report is selected.", "one"),
@@ -218,6 +220,8 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "modal.",
             "Preserve should separately from must even when both express required "
             "product behavior.",
+            "Imperative grammar alone does not state a modal strength; use "
+            "unspecified when the proposition contains no explicit modal.",
         ),
         (
             ClassificationExample("The method must return a snapshot.", "must"),
@@ -251,7 +255,12 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
     "has_precondition": ClassifierDefinition(
         "Does this exact proposition explicitly state a condition that must hold "
         "before or while the behavior applies?",
-        ("Choose present or absent; do not extract or invent the condition.",),
+        (
+            "Choose present or absent; do not extract or invent the condition.",
+            "Choose present only when a condition limits when, where, or for whom "
+            "the behavior applies; a purpose or result clause is not itself a "
+            "precondition.",
+        ),
         tuple(
             [
                 ClassificationExample(text, "present")
@@ -291,6 +300,11 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose present or absent; do not treat an ordinary condition as an "
             "exception.",
+            "An exception is an explicit carve-out from an otherwise included set "
+            "or behavior. A negative contrast that states what the behavior is not "
+            "does not by itself create an exception. Choose absent when no carve-out "
+            "is stated; reserve unresolved for wording whose meaning cannot be "
+            "determined.",
         ),
         tuple(
             [
@@ -328,7 +342,18 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
     "has_explicit_result": ClassifierDefinition(
         "Does this exact proposition explicitly state the observable result of the "
         "behavior?",
-        ("Choose present only when the result itself appears in the proposition.",),
+        (
+            "Choose present only when the proposition itself names an observable "
+            "outcome, returned value, state change, emitted item, or other effect.",
+            "Choose absent when the proposition only names an action, capability, "
+            "or availability without specifying its outcome.",
+            "Do not require a particular verb or output format; recognize the result "
+            "from the proposition's meaning, and do not infer unstated details.",
+            "A stated invariant or property is a result when it specifies an "
+            "observable state or value. Choose absent, rather than unresolved, when "
+            "the proposition does not state a distinct outcome; reserve unresolved "
+            "for text whose meaning cannot be determined.",
+        ),
         tuple(
             [
                 ClassificationExample(text, "present")
@@ -367,6 +392,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose current, future, current_and_future, event_bound, or unspecified.",
             "Do not infer future scope from every or all.",
+            "Use unspecified when the proposition gives no explicit temporal "
+            "marker; ordinary present-tense wording does not establish that the "
+            "behavior already exists.",
         ),
         (
             ClassificationExample(
@@ -424,6 +452,16 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "Choose explicit, implied_by_registered_term, or not_stated.",
             "Use implied_by_registered_term only when supplied accepted context "
             "defines the term.",
+            "Choose explicit when the proposition states what an operation, "
+            "component, or value does, produces, changes, or exposes. A named "
+            "capability alone is not explicit when its behavior is left open.",
+            "An asserted or requested behavior can be explicit even when some "
+            "implementation details or edge cases are unspecified. Use not_stated "
+            "when the proposition does not assert or require a behavior at all; "
+            "reserve unresolved for wording whose predicate cannot be identified.",
+            "When a product requirement names a capability and the behavior it "
+            "requires, classify that stated requirement as explicit; do not demand "
+            "complete acceptance criteria before resolving this decision.",
         ),
         (
             ClassificationExample("The endpoint returns CSV.", "explicit"),
@@ -648,43 +686,36 @@ EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Return an exact case-sensitive substring, not a paraphrase.",
             "Do not return only a determiner or quantifier such as all, every, a, "
-            "or the.",
-            "Examples: 'All data should pickle' returns 'data'; 'Users can export "
-            "reports' returns 'Users'.",
+            "or the. Include the smallest noun phrase that identifies the subject.",
         ),
     ),
     "behavior": ClassifierDefinition(
         "Copy the smallest exact phrase naming the behavior, state, or prohibition.",
         (
             "Return an exact case-sensitive substring, not a paraphrase.",
-            "Keep meaning-bearing result modifiers in the behavior phrase.",
-            "Examples: return 'pickle', 'export reports as CSV', or 'add retries "
-            "to report exports'.",
+            "Keep meaning-bearing conditions and stated outcome modifiers in the "
+            "behavior phrase; do not add unstated steps or results.",
         ),
     ),
     "precondition": ClassifierDefinition(
         "Copy the smallest exact phrase stating the behavior's precondition.",
         (
             "Return an exact case-sensitive substring and include the complete "
-            "condition.",
-            "Example: 'Every active report can be exported' returns 'active'.",
+            "condition that must hold for the behavior to apply.",
         ),
     ),
     "exception": ClassifierDefinition(
         "Copy the smallest exact phrase stating the exception.",
         (
-            "Return an exact case-sensitive substring and include the exception "
-            "boundary.",
-            "Example: 'All reports except archived reports' returns 'except archived "
-            "reports'.",
+            "Return an exact case-sensitive substring and include the complete "
+            "exception boundary.",
         ),
     ),
     "explicit_result": ClassifierDefinition(
         "Copy the smallest exact phrase stating the behavior's observable result.",
         (
-            "Return an exact case-sensitive substring; do not invent an unstated "
-            "success predicate.",
-            "Example: 'The endpoint returns CSV' returns 'CSV'.",
+            "Return an exact case-sensitive substring naming the stated outcome; "
+            "do not invent an unstated success predicate.",
         ),
     ),
 }
@@ -864,8 +895,11 @@ def bind_source_semantic_decisions(
     resolved_decisions: Sequence[Mapping[str, Any]],
     pending_specs: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    clarification_policy: str = "ask",
     created_at: str | None = None,
 ) -> list[SemanticDecision]:
+    if clarification_policy not in {"ask", "normative_defaults"}:
+        raise SemanticContractError("clarification policy is invalid")
     if len(pending_specs) != len(provider_results):
         raise SemanticContractError("semantic classifier result count is invalid")
     decisions = [SemanticDecision.from_data(item) for item in resolved_decisions]
@@ -875,11 +909,23 @@ def bind_source_semantic_decisions(
         if not isinstance(spec_raw, Mapping):
             raise SemanticContractError("semantic classifier request has no spec")
         spec = SemanticDecisionSpec.from_data(spec_raw)
+        provider = SemanticDecisionProvider(kind="planning-llm")
+        provider_result = result
+        evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
+        if clarification_policy == "normative_defaults":
+            fallback = _normative_source_decision_default(spec, decisions)
+            if result.get("status") == "unresolved" and fallback is not None:
+                provider = SemanticDecisionProvider(kind="deterministic-rule")
+                provider_result = {"status": "resolved", "value": fallback}
+                evidence_refs = (
+                    *evidence_refs,
+                    f"normative-default:{spec.decision_kind}:{fallback}",
+                )
         decisions.append(
             spec.bind(
-                provider=SemanticDecisionProvider(kind="planning-llm"),
-                provider_result=result,
-                evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+                provider=provider,
+                provider_result=provider_result,
+                evidence_refs=evidence_refs,
                 created_at=timestamp,
             )
         )
@@ -889,6 +935,40 @@ def bind_source_semantic_decisions(
     if len(ordered) > 1:
         _validate_decision_tree(ordered)
     return ordered
+
+
+def _normative_source_decision_default(
+    spec: SemanticDecisionSpec, decisions: Sequence[SemanticDecision]
+) -> str | None:
+    """Default non-core modifiers without guessing a task's product behavior."""
+    values = {item.decision_kind: item.result.value for item in decisions}
+    root = values.get("disposition")
+    if spec.decision_kind in {
+        "has_precondition",
+        "has_exception",
+        "has_explicit_result",
+    }:
+        return "absent"
+    if spec.decision_kind == "source_predicate" and root in {
+        "feature",
+        "interface",
+        "invariant",
+        "non_goal",
+    }:
+        return "explicit"
+    if spec.decision_kind == "nonactionable_exclusion_safety" and root in {
+        "feature",
+        "interface",
+        "invariant",
+        "non_goal",
+    }:
+        return "product_semantics_present"
+    if spec.decision_kind == "polarity":
+        if root == "non_goal":
+            return "prohibited"
+        if root in {"feature", "interface", "invariant"}:
+            return "required"
+    return None
 
 
 def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
@@ -1035,6 +1115,23 @@ def prepare_behavior_family_decision(
     )
     request = _classifier_request(spec, CLASSIFIER_DEFINITIONS["behavior_family"])
     request["subject_text"] = behavior.span.text
+    decision_values = {
+        item.decision_kind: item.result.value
+        for item in (
+            value
+            if isinstance(value, SemanticDecision)
+            else SemanticDecision.from_data(value)
+            for value in decisions
+        )
+    }
+    explicitly_stated_behavior = decision_values.get("source_predicate") == "explicit"
+    if explicitly_stated_behavior:
+        request["fallback_to_other_if_unresolved"] = True
+        request["instructions"].append(
+            "The source explicitly states this behavior. If no registered "
+            "behavior-family label fits, choose other and preserve the exact "
+            "source phrase; do not treat a missing taxonomy label as ambiguity."
+        )
     root = next(
         (
             item
@@ -1075,6 +1172,17 @@ def bind_behavior_family_decision(
         # Context and process-only clauses use "other" as a schema placeholder;
         # no model judgment is needed to classify a clause that creates no
         # product behavior obligation.
+        return spec.bind(
+            provider=SemanticDecisionProvider(kind="deterministic-rule"),
+            provider_result={"status": "resolved", "value": "other"},
+            evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+            created_at=created_at or _created_at(),
+        )
+    if (
+        request.get("fallback_to_other_if_unresolved") is True
+        and provider_result.get("status") == "unresolved"
+        and "other" in request.get("allowed_values", ())
+    ):
         return spec.bind(
             provider=SemanticDecisionProvider(kind="deterministic-rule"),
             provider_result={"status": "resolved", "value": "other"},
@@ -1201,30 +1309,8 @@ def _render_evidence_case(contract: PartialSemanticContract) -> str:
 def _classifier_request(
     spec: SemanticDecisionSpec, definition: ClassifierDefinition
 ) -> dict[str, Any]:
+    """Build a source-only classifier request without task-specific exemplars."""
     instructions = list(definition.instructions)
-    if definition.examples:
-        examples = []
-        for example in definition.examples:
-            if example.value is not None:
-                result = {
-                    "status": "resolved",
-                    "value": example.value,
-                    "reason_code": None,
-                }
-            else:
-                result = {
-                    "status": "unresolved",
-                    "value": None,
-                    "reason_code": example.unresolved_reason,
-                }
-            example_text = f"{example.proposition!r} => {json.dumps(result)}"
-            if example.context is not None:
-                example_text += f" (accepted context: {example.context})"
-            examples.append(example_text)
-        instructions.append(
-            "Worked examples (source proposition => exact result JSON):\n- "
-            + "\n- ".join(examples)
-        )
     return {
         "spec": spec.to_data(),
         "question": definition.question,

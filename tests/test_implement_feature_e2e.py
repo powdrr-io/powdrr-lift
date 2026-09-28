@@ -94,6 +94,8 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"consistency_review"}:
+            return {"consistency_review": {"updates": []}}
         if required == {"multiple"}:
             return {"multiple": False}
         if required == {"statements", "validation_groups"}:
@@ -107,6 +109,7 @@ class DeterministicPlanningClient:
                     "given": "the declared inputs and supported context",
                     "when": "the requested operation is performed",
                     "then": "the stated acceptance outcome is observed",
+                    "related_requirements": [],
                     "dimensions": {
                         "normal_result": "the stated acceptance outcome is observed",
                         "error_behavior": "not_applicable",

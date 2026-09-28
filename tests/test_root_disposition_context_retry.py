@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +67,7 @@ def test_underspecified_root_retries_with_local_context_and_records_trace(
         client=object(),
         provider="test",
         model="test",
+        clause_workers=1,
     )
 
     first, second = task_run["root_dispositions"]
@@ -89,3 +91,66 @@ def test_underspecified_root_retries_with_local_context_and_records_trace(
         "trigger_reason": "source_underspecified",
     }
     assert calls.count("context_assisted_root_decision_request") == 1
+
+
+def test_independent_clause_requests_run_concurrently_in_stable_order(
+    monkeypatch: Any,
+) -> None:
+    lock = threading.Lock()
+    barriers = {
+        "atomicity_clause": threading.Barrier(2),
+        "root_decision_request": threading.Barrier(2),
+    }
+    started = {name: 0 for name in barriers}
+    active = {name: 0 for name in barriers}
+    peak = {name: 0 for name in barriers}
+
+    def fake_call_judge(
+        _client: Any,
+        *,
+        context_name: str,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        if context_name in barriers:
+            with lock:
+                started[context_name] += 1
+                active[context_name] += 1
+                peak[context_name] = max(peak[context_name], active[context_name])
+                wait_for_peer = started[context_name] <= 2
+            if wait_for_peer:
+                barriers[context_name].wait(timeout=3)
+            with lock:
+                active[context_name] -= 1
+        if context_name == "atomicity_clause":
+            return {"multiple": False}
+        assert context_name == "root_decision_request"
+        return {"status": "resolved", "value": "feature", "reason_code": None}
+
+    monkeypatch.setattr(build_dataset, "_call_judge", fake_call_judge)
+    sentences = [
+        "First proposition describes one behavior.",
+        "Second proposition describes another behavior.",
+        "Third proposition describes a final behavior.",
+    ]
+    task = {
+        "task_id": "parallel-classification",
+        "task_metadata": {
+            "name": "Parallel classification",
+            "repository_url": "https://example.com/project",
+        },
+        "instruction": " ".join(sentences),
+    }
+
+    task_run = build_dataset._label_task(
+        task,
+        client=object(),
+        provider="test",
+        model="test",
+        clause_workers=2,
+    )
+
+    assert peak["atomicity_clause"] == 2
+    assert peak["root_decision_request"] == 2
+    assert [record["clause"]["text"] for record in task_run["root_dispositions"]] == (
+        sentences
+    )

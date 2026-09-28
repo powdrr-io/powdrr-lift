@@ -373,7 +373,6 @@ def evaluate_deepswe_worker_prompt(
         raise DeepSWEEvaluationError("prompt-only run captured no worker prompts")
     artifacts_root = (run_dir / "artifacts").resolve()
     prompts: list[dict[str, str]] = []
-    seen_request_ids: set[str] = set()
     for record in prompt_records:
         if not isinstance(record, Mapping):
             raise DeepSWEEvaluationError("captured worker prompt index is malformed")
@@ -383,34 +382,21 @@ def evaluate_deepswe_worker_prompt(
         prompt_digest = record.get("prompt_sha256")
         if (
             not isinstance(request_id, str)
-            or request_id in seen_request_ids
             or Path(request_id).name != request_id
             or not isinstance(provider, str)
             or not isinstance(relative_path, str)
             or not isinstance(prompt_digest, str)
         ):
             raise DeepSWEEvaluationError("captured worker prompt metadata is invalid")
-        seen_request_ids.add(request_id)
         prompt_path = (artifacts_root / relative_path).resolve()
         if not prompt_path.is_relative_to(artifacts_root) or not prompt_path.is_file():
             raise DeepSWEEvaluationError(
                 f"captured prompt path is missing or escapes artifacts: {relative_path}"
             )
         prompt_text = prompt_path.read_text(encoding="utf-8")
-        if "sha256:" + hashlib.sha256(prompt_text.encode("utf-8")).hexdigest() != (
-            prompt_digest
-        ):
+        if hashlib.sha256(prompt_text.encode("utf-8")).hexdigest() != prompt_digest:
             raise DeepSWEEvaluationError(
                 f"captured prompt fingerprint does not match: {relative_path}"
-            )
-        request_path = artifacts_root / "requests" / f"{request_id}.json"
-        request = _read_json(request_path)
-        if (
-            request.get("request_id") != request_id
-            or request.get("prompt") != prompt_text
-        ):
-            raise DeepSWEEvaluationError(
-                f"captured prompt does not match its serialized request: {request_id}"
             )
         prompts.append(
             {

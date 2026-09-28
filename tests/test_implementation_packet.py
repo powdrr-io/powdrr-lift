@@ -46,12 +46,12 @@ def test_packet_renders_behavioral_test_descriptions_without_selectors() -> None
     assert packet.from_data(packet.to_data()).to_data() == packet.to_data()
 
 
-def test_packet_removes_source_workflow_instructions_from_objective() -> None:
+def test_packet_preserves_source_objective_without_rendering_product_work() -> None:
+    objective = (
+        "Add behavior.\n\nIMPORTANT: create a branch from main and commit everything."
+    )
     packet = compile_implementation_packet(
-        objective=(
-            "Add behavior.\n\n"
-            "IMPORTANT: create a branch from main and commit everything."
-        ),
+        objective=objective,
         obligations=("The behavior exists.",),
         required_tests=(
             {
@@ -65,7 +65,8 @@ def test_packet_removes_source_workflow_instructions_from_objective() -> None:
         validation_profiles=("pytest",),
     )
 
-    assert packet.objective == "Add behavior."
+    assert packet.objective == objective
+    assert "IMPORTANT:" not in packet.render()
 
 
 def test_packet_requires_a_contract_for_each_obligation() -> None:

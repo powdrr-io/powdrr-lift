@@ -146,6 +146,20 @@ def prepare_field_entailment_reviews(
         value = values.get(field)
         if value is None or not str(value).strip():
             continue
+        instructions = [
+            "Choose entailed only when the source supports this field without "
+            "adding meaning.",
+            "Choose contradicted when the source rules the candidate out.",
+            "Choose not_stated when the source does not say enough.",
+            "Evaluate only this field; do not repair or rewrite it.",
+        ]
+        if field == "behavior_family":
+            instructions.append(
+                "This is a semantic action-family label, not a verbatim quote. "
+                "Treat enforcing a declared constraint or rejecting an invalid "
+                "declaration as validate, even when the source does not use the "
+                "word 'validate'."
+            )
         spec = FieldEntailmentSpec(
             field=field,
             candidate_value=str(value),
@@ -161,15 +175,7 @@ def prepare_field_entailment_reviews(
                 "question": (
                     "Is this candidate field entailed by the exact source proposition?"
                 ),
-                "instructions": [
-                    (
-                        "Choose entailed only when the source supports this field "
-                        "without adding meaning."
-                    ),
-                    "Choose contradicted when the source rules the candidate out.",
-                    "Choose not_stated when the source does not say enough.",
-                    "Evaluate only this field; do not repair or rewrite it.",
-                ],
+                "instructions": instructions,
                 "allowed_values": ["entailed", "contradicted", "not_stated"],
                 "source_text": contract.proposition_text,
                 "candidate_field": field,

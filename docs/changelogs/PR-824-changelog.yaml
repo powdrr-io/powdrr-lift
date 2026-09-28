@@ -1,0 +1,289 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 824
+title: Improve source-faithful worker prompt generation
+intent:
+  problem: Compiled worker prompts could replace task-relevant source requirements with generic summaries, omit task-scoped context during repair, and treat prompt-only capture as an incomplete implementation that needed repair.
+  goal: Preserve exact product-requirement source text in worker objectives, keep task-scoped implementation context intact, and make prompt capture terminate at the captured worker boundary without running repair.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 51, end_line: 54}
+    summary: Normalize nested evidence for serialization and avoid invalid error placeholders on support-only capability rows.
+    rationale: Keep compiled behavior contracts valid and unambiguous for downstream prompt generation.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 182, end_line: 182}
+    summary: Normalize nested evidence for serialization and avoid invalid error placeholders on support-only capability rows.
+    rationale: Keep compiled behavior contracts valid and unambiguous for downstream prompt generation.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 16, end_line: 24}
+    summary: Preserve source-faithful objectives in implementation packets instead of stripping text by formatting heuristics.
+    rationale: Retain requirement provenance and avoid brittle parsing of workflow prose.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 69, end_line: 69}
+    summary: Preserve source-faithful objectives in implementation packets instead of stripping text by formatting heuristics.
+    rationale: Retain requirement provenance and avoid brittle parsing of workflow prose.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 136, end_line: 136}
+    summary: Preserve source-faithful objectives in implementation packets instead of stripping text by formatting heuristics.
+    rationale: Retain requirement provenance and avoid brittle parsing of workflow prose.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 224, end_line: 224}
+    summary: Preserve source-faithful objectives in implementation packets instead of stripping text by formatting heuristics.
+    rationale: Retain requirement provenance and avoid brittle parsing of workflow prose.
+  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    type: modified
+    span: {start_line: 149, end_line: 162}
+    summary: Add behavior-family-specific field entailment guidance for semantic faithfulness review.
+    rationale: Improve the consistency of instruction-to-contract interpretation.
+  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    type: modified
+    span: {start_line: 178, end_line: 178}
+    summary: Add behavior-family-specific field entailment guidance for semantic faithfulness review.
+    rationale: Improve the consistency of instruction-to-contract interpretation.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 86, end_line: 89}
+    summary: Render repair prompts with task-scoped objective and behavioral acceptance details when a task packet is available.
+    rationale: Keep repair context aligned with the selected implementation task.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 94, end_line: 99}
+    summary: Render repair prompts with task-scoped objective and behavioral acceptance details when a task packet is available.
+    rationale: Keep repair context aligned with the selected implementation task.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 103, end_line: 103}
+    summary: Render repair prompts with task-scoped objective and behavioral acceptance details when a task packet is available.
+    rationale: Keep repair context aligned with the selected implementation task.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 376, end_line: 376}
+    summary: Validate captured-prompt fingerprints against the exact prompt bytes and avoid counting duplicate retry captures.
+    rationale: Make prompt-quality evaluation evidence refer to the actual captured worker prompt.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 386, end_line: 386}
+    summary: Validate captured-prompt fingerprints against the exact prompt bytes and avoid counting duplicate retry captures.
+    rationale: Make prompt-quality evaluation evidence refer to the actual captured worker prompt.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 393, end_line: 393}
+    summary: Validate captured-prompt fingerprints against the exact prompt bytes and avoid counting duplicate retry captures.
+    rationale: Make prompt-quality evaluation evidence refer to the actual captured worker prompt.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 397, end_line: 397}
+    summary: Validate captured-prompt fingerprints against the exact prompt bytes and avoid counting duplicate retry captures.
+    rationale: Make prompt-quality evaluation evidence refer to the actual captured worker prompt.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 406, end_line: 414}
+    summary: Validate captured-prompt fingerprints against the exact prompt bytes and avoid counting duplicate retry captures.
+    rationale: Make prompt-quality evaluation evidence refer to the actual captured worker prompt.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2261, end_line: 2272}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2274, end_line: 2275}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2296, end_line: 2300}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2303, end_line: 2303}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2324, end_line: 2324}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4014, end_line: 4031}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4659, end_line: 4664}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4684, end_line: 4697}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4725, end_line: 4727}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4765, end_line: 4771}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4788, end_line: 4796}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4830, end_line: 4902}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5143, end_line: 5144}
+    summary: Compile source-clause references into exact source-span objectives and return from prompt-only capture before repair or focused validation.
+    rationale: Preserve the product requirements that drove the task and ensure the measured prompt is the one sent at the worker boundary.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 535, end_line: 536}
+    summary: Classify invalid-declaration rejections as validation behavior in semantic contract compilation.
+    rationale: Preserve explicit rejection requirements in the resulting behavior contract.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 548, end_line: 550}
+    summary: Classify invalid-declaration rejections as validation behavior in semantic contract compilation.
+    rationale: Preserve explicit rejection requirements in the resulting behavior contract.
+  - path: tests/test_behavior_contract.py
+    type: modified
+    span: {start_line: 99, end_line: 131}
+    summary: Cover capability-matrix evidence normalization and support-only error handling.
+    rationale: Prevent malformed behavioral contracts from reaching prompt generation.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 164, end_line: 164}
+    summary: Cover exact prompt fingerprint validation and duplicate capture handling.
+    rationale: Keep evaluation tied to the captured prompt content.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 219, end_line: 219}
+    summary: Cover exact prompt fingerprint validation and duplicate capture handling.
+    rationale: Keep evaluation tied to the captured prompt content.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 231, end_line: 262}
+    summary: Cover exact prompt fingerprint validation and duplicate capture handling.
+    rationale: Keep evaluation tied to the captured prompt content.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1270, end_line: 1283}
+    summary: Cover prompt-capture terminal behavior and exact source-span restoration in compiled task objectives.
+    rationale: Prevent repair loops and verify that selected product requirements survive into the worker objective while unrelated workflow directions do not.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2016, end_line: 2051}
+    summary: Cover prompt-capture terminal behavior and exact source-span restoration in compiled task objectives.
+    rationale: Prevent repair loops and verify that selected product requirements survive into the worker objective while unrelated workflow directions do not.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2532, end_line: 2640}
+    summary: Cover prompt-capture terminal behavior and exact source-span restoration in compiled task objectives.
+    rationale: Prevent repair loops and verify that selected product requirements survive into the worker objective while unrelated workflow directions do not.
+  - path: tests/test_implementation_packet.py
+    type: modified
+    span: {start_line: 49, end_line: 52}
+    summary: Verify implementation packets retain source-faithful objective text without newline-based filtering.
+    rationale: Guard against regression to brittle process-instruction detection.
+  - path: tests/test_implementation_packet.py
+    type: modified
+    span: {start_line: 54, end_line: 54}
+    summary: Verify implementation packets retain source-faithful objective text without newline-based filtering.
+    rationale: Guard against regression to brittle process-instruction detection.
+  - path: tests/test_implementation_packet.py
+    type: modified
+    span: {start_line: 68, end_line: 69}
+    summary: Verify implementation packets retain source-faithful objective text without newline-based filtering.
+    rationale: Guard against regression to brittle process-instruction detection.
+  - path: tests/test_intent_packet.py
+    type: modified
+    span: {start_line: 3, end_line: 4}
+    summary: Verify repair prompts do not replay the full intent packet when task-specific context is available.
+    rationale: Keep repair prompts focused on the selected task.
+  - path: tests/test_intent_packet.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Verify repair prompts do not replay the full intent packet when task-specific context is available.
+    rationale: Keep repair prompts focused on the selected task.
+  - path: tests/test_intent_packet.py
+    type: modified
+    span: {start_line: 158, end_line: 192}
+    summary: Verify repair prompts do not replay the full intent packet when task-specific context is available.
+    rationale: Keep repair prompts focused on the selected task.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 82, end_line: 89}
+    summary: Cover declaration-validation classification and field-faithfulness entailment decisions.
+    rationale: Ensure semantic compilation retains invalid-declaration requirements without inventing unsupported behavior.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 304, end_line: 310}
+    summary: Cover declaration-validation classification and field-faithfulness entailment decisions.
+    rationale: Ensure semantic compilation retains invalid-declaration requirements without inventing unsupported behavior.
+entities:
+  - id: source-faithful-worker-objectives
+    type: Capability
+    action: added
+  - id: prompt-capture-terminal-boundary
+    type: Capability
+    action: added
+  - id: task-scoped-repair-prompt-rendering
+    type: Capability
+    action: added
+  - id: worker-prompt-quality-regression-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: source-objective-tests-cover-compiled-objectives
+    source: worker-prompt-quality-regression-tests
+    target: source-faithful-worker-objectives
+    relationship: tests
+    description: Regression tests verify that selected instruction source spans are preserved in compiled task objectives.
+    rationale: Keep instruction provenance intact from source clauses to worker prompts.
+    action: added
+  - id: capture-tests-cover-terminal-boundary
+    source: worker-prompt-quality-regression-tests
+    target: prompt-capture-terminal-boundary
+    relationship: tests
+    description: Regression tests verify prompt-only capture exits before the repair loop.
+    rationale: Measure the generated prompt without implementation execution or repair.
+    action: added
+invariants:
+  - id: product-objective-uses-selected-source-spans
+    action: added
+    description: A compiled code-task objective preserves exact source text for its selected product instruction clauses and excludes unselected workflow instructions.
+    rationale: Keep generated prompts grounded in user requirements without hard-coded formatting-based process detection.
+  - id: prompt-capture-stops-at-worker-prompt
+    action: added
+    description: Capture-only runs return after the worker prompt is captured and do not invoke implementation repair or focused validation.
+    rationale: Ensure prompt evaluation observes one real worker prompt rather than downstream recovery prompts.
+  - id: repairs-preserve-task-context
+    action: added
+    description: When repairing a code task, the prompt uses the task-specific objective and acceptance criteria instead of replaying unrelated feature context.
+    rationale: Keep recovery work bounded to the selected implementation task.
+guidance:
+  - id: recover-requirements-by-source-span
+    action: added
+    description: Use instruction-ledger source spans associated with selected product obligations when constructing a worker objective; do not infer process directions from newline or phrase formatting.
+    rationale: Preserve full source requirements and avoid brittle text heuristics.
+  - id: evaluate-prompt-capture-at-agent-boundary
+    action: added
+    description: Run prompt-only capture through worker-prompt compilation and stop before execution or repair when evaluating instruction-to-prompt quality.
+    rationale: Isolate prompt-generation quality from coding-agent behavior.

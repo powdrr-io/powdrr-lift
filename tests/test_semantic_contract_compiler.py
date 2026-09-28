@@ -79,6 +79,14 @@ def test_behavior_family_classifies_public_api_availability_as_other() -> None:
     )
 
 
+def test_behavior_family_classifies_invalid_declaration_errors_as_validation() -> None:
+    assert any(
+        example.proposition == "Invalid declarations raise InvalidDefinition."
+        and example.value == "validate"
+        for example in CLASSIFIER_DEFINITIONS["behavior_family"].examples
+    )
+
+
 def test_background_clause_takes_context_branch_before_child_classifiers() -> None:
     clause = _clause(
         "States lack built-in data ownership, forcing manual variable management "
@@ -293,6 +301,13 @@ def test_field_faithfulness_rejects_invented_candidate() -> None:
         ),
     )
     requests = prepare_field_entailment_reviews(contract)
+    family_review = next(
+        item for item in requests if item["spec"]["field"] == "behavior_family"
+    )
+    assert any(
+        "semantic action-family label" in instruction
+        for instruction in family_review["instructions"]
+    )
     results = [
         {"status": "resolved", "value": "contradicted", "reason_code": None}
         if request["spec"]["field"] == "behavior"

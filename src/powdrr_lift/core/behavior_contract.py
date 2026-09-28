@@ -48,7 +48,10 @@ class BehaviorScenario:
             "dimensions": {name: self.dimensions[name] for name in BEHAVIOR_DIMENSIONS},
             "evidence": list(self.evidence),
             "validator": self.validator,
-            "capability_matrix": [dict(item) for item in self.capability_matrix],
+            "capability_matrix": [
+                {**dict(item), "evidence": list(item["evidence"])}
+                for item in self.capability_matrix
+            ],
         }
 
 
@@ -176,7 +179,7 @@ def validate_capability_matrix(
                 "capability": name,
                 "behavior": behavior,
                 "evidence": _texts(item.get("evidence"), f"capability {name} evidence"),
-                **({"error": error} if error is not None else {}),
+                **({"error": error} if behavior == "reject" else {}),
             }
         )
     return tuple(result)

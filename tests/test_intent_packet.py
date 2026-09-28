@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.core.implementation_packet import compile_implementation_packet
 from powdrr_lift.core.intent_packet import IntentPacket
 
 
@@ -152,3 +155,38 @@ def test_repair_prompt_does_not_replay_the_full_intent_packet() -> None:
     assert "Must preserve" not in prompt
     assert "criterion 39" not in prompt
     assert len(prompt) < 2_000
+
+
+def test_repair_prompt_uses_compiled_contract_instead_of_raw_source_objective() -> None:
+    from powdrr_lift.workrr.coding_agent import ImplementationRequest
+
+    source_objective = (
+        "Add state data support.\n\n"
+        "IMPORTANT: create a branch from main and commit everything."
+    )
+    request = ImplementationRequest.from_execution_unit(
+        ExecutionUnit(
+            unit_id="operation-1",
+            objective=source_objective,
+            paths=("src/state.py",),
+            acceptance_criteria=("state data initializes on entry",),
+        ),
+        request_id="request-1",
+        base_commit="abc",
+        plan_fingerprint="plan-1",
+    )
+    packet = compile_implementation_packet(
+        objective="State data initializes on entry.",
+        obligations=("State data initializes on entry.",),
+        required_tests=({"description": "state data initializes on entry"},),
+        allowed_paths=("src/state.py",),
+        validation_profiles=("pytest",),
+    )
+
+    prompt = replace(request, implementation_packet=packet).repair_prompt(
+        {"finding_id": "F-1", "expected": "state data initializes on entry"}
+    )
+
+    assert "State data initializes on entry." in prompt
+    assert "Feature objective:\nState data initializes on entry." in prompt
+    assert "IMPORTANT: create a branch" not in prompt

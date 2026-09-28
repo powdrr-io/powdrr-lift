@@ -83,23 +83,24 @@ class ImplementationRequest:
     def repair_prompt(self, issue: Mapping[str, Any]) -> str:
         """Render a finding-specific prompt without replaying the full packet.
 
-        The original implementation handoff intentionally contains the full
-        operation contract.  Reusing that packet for repair is harmful: the
-        packet's preservation criteria are already expanded from the feature
-        obligations, tests, and active intents, so rendering it again makes a
-        repair request substantially larger and gives the coding agent several
-        competing representations of the same requirements.  Repair is a
-        targeted operation; the durable request and evidence artifacts remain
-        available to Workrr, while the model sees only the failed finding and
-        the boundaries needed to fix it.
+        Repair stays targeted by rendering the packet's executable behavioral
+        contract instead of replaying the raw source objective and provenance.
+        The model sees the failed finding and the product acceptance contract
+        needed to resolve it.
         """
         observed_issue = json.dumps(dict(issue), indent=2, sort_keys=True, default=str)
         paths = ", ".join(self.allowed_paths) or "none declared"
         commands = _render_allowed_command_forms(self.allowed_commands)
+        feature_contract = (
+            f"{self.implementation_packet.objective}\n\n"
+            f"{self.implementation_packet.render()}"
+            if self.implementation_packet is not None
+            else self.objective
+        )
         return (
             "Repair only the reported issue in the existing worktree, then stop.\n"
             "Do not re-plan the feature or revisit unrelated changes.\n\n"
-            f"Feature objective:\n{self.objective}\n\n"
+            f"Feature objective:\n{feature_contract}\n\n"
             "Observed issue:\n"
             f"{observed_issue}\n\n"
             f"Allowed durable paths: {paths}\n"

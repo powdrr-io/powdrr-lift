@@ -885,13 +885,14 @@ class FeatureCommandRuntime:
                 clause.clause_id: {"multiple": False} for clause in ledger.clauses
             }
             for clause_id, split in zip(multiple_ids, split_results, strict=True):
-                if set(split) != {"statements"}:
+                if set(split) != {"statements", "validation_groups"}:
                     raise PowdrrExecutionError(
-                        "atomicity split may contain only ordered statements"
+                        "atomicity split requires statements and validation_groups"
                     )
                 compiler_decisions[clause_id] = {
                     "multiple": True,
                     "statements": split.get("statements"),
+                    "validation_groups": split.get("validation_groups"),
                 }
             try:
                 refined = apply_atomicity_decisions(ledger, compiler_decisions)
@@ -2195,6 +2196,18 @@ def _merge_behavior_scenario_values(
         "evidence": [evidence.strip()],
         "validator": evidence.strip(),
     }
+    partial_contract = design.get("partial_contract")
+    routing = (
+        partial_contract.get("routing")
+        if isinstance(partial_contract, Mapping)
+        else "include"
+    )
+    scenario["routing"] = routing
+    validation_group_id = clause.get("validation_group_id")
+    validation_relation = clause.get("validation_relation", "independent")
+    if isinstance(validation_group_id, str) and validation_group_id.strip():
+        scenario["validation_group_id"] = validation_group_id
+        scenario["validation_relation"] = validation_relation
     try:
         compiled = compile_behavior_scenarios((scenario,))[0]
     except ValueError as error:

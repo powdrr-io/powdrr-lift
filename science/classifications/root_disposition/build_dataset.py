@@ -80,7 +80,7 @@ SPLIT_INSTRUCTIONS = (
 
 
 def _json_schema_for_root() -> dict[str, Any]:
-    values = sorted(DECISION_VALUES["disposition"])
+    values = sorted(DECISION_VALUES["routing"])
     reasons = [
         "source_ambiguous",
         "source_underspecified",
@@ -348,7 +348,7 @@ def _label_task(
             pending_specs=[request],
             provider_results=[response],
         )
-        root = next(item for item in bound if item.decision_kind == "disposition")
+        root = next(item for item in bound if item.decision_kind == "routing")
         return {
             "clause": clause_data,
             "decision": root.to_data(),
@@ -392,7 +392,7 @@ def _example(task_run: Mapping[str, Any], record: Mapping[str, Any]) -> dict[str
     return {
         "schema_version": DATASET_SCHEMA,
         "example_id": f"example:root-disposition:{task_id}:{clause['clause_id']}",
-        "decision_kind": "disposition",
+        "decision_kind": "routing",
         "decision_contract_revision": record["spec"]["contract_revision"],
         "inputs": {
             "proposition": proposition,

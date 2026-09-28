@@ -42,6 +42,7 @@ NOW = "2026-09-25T00:00:00Z"
 
 def test_every_source_classifier_has_a_question_and_decision_rules() -> None:
     assert set(CLASSIFIER_DEFINITIONS) == {
+        "routing",
         "disposition",
         "polarity",
         "quantifier",
@@ -68,7 +69,7 @@ def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     root = bind_source_semantic_decisions(
         resolved_decisions=[],
         pending_specs=[root_request],
-        provider_results=[{"status": "resolved", "value": "feature"}],
+        provider_results=[{"status": "resolved", "value": "include"}],
         created_at=NOW,
     )
     child_requests = prepare_dependent_source_semantic_decisions(
@@ -102,17 +103,17 @@ def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     assert any("negative contrast" in rule for rule in exception_rules)
 
 
-def test_background_clause_takes_context_branch_before_child_classifiers() -> None:
+def test_excluded_background_takes_context_branch_before_child_classifiers() -> None:
     clause = _clause(
         "States lack built-in data ownership, forcing manual variable management "
         "without scoping or lifecycle."
     )
     root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
-    assert root_plan["pending_specs"][0]["spec"]["decision_kind"] == "disposition"
+    assert root_plan["pending_specs"][0]["spec"]["decision_kind"] == "routing"
     root = bind_source_semantic_decisions(
         resolved_decisions=[],
         pending_specs=root_plan["pending_specs"],
-        provider_results=[{"status": "resolved", "value": "context"}],
+        provider_results=[{"status": "resolved", "value": "exclude"}],
         created_at=NOW,
     )
     child_plan = prepare_dependent_source_semantic_decisions(
@@ -134,13 +135,14 @@ def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> Non
     root = bind_source_semantic_decisions(
         resolved_decisions=[],
         pending_specs=root_plan["pending_specs"],
-        provider_results=[{"status": "resolved", "value": "invariant"}],
+        provider_results=[{"status": "resolved", "value": "include"}],
         created_at=NOW,
     )
     child_plan = prepare_dependent_source_semantic_decisions(
         clause, root, created_at=NOW
     )
     unresolved_values = {
+        "disposition": "feature",
         "has_precondition": None,
         "has_exception": None,
         "has_explicit_result": None,
@@ -181,10 +183,12 @@ def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> Non
         "has_exception",
         "has_explicit_result",
         "source_predicate",
-        "nonactionable_exclusion_safety",
     ):
         assert by_kind[kind].provider.kind == "deterministic-rule"
         assert f"normative-default:{kind}:" in " ".join(by_kind[kind].evidence_refs)
+    assert (
+        by_kind["nonactionable_exclusion_safety"].provider.kind == "deterministic-rule"
+    )
 
 
 def test_nonactionable_clause_takes_process_only_branch() -> None:
@@ -193,7 +197,7 @@ def test_nonactionable_clause_takes_process_only_branch() -> None:
     root = bind_source_semantic_decisions(
         resolved_decisions=[],
         pending_specs=root_plan["pending_specs"],
-        provider_results=[{"status": "resolved", "value": "nonactionable"}],
+        provider_results=[{"status": "resolved", "value": "exclude"}],
         created_at=NOW,
     )
 
@@ -201,14 +205,13 @@ def test_nonactionable_clause_takes_process_only_branch() -> None:
         clause, root, created_at=NOW
     )
 
-    assert [item["spec"]["decision_kind"] for item in child_plan["pending_specs"]] == [
-        "nonactionable_exclusion_safety"
-    ]
+    assert child_plan["pending_specs"] == []
     child_values = {
         item["decision_kind"]: item["result"]["value"]
         for item in child_plan["resolved_decisions"]
     }
     assert child_values["polarity"] == "descriptive"
+    assert child_values["disposition"] == "context"
 
 
 def test_nonactionable_behavior_family_uses_deterministic_placeholder() -> None:
@@ -247,6 +250,7 @@ def _clause(text: str = "All data should pickle.") -> dict[str, Any]:
 
 def _source_result(kind: str, *, disposition: str = "invariant") -> str:
     return {
+        "routing": "include",
         "disposition": disposition,
         "polarity": "required",
         "quantifier": "every",
@@ -270,7 +274,18 @@ def _bind_source_decisions(
     root = bind_source_semantic_decisions(
         resolved_decisions=root_plan["resolved_decisions"],
         pending_specs=root_plan["pending_specs"],
-        provider_results=[{"status": "resolved", "value": disposition}],
+        provider_results=[
+            {
+                "status": "resolved",
+                "value": (
+                    "exclude"
+                    if disposition in {"context", "nonactionable"}
+                    else "include_prohibition"
+                    if disposition == "non_goal"
+                    else "include"
+                ),
+            }
+        ],
         created_at=NOW,
     )
     plan = prepare_dependent_source_semantic_decisions(clause, root, created_at=NOW)
@@ -298,7 +313,7 @@ def test_pipeline_compiles_source_anchored_partial_contract() -> None:
 
     assert plan["resolved_decisions"] == []
     assert [item["spec"]["decision_kind"] for item in plan["pending_specs"]] == [
-        "disposition"
+        "routing"
     ]
     decisions = _bind_source_decisions(clause)
     extraction_requests = prepare_source_extractions(clause, decisions)
@@ -325,7 +340,8 @@ def test_pipeline_compiles_source_anchored_partial_contract() -> None:
     )
 
     data = contract.to_data()
-    assert data["schema_version"] == "partial-semantic-contract-v1"
+    assert data["schema_version"] == "partial-semantic-contract-v2"
+    assert data["routing"] == "include"
     assert data["disposition"] == "invariant"
     assert data["quantifier"] == "every"
     assert data["subject"]["source_text"] == "data"
@@ -540,41 +556,32 @@ def test_modifier_presence_controls_exact_extraction_requests() -> None:
     ]
 
 
-def test_nonactionable_requires_independent_process_only_confirmation() -> None:
+def test_prohibition_route_forces_negative_product_contract() -> None:
     clause = _clause("Do not add retries.")
-    with pytest.raises(SemanticContractError, match="requires process-only evidence"):
-        _bind_source_decisions(
-            clause,
-            disposition="nonactionable",
-            overrides={"nonactionable_exclusion_safety": "product_semantics_present"},
-        )
+    decisions = _bind_source_decisions(clause, disposition="non_goal")
+    values = {item.decision_kind: item.result.value for item in decisions}
+    assert values["routing"] == "include_prohibition"
+    assert values["disposition"] == "non_goal"
+    assert values["polarity"] == "prohibited"
 
 
-def test_actionable_disposition_rejects_process_only_confirmation() -> None:
-    clause = _clause()
-    with pytest.raises(SemanticContractError, match="conflicts with process-only"):
-        _bind_source_decisions(
-            clause, overrides={"nonactionable_exclusion_safety": "process_only"}
-        )
-    decisions = _bind_source_decisions(clause)
-    requests = prepare_source_extractions(clause, decisions)
-    extractions = bind_source_extractions(
-        requests=requests,
-        provider_results=[{"quote": "data"}, {"quote": "pickle"}],
+def test_unclear_route_continues_as_headless_review_candidate() -> None:
+    clause = _clause("It should work well.")
+    plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=[],
+        pending_specs=plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "unclear"}],
         created_at=NOW,
     )
-    family_request = prepare_behavior_family_decision(clause, extractions[1])
-    family = bind_behavior_family_decision(
-        family_request,
-        {"status": "resolved", "value": "serialize"},
-        created_at=NOW,
+    dependent = prepare_dependent_source_semantic_decisions(
+        clause, root, created_at=NOW
     )
 
-    compile_source_contract(
-        clause=clause,
-        decisions=decisions,
-        extractions=extractions,
-        behavior_family=family,
+    assert dependent["pending_specs"][0]["spec"]["decision_kind"] == "disposition"
+    assert (
+        "headless review packet"
+        in " ".join(dependent["pending_specs"][0]["instructions"]).casefold()
     )
 
 

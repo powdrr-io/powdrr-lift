@@ -649,13 +649,15 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     )
     assert atomicity_judge["output"]["schema"]["required"] == ["multiple"]
     assert split_judge["question"] == (
-        "What are the smallest independently verifiable requirements contained in "
-        "this one instruction clause?"
+        "How can this clause be decomposed without losing validation dependencies?"
     )
-    assert split_judge["output"]["schema"]["required"] == ["statements"]
+    assert split_judge["output"]["schema"]["required"] == [
+        "statements",
+        "validation_groups",
+    ]
 
     assert classifier_loop["snapshot"]["max_items"] == 16
-    assert root_judge["question"].startswith("Decide the root role")
+    assert root_judge["question"].startswith("Decide how the pipeline should route")
     assert dependent_operation["command"] == [
         "prepare_dependent_source_semantic_decisions"
     ]

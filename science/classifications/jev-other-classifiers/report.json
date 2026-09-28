@@ -1,0 +1,274 @@
+{
+  "example_count": 21,
+  "generated_at": "2026-09-28T19:53:36.433060+00:00",
+  "jev_model": "jev-latest",
+  "limitations": [
+    "Agreement is between Jev and a fresh LLM reference, not accuracy against human labels.",
+    "The LLM reference is a fresh run of DeepSeek V4 Flash, not an archived disposition label.",
+    "The exact proposition is used as the behavior phrase for behavior_family in this pilot.",
+    "Multiple typed decisions are requested in one call per provider for cost and latency control."
+  ],
+  "llm_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "llm_provider": "deepinfra-cheap",
+  "not_tested": {
+    "candidate_relation": "requires a repository or ontology candidate pair",
+    "contract_observation_relation": "requires a pair of bound contracts",
+    "entailment": "requires a source proposition and field assertion pair",
+    "proposition_coverage": "requires source-parent and child proposition pairs",
+    "source_extractors": "span extraction is outside this categorical decision pilot"
+  },
+  "reference": "fresh LLM outputs; not human gold labels",
+  "sampling": {
+    "per_teacher_disposition": 3,
+    "seed": 20260930,
+    "source_split": "non-held-out source families"
+  },
+  "schema_version": "jev-other-source-classifiers-comparison-v1",
+  "tested_kinds": {
+    "behavior_family": {
+      "agreement": 0.4444444444444444,
+      "confusion_matrix": {
+        "other": {
+          "emit": 1,
+          "other": 4,
+          "persist": 1,
+          "retrieve": 2,
+          "unresolved": 3,
+          "validate": 3
+        },
+        "persist": {
+          "persist": 1
+        },
+        "serialize": {
+          "serialize": 1
+        },
+        "transform": {
+          "transform": 1
+        },
+        "validate": {
+          "validate": 1
+        }
+      },
+      "jev_labels": {
+        "emit": 1,
+        "other": 4,
+        "persist": 2,
+        "retrieve": 2,
+        "serialize": 1,
+        "transform": 1,
+        "unresolved": 3,
+        "validate": 4
+      },
+      "llm_labels": {
+        "other": 14,
+        "persist": 1,
+        "serialize": 1,
+        "transform": 1,
+        "validate": 1
+      },
+      "n": 18
+    },
+    "has_exception": {
+      "agreement": 0.9444444444444444,
+      "confusion_matrix": {
+        "absent": {
+          "absent": 16,
+          "present": 1
+        },
+        "present": {
+          "present": 1
+        }
+      },
+      "jev_labels": {
+        "absent": 16,
+        "present": 2
+      },
+      "llm_labels": {
+        "absent": 17,
+        "present": 1
+      },
+      "n": 18
+    },
+    "has_explicit_result": {
+      "agreement": 0.5,
+      "confusion_matrix": {
+        "absent": {
+          "absent": 7,
+          "present": 8
+        },
+        "present": {
+          "absent": 1,
+          "present": 2
+        }
+      },
+      "jev_labels": {
+        "absent": 8,
+        "present": 10
+      },
+      "llm_labels": {
+        "absent": 15,
+        "present": 3
+      },
+      "n": 18
+    },
+    "has_precondition": {
+      "agreement": 0.7222222222222222,
+      "confusion_matrix": {
+        "absent": {
+          "absent": 10,
+          "present": 5
+        },
+        "present": {
+          "present": 3
+        }
+      },
+      "jev_labels": {
+        "absent": 10,
+        "present": 8
+      },
+      "llm_labels": {
+        "absent": 15,
+        "present": 3
+      },
+      "n": 18
+    },
+    "nonactionable_exclusion_safety": {
+      "agreement": 0.6666666666666666,
+      "confusion_matrix": {
+        "process_only": {
+          "process_only": 1,
+          "product_semantics_present": 1
+        },
+        "product_semantics_present": {
+          "product_semantics_present": 1
+        }
+      },
+      "jev_labels": {
+        "process_only": 1,
+        "product_semantics_present": 2
+      },
+      "llm_labels": {
+        "process_only": 2,
+        "product_semantics_present": 1
+      },
+      "n": 3
+    },
+    "polarity": {
+      "agreement": 0.7777777777777778,
+      "confusion_matrix": {
+        "descriptive": {
+          "descriptive": 7,
+          "required": 4
+        },
+        "required": {
+          "required": 7
+        }
+      },
+      "jev_labels": {
+        "descriptive": 7,
+        "required": 11
+      },
+      "llm_labels": {
+        "descriptive": 11,
+        "required": 7
+      },
+      "n": 18
+    },
+    "quantifier": {
+      "agreement": 0.6111111111111112,
+      "confusion_matrix": {
+        "every": {
+          "every": 5,
+          "one": 2
+        },
+        "unspecified": {
+          "every": 1,
+          "one": 4,
+          "unspecified": 6
+        }
+      },
+      "jev_labels": {
+        "every": 6,
+        "one": 6,
+        "unspecified": 6
+      },
+      "llm_labels": {
+        "every": 7,
+        "unspecified": 11
+      },
+      "n": 18
+    },
+    "requirement_strength": {
+      "agreement": 0.7222222222222222,
+      "confusion_matrix": {
+        "descriptive": {
+          "descriptive": 7,
+          "must": 1,
+          "unspecified": 3
+        },
+        "must": {
+          "must": 6,
+          "unspecified": 1
+        }
+      },
+      "jev_labels": {
+        "descriptive": 7,
+        "must": 7,
+        "unspecified": 4
+      },
+      "llm_labels": {
+        "descriptive": 11,
+        "must": 7
+      },
+      "n": 18
+    },
+    "source_predicate": {
+      "agreement": 0.7777777777777778,
+      "confusion_matrix": {
+        "explicit": {
+          "explicit": 3
+        },
+        "not_stated": {
+          "explicit": 4,
+          "not_stated": 11
+        }
+      },
+      "jev_labels": {
+        "explicit": 7,
+        "not_stated": 11
+      },
+      "llm_labels": {
+        "explicit": 3,
+        "not_stated": 15
+      },
+      "n": 18
+    },
+    "temporal_scope": {
+      "agreement": 0.8888888888888888,
+      "confusion_matrix": {
+        "current": {
+          "current": 1,
+          "unspecified": 1
+        },
+        "event_bound": {
+          "event_bound": 2
+        },
+        "unspecified": {
+          "event_bound": 1,
+          "unspecified": 13
+        }
+      },
+      "jev_labels": {
+        "current": 1,
+        "event_bound": 3,
+        "unspecified": 14
+      },
+      "llm_labels": {
+        "current": 2,
+        "event_bound": 2,
+        "unspecified": 14
+      },
+      "n": 18
+    }
+  }
+}

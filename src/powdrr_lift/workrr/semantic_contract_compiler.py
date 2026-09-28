@@ -986,6 +986,16 @@ def bind_behavior_family_decision(
     if not isinstance(spec_raw, Mapping):
         raise SemanticContractError("behavior-family request has no spec")
     spec = SemanticDecisionSpec.from_data(spec_raw)
+    if request.get("allowed_values") == ["other"]:
+        # Context and process-only clauses use "other" as a schema placeholder;
+        # no model judgment is needed to classify a clause that creates no
+        # product behavior obligation.
+        return spec.bind(
+            provider=SemanticDecisionProvider(kind="deterministic-rule"),
+            provider_result={"status": "resolved", "value": "other"},
+            evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+            created_at=created_at or _created_at(),
+        )
     return spec.bind(
         provider=SemanticDecisionProvider(kind="planning-llm"),
         provider_result=provider_result,

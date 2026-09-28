@@ -141,6 +141,32 @@ def test_nonactionable_clause_takes_process_only_branch() -> None:
     assert child_values["polarity"] == "descriptive"
 
 
+def test_nonactionable_behavior_family_uses_deterministic_placeholder() -> None:
+    clause = _clause("Create a new branch and commit everything when done.")
+    decisions = _bind_source_decisions(
+        clause,
+        disposition="nonactionable",
+        overrides={"nonactionable_exclusion_safety": "process_only"},
+    )
+    extraction_requests = prepare_source_extractions(clause, decisions)
+    extractions = bind_source_extractions(
+        requests=extraction_requests,
+        provider_results=[{"quote": "branch"}, {"quote": "commit everything"}],
+        created_at=NOW,
+    )
+
+    request = prepare_behavior_family_decision(clause, extractions[1], decisions)
+    family = bind_behavior_family_decision(
+        request,
+        {"status": "unresolved", "value": None, "reason_code": "no_candidate"},
+        created_at=NOW,
+    )
+
+    assert family.result.status == "resolved"
+    assert family.result.value == "other"
+    assert family.provider.kind == "deterministic-rule"
+
+
 def _clause(text: str = "All data should pickle.") -> dict[str, Any]:
     return {
         "clause_id": "instruction-001",

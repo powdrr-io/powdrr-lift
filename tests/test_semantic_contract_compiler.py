@@ -82,6 +82,11 @@ def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     assert "Worked examples" not in all_instructions
     assert "DataVar" not in all_instructions
     assert "state data" not in all_instructions
+    assert any(
+        "Use unspecified when the proposition does not explicitly state how many"
+        in rule
+        for rule in CLASSIFIER_DEFINITIONS["quantifier"].instructions
+    )
     result_rules = next(
         request["instructions"]
         for request in child_requests

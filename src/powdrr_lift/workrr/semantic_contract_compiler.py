@@ -159,6 +159,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose one, some, every, or unspecified; do not infer universal "
             "coverage from normative tone.",
+            "Use unspecified when the proposition does not explicitly state how "
+            "many subjects or what proportion are covered; do not infer one from "
+            "singular grammar.",
         ),
         (
             ClassificationExample("One active report is selected.", "one"),
@@ -192,6 +195,8 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "modal.",
             "Preserve should separately from must even when both express required "
             "product behavior.",
+            "Imperative grammar alone does not state a modal strength; use "
+            "unspecified when the proposition contains no explicit modal.",
         ),
         (
             ClassificationExample("The method must return a snapshot.", "must"),
@@ -225,7 +230,12 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
     "has_precondition": ClassifierDefinition(
         "Does this exact proposition explicitly state a condition that must hold "
         "before or while the behavior applies?",
-        ("Choose present or absent; do not extract or invent the condition.",),
+        (
+            "Choose present or absent; do not extract or invent the condition.",
+            "Choose present only when a condition limits when, where, or for whom "
+            "the behavior applies; a purpose or result clause is not itself a "
+            "precondition.",
+        ),
         tuple(
             [
                 ClassificationExample(text, "present")
@@ -348,6 +358,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose current, future, current_and_future, event_bound, or unspecified.",
             "Do not infer future scope from every or all.",
+            "Use unspecified when the proposition gives no explicit temporal "
+            "marker; ordinary present-tense wording does not establish that the "
+            "behavior already exists.",
         ),
         (
             ClassificationExample(

@@ -53,13 +53,11 @@ def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     )
     rendered = packet.render()
     assert rendered.count("nested-error-continues") == 1
-    assert "Given: result: nested error with source location" in rendered
-    assert "When: process this record followed by a valid record" in rendered
-    assert (
-        "Expect: errors: preserved with location; later_record: processed" in rendered
-    )
-    assert "Errors: nested_errors: preserve locations" in rendered
-    assert "Afterward: later_records: continue" in rendered
+    assert "Given result: nested error with source location" in rendered
+    assert "when process this record followed by a valid record" in rendered
+    assert "expect errors: preserved with location; later_record: processed" in rendered
+    assert "nested_errors: preserve locations" not in rendered
+    assert "later_records: continue" not in rendered
     assert "not_applicable" not in rendered
     assert '"scenario"' not in rendered
     restored = type(packet).from_data(packet.to_data())
@@ -148,18 +146,27 @@ def test_behavior_scenario_preserves_normative_assumption_provenance() -> None:
     assert packet.behavior_scenarios[0].assumptions[0]["basis_reference"] == (
         "Python ast.literal_eval behavior"
     )
-    assert "Default for errors: Propagate the parser's native literal error." in (
+    assert "error_behavior: Propagate the parser's native literal error." in (
         packet.render()
     )
 
 
-def test_worker_check_includes_meaningful_boundaries_and_execution_paths() -> None:
+def test_worker_check_includes_defaults_capabilities_and_execution_paths() -> None:
     scenario = _scenario()
     scenario["dimensions"] = {
         **scenario["dimensions"],
         "normal_result": "The later record is processed.",
-        "negative_boundaries": "An invalid record does not abort the batch.",
     }
+    scenario["assumptions"] = [
+        {
+            "dimension": "negative_boundaries",
+            "resolution": "An invalid record does not abort the batch.",
+            "rationale": "The operation is isolated per record.",
+            "basis": "conservative_default",
+            "basis_reference": "No batch failure behavior was specified.",
+            "confidence": "medium",
+        }
+    ]
     scenario["capability_matrix"] = [
         {
             "capability": "invalid records",
@@ -178,11 +185,13 @@ def test_worker_check_includes_meaningful_boundaries_and_execution_paths() -> No
     )
 
     rendered = packet.render()
-    assert "synchronous and asynchronous engines" in rendered
-    assert "Result details: The later record is processed." in rendered
-    assert "Boundary: An invalid record does not abort the batch." in rendered
-    assert "Capability: reject invalid records with InvalidRecord" in rendered
-    assert "Check every applicable execution path" in rendered
+    assert "synchronous and asynchronous implementations" in rendered
+    assert "Defaults for behavior the source leaves unspecified:" in rendered
+    assert (
+        "negative_boundaries: An invalid record does not abort the batch." in rendered
+    )
+    assert "Capabilities: reject invalid records with InvalidRecord" in rendered
+    assert "Do not treat a passing test on one execution path" in rendered
 
 
 def test_normative_assumption_cannot_claim_not_applicable_as_a_default() -> None:

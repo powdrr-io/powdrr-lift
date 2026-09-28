@@ -718,8 +718,8 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
     assert "Required behavior checks:" in prompt_text
-    assert "Expect: the stated acceptance outcome is observed" in prompt_text
-    assert "Run the focused required tests after implementation." in prompt_text
+    assert "expect the stated acceptance outcome is observed" in prompt_text
+    assert "Run the tests before reporting completion." in prompt_text
     assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text
     proposal = json.loads(

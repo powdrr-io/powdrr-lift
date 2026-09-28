@@ -145,58 +145,40 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
     """
     lines = [
         "Required behavior checks:",
-        "Implement every numbered case and add focused tests for its observable "
-        "result and boundaries. Inspect the repository for every execution "
-        "path that supports the behavior (for example, synchronous and "
-        "asynchronous engines) and test each applicable path. Include "
-        "integrations and inactive or empty states when a case calls for them.",
+        "Implement every case. First trace the affected code paths, including "
+        "synchronous and asynchronous implementations and named integrations. "
+        "Add focused tests for the listed cases and applicable paths. Run the "
+        "tests before reporting completion.",
         "",
     ]
-    labels = {
-        "normal_result": "Result details",
-        "error_behavior": "Errors",
-        "continuation": "Afterward",
-        "unsupported_behavior": "Unsupported cases",
-        "cancellation_cleanup": "Cleanup",
-        "compatibility": "Existing behavior",
-        "negative_boundaries": "Boundary",
-    }
     for index, item in enumerate(scenarios, start=1):
-        lines.extend(
-            (
-                f"{index}. {item.subject} [{item.scenario_id}]",
-                f"   Given: {_worker_text(item.given)}",
-                f"   When: {item.when}",
-                f"   Expect: {_worker_text(item.then)}",
-            )
+        detail = (
+            f"{index}. [{item.scenario_id}] {item.subject}: "
+            f"Given {_worker_text(item.given)}; "
+            f"when {item.when}; "
+            f"expect {_worker_text(item.then)}."
         )
-        for name in BEHAVIOR_DIMENSIONS:
-            value = item.dimensions[name]
-            if isinstance(value, str) and _is_not_applicable(value):
-                continue
-            detail = _worker_text(value)
-            if name == "normal_result" and _repeats_expectation(detail, item.then):
-                continue
-            lines.append(f"   {labels[name]}: {detail}")
-        for assumption in item.assumptions:
-            resolution = assumption["resolution"]
-            dimension = assumption["dimension"]
-            if (
-                resolution.casefold()
-                not in _worker_text(item.dimensions[dimension]).casefold()
-            ):
-                lines.append(
-                    f"   Default for {labels[dimension].lower()}: {resolution}"
-                )
-        for capability in item.capability_matrix:
-            detail = f"{capability['behavior']} {capability['capability']}"
-            if capability["behavior"] == "reject":
-                detail += f" with {capability['error']}"
-            lines.append(f"   Capability: {detail}")
-        lines.append("")
+        capabilities = [
+            f"{value['behavior']} {value['capability']}"
+            + (f" with {value['error']}" if value["behavior"] == "reject" else "")
+            for value in item.capability_matrix
+        ]
+        if capabilities:
+            detail += " Capabilities: " + "; ".join(capabilities) + "."
+        lines.append(detail)
+    assumptions = [
+        (item.scenario_id, value["dimension"], value["resolution"])
+        for item in scenarios
+        for value in item.assumptions
+        if value["dimension"]
+        in {"error_behavior", "negative_boundaries", "unsupported_behavior"}
+    ]
+    if assumptions:
+        lines.extend(("", "Defaults for behavior the source leaves unspecified:"))
+        for scenario_id, dimension, resolution in assumptions:
+            lines.append(f"- [{scenario_id}] {dimension}: {resolution}")
     lines.append(
-        "Run the focused required tests after implementation. Check every "
-        "applicable execution path before claiming the feature is complete."
+        "Do not treat a passing test on one execution path as proof for another."
     )
     return "\n".join(lines)
 
@@ -208,12 +190,6 @@ def _worker_text(value: Any) -> str:
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         return "; ".join(_worker_text(item) for item in value)
     return str(value)
-
-
-def _repeats_expectation(detail: str, expectation: Any) -> bool:
-    expected = _worker_text(expectation).strip().casefold().rstrip(".")
-    actual = detail.strip().casefold().rstrip(".")
-    return actual == expected or actual in expected
 
 
 def validate_capability_matrix(

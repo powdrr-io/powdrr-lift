@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 851
+title: Run independent instruction classifications concurrently
+intent:
+  problem: The instruction design interview waits for each independent clause classification to finish before starting the next one.
+  goal: Reduce classification wall time while preserving one decision per clause, the existing prompt contract, and deterministic collection order.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 146, end_line: 146}
+    summary: Allow up to four independent clause classifications in flight.
+    rationale: Overlap model latency without changing individual prompts or decision schemas.
+    related: {entities: [bounded-foreach-judgments], invariants: [parallel-judgment-order-preserved]}
+  - path: src/procedrr/parser.py
+    type: modified
+    span: {start_line: 860, end_line: 860}
+    summary: Recognize the for-each parallelism setting.
+    rationale: Validate the runtime concurrency declaration as part of the workflow definition.
+    related: {entities: [foreach-parallelism-validation]}
+  - path: src/procedrr/parser.py
+    type: modified
+    span: {start_line: 1503, end_line: 1523}
+    summary: Bound parallelism to one through thirty-two workers and restrict it to for-each loops.
+    rationale: Reject invalid or unsupported concurrency settings before execution.
+    related: {entities: [foreach-parallelism-validation], invariants: [parallel-judgment-order-preserved]}
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Add a bounded thread pool for independent judge calls.
+    rationale: Run classifier requests concurrently while leaving prompt construction unchanged.
+    related: {entities: [bounded-foreach-judgments]}
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 725, end_line: 802}
+    summary: Execute judge-only for-each bodies concurrently with isolated iteration state and ordered collection.
+    rationale: Preserve per-clause decisions and deterministic outputs while overlapping provider calls.
+    related: {entities: [bounded-foreach-judgments], invariants: [parallel-judgment-order-preserved]}
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 633, end_line: 633}
+    summary: Assert the design interview opts into four-way clause classification.
+    rationale: Keep the speedup configuration explicit and covered by workflow tests.
+    related: {entities: [parallel-judgment-tests]}
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 652, end_line: 652}
+    summary: Assert the configured parallel worker bound.
+    rationale: Keep the design-interview concurrency setting explicit in regression coverage.
+    related: {entities: [parallel-judgment-tests]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: Import the barrier used to prove overlapping evaluator requests.
+    rationale: Test real concurrent calls deterministically without relying on elapsed-time thresholds.
+    related: {entities: [parallel-judgment-tests]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 31, end_line: 84}
+    summary: Verify judge-only items overlap and their results retain input order.
+    rationale: Cover the concurrency behavior without relying on a live provider.
+    related: {entities: [parallel-judgment-tests], invariants: [parallel-judgment-order-preserved]}
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 827, end_line: 903}
+    summary: Compare serial and parallel atomicity classifications with a live provider.
+    rationale: Check exact decision parity and record observed elapsed time and activation counts.
+    related: {entities: [parallel-judgment-tests], invariants: [parallel-judgment-order-preserved]}
+entities:
+  - id: bounded-foreach-judgments
+    type: Function
+    action: added
+  - id: foreach-parallelism-validation
+    type: Function
+    action: added
+  - id: parallel-judgment-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: parallel-judgment-tests-cover-runtime
+    source: parallel-judgment-tests
+    target: bounded-foreach-judgments
+    relationship: verifies
+    description: Tests verify parallel item execution, ordered collection, and serial parity.
+    rationale: Guard the behavior and result contract of concurrent clause classification.
+    action: added
+invariants:
+  - id: parallel-judgment-order-preserved
+    action: added
+    description: Parallel judge-only for-each iterations collect outputs and emit events in source item order, with each iteration receiving an isolated state mapping.
+    rationale: Keep classification results and event traces deterministic while requests overlap.
+guidance: []

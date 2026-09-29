@@ -48,6 +48,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _capture_benchmark_fallback_prompt,
     _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
@@ -2362,6 +2363,44 @@ def test_prompt_capture_does_not_enter_coding_attempt_recovery_loop(
     assert result["continuations"] == 0
     assert len(calls) == 1
     assert "repair_issue" not in calls[0]
+
+
+def test_benchmark_fallback_captures_source_instruction_after_design_failure(
+    tmp_path: Path,
+) -> None:
+    source = "Keep the original instruction intact, even when classification fails."
+    config = FeatureEndpointConfig(
+        feature_description=source,
+        work_item_name="fallback prompt",
+        repo_root=tmp_path,
+        allowed_paths=("src", "tests"),
+        benchmark_mode=True,
+        capture_worker_prompts_only=True,
+    )
+    state: dict[str, Any] = {"validation_profile_names": ("pytest",)}
+
+    _capture_benchmark_fallback_prompt(
+        config,
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, "abc123\n", ""
+        ),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        slug="fallback-prompt",
+        state=state,
+        failure=PowdrrExecutionError("unresolved semantic clause"),
+    )
+
+    prompt_path = state["latest_worker_prompt_path"]
+    prompt = prompt_path.read_text(encoding="utf-8")
+    assert source in prompt
+    assert "classification did not complete" in prompt
+    assert state["request_path"].is_file()
+    fallback = json.loads(
+        (tmp_path / "output" / "benchmark-prompt-fallback.json").read_text()
+    )
+    assert fallback["semantic_analysis"] == "incomplete"
+    assert fallback["source_text_preserved_verbatim"] is True
 
 
 def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(

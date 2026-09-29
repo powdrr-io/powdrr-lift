@@ -526,9 +526,34 @@ def _execute_procedrr_flow(
             artifact_paths=_artifact_paths(output_root),
         )
         _write_failure_artifact(output_root, failure)
-        result = _feature_endpoint_result(
-            state, branch, worktree, "review_failed", failure=failure
-        )
+        if config.benchmark_mode and config.capture_worker_prompts_only:
+            _capture_benchmark_fallback_prompt(
+                config,
+                runner=runner,
+                worktree=worktree,
+                output_root=output_root,
+                slug=slug,
+                state=state,
+                failure=error,
+            )
+            state["review"] = {
+                "passed": False,
+                "scope": "worker prompt compilation",
+                "implementation_review": "not_run",
+                "fallback": True,
+                "failure": str(error),
+            }
+            result = _feature_endpoint_result(
+                state,
+                branch,
+                worktree,
+                "prompt_captured_with_fallback",
+                failure=failure,
+            )
+        else:
+            result = _feature_endpoint_result(
+                state, branch, worktree, "review_failed", failure=failure
+            )
     else:
         if config.design_only:
             canonical_path = state.get("canonical_feature_design_path")
@@ -561,6 +586,86 @@ def _execute_procedrr_flow(
         )
     _write_run_result(output_root, result)
     return result
+
+
+def _capture_benchmark_fallback_prompt(
+    config: FeatureEndpointConfig,
+    *,
+    runner: Runner,
+    worktree: Path,
+    output_root: Path,
+    slug: str,
+    state: dict[str, Any],
+    failure: Exception,
+) -> None:
+    """Capture a source-faithful prompt when benchmark design classification fails."""
+
+    class _FallbackProvider:
+        provider_name = f"{config.code_agent}-benchmark-fallback"
+
+    try:
+        base_commit = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+    except (OSError, subprocess.CalledProcessError):
+        base_commit = "unavailable"
+    unresolved_path = output_root / "benchmark-prompt-fallback.json"
+    unresolved_path.parent.mkdir(parents=True, exist_ok=True)
+    unresolved = {
+        "reason": str(failure),
+        "source": "feature_description",
+        "source_text_preserved_verbatim": True,
+        "semantic_analysis": "incomplete",
+        "policy": (
+            "Prompt generation is mandatory in benchmark mode; unresolved "
+            "semantics remain explicit."
+        ),
+    }
+    unresolved_path.write_text(
+        json.dumps(unresolved, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    prompt = (
+        "Implement the requested feature using the source instruction below as "
+        "the authoritative requirement. Design classification did not complete; "
+        "do not infer additional requirements from missing semantic fields. "
+        "Preserve ambiguity by following only behavior stated in the source and "
+        "inspect the repository to determine the appropriate implementation "
+        "and tests.\n\n"
+        f"Source instruction (verbatim):\n{config.feature_description}\n\n"
+        "Benchmark note: the design interview failed before prompt generation. "
+        "Unresolved semantics are recorded in benchmark-prompt-fallback.json.\n"
+    )
+    request = ImplementationRequest(
+        request_id=f"{slug}-benchmark-fallback",
+        objective=config.feature_description,
+        prompt=prompt,
+        base_commit=base_commit,
+        plan_fingerprint=content_fingerprint(
+            {"feature_description": config.feature_description, "fallback": unresolved}
+        ),
+        allowed_paths=config.allowed_paths,
+        acceptance_criteria=(
+            "Implement behavior explicitly stated in the source instruction.",
+            "Do not invent behavior for unresolved semantic details.",
+        ),
+        validation_profiles=tuple(state.get("validation_profile_names", ())),
+        context_refs=(str(unresolved_path),),
+    )
+    request_path = output_root / "implementation-request.json"
+    operation_request_path = (
+        output_root / "requests" / f"{slug}-benchmark-fallback.json"
+    )
+    capture = _capture_worker_prompt(
+        request,
+        provider=_FallbackProvider(),
+        attempt_store=CodingAgentAttemptStore(output_root / "artifacts"),
+        state=state,
+        request_path=request_path,
+        operation_request_path=operation_request_path,
+        slug=slug,
+        unit_id="benchmark-fallback",
+    )
+    state.update(capture.pop("state"))
+    state["request"] = capture["request"]
+    state["latest_worker_prompt_path"] = capture["prompt_path"]
 
 
 def _prepare_proposal_review(

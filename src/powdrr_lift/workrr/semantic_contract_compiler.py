@@ -914,7 +914,27 @@ def bind_source_semantic_decisions(
         evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
         if clarification_policy == "normative_defaults":
             fallback = _normative_source_decision_default(spec, decisions)
-            if result.get("status") == "unresolved" and fallback is not None:
+            result_is_resolved = (
+                isinstance(result, Mapping)
+                and result.get("status") == "resolved"
+                and result.get("value")
+                in DECISION_VALUES.get(spec.decision_kind, frozenset())
+                and result.get("reason_code") is None
+                and set(result).issubset({"status", "value", "reason_code"})
+            )
+            result_conflicts_with_route = (
+                spec.decision_kind == "disposition"
+                and result_is_resolved
+                and not _disposition_matches_route(
+                    str(result.get("value")),
+                    {item.decision_kind: item.result.value for item in decisions}.get(
+                        "routing"
+                    ),
+                )
+            )
+            if (
+                not result_is_resolved or result_conflicts_with_route
+            ) and fallback is not None:
                 provider = SemanticDecisionProvider(kind="deterministic-rule")
                 provider_result = {"status": "resolved", "value": fallback}
                 evidence_refs = (
@@ -940,9 +960,22 @@ def bind_source_semantic_decisions(
 def _normative_source_decision_default(
     spec: SemanticDecisionSpec, decisions: Sequence[SemanticDecision]
 ) -> str | None:
-    """Default non-core modifiers without guessing a task's product behavior."""
+    """Keep unattended compilation moving with source-preserving defaults."""
     values = {item.decision_kind: item.result.value for item in decisions}
     root = values.get("disposition")
+    route = values.get("routing")
+    if spec.decision_kind == "routing":
+        # If the router cannot decide, retain the user's words as included
+        # guidance. Dropping an ambiguous clause would silently lose intent.
+        return "include"
+    if spec.decision_kind == "disposition":
+        if route == "include_prohibition":
+            return "non_goal"
+        if route == "exclude":
+            return "context"
+        # A broad guidance label carries the exact proposition without claiming
+        # whether it is a feature, API, invariant, or domain entity.
+        return "guidance"
     if spec.decision_kind in {
         "has_precondition",
         "has_exception",
@@ -956,19 +989,65 @@ def _normative_source_decision_default(
         "non_goal",
     }:
         return "explicit"
+    if spec.decision_kind == "source_predicate" and root == "guidance":
+        return "not_stated"
     if spec.decision_kind == "nonactionable_exclusion_safety" and root in {
         "feature",
         "interface",
         "invariant",
+        "guidance",
         "non_goal",
     }:
         return "product_semantics_present"
+    if (
+        spec.decision_kind == "nonactionable_exclusion_safety"
+        and root == "nonactionable"
+    ):
+        return "process_only"
     if spec.decision_kind == "polarity":
         if root == "non_goal":
             return "prohibited"
-        if root in {"feature", "interface", "invariant"}:
+        if root in {"feature", "interface", "invariant", "guidance"}:
+            deterministic = resolve_deterministic_source_decision(
+                "polarity", spec.proposition_text
+            )
+            if deterministic is not None:
+                return deterministic.value
             return "required"
+        if root in {"context", "nonactionable"}:
+            return "descriptive"
+    if spec.decision_kind == "quantifier":
+        deterministic = resolve_deterministic_source_decision(
+            "quantifier", spec.proposition_text
+        )
+        return deterministic.value if deterministic is not None else "unspecified"
+    if spec.decision_kind == "requirement_strength":
+        deterministic = resolve_deterministic_source_decision(
+            "requirement_strength", spec.proposition_text
+        )
+        return deterministic.value if deterministic is not None else "unspecified"
+    if spec.decision_kind == "temporal_scope":
+        deterministic = resolve_deterministic_source_decision(
+            "temporal_scope", spec.proposition_text
+        )
+        return deterministic.value if deterministic is not None else "unspecified"
     return None
+
+
+def _disposition_matches_route(disposition: str, route: str | None) -> bool:
+    if route == "include":
+        return disposition in {
+            "entity",
+            "feature",
+            "interface",
+            "invariant",
+            "guidance",
+        }
+    if route == "include_prohibition":
+        return disposition == "non_goal"
+    if route == "exclude":
+        return disposition == "context"
+    return True
 
 
 def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
@@ -1075,8 +1154,11 @@ def bind_source_extractions(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    clarification_policy: str = "ask",
     created_at: str | None = None,
 ) -> list[BoundSourceExtraction]:
+    if clarification_policy not in {"ask", "normative_defaults"}:
+        raise SemanticContractError("clarification policy is invalid")
     if len(requests) != len(provider_results):
         raise SemanticContractError("source extraction result count is invalid")
     timestamp = created_at or _created_at()
@@ -1086,13 +1168,24 @@ def bind_source_extractions(
         if not isinstance(spec_raw, Mapping):
             raise SemanticContractError("source extraction request has no spec")
         spec = SourceExtractionSpec.from_data(spec_raw)
-        result.append(
-            spec.bind(
+        try:
+            extraction = spec.bind(
                 provider=SemanticDecisionProvider(kind="planning-llm"),
                 provider_result=provider_result,
                 created_at=timestamp,
             )
-        )
+        except (SemanticContractError, TypeError, AttributeError):
+            if clarification_policy != "normative_defaults":
+                raise
+            # The whole clause is an exact, unambiguous quote even when the
+            # model cannot isolate a narrower subject/behavior phrase. Keeping
+            # it verbatim is less lossy than aborting or inventing a paraphrase.
+            extraction = spec.bind(
+                provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                provider_result={"quote": spec.proposition_text},
+                created_at=timestamp,
+            )
+        result.append(extraction)
     return result
 
 
@@ -1162,6 +1255,7 @@ def bind_behavior_family_decision(
     request: Mapping[str, Any],
     provider_result: Mapping[str, Any],
     *,
+    clarification_policy: str = "ask",
     created_at: str | None = None,
 ) -> SemanticDecision:
     spec_raw = request.get("spec")
@@ -1178,15 +1272,31 @@ def bind_behavior_family_decision(
             evidence_refs=(f"source-proposition:{spec.subject_ref}",),
             created_at=created_at or _created_at(),
         )
-    if (
+    family_values = set(request.get("allowed_values", ()))
+    family_result_is_valid = (
+        isinstance(provider_result, Mapping)
+        and provider_result.get("status") == "resolved"
+        and provider_result.get("value") in family_values
+        and provider_result.get("reason_code") is None
+        and set(provider_result).issubset({"status", "value", "reason_code"})
+    )
+    use_generic_family = (
+        clarification_policy == "normative_defaults" and not family_result_is_valid
+    )
+    use_source_predicate_fallback = (
         request.get("fallback_to_other_if_unresolved") is True
         and provider_result.get("status") == "unresolved"
-        and "other" in request.get("allowed_values", ())
-    ):
+    )
+    if (
+        use_generic_family or use_source_predicate_fallback
+    ) and "other" in family_values:
+        evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
+        if clarification_policy == "normative_defaults":
+            evidence_refs = (*evidence_refs, "normative-default:behavior_family:other")
         return spec.bind(
             provider=SemanticDecisionProvider(kind="deterministic-rule"),
             provider_result={"status": "resolved", "value": "other"},
-            evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+            evidence_refs=evidence_refs,
             created_at=created_at or _created_at(),
         )
     return spec.bind(
@@ -1258,11 +1368,13 @@ def bind_field_entailment_reviews(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    clarification_policy: str = "ask",
     created_at: str | None = None,
 ) -> list[FieldEntailmentReview]:
     return bind_field_reviews(
         requests=requests,
         provider_results=provider_results,
+        clarification_policy=clarification_policy,
         created_at=created_at or _created_at(),
     )
 

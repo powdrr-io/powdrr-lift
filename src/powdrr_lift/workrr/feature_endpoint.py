@@ -14,6 +14,13 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
+from powdrr_lift.core.contract_closure import (
+    ContractClosureError,
+    RepositoryEvidence,
+    collect_python_evidence,
+    compile_contract_closure,
+    validate_contract_closure,
+)
 from powdrr_lift.core.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
@@ -2202,6 +2209,84 @@ def _run_code_agent_phase(
         raise PowdrrExecutionError(
             f"implementation packet compilation failed: {error}"
         ) from error
+    if implementation_packet.behavior_scenarios:
+        closure = state.get("contract_closure")
+        evidence_path = output_root / "artifacts" / "repository-contract-evidence.json"
+        closure_path = output_root / "artifacts" / "contract-closure.json"
+        if not isinstance(closure, Mapping):
+            if evidence_path.exists() or closure_path.exists():
+                if not evidence_path.is_file() or not closure_path.is_file():
+                    raise PowdrrExecutionError(
+                        "frozen contract closure artifacts are incomplete"
+                    )
+                try:
+                    repository_evidence = RepositoryEvidence.from_data(
+                        json.loads(evidence_path.read_text(encoding="utf-8"))
+                    )
+                    closure = json.loads(closure_path.read_text(encoding="utf-8"))
+                    if not isinstance(closure, Mapping):
+                        raise ContractClosureError(
+                            "frozen contract closure artifact is malformed"
+                        )
+                    validate_contract_closure(closure, repository_evidence)
+                except (OSError, json.JSONDecodeError, ContractClosureError) as error:
+                    raise PowdrrExecutionError(
+                        f"frozen contract closure artifacts are invalid: {error}"
+                    ) from error
+            else:
+                # Capture implementation evidence once, before the first worker
+                # invocation. Reuse this frozen record on resume so a solution
+                # edit or validator result cannot influence the prompt context.
+                try:
+                    _run(
+                        runner,
+                        worktree,
+                        ["git", "diff", "--quiet", base_commit],
+                    )
+                except PowdrrExecutionError as error:
+                    raise PowdrrExecutionError(
+                        "cannot capture repository evidence from a modified "
+                        "worktree; refusing to include post-base edits"
+                    ) from error
+                tracked_paths = _git_output(
+                    runner,
+                    worktree,
+                    [
+                        "git",
+                        "ls-tree",
+                        "-r",
+                        "--name-only",
+                        base_commit,
+                    ],
+                ).splitlines()
+                repository_evidence = collect_python_evidence(
+                    worktree,
+                    base_commit=base_commit,
+                    tracked_paths=tracked_paths,
+                )
+                closure = compile_contract_closure(
+                    [
+                        item.to_data()
+                        for item in implementation_packet.behavior_scenarios
+                    ],
+                    repository_evidence,
+                    design_revision=proposal_revision.fingerprint,
+                )
+                validate_contract_closure(closure, repository_evidence)
+                evidence_path.parent.mkdir(parents=True, exist_ok=True)
+                evidence_path.write_text(
+                    json.dumps(repository_evidence.to_data(), indent=2, sort_keys=True)
+                    + "\n",
+                    encoding="utf-8",
+                )
+                closure_path.write_text(
+                    json.dumps(dict(closure), indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            state["contract_closure"] = dict(closure)
+        implementation_packet = replace(
+            implementation_packet, contract_closure=dict(closure)
+        )
     implementation_packet_path = output_root / "implementation-packet.json"
     implementation_packet_path.write_text(
         json.dumps(implementation_packet.to_data(), indent=2, sort_keys=True) + "\n",

@@ -11,6 +11,7 @@ from powdrr_lift.core.behavior_contract import (
     compile_behavior_scenarios,
     render_behavior_matrix,
 )
+from powdrr_lift.core.contract_closure import render_contract_closure
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +39,7 @@ class ImplementationPacket:
     required_tests: tuple[Mapping[str, Any], ...]
     repository: RepositoryContextPacket
     behavior_scenarios: tuple[BehaviorScenario, ...] = ()
+    contract_closure: Mapping[str, Any] | None = None
 
     def for_obligation(self, ordinal: int) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
@@ -57,6 +59,7 @@ class ImplementationPacket:
                 if index < len(self.behavior_scenarios)
                 else ()
             ),
+            contract_closure=self.contract_closure,
         )
 
     def for_task(
@@ -82,10 +85,11 @@ class ImplementationPacket:
             required_tests=tests,
             repository=self.repository,
             behavior_scenarios=self.behavior_scenarios,
+            contract_closure=self.contract_closure,
         )
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data = {
             "schema_version": "implementation-packet-v1",
             "objective": self.objective,
             "obligations": [
@@ -102,6 +106,9 @@ class ImplementationPacket:
             "repository": self.repository.to_data(),
             "behavior_scenarios": [item.to_data() for item in self.behavior_scenarios],
         }
+        if self.contract_closure is not None:
+            data["contract_closure"] = dict(self.contract_closure)
+        return data
 
     @classmethod
     def from_data(cls, raw: Mapping[str, Any]) -> ImplementationPacket:
@@ -132,6 +139,9 @@ class ImplementationPacket:
             isinstance(item, Mapping) for item in raw_scenarios
         ):
             raise ValueError("implementation packet behavior scenarios are malformed")
+        raw_closure = raw.get("contract_closure")
+        if raw_closure is not None and not isinstance(raw_closure, Mapping):
+            raise ValueError("implementation packet contract closure is malformed")
         packet = cls(
             objective=str(raw.get("objective", "")).strip(),
             obligations=obligations,
@@ -148,6 +158,9 @@ class ImplementationPacket:
                 ),
             ),
             behavior_scenarios=compile_behavior_scenarios(raw_scenarios),
+            contract_closure=(
+                dict(raw_closure) if isinstance(raw_closure, Mapping) else None
+            ),
         )
         if not packet.objective.strip() or not packet.obligations:
             raise ValueError("implementation packet is missing required content")
@@ -171,20 +184,26 @@ class ImplementationPacket:
             )
         test_lines = test_lines or ["- none"]
         if self.behavior_scenarios:
-            return render_behavior_matrix(self.behavior_scenarios)
-        return "\n".join(
-            (
-                "Required behavioral tests:",
-                "Make every required behavioral test below pass. These tests "
-                "are the executable acceptance contract; do not weaken or "
-                "delete them.",
-                *test_lines,
-                "Run the focused required tests after implementation. If a "
-                "test is broken because of an import, fixture, API, assertion, "
-                "or other test defect, repair the test and implementation as "
-                "needed; never weaken the behavioral assertion.",
+            behavior_text = render_behavior_matrix(self.behavior_scenarios)
+        else:
+            behavior_text = "\n".join(
+                (
+                    "Required behavioral tests:",
+                    "Make every required behavioral test below pass. These tests "
+                    "are the executable acceptance contract; do not weaken or "
+                    "delete them.",
+                    *test_lines,
+                    "Run the focused required tests after implementation. If a "
+                    "test is broken because of an import, fixture, API, assertion, "
+                    "or other test defect, repair the test and implementation as "
+                    "needed; never weaken the behavioral assertion.",
+                )
             )
-        )
+        if self.contract_closure is not None:
+            return (
+                behavior_text + "\n\n" + render_contract_closure(self.contract_closure)
+            )
+        return behavior_text
 
 
 def compile_implementation_packet(
@@ -196,6 +215,7 @@ def compile_implementation_packet(
     validation_profiles: Sequence[str],
     existing_tests: Sequence[Mapping[str, Any]] = (),
     behavior_scenarios: Sequence[Mapping[str, Any]] = (),
+    contract_closure: Mapping[str, Any] | None = None,
 ) -> ImplementationPacket:
     """Normalize worker inputs and reject incomplete executable contracts."""
     if not objective.strip():
@@ -240,6 +260,9 @@ def compile_implementation_packet(
         ),
         behavior_scenarios=compile_behavior_scenarios(
             (*embedded_scenarios, *behavior_scenarios)
+        ),
+        contract_closure=(
+            dict(contract_closure) if contract_closure is not None else None
         ),
     )
 

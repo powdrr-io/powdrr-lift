@@ -35,16 +35,30 @@ steps:
       outputs:
         feature_design: feature_design
         feature_obligations: feature_design
-  # The research subprocedure is kept reusable. At this stage it captures
-  # source evidence; a later stage will assess applicability and project only
-  # accepted requirements into design and worker prompts.
+  # External evidence is reviewed and projected before the accepted design is
+  # planned, verified, and compiled into the worker packet.
   - call:
       process: resolve-external-contracts
       inputs:
         feature_description: {type: reference, value: feature_description}
         feature_design: {type: reference, value: feature_design}
+        clarification_policy: {type: reference, value: clarification_policy}
       outputs:
         external_contract_sources: external_contract_sources
+        external_contract_context: external_contract_context
+  - operation:
+      tool: internal
+      command: [apply_external_contract_context]
+      parameters:
+        feature_design: {type: reference, value: feature_design}
+        external_contract_context: {type: reference, value: external_contract_context}
+      returns:
+        type: object
+        required: [feature_design, feature_obligations]
+        properties:
+          feature_design: {type: object}
+          feature_obligations: {type: object}
+      bind: externally_enriched_design
   - operation:
       tool: internal
       command: [plan_structrr_diff]
@@ -52,7 +66,7 @@ steps:
         baseline: {type: reference, value: baseline.path}
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
-        feature_design: {type: reference, value: feature_design}
+        feature_design: {type: reference, value: externally_enriched_design.feature_design}
       returns:
         type: object
         required: [path]
@@ -63,7 +77,7 @@ steps:
       command: [materialize_feature_intents]
       parameters:
         plan: {type: reference, value: plan.path}
-        obligations: {type: reference, value: feature_obligations}
+        obligations: {type: reference, value: externally_enriched_design.feature_obligations}
       returns:
         type: object
         required: [path, updated, intent_clauses]
@@ -204,7 +218,7 @@ steps:
         baseline: {type: reference, value: baseline.path}
         plan: {type: reference, value: plan.path}
         proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
-        feature_design: {type: reference, value: feature_design}
+        feature_design: {type: reference, value: externally_enriched_design.feature_design}
         obligations: {type: reference, value: verification_obligations.obligations}
       returns:
         type: object

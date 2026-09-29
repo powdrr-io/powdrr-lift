@@ -48,8 +48,14 @@ from powdrr_lift.core.semantic_faithfulness import (
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.external_contract_research import (
+    bind_external_contract_assessments,
+    bind_external_contract_claims,
     bind_external_contract_search_selections,
     capture_external_sources,
+    extract_external_contract_evidence,
+    finalize_external_contract_context,
+    prepare_external_contract_projection_requests,
+    project_external_contract_requirements,
     search_external_contract_sources,
 )
 from powdrr_lift.workrr.repository_subject_binding import (
@@ -188,6 +194,94 @@ def feature_command_catalog(
                 "properties": {"requests": {"type": "array"}},
             },
             logic=implementations.get("bind_external_contract_search_selections"),
+        ),
+        "extract_external_contract_evidence": CommandSpec(
+            name="extract_external_contract_evidence",
+            input_schema=object_schema(
+                {
+                    "sources": {"type": "array"},
+                    "feature_description": {"type": "string"},
+                },
+                required=("sources", "feature_description"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("extract_external_contract_evidence"),
+        ),
+        "bind_external_contract_claims": CommandSpec(
+            name="bind_external_contract_claims",
+            input_schema=object_schema(
+                {"evidence": {"type": "object"}, "claims": {"type": "array"}},
+                required=("evidence", "claims"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("bind_external_contract_claims"),
+        ),
+        "bind_external_contract_assessments": CommandSpec(
+            name="bind_external_contract_assessments",
+            input_schema=object_schema(
+                {
+                    "claims": {"type": "array"},
+                    "assessments": {"type": "array"},
+                    "clarification_policy": {
+                        "type": "string",
+                        "enum": ["ask", "normative_defaults"],
+                    },
+                },
+                required=("claims", "assessments", "clarification_policy"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("bind_external_contract_assessments"),
+        ),
+        "prepare_external_contract_projection_requests": CommandSpec(
+            name="prepare_external_contract_projection_requests",
+            input_schema=object_schema(
+                {"requirements": {"type": "array"}, "claims": {"type": "array"}},
+                required=("requirements", "claims"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("prepare_external_contract_projection_requests"),
+        ),
+        "project_external_contract_requirements": CommandSpec(
+            name="project_external_contract_requirements",
+            input_schema=object_schema(
+                {"requests": {"type": "array"}},
+                required=("requests",),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("project_external_contract_requirements"),
+        ),
+        "finalize_external_contract_context": CommandSpec(
+            name="finalize_external_contract_context",
+            input_schema=object_schema(
+                {
+                    "evidence": {"type": "object"},
+                    "claims": {"type": "array"},
+                    "assessment_result": {"type": "object"},
+                    "projections": {"type": "array"},
+                },
+                required=("evidence", "claims", "assessment_result", "projections"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("finalize_external_contract_context"),
+        ),
+        "apply_external_contract_context": CommandSpec(
+            name="apply_external_contract_context",
+            input_schema=object_schema(
+                {
+                    "feature_design": {"type": "object"},
+                    "external_contract_context": {"type": "object"},
+                },
+                required=("feature_design", "external_contract_context"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("apply_external_contract_context"),
         ),
         "compile_instruction_ledger": CommandSpec(
             name="compile_instruction_ledger",
@@ -837,6 +931,219 @@ class FeatureCommandRuntime:
                     search_results, parameters.get("selections", [])
                 )
             }
+        if name == "extract_external_contract_evidence":
+            try:
+                return extract_external_contract_evidence(
+                    parameters.get("sources", []),
+                    feature_description=str(parameters.get("feature_description", "")),
+                    artifact_root=output_root,
+                )
+            except (OSError, TypeError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"external contract evidence extraction failed: {error}"
+                ) from error
+        if name == "bind_external_contract_claims":
+            try:
+                result = bind_external_contract_claims(
+                    parameters.get("evidence", {}), parameters.get("claims", [])
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+            return result
+        if name == "bind_external_contract_assessments":
+            try:
+                return bind_external_contract_assessments(
+                    parameters.get("claims", []),
+                    parameters.get("assessments", []),
+                    clarification_policy=str(
+                        parameters.get("clarification_policy", "ask")
+                    ),
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "prepare_external_contract_projection_requests":
+            try:
+                return prepare_external_contract_projection_requests(
+                    parameters.get("requirements", []), parameters.get("claims", [])
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "project_external_contract_requirements":
+            try:
+                return project_external_contract_requirements(
+                    parameters.get("requests", [])
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "finalize_external_contract_context":
+            try:
+                return finalize_external_contract_context(
+                    evidence=parameters.get("evidence", {}),
+                    claims=parameters.get("claims", []),
+                    assessment_result=parameters.get("assessment_result", {}),
+                    projections=parameters.get("projections", []),
+                    artifact_root=output_root,
+                )
+            except (OSError, TypeError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"external contract context is invalid: {error}"
+                ) from error
+        if name == "apply_external_contract_context":
+            feature_design = parameters.get("feature_design")
+            context = parameters.get("external_contract_context")
+            if not isinstance(feature_design, Mapping) or not isinstance(
+                context, Mapping
+            ):
+                raise PowdrrExecutionError(
+                    "external contract projection inputs are malformed"
+                )
+            obligations = feature_design.get("obligations")
+            projected = context.get("projected_obligations")
+            if not isinstance(obligations, list) or not isinstance(projected, list):
+                raise PowdrrExecutionError("external contract projection is incomplete")
+            design_path = feature_design.get("path")
+            canonical_path: Path | None = None
+            canonical_design: Mapping[str, Any] = feature_design
+            if isinstance(design_path, str) and design_path.strip():
+                canonical_path = Path(design_path).resolve()
+                if not canonical_path.is_relative_to(output_root.resolve()):
+                    raise PowdrrExecutionError(
+                        "external design path escapes the run artifacts"
+                    )
+                if canonical_path.is_file():
+                    try:
+                        loaded_design = json.loads(
+                            canonical_path.read_text(encoding="utf-8")
+                        )
+                    except (OSError, json.JSONDecodeError) as error:
+                        raise PowdrrExecutionError(
+                            "canonical feature design could not be read"
+                        ) from error
+                    if isinstance(loaded_design, Mapping):
+                        canonical_design = loaded_design
+            canonical_obligations = canonical_design.get("obligations", obligations)
+            if not isinstance(canonical_obligations, list):
+                raise PowdrrExecutionError(
+                    "canonical feature design has no obligations"
+                )
+            enriched = dict(feature_design)
+            enriched_obligations = list(obligations)
+            existing_ids = {
+                item.get("id")
+                for item in enriched_obligations
+                if isinstance(item, Mapping)
+            }
+            raw_contracts = feature_design.get("verification_contracts", [])
+            if not isinstance(raw_contracts, list):
+                raise PowdrrExecutionError(
+                    "feature design verification contracts are malformed"
+                )
+            contracts = list(raw_contracts)
+            for item in projected:
+                if not isinstance(item, Mapping):
+                    raise PowdrrExecutionError(
+                        "external projected obligation is malformed"
+                    )
+                identifier = item.get("id")
+                design = item.get("design")
+                if (
+                    not isinstance(identifier, str)
+                    or identifier in existing_ids
+                    or not isinstance(design, Mapping)
+                ):
+                    raise PowdrrExecutionError(
+                        "external projected obligation identity is invalid"
+                    )
+                scenario = design.get("behavior_scenario")
+                if not isinstance(scenario, Mapping):
+                    raise PowdrrExecutionError(
+                        "external projected obligation has no scenario"
+                    )
+                enriched_obligations.append(dict(item))
+                existing_ids.add(identifier)
+                contracts.append(
+                    {
+                        "id": f"test:{identifier}",
+                        "obligation_ref": identifier,
+                        "population": str(scenario.get("given", "")),
+                        "operation": str(scenario.get("when", "")),
+                        "oracle": str(scenario.get("then", "")),
+                        "evidence_case": str(design.get("expected_test", "")),
+                    }
+                )
+            enriched["obligations"] = enriched_obligations
+            enriched["verification_contracts"] = contracts
+            enriched["fingerprint"] = content_fingerprint(
+                {key: value for key, value in enriched.items() if key != "fingerprint"}
+            )
+            design_path = feature_design.get("path")
+            if (
+                projected
+                and isinstance(design_path, str)
+                and design_path.strip()
+                and canonical_design.get("schema_version") == "feature-design-v2"
+            ):
+                path = Path(design_path).resolve()
+                if not path.is_relative_to(output_root.resolve()):
+                    raise PowdrrExecutionError(
+                        "external design path escapes the run artifacts"
+                    )
+                canonical_enriched = dict(canonical_design)
+                canonical_external = canonical_design.get(
+                    "external_contract_obligations", []
+                )
+                if not isinstance(canonical_external, list):
+                    raise PowdrrExecutionError(
+                        "canonical external obligations are malformed"
+                    )
+                canonical_enriched["external_contract_obligations"] = [
+                    *canonical_external,
+                    *[
+                        item
+                        for item in projected
+                        if isinstance(item, Mapping)
+                        and item.get("id")
+                        not in {
+                            existing.get("id")
+                            for existing in canonical_external
+                            if isinstance(existing, Mapping)
+                        }
+                    ],
+                ]
+                canonical_contracts = canonical_design.get(
+                    "verification_contracts", raw_contracts
+                )
+                if not isinstance(canonical_contracts, list):
+                    raise PowdrrExecutionError(
+                        "canonical verification contracts are malformed"
+                    )
+                canonical_enriched["verification_contracts"] = [
+                    *canonical_contracts,
+                    *contracts[len(raw_contracts) :],
+                ]
+                canonical_enriched["fingerprint"] = content_fingerprint(
+                    {
+                        key: value
+                        for key, value in canonical_enriched.items()
+                        if key != "fingerprint"
+                    }
+                )
+                path.write_text(
+                    json.dumps(canonical_enriched, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            state["external_contract_context"] = dict(context)
+            state["external_contract_requirements"] = [
+                dict(item)
+                for item in context.get("requirements", [])
+                if isinstance(item, Mapping)
+            ]
+            state["external_contract_notes"] = [
+                dict(item)
+                for item in context.get("unresolved_claims", [])
+                if isinstance(item, Mapping)
+            ]
+            return {"feature_design": enriched, "feature_obligations": enriched}
         if command[:2] == ["powdrr-lift", "design-interview-input"]:
             feature_endpoint._run(runner, worktree, command)
             work_item_name = feature_endpoint._command_option(

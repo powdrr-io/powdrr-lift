@@ -1,6 +1,6 @@
 # Procedrr discovery of external implementation contracts
 
-Status: provider-backed source discovery, local result cache, and capture are implemented; applicability and prompt projection remain planned
+Status: provider-backed source discovery, local result cache, evidence extraction, applicability review, requirement projection, and worker-prompt injection are implemented; end-to-end and cross-task quality evaluation remain in progress
 
 ## Decision
 
@@ -300,9 +300,15 @@ unsupported standard-derived requirements, error-flow coverage, prompt size,
 and later agent outcomes separately. Existing DeepSWE execution quality is a
 regression constraint, not a reason to put benchmark facts into the compiler.
 
-Implement this in two substantial changes: first the Procedrr research
-subprocedure, evidence/version schemas, and deterministic artifact capture;
-then applicability/flow closure, prompt projection, and cross-task evaluation.
-Neither change needs a parallel Workrr decision path. Both must preserve the
-current `ask` and `normative_defaults` behavior and the guarantee that a
-prompt is produced when external evidence is unavailable.
+The research subprocedure, evidence capture, applicability/default routing,
+projection into typed design obligations, and injection into the worker packet
+are implemented in Procedrr. Accepted requirements are projected
+deterministically: the cited requirement remains the acceptance outcome and
+the generated scenario adds no normative behavior. Invalid or unciteable model
+claims are retained as rejected-claim diagnostics instead of blocking prompt
+generation. Remaining work is to complete end-to-end validation across the
+diagnostic GraphQL task
+and held-out tasks, then assess whether projected obligations improve worker
+outcomes without regressing existing DeepSWE runs. No parallel Workrr decision
+path is used. Both `ask` and `normative_defaults` remain supported, and the
+prompt-generation path continues when external evidence is unavailable.

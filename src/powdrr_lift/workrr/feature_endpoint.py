@@ -2285,6 +2285,16 @@ def _run_code_agent_phase(
             allowed_paths=config.allowed_paths,
             validation_profiles=state["validation_profile_names"],
             existing_tests=state.get("provider_inventory", ()),
+            external_contract_requirements=tuple(
+                item
+                for item in state.get("external_contract_requirements", ())
+                if isinstance(item, Mapping)
+            ),
+            external_contract_notes=tuple(
+                item
+                for item in state.get("external_contract_notes", ())
+                if isinstance(item, Mapping)
+            ),
         )
     except ValueError as error:
         raise PowdrrExecutionError(

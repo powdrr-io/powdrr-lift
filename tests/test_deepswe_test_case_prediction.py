@@ -8,13 +8,19 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from science.deepswe.test_case_prediction import predictor as predictor_module
 from science.deepswe.test_case_prediction.evaluation import (
     prepare_review,
     score_reviews,
 )
 from science.deepswe.test_case_prediction.predictor import (
+    TEST_CASE_PROMPT,
+    TEST_CASES_SCHEMA,
     build_messages,
+    build_test_cases_response_schema,
+    validate_obligations,
     validate_predictions,
+    validate_test_count,
 )
 from science.deepswe.test_case_prediction.records import collect_task_record
 
@@ -149,6 +155,120 @@ def test_predictor_messages_include_only_preimplementation_input() -> None:
     assert "pytest" in serialized
     assert "hidden_test_name" not in serialized
     assert "secret/path" not in serialized
+    assert "independently observable contract" in serialized
+
+
+def test_staged_predictor_validates_count_and_obligation_links() -> None:
+    count = validate_test_count(
+        {
+            "estimated_test_case_count": 12,
+            "lower_bound": 9,
+            "upper_bound": 16,
+            "confidence": 0.7,
+            "rationale": "The request introduces multiple distinct behaviors.",
+        }
+    )
+    assert count["estimated_test_case_count"] == 12
+
+    instruction = "Expose the result through fetch_items()."
+    obligations = validate_obligations(
+        instruction,
+        {
+            "obligations": [
+                {
+                    "behavior": "The function returns items.",
+                    "instruction_clause_ids": ["instruction-001"],
+                    "basis": "explicit",
+                    "rationale": "The instruction asks to expose the function.",
+                }
+            ]
+        },
+    )
+    assert obligations[0]["id"] == "obligation-001"
+    assert "exactly the forecast number" in TEST_CASE_PROMPT
+    assert "maxItems" not in TEST_CASES_SCHEMA["properties"]["cases"]
+    assert build_test_cases_response_schema(12)["properties"]["cases"]["maxItems"] == 12
+
+
+def test_predict_record_runs_count_obligation_and_case_stages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeClient:
+        output_limit: int | None = None
+
+        def set_structured_output_token_limit(self, limit: int) -> None:
+            self.output_limit = limit
+
+    client = FakeClient()
+    calls: list[dict[str, Any]] = []
+
+    def fake_complete_json(
+        _client: Any,
+        _messages: list[dict[str, str]],
+        *,
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        calls.append(response_schema)
+        properties = response_schema["properties"]
+        if "estimated_test_case_count" in properties:
+            return {
+                "estimated_test_case_count": 1,
+                "lower_bound": 1,
+                "upper_bound": 1,
+                "confidence": 0.8,
+                "rationale": "One requested behavior.",
+            }
+        if "obligations" in properties:
+            return {
+                "obligations": [
+                    {
+                        "behavior": "fetch_items returns items",
+                        "instruction_clause_ids": ["instruction-001"],
+                        "basis": "explicit",
+                        "rationale": "The instruction names the function.",
+                    }
+                ]
+            }
+        return {
+            "cases": [
+                {
+                    "subject": "fetch_items",
+                    "given": "valid inputs",
+                    "when": "the function runs",
+                    "then": "it returns items",
+                    "category": "normal",
+                    "instruction_clause_ids": ["instruction-001"],
+                    "obligation_ids": ["obligation-001"],
+                    "basis": "explicit",
+                    "confidence": 0.8,
+                    "inference_rationale": "",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        predictor_module, "resolve_provider_credentials", lambda _: object()
+    )
+    monkeypatch.setattr(
+        predictor_module, "build_workflow_client", lambda *_, **__: client
+    )
+    monkeypatch.setattr(predictor_module, "complete_json", fake_complete_json)
+    record = {
+        "task_id": "example-task",
+        "input": {"instruction": "Expose fetch_items().", "validation": []},
+    }
+
+    predictions = predictor_module.predict_record(
+        record, provider="test", model="test-model"
+    )
+
+    assert len(calls) == 3
+    assert calls[-1]["properties"]["cases"]["maxItems"] == 1
+    assert client.output_limit == predictor_module.FULL_SET_STRUCTURED_OUTPUT_TOKENS
+    assert predictions["test_count_prediction"]["estimated_test_case_count"] == 1
+    assert predictions["cases"][0]["obligation_evidence"][0]["obligation_id"] == (
+        "obligation-001"
+    )
 
 
 def test_prediction_validator_requires_valid_clause_and_inference_reason() -> None:
@@ -182,10 +302,62 @@ def test_prediction_validator_requires_valid_clause_and_inference_reason() -> No
         validate_predictions("task", instruction, response)
 
 
-def test_review_scoring_reports_exact_and_partial_coverage_at_k() -> None:
+def test_prediction_validator_accepts_complete_sets_larger_than_eight() -> None:
+    instruction = "Expose the result through fetch_items()."
+    cases = [
+        {
+            "subject": f"fetch_items case {index}",
+            "given": f"input {index}",
+            "when": f"case {index} runs",
+            "then": f"result {index} is returned",
+            "category": "normal",
+            "instruction_clause_ids": ["instruction-001"],
+            "basis": "explicit",
+            "confidence": 0.8,
+            "inference_rationale": "",
+        }
+        for index in range(12)
+    ]
+
+    predictions = validate_predictions("task", instruction, {"cases": cases})
+
+    assert len(predictions["cases"]) == 12
+
+
+def test_prediction_validator_keeps_distinct_inputs_with_same_expected_result() -> None:
+    template = {
+        "subject": "fetch_items",
+        "when": "the method runs",
+        "then": "it returns items",
+        "category": "normal",
+        "instruction_clause_ids": ["instruction-001"],
+        "basis": "explicit",
+        "confidence": 0.8,
+        "inference_rationale": "",
+    }
+    response = {
+        "cases": [
+            {**template, "given": "one matching item"},
+            {**template, "given": "multiple matching items"},
+        ]
+    }
+
+    predictions = validate_predictions(
+        "task", "Expose the result through fetch_items().", response
+    )
+
+    assert len(predictions["cases"]) == 2
+
+
+def test_review_scoring_reports_full_set_exact_and_partial_coverage() -> None:
     record = _scoring_record()
     predictions = {
         "task_id": "example-task",
+        "test_count_prediction": {
+            "estimated_test_case_count": 3,
+            "lower_bound": 2,
+            "upper_bound": 4,
+        },
         "cases": [
             {"id": "pred-001"},
             {"id": "pred-002"},
@@ -208,7 +380,7 @@ def test_review_scoring_reports_exact_and_partial_coverage_at_k() -> None:
         pair["judgment"] = judgments[(pair["prediction_id"], pair["ground_truth_id"])]
         pair["rationale"] = "reviewed behavior and outcome"
 
-    report = score_reviews([(record, predictions, review)], cutoffs=(1, 2, 5))
+    report = score_reviews([(record, predictions, review)])
     metrics = report["tasks"][0]
 
     assert metrics["matched_exact"] == 1
@@ -216,12 +388,22 @@ def test_review_scoring_reports_exact_and_partial_coverage_at_k() -> None:
     assert metrics["unsupported_predictions"] == 1
     assert metrics["exact_precision"] == pytest.approx(1 / 3)
     assert metrics["coverage_recall"] == 1.0
-    assert metrics["at_k"]["1"] == {
-        "prediction_count": 1,
-        "matched_predictions": 1,
-        "matched_ground_truth": 1,
+    assert metrics["prediction_count"] == 3
+    assert metrics["ground_truth_count"] == 2
+    assert "at_k" not in metrics
+    assert metrics["test_case_count"] == {
+        "estimated_test_case_count": 3,
+        "known_ground_truth_case_count": 2,
+        "absolute_error": 1,
+        "exact_match": False,
+        "within_bounds": True,
     }
-    assert metrics["at_k"]["2"]["matched_ground_truth"] == 2
+    assert report["aggregate"]["test_case_count_prediction"] == {
+        "task_count": 1,
+        "mean_absolute_error": 1.0,
+        "exact_count_accuracy": 0.0,
+        "interval_coverage": 1.0,
+    }
 
 
 def test_review_scoring_rejects_unreviewed_pairs() -> None:

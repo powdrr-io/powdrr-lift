@@ -355,6 +355,7 @@ class OpenAIChatClient:
         base_url: str,
         timeout: float = 120.0,
         limits: LLMModelLimits | None = None,
+        structured_output_token_limit: int | None = None,
         progress_stream: TextIO | None = None,
         reasoning_effort: str | None = None,
     ) -> None:
@@ -363,10 +364,24 @@ class OpenAIChatClient:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._limits = limits or DEFAULT_MODEL_LIMITS
+        if (
+            structured_output_token_limit is not None
+            and structured_output_token_limit < 1
+        ):
+            raise ValueError("structured_output_token_limit must be positive")
+        self._structured_output_token_limit = (
+            structured_output_token_limit or _MAX_STRUCTURED_COMPLETION_TOKENS
+        )
         self._progress_stream = progress_stream
         self._reasoning_effort = reasoning_effort
         self.last_usage: dict[str, Any] = {}
         self.last_serialized_messages: str | None = None
+
+    def set_structured_output_token_limit(self, token_limit: int) -> None:
+        """Set a per-client structured-output budget for staged tasks."""
+        if token_limit < 1:
+            raise ValueError("structured output token limit must be positive")
+        self._structured_output_token_limit = token_limit
 
     def complete_json(
         self,
@@ -382,7 +397,7 @@ class OpenAIChatClient:
             serialized_messages=serialized_messages,
         )
         if response_schema is not None:
-            max_tokens = min(max_tokens, _MAX_STRUCTURED_COMPLETION_TOKENS)
+            max_tokens = min(max_tokens, self._structured_output_token_limit)
         payload = {
             "model": self._model,
             "messages": messages,

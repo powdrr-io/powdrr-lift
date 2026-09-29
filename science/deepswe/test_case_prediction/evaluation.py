@@ -29,7 +29,7 @@ def prepare_review(
         for case in cases
     ]
     return {
-        "schema_version": "deepswe-test-prediction-review-v1",
+        "schema_version": "deepswe-test-prediction-review-v2",
         "task_id": record["task_id"],
         "ground_truth_availability": record["ground_truth"]["availability"],
         "predictions": predicted,
@@ -51,8 +51,6 @@ def prepare_review(
 
 def score_reviews(
     entries: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]],
-    *,
-    cutoffs: tuple[int, ...] = (5, 10, 20),
 ) -> dict[str, Any]:
     task_reports = []
     all_exact_predictions = 0
@@ -62,18 +60,17 @@ def score_reviews(
     all_predictions = 0
     all_truth = 0
     tasks_with_labels = 0
-    cutoff_totals = {
-        str(k): {
-            "prediction_hits": 0,
-            "prediction_count": 0,
-            "ground_truth_hits": 0,
-            "ground_truth_count": 0,
-        }
-        for k in cutoffs
-    }
+    count_errors = []
+    count_exact = []
+    count_interval_hits = []
     for record, predictions, review in entries:
-        task_report = _score_one(record, predictions, review, cutoffs)
+        task_report = _score_one(record, predictions, review)
         task_reports.append(task_report)
+        count_report = task_report.get("test_case_count")
+        if count_report is not None:
+            count_errors.append(count_report["absolute_error"])
+            count_exact.append(count_report["exact_match"])
+            count_interval_hits.append(count_report["within_bounds"])
         if task_report["ground_truth_count"]:
             tasks_with_labels += 1
             all_exact_predictions += task_report["exact_prediction_count"]
@@ -84,17 +81,8 @@ def score_reviews(
             )
             all_predictions += task_report["prediction_count"]
             all_truth += task_report["ground_truth_count"]
-        for k in cutoffs:
-            metrics = task_report["at_k"][str(k)]
-            totals = cutoff_totals[str(k)]
-            if task_report["ground_truth_count"]:
-                totals["prediction_hits"] += metrics["matched_predictions"]
-                totals["prediction_count"] += metrics["prediction_count"]
-                totals["ground_truth_hits"] += metrics["matched_ground_truth"]
-                totals["ground_truth_count"] += task_report["ground_truth_count"]
-
     return {
-        "schema_version": "deepswe-test-prediction-score-v1",
+        "schema_version": "deepswe-test-prediction-score-v2",
         "task_count": len(task_reports),
         "tasks_with_reviewable_ground_truth": tasks_with_labels,
         "aggregate": {
@@ -105,16 +93,19 @@ def score_reviews(
             "unsupported_predictions": all_predictions - all_covered_predictions,
             "prediction_count": all_predictions,
             "ground_truth_count": all_truth,
-            "at_k": {
-                k: {
-                    "precision": _ratio(
-                        values["prediction_hits"], values["prediction_count"]
-                    ),
-                    "recall": _ratio(
-                        values["ground_truth_hits"], values["ground_truth_count"]
-                    ),
-                }
-                for k, values in cutoff_totals.items()
+            "test_case_count_prediction": {
+                "task_count": len(count_errors),
+                "mean_absolute_error": (
+                    sum(count_errors) / len(count_errors) if count_errors else None
+                ),
+                "exact_count_accuracy": (
+                    sum(count_exact) / len(count_exact) if count_exact else None
+                ),
+                "interval_coverage": (
+                    sum(count_interval_hits) / len(count_interval_hits)
+                    if count_interval_hits
+                    else None
+                ),
             },
         },
         "tasks": task_reports,
@@ -125,8 +116,6 @@ def score_files(
     record_paths: list[Path],
     prediction_paths: list[Path],
     review_paths: list[Path],
-    *,
-    cutoffs: tuple[int, ...] = (5, 10, 20),
 ) -> dict[str, Any]:
     records = {
         record["task_id"]: record for record in map(load_task_record, record_paths)
@@ -143,7 +132,7 @@ def score_files(
         raise ValueError("every prediction must have a corresponding task record")
     task_ids = sorted(predictions)
     entries = [(records[key], predictions[key], reviews[key]) for key in task_ids]
-    return score_reviews(entries, cutoffs=cutoffs)
+    return score_reviews(entries)
 
 
 def write_json(value: dict[str, Any], path: Path) -> None:
@@ -157,7 +146,6 @@ def _score_one(
     record: dict[str, Any],
     predictions: dict[str, Any],
     review: dict[str, Any],
-    cutoffs: tuple[int, ...],
 ) -> dict[str, Any]:
     if record["task_id"] != predictions.get("task_id") or record[
         "task_id"
@@ -244,7 +232,6 @@ def _score_one(
         if pair[1] not in truth_ids:
             judgments[pair] = "no_match"
 
-    ranked_ids = [item["id"] for item in predicted]
     truth_groups = {
         item["id"]: dispositions[item["id"]].get(
             "behavior_group_id", item.get("behavior_group_id", item["id"])
@@ -258,19 +245,21 @@ def _score_one(
     covered_prediction_ids = {pair[0] for pair in matches}
     truth_hit_ids = {pair[1] for pair in matches}
     exact_prediction_ids = {pair[0] for pair in exact_pairs}
-    at_k = {}
-    for k in cutoffs:
-        selected = set(ranked_ids[:k])
-        selected_judgments = {
-            pair: judgment
-            for pair, judgment in judgments.items()
-            if pair[0] in selected
-        }
-        matched = _assign_matches(selected_judgments, truth_groups, prediction_rank)
-        at_k[str(k)] = {
-            "prediction_count": min(k, len(ranked_ids)),
-            "matched_predictions": len({pair[0] for pair in matched}),
-            "matched_ground_truth": len({pair[1] for pair in matched}),
+    count_prediction = predictions.get("test_count_prediction")
+    count_metrics = None
+    if isinstance(count_prediction, dict) and truth:
+        estimate = _nonnegative_int(
+            count_prediction.get("estimated_test_case_count"), record["task_id"]
+        )
+        lower = _nonnegative_int(count_prediction.get("lower_bound"), record["task_id"])
+        upper = _nonnegative_int(count_prediction.get("upper_bound"), record["task_id"])
+        known_case_count = len(truth)
+        count_metrics = {
+            "estimated_test_case_count": estimate,
+            "known_ground_truth_case_count": known_case_count,
+            "absolute_error": abs(estimate - known_case_count),
+            "exact_match": estimate == known_case_count,
+            "within_bounds": lower <= known_case_count <= upper,
         }
     return {
         "task_id": record["task_id"],
@@ -288,7 +277,7 @@ def _score_one(
         "exact_recall": _ratio(len(exact_pairs), len(truth)),
         "coverage_precision": _ratio(len(covered_prediction_ids), len(predicted)),
         "coverage_recall": _ratio(len(matches), len(truth)),
-        "at_k": at_k,
+        "test_case_count": count_metrics,
         "matches": [
             {
                 "prediction_id": prediction_id,
@@ -330,3 +319,9 @@ def _assign_matches(
 
 def _ratio(numerator: int, denominator: int) -> float | None:
     return numerator / denominator if denominator else None
+
+
+def _nonnegative_int(value: Any, task_id: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"task {task_id} has an invalid count forecast")
+    return value

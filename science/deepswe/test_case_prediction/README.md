@@ -43,12 +43,21 @@ uv run python -m science.deepswe.test_case_prediction.cli predict \
   --model deepseek-ai/DeepSeek-V4-Flash-0731
 ```
 
-The prompt includes only the instruction and validation profile names,
-commands, and sources. Each ranked scenario contains `given`, `when`, `then`,
-category, confidence, instruction clause IDs, and whether it is explicit or
-inferred. The predictor returns exact source text for cited clauses. Inferred
-cases require a rationale. The response validator rejects unsupported clause
-IDs, empty fields, invalid scores, and duplicate scenarios.
+Prediction runs in three stages using only the instruction and validation
+profile names, commands, and sources:
+
+1. Estimate the number of test cases, including a plausible range.
+2. Enumerate distinct observable behavior obligations.
+3. Expand the obligations into the complete set of likely test cases, linking
+   every case to its obligations and instruction clauses.
+
+The final expansion uses the count forecast as its exact per-task case count;
+there is no global case-count cap. Each case contains `given`, `when`, `then`,
+category, confidence, instruction clause IDs, obligation IDs, and whether it is
+explicit or inferred. The predictor returns exact source text for cited
+clauses. Inferred cases require a rationale. The response validator rejects
+unsupported clause or obligation IDs, empty fields, invalid scores, and
+duplicate cases.
 
 ## Semantic review and scoring
 
@@ -80,10 +89,12 @@ uv run python -m science.deepswe.test_case_prediction.cli score \
   --output /path/to/evaluation.json
 ```
 
-The report includes exact and coverage precision/recall, unsupported
-predictions, uncovered cases, per-task scores, and precision/recall at 5, 10,
-and 20 predictions. Tasks without extractable named test declarations remain
-visible in the audit but cannot contribute to semantic metrics.
+The report scores the full predicted set using exact and coverage
+precision/recall, unsupported predictions, uncovered cases, and per-task
+scores. It also reports test-count mean absolute error, exact-count accuracy,
+and the share of count ranges containing the reviewed ground-truth count. Tasks
+without extractable named test declarations remain visible in the audit but
+cannot contribute to semantic metrics.
 
 ## Pilot interpretation
 

@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from powdrr_lift.core.decision_obligation import evidence_fingerprint
@@ -19,6 +20,16 @@ from powdrr_lift.workrr.feature_endpoint import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def keep_deterministic_feature_tests_off_live_jev(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not send fixture clauses to Jev when a developer has API credentials."""
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
 
 DEEPSWE_STATE_DATA_DESCRIPTION = """\
 States lack built-in data ownership, forcing manual variable management without

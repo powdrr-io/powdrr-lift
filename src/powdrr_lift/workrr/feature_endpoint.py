@@ -487,21 +487,23 @@ def _execute_procedrr_flow(
         )
     try:
         flow_directory = flow_path.parent
-        classifier_client = JevSemanticClassifierClient(config.planning_client)
+        planning_client = WorkrrProcedrrClient(
+            config.planning_client,
+            skills_dir=flow_directory,
+            replay_responses=replay_responses,
+        )
+        jev_classifier_client = WorkrrProcedrrClient(
+            JevSemanticClassifierClient(config.planning_client),
+            skills_dir=flow_directory,
+            replay_responses=replay_responses,
+        )
         evaluator = Evaluator(
-            WorkrrProcedrrClient(
-                classifier_client,
-                skills_dir=flow_directory,
-                replay_responses=replay_responses,
-            ),
+            planning_client,
             execute,
             process_directory=flow_directory,
             judge_clients={
-                "planning": WorkrrProcedrrClient(
-                    classifier_client,
-                    skills_dir=flow_directory,
-                    replay_responses=replay_responses,
-                )
+                "planning": planning_client,
+                "jev": jev_classifier_client,
             },
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,

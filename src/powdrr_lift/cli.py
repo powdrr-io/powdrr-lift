@@ -4709,6 +4709,7 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             design_only=args.design_only,
             capture_worker_prompts_only=args.capture_worker_prompts_only,
             clarification_policy=args.clarification_policy,
+            benchmark_mode=True,
         )
     )
     if args.json:

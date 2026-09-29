@@ -217,6 +217,31 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
     )
 
 
+def test_benchmark_bootstrap_omits_validation_without_tracked_source(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    (repo / "tests").mkdir()
+    (repo / "tests/test_app.py").write_text("def test_app(): pass\n", encoding="utf-8")
+    _git(repo, "add", "tests/test_app.py")
+    _git(repo, "commit", "-qm", "add tests")
+
+    regular = bootstrap_structrr(repo, output_path=tmp_path / "regular.yaml")
+    benchmark = bootstrap_structrr(
+        repo, output_path=tmp_path / "benchmark.yaml", benchmark_mode=True
+    )
+
+    assert not regular.validation.successful
+    assert "semantic_source_missing" in {
+        issue.code for issue in regular.validation.issues
+    }
+    assert benchmark.validation.successful
+    assert not any(
+        tool.get("id", "").startswith("validation:")
+        for tool in benchmark.document["tools"]
+    )
+
+
 def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     (repo / "pyproject.toml").write_text(

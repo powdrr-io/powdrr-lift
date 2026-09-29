@@ -106,6 +106,7 @@ def bootstrap_structrr(
     change_id: str = "bootstrap",
     title: str | None = None,
     taxonomy_path: str | Path = "software_development_entity_taxonomy.md",
+    benchmark_mode: bool = False,
 ) -> BootstrapResult:
     """Build and validate a Structrr snapshot from tracked repository evidence.
 
@@ -127,6 +128,7 @@ def bootstrap_structrr(
         spec_documents=spec_documents,
         change_id=change_id,
         title=title or f"Bootstrap Structrr for {root.name}",
+        benchmark_mode=benchmark_mode,
     )
     validation = validate_bootstrap_document(document, root=root, taxonomy=taxonomy)
     selected_output = (
@@ -979,6 +981,7 @@ def _build_document(
     spec_documents: Sequence[tuple[str, Mapping[str, Any]]],
     change_id: str,
     title: str,
+    benchmark_mode: bool = False,
 ) -> dict[str, Any]:
     from powdrr_lift.structrr.active_intent import active_intent_section
     from powdrr_lift.structrr.validation import (
@@ -1063,7 +1066,10 @@ def _build_document(
         )
         _collect_statements(statements, "approach", spec.get("approach"), spec_path)
 
+    validation_source = _validation_tool_source(root, tracked_files)
     validation_profiles = discover_validation_profiles(root)
+    if benchmark_mode and validation_source is None:
+        validation_profiles = ()
     for profile in validation_profiles:
         tool_id = f"validation:{profile.name}"
         tools.setdefault(
@@ -1072,7 +1078,7 @@ def _build_document(
                 "id": tool_id,
                 "action": "added",
                 "validation_action": list(profile.command),
-                "source": _validation_tool_source(root),
+                "source": validation_source or "README.md",
             },
         )
 
@@ -1172,16 +1178,16 @@ def _build_document(
     }
 
 
-def _validation_tool_source(root: Path) -> str:
+def _validation_tool_source(root: Path, tracked_files: Sequence[str]) -> str | None:
     for relative in (
         "pyproject.toml",
         ".github/workflows/ci.yml",
         ".github/workflows/ci.yaml",
         "Makefile",
     ):
-        if (root / relative).exists():
+        if relative in tracked_files:
             return relative
-    return "README.md"
+    return None
 
 
 def _file_entity_type(relative: str) -> str:

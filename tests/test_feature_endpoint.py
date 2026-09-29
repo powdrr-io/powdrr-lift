@@ -587,6 +587,7 @@ def test_harbor_feature_cli_uses_in_place_endpoint(
     assert config.minisweagent_model == ("deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731")
     assert config.open_pr is False
     assert config.push_changes is False
+    assert config.benchmark_mode is True
 
 
 def test_harbor_feature_cli_propagates_task_id(

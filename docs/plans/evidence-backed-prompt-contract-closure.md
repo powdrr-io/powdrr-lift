@@ -70,10 +70,12 @@ Use only information available before implementation:
   language adapter. The current Python adapter reads only tracked Python
   files; it does not scan the mutable working tree and refuses capture when
   tracked files differ from the captured commit.
-- Versioned repository or ecosystem specifications if explicitly supplied by
-  the task or pinned in the repository. An external standard may be consulted
-  only when the environment permits it; record its identity and version. No
-  uncited model recollection counts as standard evidence.
+- Versioned repository or ecosystem specifications selected by the Procedrr
+  research procedure in
+  `docs/design/procedrr-external-contract-discovery.md`. It determines when
+  external context is necessary, selects the applicable revision, and records
+  exact evidence before the final design and prompt are compiled. No uncited
+  model recollection counts as standard evidence.
 - Accepted human clarifications and previously recorded repository intent.
 
 Solution patches, verifier reports, hidden tests supplied outside the captured
@@ -234,16 +236,18 @@ editing. The prompt artifact remains independently capturable without Pier.
 
 ## Integration with the current flow
 
-1. After `compile_canonical_feature_design` and scenario consistency review,
-   compile the repository evidence snapshot and closure record for the same
-   design revision. Introduce a Procedrr operation and readiness gate before
-   `compile_code_task_plan` in
-   `docs/procedrr/skill-definitions/implement-feature.yaml` (or place the
-   operation at the equivalent design handoff if that flow is refactored).
-2. Add typed schema and validation in a new core module, tentatively
-   `src/powdrr_lift/core/contract_closure.py`. Keep repository discovery and
-   bounded question preparation in Workrr, using language adapters and the
-   existing semantic inventory where possible.
+1. After initial instruction interpretation, run Procedrr's external-contract
+   research subprocedure before finalizing the feature design, as specified in
+   `docs/design/procedrr-external-contract-discovery.md`. After the final
+   design and scenario consistency review, compile the repository evidence
+   snapshot and closure record for that same design revision. Procedrr gates
+   the record before `compile_code_task_plan` in
+   `docs/procedrr/skill-definitions/implement-feature.yaml`.
+2. Put typed closure schemas, candidate selection, bounded question
+   preparation, and validation in Procedrr. Reuse the existing semantic
+   inventory and language adapters to supply captured Git-tree facts through
+   the authorized operation boundary; Workrr does not own a separate closure
+   decision path.
 3. Pass accepted closure refs into the canonical design, code task, and
    `ImplementationPacket`. Populate `must_preserve` and `non_goals` from
    evidence-backed contracts where applicable. Extend

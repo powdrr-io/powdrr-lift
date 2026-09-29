@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,56 +19,48 @@ from science.deepswe.test_case_prediction.predictor import (
 from science.deepswe.test_case_prediction.records import collect_task_record
 
 
-def test_collector_merges_repeated_f2p_cases_and_excludes_base_tests(
-    tmp_path: Path,
-) -> None:
+def test_collector_extracts_named_cases_from_test_patch(tmp_path: Path) -> None:
     task_dir = _task_dir(tmp_path)
-    reports = [
-        _write_ctrf(
-            tmp_path / "run-a" / "ctrf.json",
-            [
-                {"name": "[p2p] tests.test_existing", "status": "passed"},
-                {"name": "[f2p] tests.test_new_behavior", "status": "failed"},
-            ],
-        ),
-        _write_ctrf(
-            tmp_path / "run-b" / "ctrf.json",
-            [{"name": "[f2p] tests.test_new_behavior", "status": "passed"}],
-        ),
-    ]
-
-    record = collect_task_record(task_dir, verifier_reports=tuple(reports))
+    patch = task_dir / "tests" / "test.patch"
+    patch.parent.mkdir()
+    patch.write_text(
+        "diff --git a/tests/test_widget.py b/tests/test_widget.py\n"
+        "new file mode 100644\n@@ -0,0 +1,5 @@\n"
+        "+def test_widget_returns_value():\n"
+        "+    result = widget()\n+    assert result == 3\n"
+        "+\n+def test_widget_rejects_none():\n+    with pytest.raises(ValueError):\n"
+        "+        widget(None)\n",
+        encoding="utf-8",
+    )
+    record = collect_task_record(task_dir)
 
     assert record["task_id"] == "example-task"
-    assert record["ground_truth"]["availability"] == "individual_tests"
-    assert record["ground_truth"]["cases"] == [
-        {
-            "id": "tests.test_new_behavior",
-            "test_name": "tests.test_new_behavior",
-            "behavior_group_id": "tests.test_new_behavior",
-            "observed_statuses": ["failed", "passed"],
-            "behavior_status": "needs_review",
-        }
+    assert record["ground_truth"]["availability"] == "patch_test_cases"
+    assert [case["test_name"] for case in record["ground_truth"]["cases"]] == [
+        "test_widget_rejects_none",
+        "test_widget_returns_value",
     ]
-    assert record["provenance"]["verifier_report_count"] == 2
+    assert record["ground_truth"]["cases"][0]["source_file"] == "tests/test_widget.py"
+    assert "assert result == 3" in record["ground_truth"]["cases"][1]["source_excerpt"]
     assert "solution" not in record
 
 
-def test_task_record_marks_missing_feature_markers_as_unavailable_labels(
-    tmp_path: Path,
-) -> None:
-    record = collect_task_record(
-        _task_dir(tmp_path),
-        verifier_reports=(
-            _write_ctrf(
-                tmp_path / "run" / "ctrf.json",
-                [{"name": "tests.test_existing", "status": "passed"}],
-            ),
-        ),
+def test_test_patch_cases_support_go_and_javascript_names(tmp_path: Path) -> None:
+    task_dir = _task_dir(tmp_path)
+    patch = task_dir / "tests" / "test.patch"
+    patch.parent.mkdir()
+    patch.write_text(
+        "diff --git a/widget_test.go b/widget_test.go\n@@ -0,0 +1,2 @@\n"
+        "+func TestWidgetWorks(t *testing.T) {\n+}\n"
+        "diff --git a/widget.test.ts b/widget.test.ts\n@@ -0,0 +1,2 @@\n"
+        "+it('returns a widget', () => {\n+});\n",
+        encoding="utf-8",
     )
-
-    assert record["ground_truth"]["availability"] == "aggregate_or_no_f2p_marker"
-    assert record["ground_truth"]["cases"] == []
+    record = collect_task_record(task_dir)
+    assert [case["test_name"] for case in record["ground_truth"]["cases"]] == [
+        "returns a widget",
+        "TestWidgetWorks",
+    ]
 
 
 def test_task_record_reads_declared_verifier_command(tmp_path: Path) -> None:
@@ -255,23 +246,14 @@ def _task_dir(root: Path) -> Path:
     return task_dir
 
 
-def _write_ctrf(path: Path, tests: list[dict[str, str]]) -> Path:
-    path.parent.mkdir(parents=True)
-    path.write_text(
-        json.dumps({"results": {"tests": tests}}),
-        encoding="utf-8",
-    )
-    return path
-
-
 def _scoring_record() -> dict[str, Any]:
     return {
-        "schema_version": "deepswe-test-prediction-task-v1",
+        "schema_version": "deepswe-test-prediction-task-v2",
         "task_id": "example-task",
         "repository_id": "example-repo",
         "input": {"instruction": "Implement behavior", "validation": []},
         "ground_truth": {
-            "availability": "individual_tests",
+            "availability": "patch_test_cases",
             "cases": [
                 {"id": "test-a", "test_name": "test_a", "behavior_group_id": "test_a"},
                 {"id": "test-b", "test_name": "test_b", "behavior_group_id": "test_b"},

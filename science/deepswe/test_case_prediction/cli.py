@@ -23,13 +23,6 @@ def main(argv: list[str] | None = None) -> int:
         "collect", help="Build task records and audit data coverage."
     )
     collect.add_argument("--tasks-dir", required=True, type=Path)
-    collect.add_argument(
-        "--runs-dir",
-        type=Path,
-        action="append",
-        default=[],
-        help="Pier output root to scan; may be supplied more than once.",
-    )
     collect.add_argument("--repository-roots", type=Path)
     collect.add_argument("--output-dir", required=True, type=Path)
 
@@ -61,16 +54,13 @@ def main(argv: list[str] | None = None) -> int:
 
             audit = collect_records(
                 tasks_dir=args.tasks_dir,
-                runs_dirs=args.runs_dir,
                 repository_roots=load_repository_roots(args.repository_roots),
                 output_dir=args.output_dir,
             )
             _print(
                 {
                     "unique_task_count": audit["unique_task_count"],
-                    "tasks_with_individual_feature_tests": audit[
-                        "tasks_with_individual_feature_tests"
-                    ],
+                    "tasks_with_patch_test_cases": audit["tasks_with_patch_test_cases"],
                     "validation_metadata_available": audit[
                         "validation_metadata_available"
                     ],

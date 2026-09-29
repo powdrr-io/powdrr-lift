@@ -1,4 +1,4 @@
-"""Build auditable task records from DeepSWE instructions and verifier reports."""
+"""Build auditable task records from DeepSWE instructions and test patches."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import re
 import shlex
 import tomllib
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +14,16 @@ from powdrr_lift.structrr.validation import discover_validation_profiles
 
 from . import SCHEMA_VERSION
 
-_F2P_PREFIX = re.compile(r"^\[f2p\]\s*", re.IGNORECASE)
+_TEST_DECLARATIONS = (
+    re.compile(r"^\s*(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)\s*\("),
+    re.compile(r"^\s*func\s+(Test[A-Za-z0-9_]+)\s*\("),
+    re.compile(r"^\s*(?:it|test)\s*\(\s*(['\"`])(.+?)\1"),
+    re.compile(r"^\s*(?:it|test)\.(?:each|todo|skip)\s*\(\s*(['\"`])(.+?)\1"),
+    re.compile(r"^\s*fn\s+(test_[A-Za-z0-9_]+)\s*\("),
+    re.compile(r"^\s*fn\s+([A-Za-z][A-Za-z0-9_]*)\s*\("),
+    re.compile(r"^\s*testName\s*:\s*(['\"`])(.+?)\1"),
+    re.compile(r"^\s*name\s*:\s*(['\"`])(.+?)\1"),
+)
 
 
 def load_json(path: Path) -> Any:
@@ -54,32 +63,12 @@ def load_repository_roots(path: Path | None) -> dict[str, Path]:
     return {str(task_id): Path(str(root)).resolve() for task_id, root in value.items()}
 
 
-def discover_verifier_reports(
-    runs_dirs: tuple[Path, ...] | list[Path] = (),
-) -> dict[str, list[Path]]:
-    reports: dict[str, list[Path]] = defaultdict(list)
-    seen: set[Path] = set()
-    for runs_dir in runs_dirs:
-        if not runs_dir.is_dir():
-            raise ValueError(f"runs directory does not exist: {runs_dir}")
-        for ctrf_path in sorted(runs_dir.rglob("ctrf.json")):
-            resolved = ctrf_path.resolve()
-            if resolved in seen:
-                continue
-            seen.add(resolved)
-            task_id = _task_id_for_report(ctrf_path)
-            if task_id:
-                reports[task_id].append(ctrf_path)
-    return reports
-
-
 def collect_task_record(
     task_dir: Path,
     *,
-    verifier_reports: tuple[Path, ...] = (),
     repository_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Read only task metadata, instruction, validation config, and verifier labels."""
+    """Read task metadata, instruction, validation config, and test patch labels."""
     task_dir = task_dir.resolve()
     instruction_path = task_dir / "instruction.md"
     instruction = instruction_path.read_text(encoding="utf-8").strip()
@@ -107,51 +96,9 @@ def collect_task_record(
     if not validation:
         validation = _declared_validation(task_config)
 
-    cases: dict[str, dict[str, Any]] = {}
-    report_sources: list[str] = []
-    report_count = 0
-    saw_ctrf = False
-    saw_feature_marker = False
-    for report_path in verifier_reports:
-        report_count += 1
-        report_sources.append(str(report_path.resolve()))
-        report = load_json(report_path)
-        saw_ctrf = True
-        results = report.get("results", {}) if isinstance(report, dict) else {}
-        tests = results.get("tests", []) if isinstance(results, dict) else []
-        if not isinstance(tests, list):
-            continue
-        for test in tests:
-            if not isinstance(test, dict):
-                continue
-            full_name = str(test.get("name", ""))
-            match = _F2P_PREFIX.match(full_name)
-            if match is None:
-                continue
-            saw_feature_marker = True
-            name = full_name[match.end() :].strip()
-            if not name:
-                continue
-            case = cases.setdefault(
-                name,
-                {
-                    "id": name,
-                    "test_name": name,
-                    "behavior_group_id": re.sub(r"(?:\[[^\]]*\])+$", "", name),
-                    "observed_statuses": [],
-                    "behavior_status": "needs_review",
-                },
-            )
-            status = str(test.get("status", "unknown")).casefold()
-            if status not in case["observed_statuses"]:
-                case["observed_statuses"].append(status)
-
-    if saw_feature_marker:
-        availability = "individual_tests"
-    elif saw_ctrf:
-        availability = "aggregate_or_no_f2p_marker"
-    else:
-        availability = "unavailable"
+    patch_path = task_dir / "tests" / "test.patch"
+    cases = _extract_patch_cases(patch_path) if patch_path.is_file() else []
+    availability = "patch_test_cases" if cases else "patch_without_test_cases"
 
     config_task_id = str(task_table.get("name") or task_id)
     return {
@@ -164,7 +111,9 @@ def collect_task_record(
         },
         "ground_truth": {
             "availability": availability,
-            "cases": sorted(cases.values(), key=lambda item: item["test_name"]),
+            "cases": sorted(
+                cases, key=lambda item: (item["source_file"], item["test_name"])
+            ),
         },
         "provenance": {
             "instruction_source": str(instruction_path.resolve()),
@@ -175,8 +124,9 @@ def collect_task_record(
             "validation_repository_root": str(repository_root.resolve())
             if repository_root is not None
             else None,
-            "ground_truth_sources": report_sources,
-            "verifier_report_count": report_count,
+            "ground_truth_sources": [str(patch_path.resolve())]
+            if patch_path.is_file()
+            else [],
         },
     }
 
@@ -184,11 +134,9 @@ def collect_task_record(
 def collect_records(
     *,
     tasks_dir: Path,
-    runs_dirs: tuple[Path, ...] | list[Path],
     repository_roots: dict[str, Path],
     output_dir: Path,
 ) -> dict[str, Any]:
-    report_map = discover_verifier_reports(runs_dirs)
     output_dir.mkdir(parents=True, exist_ok=True)
     records = []
     seen_task_ids: set[str] = set()
@@ -196,7 +144,6 @@ def collect_records(
         provisional_id = _task_id_for_dir(task_dir)
         record = collect_task_record(
             task_dir,
-            verifier_reports=tuple(report_map.get(provisional_id, ())),
             repository_root=repository_roots.get(provisional_id),
         )
         if record["task_id"] in seen_task_ids:
@@ -219,6 +166,11 @@ def build_audit(records: list[dict[str, Any]]) -> dict[str, Any]:
     availability = Counter(
         str(record["ground_truth"]["availability"]) for record in records
     )
+    extraction_methods = Counter(
+        str(case["extraction_method"])
+        for record in records
+        for case in record["ground_truth"]["cases"]
+    )
     validation_profiles = Counter(
         str(profile.get("name", "unknown"))
         for record in records
@@ -226,15 +178,18 @@ def build_audit(records: list[dict[str, Any]]) -> dict[str, Any]:
     )
     tasks_with_cases = sum(bool(record["ground_truth"]["cases"]) for record in records)
     return {
-        "schema_version": "deepswe-test-prediction-audit-v1",
+        "schema_version": "deepswe-test-prediction-audit-v2",
         "unique_task_count": len({record["task_id"] for record in records}),
         "task_ids": sorted({record["task_id"] for record in records}),
-        "tasks_with_individual_feature_tests": sum(
-            record["ground_truth"]["availability"] == "individual_tests"
+        "tasks_with_patch_test_cases": sum(
+            record["ground_truth"]["availability"] == "patch_test_cases"
             for record in records
         ),
         "tasks_with_any_labeled_cases": tasks_with_cases,
         "ground_truth_availability": dict(sorted(availability.items())),
+        "ground_truth_case_extraction_methods": dict(
+            sorted(extraction_methods.items())
+        ),
         "validation_profile_counts": dict(sorted(validation_profiles.items())),
         "validation_metadata_available": sum(
             bool(record["input"].get("validation")) for record in records
@@ -246,27 +201,117 @@ def build_audit(records: list[dict[str, Any]]) -> dict[str, Any]:
                 "validation_count": len(record["input"].get("validation", [])),
                 "ground_truth_availability": record["ground_truth"]["availability"],
                 "ground_truth_case_count": len(record["ground_truth"]["cases"]),
-                "verifier_report_count": record["provenance"]["verifier_report_count"],
+                "ground_truth_source_count": len(
+                    record["provenance"]["ground_truth_sources"]
+                ),
             }
             for record in sorted(records, key=lambda item: item["task_id"])
         ],
     }
 
 
-def _task_id_for_report(ctrf_path: Path) -> str | None:
-    task_root = ctrf_path.parent.parent
-    config_path = task_root / "config.json"
-    if config_path.is_file():
-        try:
-            config = load_json(config_path)
-            task = config.get("task", {}) if isinstance(config, dict) else {}
-            task_path = task.get("path") if isinstance(task, dict) else None
-            if task_path:
-                return Path(str(task_path)).name
-        except (OSError, json.JSONDecodeError):
-            pass
-    trial_name = task_root.name
-    return trial_name.split("__", 1)[0] if trial_name else None
+def _extract_patch_cases(patch_path: Path) -> list[dict[str, Any]]:
+    """Extract named test cases and added source from a unified test patch."""
+    lines = patch_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    cases: list[dict[str, Any]] = []
+    current_file = ""
+    added: list[str] = []
+    case_id_counts: Counter[str] = Counter()
+
+    def flush() -> None:
+        nonlocal added
+        initial_case_count = len(cases)
+        declarations = []
+        for index, line in enumerate(added):
+            declaration = next(
+                (
+                    match
+                    for pattern in _TEST_DECLARATIONS
+                    if (match := pattern.match(line))
+                ),
+                None,
+            )
+            if declaration is None:
+                continue
+            if declaration.re.pattern.startswith(r"^\s*fn\s+") and not (
+                declaration.group(1).startswith("test_")
+                or any("#[test]" in prior for prior in added[max(0, index - 3) : index])
+            ):
+                continue
+            declarations.append((index, declaration))
+        for declaration_index, (index, declaration) in enumerate(declarations):
+            name = (
+                declaration.group(2)
+                if declaration.lastindex == 2
+                else declaration.group(1)
+            )
+            if not name:
+                continue
+            end = (
+                declarations[declaration_index + 1][0]
+                if declaration_index + 1 < len(declarations)
+                else len(added)
+            )
+            # Keep each added test's own bounded excerpt. The model never sees it.
+            excerpt = "\n".join(added[index : min(end, index + 120)]).strip()
+            identifier = f"{current_file}::{name}"
+            case_id_counts[identifier] += 1
+            if case_id_counts[identifier] > 1:
+                identifier = f"{identifier}#{case_id_counts[identifier]}"
+            cases.append(
+                {
+                    "id": identifier,
+                    "test_name": name,
+                    "behavior_group_id": identifier,
+                    "source_file": current_file,
+                    "source_excerpt": excerpt,
+                    "extraction_method": "named_declaration",
+                }
+            )
+        if (
+            len(cases) == initial_case_count
+            and added
+            and _is_test_source_file(current_file)
+        ):
+            excerpt = "\n".join(added[:160]).strip()[:12000]
+            identifier = f"{current_file}::patch-content"
+            cases.append(
+                {
+                    "id": identifier,
+                    "test_name": f"test patch for {current_file}",
+                    "behavior_group_id": identifier,
+                    "source_file": current_file,
+                    "source_excerpt": excerpt,
+                    "extraction_method": "patch_file_fallback",
+                }
+            )
+        added = []
+
+    for line in lines:
+        if line.startswith("diff --git "):
+            flush()
+            match = re.match(r"diff --git a/(.*?) b/(.*)$", line)
+            current_file = match.group(2) if match else "unknown"
+        elif line.startswith("+") and not line.startswith("+++"):
+            added.append(line[1:])
+        elif line.startswith((" ", "-", "\\")):
+            continue
+        elif line.startswith("@@"):
+            continue
+    flush()
+    return cases
+
+
+def _is_test_source_file(path: str) -> bool:
+    name = Path(path).name.casefold()
+    parts = {part.casefold() for part in Path(path).parts}
+    return not name.endswith(".sh") and bool(
+        parts.intersection({"test", "tests", "__tests__", "testdata"})
+        or name.startswith("test")
+        or "_test." in name
+        or ".test." in name
+        or ".spec." in name
+    )
 
 
 def _task_id_for_dir(task_dir: Path) -> str:

@@ -91,8 +91,12 @@ uv run python -m science.deepswe.test_case_prediction.cli score \
 
 The report scores the full predicted set using exact and coverage
 precision/recall, unsupported predictions, uncovered cases, and per-task
-scores. It also reports test-count mean absolute error, exact-count accuracy,
-and the share of count ranges containing the reviewed ground-truth count. Tasks
+scores. It also reports asymmetric costs: each missing test in the count
+forecast costs 2, each extra forecast test costs 1; each uncovered patch test
+costs 2, each unsupported predicted case costs 1. The report retains the
+unweighted precision/recall and count mean absolute error alongside these
+costs. It also reports exact-count accuracy and the share of count ranges
+containing the reviewed ground-truth count. Tasks
 without extractable named test declarations remain visible in the audit but
 cannot contribute to semantic metrics.
 

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -627,7 +627,7 @@ def test_checked_in_design_interview_definition_parses() -> None:
         if isinstance(value, dict):
             kind = value.get("kind")
             if isinstance(kind, str) and kind in judge_providers:
-                judge_providers[kind].append(value.get("provider"))
+                judge_providers[kind].append(cast(str, value.get("provider")))
             for nested in value.values():
                 collect_judges(nested)
         elif isinstance(value, list):

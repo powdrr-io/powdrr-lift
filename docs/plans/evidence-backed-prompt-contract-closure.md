@@ -66,25 +66,29 @@ validation obligations in machine-readable artifacts.
 Use only information available before implementation:
 
 - The exact user instruction, atomic clauses, and accepted semantic contracts.
-- The repository at the task's base commit: source declarations, implementation
-  variants, tests, documentation, package metadata, and discovered validation
-  commands.
+- Files tracked in the task's captured base commit, selected by the relevant
+  language adapter. The current Python adapter reads only tracked Python
+  files; it does not scan the mutable working tree and refuses capture when
+  tracked files differ from the captured commit.
 - Versioned repository or ecosystem specifications if explicitly supplied by
   the task or pinned in the repository. An external standard may be consulted
   only when the environment permits it; record its identity and version. No
   uncited model recollection counts as standard evidence.
 - Accepted human clarifications and previously recorded repository intent.
 
-Verifier reports, hidden tests, solution patches, agent edits, and validation
-failures from the same attempt are never inputs to closure. They may be used
-after a prompt is frozen to evaluate whether closure succeeded. This keeps
-benchmark measurement independent of prompt construction.
+Solution patches, verifier reports, hidden tests supplied outside the captured
+base commit, validation output, and edits from any implementation attempt are
+never inputs to closure or prompt construction. The inventory is read from the
+Git tree at the captured base commit, so files added or changed by an agent or
+benchmark run cannot enter it. Verifier reports and solution material may be
+used only after the prompt is frozen, to evaluate whether closure succeeded.
+This keeps benchmark measurement independent of prompt construction.
 
 Authority order for a particular decision is: explicit instruction; accepted
 human decision; applicable repository contract at the base commit; pinned
 standard; documented ecosystem convention; conservative default. A lower
-level cannot contradict a higher one. Existing tests are evidence of current
-behavior, not authority to cancel an explicit requested change.
+level cannot contradict a higher one. Post-run validation artifacts do not
+participate in this authority decision.
 
 With `clarification_policy=ask`, unresolved material choices produce the
 existing clarification path. With `normative_defaults`, the compiler chooses
@@ -108,7 +112,7 @@ operations:
     source_clause_refs: [instruction-007]
     surfaces:
       - surface_ref: inventory:...
-        role: public_api # or base, sync, async, adapter, consumer, test
+        role: public_api # or base, sync, async, adapter, caller, callee
         existing_contract_refs: [evidence:...]
         required_behavior_refs: [scenario:...]
         preservation_refs: [preservation:...]
@@ -164,9 +168,10 @@ surface disposition: change, preserve, irrelevant with evidence, or unresolved.
 
 ### 2. Capture existing contracts and omissions
 
-For each relevant surface, extract current signatures, rejection behavior,
-documented guarantees, and focused tests. Compare these facts to the new
-behavior scenarios. Ask narrow semantic questions only when evidence does not
+For each relevant surface, extract current signatures, rejection behavior, and
+documented guarantees from files tracked at the base commit. Do not read
+solution patches or post-run validation artifacts. Compare the source facts to
+the new behavior scenarios. Ask narrow semantic questions only when evidence does not
 deterministically establish the relationship. Examples of question shapes:
 
 - Does this base method reject the new operation unless an adapter overrides
@@ -203,11 +208,11 @@ preservation of pre-existing rejection behavior. Each case has a concrete
 operation and observable assertion. A single test can cover multiple rows only
 if its assertions distinguish them independently.
 
-Existing tests are candidate evidence, not a substitute for a new feature
-case. Do not generate a test selector from prose as proof that a test exists.
-The private validation manifest records whether a case needs a new test, an
-existing test, or a manual/semantic check. The worker prompt states the
-behavior and asks for focused tests; it does not expose hidden verifier facts.
+The private validation manifest records required observable checks, but it is
+compiled from accepted source contracts and base-commit evidence, not from
+verifier output. Do not generate a test selector from prose as proof that a
+test exists. The worker prompt states behavior without exposing hidden
+verifier facts.
 
 ### 5. Validate and render
 
@@ -259,7 +264,7 @@ benchmark infrastructure are separate work.
 
 ## Verification strategy
 
-Create fixtures from several unrelated feature shapes: an API with variants,
+Create fixtures from several unrelated base-commit trees: an API with variants,
 a nested error/continuation flow, an explicitly unsupported base operation,
 and a feature with no special boundary behavior. These exercise general
 rules, not task-name branches. Unit tests should cover evidence binding,
@@ -270,8 +275,9 @@ record reaches the one worker prompt and that the old `ask` behavior remains.
 For benchmark evaluation, freeze the prompt and closure artifacts before
 looking at verifier outputs. Compare the existing generator and the new one on
 the GraphQL and state-machine tasks, then on at least one held-out DeepSWE task.
-Use the same base commit, instruction, policy, model, and validation setup for
-each comparison. Prompt-only evaluation comes first; full Mini-SWE runs follow
+Use the same base commit, instruction, policy, model, and post-freeze scoring
+procedure for each comparison. Do not provide validation setup or outcomes to
+the prompt generator. Prompt-only evaluation comes first; full Mini-SWE runs follow
 only when prompt coverage and provenance pass. Report separately:
 
 - explicit source coverage and unsupported inferred requirements;

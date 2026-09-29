@@ -144,6 +144,7 @@ class FeatureEndpointConfig:
     design_only: bool = False
     capture_worker_prompts_only: bool = False
     clarification_policy: str = "ask"
+    benchmark_mode: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -386,8 +387,9 @@ def _execute_procedrr_flow(
         worktree,
         output_root=output_root,
         explicit_command=config.validation_command,
+        benchmark_mode=config.benchmark_mode,
     )
-    if not validation_profiles:
+    if not validation_profiles and not config.benchmark_mode:
         raise PowdrrExecutionError(
             "Could not discover a validation command. Provide "
             "--validation-command or declare project validation tooling."
@@ -4381,12 +4383,14 @@ def _bootstrap_validation_profiles(
     *,
     output_root: Path,
     explicit_command: tuple[str, ...],
+    benchmark_mode: bool = False,
 ) -> tuple[DiscoveredValidationProfile, ...]:
     """Run Structrr bootstrap and adapt its detected tools for Workrr."""
     bootstrap = bootstrap_structrr(
         worktree,
         output_path=output_root / "validation-bootstrap.yaml",
         taxonomy_path=_structrr_taxonomy_path(worktree),
+        benchmark_mode=benchmark_mode,
     )
     if not bootstrap.validation.successful:
         raise PowdrrExecutionError(
@@ -4418,7 +4422,7 @@ def _bootstrap_validation_profiles(
                 str(tool.get("source", "Structrr bootstrap")),
             )
         )
-    if not profiles:
+    if not profiles and not benchmark_mode:
         profiles.append(
             DiscoveredValidationProfile(
                 "repository-validation",

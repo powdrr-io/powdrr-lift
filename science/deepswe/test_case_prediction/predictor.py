@@ -20,7 +20,7 @@ from powdrr_lift.workrr.providers import (
 from . import PREDICTIONS_SCHEMA_VERSION
 from .records import load_task_record
 
-PREDICTOR_PROMPT_VERSION = "test-case-staged-v2"
+PREDICTOR_PROMPT_VERSION = "test-case-staged-v3"
 FULL_SET_STRUCTURED_OUTPUT_TOKENS = 16_384
 
 COUNT_PROMPT = """Estimate how many new test cases the patch for this task will add.
@@ -34,7 +34,10 @@ Split cases when the API mode, setup/state transition, or expected outcome is
 materially different. Do not count fixtures, helpers, or setup-only changes.
 Estimate the likely patch's test-case count and plausible lower and upper
 bounds; use realistic grouping by a test author instead of expanding every
-condition into its own test. Output JSON only."""
+condition into its own test. When two counts are similarly plausible, lean
+slightly higher because underpredicting the patch size is more costly than a
+modest overprediction. Keep the estimate grounded in likely test blocks; do not
+inflate it to one test per clause or obligation. Output JSON only."""
 
 OBLIGATION_PROMPT = """Enumerate the distinct observable behavior obligations that
 the new tests should verify. Use only the task instruction and validation
@@ -60,7 +63,10 @@ or external benchmark knowledge.
 Create one case for each likely added test function/block and each separately
 executed parameter or named table row when it represents a distinct test. Cover
 all obligations and meaningful input classes, outcomes, API modes, and state
-transitions. Avoid speculative cross-products and duplicate cases. Use the
+transitions. Missing a distinct, well-grounded behavior is more costly than
+including one additional grounded case, so favor complete coverage when choosing
+between plausible cases. Do not add speculative behavior or unsupported cases.
+Avoid speculative cross-products and duplicate cases. Use the
 count forecast as the predicted patch size: return exactly the forecast number
 of cases. Do not pad the set with unsupported behavior or omit an obligation;
 choose the most likely grouping and parameterization of the tests. The forecast

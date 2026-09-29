@@ -9,6 +9,10 @@ from typing import Any
 from .records import load_json, load_task_record
 
 JUDGMENTS = {"exact", "partial", "no_match", "unreviewed"}
+UNDERPREDICTION_COST = 2
+OVERPREDICTION_COST = 1
+MISSED_CASE_COST = 2
+ADDITIONAL_CASE_COST = 1
 
 
 def prepare_review(
@@ -59,8 +63,11 @@ def score_reviews(
     all_covered_truth = 0
     all_predictions = 0
     all_truth = 0
+    all_unsupported_predictions = 0
+    all_uncovered_truth = 0
     tasks_with_labels = 0
     count_errors = []
+    count_weighted_errors = []
     count_exact = []
     count_interval_hits = []
     for record, predictions, review in entries:
@@ -69,6 +76,7 @@ def score_reviews(
         count_report = task_report.get("test_case_count")
         if count_report is not None:
             count_errors.append(count_report["absolute_error"])
+            count_weighted_errors.append(count_report["weighted_error"])
             count_exact.append(count_report["exact_match"])
             count_interval_hits.append(count_report["within_bounds"])
         if task_report["ground_truth_count"]:
@@ -81,6 +89,8 @@ def score_reviews(
             )
             all_predictions += task_report["prediction_count"]
             all_truth += task_report["ground_truth_count"]
+            all_unsupported_predictions += task_report["unsupported_predictions"]
+            all_uncovered_truth += task_report["uncovered_ground_truth"]
     return {
         "schema_version": "deepswe-test-prediction-score-v2",
         "task_count": len(task_reports),
@@ -90,6 +100,15 @@ def score_reviews(
             "exact_recall": _ratio(all_exact_truth, all_truth),
             "coverage_precision": _ratio(all_covered_predictions, all_predictions),
             "coverage_recall": _ratio(all_covered_truth, all_truth),
+            "miss_weighted_case_cost": (
+                MISSED_CASE_COST * all_uncovered_truth
+                + ADDITIONAL_CASE_COST * all_unsupported_predictions
+            ),
+            "miss_weighted_case_cost_per_ground_truth": _ratio(
+                MISSED_CASE_COST * all_uncovered_truth
+                + ADDITIONAL_CASE_COST * all_unsupported_predictions,
+                all_truth,
+            ),
             "unsupported_predictions": all_predictions - all_covered_predictions,
             "prediction_count": all_predictions,
             "ground_truth_count": all_truth,
@@ -98,6 +117,13 @@ def score_reviews(
                 "mean_absolute_error": (
                     sum(count_errors) / len(count_errors) if count_errors else None
                 ),
+                "mean_underprediction_weighted_error": (
+                    sum(count_weighted_errors) / len(count_weighted_errors)
+                    if count_weighted_errors
+                    else None
+                ),
+                "underprediction_cost": UNDERPREDICTION_COST,
+                "overprediction_cost": OVERPREDICTION_COST,
                 "exact_count_accuracy": (
                     sum(count_exact) / len(count_exact) if count_exact else None
                 ),
@@ -258,6 +284,12 @@ def _score_one(
             "estimated_test_case_count": estimate,
             "known_ground_truth_case_count": known_case_count,
             "absolute_error": abs(estimate - known_case_count),
+            "underprediction_count": max(known_case_count - estimate, 0),
+            "overprediction_count": max(estimate - known_case_count, 0),
+            "weighted_error": (
+                UNDERPREDICTION_COST * max(known_case_count - estimate, 0)
+                + OVERPREDICTION_COST * max(estimate - known_case_count, 0)
+            ),
             "exact_match": estimate == known_case_count,
             "within_bounds": lower <= known_case_count <= upper,
         }
@@ -277,6 +309,10 @@ def _score_one(
         "exact_recall": _ratio(len(exact_pairs), len(truth)),
         "coverage_precision": _ratio(len(covered_prediction_ids), len(predicted)),
         "coverage_recall": _ratio(len(matches), len(truth)),
+        "miss_weighted_case_cost": (
+            MISSED_CASE_COST * (len(truth) - len(truth_hit_ids))
+            + ADDITIONAL_CASE_COST * (len(predicted) - len(covered_prediction_ids))
+        ),
         "test_case_count": count_metrics,
         "matches": [
             {

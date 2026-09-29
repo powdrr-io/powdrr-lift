@@ -395,15 +395,24 @@ def test_review_scoring_reports_full_set_exact_and_partial_coverage() -> None:
         "estimated_test_case_count": 3,
         "known_ground_truth_case_count": 2,
         "absolute_error": 1,
+        "underprediction_count": 0,
+        "overprediction_count": 1,
+        "weighted_error": 1,
         "exact_match": False,
         "within_bounds": True,
     }
     assert report["aggregate"]["test_case_count_prediction"] == {
         "task_count": 1,
         "mean_absolute_error": 1.0,
+        "mean_underprediction_weighted_error": 1.0,
+        "underprediction_cost": 2,
+        "overprediction_cost": 1,
         "exact_count_accuracy": 0.0,
         "interval_coverage": 1.0,
     }
+    assert metrics["miss_weighted_case_cost"] == 1
+    assert report["aggregate"]["miss_weighted_case_cost"] == 1
+    assert report["aggregate"]["miss_weighted_case_cost_per_ground_truth"] == 0.5
 
 
 def test_review_scoring_rejects_unreviewed_pairs() -> None:
@@ -416,6 +425,39 @@ def test_review_scoring_rejects_unreviewed_pairs() -> None:
 
     with pytest.raises(ValueError, match="still has unreviewed"):
         score_reviews([(record, predictions, review)])
+
+
+def test_underprediction_has_double_count_and_case_cost() -> None:
+    record = _scoring_record()
+    predictions = {
+        "task_id": "example-task",
+        "test_count_prediction": {
+            "estimated_test_case_count": 1,
+            "lower_bound": 1,
+            "upper_bound": 1,
+        },
+        "cases": [{"id": "pred-001"}],
+    }
+    review = prepare_review(record, predictions)
+    for disposition in review["ground_truth_dispositions"]:
+        disposition["behavior_status"] = "known"
+        disposition["rationale"] = "patch test has distinct expected behavior"
+    for pair in review["pairs"]:
+        pair["judgment"] = (
+            "exact" if pair["ground_truth_id"] == "test-a" else "no_match"
+        )
+        pair["rationale"] = "case covers test-a only"
+
+    report = score_reviews([(record, predictions, review)])
+
+    assert report["tasks"][0]["test_case_count"]["weighted_error"] == 2
+    assert report["tasks"][0]["miss_weighted_case_cost"] == 2
+    assert (
+        report["aggregate"]["test_case_count_prediction"][
+            "mean_underprediction_weighted_error"
+        ]
+        == 2
+    )
 
 
 def test_unknown_ground_truth_is_excluded_from_semantic_metrics() -> None:

@@ -1,0 +1,275 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 854
+title: Route all design-interview classifiers through Jev
+intent:
+  problem: All design-interview classifier judges currently use the planning model despite Jev being available for typed choices.
+  goal: Route every classify_one decision in the design interview through Jev while leaving generation and evidence-verification work on the planning model.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 150, end_line: 150}
+    summary: Route atomicity classification through Jev.
+    rationale: Use Jev for the typed true/false decision.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 291, end_line: 291}
+    summary: Route root instruction decisions through Jev.
+    rationale: Apply Jev to the root classification in the source decision tree.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 353, end_line: 353}
+    summary: Route dependent semantic decisions through Jev.
+    rationale: Apply Jev to the child classification after root routing.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 464, end_line: 464}
+    summary: Route behavior-family decisions through Jev.
+    rationale: Use Jev for the registered behavior category choice.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 533, end_line: 533}
+    summary: Route field-entailment decisions through Jev.
+    rationale: Use Jev to classify whether each semantic field is supported by the source.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 490, end_line: 499}
+    summary: Configure separate Jev and planning judge clients.
+    rationale: Keep typed classifiers on Jev while preserving the planning model for the rest of the workflow and as a Jev failure fallback.
+    related: {entities: [jev-classifier-client], invariants: [classifier-provider-routing]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 501, end_line: 501}
+    summary: Keep planning as the evaluator's default client.
+    rationale: Preserve the planning model for generation steps.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 505, end_line: 506}
+    summary: Register Jev as a dedicated judge provider.
+    rationale: Resolve workflow-declared Jev providers to the Jev classifier client.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 1, end_line: 1}
+    summary: Define the Jev classification client interface.
+    rationale: Accept workflow classification requests through the Jev adapter.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Add required typed classification imports.
+    rationale: Map workflow schemas and labels to Jev requests.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Add classification client declarations.
+    rationale: Separate Jev classification from planning model behavior.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 28, end_line: 28}
+    summary: Define Jev endpoint configuration.
+    rationale: Allow deployment-specific System One endpoints.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 35, end_line: 41}
+    summary: Build typed Jev requests from workflow inputs.
+    rationale: Pass semantic context and allowed values to Jev.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 37, end_line: 37}
+    summary: Include source text in classification context.
+    rationale: Ground semantic classifications in their source.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 50, end_line: 50}
+    summary: Map boolean schemas to Jev choices.
+    rationale: Support atomicity decisions using typed Jev responses.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 48, end_line: 50}
+    summary: Map field entailment to workflow schema values.
+    rationale: Preserve declared field entailment results.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 54, end_line: 54}
+    summary: Handle unresolved Jev choices.
+    rationale: Represent abstentions using the workflow unresolved envelope.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 56, end_line: 56}
+    summary: Fall back when the Jev response cannot be mapped.
+    rationale: Preserve workflow operation for invalid classifications.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 79, end_line: 80}
+    summary: Define the generic classification request path.
+    rationale: Reuse Jev for supported classify_one decisions.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 93, end_line: 93}
+    summary: Validate classification labels against allowed values.
+    rationale: Ensure Jev output fits the workflow's declared choices.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 99, end_line: 104}
+    summary: Extract classification question and context.
+    rationale: Provide Jev the same decision information as the workflow judge.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 108, end_line: 160}
+    summary: Translate workflow schemas and responses to Jev types.
+    rationale: Support semantic labels, booleans, and field entailment.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 162, end_line: 164}
+    summary: Handle provider fallback configuration.
+    rationale: Route unsupported or unavailable Jev calls through planning.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 166, end_line: 213}
+    summary: Send classification requests and map typed results.
+    rationale: Apply Jev classifications to workflow response shapes.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 216, end_line: 218}
+    summary: Add credential and endpoint resolution.
+    rationale: Configure Jev from environment credentials.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 223, end_line: 223}
+    summary: Preserve planning fallback on request failures.
+    rationale: Keep evaluation available when Jev is unreachable.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 239, end_line: 239}
+    summary: Return mapped Jev classification choices.
+    rationale: Adapt provider results to evaluator expectations.
+    related: {entities: [jev-classifier-client]}
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Import pytest for isolated feature-flow fixtures.
+    rationale: Keep deterministic end-to-end checks independent of live Jev credentials.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 24, end_line: 33}
+    summary: Prevent deterministic pipeline tests from making live Jev requests.
+    rationale: Keep fixture-based tests hermetic when developer credentials are configured.
+    related: {entities: [jev-integration-tests], invariants: [offline-test-fixtures]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import classification client test dependencies.
+    rationale: Exercise typed Jev mappings.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 26, end_line: 27}
+    summary: Test semantic classification context and choices.
+    rationale: Verify Jev receives supported labels and source context.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 33, end_line: 40}
+    summary: Test typed semantic choice mapping.
+    rationale: Ensure Jev classifications map to workflow values.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 49, end_line: 49}
+    summary: Test boolean atomicity classification.
+    rationale: Cover the design interview boolean schema.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 56, end_line: 56}
+    summary: Test boolean response mapping.
+    rationale: Confirm Jev output becomes a workflow boolean.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 65, end_line: 65}
+    summary: Test field entailment classification.
+    rationale: Cover field-level semantic support decisions.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 68, end_line: 69}
+    summary: Test field entailment mapping.
+    rationale: Verify Jev results fit the workflow schema.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 72, end_line: 72}
+    summary: Test unresolved Jev decisions.
+    rationale: Preserve abstentions as unresolved results.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 74, end_line: 160}
+    summary: Test classification fallback and response edge cases.
+    rationale: Keep failure handling and mapping behavior covered.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 163, end_line: 163}
+    summary: Test unsupported classification requests.
+    rationale: Ensure unsupported shapes use the planning fallback.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 1, end_line: 2}
+    summary: Import Any for recursive judge-provider inspection.
+    rationale: Type the workflow-provider regression assertion.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 624, end_line: 640}
+    summary: Assert every classify_one judge uses Jev and construct_one remains on planning.
+    rationale: Prevent accidental routing of generation calls through Jev.
+    related: {entities: [jev-integration-tests], invariants: [classifier-provider-routing]}
+entities:
+  - id: design-interview-classifiers
+    type: Function
+    action: added
+  - id: jev-classifier-client
+    type: Function
+    action: added
+  - id: jev-integration-tests
+    type: Test suite
+    action: added
+invariants:
+  - id: classifier-provider-routing
+    action: added
+    description: Every classify_one judge in design-interview uses provider jev; construct_one generation and exact source-span extraction remain on planning.
+    rationale: Route classification decisions to Jev while preserving the provider for generative work.
+  - id: offline-test-fixtures
+    action: added
+    description: Deterministic end-to-end tests remove Jev API credentials so fixtures never issue billable requests.
+    rationale: Keep test outcomes repeatable and independent of workstation credentials.
+guidance: []

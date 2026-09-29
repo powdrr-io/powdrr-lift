@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pytest
 
 from procedrr import (
@@ -619,6 +621,23 @@ def test_checked_in_design_interview_definition_parses() -> None:
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     document = parse_and_validate(source)
+    judge_providers: dict[str, list[str]] = {"classify_one": [], "construct_one": []}
+
+    def collect_judges(value: Any) -> None:
+        if isinstance(value, dict):
+            kind = value.get("kind")
+            if isinstance(kind, str) and kind in judge_providers:
+                judge_providers[kind].append(cast(str, value.get("provider")))
+            for nested in value.values():
+                collect_judges(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                collect_judges(nested)
+
+    collect_judges(document["steps"])
+    assert judge_providers["classify_one"]
+    assert set(judge_providers["classify_one"]) == {"jev"}
+    assert set(judge_providers["construct_one"]) == {"planning"}
     assert document["name"] == "design-interview"
     assert validate_single_decision(document) == ()
 

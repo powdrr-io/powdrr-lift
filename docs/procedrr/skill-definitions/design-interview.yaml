@@ -147,7 +147,7 @@ steps:
       body:
         - judge:
             kind: classify_one
-            provider: planning
+            provider: jev
             question: Does this one instruction clause contain more than one independently verifiable requirement?
             subject: atomicity_clause.text
             prompt_system: Return only the declared JSON object.
@@ -290,7 +290,7 @@ steps:
             body:
               - judge:
                   kind: classify_one
-                  provider: planning
+                  provider: jev
                   question: Decide how the pipeline should route this exact instruction clause before classifying details.
                   subject: root_decision_request.subject_text
                   prompt_system: Return only the declared JSON object.
@@ -353,7 +353,7 @@ steps:
             body:
               - judge:
                   kind: classify_one
-                  provider: planning
+                  provider: jev
                   question: Resolve this child decision only within the already-selected root branch.
                   subject: dependent_decision_request.subject_text
                   prompt_system: Return only the declared JSON object.
@@ -465,7 +465,7 @@ steps:
             bind: behavior_family_request
         - judge:
             kind: classify_one
-            provider: planning
+            provider: jev
             question: Classify only the extracted behavior into one registered behavior family.
             subject: behavior_family_request.subject_text
             prompt_system: Return only the declared JSON object.
@@ -535,7 +535,7 @@ steps:
             body:
               - judge:
                   kind: classify_one
-                  provider: planning
+                  provider: jev
                   question: Is this candidate field entailed by the exact source proposition?
                   subject: field_entailment_request.source_text
                   prompt_system: Return only the declared JSON object.

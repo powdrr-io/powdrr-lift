@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 import threading
+from threading import Barrier
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -454,6 +455,70 @@ def test_for_each_collects_structured_results_in_order() -> None:
     assert result.bindings["validation_results"] == [
         {"command": 0, "result": {"returncode": 0}},
         {"command": 1, "result": {"returncode": 1}},
+    ]
+
+
+def test_for_each_parallel_judgments_run_concurrently_and_collect_in_order() -> None:
+    barrier = Barrier(2)
+
+    class ConcurrentLLM:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            **_: Any,
+        ) -> dict[str, Any]:
+            barrier.wait(timeout=5)
+            content = messages[-1]["content"]
+            answer = "item-0" if '"instruction": "item-0"' in content else "item-1"
+            return {"answer": answer}
+
+    result = Evaluator(ConcurrentLLM(), lambda _tool, _parameters: None).evaluate(
+        {
+            "name": "parallel-instruction-judgments",
+            "steps": [
+                {
+                    "for_each": {
+                        "snapshot": {"name": "instructions", "max_items": 2},
+                        "item_binding": "instruction",
+                        "max_parallel": 2,
+                        "collect": {
+                            "binding": "answers",
+                            "mode": "list",
+                            "value": "judgment",
+                        },
+                        "body": [
+                            {
+                                "judge": {
+                                    "question": "Classify the instruction",
+                                    "prompt_system": "Return JSON",
+                                    "context": ["instruction"],
+                                    "output": {
+                                        "name": "judgment",
+                                        "schema": {
+                                            "type": "object",
+                                            "required": ["answer"],
+                                            "properties": {
+                                                "answer": {"type": "string"}
+                                            },
+                                        },
+                                    },
+                                }
+                            }
+                        ],
+                    }
+                }
+            ],
+        },
+        {"instructions": ["item-0", "item-1"]},
+    )
+
+    assert result.bindings["answers"] == [
+        {"item": "item-0", "result": {"answer": "item-0"}},
+        {"item": "item-1", "result": {"answer": "item-1"}},
+    ]
+    assert [event.path for event in result.events] == [
+        "steps[0].for_each[0][0][0]",
+        "steps[0].for_each[0][1][0]",
     ]
 
 

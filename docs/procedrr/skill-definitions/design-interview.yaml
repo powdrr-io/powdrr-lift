@@ -293,7 +293,7 @@ steps:
                   prompt_system: Return only the declared JSON object.
                   instructions:
                     - Follow the request's question, instructions, and allowed_values exactly.
-                    - This is the root of a decision tree. Choose include for product behavior, interfaces, invariants, entity definitions, or implementation guidance; include_prohibition for explicit product prohibitions; exclude for process instructions or background with no implementation obligation; unclear when meaning or route cannot be determined without guessing.
+                    - This is the root of a decision tree. Choose include for product behavior, interfaces, invariants, entity definitions, or implementation guidance; include_prohibition for explicit product prohibitions; exclude for process instructions or background with no implementation obligation; unclear when meaning or route cannot be determined without guessing. A required rejection, exception, or error for invalid input is product behavior and must route to include, not include_prohibition.
                     - Do not classify detailed product kind, polarity, strength, scope, behavior family, or validation oracle here.
                     - Return resolved with exactly one allowed value when the source supports it.
                     - Return unresolved with a closed reason_code when the source does not support one value.
@@ -593,6 +593,11 @@ steps:
                 product obligation, exclude creates no implementation obligation,
                 and unclear must be resolved before this step.
               - For include_prohibition, put the forbidden outcome in the scenario expectation and test the prohibited boundary; do not rewrite it as a request to implement the forbidden behavior.
+              - >-
+                A required failure when invalid input is tried is an obligation:
+                preserve the failure mode as the expected behavior and require a
+                test that the invalid input fails. Do not classify this as a
+                non-goal just because the input is rejected.
               - For guidance, preserve recommendation strength. Turn the recommendation into an implementation check without upgrading it to a mandatory behavior unless the accepted source explicitly requires that.
               - Use the complete atomic instruction ledger as supporting specification context when another clause explicitly supplies this behavior's result, error, compatibility, or boundary detail.
               - Keep each scenario centered on its exact clause, but do not isolate it from the rest of the requested behavior. Preserve explicit relationships to other clauses when they define how this behavior is exposed, consumed, combined, ordered, or made available through another API or integration.

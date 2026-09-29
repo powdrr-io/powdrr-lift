@@ -247,11 +247,13 @@ def test_tavily_http_request_uses_bearer_key_and_bounded_parameters(
         api_key="server-side-key",
     )
 
+    request_body = observed.get("body")
+    assert isinstance(request_body, dict)
     assert observed["url"] == research_module.TAVILY_SEARCH_ENDPOINT
     assert observed["token"] == "Bearer server-side-key"
-    assert observed["body"]["query"] == _query()["query"]
-    assert observed["body"]["search_depth"] == "basic"
-    assert observed["body"]["max_results"] == research_module.MAX_SEARCH_RESULTS
+    assert request_body["query"] == _query()["query"]
+    assert request_body["search_depth"] == "basic"
+    assert request_body["max_results"] == research_module.MAX_SEARCH_RESULTS
     assert observed["timeout"] == research_module.FETCH_TIMEOUT_SECONDS
     assert result["candidate_count"] == 1
 

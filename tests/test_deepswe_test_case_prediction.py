@@ -63,6 +63,56 @@ def test_test_patch_cases_support_go_and_javascript_names(tmp_path: Path) -> Non
     ]
 
 
+def test_test_patch_cases_preserve_pytest_decorators_and_expand_parameters(
+    tmp_path: Path,
+) -> None:
+    task_dir = _task_dir(tmp_path)
+    patch = task_dir / "tests" / "test.patch"
+    patch.parent.mkdir()
+    patch.write_text(
+        "diff --git a/tests/test_widget.py b/tests/test_widget.py\n"
+        "@@ -0,0 +1,8 @@\n"
+        "+@pytest.mark.parametrize(('value', 'expected'), [(1, 2), (3, 4)])\n"
+        "+def test_doubles(value, expected):\n"
+        "+    assert double(value) == expected\n",
+        encoding="utf-8",
+    )
+
+    record = collect_task_record(task_dir)
+    cases = record["ground_truth"]["cases"]
+
+    assert [case["test_name"] for case in cases] == [
+        "test_doubles[value=1,expected=2]",
+        "test_doubles[value=3,expected=4]",
+    ]
+    assert {case["behavior_group_id"] for case in cases} == {
+        "tests/test_widget.py::test_doubles"
+    }
+    assert all("@pytest.mark.parametrize" in case["source_excerpt"] for case in cases)
+
+
+def test_test_patch_cases_expand_named_go_table_cases(tmp_path: Path) -> None:
+    task_dir = _task_dir(tmp_path)
+    patch = task_dir / "tests" / "test.patch"
+    patch.parent.mkdir()
+    patch.write_text(
+        "diff --git a/widget_test.go b/widget_test.go\n@@ -0,0 +1,8 @@\n"
+        "+func TestWidget(t *testing.T) {\n"
+        "+    tests := []struct { name string }{\n"
+        '+        {name: "empty input"},\n'
+        '+        {name: "valid input"},\n'
+        "+    }\n+}\n",
+        encoding="utf-8",
+    )
+
+    record = collect_task_record(task_dir)
+
+    assert [case["test_name"] for case in record["ground_truth"]["cases"]] == [
+        "TestWidget[empty input]",
+        "TestWidget[valid input]",
+    ]
+
+
 def test_task_record_reads_declared_verifier_command(tmp_path: Path) -> None:
     task_dir = _task_dir(tmp_path)
     (task_dir / "task.toml").write_text(

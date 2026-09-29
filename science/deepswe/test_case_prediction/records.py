@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import shlex
@@ -252,22 +253,50 @@ def _extract_patch_cases(patch_path: Path) -> list[dict[str, Any]]:
                 if declaration_index + 1 < len(declarations)
                 else len(added)
             )
-            # Keep each added test's own bounded excerpt. The model never sees it.
-            excerpt = "\n".join(added[index : min(end, index + 120)]).strip()
+            # Decorators carry important test dimensions (for example pytest
+            # parameter tables), so include the contiguous decorator block.
+            excerpt_start = index
+            while excerpt_start > 0 and (
+                added[excerpt_start - 1].lstrip().startswith("@")
+                or added[excerpt_start - 1].lstrip().startswith("#[")
+                or not added[excerpt_start - 1].strip()
+                and excerpt_start > 1
+                and (
+                    added[excerpt_start - 2].lstrip().startswith("@")
+                    or added[excerpt_start - 2].lstrip().startswith("#[")
+                )
+            ):
+                excerpt_start -= 1
+            body = added[excerpt_start : min(end, index + 120)]
+            excerpt = "\n".join(added[excerpt_start : min(end, index + 120)]).strip()
             identifier = f"{current_file}::{name}"
             case_id_counts[identifier] += 1
             if case_id_counts[identifier] > 1:
                 identifier = f"{identifier}#{case_id_counts[identifier]}"
-            cases.append(
-                {
-                    "id": identifier,
-                    "test_name": name,
-                    "behavior_group_id": identifier,
-                    "source_file": current_file,
-                    "source_excerpt": excerpt,
-                    "extraction_method": "named_declaration",
-                }
-            )
+            variants = _parameterized_case_names(body)
+            if variants:
+                for variant in variants:
+                    cases.append(
+                        {
+                            "id": f"{identifier}[{variant}]",
+                            "test_name": f"{name}[{variant}]",
+                            "behavior_group_id": identifier,
+                            "source_file": current_file,
+                            "source_excerpt": excerpt,
+                            "extraction_method": "parameterized_declaration",
+                        }
+                    )
+            else:
+                cases.append(
+                    {
+                        "id": identifier,
+                        "test_name": name,
+                        "behavior_group_id": identifier,
+                        "source_file": current_file,
+                        "source_excerpt": excerpt,
+                        "extraction_method": "named_declaration",
+                    }
+                )
         if (
             len(cases) == initial_case_count
             and added
@@ -300,6 +329,73 @@ def _extract_patch_cases(patch_path: Path) -> list[dict[str, Any]]:
             continue
     flush()
     return cases
+
+
+def _parameterized_case_names(lines: list[str]) -> list[str]:
+    """Return statically declared pytest or Go table case names, if present."""
+    source = "\n".join(lines)
+    names: list[str] = []
+    try:
+        module = ast.parse(source)
+    except SyntaxError:
+        module = None
+    if module is not None:
+        calls = [
+            decorator
+            for node in ast.walk(module)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            for decorator in node.decorator_list
+            if isinstance(decorator, ast.Call)
+            and isinstance(decorator.func, ast.Attribute)
+            and decorator.func.attr == "parametrize"
+            and isinstance(decorator.func.value, ast.Attribute)
+            and decorator.func.value.attr == "mark"
+        ]
+        for call in calls:
+            if len(call.args) < 2:
+                continue
+            try:
+                parameters = ast.literal_eval(call.args[0])
+                values = ast.literal_eval(call.args[1])
+            except (SyntaxError, ValueError):
+                continue
+            parameter_names = (
+                [part.strip() for part in parameters.split(",")]
+                if isinstance(parameters, str)
+                else [str(item) for item in parameters]
+            )
+            explicit_ids = next(
+                (keyword.value for keyword in call.keywords if keyword.arg == "ids"),
+                None,
+            )
+            try:
+                explicit_ids = ast.literal_eval(explicit_ids) if explicit_ids else None
+            except (SyntaxError, ValueError):
+                explicit_ids = None
+            if not isinstance(values, (list, tuple)):
+                continue
+            for index, value in enumerate(values):
+                if isinstance(explicit_ids, (list, tuple)) and index < len(
+                    explicit_ids
+                ):
+                    label = str(explicit_ids[index])
+                else:
+                    values_for_row = (
+                        value if isinstance(value, (list, tuple)) else (value,)
+                    )
+                    label_parts = []
+                    for pos, item in enumerate(values_for_row):
+                        parameter = (
+                            parameter_names[pos]
+                            if pos < len(parameter_names)
+                            else str(pos)
+                        )
+                        label_parts.append(f"{parameter}={item!r}")
+                    label = ",".join(label_parts)
+                names.append(label or f"case-{index + 1}")
+    if not names:
+        names.extend(re.findall(r"\bname\s*:\s*\"([^\"]+)\"", source))
+    return list(dict.fromkeys(names))
 
 
 def _is_test_source_file(path: str) -> bool:

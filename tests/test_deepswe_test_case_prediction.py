@@ -97,6 +97,48 @@ def test_test_patch_cases_preserve_pytest_decorators_and_expand_parameters(
     assert all("@pytest.mark.parametrize" in case["source_excerpt"] for case in cases)
 
 
+def test_parameterized_tests_with_adjacent_decorators_expand_independently(
+    tmp_path: Path,
+) -> None:
+    task_dir = _task_dir(tmp_path)
+    patch = task_dir / "tests" / "test.patch"
+    patch.parent.mkdir()
+    patch.write_text(
+        "diff --git a/tests/test_widget.py b/tests/test_widget.py\n"
+        "@@ -0,0 +1,6 @@\n"
+        "+@pytest.mark.parametrize(\n"
+        '+    "value",\n+    [1, 2],\n+)'
+        "\n"
+        "+def test_first(value):\n+    assert value > 0\n"
+        "+@pytest.mark.parametrize(\n"
+        '+    "value",\n+    [3, 4],\n+)'
+        "\n"
+        "+def test_second(value):\n+    assert value > 0\n",
+        encoding="utf-8",
+    )
+
+    record = collect_task_record(task_dir)
+
+    assert [case["test_name"] for case in record["ground_truth"]["cases"]] == [
+        "test_first[value=1]",
+        "test_first[value=2]",
+        "test_second[value=3]",
+        "test_second[value=4]",
+    ]
+    assert all(
+        case["test_name"].split("[", 1)[0] in case["source_excerpt"]
+        for case in record["ground_truth"]["cases"]
+    )
+    assert all(
+        "def test_second" not in case["source_excerpt"]
+        for case in record["ground_truth"]["cases"][:2]
+    )
+    assert all(
+        "def test_first" not in case["source_excerpt"]
+        for case in record["ground_truth"]["cases"][2:]
+    )
+
+
 def test_test_patch_cases_expand_named_go_table_cases(tmp_path: Path) -> None:
     task_dir = _task_dir(tmp_path)
     patch = task_dir / "tests" / "test.patch"

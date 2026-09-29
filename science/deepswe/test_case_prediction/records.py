@@ -223,6 +223,18 @@ def _extract_patch_cases(patch_path: Path) -> list[dict[str, Any]]:
         nonlocal added
         initial_case_count = len(cases)
         declarations = []
+        python_decorator_starts: dict[int, int] = {}
+        try:
+            module = ast.parse("\n".join(added))
+        except SyntaxError:
+            module = None
+        if module is not None:
+            for node in ast.walk(module):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    python_decorator_starts[node.lineno - 1] = min(
+                        (decorator.lineno - 1 for decorator in node.decorator_list),
+                        default=node.lineno - 1,
+                    )
         for index, line in enumerate(added):
             declaration = next(
                 (
@@ -239,8 +251,23 @@ def _extract_patch_cases(patch_path: Path) -> list[dict[str, Any]]:
                 or any("#[test]" in prior for prior in added[max(0, index - 3) : index])
             ):
                 continue
-            declarations.append((index, declaration))
-        for declaration_index, (index, declaration) in enumerate(declarations):
+            excerpt_start = python_decorator_starts.get(index, index)
+            if excerpt_start == index:
+                while excerpt_start > 0 and (
+                    added[excerpt_start - 1].lstrip().startswith("@")
+                    or added[excerpt_start - 1].lstrip().startswith("#[")
+                    or not added[excerpt_start - 1].strip()
+                    and excerpt_start > 1
+                    and (
+                        added[excerpt_start - 2].lstrip().startswith("@")
+                        or added[excerpt_start - 2].lstrip().startswith("#[")
+                    )
+                ):
+                    excerpt_start -= 1
+            declarations.append((excerpt_start, index, declaration))
+        for declaration_index, (excerpt_start, index, declaration) in enumerate(
+            declarations
+        ):
             name = (
                 declaration.group(2)
                 if declaration.lastindex == 2
@@ -254,19 +281,8 @@ def _extract_patch_cases(patch_path: Path) -> list[dict[str, Any]]:
                 else len(added)
             )
             # Decorators carry important test dimensions (for example pytest
-            # parameter tables), so include the contiguous decorator block.
-            excerpt_start = index
-            while excerpt_start > 0 and (
-                added[excerpt_start - 1].lstrip().startswith("@")
-                or added[excerpt_start - 1].lstrip().startswith("#[")
-                or not added[excerpt_start - 1].strip()
-                and excerpt_start > 1
-                and (
-                    added[excerpt_start - 2].lstrip().startswith("@")
-                    or added[excerpt_start - 2].lstrip().startswith("#[")
-                )
-            ):
-                excerpt_start -= 1
+            # parameter tables). Stop before the next test's decorators so
+            # each declaration can be parsed independently.
             body = added[excerpt_start : min(end, index + 120)]
             excerpt = "\n".join(added[excerpt_start : min(end, index + 120)]).strip()
             identifier = f"{current_file}::{name}"

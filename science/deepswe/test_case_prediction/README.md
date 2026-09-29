@@ -23,12 +23,14 @@ validation list means no usable pre-implementation validation metadata was
 available.
 
 The collector parses named test declarations and their added source excerpts
-from each task's `tests/test.patch`. It supports common Python, Go, JavaScript,
-and Rust test naming forms; patches with other naming conventions remain
-visible in the audit but may need a parser extension or manual labeling. Patch
-content is stored only as ground truth for blinded human review and is never
-sent to the prediction provider. One record per task and `audit.json` are
-written to the output directory.
+from each task's `tests/test.patch`. Statically declared pytest
+`@pytest.mark.parametrize` rows become separate ground-truth cases grouped under
+their test function. It supports common Python, Go, JavaScript, and Rust test
+naming forms; patches with other naming conventions remain visible in the audit
+but may need a parser extension or manual labeling. Patch content is stored
+only as ground truth for blinded human review and is never sent to the
+prediction provider. One record per task and `audit.json` are written to the
+output directory.
 
 ## Predict
 

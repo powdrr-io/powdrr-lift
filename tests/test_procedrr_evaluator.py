@@ -4,6 +4,7 @@ import os
 import json
 import subprocess
 import sys
+import threading
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -25,6 +26,60 @@ class FakeLLM:
             "added": [{"id": "req-1", "description": "Do the thing"}],
             "deleted": [],
         }
+
+
+def test_for_each_runs_judge_only_items_concurrently_and_collects_in_order() -> None:
+    from procedrr import parse_and_validate
+
+    barrier = threading.Barrier(2)
+
+    class ConcurrentLLM:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            barrier.wait(timeout=5)
+            return {"multiple": "compound" in messages[1]["content"]}
+
+    document = parse_and_validate(
+        """\
+name: concurrent-classification
+inputs:
+  - {name: clauses, type: array, required: true}
+steps:
+  - for_each:
+      snapshot: {name: clauses, max_items: 2}
+      item_binding: clause
+      collect: {binding: decisions, mode: list, value: decision}
+      max_parallel: 2
+      body:
+        - judge:
+            kind: classify_one
+            provider: planning
+            question: Classify this clause's multiplicity.
+            subject: clause
+            prompt_system: Return only JSON.
+            instructions: [Judge this clause alone.]
+            context: [clause]
+            output:
+              name: decision
+              schema:
+                type: object
+                required: [multiple]
+                additionalProperties: false
+                properties:
+                  multiple: {type: boolean}
+            validation: {kind: json_schema}
+"""
+    )
+    result = Evaluator(ConcurrentLLM(), lambda *_: None).evaluate(
+        document, {"clauses": ["simple", "compound"]}
+    )
+
+    assert result.bindings["decisions"] == [
+        {"item": "simple", "result": {"multiple": False}},
+        {"item": "compound", "result": {"multiple": True}},
+    ]
+    assert result.llm_activations == 2
 
 
 def test_evaluator_enforces_declared_operation_return_schema() -> None:
@@ -767,6 +822,83 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         "reason_code": None,
     }
     assert judge_values["source_extraction_result"]["quote"] == "Add"
+
+
+@pytest.mark.live_provider
+def test_live_parallel_atomicity_matches_serial_judgments(tmp_path: Path) -> None:
+    """Check exact per-clause prompts under serial and bounded parallel execution."""
+    if os.environ.get("POWDRR_LIVE_LLM") != "1":
+        pytest.skip("set POWDRR_LIVE_LLM=1 to run the paid live-provider test")
+
+    import copy
+    import time
+    from importlib import import_module
+
+    import yaml
+    from procedrr import parse_and_validate
+
+    build_probe_client = import_module(
+        "powdrr_lift.workrr.prompt_probe"
+    ).build_probe_client
+    llm = build_probe_client(
+        provider="deepinfra-cheap",
+        model=DEEPINFRA_CHEAP_MODEL,
+        api_key=None,
+        base_url=None,
+        repo_root=tmp_path,
+        progress_stream=sys.stderr,
+    )
+    clauses = [
+        {"clause_id": "instruction-001", "text": "On entry, data is copied."},
+        {"clause_id": "instruction-002", "text": "On exit, data is removed."},
+        {
+            "clause_id": "instruction-003",
+            "text": (
+                "set_state_data validates the key and value, and raises "
+                "InvalidDefinition when either is invalid."
+            ),
+        },
+    ]
+    production = parse_and_validate(
+        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    )
+    loop = copy.deepcopy(production["steps"][1]["for_each"])
+    loop["snapshot"]["name"] = "atomicity_clauses"
+
+    def stage(max_parallel: int) -> dict[str, Any]:
+        declaration = copy.deepcopy(loop)
+        declaration["max_parallel"] = max_parallel
+        return parse_and_validate(
+            yaml.safe_dump(
+                {
+                    "name": "atomicity-comparison",
+                    "inputs": [
+                        {"name": "atomicity_clauses", "type": "array", "required": True}
+                    ],
+                    "steps": [{"for_each": declaration}],
+                },
+                sort_keys=False,
+            )
+        )
+
+    started = time.perf_counter()
+    serial = Evaluator(llm, lambda *_: None).evaluate(
+        stage(1), {"atomicity_clauses": clauses}
+    )
+    serial_seconds = time.perf_counter() - started
+    started = time.perf_counter()
+    parallel = Evaluator(llm, lambda *_: None).evaluate(
+        stage(4), {"atomicity_clauses": clauses}
+    )
+    parallel_seconds = time.perf_counter() - started
+    assert (
+        parallel.bindings["atomicity_decisions"]
+        == serial.bindings["atomicity_decisions"]
+    )
+    assert serial.llm_activations == parallel.llm_activations == len(clauses)
+    print(
+        f"atomicity A/B: serial={serial_seconds:.2f}s, parallel={parallel_seconds:.2f}s"
+    )
 
 
 @pytest.mark.live_provider

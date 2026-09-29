@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -721,6 +722,84 @@ class Evaluator:
         )
         collected: dict[str, Any] = {}
         collected_list: list[Any] = []
+        max_parallel = declaration.get("max_parallel", 1)
+        if (
+            not isinstance(max_parallel, int)
+            or isinstance(max_parallel, bool)
+            or not 1 <= max_parallel <= 32
+        ):
+            raise EvaluationError(f"{path}.{kind}.max_parallel is malformed")
+        if max_parallel > 1:
+            if kind != "for_each" or len(body) != 1 or "judge" not in body[0]:
+                raise EvaluationError(
+                    f"{path}.{kind}.max_parallel supports judge-only for_each bodies"
+                )
+            binding = declaration.get("item_binding", declaration.get("item"))
+            if not isinstance(binding, str):
+                raise EvaluationError(f"{path}.{kind}.item_binding is required")
+
+            def evaluate_item(
+                index: int, item: Any
+            ) -> tuple[dict[str, Any], list[EvaluationEvent], dict[str, int]]:
+                item_state = dict(state)
+                item_state[binding] = item
+                item_events: list[EvaluationEvent] = []
+                item_usage = {"llm": 0, "tools": 0}
+                self._steps(
+                    body,
+                    item_state,
+                    item_events,
+                    item_usage,
+                    limits,
+                    f"{path}.{kind}[0][{index}]",
+                )
+                return item_state, item_events, item_usage
+
+            start = 0
+            while start < len(items):
+                max_chunk = max_parallel
+                activation_limit = limits.get("llm_activations")
+                if isinstance(activation_limit, int):
+                    remaining = max(0, activation_limit - usage["llm"])
+                    max_chunk = min(max_chunk, max(1, remaining + 1))
+                chunk = items[start : start + max_chunk]
+                with ThreadPoolExecutor(max_workers=len(chunk)) as pool:
+                    futures = [
+                        pool.submit(evaluate_item, start + offset, item)
+                        for offset, item in enumerate(chunk)
+                    ]
+                    parallel_results = [future.result() for future in futures]
+
+                for item, (item_state, item_events, item_usage) in zip(
+                    chunk, parallel_results, strict=True
+                ):
+                    usage["llm"] += item_usage["llm"]
+                    usage["tools"] += item_usage["tools"]
+                    self._limit(usage, limits, "llm_activations", "LLM activations")
+                    self._limit(usage, limits, "tool_calls", "tool calls")
+                    for event in item_events:
+                        events.append(event)
+                    if isinstance(collect, Mapping):
+                        value_binding = collect.get("value")
+                        output = (
+                            item_state.get(value_binding)
+                            if isinstance(value_binding, str)
+                            else item
+                        )
+                        if output is not None:
+                            if collect_mode == "list":
+                                key_name = collect.get("key", "item")
+                                collected_list.append(
+                                    {str(key_name): item, "result": output}
+                                )
+                            else:
+                                collected[str(item)] = output
+                start += len(chunk)
+            if isinstance(collect, Mapping) and isinstance(collect.get("binding"), str):
+                state[collect["binding"]] = (
+                    collected_list if collect_mode == "list" else collected
+                )
+            return
         for epoch in range(epochs):
             for index, item in enumerate(items):
                 binding = declaration.get("item_binding", declaration.get("item"))

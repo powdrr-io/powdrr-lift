@@ -69,6 +69,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _proposal_execution_units,
     _remove_temporary_feature_artifacts,
     _run_code_task_agent,
+    _task_structrr_changes,
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
     _validate_required_test_cases,
@@ -1224,6 +1225,66 @@ def test_structured_obligation_contracts_cover_generated_design_intents(
         }
 
 
+def test_structrr_diff_records_instruction_lineage(tmp_path: Path) -> None:
+    config = FeatureEndpointConfig(
+        repo_root=tmp_path,
+        work_item_name="lineage",
+        feature_description="Show a greeting.",
+        allowed_paths=(".",),
+    )
+    obligation = {
+        "id": "sentence-1",
+        "design": {
+            "clause_id": "instruction-001",
+            "kind": "feature",
+            "description": "Show a greeting.",
+            "acceptance_criterion": "A greeting is shown.",
+            "expected_test": "Test the greeting.",
+            "behavior_scenario": _test_behavior_scenario("sentence-1"),
+        },
+    }
+    path = _write_structrr_plan_from_obligations(
+        tmp_path / "structrr-diff.yaml", config, [obligation], ()
+    )
+    plan = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert plan["features"][0]["instruction_ref"] == "instruction-001"
+    additions, deletions, refs = _task_structrr_changes(
+        plan,
+        {"source_clause_refs": ["instruction-001"]},
+        "structrr-diff:docs/proposals/lineage/structrr-diff.yaml",
+    )
+    assert additions == ({"section": "features", **plan["features"][0]},)
+    assert deletions == ()
+    assert refs == (
+        "structrr-diff:docs/proposals/lineage/structrr-diff.yaml"
+        "#add:features:design-sentence-1",
+    )
+    unit = ExecutionUnit(
+        unit_id="implement-lineage",
+        objective="Show a greeting.",
+        paths=(".",),
+        validation_profiles=("pytest",),
+        acceptance_criteria=("A greeting is shown.",),
+        planned_additions=additions,
+        source_refs=refs,
+    )
+    request = ImplementationRequest.from_execution_unit(
+        unit,
+        request_id="lineage-request",
+        base_commit="base",
+        plan_fingerprint="proposal",
+        context_refs=refs,
+    )
+    assert "Show a greeting." in request.prompt
+    assert "instruction-001" in request.prompt
+    assert request.intent_packet is not None
+    assert refs[0] in request.intent_packet.source_refs
+    with pytest.raises(PowdrrExecutionError, match="instruction-002"):
+        _task_structrr_changes(
+            plan, {"source_clause_refs": ["instruction-002"]}, "structrr-diff:x"
+        )
+
+
 def test_feature_test_contracts_do_not_retain_unrelated_inventory_selectors() -> None:
     contracts = _derive_feature_test_contracts(
         {
@@ -1442,6 +1503,32 @@ def test_endpoint_reuses_existing_latest_baseline_without_writing(
 
     assert selected == second
     assert not (current / "baseline.yaml").exists()
+
+
+def test_endpoint_refreshes_stale_baseline_from_validated_bootstrap(
+    tmp_path: Path,
+) -> None:
+    current = tmp_path / "docs" / "structrr" / "current"
+    current.mkdir(parents=True)
+    old: dict[str, Any] = {section: [] for section in BOOTSTRAP_SECTION_VERSIONS}
+    old["intent"] = {}
+    old["section_versions"] = BOOTSTRAP_SECTION_VERSIONS
+    (current / "baseline-old.yaml").write_text(yaml.safe_dump(old), encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "old baseline")
+    fresh = {**old, "features": [{"id": "new-feature", "action": "added"}]}
+    bootstrap_path = tmp_path / "bootstrap.yaml"
+    bootstrap_path.write_text(yaml.safe_dump(fresh), encoding="utf-8")
+
+    selected = _ensure_current_baseline(
+        tmp_path, subprocess.run, bootstrap_path=bootstrap_path
+    )
+
+    assert yaml.safe_load(selected.read_text(encoding="utf-8")) == fresh
+    assert _git(tmp_path, "status", "--short").stdout == ""
 
 
 def test_feature_flow_is_shared_and_validated() -> None:

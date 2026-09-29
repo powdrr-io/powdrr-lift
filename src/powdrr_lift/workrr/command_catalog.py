@@ -703,7 +703,9 @@ class FeatureCommandRuntime:
         state = self.state
         if name == "ensure_current_structrr":
             state["baseline_path"] = feature_endpoint._ensure_current_baseline(
-                worktree, runner
+                worktree,
+                runner,
+                bootstrap_path=output_root / "validation-bootstrap.yaml",
             )
             return {"path": str(state["baseline_path"])}
         if name == "discover_validation_profiles":

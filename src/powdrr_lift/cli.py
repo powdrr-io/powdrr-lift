@@ -1430,7 +1430,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="ask",
         help=(
             "Resolve underspecified behavior by asking (default), or use explicit "
-            "recorded normative defaults for unattended runs."
+            "recorded defaults for unattended runs; uncertain product clauses are "
+            "retained verbatim as generic guidance instead of "
+            "blocking prompt generation."
         ),
     )
     workrr_feature_parser.add_argument("--output-root", type=Path)
@@ -1461,7 +1463,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="ask",
         help=(
             "Resolve underspecified behavior by asking (default), or use explicit "
-            "recorded normative defaults for unattended benchmark runs."
+            "recorded defaults for unattended runs; uncertain product clauses are "
+            "retained verbatim as generic guidance instead of "
+            "blocking prompt generation."
         ),
     )
     harbor_feature_parser.add_argument("--repo-root", type=Path)

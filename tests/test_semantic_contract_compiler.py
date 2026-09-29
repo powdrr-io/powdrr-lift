@@ -191,6 +191,111 @@ def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> Non
     )
 
 
+def test_normative_defaults_compile_uncertain_instruction_as_source_guidance() -> None:
+    clause = _clause(
+        "Implement the requested operation while preserving the caller's data."
+    )
+    root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=root_plan["resolved_decisions"],
+        pending_specs=root_plan["pending_specs"],
+        provider_results=[
+            {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
+        ],
+        clarification_policy="normative_defaults",
+        created_at=NOW,
+    )
+    assert root[0].result.value == "include"
+    assert root[0].provider.kind == "deterministic-rule"
+
+    decision_plan = prepare_dependent_source_semantic_decisions(
+        clause, root, created_at=NOW
+    )
+    decisions = bind_source_semantic_decisions(
+        resolved_decisions=decision_plan["resolved_decisions"],
+        pending_specs=decision_plan["pending_specs"],
+        provider_results=[
+            {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
+            for _ in decision_plan["pending_specs"]
+        ],
+        clarification_policy="normative_defaults",
+        created_at=NOW,
+    )
+    by_kind = {item.decision_kind: item for item in decisions}
+    assert by_kind["disposition"].result.value == "guidance"
+    assert by_kind["disposition"].provider.kind == "deterministic-rule"
+    assert (
+        "normative-default:disposition:guidance" in by_kind["disposition"].evidence_refs
+    )
+    assert by_kind["source_predicate"].result.value == "not_stated"
+    assert all(item.result.status == "resolved" for item in decisions)
+
+    disposition_request = next(
+        request
+        for request in decision_plan["pending_specs"]
+        if request["spec"]["decision_kind"] == "disposition"
+    )
+    conflicting_kind = bind_source_semantic_decisions(
+        resolved_decisions=decision_plan["resolved_decisions"],
+        pending_specs=[disposition_request],
+        provider_results=[
+            {"status": "resolved", "value": "context", "reason_code": None}
+        ],
+        clarification_policy="normative_defaults",
+        created_at=NOW,
+    )
+    assert (
+        next(
+            item for item in conflicting_kind if item.decision_kind == "disposition"
+        ).result.value
+        == "guidance"
+    )
+
+    extraction_requests = prepare_source_extractions(clause, decisions)
+    extractions = bind_source_extractions(
+        requests=extraction_requests,
+        provider_results=[{} for _ in extraction_requests],
+        clarification_policy="normative_defaults",
+        created_at=NOW,
+    )
+    family_request = prepare_behavior_family_decision(
+        clause,
+        next(item for item in extractions if item.extraction_kind == "behavior"),
+        decisions,
+    )
+    family = bind_behavior_family_decision(
+        family_request,
+        {"status": "unresolved", "value": None, "reason_code": "no_candidate"},
+        clarification_policy="normative_defaults",
+        created_at=NOW,
+    )
+    contract = compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=family,
+    )
+
+    assert family.result.value == "other"
+    assert all(item.span.text == clause["text"] for item in extractions)
+    assert all(item.provider.kind == "deterministic-rule" for item in extractions)
+    assert contract.disposition == "guidance"
+    design = project_partial_contract_to_legacy_design(contract)
+    assert design["evidence_case"] == f"Source instruction-001: {clause['text']}"
+
+    review_requests = prepare_field_entailment_reviews(contract)
+    reviews = bind_field_entailment_reviews(
+        requests=review_requests,
+        provider_results=[
+            {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
+            for _ in review_requests
+        ],
+        clarification_policy="normative_defaults",
+        created_at=NOW,
+    )
+    assert finalize_source_faithfulness(contract, reviews).accepted
+
+
 def test_nonactionable_clause_takes_process_only_branch() -> None:
     clause = _clause("Create a new branch and commit everything when done.")
     root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)

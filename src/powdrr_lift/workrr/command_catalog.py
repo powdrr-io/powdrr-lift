@@ -1140,7 +1140,9 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError("source extraction binding is malformed")
             try:
                 extractions = bind_source_extractions(
-                    requests=requests, provider_results=raw_results
+                    requests=requests,
+                    provider_results=raw_results,
+                    clarification_policy=getattr(config, "clarification_policy", "ask"),
                 )
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
@@ -1178,7 +1180,11 @@ class FeatureCommandRuntime:
             ):
                 raise PowdrrExecutionError("behavior-family decision is malformed")
             try:
-                family = bind_behavior_family_decision(family_request, family_result)
+                family = bind_behavior_family_decision(
+                    family_request,
+                    family_result,
+                    clarification_policy=getattr(config, "clarification_policy", "ask"),
+                )
                 contract = compile_source_contract(
                     clause=clause,
                     decisions=semantic_decisions(parameters.get("decisions")),
@@ -1213,7 +1219,9 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError("field entailment binding is malformed")
             try:
                 reviews = bind_field_entailment_reviews(
-                    requests=requests, provider_results=raw_results
+                    requests=requests,
+                    provider_results=raw_results,
+                    clarification_policy=getattr(config, "clarification_policy", "ask"),
                 )
             except (
                 SemanticContractError,

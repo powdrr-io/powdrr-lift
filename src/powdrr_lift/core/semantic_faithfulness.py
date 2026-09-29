@@ -10,6 +10,7 @@ from typing import Any
 
 from powdrr_lift.core.semantic_contract import PartialSemanticContract
 from powdrr_lift.core.semantic_decision import (
+    DECISION_VALUES,
     SemanticDecision,
     SemanticDecisionProvider,
     SemanticDecisionSpec,
@@ -189,11 +190,14 @@ def bind_field_entailment_reviews(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    clarification_policy: str = "ask",
     created_at: str,
 ) -> list[FieldEntailmentReview]:
+    if clarification_policy not in {"ask", "normative_defaults"}:
+        raise FaithfulnessError("clarification policy is invalid")
     if len(requests) != len(provider_results):
         raise FaithfulnessError("field entailment result count is invalid")
-    result: list[FieldEntailmentReview] = []
+    reviews: list[FieldEntailmentReview] = []
     for request, provider_result in zip(requests, provider_results, strict=True):
         raw_spec = request.get("spec")
         if not isinstance(raw_spec, Mapping):
@@ -208,14 +212,52 @@ def bind_field_entailment_reviews(
             candidate_set_fingerprint=spec.input_fingerprint,
             contract_revision=FAITHFULNESS_REVISION,
         )
+        provider = SemanticDecisionProvider(kind="planning-llm")
+        result_to_bind = provider_result
+        evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.source_ref}",)
+        if clarification_policy == "normative_defaults":
+            exact_source_quote = (
+                spec.field
+                in {
+                    "subject",
+                    "behavior",
+                    "preconditions",
+                    "exceptions",
+                    "explicit_result",
+                }
+                and spec.candidate_value in spec.source_text
+            )
+            if exact_source_quote:
+                # Exact spans are stronger evidence than an uncertain entailment
+                # judgment: the quoted words are necessarily present in source.
+                result_to_bind = {"status": "resolved", "value": "entailed"}
+                provider = SemanticDecisionProvider(kind="deterministic-rule")
+                evidence_refs = (
+                    *evidence_refs,
+                    f"normative-default:{spec.field}:exact-source-quote",
+                )
+            elif (
+                not isinstance(provider_result, Mapping)
+                or provider_result.get("status") != "resolved"
+                or provider_result.get("value") not in DECISION_VALUES["entailment"]
+                or provider_result.get("reason_code") is not None
+                or not set(provider_result).issubset({"status", "value", "reason_code"})
+                or provider_result.get("value") == "contradicted"
+            ):
+                result_to_bind = {"status": "resolved", "value": "not_stated"}
+                provider = SemanticDecisionProvider(kind="deterministic-rule")
+                evidence_refs = (
+                    *evidence_refs,
+                    f"normative-default:{spec.field}:not_stated",
+                )
         decision = decision_spec.bind(
-            provider=SemanticDecisionProvider(kind="planning-llm"),
-            provider_result=provider_result,
-            evidence_refs=(f"source-proposition:{spec.source_ref}",),
+            provider=provider,
+            provider_result=result_to_bind,
+            evidence_refs=evidence_refs,
             created_at=created_at,
         )
-        result.append(FieldEntailmentReview(spec=spec, decision=decision))
-    return result
+        reviews.append(FieldEntailmentReview(spec=spec, decision=decision))
+    return reviews
 
 
 def finalize_source_faithfulness(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from collections.abc import Mapping
@@ -150,8 +151,9 @@ class WorkrrProcedrrClient:
 
     @staticmethod
     def replay_key(messages: list[dict[str, str]]) -> str:
-        """Return the stable key used to replay one completed judge request."""
-        return json.dumps(messages, ensure_ascii=False, sort_keys=True)
+        """Return a stable, non-reversible key for one completed judge request."""
+        canonical = json.dumps(messages, ensure_ascii=False, sort_keys=True)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def _complete_from_provider(
         self,

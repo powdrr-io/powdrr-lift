@@ -113,14 +113,24 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
 ) -> None:
     event_path = tmp_path / "procedrr-events.jsonl"
     messages = [{"role": "user", "content": "judge this clause"}]
+    redacted_messages = [{"role": "user", "content": "sensitive search context"}]
     event_path.write_text(
-        json.dumps(
-            {
-                "record_type": "procedrr.step",
-                "kind": "judge",
-                "messages": messages,
-                "value": {"multiple": True},
-            }
+        "\n".join(
+            json.dumps(record)
+            for record in (
+                {
+                    "record_type": "procedrr.step",
+                    "kind": "judge",
+                    "messages": messages,
+                    "value": {"multiple": True},
+                },
+                {
+                    "record_type": "procedrr.step",
+                    "kind": "judge",
+                    "replay_key": WorkrrProcedrrClient.replay_key(redacted_messages),
+                    "value": {"multiple": False},
+                },
+            )
         )
         + "\nmalformed partial record",
         encoding="utf-8",
@@ -128,7 +138,10 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
 
     replay = _load_procedrr_replay_responses(event_path)
 
-    assert replay == {WorkrrProcedrrClient.replay_key(messages): {"multiple": True}}
+    assert replay == {
+        WorkrrProcedrrClient.replay_key(messages): {"multiple": True},
+        WorkrrProcedrrClient.replay_key(redacted_messages): {"multiple": False},
+    }
 
 
 def test_worker_prompt_capture_trims_real_implement_feature_at_worker_boundary() -> (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -46,6 +47,11 @@ from powdrr_lift.core.semantic_faithfulness import (
     FieldEntailmentSpec,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.external_contract_research import (
+    bind_external_contract_search_selections,
+    capture_external_sources,
+    search_external_contract_sources,
+)
 from powdrr_lift.workrr.repository_subject_binding import (
     bind_candidate_relation_decisions,
     finalize_subject_binding,
@@ -95,6 +101,93 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("discover_validation_profiles"),
+        ),
+        "capture_external_contract_sources": CommandSpec(
+            name="capture_external_contract_sources",
+            input_schema=object_schema(
+                {
+                    "requests": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                            "type": "object",
+                            "required": ["url", "research_question", "why_applicable"],
+                            "additionalProperties": False,
+                            "properties": {
+                                "url": {"type": "string", "minLength": 1},
+                                "search_source_ref": {"type": "string"},
+                                "search_title": {"type": "string"},
+                                "search_query": {"type": "string"},
+                                "profile": {"type": "string"},
+                                "research_question": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                                "why_applicable": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                            },
+                        },
+                    },
+                    "decision": {"type": "string", "enum": ["research", "skip"]},
+                    "rationale": {"type": "string", "minLength": 1},
+                },
+                required=("requests", "decision", "rationale"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("capture_external_contract_sources"),
+        ),
+        "search_external_contract_sources": CommandSpec(
+            name="search_external_contract_sources",
+            input_schema=object_schema(
+                {
+                    "decision": {"type": "string", "enum": ["research", "skip"]},
+                    "queries": {
+                        "type": "array",
+                        "maxItems": 4,
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "query",
+                                "research_question",
+                                "profile",
+                                "why_applicable",
+                            ],
+                            "additionalProperties": False,
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 600,
+                                },
+                                "research_question": {"type": "string", "minLength": 1},
+                                "profile": {"type": "string", "minLength": 1},
+                                "why_applicable": {"type": "string", "minLength": 1},
+                            },
+                        },
+                    },
+                },
+                required=("decision", "queries"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("search_external_contract_sources"),
+        ),
+        "bind_external_contract_search_selections": CommandSpec(
+            name="bind_external_contract_search_selections",
+            input_schema=object_schema(
+                {"search_results": {}, "selections": {"type": "array", "maxItems": 8}},
+                required=("search_results", "selections"),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": ["requests"],
+                "properties": {"requests": {"type": "array"}},
+            },
+            logic=implementations.get("bind_external_contract_search_selections"),
         ),
         "compile_instruction_ledger": CommandSpec(
             name="compile_instruction_ledger",
@@ -717,6 +810,33 @@ class FeatureCommandRuntime:
                 }
                 for profile in state["validation_profiles"]
             ]
+        if name == "capture_external_contract_sources":
+            return capture_external_sources(
+                parameters.get("requests", []),
+                artifact_root=output_root,
+                decision=str(parameters.get("decision", "research")),
+                rationale=str(parameters.get("rationale", "")),
+            )
+        if name == "search_external_contract_sources":
+            cache_root = (
+                Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+                / "powdrr-lift"
+            )
+            return search_external_contract_sources(
+                parameters.get("queries", []),
+                decision=str(parameters.get("decision", "research")),
+                api_key=os.environ.get("TAVILY_API_KEY"),
+                cache_path=cache_root / "external-contract-search.sqlite3",
+            )
+        if name == "bind_external_contract_search_selections":
+            search_results = parameters.get("search_results")
+            if not isinstance(search_results, Mapping):
+                raise PowdrrExecutionError("external search results are malformed")
+            return {
+                "requests": bind_external_contract_search_selections(
+                    search_results, parameters.get("selections", [])
+                )
+            }
         if command[:2] == ["powdrr-lift", "design-interview-input"]:
             feature_endpoint._run(runner, worktree, command)
             work_item_name = feature_endpoint._command_option(

@@ -35,6 +35,16 @@ steps:
       outputs:
         feature_design: feature_design
         feature_obligations: feature_design
+  # The research subprocedure is kept reusable. At this stage it captures
+  # source evidence; a later stage will assess applicability and project only
+  # accepted requirements into design and worker prompts.
+  - call:
+      process: resolve-external-contracts
+      inputs:
+        feature_description: {type: reference, value: feature_description}
+        feature_design: {type: reference, value: feature_design}
+      outputs:
+        external_contract_sources: external_contract_sources
   - operation:
       tool: internal
       command: [plan_structrr_diff]

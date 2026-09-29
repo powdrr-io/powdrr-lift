@@ -1,0 +1,161 @@
+version: 1
+name: resolve-external-contracts
+description: >-
+  Decide whether an implementation request needs external contract research,
+  propose a bounded set of version-relevant source queries, and capture those
+  sources immutably. The process proposes evidence retrieval only; source
+  applicability and requirement projection are a later stage.
+inputs:
+  - {name: feature_description, type: string, required: true}
+  - {name: feature_design, type: object, required: true}
+outputs:
+  external_contract_sources:
+    type: object
+    required: [path, sources, captured_count, unavailable_count]
+    additionalProperties: false
+    properties:
+      path: {type: string, minLength: 1}
+      sources: {type: array}
+      captured_count: {type: integer, minimum: 0}
+      unavailable_count: {type: integer, minimum: 0}
+steps:
+  - judge:
+      kind: plan_external_contract_research
+      provider: planning
+      question: Does this requested behavior depend on an external contract that is not fully specified by the request?
+      subject: feature_description
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - >-
+          Research only a standard, protocol, wire format, language construct,
+          or public API that the requested capability actually implements or
+          necessarily uses. A background mention alone is not a trigger.
+        - >-
+          If an external contract matters, create up to four short web-search
+          queries, each anchored on the exact version/profile when one is named
+          and one specific unanswered behavior. Search query text must not
+          contain private repository names, source code, benchmark identifiers,
+          expected outputs, or verifier findings.
+        - >-
+          Queries locate candidate sources only. Do not present search snippets
+          as evidence or derive requirements from them. Search inputs are sent
+          to the configured Tavily service, so include only the public contract,
+          profile/version, and behavior needed to find authoritative sources;
+          omit private task and repository details. A fully specified local
+          behavior with no external compatibility contract should choose skip.
+        - >-
+          Do not use benchmark solutions, verifier results, expected patches,
+          or post-run diagnoses to choose research subjects or queries.
+      context: [feature_description, feature_design]
+      output:
+        name: external_contract_research_plan
+        schema:
+          type: object
+          required: [decision, rationale, queries]
+          additionalProperties: false
+          properties:
+            decision: {type: string, enum: [research, skip]}
+            rationale: {type: string, minLength: 1}
+            queries:
+              type: array
+              maxItems: 4
+              items:
+                type: object
+                required: [query, research_question, profile, why_applicable]
+                additionalProperties: false
+                properties:
+                  query: {type: string, minLength: 1, maxLength: 600}
+                  research_question: {type: string, minLength: 1}
+                  profile: {type: string, minLength: 1}
+                  why_applicable: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [search_external_contract_sources]
+      parameters:
+        decision: {type: reference, value: external_contract_research_plan.decision}
+        queries: {type: reference, value: external_contract_research_plan.queries}
+      returns:
+        type: object
+        required: [provider, searches, candidate_count, unavailable_count]
+        properties:
+          provider: {type: string, const: tavily}
+          searches: {type: array}
+          candidate_count: {type: integer, minimum: 0}
+          unavailable_count: {type: integer, minimum: 0}
+      bind: external_contract_search_results
+  - judge:
+      kind: select_official_versioned_sources
+      provider: planning
+      question: Which search hits are credible official sources for the exact requested profile and unanswered questions?
+      subject: external_contract_search_results.searches
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - >-
+          Search hits are untrusted discovery hints, not evidence. Select only
+          URLs whose publisher/host is the responsible standards body, project
+          maintainer, or explicitly named implementation owner, and whose title
+          or snippet indicates the requested version/profile. Prefer primary
+          specifications or maintained versioned documentation over
+          discussions. A discussion may be selected only when it is the
+          primary record of the exact version-specific decision being asked.
+        - >-
+          Do not treat HTTPS, search rank, or a snippet alone as proof of
+          authority. If official status or version applicability is unclear,
+          leave that hit unselected and explain the uncertainty.
+        - >-
+          Do not infer normative requirements from snippets. The selected URL
+          will be fetched separately; later review must inspect that source.
+        - >-
+          Identify selected results using their supplied query_index and
+          result_rank values. Procedrr binds those coordinates back to exact
+          URLs and questions; do not provide or invent URLs.
+      context: [external_contract_research_plan, external_contract_search_results]
+      output:
+        name: external_contract_source_selections
+        schema:
+          type: object
+          required: [rationale, selections]
+          additionalProperties: false
+          properties:
+            rationale: {type: string, minLength: 1}
+            selections:
+              type: array
+              maxItems: 8
+              items:
+                type: object
+                required: [query_index, result_rank, why_applicable]
+                additionalProperties: false
+                properties:
+                  query_index: {type: integer, minimum: 1, maximum: 4}
+                  result_rank: {type: integer, minimum: 1, maximum: 5}
+                  why_applicable: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [bind_external_contract_search_selections]
+      parameters:
+        search_results: {type: reference, value: external_contract_search_results}
+        selections: {type: reference, value: external_contract_source_selections.selections}
+      returns:
+        type: object
+        required: [requests]
+        properties:
+          requests: {type: array, maxItems: 8}
+      bind: external_contract_source_requests
+  - operation:
+      tool: internal
+      command: [capture_external_contract_sources]
+      parameters:
+        decision: {type: reference, value: external_contract_research_plan.decision}
+        rationale: {type: reference, value: external_contract_source_selections.rationale}
+        requests: {type: reference, value: external_contract_source_requests.requests}
+      returns:
+        type: object
+        required: [path, sources, captured_count, unavailable_count]
+        properties:
+          path: {type: string, minLength: 1}
+          sources: {type: array}
+          captured_count: {type: integer, minimum: 0}
+          unavailable_count: {type: integer, minimum: 0}
+      bind: external_contract_sources

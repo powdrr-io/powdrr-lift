@@ -100,6 +100,9 @@ from powdrr_lift.workrr.command_catalog import (
     feature_command_catalog,
 )
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
+from powdrr_lift.workrr.external_contract_research import (
+    redact_external_contract_search_event,
+)
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
@@ -202,11 +205,13 @@ def _load_procedrr_replay_responses(
         if (
             isinstance(record, Mapping)
             and record.get("kind") == "judge"
-            and isinstance(record.get("messages"), list)
             and isinstance(record.get("value"), Mapping)
         ):
-            messages = record["messages"]
-            if all(
+            stored_replay_key = record.get("replay_key")
+            messages = record.get("messages")
+            if isinstance(stored_replay_key, str):
+                replay_responses[stored_replay_key] = dict(record["value"])
+            elif isinstance(messages, list) and all(
                 isinstance(message, Mapping)
                 and isinstance(message.get("role"), str)
                 and isinstance(message.get("content"), str)
@@ -372,14 +377,30 @@ def _execute_procedrr_flow(
     procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
     replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
     procedrr_event_path.touch()
+    external_search_event_state = {"pending": False}
 
     def record_procedrr_event(event: Any) -> None:
+        is_redacted_search_judge = (
+            event.kind == "judge"
+            and external_search_event_state.get("pending", False)
+            and isinstance(event.data.get("messages"), list)
+        )
+        replay_key = (
+            WorkrrProcedrrClient.replay_key(event.data["messages"])
+            if is_redacted_search_judge
+            else None
+        )
+        event_data = redact_external_contract_search_event(
+            event.kind, event.data, external_search_event_state
+        )
         record = {
             "record_type": "procedrr.step",
             "kind": event.kind,
             "path": event.path,
-            **dict(event.data),
+            **event_data,
         }
+        if replay_key is not None:
+            record["replay_key"] = replay_key
         with procedrr_event_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
 

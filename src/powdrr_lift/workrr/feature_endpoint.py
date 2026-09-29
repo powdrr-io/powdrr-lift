@@ -101,6 +101,7 @@ from powdrr_lift.workrr.command_catalog import (
 )
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
+from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
@@ -465,9 +466,10 @@ def _execute_procedrr_flow(
         )
     try:
         flow_directory = flow_path.parent
+        classifier_client = JevSemanticClassifierClient(config.planning_client)
         evaluator = Evaluator(
             WorkrrProcedrrClient(
-                config.planning_client,
+                classifier_client,
                 skills_dir=flow_directory,
                 replay_responses=replay_responses,
             ),
@@ -475,7 +477,7 @@ def _execute_procedrr_flow(
             process_directory=flow_directory,
             judge_clients={
                 "planning": WorkrrProcedrrClient(
-                    config.planning_client,
+                    classifier_client,
                     skills_dir=flow_directory,
                     replay_responses=replay_responses,
                 )

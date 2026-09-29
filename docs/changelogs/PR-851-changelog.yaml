@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 851
-title: Run independent instruction classifications concurrently
+title: Speed up instruction classification with concurrency and Jev
 intent:
   problem: The instruction design interview waits for each independent clause classification to finish before starting the next one.
-  goal: Reduce classification wall time while preserving one decision per clause, the existing prompt contract, and deterministic collection order.
+  goal: Reduce classification wall time with bounded concurrency and route high-confidence exception and temporal-scope decisions through Jev while preserving conservative fallback behavior.
 human-decisions: []
 structured_files: []
 files:
@@ -37,6 +37,24 @@ files:
     summary: Execute judge-only for-each bodies concurrently with isolated iteration state and ordered collection.
     rationale: Preserve per-clause decisions and deterministic outputs while overlapping provider calls.
     related: {entities: [bounded-foreach-judgments], invariants: [parallel-judgment-order-preserved]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: added
+    span: {start_line: 1, end_line: 158}
+    summary: Route selected semantic classifiers through Jev at high confidence and fall back to the configured classifier otherwise.
+    rationale: Apply Jev where the existing comparison is strongest while keeping uncertain and unsupported decisions on the established provider.
+    related: {entities: [jev-semantic-classifier], invariants: [jev-conservative-fallback]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 466, end_line: 479}
+    summary: Add the Jev semantic classifier adapter to design-interview judge calls.
+    rationale: Make qualified Jev decisions available in the instruction pipeline.
+    related: {entities: [jev-semantic-classifier]}
+  - path: tests/test_jev_classifier.py
+    type: added
+    span: {start_line: 1, end_line: 74}
+    summary: Cover Jev routing, confidence fallback, and provider scope.
+    rationale: Verify only qualified high-confidence semantic decisions use Jev.
+    related: {entities: [jev-semantic-classifier], invariants: [jev-conservative-fallback]}
   - path: tests/test_procedrr.py
     type: modified
     span: {start_line: 633, end_line: 633}
@@ -77,6 +95,9 @@ entities:
   - id: parallel-judgment-tests
     type: Test suite
     action: added
+  - id: jev-semantic-classifier
+    type: Function
+    action: added
 entity_relationships:
   - id: parallel-judgment-tests-cover-runtime
     source: parallel-judgment-tests
@@ -90,4 +111,8 @@ invariants:
     action: added
     description: Parallel judge-only for-each iterations collect outputs and emit events in source item order, with each iteration receiving an isolated state mapping.
     rationale: Keep classification results and event traces deterministic while requests overlap.
+  - id: jev-conservative-fallback
+    action: added
+    description: Jev is used only for has_exception and temporal_scope when confidence is at least 0.98; missing credentials, failures, unsupported decisions, and lower confidence use the configured classifier.
+    rationale: Restrict Jev routing to decisions with the strongest measured agreement and preserve fallback for uncertain results.
 guidance: []

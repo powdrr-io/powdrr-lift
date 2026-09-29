@@ -920,26 +920,38 @@ def bind_source_semantic_decisions(
         provider = SemanticDecisionProvider(kind="planning-llm")
         provider_result = result
         evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
+        result_is_resolved = (
+            isinstance(result, Mapping)
+            and result.get("status") == "resolved"
+            and result.get("value")
+            in DECISION_VALUES.get(spec.decision_kind, frozenset())
+            and result.get("reason_code") is None
+            and set(result).issubset({"status", "value", "reason_code"})
+        )
+        values = {item.decision_kind: item.result.value for item in decisions}
+        result_conflicts_with_route = (
+            spec.decision_kind == "disposition"
+            and result_is_resolved
+            and not _disposition_matches_route(
+                str(result.get("value")), values.get("routing")
+            )
+        )
+        if (
+            spec.decision_kind == "disposition"
+            and values.get("routing") == "include"
+            and (not result_is_resolved or result_conflicts_with_route)
+        ):
+            # The router has already committed to product behavior. If the
+            # kind classifier cannot supply an included kind, preserve that
+            # obligation as an invariant instead of aborting or dropping it.
+            provider = SemanticDecisionProvider(kind="deterministic-rule")
+            provider_result = {"status": "resolved", "value": "invariant"}
+            evidence_refs = (
+                *evidence_refs,
+                "fallback:include-without-product-kind:invariant",
+            )
         if clarification_policy == "normative_defaults":
             fallback = _normative_source_decision_default(spec, decisions)
-            result_is_resolved = (
-                isinstance(result, Mapping)
-                and result.get("status") == "resolved"
-                and result.get("value")
-                in DECISION_VALUES.get(spec.decision_kind, frozenset())
-                and result.get("reason_code") is None
-                and set(result).issubset({"status", "value", "reason_code"})
-            )
-            result_conflicts_with_route = (
-                spec.decision_kind == "disposition"
-                and result_is_resolved
-                and not _disposition_matches_route(
-                    str(result.get("value")),
-                    {item.decision_kind: item.result.value for item in decisions}.get(
-                        "routing"
-                    ),
-                )
-            )
             if (
                 not result_is_resolved or result_conflicts_with_route
             ) and fallback is not None:
@@ -979,6 +991,8 @@ def _normative_source_decision_default(
     if spec.decision_kind == "disposition":
         if route == "include_prohibition":
             return "non_goal"
+        if route == "include":
+            return "invariant"
         if route == "exclude":
             return "context"
         # A broad guidance label carries the exact proposition without claiming

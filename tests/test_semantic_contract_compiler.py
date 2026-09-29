@@ -103,6 +103,48 @@ def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     assert any("negative contrast" in rule for rule in exception_rules)
 
 
+@pytest.mark.parametrize(
+    "provider_result",
+    [
+        {"status": "unresolved", "value": None, "reason_code": "no_candidate"},
+        {"status": "resolved", "value": "context", "reason_code": None},
+    ],
+)
+def test_included_clause_with_missing_product_kind_falls_back_to_invariant(
+    provider_result: Mapping[str, Any],
+) -> None:
+    clause = _clause("Data survives pickle.")
+    root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=root_plan["resolved_decisions"],
+        pending_specs=root_plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "include"}],
+        created_at=NOW,
+    )
+    plan = prepare_dependent_source_semantic_decisions(clause, root, created_at=NOW)
+    disposition_request = next(
+        request
+        for request in plan["pending_specs"]
+        if request["spec"]["decision_kind"] == "disposition"
+    )
+
+    decisions = bind_source_semantic_decisions(
+        resolved_decisions=plan["resolved_decisions"],
+        pending_specs=[disposition_request],
+        provider_results=[provider_result],
+        created_at=NOW,
+    )
+    disposition = next(
+        item for item in decisions if item.decision_kind == "disposition"
+    )
+
+    assert disposition.result.value == "invariant"
+    assert disposition.provider.kind == "deterministic-rule"
+    assert (
+        "fallback:include-without-product-kind:invariant" in disposition.evidence_refs
+    )
+
+
 def test_excluded_background_takes_context_branch_before_child_classifiers() -> None:
     clause = _clause(
         "States lack built-in data ownership, forcing manual variable management "
@@ -191,7 +233,7 @@ def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> Non
     )
 
 
-def test_normative_defaults_compile_uncertain_instruction_as_source_guidance() -> None:
+def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
     clause = _clause(
         "Implement the requested operation while preserving the caller's data."
     )
@@ -222,12 +264,13 @@ def test_normative_defaults_compile_uncertain_instruction_as_source_guidance() -
         created_at=NOW,
     )
     by_kind = {item.decision_kind: item for item in decisions}
-    assert by_kind["disposition"].result.value == "guidance"
+    assert by_kind["disposition"].result.value == "invariant"
     assert by_kind["disposition"].provider.kind == "deterministic-rule"
     assert (
-        "normative-default:disposition:guidance" in by_kind["disposition"].evidence_refs
+        "normative-default:disposition:invariant"
+        in by_kind["disposition"].evidence_refs
     )
-    assert by_kind["source_predicate"].result.value == "not_stated"
+    assert by_kind["source_predicate"].result.value == "explicit"
     assert all(item.result.status == "resolved" for item in decisions)
 
     disposition_request = next(
@@ -248,7 +291,7 @@ def test_normative_defaults_compile_uncertain_instruction_as_source_guidance() -
         next(
             item for item in conflicting_kind if item.decision_kind == "disposition"
         ).result.value
-        == "guidance"
+        == "invariant"
     )
 
     extraction_requests = prepare_source_extractions(clause, decisions)
@@ -279,7 +322,7 @@ def test_normative_defaults_compile_uncertain_instruction_as_source_guidance() -
     assert family.result.value == "other"
     assert all(item.span.text == clause["text"] for item in extractions)
     assert all(item.provider.kind == "deterministic-rule" for item in extractions)
-    assert contract.disposition == "guidance"
+    assert contract.disposition == "invariant"
     design = project_partial_contract_to_legacy_design(contract)
     assert design["evidence_case"] == f"Source instruction-001: {clause['text']}"
 

@@ -67,6 +67,7 @@ from powdrr_lift.structrr.proposal_review import (
     load_review_receipt,
     write_review_receipt,
 )
+from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
 )
@@ -1995,6 +1996,49 @@ def _execution_unit_for_code_task(
     )
 
 
+def _task_structrr_changes(
+    plan: Mapping[str, Any], task: Mapping[str, Any], plan_ref: str
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...], tuple[str, ...]]:
+    """Select accepted diff operations for the clauses assigned to one task."""
+    clause_refs = task.get("source_clause_refs")
+    if not isinstance(clause_refs, (list, tuple)):
+        raise PowdrrExecutionError("code task has no instruction clause references")
+    selected = {ref for ref in clause_refs if isinstance(ref, str) and ref}
+    if not selected:
+        raise PowdrrExecutionError("code task has no instruction clause references")
+    additions: list[dict[str, Any]] = []
+    deletions: list[dict[str, Any]] = []
+    operation_refs: list[str] = []
+    covered: set[str] = set()
+    for section in ("features", "invariants", "guidance"):
+        items = plan.get(section, ())
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if (
+                not isinstance(item, Mapping)
+                or item.get("instruction_ref") not in selected
+            ):
+                continue
+            action = item.get("action")
+            if action not in {"added", "deleted", "removed"}:
+                continue
+            subject_id = item.get("id")
+            if not isinstance(subject_id, str) or not subject_id:
+                raise PowdrrExecutionError("selected Structrr operation has no id")
+            change = {"section": section, **dict(item)}
+            (additions if action == "added" else deletions).append(change)
+            operation = "add" if action == "added" else "remove"
+            operation_refs.append(f"{plan_ref}#{operation}:{section}:{subject_id}")
+            covered.add(str(item["instruction_ref"]))
+    if missing := selected - covered:
+        raise PowdrrExecutionError(
+            "code task has no Structrr operations for instruction clauses: "
+            + ", ".join(sorted(missing))
+        )
+    return tuple(additions), tuple(deletions), tuple(operation_refs)
+
+
 def _is_repository_workflow_objective(value: Any) -> bool:
     """Identify instructions about git/PR mechanics rather than product work."""
     if not isinstance(value, str):
@@ -2187,13 +2231,23 @@ def _run_code_agent_phase(
     )
     code_task = parameters.get("task")
     if isinstance(code_task, Mapping):
+        additions, deletions, operation_refs = _task_structrr_changes(
+            plan_document,
+            code_task,
+            f"structrr-diff:{plan_path.relative_to(worktree)}",
+        )
         units = (
-            _execution_unit_for_code_task(
-                code_task,
-                slug=slug,
-                default_paths=config.allowed_paths,
-                default_profiles=state["validation_profile_names"],
-                source_refs=source_context,
+            replace(
+                _execution_unit_for_code_task(
+                    code_task,
+                    slug=slug,
+                    default_paths=config.allowed_paths,
+                    default_profiles=state["validation_profile_names"],
+                    source_refs=source_context,
+                ),
+                planned_additions=additions,
+                planned_deletions=deletions,
+                source_refs=tuple(dict.fromkeys((*source_context, *operation_refs))),
             ),
         )
     try:
@@ -2370,7 +2424,7 @@ def _run_code_agent_phase(
             ),
             base_commit=base_commit,
             plan_fingerprint=plan.proposed_pr_fingerprint,
-            context_refs=source_context,
+            context_refs=unit.source_refs,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
             implementation_packet=worker_packet,
         )
@@ -3647,6 +3701,16 @@ def _write_structrr_plan_from_obligations(
         description_text = str(description).strip()
         acceptance_text = str(acceptance).strip()
         expected_test_text = str(expected_test).strip()
+        instruction_ref = design.get("clause_id")
+        if instruction_ref is not None and (
+            not isinstance(instruction_ref, str)
+            or not instruction_ref.startswith("instruction-")
+        ):
+            raise PowdrrExecutionError(
+                f"structured feature obligation {obligation_id!r} has an "
+                "invalid instruction reference"
+            )
+        lineage = {"instruction_ref": instruction_ref} if instruction_ref else {}
         section = (
             "invariants"
             if kind_text == "invariant"
@@ -3659,6 +3723,7 @@ def _write_structrr_plan_from_obligations(
                 "id": f"design-{obligation_id}",
                 "description": description_text,
                 "action": "added",
+                **lineage,
                 "intent_effect": (
                     "records the compiler-owned design consequence of one "
                     "instruction obligation"
@@ -3669,6 +3734,7 @@ def _write_structrr_plan_from_obligations(
             {
                 "id": f"acceptance-{obligation_id}",
                 "description": acceptance_text,
+                **lineage,
                 "intent_effect": "defines proof of one instruction obligation",
             }
         )
@@ -3676,6 +3742,7 @@ def _write_structrr_plan_from_obligations(
             {
                 "id": f"test-{obligation_id}",
                 "description": expected_test_text,
+                **lineage,
                 "intent_effect": "defines evidence for one instruction obligation",
             }
         )
@@ -4237,13 +4304,27 @@ def _structrr_taxonomy_path(worktree: Path) -> Path:
     )
 
 
-def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
+def _ensure_current_baseline(
+    worktree: Path, runner: Runner, *, bootstrap_path: Path | None = None
+) -> Path:
     """Reuse a current baseline only when every bootstrap section is current."""
+    current = _load_yaml_mapping(bootstrap_path) if bootstrap_path else None
     relative_paths = _git_output(
         runner,
         worktree,
         ["git", "ls-files", "docs/structrr/current/baseline-*.yaml"],
     ).splitlines()
+    if not relative_paths and current is not None:
+        short_head = _git_output(
+            runner, worktree, ["git", "rev-parse", "--short", "HEAD"]
+        )
+        target = (
+            worktree / "docs" / "structrr" / "current" / f"baseline-{short_head}.yaml"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
+        _commit(runner, worktree, "Bootstrap Structrr baseline")
+        return target
     if not relative_paths:
         baseline = bootstrap_structrr(
             worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
@@ -4269,8 +4350,21 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
     except PowdrrExecutionError:
         document = {}
     section_issues = validate_bootstrap_sections(document)
-    if not section_issues:
+    if not section_issues and (
+        current is None or snapshot_digest(document) == snapshot_digest(current)
+    ):
         return selected_path
+    if current is not None:
+        short_head = _git_output(
+            runner, worktree, ["git", "rev-parse", "--short", "HEAD"]
+        )
+        target = (
+            worktree / "docs" / "structrr" / "current" / f"baseline-{short_head}.yaml"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
+        _commit(runner, worktree, "Refresh Structrr baseline")
+        return target
     baseline = bootstrap_structrr(
         worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
     )
@@ -4289,12 +4383,6 @@ def _bootstrap_validation_profiles(
     explicit_command: tuple[str, ...],
 ) -> tuple[DiscoveredValidationProfile, ...]:
     """Run Structrr bootstrap and adapt its detected tools for Workrr."""
-    if explicit_command:
-        return (
-            DiscoveredValidationProfile(
-                "feature-validation", explicit_command, "feature command"
-            ),
-        )
     bootstrap = bootstrap_structrr(
         worktree,
         output_path=output_root / "validation-bootstrap.yaml",
@@ -4304,6 +4392,12 @@ def _bootstrap_validation_profiles(
         raise PowdrrExecutionError(
             "Structrr bootstrap validation failed while discovering validation "
             f"tools: {bootstrap.validation.issues}"
+        )
+    if explicit_command:
+        return (
+            DiscoveredValidationProfile(
+                "feature-validation", explicit_command, "feature command"
+            ),
         )
     profiles: list[DiscoveredValidationProfile] = []
     for tool in bootstrap.document.get("tools", []):

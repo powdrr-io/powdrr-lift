@@ -143,7 +143,7 @@ steps:
       snapshot: {name: instruction_ledger.clauses, max_items: 128}
       item_binding: atomicity_clause
       collect: {binding: atomicity_decisions, mode: list, value: atomicity_decision}
-      max_parallel: 4
+      max_parallel: 8
       body:
         - judge:
             kind: classify_one
@@ -186,6 +186,7 @@ steps:
       bind: atomicity_plan
   - for_each:
       snapshot: {name: atomicity_plan.split_requests, max_items: 128}
+      max_parallel: 8
       item_binding: atomicity_split_request
       collect: {binding: atomicity_splits, mode: list, value: atomicity_split}
       body:
@@ -283,6 +284,7 @@ steps:
             bind: semantic_decision_plan
         - for_each:
             snapshot: {name: semantic_decision_plan.pending_specs, max_items: 16}
+            max_parallel: 8
             item_binding: root_decision_request
             collect: {binding: root_decision_results, mode: list, value: root_decision_result}
             body:
@@ -345,6 +347,7 @@ steps:
             bind: dependent_semantic_decision_plan
         - for_each:
             snapshot: {name: dependent_semantic_decision_plan.pending_specs, max_items: 16}
+            max_parallel: 8
             item_binding: dependent_decision_request
             collect: {binding: dependent_decision_results, mode: list, value: dependent_decision_result}
             body:
@@ -403,6 +406,7 @@ steps:
             bind: source_extraction_plan
         - for_each:
             snapshot: {name: source_extraction_plan.requests, max_items: 5}
+            max_parallel: 5
             item_binding: source_extraction_request
             collect: {binding: source_extraction_results, mode: list, value: source_extraction_result}
             body:
@@ -525,6 +529,7 @@ steps:
             bind: field_entailment_plan
         - for_each:
             snapshot: {name: field_entailment_plan.requests, max_items: 16}
+            max_parallel: 8
             item_binding: field_entailment_request
             collect: {binding: field_entailment_results, mode: list, value: field_entailment_result}
             body:

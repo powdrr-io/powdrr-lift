@@ -730,7 +730,7 @@ class Evaluator:
         ):
             raise EvaluationError(f"{path}.{kind}.max_parallel is malformed")
         if max_parallel > 1:
-            if kind != "for_each" or len(body) != 1 or "judge" not in body[0]:
+            if kind != "for_each" or not _judge_only_steps(body):
                 raise EvaluationError(
                     f"{path}.{kind}.max_parallel supports judge-only for_each bodies"
                 )
@@ -851,6 +851,13 @@ class Evaluator:
         usage_key = "llm" if key == "llm_activations" else "tools"
         if isinstance(bound, int) and usage[usage_key] > bound:
             raise EvaluationError(f"{label} budget exceeded")
+
+
+def _judge_only_steps(steps: Sequence[Any]) -> bool:
+    """Parallel loop iterations may run only independent model judgments."""
+    return bool(steps) and all(
+        isinstance(step, Mapping) and set(step) == {"judge"} for step in steps
+    )
 
 
 def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:

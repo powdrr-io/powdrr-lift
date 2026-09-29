@@ -1,6 +1,6 @@
 # Procedrr discovery of external implementation contracts
 
-Status: proposed
+Status: source-query and capture stage implemented; applicability and prompt projection remain planned
 
 ## Decision
 
@@ -126,6 +126,24 @@ question through `ask`, or record a narrow, visible assumption under
    relevant payload shape, and its error/continuation semantics. Bound
    requests, pages, extracted spans, and elapsed time per subject. Record when
    the budget is exhausted instead of implying complete research.
+
+The initial retrieval interface is deliberately URL-based: Procedrr emits at
+most eight records of `(URL, research question, applicability rationale)`;
+Workrr performs HTTPS GETs only for those candidates. The question is retained
+as provenance for later span/applicability review, not used as an unbounded
+search query. Redirects must remain HTTPS and public-hosted, each response is
+capped at 1 MB, and each request has a 12-second timeout. If the process cannot
+name a plausible official URL, it records that discovery as unresolved and
+continues prompt generation. A general-purpose search provider is not part of
+this first slice; adding one requires an explicit provider/credential and
+source-ranking contract rather than silently scraping a search engine.
+
+The source-capture operation persists response bytes and their SHA-256 digest
+under the run artifact directory, with the requested/final URL, capture time,
+HTTP status, question, applicability rationale, and unavailable reason in a
+JSON manifest. Retrieval failures and unsafe candidates become unavailable
+records, not workflow failures. This is evidence capture only: it does not yet
+accept standard-derived claims or put source text in the worker prompt.
 
 Each source record contains the canonical URL, publisher, document title,
 revision or commit, retrieved timestamp, content hash, relevant section/span,

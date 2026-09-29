@@ -46,6 +46,7 @@ from powdrr_lift.core.semantic_faithfulness import (
     FieldEntailmentSpec,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.external_contract_research import capture_external_sources
 from powdrr_lift.workrr.repository_subject_binding import (
     bind_candidate_relation_decisions,
     finalize_subject_binding,
@@ -95,6 +96,39 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("discover_validation_profiles"),
+        ),
+        "capture_external_contract_sources": CommandSpec(
+            name="capture_external_contract_sources",
+            input_schema=object_schema(
+                {
+                    "requests": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                            "type": "object",
+                            "required": ["url", "research_question", "why_applicable"],
+                            "additionalProperties": False,
+                            "properties": {
+                                "url": {"type": "string", "minLength": 1},
+                                "research_question": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                                "why_applicable": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                            },
+                        },
+                    },
+                    "decision": {"type": "string", "enum": ["research", "skip"]},
+                    "rationale": {"type": "string", "minLength": 1},
+                },
+                required=("requests", "decision", "rationale"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("capture_external_contract_sources"),
         ),
         "compile_instruction_ledger": CommandSpec(
             name="compile_instruction_ledger",
@@ -717,6 +751,13 @@ class FeatureCommandRuntime:
                 }
                 for profile in state["validation_profiles"]
             ]
+        if name == "capture_external_contract_sources":
+            return capture_external_sources(
+                parameters.get("requests", []),
+                artifact_root=output_root,
+                decision=str(parameters.get("decision", "research")),
+                rationale=str(parameters.get("rationale", "")),
+            )
         if command[:2] == ["powdrr-lift", "design-interview-input"]:
             feature_endpoint._run(runner, worktree, command)
             work_item_name = feature_endpoint._command_option(

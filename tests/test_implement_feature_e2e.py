@@ -94,6 +94,14 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"decision", "rationale", "requests"}:
+            return {
+                "decision": "skip",
+                "rationale": (
+                    "The fixture describes local behavior with no external contract."
+                ),
+                "requests": [],
+            }
         if required == {"consistency_review"}:
             return {"consistency_review": {"updates": []}}
         if required == {"multiple"}:

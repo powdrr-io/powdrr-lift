@@ -91,12 +91,20 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "with no product semantics.",
             "A product prohibition is non_goal, not nonactionable; a universal "
             "product rule is invariant.",
+            "A required rejection, exception, or error for invalid input is "
+            "positive product behavior and an actionable obligation. Do not use "
+            "non_goal merely because the input or outcome is forbidden; reserve "
+            "non_goal for an explicit instruction not to build or support "
+            "a capability.",
         ),
         (
             ClassificationExample("A Report is a domain record.", "entity"),
             ClassificationExample("The ExportJob represents one export.", "entity"),
             ClassificationExample("Users can export reports.", "feature"),
             ClassificationExample("The service creates a report.", "feature"),
+            ClassificationExample(
+                "DataVar rejects simultaneous default and factory.", "feature"
+            ),
             ClassificationExample("Expose get_state_data(state).", "interface"),
             ClassificationExample("Callbacks receive state_data.", "interface"),
             ClassificationExample("Every response has an ID.", "invariant"),

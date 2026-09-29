@@ -155,3 +155,25 @@ def test_non_goal_cannot_invert_a_missing_capability_into_a_prohibition() -> Non
 
     with pytest.raises(FeatureObligationError, match="explicit product prohibition"):
         compile_feature_design(ledger, "feature", semantic)
+
+
+def test_required_rejection_is_compiled_as_an_actionable_obligation() -> None:
+    ledger = compile_instruction_ledger(
+        "state-data", "DataVar rejects simultaneous default and factory."
+    )
+    semantic = [
+        {
+            "design": {
+                "kind": "non_goal",
+                "description": "Reject simultaneous default and factory.",
+                "acceptance_criterion": "The invalid combination raises an error.",
+                "expected_test": "Assert construction fails for both arguments.",
+            }
+        }
+    ]
+
+    design = compile_feature_design(ledger, "state-data", semantic)
+
+    assert design.projections[0].kind == "feature"
+    assert design.obligations[0].projection.kind == "feature"
+    assert design.test_contracts[0].obligation_id == "obligation:instruction-001"

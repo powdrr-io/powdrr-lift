@@ -11,6 +11,7 @@ from powdrr_lift.workrr.command_catalog import feature_command_catalog
 from powdrr_lift.workrr.external_contract_research import (
     bind_external_contract_search_selections,
     capture_external_sources,
+    redact_external_contract_search_event,
     search_external_contract_sources,
 )
 from procedrr.parser import parse_and_validate
@@ -147,30 +148,27 @@ def _query() -> dict[str, str]:
     }
 
 
-def test_brave_search_results_are_bounded_and_only_return_candidate_fields() -> None:
+def test_tavily_search_results_are_bounded_and_only_return_candidate_fields() -> None:
     called: list[tuple[str, str]] = []
 
     def fake_search(query: str, key: str) -> dict[str, object]:
         called.append((query, key))
         return {
-            "web": {
-                "results": [
-                    {
-                        "url": f"https://spec.example.org/{index}",
-                        "title": f"Spec {index}",
-                        "description": "The relevant versioned source.",
-                        "extra": "not retained",
-                    }
-                    for index in range(8)
-                ]
-            }
+            "results": [
+                {
+                    "url": f"https://spec.example.org/{index}",
+                    "title": f"Spec {index}",
+                    "content": "The relevant versioned source.",
+                    "extra": "not retained",
+                }
+                for index in range(8)
+            ]
         }
 
     result = search_external_contract_sources(
         [_query()],
         decision="research",
         api_key="fake-secret",
-        storage_rights_confirmed=True,
         search=fake_search,
     )
 
@@ -185,28 +183,16 @@ def test_brave_search_results_are_bounded_and_only_return_candidate_fields() -> 
     }
 
 
-@pytest.mark.parametrize(
-    ("api_key", "storage_rights_confirmed", "expected_reason"),
-    [
-        (None, True, "API key is not configured"),
-        ("fake-secret", False, "storage rights were not explicitly confirmed"),
-    ],
-)
-def test_search_fails_open_without_credentials_or_storage_rights(
-    api_key: str | None,
-    storage_rights_confirmed: bool,
-    expected_reason: str,
-) -> None:
+def test_search_fails_open_without_credentials() -> None:
     result = search_external_contract_sources(
         [_query()],
         decision="research",
-        api_key=api_key,
-        storage_rights_confirmed=storage_rights_confirmed,
+        api_key=None,
         search=lambda _query, _key: pytest.fail("provider must not be called"),
     )
 
     assert result["unavailable_count"] == 1
-    assert expected_reason in result["searches"][0]["reason"]
+    assert "API key is not configured" in result["searches"][0]["reason"]
 
 
 def test_skipped_research_never_calls_provider() -> None:
@@ -214,14 +200,13 @@ def test_skipped_research_never_calls_provider() -> None:
         [_query()],
         decision="skip",
         api_key="fake-secret",
-        storage_rights_confirmed=True,
         search=lambda _query, _key: pytest.fail("provider must not be called"),
     )
 
     assert result["searches"] == []
 
 
-def test_brave_http_request_uses_server_key_header(
+def test_tavily_http_request_uses_bearer_key_and_bounded_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     observed: dict[str, object] = {}
@@ -238,21 +223,20 @@ def test_brave_http_request_uses_server_key_header(
         def read(self, _size: int) -> bytes:
             return json.dumps(
                 {
-                    "web": {
-                        "results": [
-                            {
-                                "url": "https://spec.example.org/v1",
-                                "title": "Versioned specification",
-                                "description": "Official source.",
-                            }
-                        ]
-                    }
+                    "results": [
+                        {
+                            "url": "https://spec.example.org/v1",
+                            "title": "Versioned specification",
+                            "content": "Official source.",
+                        }
+                    ]
                 }
             ).encode()
 
     def fake_urlopen(request: object, *, timeout: float) -> FakeResponse:
         observed["url"] = request.full_url  # type: ignore[attr-defined]
-        observed["token"] = request.get_header("X-subscription-token")  # type: ignore[attr-defined]
+        observed["token"] = request.get_header("Authorization")  # type: ignore[attr-defined]
+        observed["body"] = json.loads(request.data)  # type: ignore[attr-defined]
         observed["timeout"] = timeout
         return FakeResponse()
 
@@ -261,14 +245,122 @@ def test_brave_http_request_uses_server_key_header(
         [_query()],
         decision="research",
         api_key="server-side-key",
-        storage_rights_confirmed=True,
     )
 
-    assert str(observed["url"]).startswith(research_module.BRAVE_SEARCH_ENDPOINT)
-    assert "deferSpec%3D%2220220824%22" in str(observed["url"])
-    assert observed["token"] == "server-side-key"
+    assert observed["url"] == research_module.TAVILY_SEARCH_ENDPOINT
+    assert observed["token"] == "Bearer server-side-key"
+    assert observed["body"]["query"] == _query()["query"]
+    assert observed["body"]["search_depth"] == "basic"
+    assert observed["body"]["max_results"] == research_module.MAX_SEARCH_RESULTS
     assert observed["timeout"] == research_module.FETCH_TIMEOUT_SECONDS
     assert result["candidate_count"] == 1
+
+
+def test_search_results_are_persistently_cached_for_identical_provider_inputs(
+    tmp_path: Path,
+) -> None:
+    cache_path = tmp_path / "external-search.sqlite3"
+    calls: list[str] = []
+
+    def fake_search(query: str, _key: str) -> dict[str, object]:
+        calls.append(query)
+        return {
+            "results": [
+                {
+                    "url": "https://spec.example.org/v1",
+                    "title": "Specification",
+                    "content": "Cached discovery snippet.",
+                }
+            ]
+        }
+
+    first = search_external_contract_sources(
+        [_query()],
+        decision="research",
+        api_key="key",
+        cache_path=cache_path,
+        search=fake_search,
+    )
+    second = search_external_contract_sources(
+        [_query()],
+        decision="research",
+        api_key="key",
+        cache_path=cache_path,
+        search=fake_search,
+    )
+
+    assert calls == [_query()["query"]]
+    assert first["searches"][0]["status"] == "searched"
+    assert second["searches"][0]["status"] == "cached"
+    assert second["searches"][0]["candidates"] == first["searches"][0]["candidates"]
+    assert cache_path.is_file()
+
+
+def test_search_event_log_redacts_raw_results_and_selection_context() -> None:
+    state = {"pending": False}
+    search_event = redact_external_contract_search_event(
+        "operation",
+        {
+            "tool": "internal",
+            "inputs": {
+                "command": ["search_external_contract_sources"],
+                "decision": "research",
+                "queries": [_query()],
+            },
+            "output": {
+                "provider": "tavily",
+                "searches": [
+                    {
+                        "status": "searched",
+                        "candidates": [
+                            {
+                                "url": "https://spec.example.org/v1",
+                                "snippet": "Sensitive provider excerpt",
+                            }
+                        ],
+                    }
+                ],
+                "candidate_count": 1,
+                "unavailable_count": 0,
+            },
+        },
+        state,
+    )
+    judge_event = redact_external_contract_search_event(
+        "judge",
+        {
+            "messages": [{"content": "Sensitive provider excerpt"}],
+            "value": {
+                "rationale": "Sensitive provider excerpt is authoritative.",
+                "selections": [{"query_index": 1, "result_rank": 1}],
+            },
+        },
+        state,
+    )
+    binder_event = redact_external_contract_search_event(
+        "operation",
+        {
+            "inputs": {
+                "command": ["bind_external_contract_search_selections"],
+                "search_results": {"snippet": "Sensitive provider excerpt"},
+                "selections": [{"query_index": 1, "result_rank": 1}],
+            },
+            "output": {"requests": [{"url": "https://spec.example.org/v1"}]},
+        },
+        state,
+    )
+
+    persisted = json.dumps([search_event, judge_event, binder_event])
+    assert "Sensitive provider excerpt" not in persisted
+    assert "https://spec.example.org/v1" not in persisted
+    assert search_event["output"] == {
+        "provider": "tavily",
+        "candidate_count": 1,
+        "unavailable_count": 0,
+        "statuses": ["searched"],
+    }
+    assert "messages" not in judge_event
+    assert binder_event["output"] == {"request_count": 1}
 
 
 def test_selection_binds_only_real_result_refs_and_preserves_query_scope() -> None:
@@ -276,17 +368,14 @@ def test_selection_binds_only_real_result_refs_and_preserves_query_scope() -> No
         [_query()],
         decision="research",
         api_key="fake-secret",
-        storage_rights_confirmed=True,
         search=lambda _query, _key: {
-            "web": {
-                "results": [
-                    {
-                        "url": "https://spec.example.org/defer/v1",
-                        "title": "Defer v1 reference",
-                        "description": "Versioned directive reference.",
-                    }
-                ]
-            }
+            "results": [
+                {
+                    "url": "https://spec.example.org/defer/v1",
+                    "title": "Defer v1 reference",
+                    "content": "Versioned directive reference.",
+                }
+            ]
         },
     )
 

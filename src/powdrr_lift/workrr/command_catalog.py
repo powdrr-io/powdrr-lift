@@ -818,14 +818,15 @@ class FeatureCommandRuntime:
                 rationale=str(parameters.get("rationale", "")),
             )
         if name == "search_external_contract_sources":
-            storage_rights = os.environ.get(
-                "BRAVE_SEARCH_STORAGE_RIGHTS_CONFIRMED", ""
-            ).strip().casefold() in {"1", "true", "yes"}
+            cache_root = (
+                Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+                / "powdrr-lift"
+            )
             return search_external_contract_sources(
                 parameters.get("queries", []),
                 decision=str(parameters.get("decision", "research")),
-                api_key=os.environ.get("BRAVE_SEARCH_API_KEY"),
-                storage_rights_confirmed=storage_rights,
+                api_key=os.environ.get("TAVILY_API_KEY"),
+                cache_path=cache_root / "external-contract-search.sqlite3",
             )
         if name == "bind_external_contract_search_selections":
             search_results = parameters.get("search_results")

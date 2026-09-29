@@ -1,6 +1,6 @@
 # Procedrr discovery of external implementation contracts
 
-Status: source-query and capture stage implemented; applicability and prompt projection remain planned
+Status: provider-backed source discovery, local result cache, and capture are implemented; applicability and prompt projection remain planned
 
 ## Decision
 
@@ -127,27 +127,40 @@ question through `ask`, or record a narrow, visible assumption under
    requests, pages, extracted spans, and elapsed time per subject. Record when
    the budget is exhausted instead of implying complete research.
 
-Source discovery uses the Brave Web Search API rather than scraping a search
+Source discovery uses the Tavily Search API rather than scraping a search
 engine. Procedrr emits at most four concise queries, each bound to an exact
 research question, profile/version, and applicability rationale. Queries must
 not contain private repository identifiers, source code, benchmark identifiers,
-expected outputs, or verifier findings. Brave returns at most five candidate
+expected outputs, or verifier findings. Tavily returns at most five candidate
 hits per query; snippets are untrusted discovery hints, never requirement
 evidence. Procedrr selects hit references, and deterministic binding checks
 that each selected URL is one of the returned HTTPS candidates before fetching
 it. Redirects must remain HTTPS and public-hosted, each fetched response is
 capped at 1 MB, and each fetch has a 12-second timeout.
 
-The runtime reads `BRAVE_SEARCH_API_KEY` from the environment. Because the
-Procedrr event log captures bounded operation inputs and outputs, search is
-disabled unless `BRAVE_SEARCH_STORAGE_RIGHTS_CONFIRMED=true` is also set. That
-setting is an operator attestation that the active Brave plan permits retaining
-the selected source references and search records needed for audit. If the key
-or rights confirmation is absent, a provider error occurs, or no source can be
-selected, the procedure records discovery as unavailable/unresolved and
-continues prompt generation. The search response itself is not written as a
-separate artifact; the selected source URL and provenance are retained with
-the fetched evidence.
+The runtime reads `TAVILY_API_KEY` from the environment. Use the free plan's
+credit limit (basic search is one credit per query); when its credits are
+exhausted, Tavily rejects further requests until the limit resets or the
+account is upgraded. Search fails open when the key is absent, the provider
+fails, or no source can be selected, so prompt generation continues.
+
+Successful results are cached in a local SQLite database under
+`$XDG_CACHE_HOME/powdrr-lift/external-contract-search.sqlite3` (or
+`~/.cache/powdrr-lift/...` when XDG cache is unset), keyed by a hash of the
+exact provider request and its search parameters. Entries expire after 30 days;
+failed requests are not cached. The cache stores only the bounded candidate
+URLs, titles, and snippets. The procedural event log records counts/statuses,
+not raw search hits or the selection judge's messages/rationale. Search cache
+contents therefore live in this separate local cache, while selected source
+URLs and provenance are retained with the fetched evidence artifacts.
+
+Search queries are transmitted to Tavily; do not include secrets or private
+task/repository context. Tavily's privacy policy says query data may be shared
+with third-party search indexes in limited cases and retained as necessary to
+provide/improve its service. Keep queries narrowly scoped to the public
+contract/profile and the unresolved behavior. Operators should review the
+current [Tavily terms](https://www.tavily.com/terms) and [privacy policy](https://www.tavily.com/privacy)
+before enabling the provider.
 
 The source-capture operation persists response bytes and their SHA-256 digest
 under the run artifact directory, with the requested/final URL, selected search

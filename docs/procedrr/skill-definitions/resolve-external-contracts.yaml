@@ -38,7 +38,10 @@ steps:
           expected outputs, or verifier findings.
         - >-
           Queries locate candidate sources only. Do not present search snippets
-          as evidence or derive requirements from them. A fully specified local
+          as evidence or derive requirements from them. Search inputs are sent
+          to the configured Tavily service, so include only the public contract,
+          profile/version, and behavior needed to find authoritative sources;
+          omit private task and repository details. A fully specified local
           behavior with no external compatibility contract should choose skip.
         - >-
           Do not use benchmark solutions, verifier results, expected patches,
@@ -76,7 +79,7 @@ steps:
         type: object
         required: [provider, searches, candidate_count, unavailable_count]
         properties:
-          provider: {type: string, const: brave}
+          provider: {type: string, const: tavily}
           searches: {type: array}
           candidate_count: {type: integer, minimum: 0}
           unavailable_count: {type: integer, minimum: 0}

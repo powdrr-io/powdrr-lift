@@ -143,6 +143,7 @@ steps:
       snapshot: {name: instruction_ledger.clauses, max_items: 128}
       item_binding: atomicity_clause
       collect: {binding: atomicity_decisions, mode: list, value: atomicity_decision}
+      max_parallel: 4
       body:
         - judge:
             kind: classify_one

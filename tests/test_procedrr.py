@@ -630,6 +630,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     document = parse_and_validate(source)
     atomicity_body = document["steps"][1]["for_each"]["body"]
     atomicity_judge = atomicity_body[0]["judge"]
+    atomicity_loop = document["steps"][1]["for_each"]
     split_body = document["steps"][3]["for_each"]["body"]
     split_judge = split_body[0]["judge"]
     body = document["steps"][5]["for_each"]["body"]
@@ -648,6 +649,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
         "verifiable requirement?"
     )
     assert atomicity_judge["output"]["schema"]["required"] == ["multiple"]
+    assert atomicity_loop["max_parallel"] == 4
     assert split_judge["question"] == (
         "How can this clause be decomposed without losing validation dependencies?"
     )

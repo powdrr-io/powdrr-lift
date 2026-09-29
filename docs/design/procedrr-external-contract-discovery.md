@@ -127,23 +127,35 @@ question through `ask`, or record a narrow, visible assumption under
    requests, pages, extracted spans, and elapsed time per subject. Record when
    the budget is exhausted instead of implying complete research.
 
-The initial retrieval interface is deliberately URL-based: Procedrr emits at
-most eight records of `(URL, research question, applicability rationale)`;
-Workrr performs HTTPS GETs only for those candidates. The question is retained
-as provenance for later span/applicability review, not used as an unbounded
-search query. Redirects must remain HTTPS and public-hosted, each response is
-capped at 1 MB, and each request has a 12-second timeout. If the process cannot
-name a plausible official URL, it records that discovery as unresolved and
-continues prompt generation. A general-purpose search provider is not part of
-this first slice; adding one requires an explicit provider/credential and
-source-ranking contract rather than silently scraping a search engine.
+Source discovery uses the Brave Web Search API rather than scraping a search
+engine. Procedrr emits at most four concise queries, each bound to an exact
+research question, profile/version, and applicability rationale. Queries must
+not contain private repository identifiers, source code, benchmark identifiers,
+expected outputs, or verifier findings. Brave returns at most five candidate
+hits per query; snippets are untrusted discovery hints, never requirement
+evidence. Procedrr selects hit references, and deterministic binding checks
+that each selected URL is one of the returned HTTPS candidates before fetching
+it. Redirects must remain HTTPS and public-hosted, each fetched response is
+capped at 1 MB, and each fetch has a 12-second timeout.
+
+The runtime reads `BRAVE_SEARCH_API_KEY` from the environment. Because the
+Procedrr event log captures bounded operation inputs and outputs, search is
+disabled unless `BRAVE_SEARCH_STORAGE_RIGHTS_CONFIRMED=true` is also set. That
+setting is an operator attestation that the active Brave plan permits retaining
+the selected source references and search records needed for audit. If the key
+or rights confirmation is absent, a provider error occurs, or no source can be
+selected, the procedure records discovery as unavailable/unresolved and
+continues prompt generation. The search response itself is not written as a
+separate artifact; the selected source URL and provenance are retained with
+the fetched evidence.
 
 The source-capture operation persists response bytes and their SHA-256 digest
-under the run artifact directory, with the requested/final URL, capture time,
-HTTP status, question, applicability rationale, and unavailable reason in a
-JSON manifest. Retrieval failures and unsafe candidates become unavailable
-records, not workflow failures. This is evidence capture only: it does not yet
-accept standard-derived claims or put source text in the worker prompt.
+under the run artifact directory, with the requested/final URL, selected search
+reference/title, capture time, HTTP status, question, applicability rationale,
+and unavailable reason in a JSON manifest. Retrieval failures and unsafe
+candidates become unavailable records, not workflow failures. This is evidence
+capture only: it does not yet accept standard-derived claims or put source text
+in the worker prompt.
 
 Each source record contains the canonical URL, publisher, document title,
 revision or commit, retrieved timestamp, content hash, relevant section/span,

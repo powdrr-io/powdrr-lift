@@ -45,9 +45,27 @@ files:
     related: {entities: [jev-semantic-classifier], invariants: [jev-conservative-fallback]}
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 466, end_line: 479}
-    summary: Add the Jev semantic classifier adapter to design-interview judge calls.
-    rationale: Make qualified Jev decisions available in the instruction pipeline.
+    span: {start_line: 104, end_line: 104}
+    summary: Import the Jev semantic classifier adapter.
+    rationale: Connect the Jev classifier to the design-interview runtime.
+    related: {entities: [jev-semantic-classifier]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 469, end_line: 469}
+    summary: Construct the Jev classifier wrapper around the configured planning client.
+    rationale: Retain planning as the fallback provider.
+    related: {entities: [jev-semantic-classifier], invariants: [jev-conservative-fallback]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 472, end_line: 472}
+    summary: Use the classifier wrapper for the design-interview transport.
+    rationale: Route qualifying source decisions through Jev.
+    related: {entities: [jev-semantic-classifier]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 480, end_line: 480}
+    summary: Use the classifier wrapper for configured planning judges.
+    rationale: Apply semantic decision routing to judge calls.
     related: {entities: [jev-semantic-classifier]}
   - path: tests/test_jev_classifier.py
     type: added

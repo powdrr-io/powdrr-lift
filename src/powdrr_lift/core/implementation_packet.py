@@ -40,6 +40,8 @@ class ImplementationPacket:
     repository: RepositoryContextPacket
     behavior_scenarios: tuple[BehaviorScenario, ...] = ()
     contract_closure: Mapping[str, Any] | None = None
+    external_contract_requirements: tuple[Mapping[str, Any], ...] = ()
+    external_contract_notes: tuple[Mapping[str, Any], ...] = ()
 
     def for_obligation(self, ordinal: int) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
@@ -60,6 +62,8 @@ class ImplementationPacket:
                 else ()
             ),
             contract_closure=self.contract_closure,
+            external_contract_requirements=self.external_contract_requirements,
+            external_contract_notes=self.external_contract_notes,
         )
 
     def for_task(
@@ -86,6 +90,8 @@ class ImplementationPacket:
             repository=self.repository,
             behavior_scenarios=self.behavior_scenarios,
             contract_closure=self.contract_closure,
+            external_contract_requirements=self.external_contract_requirements,
+            external_contract_notes=self.external_contract_notes,
         )
 
     def to_data(self) -> dict[str, Any]:
@@ -108,6 +114,14 @@ class ImplementationPacket:
         }
         if self.contract_closure is not None:
             data["contract_closure"] = dict(self.contract_closure)
+        if self.external_contract_requirements:
+            data["external_contract_requirements"] = [
+                dict(item) for item in self.external_contract_requirements
+            ]
+        if self.external_contract_notes:
+            data["external_contract_notes"] = [
+                dict(item) for item in self.external_contract_notes
+            ]
         return data
 
     @classmethod
@@ -142,6 +156,18 @@ class ImplementationPacket:
         raw_closure = raw.get("contract_closure")
         if raw_closure is not None and not isinstance(raw_closure, Mapping):
             raise ValueError("implementation packet contract closure is malformed")
+        raw_external_requirements = raw.get("external_contract_requirements", [])
+        if not isinstance(raw_external_requirements, list) or not all(
+            isinstance(item, Mapping) for item in raw_external_requirements
+        ):
+            raise ValueError(
+                "implementation packet external requirements are malformed"
+            )
+        raw_external_notes = raw.get("external_contract_notes", [])
+        if not isinstance(raw_external_notes, list) or not all(
+            isinstance(item, Mapping) for item in raw_external_notes
+        ):
+            raise ValueError("implementation packet external notes are malformed")
         packet = cls(
             objective=str(raw.get("objective", "")).strip(),
             obligations=obligations,
@@ -161,6 +187,10 @@ class ImplementationPacket:
             contract_closure=(
                 dict(raw_closure) if isinstance(raw_closure, Mapping) else None
             ),
+            external_contract_requirements=tuple(
+                dict(item) for item in raw_external_requirements
+            ),
+            external_contract_notes=tuple(dict(item) for item in raw_external_notes),
         )
         if not packet.objective.strip() or not packet.obligations:
             raise ValueError("implementation packet is missing required content")
@@ -199,11 +229,45 @@ class ImplementationPacket:
                     "needed; never weaken the behavioral assertion.",
                 )
             )
+        sections = [behavior_text]
+        if self.external_contract_requirements:
+            rendered = ["External contract requirements (accepted and scoped):"]
+            for index, requirement in enumerate(
+                self.external_contract_requirements, start=1
+            ):
+                rendered.append(f"{index}. {requirement.get('requirement', '')}")
+                rendered.append(
+                    "   Source: "
+                    f"{requirement.get('canonical_url', '')}"
+                    f" (profile: {requirement.get('profile', 'unspecified')})."
+                )
+                quote = requirement.get("source_quote")
+                if isinstance(quote, str) and quote.strip():
+                    rendered.append(f"   Supporting excerpt: {quote.strip()}")
+                rendered.append(
+                    f"   Scope rationale: {requirement.get('rationale', '')}"
+                )
+            sections.append("\n".join(rendered))
+        if self.external_contract_notes:
+            rendered_notes = [
+                "Unresolved external contract questions (do not assume an answer):"
+            ]
+            for index, note in enumerate(self.external_contract_notes, start=1):
+                claim = note.get("claim", {})
+                if not isinstance(claim, Mapping):
+                    claim = {}
+                rendered_notes.append(
+                    f"{index}. Candidate: {claim.get('candidate_requirement', '')}"
+                )
+                rendered_notes.append(
+                    f"   Source: {claim.get('canonical_url', '')}"
+                    f" (profile: {claim.get('profile', 'unspecified')})."
+                )
+                rendered_notes.append(f"   Uncertainty: {note.get('rationale', '')}")
+            sections.append("\n".join(rendered_notes))
         if self.contract_closure is not None:
-            return (
-                behavior_text + "\n\n" + render_contract_closure(self.contract_closure)
-            )
-        return behavior_text
+            sections.append(render_contract_closure(self.contract_closure))
+        return "\n\n".join(section for section in sections if section)
 
 
 def compile_implementation_packet(
@@ -216,6 +280,8 @@ def compile_implementation_packet(
     existing_tests: Sequence[Mapping[str, Any]] = (),
     behavior_scenarios: Sequence[Mapping[str, Any]] = (),
     contract_closure: Mapping[str, Any] | None = None,
+    external_contract_requirements: Sequence[Mapping[str, Any]] = (),
+    external_contract_notes: Sequence[Mapping[str, Any]] = (),
 ) -> ImplementationPacket:
     """Normalize worker inputs and reject incomplete executable contracts."""
     if not objective.strip():
@@ -264,6 +330,10 @@ def compile_implementation_packet(
         contract_closure=(
             dict(contract_closure) if contract_closure is not None else None
         ),
+        external_contract_requirements=tuple(
+            dict(item) for item in external_contract_requirements
+        ),
+        external_contract_notes=tuple(dict(item) for item in external_contract_notes),
     )
 
 

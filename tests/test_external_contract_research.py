@@ -9,8 +9,14 @@ import pytest
 import powdrr_lift.workrr.external_contract_research as research_module
 from powdrr_lift.workrr.command_catalog import feature_command_catalog
 from powdrr_lift.workrr.external_contract_research import (
+    bind_external_contract_assessments,
+    bind_external_contract_claims,
     bind_external_contract_search_selections,
     capture_external_sources,
+    extract_external_contract_evidence,
+    finalize_external_contract_context,
+    prepare_external_contract_projection_requests,
+    project_external_contract_requirements,
     redact_external_contract_search_event,
     search_external_contract_sources,
 )
@@ -57,6 +63,209 @@ def test_capture_external_source_persists_bytes_and_content_hash(
     assert record["search_source_ref"] == "search:1:1"
     assert record["search_query"] == 'deferSpec="20220824"'
     assert record["profile"] == "graphql-defer-v1"
+
+
+def test_extract_external_evidence_is_bounded_visible_and_hash_verified(
+    tmp_path: Path,
+) -> None:
+    body = (
+        b"<html><script>ignore @defer label</script>"
+        b"<p>The @defer directive accepts an optional label argument."
+        b" The server includes it in the response.</p></html>"
+    )
+    captured = capture_external_sources(
+        [
+            {
+                "url": "https://spec.example.org/defer",
+                "profile": "GraphQL defer directive",
+                "research_question": "What arguments does @defer support?",
+                "why_applicable": "The instruction names @defer.",
+            }
+        ],
+        artifact_root=tmp_path,
+        rationale="The request names a directive.",
+        fetch=lambda url: (200, url, body),
+    )
+
+    evidence = extract_external_contract_evidence(
+        captured["sources"],
+        feature_description="Add @defer support.",
+        artifact_root=tmp_path,
+    )
+
+    assert evidence["excerpts"]
+    assert "optional label argument" in evidence["excerpts"][0]["text"]
+    assert "ignore @defer label" not in json.dumps(evidence["excerpts"])
+    assert sum(len(item["text"]) for item in evidence["excerpts"]) <= 8_000
+    claim = {
+        "source_ref": "external:1",
+        "source_quote": "The @defer directive accepts an optional label argument.",
+        "candidate_requirement": "Support the optional label argument on @defer.",
+        "affected_surface": "DSLFragment.defer",
+    }
+    bound = bind_external_contract_claims(evidence, [claim])["claims"][0]
+    assert bound["claim_ref"] == "claim:1"
+    assert bound["canonical_url"] == "https://spec.example.org/defer"
+    assert bound["content_sha256"] == hashlib.sha256(body).hexdigest()
+
+    reflowed_claim = {
+        **claim,
+        "source_quote": (
+            "The @defer directive accepts an optional label argument.  "
+            "The server\nincludes it in the response."
+        ),
+    }
+    reflowed = bind_external_contract_claims(evidence, [reflowed_claim])["claims"][0]
+    assert reflowed["source_quote"] == (
+        "The @defer directive accepts an optional label argument."
+        " The server includes it in the response."
+    )
+
+    rejected = bind_external_contract_claims(
+        evidence, [{**claim, "source_quote": "made up"}]
+    )
+    assert rejected["claims"] == []
+    assert rejected["rejected_claims"] == [
+        {
+            "claim_index": 1,
+            "reason": "citation_not_in_captured_excerpt",
+            "source_quote": "made up",
+        }
+    ]
+
+
+def test_external_contract_assessments_preserve_ask_and_record_defaults() -> None:
+    claim = {
+        "claim_ref": "claim:1",
+        "source_ref": "external:1",
+        "canonical_url": "https://spec.example.org/defer",
+        "profile": "directive profile v1",
+        "source_quote": "@defer accepts label.",
+    }
+    ask_result = bind_external_contract_assessments(
+        [claim],
+        [
+            {
+                "item": claim,
+                "result": {
+                    "decision": "unresolved",
+                    "requirement": None,
+                    "rationale": "The source profile may be newer than requested.",
+                    "profile_compatibility": "uncertain",
+                    "assumption_basis": None,
+                },
+            }
+        ],
+        clarification_policy="ask",
+    )
+    assert ask_result["requirements"] == []
+    assert ask_result["dispositions"][0]["unresolved"] is True
+
+    defaulted = bind_external_contract_assessments(
+        [claim],
+        [
+            {
+                "decision": "unresolved",
+                "requirement": "Support the optional label argument on @defer.",
+                "rationale": "The argument contract is version-independent here.",
+                "profile_compatibility": (
+                    "argument contract applies; newer payload details excluded"
+                ),
+                "assumption_basis": "The captured official directive definition.",
+            }
+        ],
+        clarification_policy="normative_defaults",
+    )
+    assert defaulted["requirements"][0]["disposition"] == "assumed"
+    assert defaulted["requirements"][0]["source_quote"] == claim["source_quote"]
+    assert (
+        prepare_external_contract_projection_requests(
+            defaulted["requirements"], [claim]
+        )["requests"][0]["claim"]["claim_ref"]
+        == "claim:1"
+    )
+
+
+def test_finalize_external_context_binds_source_quote_to_projected_obligation(
+    tmp_path: Path,
+) -> None:
+    requirement = {
+        "requirement_ref": "requirement:1",
+        "claim_ref": "claim:1",
+        "source_ref": "external:1",
+        "canonical_url": "https://spec.example.org/defer",
+        "source_quote": "@defer accepts label.",
+        "profile": "directive v1",
+        "requirement": "DSLFragment.defer accepts an optional label.",
+        "disposition": "accepted",
+        "rationale": "Required to construct the named directive.",
+    }
+    scenario = {
+        "subject": "DSLFragment.defer label",
+        "given": "A fragment in the GraphQL DSL.",
+        "when": 'defer(label="details") is called.',
+        "then": 'The fragment prints @defer(label: "details").',
+        "dimensions": {
+            "normal_result": "The directive includes the label.",
+            "error_behavior": (
+                "Invalid labels follow existing argument rendering errors."
+            ),
+            "continuation": "Other DSL operations remain usable.",
+            "unsupported_behavior": "not_applicable",
+            "cancellation_cleanup": "not_applicable",
+            "compatibility": "Calling defer() without a label remains supported.",
+            "negative_boundaries": "No label argument is emitted when omitted.",
+        },
+        "evidence": ["Source: @defer accepts label."],
+        "validator": "A focused DSL rendering test.",
+        "routing": "include",
+    }
+    context = finalize_external_contract_context(
+        evidence={"path": str(tmp_path / "external-contract-evidence.json")},
+        claims=[{"claim_ref": "claim:1", "source_ref": "external:1"}],
+        assessment_result={"requirements": [requirement], "dispositions": []},
+        projections=[
+            {
+                "description": requirement["requirement"],
+                "acceptance_criterion": scenario["then"],
+                "expected_test": "Verify defer label rendering and omission.",
+                "behavior_scenario": scenario,
+            }
+        ],
+        artifact_root=tmp_path,
+    )
+    assert context["projected_obligations"][0]["design"]["behavior_scenario"][
+        "scenario_id"
+    ]
+    assert (
+        context["projected_obligations"][0]["design"]["external_requirement_ref"]
+        == "requirement:1"
+    )
+
+
+def test_project_external_contract_requirement_preserves_accepted_scope() -> None:
+    request = {
+        "requirement": {
+            "requirement_ref": "requirement:1",
+            "requirement": "A provided label must be included in the payload.",
+            "source_quote": (
+                "If provided, the GraphQL Server must add it to the payload."
+            ),
+            "profile": "GraphQL incremental delivery v0.1",
+        },
+        "claim": {"affected_surface": "@defer DSL rendering"},
+    }
+
+    projection = project_external_contract_requirements([request])["projections"][0]
+
+    assert projection["acceptance_criterion"] == request["requirement"]["requirement"]
+    assert (
+        projection["behavior_scenario"]["then"] == request["requirement"]["requirement"]
+    )
+    assert projection["behavior_scenario"]["evidence"] == [
+        request["requirement"]["source_quote"]
+    ]
+    assert projection["behavior_scenario"]["routing"] == "include"
 
 
 def test_unavailable_source_is_recorded_without_aborting_capture(
@@ -407,4 +616,45 @@ def test_selection_binds_only_real_result_refs_and_preserves_query_scope() -> No
             "search_query": str(_query()["query"]),
             "profile": str(_query()["profile"]),
         }
+    ]
+
+
+def test_selection_rejects_benchmark_and_verification_material() -> None:
+    search_results = {
+        "searches": [
+            {
+                "query": "GraphQL defer directive profile",
+                "research_question": "What arguments does @defer define?",
+                "profile": "GraphQL incremental delivery",
+                "candidates": [
+                    {
+                        "result_rank": 1,
+                        "url": "https://docs.example.org/spec/incremental/v1",
+                        "title": "Incremental delivery specification",
+                    },
+                    {
+                        "result_rank": 2,
+                        "url": "https://example.org/lab/harness-eval/task/example",
+                        "title": "Incremental delivery requirements",
+                    },
+                    {
+                        "result_rank": 3,
+                        "url": "https://example.org/results/defer",
+                        "title": "Benchmark task: incremental delivery",
+                    },
+                ],
+            }
+        ]
+    }
+
+    requests = bind_external_contract_search_selections(
+        search_results,
+        [
+            {"query_index": 1, "result_rank": rank, "why_applicable": "Relevant."}
+            for rank in (1, 2, 3)
+        ],
+    )
+
+    assert [request["url"] for request in requests] == [
+        "https://docs.example.org/spec/incremental/v1"
     ]

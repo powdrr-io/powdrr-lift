@@ -118,6 +118,53 @@ class DeterministicPlanningClient:
                 "rationale": "No external contract sources were needed.",
                 "selections": [],
             }
+        if required == {"claims"}:
+            return {"claims": []}
+        if required == {
+            "decision",
+            "requirement",
+            "rationale",
+            "profile_compatibility",
+            "assumption_basis",
+        }:
+            return {
+                "decision": "reject",
+                "requirement": None,
+                "rationale": "The fixture has no applicable external requirement.",
+                "profile_compatibility": "No external profile applies.",
+                "assumption_basis": None,
+            }
+        if required == {
+            "description",
+            "acceptance_criterion",
+            "expected_test",
+            "behavior_scenario",
+        }:
+            return {
+                "description": "Apply the accepted external requirement.",
+                "acceptance_criterion": "The scoped external behavior is observable.",
+                "expected_test": "Test the scoped external behavior.",
+                "behavior_scenario": {
+                    "subject": "the external requirement",
+                    "given": "the applicable external profile",
+                    "when": "the requested behavior is executed",
+                    "then": "the scoped external behavior is observable",
+                    "related_requirements": [],
+                    "dimensions": {
+                        "normal_result": "the scoped external behavior is observable",
+                        "error_behavior": "not_applicable",
+                        "continuation": "not_applicable",
+                        "unsupported_behavior": "not_applicable",
+                        "cancellation_cleanup": "not_applicable",
+                        "compatibility": "not_applicable",
+                        "negative_boundaries": "not_applicable",
+                    },
+                    "evidence": ["The accepted external requirement."],
+                    "validator": "Test the scoped external behavior.",
+                    "capability_matrix": [],
+                    "routing": "include",
+                },
+            }
         if required == {"consistency_review"}:
             return {"consistency_review": {"updates": []}}
         if required == {"multiple"}:

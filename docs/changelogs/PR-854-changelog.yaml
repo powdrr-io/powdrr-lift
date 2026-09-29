@@ -1,0 +1,113 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 854
+title: Route all design-interview classifiers through Jev
+intent:
+  problem: All design-interview classifier judges currently use the planning model despite Jev being available for typed choices.
+  goal: Route every classify_one decision in the design interview through Jev while leaving generation and evidence-verification work on the planning model.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 150, end_line: 150}
+    summary: Route atomicity classification through Jev.
+    rationale: Use Jev for the typed true/false decision.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 291, end_line: 291}
+    summary: Route root instruction decisions through Jev.
+    rationale: Apply Jev to the root classification in the source decision tree.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 353, end_line: 353}
+    summary: Route dependent semantic decisions through Jev.
+    rationale: Apply Jev to the child classification after root routing.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 464, end_line: 464}
+    summary: Route behavior-family decisions through Jev.
+    rationale: Use Jev for the registered behavior category choice.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 533, end_line: 533}
+    summary: Route field-entailment decisions through Jev.
+    rationale: Use Jev to classify whether each semantic field is supported by the source.
+    related: {entities: [design-interview-classifiers], invariants: [classifier-provider-routing]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 490, end_line: 499}
+    summary: Configure separate Jev and planning judge clients.
+    rationale: Keep typed classifiers on Jev while preserving the planning model for the rest of the workflow and as a Jev failure fallback.
+    related: {entities: [jev-classifier-client], invariants: [classifier-provider-routing]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 501, end_line: 501}
+    summary: Keep planning as the evaluator's default client.
+    rationale: Preserve the planning model for generation steps.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 505, end_line: 506}
+    summary: Register Jev as a dedicated judge provider.
+    rationale: Resolve workflow-declared Jev providers to the Jev classifier client.
+    related: {entities: [jev-classifier-client]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 1, end_line: 252}
+    summary: Support typed Jev classification for semantic choices and boolean atomicity, mapping results to workflow schemas and falling back on provider errors.
+    rationale: Enable Jev across every classify_one shape used by the design interview.
+    related: {entities: [jev-classifier-client], invariants: [classifier-provider-routing]}
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Import pytest for isolated feature-flow fixtures.
+    rationale: Keep deterministic end-to-end checks independent of live Jev credentials.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 24, end_line: 33}
+    summary: Prevent deterministic pipeline tests from making live Jev requests.
+    rationale: Keep fixture-based tests hermetic when developer credentials are configured.
+    related: {entities: [jev-integration-tests], invariants: [offline-test-fixtures]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 1, end_line: 167}
+    summary: Cover semantic labels, field entailment, boolean mapping, abstention, and provider-error fallback.
+    rationale: Exercise the Jev response mappings used by all design-interview classifiers.
+    related: {entities: [jev-integration-tests], invariants: [classifier-provider-routing]}
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 1, end_line: 2}
+    summary: Import Any for recursive judge-provider inspection.
+    rationale: Type the workflow-provider regression assertion.
+    related: {entities: [jev-integration-tests]}
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 624, end_line: 640}
+    summary: Assert every classify_one judge uses Jev and construct_one remains on planning.
+    rationale: Prevent accidental routing of generation calls through Jev.
+    related: {entities: [jev-integration-tests], invariants: [classifier-provider-routing]}
+entities:
+  - id: design-interview-classifiers
+    type: Function
+    action: modified
+  - id: jev-classifier-client
+    type: Function
+    action: modified
+  - id: jev-integration-tests
+    type: Test suite
+    action: modified
+invariants:
+  - id: classifier-provider-routing
+    action: added
+    description: Every classify_one judge in design-interview uses provider jev; construct_one generation and exact source-span extraction remain on planning.
+    rationale: Route classification decisions to Jev while preserving the provider for generative work.
+  - id: offline-test-fixtures
+    action: added
+    description: Deterministic end-to-end tests remove Jev API credentials so fixtures never issue billable requests.
+    rationale: Keep test outcomes repeatable and independent of workstation credentials.
+guidance: []

@@ -80,6 +80,10 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "task_id": predictions["task_id"],
                     "prediction_count": len(predictions["cases"]),
+                    "estimated_test_case_count": predictions["test_count_prediction"][
+                        "estimated_test_case_count"
+                    ],
+                    "obligation_count": len(predictions["obligations"]),
                 }
             )
             return 0

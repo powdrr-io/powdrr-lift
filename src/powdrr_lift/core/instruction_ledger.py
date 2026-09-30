@@ -268,6 +268,9 @@ def apply_atomicity_decisions(
                 f"atomicity split for {clause.clause_id} must contain "
                 f"2-{MAX_ATOMIC_SPLIT_CHILDREN} statements"
             )
+        validation_groups = _normalize_validation_groups(
+            raw.get("validation_groups", []), len(statements)
+        )
         for statement in statements:
             statement_ordinal = (
                 len(
@@ -280,7 +283,7 @@ def apply_atomicity_decisions(
                 + 1
             )
             group_id, relation = _atomic_validation_group(
-                raw.get("validation_groups", []),
+                validation_groups,
                 statement_ordinal,
                 len(statements),
                 clause.clause_id,
@@ -315,6 +318,88 @@ def apply_atomicity_decisions(
     result = InstructionLedger(source=ledger.source, clauses=renumbered)
     result.validate()
     return result
+
+
+def _normalize_validation_groups(
+    raw_groups: Any, statement_count: int
+) -> list[dict[str, Any]]:
+    if raw_groups is None:
+        return []
+    if not isinstance(raw_groups, list):
+        raise InstructionLedgerError("validation_groups must be a list")
+    groups: list[dict[str, Any]] = []
+    for group in raw_groups:
+        if isinstance(group, str):
+            try:
+                normalized_group = group.strip().removeprefix("./").strip()
+                members_part, parsed_relation = normalized_group.split(
+                    ";relation=", maxsplit=1
+                )
+                members_text = members_part.removeprefix("members=")
+                group = {
+                    "members": [int(item) for item in members_text.split(",")],
+                    "relation": parsed_relation,
+                }
+            except (ValueError, TypeError) as exc:
+                raise InstructionLedgerError(
+                    "validation group string is malformed"
+                ) from exc
+        if not isinstance(group, dict) or set(group) != {"members", "relation"}:
+            raise InstructionLedgerError(
+                "validation group must contain members and relation"
+            )
+        members = group.get("members")
+        relation_value = group.get("relation")
+        if (
+            not isinstance(members, list)
+            or not members
+            or not all(
+                isinstance(value, int)
+                and not isinstance(value, bool)
+                and 1 <= value <= statement_count
+                for value in members
+            )
+            or len(set(members)) != len(members)
+            or not isinstance(relation_value, str)
+            or relation_value
+            not in {"all_together", "ordered", "alternatives", "conditional"}
+        ):
+            raise InstructionLedgerError("validation group is invalid")
+        # A one-member group carries no relationship between statements. The
+        # model occasionally emits one when only one result needs no grouping.
+        if len(members) == 1:
+            continue
+        groups.append({"members": list(members), "relation": relation_value})
+
+    normalized: list[dict[str, Any]] = []
+    for group in groups:
+        members = set(group["members"])
+        overlapping = [
+            existing
+            for existing in normalized
+            if members.intersection(existing["members"])
+        ]
+        if not overlapping:
+            normalized.append(
+                {"members": sorted(members), "relation": group["relation"]}
+            )
+            continue
+        if group["relation"] != "all_together" or any(
+            existing["relation"] != "all_together" for existing in overlapping
+        ):
+            raise InstructionLedgerError(
+                "overlapping validation groups cannot be safely combined"
+            )
+        merged_members = members.union(
+            *(set(existing["members"]) for existing in overlapping)
+        )
+        normalized = [
+            existing for existing in normalized if existing not in overlapping
+        ]
+        normalized.append(
+            {"members": sorted(merged_members), "relation": "all_together"}
+        )
+    return normalized
 
 
 def _atomic_validation_group(

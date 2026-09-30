@@ -36,3 +36,33 @@ The remaining design gap is use of the bootstrapped entity inventory during
 classification and diff generation. The current diff projection maps feature
 obligations, but does not propose additions or changes to named repository
 entities such as Bandit plugins B620–B624.
+
+## SQLite import checkpoints
+
+The design-only pipeline was also run against
+`sqlite-utils-safe-import-checkpoints`; no coding agent or verifier was run.
+The task worktree and artifacts are retained under
+`/private/tmp/python-instruction-audit-20260930/sqlite-utils/`.
+
+The task contains 15 instruction clauses. Atomicity processing produced 39
+source clauses, of which 38 became product obligations and one was retained as
+context. The design-only run completed and emitted both
+`implementation-prompt.md` and `structrr-diff.yaml`. The diff contains one
+feature, 37 invariants, 38 acceptance criteria, and 38 required test cases, but
+no entity or relationship changes. Bootstrap found 89 entities, two tools, and
+two validation inventory records; the inventory is present in bootstrap but
+does not link the proposed API and CLI changes to existing repository entities.
+
+This run exposed two malformed-but-recoverable atomicity group shapes from the
+model: overlapping `all_together` groups and a path-prefixed group string. The
+ledger compiler now merges overlapping groups only when all relations are
+`all_together`, strips the stray `./` prefix, and drops singleton groups because
+they specify no relationship. It still rejects overlaps involving ordered,
+conditional, or alternatives relations. Regression tests cover the merge,
+singleton cleanup, and rejection behavior.
+
+The local validation profile discovered pytest, but task test collection could
+not import `sqlite_fts4` from the shared environment. This prevented reliable
+test-selector discovery; it did not prevent design compilation. The run
+recorded 1,001 Procedrr events, including 190 dependent decisions and 193
+field-entailment decisions. JEV was enabled and returned accepted responses.

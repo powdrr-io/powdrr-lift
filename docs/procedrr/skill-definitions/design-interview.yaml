@@ -206,6 +206,11 @@ steps:
                 Members are two or more one-based statement indexes; relation is
                 all_together, ordered, alternatives, or conditional. Leave
                 independently verifiable statements out of groups.
+              - >-
+                Validation groups must not overlap. If dependencies connect several
+                statements and all must pass together, put their indexes in one
+                all_together group rather than returning overlapping groups. Use
+                the exact "members=" prefix; do not add path prefixes or punctuation.
               - Do not split one obligation merely because it has several assertions; use all_together when those assertions jointly define success.
               - Preserve every concrete API name, value, condition, constraint, and required error from the source clause.
               - Do not add requirements, choose implementation details, weaken a requirement, or infer an opposite behavior.

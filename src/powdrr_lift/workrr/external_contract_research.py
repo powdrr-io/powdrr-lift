@@ -178,6 +178,7 @@ def extract_external_contract_evidence(
         "schema_version": "external-contract-evidence-v1",
         "sources": source_results,
         "excerpts": excerpts,
+        "has_excerpts": bool(excerpts),
         "limits": {
             "max_sources": MAX_SOURCES,
             "max_excerpts_per_source": MAX_EVIDENCE_EXCERPTS_PER_SOURCE,

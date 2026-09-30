@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,7 +22,10 @@ from powdrr_lift.workrr.external_contract_research import (
     redact_external_contract_search_event,
     search_external_contract_sources,
 )
+from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr.parser import parse_and_validate
+from procedrr_evaluator import Evaluator
 
 
 def test_external_contract_research_procedure_is_valid() -> None:
@@ -658,3 +663,144 @@ def test_selection_rejects_benchmark_and_verification_material() -> None:
     assert [request["url"] for request in requests] == [
         "https://docs.example.org/spec/incremental/v1"
     ]
+
+
+@pytest.mark.parametrize(
+    ("decision", "source_available"),
+    [("skip", False), ("research", False), ("research", True)],
+)
+def test_external_research_gate_and_evidence_control_model_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    decision: str,
+    source_available: bool,
+) -> None:
+    from powdrr_lift.workrr import jev_classifier
+
+    skills_dir = Path("docs/procedrr/skill-definitions")
+    document = parse_and_validate(
+        (skills_dir / "resolve-external-contracts.yaml").read_text(),
+        command_catalog=feature_command_catalog(),
+    )
+    # Exercise the real workflow through claim binding; later assessment and
+    # projection do not decide whether these provider calls should happen.
+    document["steps"] = document["steps"][
+        : next(i for i, step in enumerate(document["steps"]) if "for_each" in step)
+    ]
+    jev_requests: list[dict[str, Any]] = []
+    planning_outputs: list[set[str]] = []
+    quote = "The @defer directive accepts an optional label argument."
+
+    def classify(request: dict[str, Any], *_args: Any) -> dict[str, Any]:
+        jev_requests.append(request)
+        assert request["allowed_values"] == ["research", "skip"]
+        assert (
+            request["state"]["context"]["feature_description"] == "Add @defer support."
+        )
+        return {"choice": decision}
+
+    monkeypatch.setattr(jev_classifier, "_call_jev", classify)
+
+    class Planning:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            assert response_schema is not None
+            required = set(response_schema["required"])
+            planning_outputs.append(required)
+            if required == {"rationale", "queries"}:
+                return {
+                    "rationale": "The directive needs its contract.",
+                    "queries": [_query()],
+                }
+            if required == {"rationale", "selections"}:
+                return {
+                    "rationale": "Use the official specification.",
+                    "selections": [
+                        {
+                            "query_index": 1,
+                            "result_rank": 1,
+                            "why_applicable": "Directive contract.",
+                        }
+                    ]
+                    if decision == "research"
+                    else [],
+                }
+            if required == {"claims"}:
+                assert source_available
+                return {
+                    "claims": [
+                        {
+                            "source_quote": quote,
+                            "candidate_requirement": "Support optional label.",
+                            "affected_surface": "@defer",
+                        }
+                    ]
+                }
+            pytest.fail(f"Unexpected text-model contract: {required}")
+
+    def fetch(url: str) -> tuple[int, str, bytes]:
+        if not source_available:
+            raise TimeoutError("source unavailable")
+        return 200, url, quote.encode()
+
+    def execute(_tool: str, parameters: Mapping[str, Any]) -> Any:
+        name = parameters["command"][0]
+        args = {key: value for key, value in parameters.items() if key != "command"}
+        if name == "search_external_contract_sources":
+            return search_external_contract_sources(
+                **args,
+                api_key="test-key",
+                search=lambda *_: {
+                    "results": [
+                        {
+                            "url": "https://spec.example.org/defer",
+                            "title": "Official specification",
+                            "content": quote,
+                        }
+                    ]
+                },
+            )
+        if name == "bind_external_contract_search_selections":
+            return {"requests": bind_external_contract_search_selections(**args)}
+        if name == "capture_external_contract_sources":
+            return capture_external_sources(**args, artifact_root=tmp_path, fetch=fetch)
+        if name == "extract_external_contract_evidence":
+            return extract_external_contract_evidence(**args, artifact_root=tmp_path)
+        if name == "bind_external_contract_claims":
+            return bind_external_contract_claims(**args)
+        pytest.fail(f"Unexpected command: {name}")
+
+    planning = Planning()
+    evaluator = Evaluator(
+        WorkrrProcedrrClient(planning, skills_dir=skills_dir),
+        execute,
+        judge_clients={
+            "jev": WorkrrProcedrrClient(
+                JevSemanticClassifierClient(planning, api_key="test-key"),
+                skills_dir=skills_dir,
+            ),
+        },
+        command_catalog=feature_command_catalog(),
+    )
+    result = evaluator.evaluate(
+        document,
+        {
+            "feature_description": "Add @defer support.",
+            "feature_design": {},
+            "clarification_policy": "ask",
+        },
+    )
+    assert len(jev_requests) == 1
+    assert ({"rationale", "queries"} in planning_outputs) == (decision == "research")
+    assert ({"claims"} in planning_outputs) == source_available
+    claims = result.bindings["bound_external_contract_claims"]["claims"]
+    assert bool(claims) == source_available
+    if source_available:
+        assert claims[0]["source_quote"] == quote
+    evidence = json.loads((tmp_path / "external-contract-evidence.json").read_text())
+    assert evidence["has_excerpts"] == source_available
+    assert evidence["has_excerpts"] == bool(evidence["excerpts"])

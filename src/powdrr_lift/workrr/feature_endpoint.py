@@ -2481,9 +2481,9 @@ def _run_code_agent_phase(
             fallback_context = (
                 f"Work item: {work_item_name}\n"
                 f"{repair_feature_context}"
-                "This is a fresh repair session; use the existing worktree and "
-                "repair only the reported issue. Do not re-plan the feature or "
-                "revisit unrelated changes.\n\n"
+                "Continue the existing agent session in the current worktree "
+                "and repair only the reported issue. Do not re-plan the feature "
+                "or revisit unrelated changes.\n\n"
             )
             request = replace(
                 request,

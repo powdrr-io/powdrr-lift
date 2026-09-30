@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -535,6 +536,7 @@ class MiniSWEAgentProvider:
     provider_name: str = "minisweagent"
     prompt_prefix: str = ""
     prompt_suffix: str = ""
+    session_trajectory: Path | None = field(default=None, init=False)
 
     def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
         return _tailor_request_prompt(request, self.prompt_prefix, self.prompt_suffix)
@@ -571,26 +573,48 @@ class MiniSWEAgentProvider:
                     f"environment.cwd={worktree_root.resolve()}",
                 )
             )
-        command.extend(
-            [
+        output_path = (
+            self.diagnostics_root / f"{attempt_id}.traj.json"
+            if self.diagnostics_root is not None
+            else None
+        )
+        if self.session_trajectory is None:
+            command.extend(
+                [
+                    "--task",
+                    request.prompt,
+                    "--yolo",
+                    "--exit-immediately",
+                    # Powdrr owns the wall-clock budget and can continue a partial
+                    # attempt locally. mini's default dollar limit otherwise exits
+                    # cleanly in the middle of an implementation.
+                    "--cost-limit",
+                    "0",
+                ]
+            )
+            if self.model is not None:
+                command.extend(("--model", self.model))
+        else:
+            # mini has no CLI resume flag. Restore its saved conversation and
+            # append this request as another user message in the same session.
+            command = [
+                sys.executable,
+                "-m",
+                "powdrr_lift.minisweagent_session",
+                "--previous",
+                str(self.session_trajectory),
                 "--task",
                 request.prompt,
-                "--yolo",
-                "--exit-immediately",
-                # Powdrr owns the wall-clock budget and can continue a partial
-                # attempt locally. mini's default dollar limit otherwise exits
-                # cleanly in the middle of an implementation.
-                "--cost-limit",
-                "0",
             ]
-        )
-        if self.model is not None:
-            command.extend(("--model", self.model))
-        if self.diagnostics_root is not None:
+            if mini_config is not None:
+                command.extend(("--config", str(mini_config)))
+            command.extend(("--config", f"environment.cwd={worktree_root.resolve()}"))
+            if self.model is not None:
+                command.extend(("--model", self.model))
+        if output_path is not None:
+            assert self.diagnostics_root is not None
             self.diagnostics_root.mkdir(parents=True, exist_ok=True)
-            command.extend(
-                ("--output", str(self.diagnostics_root / f"{attempt_id}.traj.json"))
-            )
+            command.extend(("--output", str(output_path)))
         completed = run_minisweagent(
             command,
             trajectory_path=(
@@ -607,6 +631,8 @@ class MiniSWEAgentProvider:
             env=environment,
             timeout_seconds=self.timeout_seconds,
         )
+        if output_path is not None and output_path.exists():
+            self.session_trajectory = output_path
         if completed.returncode == 0 and self.diagnostics_root is not None:
             trajectory_path = self.diagnostics_root / f"{attempt_id}.traj.json"
             exit_status = _mini_trajectory_exit_status(trajectory_path)

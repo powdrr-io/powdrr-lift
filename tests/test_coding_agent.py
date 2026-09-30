@@ -266,6 +266,38 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     assert environment["MSWEA_CONFIGURED"] == "true"
 
 
+def test_minisweagent_provider_continues_saved_session_on_next_attempt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    diagnostics = tmp_path / "diagnostics"
+    provider = MiniSWEAgentProvider(diagnostics_root=diagnostics)
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        output = Path(command[command.index("--output") + 1])
+        output.write_text(
+            json.dumps(
+                {
+                    "info": {"exit_status": "Submitted"},
+                    "messages": [{"role": "assistant", "content": "done"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, "done\n", "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
+    provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="first")
+    provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="repair")
+
+    assert commands[0][0] == "mini"
+    assert commands[1][1:3] == ["-m", "powdrr_lift.minisweagent_session"]
+    assert commands[1][commands[1].index("--previous") + 1].endswith("first.traj.json")
+    assert commands[1][commands[1].index("--output") + 1].endswith("repair.traj.json")
+
+
 def test_minisweagent_provider_rejects_clean_exit_without_submission(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

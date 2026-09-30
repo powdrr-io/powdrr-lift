@@ -27,6 +27,10 @@ from powdrr_lift.structrr.bootstrap import (
     validate_bootstrap_document,
     validate_bootstrap_sections,
 )
+from powdrr_lift.structrr.candidate_comparison import (
+    CANDIDATE_COMPARISON_SCHEMA_VERSION,
+    compare_candidate_snapshot,
+)
 from powdrr_lift.structrr.intent_lineage import (
     INTENT_LINEAGE_HISTORY_SCHEMA,
     audit_intent_lineage,
@@ -79,6 +83,8 @@ __all__ = [
     "bootstrap_structrr",
     "validate_bootstrap_sections",
     "validate_bootstrap_document",
+    "CANDIDATE_COMPARISON_SCHEMA_VERSION",
+    "compare_candidate_snapshot",
     "ACTIVE_INTENT_SECTION_VERSION",
     "ActiveIntentReference",
     "ActiveIntentResolutionError",

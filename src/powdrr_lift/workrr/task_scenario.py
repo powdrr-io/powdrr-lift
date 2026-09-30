@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -138,9 +137,6 @@ def run_workflow_task_scenario(
         else (shared_repo_root.resolve() if shared_repo_root is not None else None)
     )
     assert repo_root is not None
-    previous_uv_cache_dir = os.environ.get("UV_CACHE_DIR")
-    if temporary is not None:
-        os.environ.setdefault("UV_CACHE_DIR", str(temporary / "uv-cache"))
     workflow_dir = repo_root / "workflow"
     try:
         if fixture_root is not None and not (repo_root / ".git").exists():
@@ -298,10 +294,6 @@ def run_workflow_task_scenario(
             ),
         }
     finally:
-        if previous_uv_cache_dir is None:
-            os.environ.pop("UV_CACHE_DIR", None)
-        else:
-            os.environ["UV_CACHE_DIR"] = previous_uv_cache_dir
         if temporary is not None:
             shutil.rmtree(temporary, ignore_errors=True)
 

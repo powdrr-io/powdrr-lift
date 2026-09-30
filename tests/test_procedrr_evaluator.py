@@ -607,7 +607,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 "product_semantics_present",
             )
         )
-        extraction_values = iter(("thing", "Add"))
 
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
@@ -623,11 +622,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "status": "resolved",
                     "value": next(self.source_values),
                     "reason_code": None,
-                }
-            if "one exact source span" in question:
-                return {
-                    "quote": next(self.extraction_values),
-                    "occurrence": None,
                 }
             if "candidate field" in question:
                 return {
@@ -682,9 +676,11 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         {
                             "clause_id": "instruction-001",
                             "text": "Add a thing",
+                            "source_span": {"start": 0, "end": 10},
                             "fingerprint": "sha256:clause",
                         }
                     ],
+                    "source": {"text": "Add a thing"},
                 }
             if command[0] == "prepare_atomicity_split_requests":
                 return {"split_requests": []}
@@ -696,9 +692,11 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         {
                             "clause_id": "instruction-001",
                             "text": "Add a thing",
+                            "source_span": {"start": 0, "end": 10},
                             "fingerprint": "sha256:clause",
                         }
                     ],
+                    "source": {"text": "Add a thing"},
                 }
             if command[0] == "prepare_source_semantic_decisions":
                 return {
@@ -723,19 +721,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 }
             if command[0] == "bind_source_semantic_decisions":
                 return {"path": "source-decisions.json", "decisions": [1]}
-            if command[0] == "prepare_source_extractions":
-                return {
-                    "requests": [
-                        {
-                            "spec": {
-                                "proposition_text": "Add a thing",
-                                "extraction_kind": kind,
-                            }
-                        }
-                        for kind in ("subject", "behavior")
-                    ]
-                }
-            if command[0] == "bind_source_extractions":
+            if command[0] == "compile_deterministic_source_extractions":
                 return {"path": "source-extractions.json", "extractions": [1, 2]}
             if command[0] == "prepare_behavior_family_decision":
                 return {
@@ -875,7 +861,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 17
+    assert result.llm_activations == 15
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events
@@ -886,7 +872,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         "value": "create",
         "reason_code": None,
     }
-    assert judge_values["source_extraction_result"]["quote"] == "Add"
+    assert "source_extraction_result" not in judge_values
 
 
 @pytest.mark.live_provider

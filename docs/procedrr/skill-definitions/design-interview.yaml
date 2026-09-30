@@ -394,51 +394,10 @@ steps:
             bind: bound_semantic_decisions
         - operation:
             tool: internal
-            command: [prepare_source_extractions]
+            command: [compile_deterministic_source_extractions]
             parameters:
               clause: {type: reference, value: instruction_clause}
               decisions: {type: reference, value: bound_semantic_decisions.decisions}
-            returns:
-              type: object
-              required: [requests]
-              properties:
-                requests: {type: array, minItems: 2, maxItems: 5}
-            bind: source_extraction_plan
-        - for_each:
-            snapshot: {name: source_extraction_plan.requests, max_items: 5}
-            max_parallel: 5
-            item_binding: source_extraction_request
-            collect: {binding: source_extraction_results, mode: list, value: source_extraction_result}
-            body:
-              - judge:
-                  kind: construct_one
-                  provider: planning
-                  question: Copy only the one exact source span specified in this extraction request.
-                  subject: source_extraction_request.spec.proposition_text
-                  prompt_system: Return only the declared JSON object.
-                  instructions:
-                    - Follow the request's question and instructions exactly.
-                    - quote must be a non-empty, case-sensitive, exact substring of the proposition.
-                    - occurrence is one-based when the same quote occurs more than once; otherwise return null.
-                    - Never paraphrase, normalize, explain, or return IDs, spans, fingerprints, or extra fields.
-                  context: [source_extraction_request]
-                  output:
-                    name: source_extraction_result
-                    schema:
-                      type: object
-                      required: [quote, occurrence]
-                      additionalProperties: false
-                      properties:
-                        quote: {type: string, minLength: 1, maxLength: 500}
-                        occurrence: {type: [integer, 'null'], minimum: 1}
-                  validation: {kind: json_schema}
-        - operation:
-            tool: internal
-            command: [bind_source_extractions]
-            parameters:
-              clause: {type: reference, value: instruction_clause}
-              requests: {type: reference, value: source_extraction_plan.requests}
-              results: {type: reference, value: source_extraction_results}
             returns:
               type: object
               required: [path, extractions]

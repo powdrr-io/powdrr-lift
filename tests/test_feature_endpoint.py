@@ -1738,7 +1738,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                 "product_semantics_present",
             )
         )
-        extraction_values = iter(("feature", "Add"))
 
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
@@ -1754,11 +1753,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                     "status": "resolved",
                     "value": next(self.source_values),
                     "reason_code": None,
-                }
-            if "one exact source span" in question:
-                return {
-                    "quote": next(self.extraction_values),
-                    "occurrence": None,
                 }
             if "one registered behavior family" in question:
                 return {
@@ -1838,8 +1832,11 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     assert json.loads(partial.read_text())["proposition_text"] == "Add the feature."
     canonical = json.loads((tmp_path / "canonical-feature-design.json").read_text())
     projection = canonical["projections"][0]
-    assert projection["description"] == "feature Add."
-    assert projection["expected_test"] == "Test Add for feature."
+    assert projection["description"] == "Add the feature."
+    assert (
+        projection["expected_test"]
+        == "Test the requested behavior in the source clause: Add the feature."
+    )
     assumptions = json.loads((tmp_path / "normative-assumptions.json").read_text())
     assert assumptions == {
         "assumptions": [],

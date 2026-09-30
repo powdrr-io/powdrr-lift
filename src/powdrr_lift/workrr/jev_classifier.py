@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
+import uuid
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
@@ -47,19 +50,66 @@ class JevSemanticClassifierClient:
         *,
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        request_id = uuid.uuid4().hex
+        endpoint_host = urlsplit(self._endpoint).hostname or "unknown"
         request_data = _classifier_request(messages, response_schema)
-        if not self._api_key or request_data is None:
+        if not self._api_key:
+            LOGGER.warning(
+                "JEV_CALL_SKIPPED "
+                "request_id=%s reason=missing_api_key endpoint_host=%s",
+                request_id,
+                endpoint_host,
+            )
             return _fallback(self._fallback, messages, response_schema)
+        if request_data is None:
+            LOGGER.warning(
+                "JEV_CALL_SKIPPED "
+                "request_id=%s reason=unsupported_request endpoint_host=%s",
+                request_id,
+                endpoint_host,
+            )
+            return _fallback(self._fallback, messages, response_schema)
+
+        started_at = time.monotonic()
+        LOGGER.warning(
+            "JEV_REQUEST_STARTED request_id=%s endpoint_host=%s model=%s",
+            request_id,
+            endpoint_host,
+            JEV_MODEL,
+        )
+        phase = "request"
         try:
             answer = _call_jev(request_data, self._api_key, self._endpoint)
-            choice = answer.get("choice")
-            return _format_classifier_result(choice, request_data, response_schema)
-        except Exception:  # noqa: BLE001 - Jev is an optional classifier provider.
             LOGGER.warning(
-                "Jev request failed; using configured classifier fallback",
-                exc_info=True,
+                "JEV_RESPONSE_RECEIVED request_id=%s endpoint_host=%s duration_ms=%d",
+                request_id,
+                endpoint_host,
+                round((time.monotonic() - started_at) * 1000),
             )
-        return _fallback(self._fallback, messages, response_schema)
+            phase = "response_mapping"
+            choice = answer.get("choice")
+            result = _format_classifier_result(choice, request_data, response_schema)
+        except Exception as exc:  # noqa: BLE001
+            # Jev is an optional classifier provider.
+            http_status = getattr(exc, "code", "none")
+            LOGGER.warning(
+                "JEV_FALLBACK request_id=%s endpoint_host=%s phase=%s "
+                "error_type=%s http_status=%s duration_ms=%d",
+                request_id,
+                endpoint_host,
+                phase,
+                type(exc).__name__,
+                http_status,
+                round((time.monotonic() - started_at) * 1000),
+            )
+            return _fallback(self._fallback, messages, response_schema)
+        LOGGER.warning(
+            "JEV_RESULT_ACCEPTED request_id=%s endpoint_host=%s duration_ms=%d",
+            request_id,
+            endpoint_host,
+            round((time.monotonic() - started_at) * 1000),
+        )
+        return result
 
 
 def _fallback(

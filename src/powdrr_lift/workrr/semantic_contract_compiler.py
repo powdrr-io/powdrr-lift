@@ -903,11 +903,9 @@ def bind_source_semantic_decisions(
     resolved_decisions: Sequence[Mapping[str, Any]],
     pending_specs: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
-    clarification_policy: str = "ask",
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> list[SemanticDecision]:
-    if clarification_policy not in {"ask", "normative_defaults"}:
-        raise SemanticContractError("clarification policy is invalid")
     if len(pending_specs) != len(provider_results):
         raise SemanticContractError("semantic classifier result count is invalid")
     decisions = [SemanticDecision.from_data(item) for item in resolved_decisions]
@@ -950,7 +948,7 @@ def bind_source_semantic_decisions(
                 *evidence_refs,
                 "fallback:include-without-product-kind:invariant",
             )
-        if clarification_policy == "normative_defaults":
+        if benchmark_mode:
             fallback = _normative_source_decision_default(spec, decisions)
             if (
                 not result_is_resolved or result_conflicts_with_route
@@ -1176,11 +1174,9 @@ def bind_source_extractions(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
-    clarification_policy: str = "ask",
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> list[BoundSourceExtraction]:
-    if clarification_policy not in {"ask", "normative_defaults"}:
-        raise SemanticContractError("clarification policy is invalid")
     if len(requests) != len(provider_results):
         raise SemanticContractError("source extraction result count is invalid")
     timestamp = created_at or _created_at()
@@ -1197,7 +1193,7 @@ def bind_source_extractions(
                 created_at=timestamp,
             )
         except (SemanticContractError, TypeError, AttributeError):
-            if clarification_policy != "normative_defaults":
+            if not benchmark_mode:
                 raise
             # The whole clause is an exact, unambiguous quote even when the
             # model cannot isolate a narrower subject/behavior phrase. Keeping
@@ -1277,7 +1273,7 @@ def bind_behavior_family_decision(
     request: Mapping[str, Any],
     provider_result: Mapping[str, Any],
     *,
-    clarification_policy: str = "ask",
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> SemanticDecision:
     spec_raw = request.get("spec")
@@ -1302,9 +1298,7 @@ def bind_behavior_family_decision(
         and provider_result.get("reason_code") is None
         and set(provider_result).issubset({"status", "value", "reason_code"})
     )
-    use_generic_family = (
-        clarification_policy == "normative_defaults" and not family_result_is_valid
-    )
+    use_generic_family = benchmark_mode and not family_result_is_valid
     use_source_predicate_fallback = (
         request.get("fallback_to_other_if_unresolved") is True
         and provider_result.get("status") == "unresolved"
@@ -1313,7 +1307,7 @@ def bind_behavior_family_decision(
         use_generic_family or use_source_predicate_fallback
     ) and "other" in family_values:
         evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
-        if clarification_policy == "normative_defaults":
+        if benchmark_mode:
             evidence_refs = (*evidence_refs, "normative-default:behavior_family:other")
         return spec.bind(
             provider=SemanticDecisionProvider(kind="deterministic-rule"),
@@ -1390,13 +1384,13 @@ def bind_field_entailment_reviews(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
-    clarification_policy: str = "ask",
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> list[FieldEntailmentReview]:
     return bind_field_reviews(
         requests=requests,
         provider_results=provider_results,
-        clarification_policy=clarification_policy,
+        benchmark_mode=benchmark_mode,
         created_at=created_at or _created_at(),
     )
 

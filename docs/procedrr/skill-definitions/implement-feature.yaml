@@ -9,7 +9,7 @@ description: >-
 inputs:
   - {name: feature_description, type: string, required: true}
   - {name: work_item_name, type: string, required: true}
-  - {name: clarification_policy, type: string, required: true}
+  - {name: benchmark_mode, type: boolean, required: true}
 steps:
   - operation:
       tool: internal
@@ -31,7 +31,7 @@ steps:
       inputs:
         work_item_name: {type: reference, value: work_item_name}
         feature_description: {type: reference, value: feature_description}
-        clarification_policy: {type: reference, value: clarification_policy}
+        benchmark_mode: {type: reference, value: benchmark_mode}
       outputs:
         feature_design: feature_design
         feature_obligations: feature_design

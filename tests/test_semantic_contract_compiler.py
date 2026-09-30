@@ -209,7 +209,7 @@ def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> Non
         resolved_decisions=child_plan["resolved_decisions"],
         pending_specs=child_plan["pending_specs"],
         provider_results=results,
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     by_kind = {item.decision_kind: item for item in decisions}
@@ -246,7 +246,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
         provider_results=[
             {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     assert root[0].result.value == "include"
@@ -262,7 +262,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
             {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
             for _ in decision_plan["pending_specs"]
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     by_kind = {item.decision_kind: item for item in decisions}
@@ -286,7 +286,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
         provider_results=[
             {"status": "resolved", "value": "context", "reason_code": None}
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     assert (
@@ -300,7 +300,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
     extractions = bind_source_extractions(
         requests=extraction_requests,
         provider_results=[{} for _ in extraction_requests],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     family_request = prepare_behavior_family_decision(
@@ -311,7 +311,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
     family = bind_behavior_family_decision(
         family_request,
         {"status": "unresolved", "value": None, "reason_code": "no_candidate"},
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     contract = compile_source_contract(
@@ -335,7 +335,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
             {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
             for _ in review_requests
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     assert finalize_source_faithfulness(contract, reviews).accepted
@@ -898,7 +898,6 @@ def test_benchmark_source_faithfulness_failure_becomes_source_invariant(
     runtime = FeatureCommandRuntime(
         config=SimpleNamespace(
             benchmark_mode=True,
-            clarification_policy="normative_defaults",
             design_only=False,
             capture_worker_prompts_only=False,
         ),
@@ -951,7 +950,6 @@ def test_benchmark_unresolved_scenario_becomes_source_invariant(
     runtime = FeatureCommandRuntime(
         config=SimpleNamespace(
             benchmark_mode=True,
-            clarification_policy="normative_defaults",
             design_only=False,
             capture_worker_prompts_only=False,
         ),

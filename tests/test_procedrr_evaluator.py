@@ -871,7 +871,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         {
             "work_item_name": "demo",
             "feature_description": "Add a thing",
-            "clarification_policy": "ask",
+            "benchmark_mode": False,
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"

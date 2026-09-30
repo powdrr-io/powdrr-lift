@@ -17,7 +17,7 @@ evaluation command at it and the local DeepSWE task directory:
   --ae POWDRR_OUTPUT_ROOT=/tmp/state-data-design-run \
   --artifact /tmp/state-data-design-run
 
-uv run powdrr-lift evaluate-deepswe-design \
+uv run python -m science.deepswe.design_evaluation_cli design \
   --task-dir /path/to/deep-swe/tasks/python-statemachine-state-data-scoping \
   --run-dir /tmp/state-data-design-run \
   --report /tmp/state-data-design-run/design-quality-evaluation.json
@@ -49,7 +49,7 @@ compiler as a regular run; it does not hand the prompt to a worker.
 Evaluate the captured prompts after generation:
 
 ```bash
-uv run powdrr-lift evaluate-deepswe-prompt \
+uv run python -m science.deepswe.design_evaluation_cli prompt \
   --task-dir /path/to/deep-swe/tasks/python-statemachine-state-data-scoping \
   --run-dir /tmp/state-data-design-run \
   --report /tmp/state-data-design-run/prompt-quality-evaluation.json

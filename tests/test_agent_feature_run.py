@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from powdrr_lift.workrr.feature_run import (
+from scripts.agent_feature_e2e import (
     AgentFeatureRunConfig,
     _run_with_inactivity_timeout,
     run_agent_feature_e2e,

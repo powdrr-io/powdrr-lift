@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from powdrr_lift.workrr.error_analysis import (
+from scripts.workflow_error_analysis import (
     cluster_workflow_errors,
     load_workflow_error_records,
     promote_replay_candidates,

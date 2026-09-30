@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import difflib
 import json
 import os
 import re
@@ -169,38 +168,18 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationRunner,
     parse_validation_profile,
 )
-from powdrr_lift.workrr.deepswe_design_evaluation import (
-    DEFAULT_STATE_DATA_RUBRIC,
-    DeepSWEEvaluationError,
-    evaluate_deepswe_design,
-    evaluate_deepswe_worker_prompt,
-)
 from powdrr_lift.workrr.definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
 )
-from powdrr_lift.workrr.definition_prompts import render_skill_prompt_snapshots
 from powdrr_lift.workrr.differential_verification import (
     classify_differential_result,
     detect_verifier_changes,
-)
-from powdrr_lift.workrr.error_analysis import (
-    WorkflowErrorAnalysisError,
-    cluster_workflow_errors,
-    load_workflow_error_records,
-    promote_replay_candidates,
-    workflow_error_analysis_data,
 )
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     run_feature_endpoint,
     run_feature_in_place,
-)
-from powdrr_lift.workrr.feature_run import (
-    DEFAULT_FEATURE_NAME,
-    DEFAULT_FEATURE_REQUEST,
-    AgentFeatureRunConfig,
-    run_agent_feature_e2e,
 )
 from powdrr_lift.workrr.git import (
     WorkflowGitState,
@@ -239,7 +218,6 @@ from powdrr_lift.workrr.replay import (
 )
 from powdrr_lift.workrr.scenario import (
     WorkflowScenarioError,
-    extract_scripted_responses,
     extract_scripted_responses_from_report,
     load_workflow_scenario,
     run_workflow_scenario,
@@ -1194,23 +1172,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     openai_proxy_parser.set_defaults(func=_run_openai_proxy)
 
-    llm_diff_parser = subparsers.add_parser(
-        "llm-diff",
-        aliases=["llm_diff"],
-        help="Show the differences between two recorded llm-*.json exchanges.",
-    )
-    llm_diff_parser.add_argument(
-        "first_file",
-        type=Path,
-        help="Earlier or reference llm-*.json exchange file.",
-    )
-    llm_diff_parser.add_argument(
-        "second_file",
-        type=Path,
-        help="Later or changed llm-*.json exchange file.",
-    )
-    llm_diff_parser.set_defaults(func=_run_llm_diff)
-
     workflow_replay_parser = subparsers.add_parser(
         "workflow-replay",
         aliases=["workflow_replay"],
@@ -1334,44 +1295,6 @@ def build_parser() -> argparse.ArgumentParser:
     scenario_suite_parser.add_argument("--report", type=Path)
     scenario_suite_parser.add_argument("--json", action="store_true")
     scenario_suite_parser.set_defaults(func=_run_workflow_scenario_suite)
-
-    agent_feature_parser = subparsers.add_parser(
-        "agent-feature-e2e",
-        help=(
-            "Prompt the live Powdrr agent to specify and implement a feature, "
-            "run its generated workflows, and verify the resulting artifacts."
-        ),
-    )
-    agent_feature_parser.add_argument("--repo-root", type=Path)
-    agent_feature_parser.add_argument("--feature-name", default=DEFAULT_FEATURE_NAME)
-    agent_feature_parser.add_argument(
-        "--feature-request", default=DEFAULT_FEATURE_REQUEST
-    )
-    agent_feature_parser.add_argument(
-        "--answer", action="append", default=[], help="Answer a live agent follow-up."
-    )
-    agent_feature_parser.add_argument(
-        "--provider",
-        choices=["auto", *ALL_PROVIDERS],
-        default="deepinfra-cheap",
-        help="LLM provider for every live phase (default: deepinfra-cheap).",
-    )
-    agent_feature_parser.add_argument("--max-turns", type=int, default=40)
-    agent_feature_parser.add_argument("--workflow-roundtrips", type=int, default=128)
-    agent_feature_parser.add_argument("--start-iterations", type=int, default=10)
-    agent_feature_parser.add_argument(
-        "--phase-timeout",
-        type=float,
-        default=None,
-        help=(
-            "Optional maximum seconds without semantic phase progress before "
-            "stopping it (default: no timeout; resets on progress)."
-        ),
-    )
-    agent_feature_parser.add_argument("--report", type=Path)
-    agent_feature_parser.add_argument("--transcript-dir", type=Path)
-    agent_feature_parser.add_argument("--json", action="store_true")
-    agent_feature_parser.set_defaults(func=_run_agent_feature_e2e)
 
     workrr_feature_parser = subparsers.add_parser(
         "workrr-feature",
@@ -1517,60 +1440,6 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument("--json", action="store_true")
     harbor_feature_parser.set_defaults(func=_run_harbor_feature)
 
-    deepswe_design_eval_parser = subparsers.add_parser(
-        "evaluate-deepswe-design",
-        help=(
-            "Evaluate a design-only run against a DeepSWE reference solution "
-            "and verifier tests."
-        ),
-    )
-    deepswe_design_eval_parser.add_argument("--task-dir", required=True, type=Path)
-    deepswe_design_eval_parser.add_argument("--run-dir", required=True, type=Path)
-    deepswe_design_eval_parser.add_argument(
-        "--rubric", type=Path, default=DEFAULT_STATE_DATA_RUBRIC
-    )
-    deepswe_design_eval_parser.add_argument("--report", type=Path)
-    deepswe_design_eval_parser.add_argument(
-        "--judge-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
-    )
-    deepswe_design_eval_parser.add_argument("--judge-model")
-    deepswe_design_eval_parser.add_argument("--judge-api-key")
-    deepswe_design_eval_parser.add_argument("--judge-base-url")
-    deepswe_design_eval_parser.add_argument("--json", action="store_true")
-    deepswe_design_eval_parser.set_defaults(func=_run_deepswe_design_evaluation)
-
-    deepswe_prompt_eval_parser = subparsers.add_parser(
-        "evaluate-deepswe-prompt",
-        help=(
-            "Evaluate captured worker prompts against a DeepSWE reference "
-            "solution and verifier tests."
-        ),
-    )
-    deepswe_prompt_eval_parser.add_argument("--task-dir", required=True, type=Path)
-    deepswe_prompt_eval_parser.add_argument("--run-dir", required=True, type=Path)
-    deepswe_prompt_eval_parser.add_argument(
-        "--rubric", type=Path, default=DEFAULT_STATE_DATA_RUBRIC
-    )
-    deepswe_prompt_eval_parser.add_argument("--report", type=Path)
-    deepswe_prompt_eval_parser.add_argument(
-        "--judge-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
-    )
-    deepswe_prompt_eval_parser.add_argument("--judge-model")
-    deepswe_prompt_eval_parser.add_argument("--judge-api-key")
-    deepswe_prompt_eval_parser.add_argument("--judge-base-url")
-    deepswe_prompt_eval_parser.add_argument("--json", action="store_true")
-    deepswe_prompt_eval_parser.set_defaults(func=_run_deepswe_prompt_evaluation)
-
-    extract_responses_parser = subparsers.add_parser(
-        "extract-workflow-responses",
-        help=(
-            "Convert a live workflow scenario report into a scripted response fixture."
-        ),
-    )
-    extract_responses_parser.add_argument("--report", required=True, type=Path)
-    extract_responses_parser.add_argument("--output", required=True, type=Path)
-    extract_responses_parser.set_defaults(func=_extract_workflow_responses)
-
     definition_validation_parser = subparsers.add_parser(
         "validate-workflow-definition",
         aliases=["validate_workflow_definition"],
@@ -1601,40 +1470,6 @@ def build_parser() -> argparse.ArgumentParser:
     definitions_validation_parser.add_argument("--warning-budget", type=Path)
     definitions_validation_parser.add_argument("--warning-report", type=Path)
     definitions_validation_parser.set_defaults(func=_run_validate_workflow_definitions)
-
-    prompt_snapshot_parser = subparsers.add_parser(
-        "render-workflow-prompts",
-        aliases=["render_workflow_prompts"],
-        help="Render normalized production prompt snapshots for every skill step.",
-    )
-    prompt_snapshot_parser.add_argument("--definition", required=True, type=Path)
-    prompt_snapshot_parser.add_argument("--output-dir", required=True, type=Path)
-    prompt_snapshot_parser.add_argument("--repo-root", type=Path)
-    prompt_snapshot_parser.set_defaults(func=_run_render_workflow_prompts)
-
-    error_analysis_parser = subparsers.add_parser(
-        "analyze-workflow-errors",
-        aliases=["analyze_workflow_errors"],
-        help="Cluster workflow LLM errors and optionally promote replay candidates.",
-    )
-    error_analysis_parser.add_argument(
-        "--error-log",
-        type=Path,
-        action="append",
-        required=True,
-        help="Workflow LLM error JSONL file; repeat to analyze multiple logs.",
-    )
-    error_analysis_parser.add_argument("--repo-root", type=Path)
-    error_analysis_parser.add_argument(
-        "--replay-output-dir",
-        type=Path,
-        help="Optional destination for representative draft replay bundles.",
-    )
-    error_analysis_parser.add_argument(
-        "--limit", type=int, help="Maximum ranked clusters to promote."
-    )
-    error_analysis_parser.add_argument("--json", action="store_true")
-    error_analysis_parser.set_defaults(func=_run_analyze_workflow_errors)
 
     ambiguity_review_parser = subparsers.add_parser(
         "review-workflow-ambiguity",
@@ -4331,31 +4166,6 @@ def _run_openai_proxy(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_llm_diff(args: argparse.Namespace) -> int:
-    try:
-        first = _read_llm_exchange(args.first_file)
-        second = _read_llm_exchange(args.second_file)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        print(f"llm-diff: {exc}", file=sys.stderr)
-        return 2
-
-    first_text = json.dumps(first, ensure_ascii=False, indent=2, sort_keys=True)
-    second_text = json.dumps(second, ensure_ascii=False, indent=2, sort_keys=True)
-    diff = difflib.unified_diff(
-        first_text.splitlines(),
-        second_text.splitlines(),
-        fromfile=str(args.first_file),
-        tofile=str(args.second_file),
-        lineterm="",
-    )
-    output = "\n".join(diff)
-    if output:
-        sys.stdout.write(output + "\n")
-    else:
-        print("No differences.")
-    return 0
-
-
 def _run_workflow_replay(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     try:
@@ -4568,33 +4378,6 @@ def _run_workflow_scenario_suite(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
-def _run_agent_feature_e2e(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    result = run_agent_feature_e2e(
-        AgentFeatureRunConfig(
-            repo_root=repo_root,
-            feature_request=args.feature_request,
-            feature_name=args.feature_name,
-            answers=tuple(args.answer),
-            max_turns=args.max_turns,
-            workflow_roundtrips=args.workflow_roundtrips,
-            start_iterations=args.start_iterations,
-            phase_timeout=args.phase_timeout,
-            provider=args.provider,
-            report_path=args.report or Path(".powdrr/agent-feature-run/report.json"),
-            transcript_dir=args.transcript_dir
-            or Path(".powdrr/agent-feature-run/transcripts"),
-        )
-    )
-    if args.json:
-        print(json.dumps(result.to_data(), indent=2, ensure_ascii=False))
-    else:
-        print(f"Agent feature run {result.status}; report: {result.report_path}")
-        for phase in result.phases:
-            print(f"{phase['name']}: returncode={phase['returncode']}")
-    return 0 if result.status == "passed" else 1
-
-
 def _run_workrr_feature(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     planning_provider = resolve_workflow_provider(args.planning_provider)
@@ -4732,110 +4515,6 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
     )
 
 
-def _run_deepswe_design_evaluation(args: argparse.Namespace) -> int:
-    provider = resolve_workflow_provider(args.judge_provider)
-    mapping = default_llm_mappings(provider)["standard_reasoning"]
-    try:
-        credentials = resolve_provider_credentials(
-            mapping.provider,
-            args.judge_api_key,
-            args.judge_base_url,
-        )
-        model = args.judge_model or mapping.model
-        judge = build_workflow_client(
-            credentials,
-            model=model,
-            model_cache_dir=args.run_dir / ".models",
-            progress_stream=sys.stderr,
-        )
-        report = evaluate_deepswe_design(
-            task_dir=args.task_dir,
-            run_dir=args.run_dir,
-            judge=judge,
-            rubric_path=args.rubric,
-            judge_id=f"{mapping.provider}/{model}",
-        )
-    except (DeepSWEEvaluationError, PowdrrExecutionError) as error:
-        print(f"DeepSWE design evaluation failed: {error}", file=sys.stderr)
-        return 1
-    report_path = args.report or args.run_dir / "design-quality-evaluation.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(
-        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    if args.json:
-        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
-    else:
-        summary = report["summary"]
-        print(
-            f"DeepSWE design evaluation {report['task_id']}: "
-            f"{summary['supported_count']}/{summary['criterion_count']} supported; "
-            f"weighted coverage {summary['weighted_coverage']:.1%}; "
-            f"critical failures {len(summary['critical_failures'])}."
-        )
-        print(f"Report: {report_path}")
-    return 0 if report["summary"]["passed"] else 1
-
-
-def _run_deepswe_prompt_evaluation(args: argparse.Namespace) -> int:
-    provider = resolve_workflow_provider(args.judge_provider)
-    mapping = default_llm_mappings(provider)["standard_reasoning"]
-    try:
-        credentials = resolve_provider_credentials(
-            mapping.provider,
-            args.judge_api_key,
-            args.judge_base_url,
-        )
-        model = args.judge_model or mapping.model
-        judge = build_workflow_client(
-            credentials,
-            model=model,
-            model_cache_dir=args.run_dir / ".models",
-            progress_stream=sys.stderr,
-        )
-        report = evaluate_deepswe_worker_prompt(
-            task_dir=args.task_dir,
-            run_dir=args.run_dir,
-            judge=judge,
-            rubric_path=args.rubric,
-            judge_id=f"{mapping.provider}/{model}",
-        )
-    except (DeepSWEEvaluationError, PowdrrExecutionError) as error:
-        print(f"DeepSWE prompt evaluation failed: {error}", file=sys.stderr)
-        return 1
-    report_path = args.report or args.run_dir / "prompt-quality-evaluation.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(
-        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    if args.json:
-        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
-    else:
-        summary = report["summary"]
-        print(
-            f"DeepSWE worker-prompt evaluation {report['task_id']}: "
-            f"{summary['supported_count']}/{summary['criterion_count']} supported; "
-            f"weighted coverage {summary['weighted_coverage']:.1%}; "
-            f"critical failures {len(summary['critical_failures'])}."
-        )
-        print(f"Report: {report_path}")
-    return 0 if report["summary"]["passed"] else 1
-
-
-def _extract_workflow_responses(args: argparse.Namespace) -> int:
-    try:
-        responses = extract_scripted_responses(args.report)
-    except WorkflowScenarioError as exc:
-        print(f"Could not extract workflow responses: {exc}", file=sys.stderr)
-        return 1
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(yaml.safe_dump(responses, sort_keys=False), encoding="utf-8")
-    print(f"Wrote {len(responses)} scripted responses to {args.output}")
-    return 0
-
-
 def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
     report = analyze_workflow_definition(args.definition)
     data = report.to_data()
@@ -4902,61 +4581,6 @@ def _run_validate_delivery_profile(args: argparse.Namespace) -> int:
         for issue in report.issues:
             print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
     return 0 if report.validation_successful else 1
-
-
-def _run_render_workflow_prompts(args: argparse.Namespace) -> int:
-    paths = render_skill_prompt_snapshots(
-        args.definition,
-        output_dir=args.output_dir,
-        repo_root=args.repo_root,
-    )
-    for path in paths:
-        print(path)
-    return 0
-
-
-def _run_analyze_workflow_errors(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    error_paths = tuple(
-        path if path.is_absolute() else repo_root / path for path in args.error_log
-    )
-    try:
-        records = load_workflow_error_records(error_paths)
-        clusters = cluster_workflow_errors(records)
-        candidates: Sequence[Mapping[str, Any]] = ()
-        if args.replay_output_dir is not None:
-            output_dir = (
-                args.replay_output_dir
-                if args.replay_output_dir.is_absolute()
-                else repo_root / args.replay_output_dir
-            )
-            candidates = promote_replay_candidates(
-                clusters,
-                repo_root=repo_root,
-                output_dir=output_dir,
-                limit=args.limit,
-            )
-    except WorkflowErrorAnalysisError as exc:
-        print(f"Workflow error analysis failed: {exc}", file=sys.stderr)
-        return 1
-    data = workflow_error_analysis_data(
-        clusters, record_count=len(records), candidates=candidates
-    )
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        print(f"Workflow errors: {len(records)} records in {len(clusters)} clusters")
-        for cluster in clusters:
-            location = " / ".join(
-                value
-                for value in (cluster.skill_or_task, cluster.step, cluster.action)
-                if value
-            )
-            print(
-                f"{cluster.count}x (rank {cluster.rank}) {location or '<unknown>'}: "
-                f"{cluster.error_summary or cluster.error_type or 'unknown error'}"
-            )
-    return 0
 
 
 def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
@@ -5160,17 +4784,6 @@ def _run_tune_workflow(args: argparse.Namespace) -> int:
         print(f"Workflow tuning {report['status']}: {report['definition']}")
         print(f"Report: {report_path}")
     return 0 if report["status"] == "passed" else 1
-
-
-def _read_llm_exchange(path: Path) -> object:
-    try:
-        exchange = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"{path}: invalid JSON: {exc.msg}") from exc
-
-    if not isinstance(exchange, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return exchange
 
 
 def _run_download_qwen_model(args: argparse.Namespace) -> int:

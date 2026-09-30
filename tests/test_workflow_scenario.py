@@ -36,8 +36,8 @@ def test_extract_scripted_responses_supports_live_report_shapes(tmp_path: Path) 
     ]
 
 
-def test_cli_extract_workflow_responses_writes_fixture(tmp_path: Path) -> None:
-    from powdrr_lift.cli import main
+def test_extract_workflow_responses_script_writes_fixture(tmp_path: Path) -> None:
+    from scripts.extract_workflow_responses import main
 
     report = tmp_path / "report.json"
     report.write_text(
@@ -45,18 +45,7 @@ def test_cli_extract_workflow_responses_writes_fixture(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     output = tmp_path / "responses.yaml"
-    assert (
-        main(
-            [
-                "extract-workflow-responses",
-                "--report",
-                str(report),
-                "--output",
-                str(output),
-            ]
-        )
-        == 0
-    )
+    assert main(["--report", str(report), "--output", str(output)]) == 0
     assert "action: next_step" in output.read_text(encoding="utf-8")
 
 

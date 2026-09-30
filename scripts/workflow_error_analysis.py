@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import re
+import sys
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -17,6 +19,58 @@ from powdrr_lift.workrr.replay import (
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
 )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Cluster captured workflow errors and optionally write replay drafts."""
+    from powdrr_lift.core import resolve_repo_root
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--error-log", type=Path, action="append", required=True)
+    parser.add_argument("--repo-root", type=Path)
+    parser.add_argument("--replay-output-dir", type=Path)
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    repo_root = resolve_repo_root(args.repo_root)
+    error_paths = tuple(
+        path if path.is_absolute() else repo_root / path for path in args.error_log
+    )
+    try:
+        records = load_workflow_error_records(error_paths)
+        clusters = cluster_workflow_errors(records)
+        candidates: Sequence[Mapping[str, Any]] = ()
+        if args.replay_output_dir is not None:
+            output_dir = (
+                args.replay_output_dir
+                if args.replay_output_dir.is_absolute()
+                else repo_root / args.replay_output_dir
+            )
+            candidates = promote_replay_candidates(
+                clusters, repo_root=repo_root, output_dir=output_dir, limit=args.limit
+            )
+    except WorkflowErrorAnalysisError as exc:
+        print(f"Workflow error analysis failed: {exc}", file=sys.stderr)
+        return 1
+    data = workflow_error_analysis_data(
+        clusters, record_count=len(records), candidates=candidates
+    )
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(f"Workflow errors: {len(records)} records in {len(clusters)} clusters")
+        for cluster in clusters:
+            location = " / ".join(
+                value
+                for value in (cluster.skill_or_task, cluster.step, cluster.action)
+                if value
+            )
+            print(
+                f"{cluster.count}x (rank {cluster.rank}) {location or '<unknown>'}: "
+                f"{cluster.error_summary or cluster.error_type or 'unknown error'}"
+            )
+    return 0
+
 
 _VOLATILE_VALUE = re.compile(
     r"(?:\b\d{2,}\b|[0-9a-f]{8,}|/[^\s'\"]+|\"[^\"]{20,}\")",
@@ -254,3 +308,7 @@ def _first_text(*values: Any) -> str | None:
 
 def _optional_text(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

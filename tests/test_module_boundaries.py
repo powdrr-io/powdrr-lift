@@ -139,7 +139,8 @@ def test_workrr_protocol_package_has_no_definition_or_execution_imports() -> Non
 
 def test_workflow_implementations_are_not_stranded_at_package_root() -> None:
     assert not tuple(SOURCE_ROOT.glob("workflow_*.py"))
-    assert not (SOURCE_ROOT / "agent_feature_run.py").exists()
+    assert not (SOURCE_ROOT / "workrr" / "feature_run.py").exists()
+    assert not (SOURCE_ROOT / "workrr" / "error_analysis.py").exists()
 
 
 def test_core_does_not_reexport_process_language() -> None:

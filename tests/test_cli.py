@@ -331,6 +331,8 @@ def test_staging_generated_directory_emits_each_file(
 
 
 def test_cli_llm_diff_shows_json_changes(tmp_path: Path) -> None:
+    from scripts.llm_exchange_diff import main as llm_diff_main
+
     first_path = tmp_path / "llm-first.json"
     second_path = tmp_path / "llm-second.json"
     first_path.write_text(
@@ -356,7 +358,7 @@ def test_cli_llm_diff_shows_json_changes(tmp_path: Path) -> None:
 
     stdout = io.StringIO()
     with redirect_stdout(stdout):
-        assert main(["llm-diff", str(first_path), str(second_path)]) == 0
+        assert llm_diff_main([str(first_path), str(second_path)]) == 0
 
     diff = stdout.getvalue()
     assert f"--- {first_path}" in diff
@@ -368,6 +370,8 @@ def test_cli_llm_diff_shows_json_changes(tmp_path: Path) -> None:
 
 
 def test_cli_llm_diff_reports_invalid_json(tmp_path: Path) -> None:
+    from scripts.llm_exchange_diff import main as llm_diff_main
+
     invalid_path = tmp_path / "llm-invalid.json"
     valid_path = tmp_path / "llm-valid.json"
     invalid_path.write_text("not json", encoding="utf-8")
@@ -375,7 +379,7 @@ def test_cli_llm_diff_reports_invalid_json(tmp_path: Path) -> None:
     stderr = io.StringIO()
 
     with redirect_stderr(stderr):
-        assert main(["llm-diff", str(invalid_path), str(valid_path)]) == 2
+        assert llm_diff_main([str(invalid_path), str(valid_path)]) == 2
 
     assert "invalid JSON" in stderr.getvalue()
 

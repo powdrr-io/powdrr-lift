@@ -1,4 +1,8 @@
-"""Compare a DeepSWE design-only run with task-grounded behavior references."""
+"""Offline evaluator for DeepSWE design and captured worker prompts.
+
+This analysis tool reads benchmark reference patches after a run has finished.
+Keep it outside the Powdrr runtime package and CLI.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +17,7 @@ from typing import Any, Protocol
 import yaml
 
 DEFAULT_STATE_DATA_RUBRIC = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[2]
     / "docs"
     / "evaluations"
     / "deepswe-python-statemachine-state-data.yaml"

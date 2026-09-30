@@ -296,12 +296,13 @@ steps:
                   prompt_system: Return only the declared JSON object.
                   instructions:
                     - Follow the request's question, instructions, and allowed_values exactly.
+                    - Use the complete instruction ledger to distinguish a report of current behavior or a problem statement from requested target behavior. When a sibling clause explicitly specifies the correction to a described limitation, keep the limitation as context and route the corrective clause as product work; do not turn the existing defect into a requirement to preserve it.
                     - This is the root of a decision tree. Choose include for product behavior, interfaces, invariants, entity definitions, or implementation guidance; include_prohibition for explicit product prohibitions; exclude for process instructions or background with no implementation obligation; unclear when meaning or route cannot be determined without guessing. A required rejection, exception, or error for invalid input is product behavior and must route to include, not include_prohibition.
                     - Do not classify detailed product kind, polarity, strength, scope, behavior family, or validation oracle here.
                     - Return resolved with exactly one allowed value when the source supports it.
                     - Return unresolved with a closed reason_code when the source does not support one value.
                     - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.
-                  context: [root_decision_request]
+                  context: [root_decision_request, atomic_instruction_ledger]
                   output:
                     name: root_decision_result
                     schema:

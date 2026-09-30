@@ -678,6 +678,14 @@ def test_design_interview_uses_single_field_source_classification() -> None:
 
     assert classifier_loop["snapshot"]["max_items"] == 16
     assert root_judge["question"].startswith("Decide how the pipeline should route")
+    assert root_judge["context"] == [
+        "root_decision_request",
+        "atomic_instruction_ledger",
+    ]
+    assert any(
+        "distinguish a report of current behavior" in instruction
+        for instruction in root_judge["instructions"]
+    )
     assert dependent_operation["command"] == [
         "prepare_dependent_source_semantic_decisions"
     ]

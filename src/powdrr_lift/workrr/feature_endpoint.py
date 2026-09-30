@@ -167,6 +167,7 @@ class FeatureEndpointResult:
     task_id: str | None = None
     failure: RunFailure | None = None
     prompt_path: Path | None = None
+    structrr_diff_path: Path | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -189,6 +190,9 @@ class FeatureEndpointResult:
             "task_id": self.task_id,
             "failure": self.failure.to_data() if self.failure else None,
             "prompt_path": str(self.prompt_path) if self.prompt_path else None,
+            "structrr_diff_path": (
+                str(self.structrr_diff_path) if self.structrr_diff_path else None
+            ),
         }
 
 
@@ -3389,6 +3393,7 @@ def _feature_endpoint_result(
         state.get("task_id"),
         failure,
         state.get("implementation_prompt_path"),
+        state.get("structrr_diff_path"),
     )
 
 
@@ -5123,7 +5128,71 @@ def _compile_design_only_prompt(
         json.dumps(packet.to_data(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    _compile_design_only_structrr_diff(
+        config=config,
+        canonical_design=canonical_design,
+        inventory=existing_tests,
+        validation_profiles=validation_profiles,
+        output_root=output_root,
+    )
     return prompt_path
+
+
+def _compile_design_only_structrr_diff(
+    *,
+    config: FeatureEndpointConfig,
+    canonical_design: Mapping[str, Any],
+    inventory: Sequence[Any],
+    validation_profiles: Sequence[DiscoveredValidationProfile],
+    output_root: Path,
+) -> Path:
+    """Render an auditable Structrr diff beside a design-only worker prompt."""
+    raw_obligations = canonical_design.get("obligations")
+    raw_projections = canonical_design.get("projections")
+    if not isinstance(raw_obligations, list) or not isinstance(raw_projections, list):
+        raise PowdrrExecutionError(
+            "canonical design cannot be projected into a Structrr diff"
+        )
+    projections = {
+        item.get("clause_id"): item
+        for item in raw_projections
+        if isinstance(item, Mapping) and isinstance(item.get("clause_id"), str)
+    }
+    obligations: list[dict[str, Any]] = []
+    for item in raw_obligations:
+        if not isinstance(item, Mapping):
+            raise PowdrrExecutionError("canonical design obligation is malformed")
+        clause_id = item.get("clause_id")
+        projection = projections.get(clause_id)
+        if not isinstance(clause_id, str) or not isinstance(projection, Mapping):
+            raise PowdrrExecutionError(
+                "canonical design obligation has no matching clause projection"
+            )
+        behavior_scenario = projection.get("behavior_scenario")
+        if not isinstance(behavior_scenario, Mapping):
+            raise PowdrrExecutionError(
+                f"canonical design obligation {clause_id!r} has no behavior scenario"
+            )
+        obligations.append(
+            {
+                "id": item.get("obligation_id"),
+                "design": {
+                    "kind": item.get("kind"),
+                    "description": item.get("description"),
+                    "acceptance_criterion": item.get("acceptance_criterion"),
+                    "expected_test": item.get("expected_test"),
+                    "clause_id": clause_id,
+                    "behavior_scenario": behavior_scenario,
+                },
+            }
+        )
+    return _write_structrr_plan_from_obligations(
+        output_root / "structrr-diff.yaml",
+        config,
+        obligations,
+        inventory,
+        validation_profiles,
+    )
 
 
 def _is_generic_contract_text(value: str) -> bool:

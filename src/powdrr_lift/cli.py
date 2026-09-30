@@ -1424,17 +1424,6 @@ def build_parser() -> argparse.ArgumentParser:
     workrr_feature_parser.add_argument("--planning-api-key")
     workrr_feature_parser.add_argument("--planning-base-url")
     workrr_feature_parser.add_argument("--task-id")
-    workrr_feature_parser.add_argument(
-        "--clarification-policy",
-        choices=("ask", "normative_defaults"),
-        default="ask",
-        help=(
-            "Resolve underspecified behavior by asking (default), or use explicit "
-            "recorded defaults for unattended runs; uncertain product clauses are "
-            "retained verbatim as generic guidance instead of "
-            "blocking prompt generation."
-        ),
-    )
     workrr_feature_parser.add_argument("--output-root", type=Path)
     workrr_feature_parser.add_argument(
         "--no-open-pr",
@@ -1447,8 +1436,9 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser = subparsers.add_parser(
         "harbor-feature",
         aliases=["harbor_feature"],
+        description="Run implement-feature in benchmark mode for Harbor.",
         help=(
-            "Run the implement-feature Procedrr flow in the current sandbox "
+            "Run implement-feature in benchmark mode in the current sandbox "
             "checkout and commit the result for Harbor to collect."
         ),
     )
@@ -1456,17 +1446,6 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument("--work-item-name", required=True)
     harbor_feature_parser.add_argument(
         "--task-id", help="Stable benchmark/task identifier propagated to run metadata."
-    )
-    harbor_feature_parser.add_argument(
-        "--clarification-policy",
-        choices=("ask", "normative_defaults"),
-        default="ask",
-        help=(
-            "Resolve underspecified behavior by asking (default), or use explicit "
-            "recorded defaults for unattended runs; uncertain product clauses are "
-            "retained verbatim as generic guidance instead of "
-            "blocking prompt generation."
-        ),
     )
     harbor_feature_parser.add_argument("--repo-root", type=Path)
     harbor_feature_parser.add_argument(
@@ -4644,7 +4623,6 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             open_pr=not args.no_open_pr,
             planning_client=planning_client,
             task_id=args.task_id or args.work_item_name,
-            clarification_policy=args.clarification_policy,
         )
     )
     if args.json:
@@ -4708,8 +4686,6 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             task_id=args.task_id or args.work_item_name,
             design_only=args.design_only,
             capture_worker_prompts_only=args.capture_worker_prompts_only,
-            clarification_policy=args.clarification_policy,
-            benchmark_mode=True,
         )
     )
     if args.json:

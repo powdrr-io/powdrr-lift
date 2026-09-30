@@ -16,14 +16,14 @@ from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
 from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
 
 
-def test_harbor_feature_exposes_opt_in_normative_defaults_policy() -> None:
+def test_harbor_feature_defaults_to_benchmark_mode_without_policy_option() -> None:
     stdout = io.StringIO()
     with redirect_stdout(stdout), pytest.raises(SystemExit) as exc_info:
         main(["harbor-feature", "--help"])
 
     assert exc_info.value.code == 0
-    assert "--clarification-policy" in stdout.getvalue()
-    assert "normative_defaults" in stdout.getvalue()
+    assert "benchmark mode" in stdout.getvalue()
+    assert "--clarification-policy" not in stdout.getvalue()
 
 
 def test_cli_init_writes_template(

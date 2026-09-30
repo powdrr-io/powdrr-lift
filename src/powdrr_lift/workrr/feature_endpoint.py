@@ -147,7 +147,6 @@ class FeatureEndpointConfig:
     task_id: str | None = None
     design_only: bool = False
     capture_worker_prompts_only: bool = False
-    clarification_policy: str = "ask"
     benchmark_mode: bool = False
 
 
@@ -291,6 +290,7 @@ def run_feature_in_place(
     The flow still commits the completed implementation to the current
     checkout so the harness can collect it.
     """
+    config = replace(config, benchmark_mode=True)
     if not config.feature_description.strip():
         raise ValueError("feature_description must not be empty")
     if not config.allowed_paths:
@@ -346,8 +346,6 @@ def _execute_procedrr_flow(
 ) -> FeatureEndpointResult:
     if config.design_only and config.capture_worker_prompts_only:
         raise ValueError("design-only and worker-prompt capture modes are exclusive")
-    if config.clarification_policy not in {"ask", "normative_defaults"}:
-        raise ValueError("clarification_policy must be 'ask' or 'normative_defaults'")
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {
         "task_id": config.task_id or config.work_item_name,
@@ -513,7 +511,7 @@ def _execute_procedrr_flow(
             {
                 "feature_description": config.feature_description,
                 "work_item_name": config.work_item_name,
-                "clarification_policy": config.clarification_policy,
+                "benchmark_mode": config.benchmark_mode,
             },
         )
     except EvaluationError as error:

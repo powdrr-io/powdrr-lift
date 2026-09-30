@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -207,7 +209,7 @@ def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> Non
         resolved_decisions=child_plan["resolved_decisions"],
         pending_specs=child_plan["pending_specs"],
         provider_results=results,
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     by_kind = {item.decision_kind: item for item in decisions}
@@ -244,7 +246,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
         provider_results=[
             {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     assert root[0].result.value == "include"
@@ -260,7 +262,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
             {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
             for _ in decision_plan["pending_specs"]
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     by_kind = {item.decision_kind: item for item in decisions}
@@ -284,7 +286,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
         provider_results=[
             {"status": "resolved", "value": "context", "reason_code": None}
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     assert (
@@ -298,7 +300,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
     extractions = bind_source_extractions(
         requests=extraction_requests,
         provider_results=[{} for _ in extraction_requests],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     family_request = prepare_behavior_family_decision(
@@ -309,7 +311,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
     family = bind_behavior_family_decision(
         family_request,
         {"status": "unresolved", "value": None, "reason_code": "no_candidate"},
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     contract = compile_source_contract(
@@ -333,7 +335,7 @@ def test_normative_defaults_compile_unresolved_include_as_invariant() -> None:
             {"status": "unresolved", "value": None, "reason_code": "no_candidate"}
             for _ in review_requests
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
         created_at=NOW,
     )
     assert finalize_source_faithfulness(contract, reviews).accepted
@@ -850,3 +852,157 @@ def test_procedrr_command_boundary_persists_intermediate_artifacts(
     assert (artifact_root / "partial-contract.json").is_file()
     assert projection["description"] == "data pickle."
     assert projection["operation"] == "serialize: pickle"
+
+
+def test_benchmark_source_faithfulness_failure_becomes_source_invariant(
+    tmp_path: Path,
+) -> None:
+    clause = _clause()
+    decisions = _bind_source_decisions(clause)
+    extraction_requests = prepare_source_extractions(clause, decisions)
+    extractions = bind_source_extractions(
+        requests=extraction_requests,
+        provider_results=[{"quote": "data"}, {"quote": "pickle"}],
+        created_at=NOW,
+    )
+    family_request = prepare_behavior_family_decision(clause, extractions[1], decisions)
+    family = bind_behavior_family_decision(
+        family_request,
+        {"status": "resolved", "value": "serialize", "reason_code": None},
+        created_at=NOW,
+    )
+    contract = compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=family,
+    )
+    requests = prepare_field_entailment_reviews(contract)
+    reviews = bind_field_entailment_reviews(
+        requests=requests,
+        provider_results=[
+            {
+                "status": "resolved",
+                "value": (
+                    "contradicted"
+                    if request["spec"]["field"] == "behavior"
+                    else "entailed"
+                ),
+                "reason_code": None,
+            }
+            for request in requests
+        ],
+        created_at=NOW,
+    )
+    state: dict[str, Any] = {}
+    runtime = FeatureCommandRuntime(
+        config=SimpleNamespace(
+            benchmark_mode=True,
+            design_only=False,
+            capture_worker_prompts_only=False,
+        ),
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="main",
+        slug="benchmark-fallback",
+        state=state,
+        catalog=feature_command_catalog(),
+    )
+
+    faithfulness = runtime.dispatch(
+        "finalize_source_faithfulness",
+        ["finalize_source_faithfulness"],
+        {
+            "contract": contract.to_data(),
+            "reviews": [item.to_data() for item in reviews],
+        },
+    )
+    design = project_partial_contract_to_legacy_design(contract) | {
+        "partial_contract": contract.to_data()
+    }
+    merged = runtime.dispatch(
+        "merge_behavior_scenario",
+        ["merge_behavior_scenario"],
+        {"clause": clause, "design": design, "scenario": {}},
+    )
+
+    assert faithfulness["accepted"] is True
+    assert faithfulness["fallback"]["kind"] == "invariant"
+    assert merged["kind"] == "invariant"
+    assert merged["description"] == clause["text"]
+    assert merged["acceptance_criterion"] == clause["text"]
+    assert merged["behavior_scenario"]["then"] == clause["text"]
+    fallback_path = (
+        tmp_path
+        / "semantic-contracts"
+        / clause["clause_id"]
+        / "invariant-fallback.json"
+    )
+    assert json.loads(fallback_path.read_text())["source_text"] == clause["text"]
+
+
+def test_benchmark_unresolved_scenario_becomes_source_invariant(
+    tmp_path: Path,
+) -> None:
+    clause = _clause("Every active state resets its data on re-entry.")
+    state: dict[str, Any] = {}
+    runtime = FeatureCommandRuntime(
+        config=SimpleNamespace(
+            benchmark_mode=True,
+            design_only=False,
+            capture_worker_prompts_only=False,
+        ),
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="main",
+        slug="benchmark-scenario-fallback",
+        state=state,
+        catalog=feature_command_catalog(),
+    )
+    design = {
+        "kind": "feature",
+        "description": "active states reset data",
+        "acceptance_criterion": "Data resets on re-entry.",
+        "expected_test": "Test state data after re-entry.",
+        "population": "active states",
+        "operation": "reset data",
+        "oracle": "data resets",
+        "evidence_case": clause["text"],
+        "partial_contract": {"routing": "include"},
+    }
+    unresolved_scenario = {
+        "status": "needs_clarification",
+        "unresolved_dimensions": ["error_behavior"],
+        "scenario": {
+            "subject": "active state data",
+            "given": "an active state is re-entered",
+            "when": "the state is entered again",
+            "then": "the state data is reset",
+            "dimensions": {
+                "normal_result": "state data is reset",
+                "error_behavior": "unresolved by source",
+                "continuation": "not_applicable",
+                "unsupported_behavior": "not_applicable",
+                "cancellation_cleanup": "not_applicable",
+                "compatibility": "not_applicable",
+                "negative_boundaries": "not_applicable",
+            },
+            "assumptions": [],
+            "capability_matrix": [],
+            "related_requirements": [],
+        },
+    }
+
+    merged = runtime.dispatch(
+        "merge_behavior_scenario",
+        ["merge_behavior_scenario"],
+        {"clause": clause, "design": design, "scenario": unresolved_scenario},
+    )
+
+    assert merged["kind"] == "invariant"
+    assert merged["description"] == clause["text"]
+    assert merged["acceptance_criterion"] == clause["text"]
+    assert merged["behavior_scenario"]["then"] == clause["text"]
+    assert state["benchmark_invariant_fallbacks"][clause["clause_id"]]["reason"]

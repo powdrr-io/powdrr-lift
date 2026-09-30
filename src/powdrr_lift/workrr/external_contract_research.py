@@ -390,11 +390,9 @@ def bind_external_contract_assessments(
     claims: Sequence[Mapping[str, Any]],
     assessments: Sequence[Mapping[str, Any]],
     *,
-    clarification_policy: str,
+    benchmark_mode: bool,
 ) -> dict[str, Any]:
     """Bind applicability decisions and retain accepted or unresolved claims."""
-    if clarification_policy not in {"ask", "normative_defaults"}:
-        raise ValueError("invalid external contract clarification policy")
     if len(claims) != len(assessments):
         raise ValueError("external contract assessment count does not match claims")
     requirements: list[dict[str, Any]] = []
@@ -430,14 +428,14 @@ def bind_external_contract_assessments(
             continue
         requirement_text = assessment.get("requirement")
         if not isinstance(requirement_text, str) or not requirement_text.strip():
-            if decision == "unresolved" and clarification_policy == "ask":
+            if decision == "unresolved" and not benchmark_mode:
                 disposition["unresolved"] = True
                 dispositions.append(disposition)
                 continue
             raise ValueError("accepted external contract assessment has no requirement")
         disposition["requirement"] = requirement_text.strip()
         if decision == "unresolved":
-            if clarification_policy == "ask":
+            if not benchmark_mode:
                 disposition["unresolved"] = True
                 dispositions.append(disposition)
                 continue

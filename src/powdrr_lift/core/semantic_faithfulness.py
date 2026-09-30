@@ -190,11 +190,9 @@ def bind_field_entailment_reviews(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
-    clarification_policy: str = "ask",
+    benchmark_mode: bool = False,
     created_at: str,
 ) -> list[FieldEntailmentReview]:
-    if clarification_policy not in {"ask", "normative_defaults"}:
-        raise FaithfulnessError("clarification policy is invalid")
     if len(requests) != len(provider_results):
         raise FaithfulnessError("field entailment result count is invalid")
     reviews: list[FieldEntailmentReview] = []
@@ -215,7 +213,7 @@ def bind_field_entailment_reviews(
         provider = SemanticDecisionProvider(kind="planning-llm")
         result_to_bind = provider_result
         evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.source_ref}",)
-        if clarification_policy == "normative_defaults":
+        if benchmark_mode:
             exact_source_quote = (
                 spec.field
                 in {

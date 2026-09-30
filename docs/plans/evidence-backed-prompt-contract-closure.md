@@ -92,7 +92,7 @@ standard; documented ecosystem convention; conservative default. A lower
 level cannot contradict a higher one. Post-run validation artifacts do not
 participate in this authority decision.
 
-With `clarification_policy=ask`, unresolved material choices produce the
+Outside benchmark mode, unresolved material choices produce the
 existing clarification path. With `normative_defaults`, the compiler chooses
 the best-supported compatible option, records its basis and uncertainty, and
 continues. If no option has enough evidence, it records a narrow conservative

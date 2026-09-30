@@ -8,7 +8,7 @@ description: >-
 inputs:
   - {name: feature_description, type: string, required: true}
   - {name: feature_design, type: object, required: true}
-  - {name: clarification_policy, type: string, required: true}
+  - {name: benchmark_mode, type: boolean, required: true}
 outputs:
   external_contract_sources:
     type: object
@@ -276,7 +276,7 @@ steps:
               - For ask policy, leave material source/profile ambiguity unresolved without inventing a choice. For normative_defaults, only resolve it when a narrow, compatible industry default is supported by the supplied evidence; state that basis and confidence in the rationale.
               - If accepted or assumed, state the precise implementable requirement. If rejected or unresolved, do not smuggle it into that field.
               - Do not use benchmark solutions, verifier tests, expected outputs, or implementation results.
-            context: [feature_description, external_contract_claim, clarification_policy]
+            context: [feature_description, external_contract_claim, benchmark_mode]
             output:
               name: external_contract_assessment
               schema:
@@ -296,7 +296,7 @@ steps:
       parameters:
         claims: {type: reference, value: bound_external_contract_claims.claims}
         assessments: {type: reference, value: external_contract_assessments}
-        clarification_policy: {type: reference, value: clarification_policy}
+        benchmark_mode: {type: reference, value: benchmark_mode}
       returns:
         type: object
         required: [requirements, dispositions]

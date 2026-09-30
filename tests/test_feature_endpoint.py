@@ -59,6 +59,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _derive_feature_test_contracts,
     _ensure_current_baseline,
     _evaluate_proposal_command,
+    _execute_procedrr_flow,
     _feature_endpoint_result,
     _finalize_proposal_review,
     _load_implementation_plan,
@@ -259,9 +260,9 @@ def test_normative_defaults_resolve_and_record_each_unresolved_dimension() -> No
         },
     }
 
-    resolved = _merge_behavior_scenario_values(
-        parameters, clarification_policy="normative_defaults"
-    )["behavior_scenario"]
+    resolved = _merge_behavior_scenario_values(parameters, benchmark_mode=True)[
+        "behavior_scenario"
+    ]
 
     assert resolved["dimensions"]["error_behavior"] == (
         "ASSUMED DEFAULT: Propagate the native literal parser error."
@@ -314,9 +315,9 @@ def test_normative_defaults_keep_not_applicable_dimensions_out_of_assumptions() 
         },
     }
 
-    resolved = _merge_behavior_scenario_values(
-        parameters, clarification_policy="normative_defaults"
-    )["behavior_scenario"]
+    resolved = _merge_behavior_scenario_values(parameters, benchmark_mode=True)[
+        "behavior_scenario"
+    ]
 
     assert resolved["dimensions"]["error_behavior"] == (
         "ASSUMED DEFAULT: Propagate the operation's native error."
@@ -355,9 +356,7 @@ def test_normative_defaults_fail_closed_if_an_unresolved_dimension_is_uncovered(
     }
 
     with pytest.raises(PowdrrExecutionError, match="resolve every clarification"):
-        _merge_behavior_scenario_values(
-            parameters, clarification_policy="normative_defaults"
-        )
+        _merge_behavior_scenario_values(parameters, benchmark_mode=True)
 
 
 def test_scenario_consistency_updates_only_rewrite_existing_defaults() -> None:
@@ -404,7 +403,7 @@ def test_scenario_consistency_updates_only_rewrite_existing_defaults() -> None:
     }
 
     updated = _apply_scenario_consistency_updates(
-        decisions, review, clarification_policy="normative_defaults"
+        decisions, review, benchmark_mode=True
     )
 
     scenario = updated[0]["behavior_scenario"]
@@ -413,12 +412,12 @@ def test_scenario_consistency_updates_only_rewrite_existing_defaults() -> None:
     assert decisions[0]["behavior_scenario"]["assumptions"][0]["resolution"] == "stop"
 
 
-def test_scenario_consistency_cannot_add_defaults_under_ask_policy() -> None:
-    with pytest.raises(PowdrrExecutionError, match="under ask policy"):
+def test_scenario_consistency_cannot_add_defaults_outside_benchmark_mode() -> None:
+    with pytest.raises(PowdrrExecutionError, match="outside benchmark mode"):
         _apply_scenario_consistency_updates(
             [{}],
             {"consistency_review": {"updates": [{"dimension": "continuation"}]}},
-            clarification_policy="ask",
+            benchmark_mode=False,
         )
 
 
@@ -600,7 +599,7 @@ def test_harbor_feature_cli_uses_in_place_endpoint(
     assert config.minisweagent_model == ("deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731")
     assert config.open_pr is False
     assert config.push_changes is False
-    assert config.benchmark_mode is True
+    assert config.benchmark_mode is False
 
 
 def test_harbor_feature_cli_propagates_task_id(
@@ -725,6 +724,7 @@ def test_run_feature_in_place_reuses_core_without_git_publication(
     assert captured["branch"] == "main"
     assert captured["config"].open_pr is False
     assert captured["config"].push_changes is False
+    assert captured["config"].benchmark_mode is True
 
 
 def test_compile_feature_obligations_binds_sentence_trace_to_plan(
@@ -1829,7 +1829,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
         {
             "work_item_name": "demo",
             "feature_description": "Add the feature.",
-            "clarification_policy": "ask",
+            "benchmark_mode": False,
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
@@ -1843,7 +1843,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     assumptions = json.loads((tmp_path / "normative-assumptions.json").read_text())
     assert assumptions == {
         "assumptions": [],
-        "policy": "ask",
+        "benchmark_mode": False,
         "schema_version": "normative-assumptions-v1",
     }
 
@@ -2362,6 +2362,66 @@ def test_prompt_capture_does_not_enter_coding_attempt_recovery_loop(
     assert result["continuations"] == 0
     assert len(calls) == 1
     assert "repair_issue" not in calls[0]
+
+
+def test_benchmark_mode_selects_normative_defaults_automatically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, Any] = {}
+    flow_path = tmp_path / "design-interview.yaml"
+    flow_path.write_text("steps: []\n", encoding="utf-8")
+
+    class SuccessfulEvaluator:
+        def __init__(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def evaluate(self, _flow: Any, inputs: Mapping[str, Any]) -> None:
+            observed.update(inputs)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._validate_procedrr_flow",
+        lambda _: flow_path,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._worker_prompt_capture_flow_source",
+        lambda source: source,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.parse_and_validate",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._bootstrap_validation_profiles",
+        lambda *args, **kwargs: (),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.default_verification_provider_registry",
+        lambda: SimpleNamespace(inventory=lambda *args: ()),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.Evaluator", SuccessfulEvaluator
+    )
+
+    _execute_procedrr_flow(
+        FeatureEndpointConfig(
+            feature_description="Keep every source requirement.",
+            work_item_name="benchmark defaults",
+            repo_root=tmp_path,
+            allowed_paths=("src",),
+            planning_client=object(),  # type: ignore[arg-type]
+            capture_worker_prompts_only=True,
+            benchmark_mode=True,
+        ),
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, "abc123\n", ""
+        ),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        branch="main",
+    )
+
+    assert observed["benchmark_mode"] is True
 
 
 def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(

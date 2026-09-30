@@ -9,6 +9,7 @@ from typing import Any
 from powdrr_lift.integrations.harbor._env import (
     env_flag_is_enabled,
     pip_install_command,
+    provider_environment,
 )
 
 try:
@@ -238,15 +239,7 @@ class PowdrrAgent(BaseInstalledAgent):
             command.append("--design-only")
         if env_flag_is_enabled(self._get_env("POWDRR_CAPTURE_WORKER_PROMPTS_ONLY")):
             command.append("--capture-worker-prompts-only")
-        provider_env = {
-            key: value
-            for key in (
-                "DEEPINFRA_API_KEY",
-                "DEEPINFRA_API_TOKEN",
-                "DEEPINFRA_BASE_URL",
-            )
-            if (value := self._get_env(key)) is not None
-        }
+        provider_env = provider_environment(self._get_env)
         for key in ("POWDRR_INSTALL_SPEC", "POWDRR_VERSION", "POWDRR_REVISION"):
             if (value := self._get_env(key)) is not None:
                 provider_env[key] = value

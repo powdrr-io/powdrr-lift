@@ -3,6 +3,24 @@
 from __future__ import annotations
 
 import shlex
+from collections.abc import Callable
+
+PROVIDER_ENV_KEYS = (
+    "DEEPINFRA_API_KEY",
+    "DEEPINFRA_API_TOKEN",
+    "DEEPINFRA_BASE_URL",
+    "TYPESAFEAI_API_KEY",
+    "TYPESAFE_API_KEY",
+    "SYSTEM_ONE_API_KEY",
+    "TAVILY_API_KEY",
+)
+
+
+def provider_environment(get_env: Callable[[str], str | None]) -> dict[str, str]:
+    """Forward configured provider credentials to the in-container Powdrr run."""
+    return {
+        key: value for key in PROVIDER_ENV_KEYS if (value := get_env(key)) is not None
+    }
 
 
 def pip_install_command(package: str, *options: str) -> str:

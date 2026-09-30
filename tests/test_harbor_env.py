@@ -5,6 +5,7 @@ import pytest
 from powdrr_lift.integrations.harbor._env import (
     env_flag_is_enabled,
     pip_install_command,
+    provider_environment,
 )
 
 
@@ -27,3 +28,12 @@ def test_pip_install_command_omits_user_flag_inside_virtualenv() -> None:
         "then python3 -m pip install --user --upgrade some-package==1.2.3; "
         "else python3 -m pip install --upgrade some-package==1.2.3; fi"
     )
+
+
+def test_provider_environment_forwards_jev_and_research_credentials() -> None:
+    configured = {
+        "TYPESAFEAI_API_KEY": "typesafe-secret",
+        "TAVILY_API_KEY": "tavily-secret",
+    }
+
+    assert provider_environment(configured.get) == configured

@@ -10,32 +10,33 @@ into work that improves performance across many tasks.
 | Task | Shape | Status | Evidence |
 | --- | --- | --- | --- |
 | `python-statemachine-state-data-scoping` | API expansion, lifecycle, callbacks, serialization, parser and diagram support | Prior run reviewed; not rerun in this audit | [run analysis](deepswe-python-statemachine-state-data-scoping.md) |
-| `fastapi-implicit-head-options` | HTTP routing behavior and response metadata | Blocked before instruction processing | Local Pier artifacts: `/private/tmp/powdrr-python-instruction-audit/fastapi-implicit-r3/python-audit-fastapi-implicit-r3/` |
+| `fastapi-implicit-head-options` | HTTP routing behavior and response metadata | Parsed 33 clauses; stopped at scenario validation before worker prompt generation | Local Pier artifacts: `/private/tmp/powdrr-python-instruction-audit/fastapi-implicit-r4/python-audit-fastapi-implicit-r4/` |
+| `igel-persist-feature-schema` | Feature schema persistence after fit | Docker image setup failed before task processing; adapter pip install fix in progress | Local Pier artifacts: `/private/tmp/powdrr-python-instruction-audit/igel-feature-schema-r1/python-audit-igel-feature-schema-r1/` |
 | `cattrs-partial-structuring-recovery` | New conversion result type and partial/error accumulation semantics | Planned | |
 | `numba-stencil-boundary-modes` | Numerical edge modes and compilation behavior | Planned | |
 
 The planned cattrs and numba runs sample distinct instruction shapes. Expand
 the sample if findings suggest the same failure modes do not generalize.
 
-## Runner prerequisite found in this audit
+## Runner setup findings
 
-The first local launch used the wrong host source path and failed to import the
-adapter. After correcting the path and using the matching pushed commit for the
-container install, Docker setup succeeded, but the adapter stopped before task
-instruction processing:
+The first two launches were setup failures: one used the wrong host source
+path, and the next was blocked by the sandbox's Docker BuildKit cache. A later
+run using the current pushed source revision passed adapter setup and reached
+the task instruction. This matters because the earlier `_get_env` failure
+came from explicitly installing a stale commit, while current source calls
+Pier's one-argument API.
+
+The Igel task then exposed another adapter setup defect. Its image activates a
+Python virtual environment, where `pip install --user` fails with:
 
 ```text
-TypeError: BaseInstalledAgent._get_env() takes 2 positional arguments but 3 were given
+Can not perform a '--user' install. User site-packages are not visible in this virtualenv.
 ```
 
-`PowdrrAgent.run()` calls `_get_env("POWDRR_DESIGN_ONLY", "")`, while the
-installed Pier 0.3.0 base agent accepts only the environment key. Pier then
-could not collect the expected in-container artifacts because the adapter
-exited before creating them. The run has a typed `TypeError` result and no
-model tokens or task validation result. This is a local adapter/Pier API
-compatibility defect; it says nothing about whether the FastAPI instruction is
-clear. Fix and verify this compatibility before launching the planned task
-sample. The fresh run and its sibling artifacts are retained at the path above.
+The adapter now chooses `--user` only for system Python and omits it inside a
+virtual environment. This should allow the adapter package and MiniSWE to
+install in both image types.
 
 ## Capability catalog
 
@@ -115,6 +116,20 @@ Follow-up work already identified from that run:
    criterion, expected test, invariant, or obligation.
 4. Preserve the generated plan and trace on failure.
 5. Keep runtime/generated state out of the candidate patch.
+
+## Confirmed finding from this audit
+
+The FastAPI instruction reached semantic scenario generation but did not
+produce a worker prompt. The model created a rejected capability for
+`GET route with auto_head disabled`, invented a `405 Method Not Allowed`
+outcome, and omitted the error field required for rejected capabilities. The
+behavior-contract validator stopped the run before planning could produce an
+implementation request. This surfaces two reusable gaps: the scenario prompt's
+constraints did not prevent an unsupported rejection/error from being
+invented, and invalid model output has no bounded correction path that can
+preserve the instruction and continue to prompt generation. The task's F2P
+score was 0 because no patch was produced; this is not an implementation
+quality result.
 
 ## Triage notes
 

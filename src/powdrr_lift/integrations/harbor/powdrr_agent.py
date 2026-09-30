@@ -6,7 +6,10 @@ import shlex
 from pathlib import PurePosixPath
 from typing import Any
 
-from powdrr_lift.integrations.harbor._env import env_flag_is_enabled
+from powdrr_lift.integrations.harbor._env import (
+    env_flag_is_enabled,
+    pip_install_command,
+)
 
 try:
     from pier.agents.installed.base import (  # type: ignore[import-not-found]
@@ -57,10 +60,11 @@ class PowdrrAgent(BaseInstalledAgent):
         code_agent = self._code_agent()
         if code_agent == "minisweagent":
             agent_install = InstallStep(
-                run=(
-                    "python3 -m pip install --user --upgrade --no-cache-dir "
-                    "--disable-pip-version-check "
-                    f"mini-swe-agent=={MINISWEAGENT_VERSION}"
+                run=pip_install_command(
+                    f"mini-swe-agent=={MINISWEAGENT_VERSION}",
+                    "--upgrade",
+                    "--no-cache-dir",
+                    "--disable-pip-version-check",
                 )
             )
             verification = "powdrr-lift --help >/dev/null && mini --help >/dev/null"
@@ -75,10 +79,12 @@ class PowdrrAgent(BaseInstalledAgent):
             version=self.version(),
             steps=[
                 InstallStep(
-                    run=(
-                        "python3 -m pip install --user --upgrade --force-reinstall "
-                        "--no-cache-dir --disable-pip-version-check "
-                        f"{shlex.quote(package)}"
+                    run=pip_install_command(
+                        package,
+                        "--upgrade",
+                        "--force-reinstall",
+                        "--no-cache-dir",
+                        "--disable-pip-version-check",
                     )
                 ),
                 agent_install,
@@ -125,21 +131,27 @@ class PowdrrAgent(BaseInstalledAgent):
         )
         await self.exec_as_agent(
             environment,
-            command=(
-                "python3 -m pip install --user --upgrade --force-reinstall "
-                "--no-cache-dir --disable-pip-version-check "
-                f"{shlex.quote(package)}"
+            command=pip_install_command(
+                package,
+                "--upgrade",
+                "--force-reinstall",
+                "--no-cache-dir",
+                "--disable-pip-version-check",
             ),
         )
 
         if self._code_agent() == "minisweagent":
+            minisweagent_install = pip_install_command(
+                f"mini-swe-agent=={MINISWEAGENT_VERSION}",
+                "--upgrade",
+                "--no-cache-dir",
+                "--disable-pip-version-check",
+            )
             await self.exec_as_agent(
                 environment,
                 command=(
                     "if ! command -v mini >/dev/null 2>&1; then "
-                    "python3 -m pip install --user --upgrade --no-cache-dir "
-                    "--disable-pip-version-check "
-                    f"mini-swe-agent=={MINISWEAGENT_VERSION}; "
+                    f"{minisweagent_install}; "
                     "fi"
                 ),
             )

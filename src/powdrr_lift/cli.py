@@ -4696,6 +4696,8 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
         if args.design_only:
             print("Design compilation: passed; implementation review: not run")
             print(f"Generated design: {result.plan_path}")
+            if result.prompt_path is not None:
+                print(f"Generated worker prompt: {result.prompt_path}")
         elif args.capture_worker_prompts_only:
             print("Worker prompt compilation: passed; coding agent: not run")
             print(f"Latest request: {result.request_path}")

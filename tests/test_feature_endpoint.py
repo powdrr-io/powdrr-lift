@@ -52,6 +52,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _compile_code_task_plan,
     _compile_code_task_postconditions,
     _compile_code_task_preconditions,
+    _compile_design_only_prompt,
     _compile_feature_obligations,
     _compile_obligation_verification_plans,
     _compile_required_test_case_edits,
@@ -84,6 +85,49 @@ from powdrr_lift.workrr.feature_endpoint import (
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
+
+
+def test_design_only_compiles_normal_worker_prompt_without_running_agent(
+    tmp_path: Path,
+) -> None:
+    config = FeatureEndpointConfig(
+        feature_description="Add `Response.iter_json()` for JSON arrays.",
+        work_item_name="streaming-json",
+        repo_root=tmp_path,
+        allowed_paths=("src", "tests"),
+        design_only=True,
+    )
+    design = {
+        "obligations": [
+            {"description": "Response.iter_json yields each array element."}
+        ]
+    }
+    test_cases = [{"description": "iter_json returns array elements"}]
+    prompt_path = _compile_design_only_prompt(
+        config=config,
+        canonical_design=design,
+        required_test_cases=test_cases,
+        base_commit="base-commit",
+        validation_profiles=(
+            DiscoveredValidationProfile(
+                "pytest", ("python", "-m", "pytest"), "project"
+            ),
+        ),
+        existing_tests=(),
+        output_root=tmp_path / "artifacts",
+    )
+
+    prompt = prompt_path.read_text()
+    request = json.loads(
+        (tmp_path / "artifacts" / "implementation-request.json").read_text()
+    )
+    packet = json.loads(
+        (tmp_path / "artifacts" / "implementation-packet.json").read_text()
+    )
+    assert "iter_json returns array elements" in prompt
+    assert "python -m pytest" in prompt
+    assert request["implementation_packet"] == packet
+    assert not list((tmp_path / "artifacts").glob("*attempt*"))
 
 
 def _test_behavior_scenario(identifier: str) -> dict[str, Any]:

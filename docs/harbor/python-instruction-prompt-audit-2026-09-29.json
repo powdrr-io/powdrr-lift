@@ -1,0 +1,2688 @@
+{
+  "coding_agent_invoked": false,
+  "mode": "host-design-only",
+  "runs": [
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r1/dateutil-rfc5545-timezone-interop",
+      "base_commit": "c981f9c7aa91b83cc9bd33a09ecee9e751b06e8d",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "instruction-ledger.json",
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "semantic-contracts/instruction-001/source-decisions.json",
+          "semantic-contracts/instruction-001/source-extractions.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "PowdrrExecutionError",
+        "message": "partial contract cannot compile unresolved source decisions: ['has_precondition', 'source_predicate', 'temporal_scope']",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790742814.754931,
+      "instruction_sha256": "029feb3185f43a1ed77c0fa9e250c50e82758c78b7544f8905782c2dda9eb9b6",
+      "ledger_clause_count": 55,
+      "partial_contract_count": 0,
+      "pipeline_exit": 1,
+      "provider_results": [
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][0][0]",
+          "value": {
+            "statements": [
+              "rrule gains a timezone-aware __str__ method.",
+              "rruleset gains a timezone-aware __str__ method.",
+              "rrule gains timezone-aware equality.",
+              "rruleset gains timezone-aware equality.",
+              "rrule gains timezone-aware hash.",
+              "rruleset gains timezone-aware hash.",
+              "rrule gains timezone-aware repr.",
+              "rruleset gains timezone-aware repr. They gain property accessors. They gain iCalendar serialization. They gain set operations."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][1][0]",
+          "value": {
+            "statements": [
+              "rrulestr gains VCALENDAR auto-detection.",
+              "rrulestr gains VTIMEZONE parsing.",
+              "rrulestr gains a tzids parameter."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][2][0]",
+          "value": {
+            "statements": [
+              "rrulestr accepts an optional tzids parameter.",
+              "The tzids parameter may be a mapping from name to tzinfo.",
+              "The tzids parameter may be a callable from name to tzinfo.",
+              "The tzids parameter may be None.",
+              "When tzids is None, rrulestr defaults to dateutil.tz.gettz for TZID resolution."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][3][0]",
+          "value": {
+            "statements": [
+              "rrule.__str__() emits DTSTART with a TZID parameter for non-UTC timezones.",
+              "rrule.__str__() emits DTSTART with a Z suffix for UTC."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][4][0]",
+          "value": {
+            "statements": [
+              "rrule.count() returns the count parameter directly when the count parameter is set.",
+              "rrule.count() iterates when the count parameter is not set.",
+              "rrule.count() inherits iteration behavior from rrulebase when the count parameter is not set."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][5][0]",
+          "value": {
+            "statements": [
+              "rrulestr auto-detects BEGIN:VCALENDAR.",
+              "rrulestr extracts VTIMEZONE.",
+              "rrulestr extracts VEVENT."
+            ]
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][0][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "feature"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "must"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": "source_underspecified",
+            "status": "unresolved",
+            "value": null
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": "source_underspecified",
+            "status": "unresolved",
+            "value": null
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": "source_underspecified",
+            "status": "unresolved",
+            "value": null
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][7][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "rrule module"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "Extend python-dateutil's rrule module with RFC 5545 timezone interoperability"
+          }
+        },
+        {
+          "output": "behavior_family_result",
+          "path": "steps[5].for_each[0][0][10]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "other"
+          }
+        }
+      ],
+      "pytest_collection_overrides": {},
+      "repository": "https://github.com/dateutil/dateutil",
+      "source_clauses_reached": [
+        {
+          "clause": {
+            "clause_id": "instruction-001",
+            "parent_clause_id": null,
+            "source_span": {
+              "end": 78,
+              "start": 0
+            },
+            "text": "Extend python-dateutil's rrule module with RFC 5545 timezone interoperability."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "feature"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "required"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "must"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": "source_underspecified",
+                "status": "unresolved",
+                "value": null
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": "source_underspecified",
+                "status": "unresolved",
+                "value": null
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": "source_underspecified",
+                "status": "unresolved",
+                "value": null
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        }
+      ],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742744.455969,
+      "task": "dateutil-rfc5545-timezone-interop",
+      "worker_prompt_generated": false
+    },
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r1/httpx-streaming-json-iteration",
+      "base_commit": "b5addb64f0161ff6bfe94c124ef76f6a1fba5254",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "PytestConfigWarning",
+        "message": "Failed to import filter module 'trio': ignore: trio.MultiError is deprecated since Trio 0.22.0:trio.TrioDeprecationWarning",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790742751.1531909,
+      "instruction_sha256": "8b9cf46588b87c532be947e1ab102f1bf3241ad01133f5ca6c461dc7f7ecd9e6",
+      "ledger_clause_count": 0,
+      "partial_contract_count": 0,
+      "pipeline_exit": 1,
+      "provider_results": [],
+      "pytest_collection_overrides": {},
+      "repository": "https://github.com/encode/httpx",
+      "source_clauses_reached": [],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742744.455931,
+      "task": "httpx-streaming-json-iteration",
+      "worker_prompt_generated": false
+    },
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r1/mashumaro-flattened-dataclass-fields",
+      "base_commit": "de139fd51c4d347666d109a8aea9d25451d908f6",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "instruction-ledger.json",
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "semantic-contracts/instruction-001/source-decisions.json",
+          "semantic-contracts/instruction-001/source-extractions.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "PowdrrExecutionError",
+        "message": "partial contract cannot compile unresolved source decisions: ['temporal_scope']",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790742786.883907,
+      "instruction_sha256": "de53da160889bdacf28b492d639f84ff899e4ada661d4afa550460ccb89ba9f3",
+      "ledger_clause_count": 16,
+      "partial_contract_count": 0,
+      "pipeline_exit": 1,
+      "provider_results": [
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][0][0]",
+          "value": {
+            "statements": [
+              "flatten_prefix accepts a string value.",
+              "flatten_prefix accepts the value True.",
+              "When flatten_prefix is True, the field name plus an underscore is used as an automatic prefix.",
+              "flatten_rename is a parameter.",
+              "flatten_prefix and flatten_rename are mutually exclusive."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][1][0]",
+          "value": {
+            "statements": [
+              "Validation occurs at class creation.",
+              "Collisions are validated.",
+              "Collisions include all alias types.",
+              "Non-dataclass types are validated.",
+              "Invalid rename keys are validated.",
+              "Duplicate rename keys are validated."
+            ]
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][0][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "feature"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "one"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "must"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": "source_underspecified",
+            "status": "unresolved",
+            "value": null
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "explicit"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][7][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "nested dataclass fields"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "Add a `flatten` option to `field_options` so nested dataclass fields merge into the parent dict."
+          }
+        },
+        {
+          "output": "behavior_family_result",
+          "path": "steps[5].for_each[0][0][10]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "configure"
+          }
+        }
+      ],
+      "pytest_collection_overrides": {},
+      "repository": "https://github.com/Fatal1ty/mashumaro",
+      "source_clauses_reached": [
+        {
+          "clause": {
+            "clause_id": "instruction-001",
+            "parent_clause_id": null,
+            "source_span": {
+              "end": 96,
+              "start": 0
+            },
+            "text": "Add a `flatten` option to `field_options` so nested dataclass fields merge into the parent dict."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "feature"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "required"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "one"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "must"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": "source_underspecified",
+                "status": "unresolved",
+                "value": null
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "explicit"
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        }
+      ],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742744.4557881,
+      "task": "mashumaro-flattened-dataclass-fields",
+      "worker_prompt_generated": false
+    },
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r1/returns-validated-error-accumulation",
+      "base_commit": "41607fae1289de2787523c452d75212206b9c7c0",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "ModuleNotFoundError",
+        "message": "No module named 'covdefaults'",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790742754.994734,
+      "instruction_sha256": "77d27406cd485339c36030cde62de2a50233a0e3253536ac0468b4f1c46cc208",
+      "ledger_clause_count": 0,
+      "partial_contract_count": 0,
+      "pipeline_exit": 1,
+      "provider_results": [],
+      "pytest_collection_overrides": {},
+      "repository": "https://github.com/dry-python/returns",
+      "source_clauses_reached": [],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742744.4558709,
+      "task": "returns-validated-error-accumulation",
+      "worker_prompt_generated": false
+    },
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r2/cattrs-partial-structuring-recovery",
+      "base_commit": "6bc4708fb9b2ac52d9a18997e923da6a58916102",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "instruction-ledger.json",
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "semantic-contracts/instruction-001/partial-contract.json",
+          "semantic-contracts/instruction-001/source-decisions.json",
+          "semantic-contracts/instruction-001/source-extractions.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "PowdrrExecutionError",
+        "message": "a resolved semantic decision cannot have a reason code",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790742904.6774049,
+      "instruction_sha256": "13eab1ccb6c77dafa95e7e815a35fc76033aaf271076012067c3502c0c11272c",
+      "ledger_clause_count": 26,
+      "partial_contract_count": 1,
+      "pipeline_exit": 1,
+      "provider_results": [
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][0][0]",
+          "value": {
+            "statements": [
+              "The function returns a PartialResult.",
+              "PartialResult.value is a partial object or None.",
+              "PartialResult.is_complete is present.",
+              "PartialResult.structured_fields is a frozenset of field names successfully structured from input.",
+              "PartialResult.failed_fields is a frozenset.",
+              "PartialResult.errors is an exception or None.",
+              "PartialResult.error_map maps field names to Exception instances."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][1][0]",
+          "value": {
+            "statements": [
+              "A failed field that has a default uses that default as its fallback value.",
+              "A failed required field that has no default makes `value` `None`."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][2][0]",
+          "value": {
+            "statements": [
+              "Nested attrs/dataclass fields should be partially structured recursively.",
+              "If the nested object is only partially complete, use its partial value.",
+              "If the nested object is only partially complete, mark the parent field as failed.",
+              "If no value can be produced at all for the nested object, treat it as a normal field failure."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][3][0]",
+          "value": {
+            "statements": [
+              "With forbid_extra_keys, extra keys make is_complete False.",
+              "With forbid_extra_keys, extra keys still produce a value."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][4][0]",
+          "value": {
+            "statements": [
+              "The instruction handles attrs classes.",
+              "The instruction handles dataclasses.",
+              "The instruction handles TypedDicts."
+            ]
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][0][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "feature"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "must"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "explicit"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][7][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "`BaseConverter`"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "Add `partial_structure` to `BaseConverter` (and top-level)."
+          }
+        },
+        {
+          "output": "behavior_family_result",
+          "path": "steps[5].for_each[0][0][10]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "create"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][1][0]",
+          "value": {
+            "reason_code": "source_ambiguous",
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        }
+      ],
+      "pytest_collection_overrides": {
+        "PYTEST_ADDOPTS": "-o addopts= -o filterwarnings=",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "repository": "https://github.com/python-attrs/cattrs",
+      "source_clauses_reached": [
+        {
+          "clause": {
+            "clause_id": "instruction-001",
+            "parent_clause_id": null,
+            "source_span": {
+              "end": 59,
+              "start": 0
+            },
+            "text": "Add `partial_structure` to `BaseConverter` (and top-level)."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "feature"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "required"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "must"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "explicit"
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        }
+      ],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742852.915933,
+      "task": "cattrs-partial-structuring-recovery",
+      "worker_prompt_generated": false
+    },
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r2/httpx-streaming-json-iteration",
+      "base_commit": "b5addb64f0161ff6bfe94c124ef76f6a1fba5254",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "instruction-ledger.json",
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "semantic-contracts/instruction-001/partial-contract.json",
+          "semantic-contracts/instruction-001/source-decisions.json",
+          "semantic-contracts/instruction-001/source-extractions.json",
+          "semantic-contracts/instruction-002/source-decisions.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "PowdrrExecutionError",
+        "message": "occurrence is required for a repeated source quote",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790742914.375168,
+      "instruction_sha256": "8b9cf46588b87c532be947e1ab102f1bf3241ad01133f5ca6c461dc7f7ecd9e6",
+      "ledger_clause_count": 37,
+      "partial_contract_count": 1,
+      "pipeline_exit": 1,
+      "provider_results": [
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][0][0]",
+          "value": {
+            "statements": [
+              "The interface must be an iterator interface.",
+              "The iterator must yield parsed JSON values.",
+              "The iterator must yield values incrementally.",
+              "The iterator must correctly handle stream consumption.",
+              "The iterator must correctly handle common JSON streaming media types."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][1][0]",
+          "value": {
+            "statements": [
+              "Add `Response.iter_json()`.",
+              "Add `Response.aiter_json()`."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][2][0]",
+          "value": {
+            "statements": [
+              "Media type matching is case-insensitive.",
+              "Media type matching allows parameters."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][3][0]",
+          "value": {
+            "statements": [
+              "For each record, at most one trailing LF is stripped.",
+              "For each record, exactly one JSON text is parsed.",
+              "For each record, only surrounding whitespace is allowed around the JSON text."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][4][0]",
+          "value": {
+            "statements": [
+              "For streaming responses, iterating JSON must consume the response stream.",
+              "For streaming responses, iterating JSON must close the response."
+            ]
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][0][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "context"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "httpx responses"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "stream JSON values"
+          }
+        },
+        {
+          "output": "behavior_family_result",
+          "path": "steps[5].for_each[0][0][10]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "other"
+          }
+        },
+        {
+          "output": "behavior_scenario_result",
+          "path": "steps[5].for_each[0][0][16]",
+          "value": {
+            "scenario": {
+              "capability_matrix": [],
+              "dimensions": {
+                "cancellation_cleanup": "not_applicable (context only)",
+                "compatibility": "not_applicable (context only)",
+                "continuation": "not_applicable (context only)",
+                "error_behavior": "not_applicable (context only)",
+                "negative_boundaries": "not_applicable (context only)",
+                "normal_result": "not_applicable (context only)",
+                "unsupported_behavior": "not_applicable (context only)"
+              },
+              "given": "The source clause is context only",
+              "subject": "httpx responses",
+              "then": "No implementation obligation is generated",
+              "when": "The feature design is compiled"
+            },
+            "status": "resolved",
+            "unresolved_dimensions": []
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][1][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "interface"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "explicit"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][1][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "interface"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][1][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "be an iterator interface"
+          }
+        }
+      ],
+      "pytest_collection_overrides": {
+        "PYTEST_ADDOPTS": "-o addopts= -o filterwarnings=",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "repository": "https://github.com/encode/httpx",
+      "source_clauses_reached": [
+        {
+          "clause": {
+            "clause_id": "instruction-001",
+            "parent_clause_id": null,
+            "source_span": {
+              "end": 72,
+              "start": 0
+            },
+            "text": "httpx responses cannot currently stream JSON values in a structured way."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "context"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "descriptive"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "descriptive"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "not_stated"
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        },
+        {
+          "clause": {
+            "clause_id": "instruction-002",
+            "parent_clause_id": "candidate:instruction-002",
+            "source_span": {
+              "end": 233,
+              "start": 73
+            },
+            "text": "The interface must be an iterator interface."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "interface"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "required"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "must"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "explicit"
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        }
+      ],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742852.91602,
+      "task": "httpx-streaming-json-iteration",
+      "worker_prompt_generated": false
+    },
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r2/numba-stencil-boundary-modes",
+      "base_commit": "5781334aa654972fdc749003e7c1e93e6d277110",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "instruction-ledger.json",
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "semantic-contracts/instruction-001/partial-contract.json",
+          "semantic-contracts/instruction-001/source-decisions.json",
+          "semantic-contracts/instruction-001/source-extractions.json",
+          "semantic-contracts/instruction-002/partial-contract.json",
+          "semantic-contracts/instruction-002/source-decisions.json",
+          "semantic-contracts/instruction-002/source-extractions.json",
+          "semantic-contracts/instruction-003/partial-contract.json",
+          "semantic-contracts/instruction-003/source-decisions.json",
+          "semantic-contracts/instruction-003/source-extractions.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "PowdrrExecutionError",
+        "message": "a resolved semantic decision cannot have a reason code",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790743038.3644931,
+      "instruction_sha256": "f04c458707106be3c67a530cd724a92b72f4a8e5e546fe926a8891a7e2fb98bd",
+      "ledger_clause_count": 17,
+      "partial_contract_count": 3,
+      "pipeline_exit": 1,
+      "provider_results": [
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][0][0]",
+          "value": {
+            "statements": [
+              "`@stencil` gains a `mode` parameter for handling out-of-bounds accesses.",
+              "The `mode` value `wrap` handles out-of-bounds accesses circularly.",
+              "The `mode` value `nearest` handles out-of-bounds accesses by clamping to the edge.",
+              "The `mode` value `reflect` handles out-of-bounds accesses by mirroring without repeating the edge.",
+              "The `mode` value `symmetric` handles out-of-bounds accesses by mirroring with repeating the edge.",
+              "The `mode` value `constant` is the default mode.",
+              "In `constant` mode, boundary positions are set to `cval`.",
+              "In `constant` mode, the kernel is not applied at boundary positions."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][1][0]",
+          "value": {
+            "statements": [
+              "Use @stencil('wrap') for a single mode.",
+              "Use mode=('wrap', 'nearest') for per-dimension control."
+            ]
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][0][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "feature"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "descriptive"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "future"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "explicit"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][7][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "`@stencil`"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][0][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "handling out-of-bounds accesses"
+          }
+        },
+        {
+          "output": "behavior_family_result",
+          "path": "steps[5].for_each[0][0][10]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "other"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "not_stated"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][0][13].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "behavior_scenario_result",
+          "path": "steps[5].for_each[0][0][16]",
+          "value": {
+            "scenario": {
+              "capability_matrix": [
+                {
+                  "behavior": "support",
+                  "capability": "mode='wrap'",
+                  "error": "./not_applicable",
+                  "evidence": [
+                    "instruction-002: The mode value wrap handles out-of-bounds accesses circularly."
+                  ]
+                },
+                {
+                  "behavior": "support",
+                  "capability": "mode='nearest'",
+                  "error": "./not_applicable",
+                  "evidence": [
+                    "instruction-003: The mode value nearest handles out-of-bounds accesses by clamping to the edge."
+                  ]
+                },
+                {
+                  "behavior": "support",
+                  "capability": "mode='reflect'",
+                  "error": "./not_applicable",
+                  "evidence": [
+                    "instruction-004: The mode value reflect handles out-of-bounds accesses by mirroring without repeating the edge."
+                  ]
+                },
+                {
+                  "behavior": "support",
+                  "capability": "mode='symmetric'",
+                  "error": "./not_applicable",
+                  "evidence": [
+                    "instruction-005: The mode value symmetric handles out-of-bounds accesses by mirroring with repeating the edge."
+                  ]
+                },
+                {
+                  "behavior": "support",
+                  "capability": "mode='constant'",
+                  "error": "./not_applicable",
+                  "evidence": [
+                    "instruction-006: The mode value constant is the default mode.",
+                    "instruction-007: In constant mode, boundary positions are set to cval.",
+                    "instruction-008: In constant mode, the kernel is not applied at boundary positions."
+                  ]
+                },
+                {
+                  "behavior": "support",
+                  "capability": "mode tuple per-dimension",
+                  "error": "./not_applicable",
+                  "evidence": [
+                    "instruction-011: Use mode=('wrap', 'nearest') for per-dimension control."
+                  ]
+                },
+                {
+                  "behavior": "reject",
+                  "capability": "invalid mode",
+                  "error": "NumbaValueError",
+                  "evidence": [
+                    "instruction-013: Invalid mode raises NumbaValueError."
+                  ]
+                },
+                {
+                  "behavior": "reject",
+                  "capability": "mode tuple length mismatch",
+                  "error": "./not_applicable",
+                  "evidence": [
+                    "instruction-014: Mode tuple length must match array dimensions."
+                  ]
+                }
+              ],
+              "dimensions": {
+                "cancellation_cleanup": "not_applicable",
+                "compatibility": "The mode parameter works alongside existing stencil options: cval, neighborhood, and standard_indexing.",
+                "continuation": "not_applicable",
+                "error_behavior": "An invalid mode raises NumbaValueError; a mode tuple whose length does not match the array dimensions raises an error.",
+                "negative_boundaries": "For reflect and symmetric modes, if the reflected index is still out of bounds, use cval for that access; in constant mode, boundary positions are set to cval and the kernel is not applied at boundary positions; default cval is 0.",
+                "normal_result": "The @stencil decorator accepts a mode parameter and applies the specified boundary handling (wrap, nearest, reflect, symmetric, or constant) to out-of-bounds accesses during stencil execution.",
+                "unsupported_behavior": "not_applicable"
+              },
+              "given": "a stencil kernel is defined with a mode parameter for handling out-of-bounds accesses",
+              "subject": "@stencil decorator",
+              "then": "the out-of-bounds accesses are handled according to the specified mode",
+              "when": "the stencil is applied to an array with out-of-bounds accesses"
+            },
+            "status": "resolved",
+            "unresolved_dimensions": []
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][1][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "feature"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "one"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "descriptive"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "explicit"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][1][4].for_each[0][7][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][1][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "mode"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][1][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "handles out-of-bounds accesses circularly"
+          }
+        },
+        {
+          "output": "behavior_family_result",
+          "path": "steps[5].for_each[0][1][10]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "other"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][1][13].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "not_stated"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][1][13].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][1][13].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][1][13].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "behavior_scenario_result",
+          "path": "steps[5].for_each[0][1][16]",
+          "value": {
+            "scenario": {
+              "capability_matrix": [
+                {
+                  "behavior": "support",
+                  "capability": "wrap mode",
+                  "error": "./n/a",
+                  "evidence": [
+                    "instruction-002: The `mode` value `wrap` handles out-of-bounds accesses circularly."
+                  ]
+                }
+              ],
+              "dimensions": {
+                "cancellation_cleanup": "not_applicable",
+                "compatibility": "mode parameter works alongside existing stencil options cval, neighborhood, and standard_indexing per instruction-015",
+                "continuation": "not_applicable",
+                "error_behavior": "no error is raised for out-of-bounds accesses in wrap mode; invalid mode values raise NumbaValueError per instruction-013",
+                "negative_boundaries": "for reflect and symmetric modes, if the reflected index is still out of bounds, cval is used per instruction-012; wrap mode has no such fallback",
+                "normal_result": "out-of-bounds accesses are resolved by wrapping the index modulo the array length, so index -1 reads the last element",
+                "unsupported_behavior": "not_applicable"
+              },
+              "given": "a stencil kernel with mode='wrap' and an out-of-bounds access at index -1 on a 1D array of length 5",
+              "subject": "stencil mode wrap",
+              "then": "the out-of-bounds access reads the element at index 4 (circular wrap)",
+              "when": "the stencil is applied to the array"
+            },
+            "status": "resolved",
+            "unresolved_dimensions": []
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][2][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "feature"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "one"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "descriptive"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "present"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "explicit"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][2][4].for_each[0][7][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][2][7].for_each[0][0][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "The `mode` value `nearest`"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][2][7].for_each[0][1][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "clamping to the edge"
+          }
+        },
+        {
+          "output": "source_extraction_result",
+          "path": "steps[5].for_each[0][2][7].for_each[0][2][0]",
+          "value": {
+            "occurrence": null,
+            "quote": "clamping to the edge"
+          }
+        },
+        {
+          "output": "behavior_family_result",
+          "path": "steps[5].for_each[0][2][10]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "other"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][2][13].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "contradicted"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][2][13].for_each[0][1][0]",
+          "value": {
+            "reason_code": "source_ambiguous",
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][2][13].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][2][13].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        },
+        {
+          "output": "field_entailment_result",
+          "path": "steps[5].for_each[0][2][13].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entailed"
+          }
+        }
+      ],
+      "pytest_collection_overrides": {
+        "PYTEST_ADDOPTS": "-o addopts= -o filterwarnings=",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "repository": "https://github.com/numba/numba",
+      "source_clauses_reached": [
+        {
+          "clause": {
+            "clause_id": "instruction-001",
+            "parent_clause_id": "candidate:instruction-001",
+            "source_span": {
+              "end": 283,
+              "start": 0
+            },
+            "text": "`@stencil` gains a `mode` parameter for handling out-of-bounds accesses."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "feature"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "required"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "descriptive"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "future"
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "explicit"
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        },
+        {
+          "clause": {
+            "clause_id": "instruction-002",
+            "parent_clause_id": "candidate:instruction-001",
+            "source_span": {
+              "end": 283,
+              "start": 0
+            },
+            "text": "The `mode` value `wrap` handles out-of-bounds accesses circularly."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "feature"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "required"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "one"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "descriptive"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "explicit"
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        },
+        {
+          "clause": {
+            "clause_id": "instruction-003",
+            "parent_clause_id": "candidate:instruction-001",
+            "source_span": {
+              "end": 283,
+              "start": 0
+            },
+            "text": "The `mode` value `nearest` handles out-of-bounds accesses by clamping to the edge."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "feature"
+              }
+            },
+            {
+              "decision_kind": "polarity",
+              "provider_kind": "deterministic-rule",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "required"
+              }
+            },
+            {
+              "decision_kind": "quantifier",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "one"
+              }
+            },
+            {
+              "decision_kind": "requirement_strength",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "descriptive"
+              }
+            },
+            {
+              "decision_kind": "has_precondition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_exception",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "absent"
+              }
+            },
+            {
+              "decision_kind": "has_explicit_result",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "present"
+              }
+            },
+            {
+              "decision_kind": "temporal_scope",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "unspecified"
+              }
+            },
+            {
+              "decision_kind": "source_predicate",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "explicit"
+              }
+            },
+            {
+              "decision_kind": "nonactionable_exclusion_safety",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "product_semantics_present"
+              }
+            }
+          ]
+        }
+      ],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742852.9161038,
+      "task": "numba-stencil-boundary-modes",
+      "worker_prompt_generated": false
+    },
+    {
+      "artifact_root": "/private/tmp/python-instruction-audit-20260929-more-r2/returns-validated-error-accumulation",
+      "base_commit": "41607fae1289de2787523c452d75212206b9c7c0",
+      "bootstrap_exit": 0,
+      "failure": {
+        "artifact_paths": [
+          "instruction-ledger.json",
+          "procedrr-events.jsonl",
+          "run-metadata.json",
+          "semantic-contracts/instruction-001/source-decisions.json",
+          "validation-bootstrap.yaml"
+        ],
+        "clause_id": null,
+        "contract_id": null,
+        "error_type": "PowdrrExecutionError",
+        "message": "descriptive polarity conflicts with normative strength",
+        "model_response_path": null,
+        "obligation_id": null,
+        "schema_version": "powdrr-run-failure-v1",
+        "stage": "unknown",
+        "validation_command": []
+      },
+      "finished_at": 1790742924.910558,
+      "instruction_sha256": "77d27406cd485339c36030cde62de2a50233a0e3253536ac0468b4f1c46cc208",
+      "ledger_clause_count": 60,
+      "partial_contract_count": 0,
+      "pipeline_exit": 1,
+      "provider_results": [
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][0][0]",
+          "value": {
+            "statements": [
+              "Validating multiple independent inputs collects all errors.",
+              "Validation does not stop at the first failure."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][1][0]",
+          "value": {
+            "statements": [
+              "The swap method turns Valid(x) into Invalid((x,)).",
+              "The swap method turns Invalid(errs) into Valid(errs)."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][2][0]",
+          "value": {
+            "statements": [
+              "Validated integrates into the library's container interface hierarchy.",
+              "Validated inherits standard container behavior.",
+              "Validated supports equality.",
+              "Validated supports repr.",
+              "Validated supports do-notation.",
+              "Validated supports unwrap.",
+              "Validated supports failure.",
+              "Validated supports value_or. Validated supports from_value."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][3][0]",
+          "value": {
+            "statements": [
+              "bind_validated is a required method.",
+              "from_result is a required classmethod.",
+              "from_result converts a Result into a Validated.",
+              "from_result maps a Success Result to Valid.",
+              "from_result maps a Failure Result to Invalid.",
+              "from_result wraps a Failure's error in a 1-tuple to become Invalid."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][4][0]",
+          "value": {
+            "statements": [
+              "combine_n is a classmethod.",
+              "combine_n accepts a tuple of N Validated containers.",
+              "combine_n accepts an N-ary function.",
+              "combine_n accumulates all errors if any of the Validated containers are failures."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][5][0]",
+          "value": {
+            "statements": [
+              "A validated decorator is added.",
+              "The validated decorator catches exceptions.",
+              "The validated decorator returns Invalid when it catches an exception.",
+              "The validated decorator supports specifying exception types via an exceptions parameter."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][6][0]",
+          "value": {
+            "statements": [
+              "A new interface must extend FailableN directly.",
+              "The new interface must have its own from_failure classmethod.",
+              "The new interface must have custom short-circuit law specs for map on failure values.",
+              "The new interface must have custom short-circuit law specs for bind on failure values.",
+              "The new interface must have custom short-circuit law specs for apply on failure values."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][7][0]",
+          "value": {
+            "statements": [
+              "The clause requires studying returns/interfaces/specific/result.py for the interface pattern.",
+              "The interface pattern includes ResultLikeN.",
+              "The interface pattern includes ResultBasedN.",
+              "The interface pattern includes UnwrappableResult.",
+              "The clause requires studying returns/result.py for the concrete container pattern.",
+              "The concrete container pattern includes the if-not-TYPE_CHECKING guard for runtime methods.",
+              "The concrete container pattern includes BaseContainer usage."
+            ]
+          }
+        },
+        {
+          "output": "atomicity_split",
+          "path": "steps[3].for_each[0][8][0]",
+          "value": {
+            "statements": [
+              "The instruction requires updating returns/methods/cond.py.",
+              "The update to returns/methods/cond.py must add a ValidatedLikeN dispatch branch.",
+              "The ValidatedLikeN dispatch branch must be added before the container_type.empty fallback.",
+              "The instruction requires updating returns/contrib/hypothesis/containers.py.",
+              "The update to returns/contrib/hypothesis/containers.py must register ValidatedLikeN with from_failure strategy generation.",
+              "The instruction requires updating returns/pointfree/__init__.py.",
+              "The update to returns/pointfree/__init__.py must export bind_validated."
+            ]
+          }
+        },
+        {
+          "output": "root_decision_result",
+          "path": "steps[5].for_each[0][0][1].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "entity"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][0][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "descriptive"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][1][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "one"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][2][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "must"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][3][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][4][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][5][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "absent"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][6][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "unspecified"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][7][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "not_stated"
+          }
+        },
+        {
+          "output": "dependent_decision_result",
+          "path": "steps[5].for_each[0][0][4].for_each[0][8][0]",
+          "value": {
+            "reason_code": null,
+            "status": "resolved",
+            "value": "product_semantics_present"
+          }
+        }
+      ],
+      "pytest_collection_overrides": {
+        "PYTEST_ADDOPTS": "-o addopts= -o filterwarnings=",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "repository": "https://github.com/dry-python/returns",
+      "source_clauses_reached": [
+        {
+          "clause": {
+            "clause_id": "instruction-001",
+            "parent_clause_id": null,
+            "source_span": {
+              "end": 125,
+              "start": 0
+            },
+            "text": "The returns library needs an error-accumulating container type called Validated with two concrete subtypes Valid and Invalid."
+          },
+          "decisions": [
+            {
+              "decision_kind": "disposition",
+              "provider_kind": "planning-llm",
+              "result": {
+                "reason_code": null,
+                "status": "resolved",
+                "value": "entity"
+              }
+            }
+          ]
+        }
+      ],
+      "source_commit": "abb954471d986736081cc7945cac68d22828b532",
+      "started_at": 1790742852.916047,
+      "task": "returns-validated-error-accumulation",
+      "worker_prompt_generated": false
+    }
+  ],
+  "schema_version": "python-instruction-audit-evidence-v1",
+  "task_test_environment_complete": false
+}

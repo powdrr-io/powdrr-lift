@@ -66,3 +66,41 @@ not import `sqlite_fts4` from the shared environment. This prevented reliable
 test-selector discovery; it did not prevent design compilation. The run
 recorded 1,001 Procedrr events, including 190 dependent decisions and 193
 field-entailment decisions. JEV was enabled and returned accepted responses.
+
+## SQLFmt DDL formatter and parser
+
+The design-only pipeline was run against `sqlfmt-create-table-ddl-formatting`;
+no coding agent or verifier was run. The initial attempt exposed a bootstrap
+failure on a tracked symlink to a directory. Bootstrap now includes only
+tracked paths that resolve to files, preserving symlinks to files while
+excluding directory targets. A regression test covers the directory case. The
+successful rerun and initial failure are retained under
+`/private/tmp/python-instruction-audit-20260930/sqlfmt/`.
+
+The successful run produced an implementation prompt and Structrr diff from 56
+ledger clauses, 52 product obligations, and 1,359 Procedrr events. Bootstrap
+found 231 entities, four tools, and four validation inventory records. As in
+the other audits, the Structrr diff contains no entity or relationship changes.
+Pytest selector discovery could not import the task package `sqlfmt` from the
+shared environment, but design generation completed and JEV returned accepted
+responses.
+
+This task exposed a source-segmentation gap in Markdown numbered lists. The
+ledger duplicated the opening two-deliverable sentence with the same source
+span, assigned the same source span to two separate requirements, and emitted
+standalone list markers (`2.`, `3.`, and so on) as clauses. Those markers then
+produced generic or undefined design scenarios. The full instruction remains
+in the worker prompt and the individual substantive rules are mostly present,
+but the extra clauses create noise and make source-to-obligation traceability
+unreliable. The parser should treat numbered markers as structure, preserve
+paragraph/list-item spans accurately, and deduplicate only when source spans
+and text genuinely identify the same source clause.
+
+The instruction also provides two distinct deliverables (formatter behavior
+and a `sqlfmt.ddl` module), eight numbered formatting requirements, explicit
+out-of-scope pass-through behavior, public data models, parser acceptance of
+arbitrary valid parsed representations, and an instruction to commit. The
+design retained both product areas and the out-of-scope clauses, while the
+commit directive remained non-product process context. This is a useful
+classification example for mixed product, API, test-oracle, exclusion, and
+workflow instructions within one Python task.

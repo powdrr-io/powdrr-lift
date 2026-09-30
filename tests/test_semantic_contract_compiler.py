@@ -659,6 +659,48 @@ def test_field_faithfulness_requires_reviews_and_routes_not_stated() -> None:
     assert outcome.findings == ()
 
 
+def test_benchmark_field_review_defaults_resolved_result_with_reason_code() -> None:
+    clause = _clause()
+    decisions = _bind_source_decisions(clause)
+    extractions = bind_source_extractions(
+        requests=prepare_source_extractions(clause, decisions),
+        provider_results=[{"quote": "data"}, {"quote": "pickle"}],
+        created_at=NOW,
+    )
+    family_request = prepare_behavior_family_decision(clause, extractions[1])
+    contract = compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=bind_behavior_family_decision(
+            family_request, {"status": "resolved", "value": "serialize"}, created_at=NOW
+        ),
+    )
+    requests = prepare_field_entailment_reviews(contract)
+    reviews = bind_field_entailment_reviews(
+        requests=requests,
+        provider_results=[
+            {
+                "status": "resolved",
+                "value": "entailed",
+                "reason_code": "source_ambiguous",
+            }
+            if request["spec"]["field"] == "behavior_family"
+            else {"status": "resolved", "value": "entailed", "reason_code": None}
+            for request in requests
+        ],
+        benchmark_mode=True,
+        created_at=NOW,
+    )
+
+    review = next(item for item in reviews if item.spec.field == "behavior_family")
+    assert review.decision.result.value == "not_stated"
+    assert review.decision.provider.kind == "deterministic-rule"
+    assert (
+        "normative-default:behavior_family:not_stated" in review.decision.evidence_refs
+    )
+
+
 def test_exact_extractor_rejects_an_invented_or_case_changed_quote() -> None:
     clause = _clause()
     requests = prepare_source_extractions(clause, _bind_source_decisions(clause))

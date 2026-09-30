@@ -122,6 +122,12 @@ The next-stage platform design is captured in
 It describes the specification families, synthesis workflows, review flows,
 and context endpoints that will extend the current skill platform.
 
+The proposed service boundary is detailed in
+[`docs/plans/hosted-instruction-compiler.md`](docs/plans/hosted-instruction-compiler.md).
+It moves instruction interpretation, design compilation, prompt assembly, and
+acceptance policy into a service while keeping repository access and
+mini-SWE-agent execution local.
+
 The current specification documents live under `docs/specs/<work-item-name>/`
 and share the `https://powdrr.io/schemas/specification-v1` schema.
 

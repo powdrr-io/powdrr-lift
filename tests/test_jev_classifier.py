@@ -196,3 +196,46 @@ def test_jev_provider_failure_falls_back(
     assert fallback.calls == 1
     assert "JEV_REQUEST_STARTED" in caplog.text
     assert "JEV_FALLBACK" in caplog.text
+
+
+@pytest.mark.parametrize("answer", [None, "unresolved", "invalid"])
+def test_jev_enum_gate_retains_planning_fallback(
+    monkeypatch: Any, answer: str | None
+) -> None:
+    class GateFallback(_Fallback):
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            self.calls += 1
+            return {"decision": "skip"}
+
+    fallback = GateFallback()
+    observed: list[dict[str, Any]] = []
+
+    def fail(request: dict[str, Any], *_: Any) -> Any:
+        observed.append(request)
+        if answer is None:
+            raise RuntimeError("provider unavailable")
+        return {"choice": answer}
+
+    monkeypatch.setattr(jev_classifier, "_call_jev", fail)
+    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+        [
+            {"role": "system", "content": "Return JSON."},
+            {
+                "role": "user",
+                "content": (
+                    "Question:\nResearch?\n\nContext:\n"
+                    '{"feature_description": "Local behavior."}'
+                ),
+            },
+        ],
+        response_schema={
+            "type": "object",
+            "required": ["decision"],
+            "properties": {
+                "decision": {"type": "string", "enum": ["research", "skip"]}
+            },
+        },
+    )
+    assert observed[0]["allowed_values"] == ["research", "skip"]
+    assert fallback.calls == 1
+    assert result == {"decision": "skip"}

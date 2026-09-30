@@ -201,6 +201,21 @@ def _classifier_request(
             "state": {"source_text": clause["text"], "context": context_suffix},
             "output_property": output_property,
         }
+    if output_property and output_property.get("type") == "string":
+        allowed = output_property.get("enum")
+        if (
+            isinstance(allowed, list)
+            and allowed
+            and all(isinstance(value, str) for value in allowed)
+        ):
+            return {
+                "kind": "enum_classifier",
+                "allowed_values": allowed,
+                "question": _question_from_prompt(prompt_prefix),
+                "instructions": [prompt_prefix],
+                "state": {"context": context},
+                "output_property": output_property,
+            }
     return None
 
 
@@ -247,6 +262,8 @@ def _format_classifier_result(
             return {output_property["name"]: choice == "true"}
         raise ValueError("Jev returned an unsupported boolean classification")
     if choice == "unresolved":
+        if output_property and output_property["name"] != "value":
+            raise ValueError("Jev abstained on a single-field classification")
         return {
             "status": "unresolved",
             "value": None,

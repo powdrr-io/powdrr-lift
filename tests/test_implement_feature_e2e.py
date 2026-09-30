@@ -105,6 +105,8 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"decision"}:
+            return {"decision": "skip"}
         if required == {"decision", "rationale", "queries"}:
             return {
                 "decision": "skip",

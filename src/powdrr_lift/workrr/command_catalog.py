@@ -47,6 +47,11 @@ from powdrr_lift.core.semantic_faithfulness import (
     FieldEntailmentSpec,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.structrr.obligation_evidence import (
+    ObligationEvidenceContract,
+    assert_obligation_evidence_complete,
+    compile_obligation_evidence_contract,
+)
 from powdrr_lift.workrr.external_contract_research import (
     bind_external_contract_assessments,
     bind_external_contract_claims,
@@ -1904,14 +1909,54 @@ class FeatureCommandRuntime:
                 if isinstance(decision, Mapping)
                 and isinstance(decision.get("behavior_scenario"), Mapping)
             }
-            obligations = [
-                {
-                    "id": f"sentence-{index}",
-                    "description": item.projection.description,
-                    "design": item.projection.to_data(),
-                }
-                for index, item in enumerate(design.obligations, start=1)
-            ]
+            evidence_by_clause: dict[str, dict[str, Any]] = {}
+            for item in design.obligations:
+                decision = decisions_by_clause_id.get(item.clause_id)
+                partial = (
+                    decision.get("partial_contract")
+                    if isinstance(decision, Mapping)
+                    else None
+                )
+                if not isinstance(partial, Mapping):
+                    raise PowdrrExecutionError(
+                        f"obligation {item.clause_id!r} has no source semantic contract"
+                    )
+                try:
+                    evidence_contract = compile_obligation_evidence_contract(
+                        obligation_id=item.obligation_id,
+                        clause_id=item.clause_id,
+                        requirement_strength=str(
+                            partial.get("requirement_strength", "")
+                        ),
+                        kind=item.projection.kind,
+                        polarity=str(partial.get("polarity", "")),
+                    )
+                except ValueError as exc:
+                    raise PowdrrExecutionError(
+                        f"could not classify evidence for {item.clause_id!r}: {exc}"
+                    ) from exc
+                evidence_by_clause[item.clause_id] = evidence_contract.to_data()
+            try:
+                assert_obligation_evidence_complete(
+                    tuple(
+                        ObligationEvidenceContract.from_data(raw)
+                        for raw in evidence_by_clause.values()
+                    ),
+                    tuple(item.obligation_id for item in design.obligations),
+                )
+            except ValueError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            obligations = []
+            for index, item in enumerate(design.obligations, start=1):
+                projection = item.projection.to_data()
+                projection["evidence_contract"] = evidence_by_clause[item.clause_id]
+                obligations.append(
+                    {
+                        "id": f"sentence-{index}",
+                        "description": item.projection.description,
+                        "design": projection,
+                    }
+                )
             semantic_cases = [
                 {
                     "id": f"test-sentence-{index}",
@@ -1954,6 +1999,12 @@ class FeatureCommandRuntime:
                     }
                 )
             canonical_document = design.to_data()
+            for canonical_obligation in canonical_document["obligations"]:
+                clause_id = canonical_obligation.get("clause_id")
+                if isinstance(clause_id, str):
+                    canonical_obligation["evidence_contract"] = evidence_by_clause[
+                        clause_id
+                    ]
             canonical_document["verification_contracts"] = verification_contracts
             path = output_root / "canonical-feature-design.json"
             path.write_text(

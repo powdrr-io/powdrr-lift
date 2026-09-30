@@ -31,6 +31,15 @@ from powdrr_lift.structrr.intent_lineage import (
     INTENT_LINEAGE_HISTORY_SCHEMA,
     audit_intent_lineage,
 )
+from powdrr_lift.structrr.obligation_evidence import (
+    DiffExpectation,
+    EvidenceRoute,
+    NormativeStrength,
+    OBLIGATION_EVIDENCE_SCHEMA_VERSION,
+    ObligationEvidenceContract,
+    assert_obligation_evidence_complete,
+    compile_obligation_evidence_contract,
+)
 from powdrr_lift.structrr.proposal import (
     PROPOSAL_REVISION_SCHEMA_VERSION,
     ProposalOperation,
@@ -78,6 +87,13 @@ __all__ = [
     "validate_active_intent_section",
     "INTENT_LINEAGE_HISTORY_SCHEMA",
     "audit_intent_lineage",
+    "DiffExpectation",
+    "EvidenceRoute",
+    "NormativeStrength",
+    "OBLIGATION_EVIDENCE_SCHEMA_VERSION",
+    "ObligationEvidenceContract",
+    "assert_obligation_evidence_complete",
+    "compile_obligation_evidence_contract",
     "StructrrChange",
     "StructrrRebaseReport",
     "StructrrRemapping",

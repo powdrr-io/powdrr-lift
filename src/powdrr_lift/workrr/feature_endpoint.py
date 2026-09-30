@@ -56,6 +56,7 @@ from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
 )
+from powdrr_lift.structrr.obligation_evidence import ObligationEvidenceContract
 from powdrr_lift.structrr.proposal import (
     ProposalRevision,
     compile_proposal_revision,
@@ -1969,6 +1970,45 @@ def _require_feature_obligations(value: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(descriptions))
 
 
+def _require_obligation_evidence_contracts(
+    value: Any,
+) -> tuple[ObligationEvidenceContract, ...]:
+    """Validate and retain any evidence contracts attached during design."""
+    if not isinstance(value, Mapping):
+        return ()
+    raw_obligations = value.get("obligations")
+    if not isinstance(raw_obligations, list):
+        return ()
+    contracts: list[ObligationEvidenceContract] = []
+    for item in raw_obligations:
+        if not isinstance(item, Mapping):
+            continue
+        design = item.get("design")
+        raw_contract = (
+            design.get("evidence_contract") if isinstance(design, Mapping) else None
+        )
+        if raw_contract is None:
+            continue
+        if not isinstance(raw_contract, Mapping):
+            raise PowdrrExecutionError("obligation evidence contract is malformed")
+        try:
+            contract = ObligationEvidenceContract.from_data(raw_contract)
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"obligation evidence contract is invalid: {error}"
+            ) from error
+        if contract.clause_id in {existing.clause_id for existing in contracts}:
+            raise PowdrrExecutionError(
+                f"duplicate obligation evidence contract for {contract.clause_id!r}"
+            )
+        contracts.append(contract)
+    if contracts and len(contracts) != len(raw_obligations):
+        raise PowdrrExecutionError(
+            "obligation evidence contracts must cover every feature obligation"
+        )
+    return tuple(contracts)
+
+
 def _execution_unit_for_code_task(
     task: Mapping[str, Any],
     *,
@@ -2146,6 +2186,9 @@ def _run_code_agent_phase(
     feature_description = _require_flow_text(parameters, "feature_description")
     work_item_name = _require_flow_text(parameters, "work_item_name")
     feature_obligations = _require_feature_obligations(parameters.get("obligations"))
+    obligation_evidence_contracts = _require_obligation_evidence_contracts(
+        parameters.get("obligations")
+    )
     (
         planned_additions,
         planned_deletions,
@@ -2298,6 +2341,9 @@ def _run_code_agent_phase(
                 item
                 for item in state.get("external_contract_notes", ())
                 if isinstance(item, Mapping)
+            ),
+            obligation_evidence_contracts=tuple(
+                item.to_data() for item in obligation_evidence_contracts
             ),
         )
     except ValueError as error:

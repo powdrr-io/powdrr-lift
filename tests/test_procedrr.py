@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pytest
 
 from procedrr import (
@@ -619,6 +621,23 @@ def test_checked_in_design_interview_definition_parses() -> None:
 
     source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
     document = parse_and_validate(source)
+    judge_providers: dict[str, list[str]] = {"classify_one": [], "construct_one": []}
+
+    def collect_judges(value: Any) -> None:
+        if isinstance(value, dict):
+            kind = value.get("kind")
+            if isinstance(kind, str) and kind in judge_providers:
+                judge_providers[kind].append(cast(str, value.get("provider")))
+            for nested in value.values():
+                collect_judges(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                collect_judges(nested)
+
+    collect_judges(document["steps"])
+    assert judge_providers["classify_one"]
+    assert set(judge_providers["classify_one"]) == {"jev"}
+    assert set(judge_providers["construct_one"]) == {"planning"}
     assert document["name"] == "design-interview"
     assert validate_single_decision(document) == ()
 
@@ -630,6 +649,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     document = parse_and_validate(source)
     atomicity_body = document["steps"][1]["for_each"]["body"]
     atomicity_judge = atomicity_body[0]["judge"]
+    atomicity_loop = document["steps"][1]["for_each"]
     split_body = document["steps"][3]["for_each"]["body"]
     split_judge = split_body[0]["judge"]
     body = document["steps"][5]["for_each"]["body"]
@@ -648,14 +668,17 @@ def test_design_interview_uses_single_field_source_classification() -> None:
         "verifiable requirement?"
     )
     assert atomicity_judge["output"]["schema"]["required"] == ["multiple"]
+    assert atomicity_loop["max_parallel"] == 8
     assert split_judge["question"] == (
-        "What are the smallest independently verifiable requirements contained in "
-        "this one instruction clause?"
+        "How can this clause be decomposed without losing validation dependencies?"
     )
-    assert split_judge["output"]["schema"]["required"] == ["statements"]
+    assert split_judge["output"]["schema"]["required"] == [
+        "statements",
+        "validation_groups",
+    ]
 
     assert classifier_loop["snapshot"]["max_items"] == 16
-    assert root_judge["question"].startswith("Decide the root role")
+    assert root_judge["question"].startswith("Decide how the pipeline should route")
     assert dependent_operation["command"] == [
         "prepare_dependent_source_semantic_decisions"
     ]
@@ -674,6 +697,10 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     assert "atomic_instruction_ledger" in scenario_judge["context"]
     assert any(
         "complete atomic instruction ledger" in item
+        for item in scenario_judge["instructions"]
+    )
+    assert any(
+        "Use reject only when the operation explicitly fails" in item
         for item in scenario_judge["instructions"]
     )
     flow_text = str(body)

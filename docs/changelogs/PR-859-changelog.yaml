@@ -1,0 +1,113 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 859
+title: Fix local DeepSWE runs and record instruction audit findings
+intent:
+  problem: Local Python DeepSWE runs were blocked by adapter setup and an instruction classifier that treated a missing product capability as an explicit prohibition, while the instruction audit did not preserve task coverage and failure evidence.
+  goal: Make the Pier adapter install dependencies in both system Python and virtual environments, keep missing persistence requirements actionable, and maintain a sourced catalog of Python task instruction patterns and observed run failures.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/integrations/harbor/_env.py
+    type: modified
+    span: {start_line: 5, end_line: 21}
+    summary: Add a shell command builder that selects pip's user install mode only for system Python.
+    rationale: DeepSWE task images may activate virtual environments where pip rejects --user.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 9, end_line: 12}
+    summary: Import the environment-aware pip command builder.
+    rationale: Keep package-install command construction in a dependency-free helper.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 63, end_line: 67}
+    summary: Use the environment-aware installer for Powdrr and MiniSWE build steps.
+    rationale: Allow Pier's generated Dockerfile to install packages into task image virtual environments.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 82, end_line: 87}
+    summary: Use the environment-aware installer for the Powdrr package build step.
+    rationale: Allow Pier's generated Dockerfile to install Powdrr into task image virtual environments.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 134, end_line: 139}
+    summary: Use the environment-aware installer for runtime installation of Powdrr.
+    rationale: Keep runtime installation consistent with Pier build-time installation.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 144, end_line: 149}
+    summary: Build the conditional MiniSWE runtime installation command with the environment-aware installer.
+    rationale: Support task containers whose Python interpreter runs in a virtual environment.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 154, end_line: 154}
+    summary: Execute the conditional installer command when MiniSWE is unavailable.
+    rationale: Keep runtime fallback installation behavior intact.
+  - path: tests/test_harbor_env.py
+    type: modified
+    span: {start_line: 5, end_line: 8}
+    summary: Import the new installer command helper for focused unit coverage.
+    rationale: Keep adapter installation behavior testable without importing Pier.
+  - path: tests/test_harbor_env.py
+    type: modified
+    span: {start_line: 19, end_line: 29}
+    summary: Test the generated pip command's system-Python and virtual-environment branches.
+    rationale: Prevent reintroducing the --user failure in task images with virtual environments.
+  - path: docs/harbor/deepswe-python-instruction-audit.md
+    type: added
+    span: {start_line: 1, end_line: 164}
+    summary: Catalog all Python DeepSWE tasks, capability areas, local runs, and observed prompt-generation blockers including the Igel disposition failure.
+    rationale: Keep run evidence distinct from hypotheses about instruction clarity and guide broader follow-up coverage.
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 263, end_line: 266}
+    summary: Keep explicitly described missing persistence capabilities actionable when a semantic classifier labels them non-goal.
+    rationale: A product gap such as a schema that is not persisted must remain an implementation obligation.
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 347, end_line: 368}
+    summary: Recognize common missing persistence and storage statements as product gaps.
+    rationale: Preserve affirmative task intent expressed as a description of current missing behavior.
+  - path: tests/test_feature_obligation.py
+    type: modified
+    span: {start_line: 160, end_line: 184}
+    summary: Add regression coverage for the Igel task's missing-persistence wording.
+    rationale: Prevent a product gap from being discarded as an explicit product prohibition.
+entities:
+  - id: harbor-pip-install-command
+    type: Function
+    action: added
+  - id: harbor-environment-flag-tests
+    type: Test suite
+    action: modified
+  - id: deepswe-python-instruction-audit
+    type: Design doc
+    action: added
+  - id: missing-persistence-feature-classification
+    type: Function
+    action: added
+entity_relationships:
+  - id: installer-tests-cover-command-builder
+    source: harbor-environment-flag-tests
+    target: harbor-pip-install-command
+    relationship: tests
+    description: The existing Harbor environment test suite asserts both installation branches emitted by the command builder.
+    rationale: Preserve correct installation behavior for system Python and virtual environments.
+    action: added
+invariants:
+  - id: pip-user-install-only-for-system-python
+    action: added
+    description: Adapter pip commands use --user only when Python is not running inside a virtual environment.
+    rationale: Install dependencies into the active interpreter without pip rejecting user-site installs in virtual environments.
+  - id: python-task-results-require-instruction-processing-evidence
+    action: added
+    description: A local task run is not reported as prompt-generation evidence unless the instruction reaches prompt creation and the prompt artifact is inspected.
+    rationale: Distinguish setup failures and semantic compilation failures from completed prompt generation.
+  - id: missing-product-capabilities-remain-actionable
+    action: added
+    description: A statement that required behavior is not currently persisted, saved, or stored remains actionable product work even when classified as non-goal.
+    rationale: Prevent current product gaps from being mistaken for prohibitions against implementing the requested capability.
+guidance:
+  - id: resume-local-python-audit-after-adapter-fix
+    action: added
+    description: Continue the local audit with fresh Pier roots and record the generated worker prompt, attempt status, validation profile, and verifier result for each task.
+    rationale: Build a broad capability catalog from observed task runs rather than instruction summaries alone.

@@ -1,0 +1,204 @@
+{
+  "agreement": {
+    "jev_vs_human": {
+      "accuracy": 0.448,
+      "confusion_matrix": {
+        "context": {
+          "feature": 1,
+          "invariant": 2
+        },
+        "entity": {
+          "entity": 4,
+          "feature": 1,
+          "interface": 3,
+          "invariant": 3
+        },
+        "feature": {
+          "feature": 14,
+          "interface": 1,
+          "invariant": 22,
+          "non_goal": 1,
+          "unresolved": 2
+        },
+        "guidance": {
+          "feature": 2,
+          "guidance": 2,
+          "invariant": 11
+        },
+        "interface": {
+          "entity": 2,
+          "feature": 10,
+          "interface": 11,
+          "invariant": 2
+        },
+        "invariant": {
+          "invariant": 7,
+          "nonactionable": 1
+        },
+        "non_goal": {
+          "non_goal": 2
+        },
+        "nonactionable": {
+          "feature": 1,
+          "nonactionable": 6
+        },
+        "unresolved": {
+          "feature": 4,
+          "unresolved": 10
+        }
+      },
+      "n": 125
+    },
+    "jev_vs_teacher_llm": {
+      "accuracy": 0.56,
+      "confusion_matrix": {
+        "context": {
+          "feature": 5,
+          "invariant": 4,
+          "unresolved": 1
+        },
+        "entity": {
+          "entity": 6,
+          "feature": 1,
+          "interface": 1,
+          "invariant": 7,
+          "nonactionable": 1
+        },
+        "feature": {
+          "feature": 13,
+          "interface": 2,
+          "invariant": 5
+        },
+        "guidance": {
+          "feature": 2,
+          "guidance": 2,
+          "invariant": 11
+        },
+        "interface": {
+          "feature": 8,
+          "interface": 12
+        },
+        "invariant": {
+          "feature": 2,
+          "invariant": 18
+        },
+        "non_goal": {
+          "feature": 1,
+          "invariant": 1,
+          "non_goal": 3
+        },
+        "nonactionable": {
+          "feature": 1,
+          "nonactionable": 6,
+          "unresolved": 1
+        },
+        "unresolved": {
+          "invariant": 1,
+          "unresolved": 10
+        }
+      },
+      "n": 125
+    },
+    "teacher_llm_vs_human": {
+      "accuracy": 0.6,
+      "confusion_matrix": {
+        "context": {
+          "context": 3
+        },
+        "entity": {
+          "entity": 7,
+          "feature": 1,
+          "interface": 2,
+          "invariant": 1
+        },
+        "feature": {
+          "context": 4,
+          "entity": 5,
+          "feature": 12,
+          "interface": 1,
+          "invariant": 13,
+          "non_goal": 2,
+          "nonactionable": 2,
+          "unresolved": 1
+        },
+        "guidance": {
+          "guidance": 15
+        },
+        "interface": {
+          "entity": 2,
+          "feature": 4,
+          "interface": 17,
+          "invariant": 2
+        },
+        "invariant": {
+          "entity": 1,
+          "feature": 1,
+          "invariant": 4,
+          "non_goal": 1,
+          "nonactionable": 1
+        },
+        "non_goal": {
+          "non_goal": 2
+        },
+        "nonactionable": {
+          "context": 1,
+          "entity": 1,
+          "nonactionable": 5
+        },
+        "unresolved": {
+          "context": 2,
+          "feature": 2,
+          "unresolved": 10
+        }
+      },
+      "n": 125
+    }
+  },
+  "endpoint": "https://api.typesafe.ai/v1/systemone",
+  "example_count": 125,
+  "generated_at": "2026-09-28T19:12:12.676149+00:00",
+  "human_label_normalization": {
+    "formatting_artifact": "unresolved",
+    "reason": "The production root-disposition schema has no formatting_artifact value."
+  },
+  "human_source": "annotator_a",
+  "human_status": "single_reviewer_not_adjudicated",
+  "label_counts": {
+    "human": {
+      "context": 3,
+      "entity": 11,
+      "feature": 40,
+      "guidance": 15,
+      "interface": 25,
+      "invariant": 8,
+      "non_goal": 2,
+      "nonactionable": 7,
+      "unresolved": 14
+    },
+    "jev": {
+      "entity": 6,
+      "feature": 33,
+      "guidance": 2,
+      "interface": 15,
+      "invariant": 47,
+      "non_goal": 3,
+      "nonactionable": 7,
+      "unresolved": 12
+    },
+    "teacher_llm": {
+      "context": 10,
+      "entity": 16,
+      "feature": 20,
+      "guidance": 15,
+      "interface": 20,
+      "invariant": 20,
+      "non_goal": 5,
+      "nonactionable": 8,
+      "unresolved": 11
+    }
+  },
+  "mean_input_tokens": 593.288,
+  "mean_jev_confidence": 0.65488,
+  "model": "jev-latest",
+  "schema_version": "jev-root-disposition-comparison-v1"
+}

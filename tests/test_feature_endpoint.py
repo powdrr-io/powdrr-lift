@@ -27,6 +27,7 @@ from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
+    CodingAgentAttemptStore,
     CodingAgentStatus,
     ImplementationRequest,
 )
@@ -36,6 +37,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 )
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
+    _apply_scenario_consistency_updates,
     _merge_behavior_scenario_values,
     _merge_semantic_design_values,
     feature_command_catalog,
@@ -46,6 +48,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
     _compile_code_task_preconditions,
@@ -57,6 +60,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _derive_feature_test_contracts,
     _ensure_current_baseline,
     _evaluate_proposal_command,
+    _execute_procedrr_flow,
     _feature_endpoint_result,
     _finalize_proposal_review,
     _load_implementation_plan,
@@ -67,9 +71,11 @@ from powdrr_lift.workrr.feature_endpoint import (
     _proposal_execution_units,
     _remove_temporary_feature_artifacts,
     _run_code_task_agent,
+    _task_structrr_changes,
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
     _validate_required_test_cases,
+    _worker_prompt_capture_flow_source,
     _worktree_state_fingerprint,
     _write_structrr_plan,
     _write_structrr_plan_from_obligations,
@@ -152,14 +158,24 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
 ) -> None:
     event_path = tmp_path / "procedrr-events.jsonl"
     messages = [{"role": "user", "content": "judge this clause"}]
+    redacted_messages = [{"role": "user", "content": "sensitive search context"}]
     event_path.write_text(
-        json.dumps(
-            {
-                "record_type": "procedrr.step",
-                "kind": "judge",
-                "messages": messages,
-                "value": {"multiple": True},
-            }
+        "\n".join(
+            json.dumps(record)
+            for record in (
+                {
+                    "record_type": "procedrr.step",
+                    "kind": "judge",
+                    "messages": messages,
+                    "value": {"multiple": True},
+                },
+                {
+                    "record_type": "procedrr.step",
+                    "kind": "judge",
+                    "replay_key": WorkrrProcedrrClient.replay_key(redacted_messages),
+                    "value": {"multiple": False},
+                },
+            )
         )
         + "\nmalformed partial record",
         encoding="utf-8",
@@ -167,7 +183,37 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
 
     replay = _load_procedrr_replay_responses(event_path)
 
-    assert replay == {WorkrrProcedrrClient.replay_key(messages): {"multiple": True}}
+    assert replay == {
+        WorkrrProcedrrClient.replay_key(messages): {"multiple": True},
+        WorkrrProcedrrClient.replay_key(redacted_messages): {"multiple": False},
+    }
+
+
+def test_worker_prompt_capture_trims_real_implement_feature_at_worker_boundary() -> (
+    None
+):
+    source = Path("docs/procedrr/skill-definitions/implement-feature.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    captured_source = _worker_prompt_capture_flow_source(source)
+    parse_and_validate(captured_source, command_catalog=feature_command_catalog())
+    document = yaml.safe_load(captured_source)
+    steps = document["steps"]
+    task_loop = next(
+        step["for_each"]
+        for step in steps
+        if "for_each" in step and step["for_each"].get("item_binding") == "code_task"
+    )
+    commands = [
+        operation.get("command")
+        for item in task_loop["body"]
+        if isinstance((operation := item.get("operation")), Mapping)
+    ]
+
+    assert ["run_code_task_agent"] in commands
+    assert ["compile_code_task_postconditions"] not in commands
+    assert steps[-1] == {"terminal": "succeeded"}
 
 
 def test_merge_semantic_design_accepts_trace_only_nonactionable_clause() -> None:
@@ -217,6 +263,259 @@ def test_design_only_preserves_unresolved_scenario_dimensions_as_draft_questions
     draft = _merge_behavior_scenario_values(parameters, allow_clarification=True)
 
     assert draft["behavior_scenario"]["dimensions"]["error_behavior"].startswith(
+        "NEEDS CLARIFICATION:"
+    )
+    assert "provisional" in draft["behavior_scenario"]["then"]
+
+
+def test_normative_defaults_resolve_and_record_each_unresolved_dimension() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior"],
+            "scenario": {
+                "subject": "SCXML data parsing",
+                "given": "an SCXML data element with a malformed literal",
+                "when": "its expression is parsed",
+                "then": "the literal parsing behavior is applied",
+                "dimensions": {
+                    "normal_result": "valid literals are parsed",
+                    "error_behavior": "unresolved by source",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "unresolved by source",
+                },
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "error_behavior",
+                        "resolution": "Propagate the native literal parser error.",
+                        "rationale": "Avoid masking the parser's error details.",
+                        "basis": "language_or_framework_default",
+                        "basis_reference": "Python ast.literal_eval behavior",
+                        "confidence": "medium",
+                    }
+                ],
+            },
+        },
+    }
+
+    resolved = _merge_behavior_scenario_values(parameters, benchmark_mode=True)[
+        "behavior_scenario"
+    ]
+
+    assert resolved["dimensions"]["error_behavior"] == (
+        "ASSUMED DEFAULT: Propagate the native literal parser error."
+    )
+    assert resolved["assumptions"][0]["confidence"] == "medium"
+    assert "NEEDS CLARIFICATION" not in resolved["then"]
+
+
+def test_normative_defaults_keep_not_applicable_dimensions_out_of_assumptions() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior", "cancellation_cleanup"],
+            "scenario": {
+                "subject": "a synchronous operation",
+                "given": "a valid operation input",
+                "when": "the operation runs",
+                "then": "the operation completes",
+                "dimensions": {
+                    "normal_result": "the operation completes",
+                    "error_behavior": "unresolved by source",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "error_behavior",
+                        "resolution": "Propagate the operation's native error.",
+                        "rationale": "Avoid masking the underlying failure.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    },
+                    {
+                        "dimension": "cancellation_cleanup",
+                        "resolution": "not_applicable",
+                        "rationale": "The operation is synchronous.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No cancellation source applies.",
+                        "confidence": "high",
+                    },
+                ],
+            },
+        },
+    }
+
+    resolved = _merge_behavior_scenario_values(parameters, benchmark_mode=True)[
+        "behavior_scenario"
+    ]
+
+    assert resolved["dimensions"]["error_behavior"] == (
+        "ASSUMED DEFAULT: Propagate the operation's native error."
+    )
+    assert resolved["dimensions"]["cancellation_cleanup"] == "not_applicable"
+    assert [item["dimension"] for item in resolved["assumptions"]] == ["error_behavior"]
+
+
+def test_normative_defaults_fail_closed_if_an_unresolved_dimension_is_uncovered() -> (
+    None
+):
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior", "negative_boundaries"],
+            "scenario": {
+                "subject": "SCXML data parsing",
+                "given": "an SCXML data element",
+                "when": "its expression is parsed",
+                "then": "a literal value is produced",
+                "dimensions": {
+                    "normal_result": "valid literals are parsed",
+                    "error_behavior": "unresolved",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "unresolved",
+                },
+                "capability_matrix": [],
+                "assumptions": [],
+            },
+        },
+    }
+
+    with pytest.raises(PowdrrExecutionError, match="resolve every clarification"):
+        _merge_behavior_scenario_values(parameters, benchmark_mode=True)
+
+
+def test_scenario_consistency_updates_only_rewrite_existing_defaults() -> None:
+    decisions: list[dict[str, Any]] = [
+        {
+            "behavior_scenario": {
+                "scenario_id": "scenario:one",
+                "subject": "items",
+                "given": "a shared list",
+                "when": "an item fails",
+                "then": "later items are processed",
+                "dimensions": {"continuation": "ASSUMED DEFAULT: stop"},
+                "assumptions": [
+                    {
+                        "dimension": "continuation",
+                        "resolution": "stop",
+                        "rationale": "Initial default.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    }
+                ],
+            }
+        }
+    ]
+    review = {
+        "consistency_review": {
+            "updates": [
+                {
+                    "subject": "items",
+                    "given": "a shared list",
+                    "when": "an item fails",
+                    "then": "later items are processed",
+                    "dimension": "continuation",
+                    "previous_resolution": "stop",
+                    "resolution": "continue",
+                    "rationale": "Keep related scenarios consistent.",
+                    "basis": "conservative_default",
+                    "basis_reference": "No specific normative source identified.",
+                    "confidence": "low",
+                }
+            ]
+        }
+    }
+
+    updated = _apply_scenario_consistency_updates(
+        decisions, review, benchmark_mode=True
+    )
+
+    scenario = updated[0]["behavior_scenario"]
+    assert scenario["dimensions"]["continuation"] == "ASSUMED DEFAULT: continue"
+    assert scenario["assumptions"][0]["resolution"] == "continue"
+    assert decisions[0]["behavior_scenario"]["assumptions"][0]["resolution"] == "stop"
+
+
+def test_scenario_consistency_cannot_add_defaults_outside_benchmark_mode() -> None:
+    with pytest.raises(PowdrrExecutionError, match="outside benchmark mode"):
+        _apply_scenario_consistency_updates(
+            [{}],
+            {"consistency_review": {"updates": [{"dimension": "continuation"}]}},
+            benchmark_mode=False,
+        )
+
+
+def test_prompt_capture_preserves_unresolved_scenarios_as_provisional(
+    tmp_path: Path,
+) -> None:
+    runtime = FeatureCommandRuntime(
+        config=SimpleNamespace(
+            design_only=False,
+            capture_worker_prompts_only=True,
+        ),
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="feature/test",
+        slug="prompt-capture",
+        state={},
+        catalog=feature_command_catalog(),
+    )
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["error_behavior", "negative_boundaries"],
+            "scenario": {
+                "subject": "SCXML data parsing",
+                "given": "an SCXML data element",
+                "when": "its expression is parsed",
+                "then": "literal data is parsed",
+                "dimensions": {
+                    "normal_result": "literal data is parsed",
+                    "error_behavior": "needs clarification",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "needs clarification",
+                },
+                "capability_matrix": [],
+            },
+        },
+    }
+
+    draft = runtime.dispatch(
+        "merge_behavior_scenario",
+        ["merge_behavior_scenario"],
+        parameters,
+    )
+
+    assert draft["behavior_scenario"]["dimensions"]["error_behavior"].startswith(
+        "NEEDS CLARIFICATION:"
+    )
+    assert draft["behavior_scenario"]["dimensions"]["negative_boundaries"].startswith(
         "NEEDS CLARIFICATION:"
     )
     assert "provisional" in draft["behavior_scenario"]["then"]
@@ -344,6 +643,7 @@ def test_harbor_feature_cli_uses_in_place_endpoint(
     assert config.minisweagent_model == ("deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731")
     assert config.open_pr is False
     assert config.push_changes is False
+    assert config.benchmark_mode is False
 
 
 def test_harbor_feature_cli_propagates_task_id(
@@ -468,6 +768,7 @@ def test_run_feature_in_place_reuses_core_without_git_publication(
     assert captured["branch"] == "main"
     assert captured["config"].open_pr is False
     assert captured["config"].push_changes is False
+    assert captured["config"].benchmark_mode is True
 
 
 def test_compile_feature_obligations_binds_sentence_trace_to_plan(
@@ -982,6 +1283,66 @@ def test_structured_obligation_contracts_cover_generated_design_intents(
         }
 
 
+def test_structrr_diff_records_instruction_lineage(tmp_path: Path) -> None:
+    config = FeatureEndpointConfig(
+        repo_root=tmp_path,
+        work_item_name="lineage",
+        feature_description="Show a greeting.",
+        allowed_paths=(".",),
+    )
+    obligation = {
+        "id": "sentence-1",
+        "design": {
+            "clause_id": "instruction-001",
+            "kind": "feature",
+            "description": "Show a greeting.",
+            "acceptance_criterion": "A greeting is shown.",
+            "expected_test": "Test the greeting.",
+            "behavior_scenario": _test_behavior_scenario("sentence-1"),
+        },
+    }
+    path = _write_structrr_plan_from_obligations(
+        tmp_path / "structrr-diff.yaml", config, [obligation], ()
+    )
+    plan = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert plan["features"][0]["instruction_ref"] == "instruction-001"
+    additions, deletions, refs = _task_structrr_changes(
+        plan,
+        {"source_clause_refs": ["instruction-001"]},
+        "structrr-diff:docs/proposals/lineage/structrr-diff.yaml",
+    )
+    assert additions == ({"section": "features", **plan["features"][0]},)
+    assert deletions == ()
+    assert refs == (
+        "structrr-diff:docs/proposals/lineage/structrr-diff.yaml"
+        "#add:features:design-sentence-1",
+    )
+    unit = ExecutionUnit(
+        unit_id="implement-lineage",
+        objective="Show a greeting.",
+        paths=(".",),
+        validation_profiles=("pytest",),
+        acceptance_criteria=("A greeting is shown.",),
+        planned_additions=additions,
+        source_refs=refs,
+    )
+    request = ImplementationRequest.from_execution_unit(
+        unit,
+        request_id="lineage-request",
+        base_commit="base",
+        plan_fingerprint="proposal",
+        context_refs=refs,
+    )
+    assert "Show a greeting." in request.prompt
+    assert "instruction-001" in request.prompt
+    assert request.intent_packet is not None
+    assert refs[0] in request.intent_packet.source_refs
+    with pytest.raises(PowdrrExecutionError, match="instruction-002"):
+        _task_structrr_changes(
+            plan, {"source_clause_refs": ["instruction-002"]}, "structrr-diff:x"
+        )
+
+
 def test_feature_test_contracts_do_not_retain_unrelated_inventory_selectors() -> None:
     contracts = _derive_feature_test_contracts(
         {
@@ -1202,6 +1563,32 @@ def test_endpoint_reuses_existing_latest_baseline_without_writing(
     assert not (current / "baseline.yaml").exists()
 
 
+def test_endpoint_refreshes_stale_baseline_from_validated_bootstrap(
+    tmp_path: Path,
+) -> None:
+    current = tmp_path / "docs" / "structrr" / "current"
+    current.mkdir(parents=True)
+    old: dict[str, Any] = {section: [] for section in BOOTSTRAP_SECTION_VERSIONS}
+    old["intent"] = {}
+    old["section_versions"] = BOOTSTRAP_SECTION_VERSIONS
+    (current / "baseline-old.yaml").write_text(yaml.safe_dump(old), encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "old baseline")
+    fresh = {**old, "features": [{"id": "new-feature", "action": "added"}]}
+    bootstrap_path = tmp_path / "bootstrap.yaml"
+    bootstrap_path.write_text(yaml.safe_dump(fresh), encoding="utf-8")
+
+    selected = _ensure_current_baseline(
+        tmp_path, subprocess.run, bootstrap_path=bootstrap_path
+    )
+
+    assert yaml.safe_load(selected.read_text(encoding="utf-8")) == fresh
+    assert _git(tmp_path, "status", "--short").stdout == ""
+
+
 def test_feature_flow_is_shared_and_validated() -> None:
     path = Path("docs/procedrr/skill-definitions/implement-feature.yaml")
 
@@ -1223,6 +1610,20 @@ def test_feature_flow_is_shared_and_validated() -> None:
     )
     assert "provider: opencode" not in flow
     assert "command: [run_code_task_agent]" in flow
+
+
+def test_feature_flow_falls_back_to_source_tree_for_external_target(
+    tmp_path: Path,
+) -> None:
+    validated = _validate_procedrr_flow(tmp_path)
+
+    assert validated == (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "procedrr"
+        / "skill-definitions"
+        / "implement-feature.yaml"
+    )
 
 
 def test_required_test_obligation_compiles_against_discovered_inventory() -> None:
@@ -1372,13 +1773,11 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     class PlanningLLM:
         source_values = iter(
             (
+                "include",
                 "feature",
-                "unspecified",
-                "must",
                 "absent",
                 "absent",
                 "absent",
-                "unspecified",
                 "not_stated",
                 "product_semantics_present",
             )
@@ -1391,7 +1790,10 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "root role" in question or "child decision" in question:
+            if (
+                "route this exact instruction clause" in question
+                or "child decision" in question
+            ):
                 return {
                     "status": "resolved",
                     "value": next(self.source_values),
@@ -1423,6 +1825,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                         "given": "the declared feature input",
                         "when": "the feature is invoked",
                         "then": "the acceptance result is observed",
+                        "related_requirements": [],
                         "dimensions": {
                             "normal_result": "the acceptance result is observed",
                             "error_behavior": "not_applicable",
@@ -1435,6 +1838,8 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                         "capability_matrix": [],
                     },
                 }
+            if "recorded defaults coherent" in question:
+                return {"consistency_review": {"updates": []}}
             raise AssertionError(question)
 
     catalog = feature_command_catalog()
@@ -1465,7 +1870,11 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
 
     result = Evaluator(PlanningLLM(), execute).evaluate(
         flow,
-        {"work_item_name": "demo", "feature_description": "Add the feature."},
+        {
+            "work_item_name": "demo",
+            "feature_description": "Add the feature.",
+            "benchmark_mode": False,
+        },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
     partial = tmp_path / "semantic-contracts/instruction-001/partial-contract.json"
@@ -1475,6 +1884,12 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     projection = canonical["projections"][0]
     assert projection["description"] == "feature Add."
     assert projection["expected_test"] == "Test Add for feature."
+    assumptions = json.loads((tmp_path / "normative-assumptions.json").read_text())
+    assert assumptions == {
+        "assumptions": [],
+        "benchmark_mode": False,
+        "schema_version": "normative-assumptions-v1",
+    }
 
 
 def test_implementation_plan_exposes_changes_and_acceptance_criteria(
@@ -1957,6 +2372,151 @@ def test_code_task_agent_continues_after_timed_out_attempt(
     )
 
 
+def test_prompt_capture_does_not_enter_coding_attempt_recovery_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[Mapping[str, Any]] = []
+
+    def capture_phase(*_: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(dict(kwargs["parameters"]))
+        return {
+            "attempt": {"status": "prompt_captured"},
+            "request_id": "request-1",
+        }
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", capture_phase
+    )
+    result = _run_code_task_agent(
+        {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
+        config=SimpleNamespace(
+            capture_worker_prompts_only=True,
+            feature_description="Implement the feature.",
+            work_item_name="feature",
+        ),
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        branch="feature",
+        slug="feature",
+        state={},
+    )
+
+    assert result["attempt"]["status"] == "prompt_captured"
+    assert result["continuations"] == 0
+    assert len(calls) == 1
+    assert "repair_issue" not in calls[0]
+
+
+def test_benchmark_mode_selects_normative_defaults_automatically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, Any] = {}
+    flow_path = tmp_path / "design-interview.yaml"
+    flow_path.write_text("steps: []\n", encoding="utf-8")
+
+    class SuccessfulEvaluator:
+        def __init__(self, *_: Any, **__: Any) -> None:
+            pass
+
+        def evaluate(self, _flow: Any, inputs: Mapping[str, Any]) -> None:
+            observed.update(inputs)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._validate_procedrr_flow",
+        lambda _: flow_path,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._worker_prompt_capture_flow_source",
+        lambda source: source,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.parse_and_validate",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._bootstrap_validation_profiles",
+        lambda *args, **kwargs: (),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.default_verification_provider_registry",
+        lambda: SimpleNamespace(inventory=lambda *args: ()),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.Evaluator", SuccessfulEvaluator
+    )
+
+    _execute_procedrr_flow(
+        FeatureEndpointConfig(
+            feature_description="Keep every source requirement.",
+            work_item_name="benchmark defaults",
+            repo_root=tmp_path,
+            allowed_paths=("src",),
+            planning_client=object(),  # type: ignore[arg-type]
+            capture_worker_prompts_only=True,
+            benchmark_mode=True,
+        ),
+        runner=lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, "abc123\n", ""
+        ),
+        worktree=tmp_path,
+        output_root=tmp_path / "output",
+        branch="main",
+    )
+
+    assert observed["benchmark_mode"] is True
+
+
+def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(
+    tmp_path: Path,
+) -> None:
+    class Provider:
+        provider_name = "minisweagent"
+
+        def prepare_request(
+            self, request: ImplementationRequest
+        ) -> ImplementationRequest:
+            return replace(request, prompt=f"PREFIX\n\n{request.prompt}\n\nSUFFIX")
+
+        def run(self, *_: Any, **__: Any) -> subprocess.CompletedProcess[str]:
+            pytest.fail("prompt capture must not invoke the coding agent")
+
+    request = ImplementationRequest(
+        request_id="feature-task-implementation-1",
+        objective="Implement the feature",
+        prompt="Actual worker contract",
+        base_commit="base",
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src",),
+        acceptance_criteria=("Behavior is correct",),
+        validation_profiles=("pytest",),
+    )
+    output_root = tmp_path / "run"
+    request_path = output_root / "implementation-request.json"
+    operation_request_path = output_root / "requests" / "task.json"
+    state: dict[str, Any] = {}
+
+    result = _capture_worker_prompt(
+        request,
+        provider=Provider(),
+        attempt_store=CodingAgentAttemptStore(output_root / "artifacts"),
+        state=state,
+        request_path=request_path,
+        operation_request_path=operation_request_path,
+        slug="feature",
+        unit_id="task",
+    )
+
+    assert result["attempt"]["status"] == "prompt_captured"
+    assert state["prompt_capture_count"] == 1
+    assert result["prompt_path"].read_text(encoding="utf-8") == (
+        "PREFIX\n\nActual worker contract\n\nSUFFIX"
+    )
+    saved_request = json.loads(operation_request_path.read_text(encoding="utf-8"))
+    assert saved_request["prompt"] == result["prompt_path"].read_text(encoding="utf-8")
+
+
 def test_code_task_agent_forwards_canonical_design_obligations(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2386,6 +2946,115 @@ def test_code_task_plan_coalesces_product_obligations_into_one_worker_task(
     assert "second behavior" in task["objective"]
     assert "first contract test" in task["validator"]["evidence_case"]
     assert "second contract test" in task["validator"]["evidence_case"]
+
+
+def test_code_task_plan_uses_verbatim_source_when_compiled_oracle_is_generic(
+    tmp_path: Path,
+) -> None:
+    source_requirement = "On entry, data initializes as a fresh copy of the defaults."
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {"failing_cases": [{"obligation_id": "lifecycle"}]},
+            "verification_plans": [
+                {
+                    "obligation_id": "lifecycle",
+                    "kind": "feature",
+                    "operation": "create: initializes as a fresh copy of defaults",
+                    "oracle": "the requested behavior is observed",
+                    "acceptance_criterion": (
+                        "The requested behavior is observed for the resolved "
+                        "population."
+                    ),
+                    "evidence_case": f"Source instruction-003: {source_requirement}",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("src",)),
+    )
+
+    task = result["tasks"][0]
+    assert source_requirement in task["objective"]
+    assert "requested behavior is observed" not in task["objective"].casefold()
+    assert any(source_requirement in item for item in task["acceptance_criteria"])
+    assert all(
+        "requested behavior is observed" not in item.casefold()
+        for item in task["acceptance_criteria"]
+    )
+
+
+def test_code_task_objective_restores_exact_selected_source_spans(
+    tmp_path: Path,
+) -> None:
+    lifecycle = (
+        "On entry, data initializes as a fresh copy of the defaults. "
+        "On exit, data is removed. "
+        "Re-entering a state resets data to the original defaults."
+    )
+    datavar = (
+        "DataVar can replace plain defaults in the data dict, supporting "
+        "optional type enforcement and factory callables."
+    )
+    validation = (
+        "Invalid declarations raise InvalidDefinition -- data requires dict "
+        "with string keys, DataVar rejects simultaneous default and factory."
+    )
+    workflow = "IMPORTANT: create a branch from main and commit everything."
+    source_text = f"{lifecycle} {datavar} {validation} {workflow}"
+    clause_texts = {
+        "instruction-003": lifecycle.split(" On exit", 1)[0],
+        "instruction-004": "On exit, data is removed.",
+        "instruction-005": "Re-entering a state resets data to the original defaults.",
+        "instruction-007": datavar,
+        "instruction-008": datavar,
+        "instruction-009": datavar,
+        "instruction-031": validation,
+        "instruction-032": validation,
+        "instruction-033": validation,
+        "instruction-038": workflow,
+    }
+    clauses = []
+    for clause_id, text in clause_texts.items():
+        start = source_text.index(text)
+        clauses.append(
+            {
+                "clause_id": clause_id,
+                "source_span": {"start": start, "end": start + len(text)},
+            }
+        )
+    (tmp_path / "instruction-ledger.json").write_text(
+        json.dumps({"source": {"text": source_text}, "clauses": clauses}),
+        encoding="utf-8",
+    )
+    obligation_refs = tuple(clause_texts)[:-1]
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {
+                "failing_cases": [{"obligation_id": item} for item in obligation_refs]
+            },
+            "verification_plans": [
+                {
+                    "obligation_id": item,
+                    "kind": "feature",
+                    "contract_refs": [f"test:obligation:{item}"],
+                    "operation": "implement the requested behavior",
+                    "oracle": "the requested behavior is observed",
+                    "acceptance_criterion": "the requested behavior is observed",
+                    "evidence_case": f"Source {item}: {clause_texts[item]}",
+                }
+                for item in obligation_refs
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("src",)),
+    )
+
+    objective = result["tasks"][0]["objective"]
+
+    assert lifecycle in objective
+    assert datavar in objective
+    assert validation in objective
+    assert workflow not in objective
 
 
 def test_code_task_plan_never_compiles_non_product_obligations(

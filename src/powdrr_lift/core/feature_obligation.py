@@ -257,6 +257,14 @@ def compile_feature_design(
                 f"missing semantic design for {clause.clause_id}"
             )
         kind = _required_text(design, "kind")
+        # Rejecting an invalid input is required product behavior, not a
+        # prohibition against implementing a capability. Keep it actionable
+        # even if the semantic classifier routes it to non_goal.
+        if kind == "non_goal" and (
+            _is_rejection_requirement(clause.text)
+            or _describes_missing_capability(clause.text)
+        ):
+            kind = "feature"
         if _is_nonactionable_clause(clause.text):
             kind = "nonactionable"
         projection = DesignProjection(
@@ -327,6 +335,35 @@ def _is_explicit_product_prohibition(text: str) -> bool:
         "exclude ",
     )
     return any(marker in lowered for marker in markers)
+
+
+def _is_rejection_requirement(text: str) -> bool:
+    return (
+        re.search(r"\b(rejects?|raises?|throws?|fails?)\b", text, re.IGNORECASE)
+        is not None
+    )
+
+
+def _describes_missing_capability(text: str) -> bool:
+    """Treat a stated product gap as requested work, not a prohibition."""
+    lowered = " ".join(text.casefold().split())
+    return any(
+        marker in lowered
+        for marker in (
+            " is not persisted",
+            " are not persisted",
+            " is not saved",
+            " are not saved",
+            " is not stored",
+            " are not stored",
+            " is missing",
+            " are missing",
+            " does not persist",
+            " do not persist",
+            " does not save",
+            " do not save",
+        )
+    )
 
 
 def _is_nonactionable_clause(text: str) -> bool:

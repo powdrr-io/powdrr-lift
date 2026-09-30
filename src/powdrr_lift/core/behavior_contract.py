@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -15,6 +14,15 @@ BEHAVIOR_DIMENSIONS = (
     "cancellation_cleanup",
     "compatibility",
     "negative_boundaries",
+)
+ASSUMPTION_BASES = frozenset(
+    {
+        "repository_convention",
+        "industry_standard",
+        "ecosystem_convention",
+        "language_or_framework_default",
+        "conservative_default",
+    }
 )
 
 
@@ -34,11 +42,16 @@ class BehaviorScenario:
     dimensions: Mapping[str, Any]
     evidence: tuple[str, ...]
     validator: str
+    related_requirements: tuple[str, ...] = ()
     capability_matrix: tuple[Mapping[str, Any], ...] = ()
+    assumptions: tuple[Mapping[str, str], ...] = ()
     schema_version: str = "behavior-scenario-v1"
+    validation_group_id: str | None = None
+    validation_relation: str = "independent"
+    routing: str = "include"
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data = {
             "schema_version": self.schema_version,
             "scenario_id": self.scenario_id,
             "subject": self.subject,
@@ -48,8 +61,19 @@ class BehaviorScenario:
             "dimensions": {name: self.dimensions[name] for name in BEHAVIOR_DIMENSIONS},
             "evidence": list(self.evidence),
             "validator": self.validator,
-            "capability_matrix": [dict(item) for item in self.capability_matrix],
+            "routing": self.routing,
+            "related_requirements": list(self.related_requirements),
+            "capability_matrix": [
+                {**dict(item), "evidence": list(item["evidence"])}
+                for item in self.capability_matrix
+            ],
         }
+        if self.assumptions:
+            data["assumptions"] = [dict(item) for item in self.assumptions]
+        if self.validation_group_id is not None:
+            data["validation_group_id"] = self.validation_group_id
+            data["validation_relation"] = self.validation_relation
+        return data
 
 
 def compile_behavior_scenarios(
@@ -91,6 +115,17 @@ def compile_behavior_scenarios(
             )
         evidence = _texts(item.get("evidence"), f"scenario {scenario_id} evidence")
         validator = _text(item.get("validator"), f"scenario {scenario_id} validator")
+        raw_relationships = item.get("related_requirements", [])
+        if not isinstance(raw_relationships, Sequence) or isinstance(
+            raw_relationships, (str, bytes)
+        ):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} related_requirements must be a list"
+            )
+        related_requirements = tuple(
+            _text(value, f"scenario {scenario_id} related requirement")
+            for value in raw_relationships
+        )
         raw_capabilities = item.get("capability_matrix", [])
         if (
             not isinstance(raw_capabilities, Sequence)
@@ -103,6 +138,35 @@ def compile_behavior_scenarios(
         capabilities = (
             validate_capability_matrix(raw_capabilities) if raw_capabilities else ()
         )
+        assumptions = validate_normative_assumptions(item.get("assumptions", []))
+        validation_group_id = item.get("validation_group_id")
+        validation_relation = item.get("validation_relation", "independent")
+        routing = item.get("routing", "include")
+        if validation_group_id is not None and not isinstance(validation_group_id, str):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} validation_group_id must be a string"
+            )
+        if validation_relation not in {
+            "independent",
+            "all_together",
+            "ordered",
+            "alternatives",
+            "conditional",
+        }:
+            raise BehaviorContractError(
+                f"scenario {scenario_id} validation_relation is invalid"
+            )
+        if validation_relation != "independent" and not validation_group_id:
+            raise BehaviorContractError(
+                f"scenario {scenario_id} related validation requires a group ID"
+            )
+        if routing not in {
+            "include",
+            "include_prohibition",
+            "exclude",
+            "unclear",
+        }:
+            raise BehaviorContractError(f"scenario {scenario_id} routing is invalid")
         scenarios.append(
             BehaviorScenario(
                 scenario_id=scenario_id,
@@ -113,41 +177,120 @@ def compile_behavior_scenarios(
                 dimensions=dimensions,
                 evidence=evidence,
                 validator=validator,
+                related_requirements=related_requirements,
                 capability_matrix=capabilities,
+                assumptions=assumptions,
+                validation_group_id=validation_group_id,
+                validation_relation=str(validation_relation),
+                routing=str(routing),
             )
         )
     return tuple(scenarios)
 
 
 def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
-    """Render the behavior contract once, without duplicate prose sections."""
-    rows = []
+    """Turn typed scenarios into concrete checks for a coding worker.
+
+    Provenance and applicability markers remain in the serialized packet. The
+    worker needs observable behavior and meaningful boundaries, in reading
+    order, rather than a JSON dump of the entire contract schema.
+    """
+    lines = [
+        "Required behavior checks:",
+        "For Include and IncludeProhibition routes, implement the listed "
+        "behavior. For Unclear routes, review repository evidence, then make "
+        "a best-supported conservative choice and continue even if uncertainty "
+        "remains. First trace the affected "
+        "code paths, including synchronous and asynchronous implementations "
+        "and named integrations. Add focused tests for accepted cases and "
+        "applicable paths. Run the tests before reporting completion.",
+        "",
+    ]
+    implementation_scenarios = [
+        item for item in scenarios if item.routing in {"include", "include_prohibition"}
+    ]
+    unclear_scenarios = [item for item in scenarios if item.routing == "unclear"]
+    for index, item in enumerate(implementation_scenarios, start=1):
+        detail = (
+            f"{index}. [{item.scenario_id}] {item.subject}: "
+            f"Given {_worker_text(item.given)}; "
+            f"when {item.when}; "
+            f"expect {_worker_text(item.then)}."
+        )
+        capabilities = [
+            f"{value['behavior']} {value['capability']}"
+            + (f" with {value['error']}" if value["behavior"] == "reject" else "")
+            for value in item.capability_matrix
+        ]
+        if capabilities:
+            detail += " Capabilities: " + "; ".join(capabilities) + "."
+        lines.append(detail)
+        for relationship in item.related_requirements:
+            lines.append(f"   Related requirement: {relationship}")
+    related_groups: dict[tuple[str, str], list[str]] = {}
     for item in scenarios:
-        rows.append(
-            "- "
-            + json.dumps(
-                {
-                    "scenario": item.scenario_id,
-                    "subject": item.subject,
-                    "given": item.given,
-                    "when": item.when,
-                    "then": item.then,
-                    **item.dimensions,
-                    "validator": item.validator,
-                    "evidence": list(item.evidence),
-                    "capability_matrix": [
-                        dict(value) for value in item.capability_matrix
-                    ],
-                },
-                sort_keys=True,
-                ensure_ascii=False,
+        if item.validation_group_id is not None:
+            related_groups.setdefault(
+                (item.validation_group_id, item.validation_relation), []
+            ).append(item.scenario_id)
+    if related_groups:
+        lines.extend(("", "Relationships between checks:"))
+        for (group_id, relation), scenario_ids in related_groups.items():
+            explanations = {
+                "all_together": "all checks must pass in the same scenario",
+                "ordered": "checks must pass in this order",
+                "alternatives": "the source allows these alternative outcomes",
+                "conditional": "preserve the condition for each branch",
+            }
+            lines.append(
+                f"- [{group_id}] {explanations[relation]}: {', '.join(scenario_ids)}."
+            )
+    if unclear_scenarios:
+        lines.extend(
+            (
+                "",
+                "Headless route review before implementation:",
+                "Inspect repository code, tests, and documentation for evidence "
+                "that informs each unclear source route. Treat the extracted "
+                "behavior below as a candidate. If repository evidence resolves "
+                "the route, follow it. If evidence remains insufficient, choose "
+                "the most conservative, backward-compatible interpretation "
+                "supported by the candidate and surrounding code, record that "
+                "assumption, and continue the benchmark task. Do not stop or "
+                "leave the task incomplete because the route remains unclear.",
             )
         )
-    return (
-        "Behavior contract matrix (implement and verify each row exactly once):\n"
-        + "\n".join(rows)
-        + "\nRun the focused required tests after implementation."
+        for item in unclear_scenarios:
+            lines.append(
+                f"- [{item.scenario_id}] source route unclear; source evidence: "
+                f"{', '.join(item.evidence)}. Candidate: {item.subject}; "
+                f"given {_worker_text(item.given)}, when {item.when}, "
+                f"expect {_worker_text(item.then)}."
+            )
+    assumptions = [
+        (item.scenario_id, value["dimension"], value["resolution"])
+        for item in scenarios
+        for value in item.assumptions
+        if value["dimension"]
+        in {"error_behavior", "negative_boundaries", "unsupported_behavior"}
+    ]
+    if assumptions:
+        lines.extend(("", "Defaults for behavior the source leaves unspecified:"))
+        for scenario_id, dimension, resolution in assumptions:
+            lines.append(f"- [{scenario_id}] {dimension}: {resolution}")
+    lines.append(
+        "Do not treat a passing test on one execution path as proof for another."
     )
+    return "\n".join(lines)
+
+
+def _worker_text(value: Any) -> str:
+    """Render structured outcomes as readable prose without schema syntax."""
+    if isinstance(value, Mapping):
+        return "; ".join(f"{key}: {_worker_text(item)}" for key, item in value.items())
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return "; ".join(_worker_text(item) for item in value)
+    return str(value)
 
 
 def validate_capability_matrix(
@@ -176,14 +319,78 @@ def validate_capability_matrix(
                 "capability": name,
                 "behavior": behavior,
                 "evidence": _texts(item.get("evidence"), f"capability {name} evidence"),
-                **({"error": error} if error is not None else {}),
+                **({"error": error} if behavior == "reject" else {}),
             }
+        )
+    return tuple(result)
+
+
+def validate_normative_assumptions(
+    raw: Any, *, expected_dimensions: Sequence[str] | None = None
+) -> tuple[dict[str, str], ...]:
+    """Validate explicit, auditable defaults used to resolve ambiguity."""
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        raise BehaviorContractError("assumptions must be a list")
+    result: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, Mapping):
+            raise BehaviorContractError(f"assumption {index} must be an object")
+        dimension = _text(item.get("dimension"), f"assumption {index} dimension")
+        if dimension not in BEHAVIOR_DIMENSIONS:
+            raise BehaviorContractError(
+                f"assumption {index} names unsupported dimension {dimension!r}"
+            )
+        if dimension in seen:
+            raise BehaviorContractError(f"duplicate assumption for {dimension}")
+        seen.add(dimension)
+        basis = _text(item.get("basis"), f"assumption {index} basis")
+        if basis not in ASSUMPTION_BASES:
+            raise BehaviorContractError(f"assumption {dimension} has invalid basis")
+        confidence = _text(item.get("confidence"), f"assumption {index} confidence")
+        if confidence not in {"high", "medium", "low"}:
+            raise BehaviorContractError(
+                f"assumption {dimension} has invalid confidence"
+            )
+        resolution = _text(item.get("resolution"), f"assumption {index} resolution")
+        if _is_not_applicable(resolution):
+            raise BehaviorContractError(
+                f"assumption {dimension} cannot resolve to not_applicable"
+            )
+        result.append(
+            {
+                "dimension": dimension,
+                "resolution": resolution,
+                "rationale": _text(
+                    item.get("rationale"), f"assumption {index} rationale"
+                ),
+                "basis": basis,
+                "basis_reference": _text(
+                    item.get("basis_reference"), f"assumption {index} basis_reference"
+                ),
+                "confidence": confidence,
+            }
+        )
+    if expected_dimensions is not None and seen != set(expected_dimensions):
+        missing = sorted(set(expected_dimensions) - seen)
+        extra = sorted(seen - set(expected_dimensions))
+        raise BehaviorContractError(
+            "assumptions must cover every unresolved dimension exactly once"
+            + (f"; missing: {', '.join(missing)}" if missing else "")
+            + (f"; unexpected: {', '.join(extra)}" if extra else "")
         )
     return tuple(result)
 
 
 def _is_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def _is_not_applicable(value: str) -> bool:
+    normalized = value.strip().casefold()
+    return normalized == "not_applicable" or normalized.startswith(
+        ("not_applicable ", "not_applicable-", "not_applicable—", "not_applicable:")
+    )
 
 
 def _text(value: Any, label: str) -> str:
@@ -203,9 +410,11 @@ def _texts(value: Any, label: str) -> tuple[str, ...]:
 
 __all__ = [
     "BEHAVIOR_DIMENSIONS",
+    "ASSUMPTION_BASES",
     "BehaviorContractError",
     "BehaviorScenario",
     "compile_behavior_scenarios",
     "render_behavior_matrix",
     "validate_capability_matrix",
+    "validate_normative_assumptions",
 ]

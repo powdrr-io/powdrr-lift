@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from powdrr_lift.core.decision_obligation import evidence_fingerprint
@@ -19,6 +20,16 @@ from powdrr_lift.workrr.feature_endpoint import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def keep_deterministic_feature_tests_off_live_jev(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not send fixture clauses to Jev when a developer has API credentials."""
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
 
 DEEPSWE_STATE_DATA_DESCRIPTION = """\
 States lack built-in data ownership, forcing manual variable management without
@@ -94,9 +105,73 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"decision"}:
+            return {"decision": "skip"}
+        if required == {"decision", "rationale", "queries"}:
+            return {
+                "decision": "skip",
+                "rationale": (
+                    "The fixture describes local behavior with no external contract."
+                ),
+                "queries": [],
+            }
+        if required == {"rationale", "selections"}:
+            return {
+                "rationale": "No external contract sources were needed.",
+                "selections": [],
+            }
+        if required == {"claims"}:
+            return {"claims": []}
+        if required == {
+            "decision",
+            "requirement",
+            "rationale",
+            "profile_compatibility",
+            "assumption_basis",
+        }:
+            return {
+                "decision": "reject",
+                "requirement": None,
+                "rationale": "The fixture has no applicable external requirement.",
+                "profile_compatibility": "No external profile applies.",
+                "assumption_basis": None,
+            }
+        if required == {
+            "description",
+            "acceptance_criterion",
+            "expected_test",
+            "behavior_scenario",
+        }:
+            return {
+                "description": "Apply the accepted external requirement.",
+                "acceptance_criterion": "The scoped external behavior is observable.",
+                "expected_test": "Test the scoped external behavior.",
+                "behavior_scenario": {
+                    "subject": "the external requirement",
+                    "given": "the applicable external profile",
+                    "when": "the requested behavior is executed",
+                    "then": "the scoped external behavior is observable",
+                    "related_requirements": [],
+                    "dimensions": {
+                        "normal_result": "the scoped external behavior is observable",
+                        "error_behavior": "not_applicable",
+                        "continuation": "not_applicable",
+                        "unsupported_behavior": "not_applicable",
+                        "cancellation_cleanup": "not_applicable",
+                        "compatibility": "not_applicable",
+                        "negative_boundaries": "not_applicable",
+                    },
+                    "evidence": ["The accepted external requirement."],
+                    "validator": "Test the scoped external behavior.",
+                    "capability_matrix": [],
+                    "routing": "include",
+                },
+            }
+        if required == {"consistency_review"}:
+            return {"consistency_review": {"updates": []}}
         if required == {"multiple"}:
             return {"multiple": False}
-        if required == {"statements"}:
+        if required == {"statements", "validation_groups"}:
             raise AssertionError("a non-multiple clause must not be split")
         if required == {"status", "unresolved_dimensions", "scenario"}:
             return {
@@ -107,6 +182,7 @@ class DeterministicPlanningClient:
                     "given": "the declared inputs and supported context",
                     "when": "the requested operation is performed",
                     "then": "the stated acceptance outcome is observed",
+                    "related_requirements": [],
                     "dimensions": {
                         "normal_result": "the stated acceptance outcome is observed",
                         "error_behavior": "not_applicable",
@@ -126,6 +202,9 @@ class DeterministicPlanningClient:
             proposition = str(_find_json_value(text, "proposition_text") or text)
             lowered = proposition.casefold()
             process_only = "new branch" in lowered or "commit everything" in lowered
+            if decision_kind == "routing":
+                route = "exclude" if process_only else "include"
+                return {"status": "resolved", "value": route, "reason_code": None}
             values = {
                 "disposition": (
                     "nonactionable"
@@ -473,14 +552,15 @@ class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
         text = "\n".join(message.get("content", "") for message in messages)
         if required == {"multiple"}:
             return {"multiple": "set_state_data(state, key, value)" in text}
-        if required == {"statements"}:
+        if required == {"statements", "validation_groups"}:
             return {
                 "statements": [
                     "set_state_data rejects an inactive state.",
                     "set_state_data rejects an undeclared key.",
                     "set_state_data enforces the declared DataVar type constraint.",
                     "An invalid set_state_data call raises InvalidDefinition.",
-                ]
+                ],
+                "validation_groups": [],
             }
         return super().complete_json(messages, response_schema=response_schema)
 
@@ -717,9 +797,9 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     prompt_text = next(prompt).read_text(encoding="utf-8")
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
-    assert "Behavior contract matrix" in prompt_text
-    assert '"normal_result": "the stated acceptance outcome is observed"' in prompt_text
-    assert "Run the focused required tests after implementation." in prompt_text
+    assert "Required behavior checks:" in prompt_text
+    assert "expect the stated acceptance outcome is observed" in prompt_text
+    assert "Run the tests before reporting completion." in prompt_text
     assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text
     proposal = json.loads(

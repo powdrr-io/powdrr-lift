@@ -27,6 +27,7 @@ def _scenario() -> dict[str, Any]:
         "given": {"result": "nested error with source location"},
         "when": "process this record followed by a valid record",
         "then": {"errors": "preserved with location", "later_record": "processed"},
+        "related_requirements": [],
         "dimensions": {name: "not_applicable" for name in BEHAVIOR_DIMENSIONS},
         "evidence": ["tests/test_processor.py::test_nested_error_and_continuation"],
         "validator": (
@@ -36,7 +37,7 @@ def _scenario() -> dict[str, Any]:
     }
 
 
-def test_behavior_scenario_is_rendered_once_as_a_behavior_matrix() -> None:
+def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     scenario = _scenario()
     scenario["dimensions"] = {
         **scenario["dimensions"],
@@ -53,10 +54,63 @@ def test_behavior_scenario_is_rendered_once_as_a_behavior_matrix() -> None:
     )
     rendered = packet.render()
     assert rendered.count("nested-error-continues") == 1
-    assert '"nested_errors": "preserve locations"' in rendered
-    assert "Required behavioral tests:" not in rendered
+    assert "Given result: nested error with source location" in rendered
+    assert "when process this record followed by a valid record" in rendered
+    assert "expect errors: preserved with location; later_record: processed" in rendered
+    assert "Related requirement:" not in rendered
+    assert "nested_errors: preserve locations" not in rendered
+    assert "later_records: continue" not in rendered
+    assert "not_applicable" not in rendered
+    assert '"scenario"' not in rendered
     restored = type(packet).from_data(packet.to_data())
     assert restored.render() == rendered
+
+
+def test_worker_prompt_preserves_joint_validation_groups() -> None:
+    first = _scenario()
+    first["scenario_id"] = "status-200"
+    first["subject"] = "valid request"
+    first["then"] = "status is 200"
+    first["validation_group_id"] = "validation:request-response:1"
+    first["validation_relation"] = "all_together"
+    second = _scenario()
+    second["scenario_id"] = "contains-account-id"
+    second["subject"] = "valid request"
+    second["then"] = "response contains account ID"
+    second["validation_group_id"] = "validation:request-response:1"
+    second["validation_relation"] = "all_together"
+
+    packet = compile_implementation_packet(
+        objective="Return valid request responses.",
+        obligations=("Return status and account ID.",),
+        required_tests=({"description": "status and account ID"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(first, second),
+    )
+
+    rendered = packet.render()
+    assert "all checks must pass in the same scenario" in rendered
+    assert "status-200, contains-account-id" in rendered
+
+
+def test_unclear_routes_continue_with_conservative_headless_assumption() -> None:
+    scenario = _scenario()
+    scenario["routing"] = "unclear"
+    packet = compile_implementation_packet(
+        objective="implement the benchmark task",
+        obligations=("candidate behavior",),
+        required_tests=({"description": "candidate behavior"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+    assert "best-supported conservative choice" in rendered
+    assert "continue even if uncertainty remains" in rendered
+    assert "record that assumption" in rendered
+    assert "Do not stop or leave the task incomplete" in rendered
 
 
 def test_behavior_scenario_rejects_an_omitted_dimension() -> None:
@@ -94,6 +148,155 @@ def test_capability_matrix_requires_evidence_and_rejection_error() -> None:
                 },
             )
         )
+
+
+def test_behavior_scenario_serializes_capability_evidence_as_json_array() -> None:
+    scenario = _scenario()
+    scenario["capability_matrix"] = [
+        {
+            "capability": "unsupported declaration",
+            "behavior": "reject",
+            "evidence": ["instruction-1: invalid declarations raise an error"],
+            "error": "InvalidDefinition",
+        }
+    ]
+
+    compiled = compile_behavior_scenarios((scenario,))[0]
+
+    assert compiled.to_data()["capability_matrix"][0]["evidence"] == [
+        "instruction-1: invalid declarations raise an error"
+    ]
+
+
+def test_behavior_scenario_preserves_normative_assumption_provenance() -> None:
+    scenario = _scenario()
+    scenario["assumptions"] = [
+        {
+            "dimension": "error_behavior",
+            "resolution": "Propagate the parser's native literal error.",
+            "rationale": "Preserves the underlying parser failure without masking it.",
+            "basis": "language_or_framework_default",
+            "basis_reference": "Python ast.literal_eval behavior",
+            "confidence": "medium",
+        }
+    ]
+
+    compiled = compile_behavior_scenarios((scenario,))[0]
+
+    assert compiled.to_data()["assumptions"] == scenario["assumptions"]
+    packet = compile_implementation_packet(
+        objective="parse literal expressions",
+        obligations=("parse supported literal values",),
+        required_tests=({"description": "invalid literal handling"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+    assert packet.behavior_scenarios[0].assumptions[0]["basis_reference"] == (
+        "Python ast.literal_eval behavior"
+    )
+    assert "error_behavior: Propagate the parser's native literal error." in (
+        packet.render()
+    )
+
+
+def test_worker_check_includes_defaults_capabilities_and_execution_paths() -> None:
+    scenario = _scenario()
+    scenario["dimensions"] = {
+        **scenario["dimensions"],
+        "normal_result": "The later record is processed.",
+    }
+    scenario["assumptions"] = [
+        {
+            "dimension": "negative_boundaries",
+            "resolution": "An invalid record does not abort the batch.",
+            "rationale": "The operation is isolated per record.",
+            "basis": "conservative_default",
+            "basis_reference": "No batch failure behavior was specified.",
+            "confidence": "medium",
+        }
+    ]
+    scenario["capability_matrix"] = [
+        {
+            "capability": "invalid records",
+            "behavior": "reject",
+            "error": "InvalidRecord",
+            "evidence": ["test invalid input"],
+        }
+    ]
+    packet = compile_implementation_packet(
+        objective="process records",
+        obligations=("process records",),
+        required_tests=({"description": "process records"},),
+        allowed_paths=("src/",),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+    assert "synchronous and asynchronous implementations" in rendered
+    assert "Defaults for behavior the source leaves unspecified:" in rendered
+    assert (
+        "negative_boundaries: An invalid record does not abort the batch." in rendered
+    )
+    assert "Capabilities: reject invalid records with InvalidRecord" in rendered
+    assert "Do not treat a passing test on one execution path" in rendered
+
+
+def test_worker_check_preserves_explicit_cross_requirement_relationships() -> None:
+    scenario = _scenario()
+    scenario["related_requirements"] = [
+        "The public operation exposes this result through the existing adapter."
+    ]
+    packet = compile_implementation_packet(
+        objective="implement the operation",
+        obligations=("implement the operation",),
+        required_tests=({"description": "exercise the adapter"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+
+    assert (
+        "Related requirement: The public operation exposes this result through "
+        "the existing adapter."
+    ) in rendered
+    restored = type(packet).from_data(packet.to_data())
+    assert restored.render() == rendered
+
+
+def test_normative_assumption_cannot_claim_not_applicable_as_a_default() -> None:
+    scenario = _scenario()
+    scenario["assumptions"] = [
+        {
+            "dimension": "cancellation_cleanup",
+            "resolution": "not_applicable",
+            "rationale": "The operation is synchronous.",
+            "basis": "conservative_default",
+            "basis_reference": "No cancellation source applies.",
+            "confidence": "high",
+        }
+    ]
+
+    with pytest.raises(BehaviorContractError, match="cannot resolve to not_applicable"):
+        compile_behavior_scenarios((scenario,))
+
+
+def test_non_rejecting_capabilities_do_not_emit_irrelevant_error_values() -> None:
+    matrix = validate_capability_matrix(
+        [
+            {
+                "capability": "ordinary mapping",
+                "behavior": "support",
+                "evidence": ["source requires a data mapping"],
+                "error": "./././",
+            }
+        ]
+    )
+
+    assert "error" not in matrix[0]
 
 
 def test_validation_report_exposes_structured_repair_failures() -> None:

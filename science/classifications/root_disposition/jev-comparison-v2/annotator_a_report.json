@@ -1,0 +1,239 @@
+{
+  "agreement": {
+    "jev_vs_human": {
+      "accuracy": 0.448,
+      "confusion_matrix": {
+        "context": {
+          "invariant": 3
+        },
+        "entity": {
+          "entity": 2,
+          "interface": 6,
+          "invariant": 3
+        },
+        "feature": {
+          "entity": 2,
+          "feature": 9,
+          "interface": 2,
+          "invariant": 25,
+          "non_goal": 1,
+          "unresolved": 1
+        },
+        "guidance": {
+          "feature": 4,
+          "guidance": 1,
+          "invariant": 9,
+          "unresolved": 1
+        },
+        "interface": {
+          "entity": 2,
+          "feature": 2,
+          "interface": 19,
+          "invariant": 2
+        },
+        "invariant": {
+          "feature": 1,
+          "invariant": 6,
+          "nonactionable": 1
+        },
+        "non_goal": {
+          "non_goal": 2
+        },
+        "nonactionable": {
+          "nonactionable": 7
+        },
+        "unresolved": {
+          "feature": 4,
+          "unresolved": 10
+        }
+      },
+      "n": 125
+    },
+    "jev_vs_teacher_llm": {
+      "accuracy": 0.6,
+      "confusion_matrix": {
+        "context": {
+          "feature": 3,
+          "invariant": 6,
+          "nonactionable": 1
+        },
+        "entity": {
+          "entity": 6,
+          "interface": 4,
+          "invariant": 5,
+          "nonactionable": 1
+        },
+        "feature": {
+          "feature": 10,
+          "interface": 4,
+          "invariant": 6
+        },
+        "guidance": {
+          "feature": 4,
+          "guidance": 1,
+          "invariant": 9,
+          "unresolved": 1
+        },
+        "interface": {
+          "feature": 1,
+          "interface": 19
+        },
+        "invariant": {
+          "invariant": 20
+        },
+        "non_goal": {
+          "feature": 1,
+          "invariant": 1,
+          "non_goal": 3
+        },
+        "nonactionable": {
+          "feature": 1,
+          "nonactionable": 6,
+          "unresolved": 1
+        },
+        "unresolved": {
+          "invariant": 1,
+          "unresolved": 10
+        }
+      },
+      "n": 125
+    },
+    "teacher_llm_vs_human": {
+      "accuracy": 0.6,
+      "confusion_matrix": {
+        "context": {
+          "context": 3
+        },
+        "entity": {
+          "entity": 7,
+          "feature": 1,
+          "interface": 2,
+          "invariant": 1
+        },
+        "feature": {
+          "context": 4,
+          "entity": 5,
+          "feature": 12,
+          "interface": 1,
+          "invariant": 13,
+          "non_goal": 2,
+          "nonactionable": 2,
+          "unresolved": 1
+        },
+        "guidance": {
+          "guidance": 15
+        },
+        "interface": {
+          "entity": 2,
+          "feature": 4,
+          "interface": 17,
+          "invariant": 2
+        },
+        "invariant": {
+          "entity": 1,
+          "feature": 1,
+          "invariant": 4,
+          "non_goal": 1,
+          "nonactionable": 1
+        },
+        "non_goal": {
+          "non_goal": 2
+        },
+        "nonactionable": {
+          "context": 1,
+          "entity": 1,
+          "nonactionable": 5
+        },
+        "unresolved": {
+          "context": 2,
+          "feature": 2,
+          "unresolved": 10
+        }
+      },
+      "n": 125
+    }
+  },
+  "confidence_policy_analysis": {
+    "0.5": {
+      "accepted_count": 99,
+      "coverage": 0.792,
+      "jev_accuracy_on_accepted": 0.48484848484848486,
+      "teacher_fallback_hybrid_accuracy": 0.496
+    },
+    "0.6": {
+      "accepted_count": 83,
+      "coverage": 0.664,
+      "jev_accuracy_on_accepted": 0.5060240963855421,
+      "teacher_fallback_hybrid_accuracy": 0.536
+    },
+    "0.7": {
+      "accepted_count": 69,
+      "coverage": 0.552,
+      "jev_accuracy_on_accepted": 0.5652173913043478,
+      "teacher_fallback_hybrid_accuracy": 0.576
+    },
+    "0.8": {
+      "accepted_count": 52,
+      "coverage": 0.416,
+      "jev_accuracy_on_accepted": 0.6538461538461539,
+      "teacher_fallback_hybrid_accuracy": 0.6
+    },
+    "0.9": {
+      "accepted_count": 37,
+      "coverage": 0.296,
+      "jev_accuracy_on_accepted": 0.7837837837837838,
+      "teacher_fallback_hybrid_accuracy": 0.608
+    }
+  },
+  "confidence_policy_note": "Threshold results are exploratory on a previously inspected batch; do not use them as a production threshold without a fresh human-labeled evaluation.",
+  "endpoint": "https://api.typesafe.ai/v1/systemone",
+  "evaluation_status": "exploratory_same_batch_after_prompt_revision",
+  "example_count": 125,
+  "generated_at": "2026-09-28T19:25:19.857692+00:00",
+  "human_label_normalization": {
+    "formatting_artifact": "unresolved",
+    "reason": "The production root-disposition schema has no formatting_artifact value."
+  },
+  "human_source": "annotator_a",
+  "human_status": "single_reviewer_not_adjudicated",
+  "label_counts": {
+    "human": {
+      "context": 3,
+      "entity": 11,
+      "feature": 40,
+      "guidance": 15,
+      "interface": 25,
+      "invariant": 8,
+      "non_goal": 2,
+      "nonactionable": 7,
+      "unresolved": 14
+    },
+    "jev": {
+      "entity": 6,
+      "feature": 20,
+      "guidance": 1,
+      "interface": 27,
+      "invariant": 48,
+      "non_goal": 3,
+      "nonactionable": 8,
+      "unresolved": 12
+    },
+    "teacher_llm": {
+      "context": 10,
+      "entity": 16,
+      "feature": 20,
+      "guidance": 15,
+      "interface": 20,
+      "invariant": 20,
+      "non_goal": 5,
+      "nonactionable": 8,
+      "unresolved": 11
+    }
+  },
+  "mean_input_tokens": 961.288,
+  "mean_jev_confidence": 0.70624,
+  "model": "jev-latest",
+  "prompt_development": "The revision uses the full written rubric and synthetic examples. Its boundaries were informed by disagreements in the baseline batch.",
+  "prompt_revision": "root-disposition-rubric-examples-v2",
+  "schema_version": "jev-root-disposition-comparison-v2"
+}

@@ -1,0 +1,6 @@
+"""Predict and evaluate behavior-level tests for DeepSWE tasks."""
+
+SCHEMA_VERSION = "deepswe-test-prediction-task-v2"
+PREDICTIONS_SCHEMA_VERSION = "deepswe-test-predictions-v2"
+
+__all__ = ["PREDICTIONS_SCHEMA_VERSION", "SCHEMA_VERSION"]

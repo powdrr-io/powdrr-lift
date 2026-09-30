@@ -142,19 +142,19 @@ def _complete_json_with_model_fallback(
                     file=stderr,
                 )
                 return None, active_model, active_provider
-                if isinstance(exc, _SemanticRepairExhaustedError):
-                    print(
-                        f"{context} semantic repair was exhausted for "
-                        f"{active_model!r}: {exc}. Switching to backup model "
-                        f"{backup_model.model!r}.",
-                        file=stderr,
-                    )
-                else:
-                    print(
-                        f"{context} model {active_model!r} is unavailable: {exc}. "
-                        f"Switching to backup model {backup_model.model!r}.",
-                        file=stderr,
-                    )
+            if isinstance(exc, _SemanticRepairExhaustedError):
+                print(
+                    f"{context} semantic repair was exhausted for "
+                    f"{active_model!r}: {exc}. Switching to backup model "
+                    f"{backup_model.model!r}.",
+                    file=stderr,
+                )
+            else:
+                print(
+                    f"{context} model {active_model!r} is unavailable: {exc}. "
+                    f"Switching to backup model {backup_model.model!r}.",
+                    file=stderr,
+                )
             attempted_models.add(backup_model.model.casefold())
             active_model = backup_model.model
             active_provider = backup_model.provider
@@ -571,21 +571,6 @@ def _complete_json_with_repair(
                 ),
             )
             continue
-            retry = _prompt_user(
-                "Type 'retry' to try again or 'abort' to stop: ",
-                input_func=input_func,
-                stdout=stdout,
-                status_stream=stderr,
-            )
-            _verbose_print(
-                stderr,
-                config.verbose,
-                f"User chose {retry!r} after {context} repair failure",
-            )
-            if retry.strip().lower() == "retry":
-                continue
-            print(f"Stopping after {context} failure.", file=stderr)
-            return None
 
 
 def _is_invalid_user_question_error(exc: RuntimeError) -> bool:

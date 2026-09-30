@@ -1,0 +1,100 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 819
+title: Evaluate DeepSWE design-only outputs against task references
+intent:
+  problem: Design-only runs produce source-grounded designs, but there is no repeatable way to compare those outputs with DeepSWE's reference solution and verifier tests.
+  goal: Generate a traceable quality report for the state-data-scoping task using its exact instruction, reference solution, verifier tests, and canonical design artifact.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: added
+    span: {start_line: 1, end_line: 467}
+    summary: Grade design projections against validated task references and persist evidence-linked findings.
+    rationale: Locate semantic omissions at the design stage without launching a coding agent.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 172, end_line: 176}
+    summary: Import the DeepSWE design evaluator into the CLI.
+    rationale: Expose the evaluator as a supported command.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1488, end_line: 1509}
+    summary: Add the evaluate-deepswe-design subcommand and judge options.
+    rationale: Run evaluation against a retrieved design-only artifact directory.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4670, end_line: 4715}
+    summary: Build the judge client, write the report, and return failure for unsupported critical criteria.
+    rationale: Make the evaluation reproducible and usable in scripted checks.
+  - path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+    type: added
+    span: {start_line: 1, end_line: 165}
+    summary: Record task-specific behavior claims with solution symbols and verifier test references.
+    rationale: Ground quality judgments in the benchmark task rather than patch-text similarity.
+  - path: docs/evaluations/deepswe-design-evaluation.md
+    type: added
+    span: {start_line: 1, end_line: 45}
+    summary: Document the design-only run and reference-evaluation sequence.
+    rationale: Keep solution and verifier references on the evaluation side of the workflow.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: added
+    span: {start_line: 1, end_line: 216}
+    summary: Test reference binding, critical omissions, and judge evidence validation.
+    rationale: Prevent stale references and unsupported positive judgments from passing.
+entities:
+  - id: deepswe-design-evaluator
+    type: Tool
+    action: added
+  - id: deepswe-design-evaluation-subcommand
+    type: Subcommand
+    action: added
+  - id: state-data-design-rubric
+    type: Configuration file
+    action: added
+  - id: state-data-reference-task
+    type: Dataset
+    action: added
+  - id: deepswe-design-evaluation-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: evaluation-command-runs-design-evaluator
+    source: deepswe-design-evaluation-subcommand
+    target: deepswe-design-evaluator
+    relationship: invokes
+    description: The subcommand grades a retrieved canonical design artifact.
+    rationale: Provide a repeatable command-line entry point.
+    action: added
+  - id: design-evaluator-uses-task-references
+    source: deepswe-design-evaluator
+    target: state-data-reference-task
+    relationship: uses
+    description: The evaluator validates rubric evidence against the task instruction, solution patch, and verifier patch.
+    rationale: Bind findings to the benchmark's reference artifacts.
+    action: added
+  - id: design-evaluator-loads-rubric
+    source: deepswe-design-evaluator
+    target: state-data-design-rubric
+    relationship: uses
+    description: The evaluator grades the curated behavior criteria for the state-data-scoping task.
+    rationale: Keep expected behavior and reference anchors reviewable.
+    action: added
+invariants:
+  - id: evaluator-references-match-task
+    action: added
+    description: Task identity, source excerpts, verifier tests, solution symbols, and design-ledger fingerprints are checked before judging.
+    rationale: Reject stale or mismatched benchmark evidence.
+  - id: positive-findings-require-design-quotes
+    action: added
+    description: A supported judgment must cite exact text from the canonical design projection.
+    rationale: Make positive judgments inspectable and reject invented evidence.
+  - id: critical-criteria-fail-closed
+    action: added
+    description: The report passes only when every critical criterion is supported.
+    rationale: Prevent weighted averages from hiding a missing core behavior.
+guidance:
+  - id: run-design-then-evaluate
+    action: added
+    description: Run Harbor with POWDRR_DESIGN_ONLY=1, retrieve its artifact directory, then call evaluate-deepswe-design with the local task directory.
+    rationale: Evaluate the actual design flow without starting a coding agent.

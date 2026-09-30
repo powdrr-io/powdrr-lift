@@ -16,7 +16,7 @@ from powdrr_lift.core.semantic_decision import (
     resolve_exact_source_span,
 )
 
-PARTIAL_SEMANTIC_CONTRACT_SCHEMA_VERSION = "partial-semantic-contract-v1"
+PARTIAL_SEMANTIC_CONTRACT_SCHEMA_VERSION = "partial-semantic-contract-v2"
 SOURCE_EXTRACTION_SCHEMA_VERSION = "source-extraction-v1"
 SOURCE_EXTRACTION_SPEC_SCHEMA_VERSION = "source-extraction-spec-v1"
 
@@ -259,6 +259,7 @@ class PartialSemanticContract:
     source_ref: str
     source_fingerprint: str
     proposition_text: str
+    routing: str
     disposition: str
     polarity: str
     requirement_strength: str
@@ -280,6 +281,7 @@ class PartialSemanticContract:
             ("source_ref", self.source_ref),
             ("source_fingerprint", self.source_fingerprint),
             ("proposition_text", self.proposition_text),
+            ("routing", self.routing),
         ):
             if not value.strip():
                 raise SemanticContractError(f"{name} must not be empty")
@@ -323,6 +325,7 @@ class PartialSemanticContract:
             "source_ref": self.source_ref,
             "source_fingerprint": self.source_fingerprint,
             "proposition_text": self.proposition_text,
+            "routing": self.routing,
             "disposition": self.disposition,
             "polarity": self.polarity,
             "requirement_strength": self.requirement_strength,
@@ -406,6 +409,7 @@ class PartialSemanticContract:
             source_ref=_required_string(raw, "source_ref"),
             source_fingerprint=_required_string(raw, "source_fingerprint"),
             proposition_text=_required_string(raw, "proposition_text"),
+            routing=_required_string(raw, "routing"),
             disposition=_required_string(raw, "disposition"),
             polarity=_required_string(raw, "polarity"),
             requirement_strength=_required_string(raw, "requirement_strength"),
@@ -460,6 +464,7 @@ def compile_partial_semantic_contract(
     decision_by_kind = _unique_by_kind(decisions)
     extraction_by_kind = _extractions_by_kind(extractions)
     required_decisions = {
+        "routing",
         "disposition",
         "polarity",
         "quantifier",
@@ -487,6 +492,7 @@ def compile_partial_semantic_contract(
             "partial contract cannot compile unresolved source decisions: "
             f"{sorted(unresolved_decisions)}"
         )
+    routing = _decision_value(decision_by_kind, "routing")
     disposition = _decision_value(decision_by_kind, "disposition")
     exclusion_safety = _decision_value(
         decision_by_kind, "nonactionable_exclusion_safety"
@@ -534,6 +540,7 @@ def compile_partial_semantic_contract(
         source_ref=source_ref,
         source_fingerprint=source_fingerprint,
         proposition_text=proposition_text,
+        routing=routing,
         disposition=disposition,
         polarity=_decision_value(decision_by_kind, "polarity"),
         requirement_strength=_decision_value(decision_by_kind, "requirement_strength"),

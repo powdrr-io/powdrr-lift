@@ -10,6 +10,7 @@ description: >-
 inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
+  - {name: benchmark_mode, type: boolean, required: true}
 outputs:
   feature_design:
     type: object
@@ -70,7 +71,7 @@ outputs:
             status: {type: string, enum: [active]}
             behavior_scenario:
               type: object
-              required: [schema_version, scenario_id, subject, given, when, then, dimensions, evidence, validator, capability_matrix]
+              required: [schema_version, scenario_id, subject, given, when, then, related_requirements, dimensions, evidence, validator, capability_matrix, routing]
               additionalProperties: false
               properties:
                 schema_version: {type: string, const: behavior-scenario-v1}
@@ -79,6 +80,9 @@ outputs:
                 given: {type: string, minLength: 1}
                 when: {type: string, minLength: 1}
                 then: {type: string, minLength: 1}
+                related_requirements:
+                  type: array
+                  items: {type: string, minLength: 1}
                 dimensions:
                   type: object
                   required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
@@ -93,6 +97,9 @@ outputs:
                     negative_boundaries: {type: string, minLength: 1}
                 evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
                 validator: {type: string, minLength: 1}
+                routing: {type: string, enum: [include, include_prohibition, exclude, unclear]}
+                validation_group_id: {type: string, minLength: 1}
+                validation_relation: {type: string, enum: [independent, all_together, ordered, alternatives, conditional]}
                 capability_matrix:
                   type: array
                   items:
@@ -104,6 +111,19 @@ outputs:
                       behavior: {type: string, enum: [support, reject, fallback]}
                       evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
                       error: {type: string, minLength: 1}
+                assumptions:
+                  type: array
+                  items:
+                    type: object
+                    required: [dimension, resolution, rationale, basis, basis_reference, confidence]
+                    additionalProperties: false
+                    properties:
+                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                      resolution: {type: string, minLength: 1}
+                      rationale: {type: string, minLength: 1}
+                      basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
+                      basis_reference: {type: string, minLength: 1}
+                      confidence: {type: string, enum: [high, medium, low]}
 steps:
   - operation:
       tool: internal
@@ -123,10 +143,11 @@ steps:
       snapshot: {name: instruction_ledger.clauses, max_items: 128}
       item_binding: atomicity_clause
       collect: {binding: atomicity_decisions, mode: list, value: atomicity_decision}
+      max_parallel: 8
       body:
         - judge:
             kind: classify_one
-            provider: planning
+            provider: jev
             question: Does this one instruction clause contain more than one independently verifiable requirement?
             subject: atomicity_clause.text
             prompt_system: Return only the declared JSON object.
@@ -142,11 +163,6 @@ steps:
                 Example: "On exit, data is removed. Re-entering a state resets data
                 to the original defaults." is already two clauses and each is judged
                 separately; do not combine neighboring clauses.
-              - >-
-                Example: "set_state_data validates active state, declared key, and
-                DataVar type constraints, raising InvalidDefinition on violation."
-                contains independently verifiable validations and an error outcome, so
-                multiple is true.
             context: [atomicity_clause]
             output:
               name: atomicity_decision
@@ -170,18 +186,27 @@ steps:
       bind: atomicity_plan
   - for_each:
       snapshot: {name: atomicity_plan.split_requests, max_items: 128}
+      max_parallel: 8
       item_binding: atomicity_split_request
       collect: {binding: atomicity_splits, mode: list, value: atomicity_split}
       body:
         - judge:
             kind: construct_one
             provider: planning
-            question: What are the smallest independently verifiable requirements contained in this one instruction clause?
+            question: How can this clause be decomposed without losing validation dependencies?
             subject: atomicity_split_request.clause.text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Return an ordered list of 2 to 8 short statements, and nothing else.
-              - Each statement must express exactly one behavior, API result, constraint, lifecycle event, error condition, or prohibition that can be verified separately.
+              - Return 2 to 8 short statements and validation_groups, and nothing else.
+              - Split statements only when each resulting obligation can independently pass or fail.
+              - Keep a trigger, condition, exception, or required outcome attached to the obligation it qualifies.
+              - Group statements that must pass together in the same scenario, form an ordered sequence, represent source-authorized alternatives, or describe conditional branches.
+              - >-
+                Encode each validation group as "members=1,2;relation=all_together".
+                Members are two or more one-based statement indexes; relation is
+                all_together, ordered, alternatives, or conditional. Leave
+                independently verifiable statements out of groups.
+              - Do not split one obligation merely because it has several assertions; use all_together when those assertions jointly define success.
               - Preserve every concrete API name, value, condition, constraint, and required error from the source clause.
               - Do not add requirements, choose implementation details, weaken a requirement, or infer an opposite behavior.
               - Do not return IDs, references, selectors, hashes, fingerprints, source spans, or parent fields; Powdrr assigns structure.
@@ -189,23 +214,41 @@ steps:
                 Example source: "set_state_data validates active state, declared key,
                 and DataVar type constraints, raising InvalidDefinition on violation."
               - >-
-                Example statements: ["set_state_data rejects an inactive state.",
-                "set_state_data rejects an undeclared key.", "set_state_data enforces
-                the declared DataVar type constraint.", "An invalid set_state_data
-                call raises InvalidDefinition."]
+                Example: "For every valid request, return status 200 and include the
+                account ID" may become two statements in one all_together group,
+                because both assertions must pass for the same valid request.
+              - >-
+                Example: "If credentials are valid, return 200; otherwise return
+                401" has two conditional branches, not alternatives; preserve each
+                branch condition in its statement and link them as conditional.
+              - >-
+                Make every statement independently understandable: repeat the
+                source subject and governing action when needed; never emit a
+                fragment that depends on a neighboring statement for its meaning.
+              - >-
+                Preserve the source relationships among subjects, actions,
+                conditions, and outcomes. Do not turn a coordinated value or
+                modifier into a new subject or action.
+              - >-
+                If a source element cannot be separated without changing or
+                obscuring its meaning, keep it with the smallest requirement
+                that governs it rather than forcing a shorter fragment.
             context: [atomicity_split_request]
             output:
               name: atomicity_split
               schema:
-                type: object
-                required: [statements]
-                additionalProperties: false
-                properties:
-                  statements:
-                    type: array
-                    minItems: 2
-                    maxItems: 8
-                    items: {type: string, minLength: 1, maxLength: 500}
+                    type: object
+                    required: [statements, validation_groups]
+                    additionalProperties: false
+                    properties:
+                      statements:
+                        type: array
+                        minItems: 2
+                        maxItems: 8
+                        items: {type: string, minLength: 1, maxLength: 500}
+                      validation_groups:
+                        type: array
+                        items: {type: string, minLength: 1, maxLength: 100}
             validation: {kind: json_schema}
   - operation:
       tool: internal
@@ -241,18 +284,20 @@ steps:
             bind: semantic_decision_plan
         - for_each:
             snapshot: {name: semantic_decision_plan.pending_specs, max_items: 16}
+            max_parallel: 8
             item_binding: root_decision_request
             collect: {binding: root_decision_results, mode: list, value: root_decision_result}
             body:
               - judge:
                   kind: classify_one
-                  provider: planning
-                  question: Decide the root role of this exact instruction clause before classifying any details.
+                  provider: jev
+                  question: Decide how the pipeline should route this exact instruction clause before classifying details.
                   subject: root_decision_request.subject_text
                   prompt_system: Return only the declared JSON object.
                   instructions:
                     - Follow the request's question, instructions, and allowed_values exactly.
-                    - This is the root of a decision tree. Do not classify polarity, strength, behavior family, or modifiers here.
+                    - This is the root of a decision tree. Choose include for product behavior, interfaces, invariants, entity definitions, or implementation guidance; include_prohibition for explicit product prohibitions; exclude for process instructions or background with no implementation obligation; unclear when meaning or route cannot be determined without guessing. A required rejection, exception, or error for invalid input is product behavior and must route to include, not include_prohibition.
+                    - Do not classify detailed product kind, polarity, strength, scope, behavior family, or validation oracle here.
                     - Return resolved with exactly one allowed value when the source supports it.
                     - Return unresolved with a closed reason_code when the source does not support one value.
                     - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.
@@ -267,7 +312,7 @@ steps:
                         status: {type: string, enum: [resolved, unresolved]}
                         value:
                           type: [string, 'null']
-                          enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
+                          enum: [include, include_prohibition, exclude, unclear, entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
                         reason_code:
                           type: [string, 'null']
                           enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
@@ -302,17 +347,18 @@ steps:
             bind: dependent_semantic_decision_plan
         - for_each:
             snapshot: {name: dependent_semantic_decision_plan.pending_specs, max_items: 16}
+            max_parallel: 8
             item_binding: dependent_decision_request
             collect: {binding: dependent_decision_results, mode: list, value: dependent_decision_result}
             body:
               - judge:
                   kind: classify_one
-                  provider: planning
+                  provider: jev
                   question: Resolve this child decision only within the already-selected root branch.
                   subject: dependent_decision_request.subject_text
                   prompt_system: Return only the declared JSON object.
                   instructions:
-                    - Follow the request's question, instructions, allowed_values, and parent decision exactly.
+                    - Follow the request's question, instructions, allowed_values, and parent routing decision exactly.
                     - Never select a child value that contradicts the parent branch; abstain when no child value fits.
                     - Return resolved with exactly one allowed value or unresolved with one closed reason_code.
                     - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.
@@ -360,6 +406,7 @@ steps:
             bind: source_extraction_plan
         - for_each:
             snapshot: {name: source_extraction_plan.requests, max_items: 5}
+            max_parallel: 5
             item_binding: source_extraction_request
             collect: {binding: source_extraction_results, mode: list, value: source_extraction_result}
             body:
@@ -418,7 +465,7 @@ steps:
             bind: behavior_family_request
         - judge:
             kind: classify_one
-            provider: planning
+            provider: jev
             question: Classify only the extracted behavior into one registered behavior family.
             subject: behavior_family_request.subject_text
             prompt_system: Return only the declared JSON object.
@@ -482,12 +529,13 @@ steps:
             bind: field_entailment_plan
         - for_each:
             snapshot: {name: field_entailment_plan.requests, max_items: 16}
+            max_parallel: 8
             item_binding: field_entailment_request
             collect: {binding: field_entailment_results, mode: list, value: field_entailment_result}
             body:
               - judge:
                   kind: classify_one
-                  provider: planning
+                  provider: jev
                   question: Is this candidate field entailed by the exact source proposition?
                   subject: field_entailment_request.source_text
                   prompt_system: Return only the declared JSON object.
@@ -496,6 +544,7 @@ steps:
                     - Return entailed only when the source supports it without added meaning.
                     - Return contradicted when the source rules it out, or not_stated when it does not say enough.
                     - Never rewrite the candidate, repair it, or return explanations or extra fields.
+                    - Set reason_code to null when status is resolved; use a listed reason code only when status is unresolved.
                   context: [field_entailment_request]
                   output:
                     name: field_entailment_result
@@ -544,8 +593,22 @@ steps:
             prompt_system: Return only the declared JSON object.
             instructions:
               - Use the exact source clause and accepted semantic design; do not add behavior that the user did not request.
+              - >-
+                The route controls how this scenario is used: include creates
+                positive product obligations, include_prohibition creates a negative
+                product obligation, exclude creates no implementation obligation,
+                and unclear must be resolved before this step.
+              - For include_prohibition, put the forbidden outcome in the scenario expectation and test the prohibited boundary; do not rewrite it as a request to implement the forbidden behavior.
+              - >-
+                A required failure when invalid input is tried is an obligation:
+                preserve the failure mode as the expected behavior and require a
+                test that the invalid input fails. Do not classify this as a
+                non-goal just because the input is rejected.
+              - For guidance, preserve recommendation strength. Turn the recommendation into an implementation check without upgrading it to a mandatory behavior unless the accepted source explicitly requires that.
               - Use the complete atomic instruction ledger as supporting specification context when another clause explicitly supplies this behavior's result, error, compatibility, or boundary detail.
-              - Keep each scenario scoped to its exact clause; sibling clauses may resolve a dimension but must not add a separate obligation to this scenario.
+              - Keep each scenario centered on its exact clause, but do not isolate it from the rest of the requested behavior. Preserve explicit relationships to other clauses when they define how this behavior is exposed, consumed, combined, ordered, or made available through another API or integration.
+              - Put each material, explicitly source-supported cross-clause relationship in scenario.related_requirements as a concise statement of both the related behavior and how it relates to this clause. Do not restate unrelated requirements or invent dependencies; return an empty list when the ledger establishes no material relationship.
+              - Use related clauses to clarify how this clause works in the complete feature, without merging their independent obligations into this clause's expected result.
               - Before returning needs_clarification, search the ledger for sibling clauses that explicitly resolve each dimension. A dimension supported by a related sibling clause is resolved, not missing.
               - Return status resolved exactly when unresolved_dimensions is empty; return needs_clarification exactly when unresolved_dimensions lists every materially applicable, unresolved dimension.
               - Use not_applicable only when the dimension cannot apply to this operation by its nature (for example, cancellation for a synchronous declaration-time configuration); use needs_clarification when the dimension can apply and the entire ledger leaves it open.
@@ -557,49 +620,65 @@ steps:
                 and compatibility for that clause. Do not mark those dimensions
                 unresolved because their evidence is in sibling clauses.
               - >-
-                Worked example from this specification: "DataVar supports optional
-                type enforcement" is resolved by the sibling clauses stating that
-                set_state_data validates DataVar type constraints and raises
-                InvalidDefinition on violation. Record valid typed assignment as the
-                normal result and the declared InvalidDefinition as error behavior
-                and a negative boundary; do not list those dimensions as unresolved.
-              - >-
                 Do not mark every dimension unresolved as a shortcut. Decide each
                 dimension independently: cite its supporting clause in the dimension
                 text when applicable, use not_applicable only for dimensions that
                 cannot apply to this behavior, and ask for clarification only for a
                 materially applicable dimension left open by the entire ledger.
-              - >-
-                Worked example: "SCXML data elements are parsed as Python literals"
-                resolves the normal result to literal Python values. Parsing is a
-                synchronous operation, so continuation and cancellation/cleanup do
-                not apply. If the ledger does not define malformed-literal behavior,
-                ask only about the applicable error and negative-boundary details.
-              - >-
-                Worked example: "Diagrams annotate state data variables" resolves
-                the normal result to variable annotations in the rendered diagram;
-                a state with no data variables has no data annotation. Synchronous
-                rendering has no continuation or cancellation/cleanup dimension.
-                Do not mark the explicitly stated normal result unresolved.
               - Describe one scenario with concrete given, when, and then values.
               - Explicitly cover normal result/state, errors and propagation, continuation, unsupported capabilities, cancellation/cleanup, compatibility, and negative boundaries.
               - For each dimension, write a concrete requirement or the exact value not_applicable when that dimension genuinely does not apply.
               - Never use not_applicable merely because the source is silent. If a dimension can materially affect behavior and the source does not resolve it, return needs_clarification and list that dimension.
               - Keep error shape and location separate from whether later work continues; nested errors must be represented explicitly when relevant.
-              - For APIs, adapters, commands, integrations, and runtime extensions, include each supported/rejected/unknown context in capability_matrix with executable evidence and the defined error for rejected contexts. Return an empty list only when this behavior change has no capability boundary.
+              - >-
+                For APIs, adapters, commands, integrations, and runtime extensions,
+                include each supported, explicitly rejected, or fallback context in
+                capability_matrix with executable evidence. Use reject only when
+                the operation explicitly fails for that context, and include the
+                exact error defined by the accepted specification. Use fallback
+                when the operation remains valid but applies a defined reduced,
+                default, or alternate behavior; describe that behavior rather than
+                inventing an error. In particular, a shallow or partial result is
+                not a rejection unless the specification says it raises an error.
+                Return an empty list only when this behavior change has no
+                capability boundary.
               - Do not return selectors, IDs, evidence paths, validator commands, or extra fields; Powdrr binds those from the compiled test contract.
+              - Return scenario.assumptions as an empty list unless benchmark_mode is true.
             prompt_rules:
-              - when: {binding: partial_semantic_design.partial_contract.disposition, equals: context}
+              - when: {binding: benchmark_mode, equals: true}
                 instructions:
-                  - This clause is background context only and must not create an implementation obligation.
+                  - Keep status as needs_clarification and list every materially applicable dimension the source leaves unresolved; do not pretend an assumption came from the user or source.
+                  - Treat defaults as narrow gap-filling, not permission to expand the specification. Mark a dimension unresolved only when its answer could materially change implementation of this clause; otherwise preserve its concrete requirement or mark it not_applicable.
+                  - Do not invent hypothetical cancellation, unsupported-input, failure, compatibility, or continuation cases that the clause does not imply. Reuse constraints already established by the source and accepted design instead of reopening them as uncertainty.
+                  - For every unresolved dimension, provide exactly one scenario.assumptions entry with a concrete resolution, rationale, basis, basis_reference, and confidence.
+                  - Each resolution must select one definite behavior; do not say behavior is undefined, may take either of several outcomes, or leave the implementation choice open.
+                  - A default must preserve and remain consistent with every explicit source requirement. Never let a fallback, edge-case policy, or conservative default weaken or contradict required behavior.
+                  - Keep unresolved_dimensions exactly consistent with dimensions. List a dimension only when its value says the source leaves it unresolved; exclude every dimension with a concrete requirement or not_applicable value.
+                  - Do not list a dimension as unresolved merely because a conservative assumption is being recorded. The unresolved_dimensions list is the exact set of dimensions requiring assumptions, and every listed dimension must have one matching assumption.
+                  - For each listed unresolved dimension, set its dimensions value to "unresolved by source" and provide exactly one assumption for that same dimension; do not create assumptions for dimensions already resolved by the source or marked not_applicable.
+                  - A dimension that genuinely does not apply must remain "not_applicable", be excluded from unresolved_dimensions, and have no assumption. Never use "not_applicable" as an assumption resolution; assumptions must choose concrete behavior.
+                  - Prefer evidence in the source and accepted design, then repository conventions only when the supplied context supports them, then an identifiable official standard or ecosystem convention, then an established language or framework default, and finally a conservative interoperable default.
+                  - Never fabricate a normative citation. If no identifiable source is available, use conservative_default and state that no specific normative source was identified in basis_reference.
+                  - State confidence honestly; low confidence is allowed but must still choose a concrete, conservative default for the benchmark run.
+              - when: {binding: benchmark_mode, equals: false}
+                instructions:
+                  - Do not resolve uncertainty with assumptions. Leave scenario.assumptions empty and report materially unresolved dimensions for human clarification.
+              - when: {binding: partial_semantic_design.partial_contract.routing, equals: exclude}
+                instructions:
+                  - This clause is excluded and must not create a product implementation obligation.
                   - Return status resolved, list no unresolved dimensions, and set every dimension to "not_applicable (context only)".
-                  - Set given to "The source clause is context only", when to "The feature design is compiled", and then to "No implementation obligation is generated".
+                  - Set given to "The source clause is excluded", when to "The feature design is compiled", and then to "No implementation obligation is generated".
+              - when: {binding: partial_semantic_design.partial_contract.routing, equals: unclear}
+                instructions:
+                  - This scenario is a candidate for headless route review; the benchmark task must continue even if the route remains unclear.
+                  - Record the best-supported candidate behavior from the source and do not invent missing product meaning.
+                  - The worker packet will ask the coding agent to inspect repository evidence, choose the most conservative backward-compatible interpretation if evidence is inconclusive, record that assumption, and continue.
               - when: {binding: partial_semantic_design.partial_contract.disposition, equals: nonactionable}
                 instructions:
                   - This clause is delivery-process metadata only and must not create a product obligation.
                   - Return status resolved, list no unresolved dimensions, and set every dimension to "not_applicable (process metadata only)".
                   - Set given to "The delivery instruction is recorded", when to "The feature design is compiled", and then to "No product implementation obligation is generated".
-            context: [instruction_clause, atomic_instruction_ledger, partial_semantic_design, source_faithfulness]
+            context: [instruction_clause, atomic_instruction_ledger, partial_semantic_design, source_faithfulness, benchmark_mode]
             output:
               name: behavior_scenario_result
               schema:
@@ -613,13 +692,16 @@ steps:
                     items: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
                   scenario:
                     type: object
-                    required: [subject, given, when, then, dimensions]
+                    required: [subject, given, when, then, dimensions, related_requirements]
                     additionalProperties: false
                     properties:
                       subject: {type: string, minLength: 1}
                       given: {type: string, minLength: 1}
                       when: {type: string, minLength: 1}
                       then: {type: string, minLength: 1}
+                      related_requirements:
+                        type: array
+                        items: {type: string, minLength: 1}
                       dimensions:
                         type: object
                         required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
@@ -632,6 +714,19 @@ steps:
                           cancellation_cleanup: {type: string, minLength: 1}
                           compatibility: {type: string, minLength: 1}
                           negative_boundaries: {type: string, minLength: 1}
+                      assumptions:
+                        type: array
+                        items:
+                          type: object
+                          required: [dimension, resolution, rationale, basis, basis_reference, confidence]
+                          additionalProperties: false
+                          properties:
+                            dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                            resolution: {type: string, minLength: 1}
+                            rationale: {type: string, minLength: 1}
+                            basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
+                            basis_reference: {type: string, minLength: 1}
+                            confidence: {type: string, enum: [high, medium, low]}
                       capability_matrix:
                         type: array
                         items:
@@ -661,12 +756,60 @@ steps:
                 expected_test: {type: string}
                 behavior_scenario: {type: object}
             bind: semantic_design
+  - judge:
+      kind: construct_one
+      provider: planning
+      question: Are the recorded defaults coherent across related behavior scenarios?
+      subject: work_item_name
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Review the complete source ledger and all compiled behavior scenarios together before any worker prompt is created.
+        - Compare assumptions only where scenarios govern the same behavior or explicitly relate to one another; a shared dimension name alone does not make two defaults conflict.
+        - Preserve every source-supported requirement and every dimension resolved by the source. This review may update only an existing normative assumption, never a source-grounded result or scenario obligation.
+        - If related assumptions prescribe incompatible outcomes for the same behavior, revise the minimum set of assumptions to one concrete outcome consistent with every applicable source requirement and linked scenario.
+        - Do not add speculative cases or new requirements. If a conflict has no identifiable normative answer, choose one conservative interoperable outcome and record the basis and low confidence rather than leaving competing defaults.
+        - In non-benchmark mode, return no updates; do not invent or reconcile assumptions on the user's behalf.
+        - For each changed assumption, quote the target scenario's subject, given, when, then, dimension, and previous resolution exactly so the compiler can bind the update without model-generated IDs.
+        - Return an empty updates list when the recorded assumptions are already coherent.
+      context: [work_item_name, atomic_instruction_ledger, semantic_designs, benchmark_mode]
+      output:
+        name: scenario_consistency_review
+        schema:
+          type: object
+          required: [consistency_review]
+          additionalProperties: false
+          properties:
+            consistency_review:
+              type: object
+              required: [updates]
+              additionalProperties: false
+              properties:
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    required: [subject, given, when, then, dimension, previous_resolution, resolution, rationale, basis, basis_reference, confidence]
+                    additionalProperties: false
+                    properties:
+                      subject: {type: string, minLength: 1}
+                      given: {type: string, minLength: 1}
+                      when: {type: string, minLength: 1}
+                      then: {type: string, minLength: 1}
+                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                      previous_resolution: {type: string, minLength: 1}
+                      resolution: {type: string, minLength: 1}
+                      rationale: {type: string, minLength: 1}
+                      basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
+                      basis_reference: {type: string, minLength: 1}
+                      confidence: {type: string, enum: [high, medium, low]}
+      validation: {kind: json_schema}
   - operation:
       tool: internal
       command: [compile_canonical_feature_design]
       parameters:
         work_item_name: {type: reference, value: work_item_name}
         design_decisions: {type: reference, value: semantic_designs}
+        scenario_consistency_review: {type: reference, value: scenario_consistency_review}
       returns:
         type: object
         required: [path, fingerprint, obligations, verification_contracts, required_test_cases]

@@ -46,12 +46,12 @@ def test_packet_renders_behavioral_test_descriptions_without_selectors() -> None
     assert packet.from_data(packet.to_data()).to_data() == packet.to_data()
 
 
-def test_packet_removes_source_workflow_instructions_from_objective() -> None:
+def test_packet_preserves_source_objective_without_rendering_product_work() -> None:
+    objective = (
+        "Add behavior.\n\nIMPORTANT: create a branch from main and commit everything."
+    )
     packet = compile_implementation_packet(
-        objective=(
-            "Add behavior.\n\n"
-            "IMPORTANT: create a branch from main and commit everything."
-        ),
+        objective=objective,
         obligations=("The behavior exists.",),
         required_tests=(
             {
@@ -65,7 +65,54 @@ def test_packet_removes_source_workflow_instructions_from_objective() -> None:
         validation_profiles=("pytest",),
     )
 
-    assert packet.objective == "Add behavior."
+    assert packet.objective == objective
+    assert "IMPORTANT:" not in packet.render()
+
+
+def test_packet_renders_scoped_external_contract_and_unresolved_source_notes() -> None:
+    packet = compile_implementation_packet(
+        objective="Add incremental GraphQL support.",
+        obligations=("Support @defer.",),
+        required_tests=(
+            {
+                "description": "Verify deferred fragment behavior.",
+                "provider": "pytest",
+                "profile": "pytest",
+                "selector": "tests/test_incremental.py::test_defer",
+            },
+        ),
+        allowed_paths=("src",),
+        validation_profiles=("pytest",),
+        external_contract_requirements=(
+            {
+                "requirement": "Support the optional label argument on @defer.",
+                "canonical_url": "https://spec.example.org/defer",
+                "profile": "directive v1",
+                "source_quote": "@defer accepts label.",
+                "rationale": "It is needed to construct the requested directive.",
+            },
+        ),
+        external_contract_notes=(
+            {
+                "rationale": "A newer profile may define a different payload format.",
+                "claim": {
+                    "candidate_requirement": "Use the newer pending/id payload format.",
+                    "canonical_url": "https://spec.example.org/latest",
+                    "profile": "latest draft",
+                },
+            },
+        ),
+    )
+
+    rendered = packet.render()
+    assert "Support the optional label argument on @defer." in rendered
+    assert "https://spec.example.org/defer" in rendered
+    assert "@defer accepts label." in rendered
+    assert (
+        "Unresolved external contract questions (do not assume an answer)" in rendered
+    )
+    assert "Use the newer pending/id payload format." in rendered
+    assert packet.from_data(packet.to_data()).render() == rendered
 
 
 def test_packet_requires_a_contract_for_each_obligation() -> None:

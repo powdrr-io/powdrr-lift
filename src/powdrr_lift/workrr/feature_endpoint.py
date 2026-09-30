@@ -14,6 +14,13 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
+from powdrr_lift.core.contract_closure import (
+    ContractClosureError,
+    RepositoryEvidence,
+    collect_python_evidence,
+    compile_contract_closure,
+    validate_contract_closure,
+)
 from powdrr_lift.core.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
@@ -60,6 +67,7 @@ from powdrr_lift.structrr.proposal_review import (
     load_review_receipt,
     write_review_receipt,
 )
+from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
 )
@@ -92,7 +100,11 @@ from powdrr_lift.workrr.command_catalog import (
     feature_command_catalog,
 )
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
+from powdrr_lift.workrr.external_contract_research import (
+    redact_external_contract_search_event,
+)
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
+from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
@@ -134,6 +146,8 @@ class FeatureEndpointConfig:
     planning_client: WorkflowLLMClient | None = None
     task_id: str | None = None
     design_only: bool = False
+    capture_worker_prompts_only: bool = False
+    benchmark_mode: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,11 +207,13 @@ def _load_procedrr_replay_responses(
         if (
             isinstance(record, Mapping)
             and record.get("kind") == "judge"
-            and isinstance(record.get("messages"), list)
             and isinstance(record.get("value"), Mapping)
         ):
-            messages = record["messages"]
-            if all(
+            stored_replay_key = record.get("replay_key")
+            messages = record.get("messages")
+            if isinstance(stored_replay_key, str):
+                replay_responses[stored_replay_key] = dict(record["value"])
+            elif isinstance(messages, list) and all(
                 isinstance(message, Mapping)
                 and isinstance(message.get("role"), str)
                 and isinstance(message.get("content"), str)
@@ -276,6 +292,7 @@ def run_feature_in_place(
     The flow still commits the completed implementation to the current
     checkout so the harness can collect it.
     """
+    config = replace(config, benchmark_mode=True)
     if not config.feature_description.strip():
         raise ValueError("feature_description must not be empty")
     if not config.allowed_paths:
@@ -301,7 +318,11 @@ def run_feature_in_place(
             output_root=output_root,
             branch=branch,
         )
-        if config.cleanup_temporary_artifacts and not config.design_only:
+        if (
+            config.cleanup_temporary_artifacts
+            and not config.design_only
+            and not config.capture_worker_prompts_only
+        ):
             _remove_temporary_feature_artifacts(
                 runner,
                 root,
@@ -325,10 +346,13 @@ def _execute_procedrr_flow(
     output_root: Path,
     branch: str,
 ) -> FeatureEndpointResult:
+    if config.design_only and config.capture_worker_prompts_only:
+        raise ValueError("design-only and worker-prompt capture modes are exclusive")
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {
         "task_id": config.task_id or config.work_item_name,
         "design_only": config.design_only,
+        "capture_worker_prompts_only": config.capture_worker_prompts_only,
     }
     flow_path = (
         _validate_design_interview_flow(worktree)
@@ -346,21 +370,38 @@ def _execute_procedrr_flow(
         state=state,
         catalog=command_catalog,
     )
-    flow = parse_and_validate(
-        flow_path.read_text(encoding="utf-8"), command_catalog=command_catalog
-    )
+    flow_source = flow_path.read_text(encoding="utf-8")
+    if config.capture_worker_prompts_only:
+        flow_source = _worker_prompt_capture_flow_source(flow_source)
+    flow = parse_and_validate(flow_source, command_catalog=command_catalog)
     procedrr_event_path = output_root / "procedrr-events.jsonl"
     procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
     replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
     procedrr_event_path.touch()
+    external_search_event_state = {"pending": False}
 
     def record_procedrr_event(event: Any) -> None:
+        is_redacted_search_judge = (
+            event.kind == "judge"
+            and external_search_event_state.get("pending", False)
+            and isinstance(event.data.get("messages"), list)
+        )
+        replay_key = (
+            WorkrrProcedrrClient.replay_key(event.data["messages"])
+            if is_redacted_search_judge
+            else None
+        )
+        event_data = redact_external_contract_search_event(
+            event.kind, event.data, external_search_event_state
+        )
         record = {
             "record_type": "procedrr.step",
             "kind": event.kind,
             "path": event.path,
-            **dict(event.data),
+            **event_data,
         }
+        if replay_key is not None:
+            record["replay_key"] = replay_key
         with procedrr_event_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
 
@@ -368,8 +409,9 @@ def _execute_procedrr_flow(
         worktree,
         output_root=output_root,
         explicit_command=config.validation_command,
+        benchmark_mode=config.benchmark_mode,
     )
-    if not validation_profiles:
+    if not validation_profiles and not config.benchmark_mode:
         raise PowdrrExecutionError(
             "Could not discover a validation command. Provide "
             "--validation-command or declare project validation tooling."
@@ -445,20 +487,23 @@ def _execute_procedrr_flow(
         )
     try:
         flow_directory = flow_path.parent
+        planning_client = WorkrrProcedrrClient(
+            config.planning_client,
+            skills_dir=flow_directory,
+            replay_responses=replay_responses,
+        )
+        jev_classifier_client = WorkrrProcedrrClient(
+            JevSemanticClassifierClient(config.planning_client),
+            skills_dir=flow_directory,
+            replay_responses=replay_responses,
+        )
         evaluator = Evaluator(
-            WorkrrProcedrrClient(
-                config.planning_client,
-                skills_dir=flow_directory,
-                replay_responses=replay_responses,
-            ),
+            planning_client,
             execute,
             process_directory=flow_directory,
             judge_clients={
-                "planning": WorkrrProcedrrClient(
-                    config.planning_client,
-                    skills_dir=flow_directory,
-                    replay_responses=replay_responses,
-                )
+                "planning": planning_client,
+                "jev": jev_classifier_client,
             },
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,
@@ -468,6 +513,7 @@ def _execute_procedrr_flow(
             {
                 "feature_description": config.feature_description,
                 "work_item_name": config.work_item_name,
+                "benchmark_mode": config.benchmark_mode,
             },
         )
     except EvaluationError as error:
@@ -493,6 +539,12 @@ def _execute_procedrr_flow(
                 "scope": "design compilation",
                 "implementation_review": "not_run",
             }
+        elif config.capture_worker_prompts_only:
+            state["review"] = {
+                "passed": True,
+                "scope": "worker prompt compilation",
+                "implementation_review": "not_run",
+            }
         result = _feature_endpoint_result(
             state,
             branch,
@@ -500,6 +552,8 @@ def _execute_procedrr_flow(
             (
                 "design_generated"
                 if config.design_only
+                else "prompt_captured"
+                if config.capture_worker_prompts_only
                 else "pr_opened"
                 if state.get("pull_request_url")
                 else "completed"
@@ -1969,6 +2023,49 @@ def _execution_unit_for_code_task(
     )
 
 
+def _task_structrr_changes(
+    plan: Mapping[str, Any], task: Mapping[str, Any], plan_ref: str
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...], tuple[str, ...]]:
+    """Select accepted diff operations for the clauses assigned to one task."""
+    clause_refs = task.get("source_clause_refs")
+    if not isinstance(clause_refs, (list, tuple)):
+        raise PowdrrExecutionError("code task has no instruction clause references")
+    selected = {ref for ref in clause_refs if isinstance(ref, str) and ref}
+    if not selected:
+        raise PowdrrExecutionError("code task has no instruction clause references")
+    additions: list[dict[str, Any]] = []
+    deletions: list[dict[str, Any]] = []
+    operation_refs: list[str] = []
+    covered: set[str] = set()
+    for section in ("features", "invariants", "guidance"):
+        items = plan.get(section, ())
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if (
+                not isinstance(item, Mapping)
+                or item.get("instruction_ref") not in selected
+            ):
+                continue
+            action = item.get("action")
+            if action not in {"added", "deleted", "removed"}:
+                continue
+            subject_id = item.get("id")
+            if not isinstance(subject_id, str) or not subject_id:
+                raise PowdrrExecutionError("selected Structrr operation has no id")
+            change = {"section": section, **dict(item)}
+            (additions if action == "added" else deletions).append(change)
+            operation = "add" if action == "added" else "remove"
+            operation_refs.append(f"{plan_ref}#{operation}:{section}:{subject_id}")
+            covered.add(str(item["instruction_ref"]))
+    if missing := selected - covered:
+        raise PowdrrExecutionError(
+            "code task has no Structrr operations for instruction clauses: "
+            + ", ".join(sorted(missing))
+        )
+    return tuple(additions), tuple(deletions), tuple(operation_refs)
+
+
 def _is_repository_workflow_objective(value: Any) -> bool:
     """Identify instructions about git/PR mechanics rather than product work."""
     if not isinstance(value, str):
@@ -2161,13 +2258,23 @@ def _run_code_agent_phase(
     )
     code_task = parameters.get("task")
     if isinstance(code_task, Mapping):
+        additions, deletions, operation_refs = _task_structrr_changes(
+            plan_document,
+            code_task,
+            f"structrr-diff:{plan_path.relative_to(worktree)}",
+        )
         units = (
-            _execution_unit_for_code_task(
-                code_task,
-                slug=slug,
-                default_paths=config.allowed_paths,
-                default_profiles=state["validation_profile_names"],
-                source_refs=source_context,
+            replace(
+                _execution_unit_for_code_task(
+                    code_task,
+                    slug=slug,
+                    default_paths=config.allowed_paths,
+                    default_profiles=state["validation_profile_names"],
+                    source_refs=source_context,
+                ),
+                planned_additions=additions,
+                planned_deletions=deletions,
+                source_refs=tuple(dict.fromkeys((*source_context, *operation_refs))),
             ),
         )
     try:
@@ -2178,11 +2285,99 @@ def _run_code_agent_phase(
             allowed_paths=config.allowed_paths,
             validation_profiles=state["validation_profile_names"],
             existing_tests=state.get("provider_inventory", ()),
+            external_contract_requirements=tuple(
+                item
+                for item in state.get("external_contract_requirements", ())
+                if isinstance(item, Mapping)
+            ),
+            external_contract_notes=tuple(
+                item
+                for item in state.get("external_contract_notes", ())
+                if isinstance(item, Mapping)
+            ),
         )
     except ValueError as error:
         raise PowdrrExecutionError(
             f"implementation packet compilation failed: {error}"
         ) from error
+    if implementation_packet.behavior_scenarios:
+        closure = state.get("contract_closure")
+        evidence_path = output_root / "artifacts" / "repository-contract-evidence.json"
+        closure_path = output_root / "artifacts" / "contract-closure.json"
+        if not isinstance(closure, Mapping):
+            if evidence_path.exists() or closure_path.exists():
+                if not evidence_path.is_file() or not closure_path.is_file():
+                    raise PowdrrExecutionError(
+                        "frozen contract closure artifacts are incomplete"
+                    )
+                try:
+                    repository_evidence = RepositoryEvidence.from_data(
+                        json.loads(evidence_path.read_text(encoding="utf-8"))
+                    )
+                    closure = json.loads(closure_path.read_text(encoding="utf-8"))
+                    if not isinstance(closure, Mapping):
+                        raise ContractClosureError(
+                            "frozen contract closure artifact is malformed"
+                        )
+                    validate_contract_closure(closure, repository_evidence)
+                except (OSError, json.JSONDecodeError, ContractClosureError) as error:
+                    raise PowdrrExecutionError(
+                        f"frozen contract closure artifacts are invalid: {error}"
+                    ) from error
+            else:
+                # Capture implementation evidence once, before the first worker
+                # invocation. Reuse this frozen record on resume so a solution
+                # edit or validator result cannot influence the prompt context.
+                try:
+                    _run(
+                        runner,
+                        worktree,
+                        ["git", "diff", "--quiet", base_commit],
+                    )
+                except PowdrrExecutionError as error:
+                    raise PowdrrExecutionError(
+                        "cannot capture repository evidence from a modified "
+                        "worktree; refusing to include post-base edits"
+                    ) from error
+                tracked_paths = _git_output(
+                    runner,
+                    worktree,
+                    [
+                        "git",
+                        "ls-tree",
+                        "-r",
+                        "--name-only",
+                        base_commit,
+                    ],
+                ).splitlines()
+                repository_evidence = collect_python_evidence(
+                    worktree,
+                    base_commit=base_commit,
+                    tracked_paths=tracked_paths,
+                )
+                closure = compile_contract_closure(
+                    [
+                        item.to_data()
+                        for item in implementation_packet.behavior_scenarios
+                    ],
+                    repository_evidence,
+                    design_revision=proposal_revision.fingerprint,
+                )
+                validate_contract_closure(closure, repository_evidence)
+                evidence_path.parent.mkdir(parents=True, exist_ok=True)
+                evidence_path.write_text(
+                    json.dumps(repository_evidence.to_data(), indent=2, sort_keys=True)
+                    + "\n",
+                    encoding="utf-8",
+                )
+                closure_path.write_text(
+                    json.dumps(dict(closure), indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            state["contract_closure"] = dict(closure)
+        implementation_packet = replace(
+            implementation_packet, contract_closure=dict(closure)
+        )
     implementation_packet_path = output_root / "implementation-packet.json"
     implementation_packet_path.write_text(
         json.dumps(implementation_packet.to_data(), indent=2, sort_keys=True) + "\n",
@@ -2243,10 +2438,21 @@ def _run_code_agent_phase(
         provider.session_id = None
     for index, unit in enumerate(request_units, start=1):
         worker_packet = implementation_packet
-        if isinstance(code_task, Mapping) and not repair_mode:
+        if isinstance(code_task, Mapping):
+            task_objective = str(code_task.get("objective", unit.objective)).strip()
+            task_acceptance = code_task.get("acceptance_criteria")
+            acceptance_criteria = (
+                tuple(
+                    str(item).strip()
+                    for item in task_acceptance
+                    if isinstance(item, str) and item.strip()
+                )
+                if isinstance(task_acceptance, (list, tuple))
+                else unit.acceptance_criteria
+            )
             worker_packet = implementation_packet.for_task(
-                objective=unit.objective,
-                acceptance_criteria=unit.acceptance_criteria,
+                objective=task_objective,
+                acceptance_criteria=acceptance_criteria,
             )
         request = ImplementationRequest.from_execution_unit(
             unit,
@@ -2255,7 +2461,7 @@ def _run_code_agent_phase(
             ),
             base_commit=base_commit,
             plan_fingerprint=plan.proposed_pr_fingerprint,
-            context_refs=source_context,
+            context_refs=unit.source_refs,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
             implementation_packet=worker_packet,
         )
@@ -2267,9 +2473,14 @@ def _run_code_agent_phase(
             if isinstance(repair_issue, Mapping):
                 repair_request = request.repair_prompt(repair_issue)
             fallback_context = ""
+            repair_feature_context = (
+                ""
+                if isinstance(code_task, Mapping)
+                else f"Feature: {feature_description}\n"
+            )
             fallback_context = (
                 f"Work item: {work_item_name}\n"
-                f"Feature: {feature_description}\n"
+                f"{repair_feature_context}"
                 "This is a fresh repair session; use the existing worktree and "
                 "repair only the reported issue. Do not re-plan the feature or "
                 "revisit unrelated changes.\n\n"
@@ -2290,6 +2501,21 @@ def _run_code_agent_phase(
         operation_request_path = output_root / "requests" / f"{unit.unit_id}.json"
         operation_request_path.parent.mkdir(parents=True, exist_ok=True)
         operation_request_path.write_text(request.to_json(), encoding="utf-8")
+        if getattr(config, "capture_worker_prompts_only", False):
+            capture = _capture_worker_prompt(
+                request,
+                provider=provider,
+                attempt_store=attempt_store,
+                state=state,
+                request_path=request_path,
+                operation_request_path=operation_request_path,
+                slug=slug,
+                unit_id=unit.unit_id,
+            )
+            state.update(capture.pop("state"))
+            state["request"] = capture.pop("request")
+            state["latest_worker_prompt_path"] = capture["prompt_path"]
+            continue
         before_paths = _changed_paths(runner, worktree)
         before_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
@@ -2326,6 +2552,23 @@ def _run_code_agent_phase(
         state.setdefault("operation_checkpoint_paths", []).append(checkpoint_path)
         if not checkpoint["passed"]:
             break
+    if config.capture_worker_prompts_only:
+        captured_request = state.get("request")
+        prompt_path = state.get("latest_worker_prompt_path")
+        if not isinstance(captured_request, ImplementationRequest) or not isinstance(
+            prompt_path, Path
+        ):
+            return {
+                "request_id": f"{slug}-no-code-task",
+                "attempt": {"status": "no_worker_prompt_required"},
+            }
+        return {
+            "request_id": captured_request.request_id,
+            "attempt": {
+                "status": "prompt_captured",
+                "prompt_path": str(prompt_path),
+            },
+        }
     request = requests[-1]
     attempt = attempts[-1]
     state.update(
@@ -2339,6 +2582,42 @@ def _run_code_agent_phase(
         "request_id": request.request_id,
         "attempt": attempt.to_data(),
         "attempts": [item.to_data() for item in attempts],
+    }
+
+
+def _capture_worker_prompt(
+    request: ImplementationRequest,
+    *,
+    provider: Any,
+    attempt_store: CodingAgentAttemptStore,
+    state: dict[str, Any],
+    request_path: Path,
+    operation_request_path: Path,
+    slug: str,
+    unit_id: str,
+) -> dict[str, Any]:
+    """Persist the same provider-ready request and prompt without invoking it."""
+    prepare_request = getattr(provider, "prepare_request", None)
+    if callable(prepare_request):
+        request = prepare_request(request)
+    serialized_request = request.to_json()
+    request_path.parent.mkdir(parents=True, exist_ok=True)
+    operation_request_path.parent.mkdir(parents=True, exist_ok=True)
+    request_path.write_text(serialized_request, encoding="utf-8")
+    operation_request_path.write_text(serialized_request, encoding="utf-8")
+    capture_number = int(state.get("prompt_capture_count", 0)) + 1
+    state["prompt_capture_count"] = capture_number
+    attempt_id = f"{slug}-{unit_id}-prompt-capture-{capture_number}"
+    attempt_store.save_request(request)
+    prompt_path = attempt_store.save_prompt(
+        request, attempt_id=attempt_id, provider=provider.provider_name
+    )
+    return {
+        "request_id": request.request_id,
+        "attempt": {"status": "prompt_captured", "prompt_path": str(prompt_path)},
+        "prompt_path": prompt_path,
+        "request": request,
+        "state": {"request_path": request_path},
     }
 
 
@@ -3460,6 +3739,16 @@ def _write_structrr_plan_from_obligations(
         description_text = str(description).strip()
         acceptance_text = str(acceptance).strip()
         expected_test_text = str(expected_test).strip()
+        instruction_ref = design.get("clause_id")
+        if instruction_ref is not None and (
+            not isinstance(instruction_ref, str)
+            or not instruction_ref.startswith("instruction-")
+        ):
+            raise PowdrrExecutionError(
+                f"structured feature obligation {obligation_id!r} has an "
+                "invalid instruction reference"
+            )
+        lineage = {"instruction_ref": instruction_ref} if instruction_ref else {}
         section = (
             "invariants"
             if kind_text == "invariant"
@@ -3472,6 +3761,7 @@ def _write_structrr_plan_from_obligations(
                 "id": f"design-{obligation_id}",
                 "description": description_text,
                 "action": "added",
+                **lineage,
                 "intent_effect": (
                     "records the compiler-owned design consequence of one "
                     "instruction obligation"
@@ -3482,6 +3772,7 @@ def _write_structrr_plan_from_obligations(
             {
                 "id": f"acceptance-{obligation_id}",
                 "description": acceptance_text,
+                **lineage,
                 "intent_effect": "defines proof of one instruction obligation",
             }
         )
@@ -3489,6 +3780,7 @@ def _write_structrr_plan_from_obligations(
             {
                 "id": f"test-{obligation_id}",
                 "description": expected_test_text,
+                **lineage,
                 "intent_effect": "defines evidence for one instruction obligation",
             }
         )
@@ -3913,7 +4205,24 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     )
     path = repository_path
     if not path.is_file():
-        path = Path(__file__).resolve().parents[2] / "implement-feature.yaml"
+        package_data_path = (
+            Path(__file__).resolve().parents[2] / "implement-feature.yaml"
+        )
+        source_tree_path = (
+            Path(__file__).resolve().parents[3]
+            / "docs"
+            / "procedrr"
+            / "skill-definitions"
+            / "implement-feature.yaml"
+        )
+        path = next(
+            (
+                candidate
+                for candidate in (package_data_path, source_tree_path)
+                if candidate.is_file()
+            ),
+            package_data_path,
+        )
     try:
         parse_and_validate(
             path.read_text(encoding="utf-8"),
@@ -3924,6 +4233,57 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
             f"Shared feature Procedrr definition is invalid: {path}: {error}"
         ) from error
     return path
+
+
+def _worker_prompt_capture_flow_source(source: str) -> str:
+    """Keep implement-feature's real planning path and stop at worker handoff."""
+    try:
+        document = yaml.safe_load(source)
+    except yaml.YAMLError as error:
+        raise PowdrrExecutionError(
+            f"could not load implement-feature flow for prompt capture: {error}"
+        ) from error
+    steps = document.get("steps") if isinstance(document, Mapping) else None
+    if not isinstance(steps, list):
+        raise PowdrrExecutionError("implement-feature flow has no steps")
+    task_loop_index: int | None = None
+    task_loop: Mapping[str, Any] | None = None
+    for index, step in enumerate(steps):
+        declaration = step.get("for_each") if isinstance(step, Mapping) else None
+        if (
+            isinstance(declaration, Mapping)
+            and declaration.get("item_binding") == "code_task"
+        ):
+            task_loop_index = index
+            task_loop = declaration
+            break
+    if task_loop_index is None or task_loop is None:
+        raise PowdrrExecutionError(
+            "implement-feature flow has no code-task execution boundary"
+        )
+    body = task_loop.get("body")
+    if not isinstance(body, list):
+        raise PowdrrExecutionError("code-task execution body is malformed")
+    capture_index: int | None = None
+    for index, step in enumerate(body):
+        operation = step.get("operation") if isinstance(step, Mapping) else None
+        command = operation.get("command") if isinstance(operation, Mapping) else None
+        if isinstance(command, list) and command == ["run_code_task_agent"]:
+            capture_index = index
+            break
+    if capture_index is None:
+        raise PowdrrExecutionError(
+            "implement-feature flow has no worker invocation boundary"
+        )
+    trimmed_loop = dict(task_loop)
+    trimmed_loop["body"] = body[: capture_index + 1]
+    trimmed_step = {"for_each": trimmed_loop}
+    document["steps"] = [
+        *steps[:task_loop_index],
+        trimmed_step,
+        {"terminal": "succeeded"},
+    ]
+    return yaml.safe_dump(document, sort_keys=False)
 
 
 def _validate_design_interview_flow(worktree: Path) -> Path:
@@ -3982,13 +4342,27 @@ def _structrr_taxonomy_path(worktree: Path) -> Path:
     )
 
 
-def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
+def _ensure_current_baseline(
+    worktree: Path, runner: Runner, *, bootstrap_path: Path | None = None
+) -> Path:
     """Reuse a current baseline only when every bootstrap section is current."""
+    current = _load_yaml_mapping(bootstrap_path) if bootstrap_path else None
     relative_paths = _git_output(
         runner,
         worktree,
         ["git", "ls-files", "docs/structrr/current/baseline-*.yaml"],
     ).splitlines()
+    if not relative_paths and current is not None:
+        short_head = _git_output(
+            runner, worktree, ["git", "rev-parse", "--short", "HEAD"]
+        )
+        target = (
+            worktree / "docs" / "structrr" / "current" / f"baseline-{short_head}.yaml"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
+        _commit(runner, worktree, "Bootstrap Structrr baseline")
+        return target
     if not relative_paths:
         baseline = bootstrap_structrr(
             worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
@@ -4014,8 +4388,21 @@ def _ensure_current_baseline(worktree: Path, runner: Runner) -> Path:
     except PowdrrExecutionError:
         document = {}
     section_issues = validate_bootstrap_sections(document)
-    if not section_issues:
+    if not section_issues and (
+        current is None or snapshot_digest(document) == snapshot_digest(current)
+    ):
         return selected_path
+    if current is not None:
+        short_head = _git_output(
+            runner, worktree, ["git", "rev-parse", "--short", "HEAD"]
+        )
+        target = (
+            worktree / "docs" / "structrr" / "current" / f"baseline-{short_head}.yaml"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
+        _commit(runner, worktree, "Refresh Structrr baseline")
+        return target
     baseline = bootstrap_structrr(
         worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
     )
@@ -4032,23 +4419,25 @@ def _bootstrap_validation_profiles(
     *,
     output_root: Path,
     explicit_command: tuple[str, ...],
+    benchmark_mode: bool = False,
 ) -> tuple[DiscoveredValidationProfile, ...]:
     """Run Structrr bootstrap and adapt its detected tools for Workrr."""
-    if explicit_command:
-        return (
-            DiscoveredValidationProfile(
-                "feature-validation", explicit_command, "feature command"
-            ),
-        )
     bootstrap = bootstrap_structrr(
         worktree,
         output_path=output_root / "validation-bootstrap.yaml",
         taxonomy_path=_structrr_taxonomy_path(worktree),
+        benchmark_mode=benchmark_mode,
     )
     if not bootstrap.validation.successful:
         raise PowdrrExecutionError(
             "Structrr bootstrap validation failed while discovering validation "
             f"tools: {bootstrap.validation.issues}"
+        )
+    if explicit_command:
+        return (
+            DiscoveredValidationProfile(
+                "feature-validation", explicit_command, "feature command"
+            ),
         )
     profiles: list[DiscoveredValidationProfile] = []
     for tool in bootstrap.document.get("tools", []):
@@ -4069,7 +4458,7 @@ def _bootstrap_validation_profiles(
                 str(tool.get("source", "Structrr bootstrap")),
             )
         )
-    if not profiles:
+    if not profiles and not benchmark_mode:
         profiles.append(
             DiscoveredValidationProfile(
                 "repository-validation",
@@ -4490,7 +4879,12 @@ def _compile_code_task_plan(
         evidence_case = str(source.get("evidence_case", "")).strip()
         operation = str(source.get("operation", "")).strip()
         oracle = str(source.get("oracle", "")).strip()
-        objective_basis = oracle or operation
+        source_requirement = _source_requirement_from_evidence(evidence_case)
+        objective_basis = (
+            source_requirement or _specific_operation_text(operation)
+            if _is_generic_contract_text(oracle)
+            else oracle
+        ) or _specific_operation_text(operation)
         if _is_repository_workflow_objective(
             operation
         ) or _is_repository_workflow_objective(oracle):
@@ -4510,8 +4904,20 @@ def _compile_code_task_plan(
         acceptance_criteria = [
             item
             for item in (
-                acceptance_criterion,
-                f"The implementation must {oracle}." if oracle else "",
+                acceptance_criterion
+                if not _is_generic_contract_text(acceptance_criterion)
+                else "",
+                (
+                    f"The implementation must {oracle}."
+                    if oracle and not _is_generic_contract_text(oracle)
+                    else ""
+                ),
+                (
+                    "The implementation must satisfy this source requirement: "
+                    f"{source_requirement}"
+                    if _is_generic_contract_text(oracle) and source_requirement
+                    else ""
+                ),
                 f"The focused validator must pass: {evidence_case}."
                 if evidence_case
                 else "",
@@ -4539,6 +4945,9 @@ def _compile_code_task_plan(
                 "task_id": f"code-task-{index:03d}",
                 "objective": objective,
                 "obligation_refs": [obligation_id] if obligation_id else [],
+                "source_clause_refs": _instruction_refs_from_contract(
+                    source.get("contract_refs", ())
+                ),
                 "allowed_paths": list(getattr(config, "allowed_paths", ())),
                 "validation_profiles": ["pytest"],
                 "acceptance_criteria": acceptance_criteria,
@@ -4576,6 +4985,13 @@ def _compile_code_task_plan(
                         for reference in item["obligation_refs"]
                     )
                 ),
+                "source_clause_refs": list(
+                    dict.fromkeys(
+                        reference
+                        for item in tasks
+                        for reference in item.get("source_clause_refs", ())
+                    )
+                ),
                 "acceptance_criteria": list(
                     dict.fromkeys(
                         criterion
@@ -4592,6 +5008,15 @@ def _compile_code_task_plan(
                 "execution_mode": "cohesive",
             }
         ]
+    for task in tasks:
+        verbatim_source = _verbatim_source_requirements(
+            output_root, task.get("source_clause_refs", ())
+        )
+        if verbatim_source:
+            task["objective"] = (
+                "Implement the product behavior described in these source "
+                f"requirements:\n{verbatim_source}"
+            )
     decisions = [
         {
             "decision_id": "task-plan:scope",
@@ -4699,6 +5124,79 @@ def _compile_design_only_prompt(
         encoding="utf-8",
     )
     return prompt_path
+
+
+def _is_generic_contract_text(value: str) -> bool:
+    normalized = " ".join(value.casefold().strip().rstrip(".").split())
+    return normalized.startswith("the requested behavior is observed")
+
+
+def _specific_operation_text(operation: str) -> str:
+    _, separator, detail = operation.partition(":")
+    return detail.strip() if separator else operation
+
+
+def _source_requirement_from_evidence(evidence_case: str) -> str:
+    if evidence_case.casefold().startswith("source "):
+        _, separator, source_text = evidence_case.partition(":")
+        if separator and source_text.strip():
+            return source_text.strip()
+    return ""
+
+
+def _instruction_refs_from_contract(contract_refs: Any) -> list[str]:
+    if not isinstance(contract_refs, (list, tuple)):
+        return []
+    refs = []
+    for contract_ref in contract_refs:
+        if not isinstance(contract_ref, str):
+            continue
+        instruction_ref = contract_ref.rsplit(":", 1)[-1]
+        if instruction_ref.startswith("instruction-"):
+            refs.append(instruction_ref)
+    return list(dict.fromkeys(refs))
+
+
+def _verbatim_source_requirements(output_root: Path, source_clause_refs: Any) -> str:
+    """Recover exact source sentences for compiled product obligations."""
+    ledger_path = output_root / "instruction-ledger.json"
+    try:
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not isinstance(ledger, Mapping):
+        return ""
+    source = ledger.get("source")
+    clauses = ledger.get("clauses")
+    if (
+        not isinstance(source, Mapping)
+        or not isinstance(source.get("text"), str)
+        or not isinstance(clauses, list)
+        or not isinstance(source_clause_refs, (list, tuple))
+    ):
+        return ""
+    selected_refs = {str(item) for item in source_clause_refs}
+    spans: dict[tuple[int, int], None] = {}
+    for clause in clauses:
+        if (
+            not isinstance(clause, Mapping)
+            or clause.get("clause_id") not in selected_refs
+        ):
+            continue
+        span = clause.get("source_span")
+        if not isinstance(span, Mapping):
+            continue
+        start = span.get("start")
+        end = span.get("end")
+        if (
+            isinstance(start, int)
+            and not isinstance(start, bool)
+            and isinstance(end, int)
+            and not isinstance(end, bool)
+            and 0 <= start < end <= len(source["text"])
+        ):
+            spans[(start, end)] = None
+    return " ".join(source["text"][start:end] for start, end in sorted(spans))
 
 
 def _evaluate_deterministic_decision(parameters: Mapping[str, Any]) -> dict[str, str]:
@@ -4941,6 +5439,8 @@ def _run_code_task_agent(
             parameters=current_parameters,
         )
         attempt_results.append(result)
+        if getattr(config, "capture_worker_prompts_only", False):
+            return {**result, "continuations": continuation}
         attempt = result.get("attempt")
         checkpoints = state.get("operation_checkpoints", ())
         checkpoint = checkpoints[-1] if checkpoints else None

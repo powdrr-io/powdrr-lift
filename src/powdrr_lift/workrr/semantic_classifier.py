@@ -27,6 +27,8 @@ def resolve_deterministic_source_decision(
         return _resolve_quantifier(normalized)
     if decision_kind == "requirement_strength":
         return _resolve_requirement_strength(normalized)
+    if decision_kind == "temporal_scope":
+        return _resolve_temporal_scope(normalized)
     return None
 
 
@@ -61,10 +63,16 @@ def _resolve_quantifier(text: str) -> DeterministicResolution | None:
     every = _first_match(text, (r"\ball\b", r"\bevery\b", r"\balways\b"))
     if every is not None:
         return DeterministicResolution("every", every)
-    some = _first_match(text, (r"\bsome\b",))
+    some = _first_match(
+        text,
+        (r"\bsome\b", r"\bseveral\b", r"\ba few\b", r"\bat least one\b"),
+    )
     if some is not None:
         return DeterministicResolution("some", some)
-    return None
+    one = _first_match(text, (r"\b(?:only\s+|exactly\s+)?one\b", r"\ba single\b"))
+    if one is not None:
+        return DeterministicResolution("one", one)
+    return DeterministicResolution("unspecified", "no explicit quantifier")
 
 
 def _resolve_requirement_strength(text: str) -> DeterministicResolution | None:
@@ -77,7 +85,48 @@ def _resolve_requirement_strength(text: str) -> DeterministicResolution | None:
     may = _first_match(text, (r"\bmay\b", r"\bmay not\b"))
     if may is not None:
         return DeterministicResolution("may", may)
-    return None
+    return DeterministicResolution("unspecified", "no explicit modal")
+
+
+def _resolve_temporal_scope(text: str) -> DeterministicResolution:
+    """Default to unspecified unless the source explicitly marks time or events."""
+    current = _first_match(
+        text,
+        (
+            r"\bcurrently\b",
+            r"\bcurrent(?:ly)?\s+(?:version|release)\b",
+            r"\btoday\b",
+            r"\bat present\b",
+        ),
+    )
+    future = _first_match(
+        text,
+        (
+            r"\bfuture\b",
+            r"\bnext\s+(?:version|release)\b",
+            r"\bwill\b",
+            r"\bgoing forward\b",
+        ),
+    )
+    if current is not None and future is not None:
+        return DeterministicResolution("current_and_future", current + "; " + future)
+    if future is not None:
+        return DeterministicResolution("future", future)
+    if current is not None:
+        return DeterministicResolution("current", current)
+    event = _first_match(
+        text,
+        (
+            r"\bwhen\b",
+            r"\bwhenever\b",
+            r"\bon\s+(?:entry|exit|failure|success)\b",
+            r"\bduring\b",
+            r"\buntil\b",
+        ),
+    )
+    if event is not None:
+        return DeterministicResolution("event_bound", event)
+    return DeterministicResolution("unspecified", "no explicit temporal marker")
 
 
 def _first_match(text: str, patterns: tuple[str, ...]) -> str | None:

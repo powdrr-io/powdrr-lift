@@ -4,6 +4,8 @@ import os
 import json
 import subprocess
 import sys
+import threading
+from threading import Barrier
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -25,6 +27,60 @@ class FakeLLM:
             "added": [{"id": "req-1", "description": "Do the thing"}],
             "deleted": [],
         }
+
+
+def test_for_each_runs_judge_only_items_concurrently_and_collects_in_order() -> None:
+    from procedrr import parse_and_validate
+
+    barrier = threading.Barrier(2)
+
+    class ConcurrentLLM:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            barrier.wait(timeout=5)
+            return {"multiple": "compound" in messages[1]["content"]}
+
+    document = parse_and_validate(
+        """\
+name: concurrent-classification
+inputs:
+  - {name: clauses, type: array, required: true}
+steps:
+  - for_each:
+      snapshot: {name: clauses, max_items: 2}
+      item_binding: clause
+      collect: {binding: decisions, mode: list, value: decision}
+      max_parallel: 2
+      body:
+        - judge:
+            kind: classify_one
+            provider: planning
+            question: Classify this clause's multiplicity.
+            subject: clause
+            prompt_system: Return only JSON.
+            instructions: [Judge this clause alone.]
+            context: [clause]
+            output:
+              name: decision
+              schema:
+                type: object
+                required: [multiple]
+                additionalProperties: false
+                properties:
+                  multiple: {type: boolean}
+            validation: {kind: json_schema}
+"""
+    )
+    result = Evaluator(ConcurrentLLM(), lambda *_: None).evaluate(
+        document, {"clauses": ["simple", "compound"]}
+    )
+
+    assert result.bindings["decisions"] == [
+        {"item": "simple", "result": {"multiple": False}},
+        {"item": "compound", "result": {"multiple": True}},
+    ]
+    assert result.llm_activations == 2
 
 
 def test_evaluator_enforces_declared_operation_return_schema() -> None:
@@ -402,6 +458,70 @@ def test_for_each_collects_structured_results_in_order() -> None:
     ]
 
 
+def test_for_each_parallel_judgments_run_concurrently_and_collect_in_order() -> None:
+    barrier = Barrier(2)
+
+    class ConcurrentLLM:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            **_: Any,
+        ) -> dict[str, Any]:
+            barrier.wait(timeout=5)
+            content = messages[-1]["content"]
+            answer = "item-0" if '"instruction": "item-0"' in content else "item-1"
+            return {"answer": answer}
+
+    result = Evaluator(ConcurrentLLM(), lambda _tool, _parameters: None).evaluate(
+        {
+            "name": "parallel-instruction-judgments",
+            "steps": [
+                {
+                    "for_each": {
+                        "snapshot": {"name": "instructions", "max_items": 2},
+                        "item_binding": "instruction",
+                        "max_parallel": 2,
+                        "collect": {
+                            "binding": "answers",
+                            "mode": "list",
+                            "value": "judgment",
+                        },
+                        "body": [
+                            {
+                                "judge": {
+                                    "question": "Classify the instruction",
+                                    "prompt_system": "Return JSON",
+                                    "context": ["instruction"],
+                                    "output": {
+                                        "name": "judgment",
+                                        "schema": {
+                                            "type": "object",
+                                            "required": ["answer"],
+                                            "properties": {
+                                                "answer": {"type": "string"}
+                                            },
+                                        },
+                                    },
+                                }
+                            }
+                        ],
+                    }
+                }
+            ],
+        },
+        {"instructions": ["item-0", "item-1"]},
+    )
+
+    assert result.bindings["answers"] == [
+        {"item": "item-0", "result": {"answer": "item-0"}},
+        {"item": "item-1", "result": {"answer": "item-1"}},
+    ]
+    assert [event.path for event in result.events] == [
+        "steps[0].for_each[0][0][0]",
+        "steps[0].for_each[0][1][0]",
+    ]
+
+
 def test_repeat_and_branch_are_bounded_and_data_driven() -> None:
     calls = 0
 
@@ -474,6 +594,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
     class DesignInterviewLLM:
         source_values = iter(
             (
+                "include",
                 "feature",
                 "required",
                 "unspecified",
@@ -494,7 +615,10 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             question = messages[1]["content"]
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
-            if "root role" in question or "child decision" in question:
+            if (
+                "route this exact instruction clause" in question
+                or "child decision" in question
+            ):
                 return {
                     "status": "resolved",
                     "value": next(self.source_values),
@@ -526,6 +650,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "given": "the declared feature input",
                         "when": "the feature is invoked",
                         "then": "the acceptance result is observed",
+                        "related_requirements": [],
                         "dimensions": {
                             "normal_result": ("the acceptance result is observed"),
                             "error_behavior": "not_applicable",
@@ -538,6 +663,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "capability_matrix": [],
                     },
                 }
+            if "recorded defaults coherent" in question:
+                return {"consistency_review": {"updates": []}}
             raise AssertionError(question)
 
     llm = DesignInterviewLLM()
@@ -631,11 +758,12 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "partial_contract_path": "partial-contract.json",
                     "partial_contract_fingerprint": "sha256:contract",
                     "partial_contract": {
-                        "schema_version": "partial-semantic-contract-v1",
+                        "schema_version": "partial-semantic-contract-v2",
                         "contract_id": "contract:instruction-001",
                         "source_ref": "instruction-001",
                         "source_fingerprint": "sha256:clause",
                         "proposition_text": "Add a thing",
+                        "routing": "include",
                         "disposition": "feature",
                     },
                 }
@@ -743,10 +871,11 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         {
             "work_item_name": "demo",
             "feature_description": "Add a thing",
+            "benchmark_mode": False,
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 16
+    assert result.llm_activations == 17
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events
@@ -758,6 +887,83 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         "reason_code": None,
     }
     assert judge_values["source_extraction_result"]["quote"] == "Add"
+
+
+@pytest.mark.live_provider
+def test_live_parallel_atomicity_matches_serial_judgments(tmp_path: Path) -> None:
+    """Check exact per-clause prompts under serial and bounded parallel execution."""
+    if os.environ.get("POWDRR_LIVE_LLM") != "1":
+        pytest.skip("set POWDRR_LIVE_LLM=1 to run the paid live-provider test")
+
+    import copy
+    import time
+    from importlib import import_module
+
+    import yaml
+    from procedrr import parse_and_validate
+
+    build_probe_client = import_module(
+        "powdrr_lift.workrr.prompt_probe"
+    ).build_probe_client
+    llm = build_probe_client(
+        provider="deepinfra-cheap",
+        model=DEEPINFRA_CHEAP_MODEL,
+        api_key=None,
+        base_url=None,
+        repo_root=tmp_path,
+        progress_stream=sys.stderr,
+    )
+    clauses = [
+        {"clause_id": "instruction-001", "text": "On entry, data is copied."},
+        {"clause_id": "instruction-002", "text": "On exit, data is removed."},
+        {
+            "clause_id": "instruction-003",
+            "text": (
+                "set_state_data validates the key and value, and raises "
+                "InvalidDefinition when either is invalid."
+            ),
+        },
+    ]
+    production = parse_and_validate(
+        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    )
+    loop = copy.deepcopy(production["steps"][1]["for_each"])
+    loop["snapshot"]["name"] = "atomicity_clauses"
+
+    def stage(max_parallel: int) -> dict[str, Any]:
+        declaration = copy.deepcopy(loop)
+        declaration["max_parallel"] = max_parallel
+        return parse_and_validate(
+            yaml.safe_dump(
+                {
+                    "name": "atomicity-comparison",
+                    "inputs": [
+                        {"name": "atomicity_clauses", "type": "array", "required": True}
+                    ],
+                    "steps": [{"for_each": declaration}],
+                },
+                sort_keys=False,
+            )
+        )
+
+    started = time.perf_counter()
+    serial = Evaluator(llm, lambda *_: None).evaluate(
+        stage(1), {"atomicity_clauses": clauses}
+    )
+    serial_seconds = time.perf_counter() - started
+    started = time.perf_counter()
+    parallel = Evaluator(llm, lambda *_: None).evaluate(
+        stage(4), {"atomicity_clauses": clauses}
+    )
+    parallel_seconds = time.perf_counter() - started
+    assert (
+        parallel.bindings["atomicity_decisions"]
+        == serial.bindings["atomicity_decisions"]
+    )
+    assert serial.llm_activations == parallel.llm_activations == len(clauses)
+    print(
+        f"atomicity A/B: serial={serial_seconds:.2f}s, parallel={parallel_seconds:.2f}s"
+    )
 
 
 @pytest.mark.live_provider
@@ -825,8 +1031,14 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
     }
     assert judge_values["atomicity_decision"] == {"multiple": True}
     statements = judge_values["atomicity_split"]["statements"]
+    groups = judge_values["atomicity_split"]["validation_groups"]
     assert len(statements) >= 2
     assert all(statement.strip() for statement in statements)
+    assert all(
+        set(group) == {"members", "relation"}
+        and all(1 <= member <= len(statements) for member in group["members"])
+        for group in groups
+    )
     assert len(result.bindings["feature_design"]["obligations"]) == len(statements)
 
 

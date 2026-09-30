@@ -1,0 +1,63 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 821
+title: Fix DeepSWE stage flags in the Pier adapter
+intent:
+  problem: The Harbor adapter calls Pier's one-argument environment lookup with a default value, causing design-only and prompt-capture runs to fail before Powdrr starts.
+  goal: Read both optional stage flags using Pier's environment API contract and safely treat missing values as disabled.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 9, end_line: 10}
+    summary: Import the dependency-free parser for optional adapter environment flags.
+    rationale: Keep flag interpretation independent from the Pier integration.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 225, end_line: 225}
+    summary: Read the design-only option through Pier's one-key environment lookup.
+    rationale: Avoid an adapter startup TypeError when checking the optional stage flag.
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 227, end_line: 227}
+    summary: Read the prompt-capture option through Pier's one-key environment lookup.
+    rationale: Keep prompt-only runs compatible with the installed Pier base class.
+  - path: src/powdrr_lift/integrations/harbor/_env.py
+    type: added
+    span: {start_line: 1, end_line: 8}
+    summary: Add a dependency-free parser for supported true environment-flag values.
+    rationale: Treat unset optional flags safely while keeping parsing independently testable.
+  - path: tests/test_harbor_env.py
+    type: added
+    span: {start_line: 1, end_line: 15}
+    summary: Cover accepted true spellings and absent or false flag values.
+    rationale: Preserve the adapter's optional-flag behavior across changes.
+entities:
+  - id: harbor-environment-flag-parser
+    type: Function
+    action: added
+  - id: harbor-environment-flag-tests
+    type: Test suite
+    action: added
+entity_relationships:
+  - id: flag-tests-cover-parser
+    source: harbor-environment-flag-tests
+    target: harbor-environment-flag-parser
+    relationship: tests
+    description: Unit tests cover supported true spellings and missing or false values.
+    rationale: Keep optional stage flags safe when absent and compatible with explicit values.
+    action: added
+invariants:
+  - id: unset-harbor-stage-flags-are-disabled
+    action: added
+    description: An unset design-only or prompt-capture environment variable does not enable that mode.
+    rationale: Preserve normal Harbor execution when stage-specific flags are omitted.
+  - id: pier-environment-lookups-use-supported-signature
+    action: added
+    description: PowdrrAgent reads Pier environment values with the one-key _get_env API and applies fallback handling locally.
+    rationale: Avoid adapter startup errors with the installed Pier base class.
+guidance:
+  - id: stage-flags-accept-true-spellings
+    action: added
+    description: POWDRR_DESIGN_ONLY and POWDRR_CAPTURE_WORKER_PROMPTS_ONLY are enabled by 1, true, or yes, case-insensitively.
+    rationale: Keep both evaluation-stage options consistent and explicit.

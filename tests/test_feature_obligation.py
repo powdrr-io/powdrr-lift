@@ -155,3 +155,50 @@ def test_non_goal_cannot_invert_a_missing_capability_into_a_prohibition() -> Non
 
     with pytest.raises(FeatureObligationError, match="explicit product prohibition"):
         compile_feature_design(ledger, "feature", semantic)
+
+
+def test_missing_persistence_behavior_is_actionable_when_model_calls_it_non_goal() -> (
+    None
+):
+    ledger = compile_instruction_ledger(
+        "feature",
+        "When fit runs with dataset.features configured, the selected raw feature "
+        "schema is not persisted.",
+    )
+    semantic = [
+        {
+            "design": {
+                "kind": "non_goal",
+                "description": "Persist the selected raw feature schema after fit.",
+                "acceptance_criterion": "The selected schema is persisted after fit.",
+                "expected_test": "Verify the selected schema is persisted after fit.",
+            }
+        }
+    ]
+
+    design = compile_feature_design(ledger, "feature", semantic)
+
+    assert design.projections[0].kind == "feature"
+    assert design.obligations[0].projection.kind == "feature"
+
+
+def test_required_rejection_is_compiled_as_an_actionable_obligation() -> None:
+    ledger = compile_instruction_ledger(
+        "state-data", "DataVar rejects simultaneous default and factory."
+    )
+    semantic = [
+        {
+            "design": {
+                "kind": "non_goal",
+                "description": "Reject simultaneous default and factory.",
+                "acceptance_criterion": "The invalid combination raises an error.",
+                "expected_test": "Assert construction fails for both arguments.",
+            }
+        }
+    ]
+
+    design = compile_feature_design(ledger, "state-data", semantic)
+
+    assert design.projections[0].kind == "feature"
+    assert design.obligations[0].projection.kind == "feature"
+    assert design.test_contracts[0].obligation_id == "obligation:instruction-001"

@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import copy
 import json
+import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
-from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
+from powdrr_lift.core.behavior_contract import (
+    BEHAVIOR_DIMENSIONS,
+    compile_behavior_scenarios,
+    validate_normative_assumptions,
+)
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.feature_obligation import (
     SEMANTIC_KINDS,
@@ -41,6 +47,17 @@ from powdrr_lift.core.semantic_faithfulness import (
     FieldEntailmentSpec,
 )
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.external_contract_research import (
+    bind_external_contract_assessments,
+    bind_external_contract_claims,
+    bind_external_contract_search_selections,
+    capture_external_sources,
+    extract_external_contract_evidence,
+    finalize_external_contract_context,
+    prepare_external_contract_projection_requests,
+    project_external_contract_requirements,
+    search_external_contract_sources,
+)
 from powdrr_lift.workrr.repository_subject_binding import (
     bind_candidate_relation_decisions,
     finalize_subject_binding,
@@ -90,6 +107,178 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("discover_validation_profiles"),
+        ),
+        "capture_external_contract_sources": CommandSpec(
+            name="capture_external_contract_sources",
+            input_schema=object_schema(
+                {
+                    "requests": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                            "type": "object",
+                            "required": ["url", "research_question", "why_applicable"],
+                            "additionalProperties": False,
+                            "properties": {
+                                "url": {"type": "string", "minLength": 1},
+                                "search_source_ref": {"type": "string"},
+                                "search_title": {"type": "string"},
+                                "search_query": {"type": "string"},
+                                "profile": {"type": "string"},
+                                "research_question": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                                "why_applicable": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                            },
+                        },
+                    },
+                    "decision": {"type": "string", "enum": ["research", "skip"]},
+                    "rationale": {"type": "string", "minLength": 1},
+                },
+                required=("requests", "decision", "rationale"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("capture_external_contract_sources"),
+        ),
+        "search_external_contract_sources": CommandSpec(
+            name="search_external_contract_sources",
+            input_schema=object_schema(
+                {
+                    "decision": {"type": "string", "enum": ["research", "skip"]},
+                    "queries": {
+                        "type": "array",
+                        "maxItems": 4,
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "query",
+                                "research_question",
+                                "profile",
+                                "why_applicable",
+                            ],
+                            "additionalProperties": False,
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 600,
+                                },
+                                "research_question": {"type": "string", "minLength": 1},
+                                "profile": {"type": "string", "minLength": 1},
+                                "why_applicable": {"type": "string", "minLength": 1},
+                            },
+                        },
+                    },
+                },
+                required=("decision", "queries"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("search_external_contract_sources"),
+        ),
+        "bind_external_contract_search_selections": CommandSpec(
+            name="bind_external_contract_search_selections",
+            input_schema=object_schema(
+                {"search_results": {}, "selections": {"type": "array", "maxItems": 8}},
+                required=("search_results", "selections"),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": ["requests"],
+                "properties": {"requests": {"type": "array"}},
+            },
+            logic=implementations.get("bind_external_contract_search_selections"),
+        ),
+        "extract_external_contract_evidence": CommandSpec(
+            name="extract_external_contract_evidence",
+            input_schema=object_schema(
+                {
+                    "sources": {"type": "array"},
+                    "feature_description": {"type": "string"},
+                },
+                required=("sources", "feature_description"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("extract_external_contract_evidence"),
+        ),
+        "bind_external_contract_claims": CommandSpec(
+            name="bind_external_contract_claims",
+            input_schema=object_schema(
+                {"evidence": {"type": "object"}, "claims": {"type": "array"}},
+                required=("evidence", "claims"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("bind_external_contract_claims"),
+        ),
+        "bind_external_contract_assessments": CommandSpec(
+            name="bind_external_contract_assessments",
+            input_schema=object_schema(
+                {
+                    "claims": {"type": "array"},
+                    "assessments": {"type": "array"},
+                    "benchmark_mode": {"type": "boolean"},
+                },
+                required=("claims", "assessments", "benchmark_mode"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("bind_external_contract_assessments"),
+        ),
+        "prepare_external_contract_projection_requests": CommandSpec(
+            name="prepare_external_contract_projection_requests",
+            input_schema=object_schema(
+                {"requirements": {"type": "array"}, "claims": {"type": "array"}},
+                required=("requirements", "claims"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("prepare_external_contract_projection_requests"),
+        ),
+        "project_external_contract_requirements": CommandSpec(
+            name="project_external_contract_requirements",
+            input_schema=object_schema(
+                {"requests": {"type": "array"}},
+                required=("requests",),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("project_external_contract_requirements"),
+        ),
+        "finalize_external_contract_context": CommandSpec(
+            name="finalize_external_contract_context",
+            input_schema=object_schema(
+                {
+                    "evidence": {"type": "object"},
+                    "claims": {"type": "array"},
+                    "assessment_result": {"type": "object"},
+                    "projections": {"type": "array"},
+                },
+                required=("evidence", "claims", "assessment_result", "projections"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("finalize_external_contract_context"),
+        ),
+        "apply_external_contract_context": CommandSpec(
+            name="apply_external_contract_context",
+            input_schema=object_schema(
+                {
+                    "feature_design": {"type": "object"},
+                    "external_contract_context": {"type": "object"},
+                },
+                required=("feature_design", "external_contract_context"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("apply_external_contract_context"),
         ),
         "compile_instruction_ledger": CommandSpec(
             name="compile_instruction_ledger",
@@ -346,8 +535,16 @@ def feature_command_catalog(
         "compile_canonical_feature_design": CommandSpec(
             name="compile_canonical_feature_design",
             input_schema=object_schema(
-                {"work_item_name": {}, "design_decisions": {}},
-                required=("work_item_name", "design_decisions"),
+                {
+                    "work_item_name": {},
+                    "design_decisions": {},
+                    "scenario_consistency_review": {},
+                },
+                required=(
+                    "work_item_name",
+                    "design_decisions",
+                    "scenario_consistency_review",
+                ),
                 additional_properties=False,
             ),
             output_schema={},
@@ -688,9 +885,15 @@ class FeatureCommandRuntime:
         branch = self.branch
         slug = self.slug
         state = self.state
+
+        def benchmark_mode() -> bool:
+            return bool(getattr(config, "benchmark_mode", False))
+
         if name == "ensure_current_structrr":
             state["baseline_path"] = feature_endpoint._ensure_current_baseline(
-                worktree, runner
+                worktree,
+                runner,
+                bootstrap_path=output_root / "validation-bootstrap.yaml",
             )
             return {"path": str(state["baseline_path"])}
         if name == "discover_validation_profiles":
@@ -702,6 +905,244 @@ class FeatureCommandRuntime:
                 }
                 for profile in state["validation_profiles"]
             ]
+        if name == "capture_external_contract_sources":
+            return capture_external_sources(
+                parameters.get("requests", []),
+                artifact_root=output_root,
+                decision=str(parameters.get("decision", "research")),
+                rationale=str(parameters.get("rationale", "")),
+            )
+        if name == "search_external_contract_sources":
+            cache_root = (
+                Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+                / "powdrr-lift"
+            )
+            return search_external_contract_sources(
+                parameters.get("queries", []),
+                decision=str(parameters.get("decision", "research")),
+                api_key=os.environ.get("TAVILY_API_KEY"),
+                cache_path=cache_root / "external-contract-search.sqlite3",
+            )
+        if name == "bind_external_contract_search_selections":
+            search_results = parameters.get("search_results")
+            if not isinstance(search_results, Mapping):
+                raise PowdrrExecutionError("external search results are malformed")
+            return {
+                "requests": bind_external_contract_search_selections(
+                    search_results, parameters.get("selections", [])
+                )
+            }
+        if name == "extract_external_contract_evidence":
+            try:
+                return extract_external_contract_evidence(
+                    parameters.get("sources", []),
+                    feature_description=str(parameters.get("feature_description", "")),
+                    artifact_root=output_root,
+                )
+            except (OSError, TypeError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"external contract evidence extraction failed: {error}"
+                ) from error
+        if name == "bind_external_contract_claims":
+            try:
+                result = bind_external_contract_claims(
+                    parameters.get("evidence", {}), parameters.get("claims", [])
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+            return result
+        if name == "bind_external_contract_assessments":
+            try:
+                return bind_external_contract_assessments(
+                    parameters.get("claims", []),
+                    parameters.get("assessments", []),
+                    benchmark_mode=bool(parameters.get("benchmark_mode", False)),
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "prepare_external_contract_projection_requests":
+            try:
+                return prepare_external_contract_projection_requests(
+                    parameters.get("requirements", []), parameters.get("claims", [])
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "project_external_contract_requirements":
+            try:
+                return project_external_contract_requirements(
+                    parameters.get("requests", [])
+                )
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "finalize_external_contract_context":
+            try:
+                return finalize_external_contract_context(
+                    evidence=parameters.get("evidence", {}),
+                    claims=parameters.get("claims", []),
+                    assessment_result=parameters.get("assessment_result", {}),
+                    projections=parameters.get("projections", []),
+                    artifact_root=output_root,
+                )
+            except (OSError, TypeError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"external contract context is invalid: {error}"
+                ) from error
+        if name == "apply_external_contract_context":
+            feature_design = parameters.get("feature_design")
+            context = parameters.get("external_contract_context")
+            if not isinstance(feature_design, Mapping) or not isinstance(
+                context, Mapping
+            ):
+                raise PowdrrExecutionError(
+                    "external contract projection inputs are malformed"
+                )
+            obligations = feature_design.get("obligations")
+            projected = context.get("projected_obligations")
+            if not isinstance(obligations, list) or not isinstance(projected, list):
+                raise PowdrrExecutionError("external contract projection is incomplete")
+            design_path = feature_design.get("path")
+            canonical_path: Path | None = None
+            canonical_design: Mapping[str, Any] = feature_design
+            if isinstance(design_path, str) and design_path.strip():
+                canonical_path = Path(design_path).resolve()
+                if not canonical_path.is_relative_to(output_root.resolve()):
+                    raise PowdrrExecutionError(
+                        "external design path escapes the run artifacts"
+                    )
+                if canonical_path.is_file():
+                    try:
+                        loaded_design = json.loads(
+                            canonical_path.read_text(encoding="utf-8")
+                        )
+                    except (OSError, json.JSONDecodeError) as error:
+                        raise PowdrrExecutionError(
+                            "canonical feature design could not be read"
+                        ) from error
+                    if isinstance(loaded_design, Mapping):
+                        canonical_design = loaded_design
+            canonical_obligations = canonical_design.get("obligations", obligations)
+            if not isinstance(canonical_obligations, list):
+                raise PowdrrExecutionError(
+                    "canonical feature design has no obligations"
+                )
+            enriched = dict(feature_design)
+            enriched_obligations = list(obligations)
+            existing_ids = {
+                item.get("id")
+                for item in enriched_obligations
+                if isinstance(item, Mapping)
+            }
+            raw_contracts = feature_design.get("verification_contracts", [])
+            if not isinstance(raw_contracts, list):
+                raise PowdrrExecutionError(
+                    "feature design verification contracts are malformed"
+                )
+            contracts = list(raw_contracts)
+            for item in projected:
+                if not isinstance(item, Mapping):
+                    raise PowdrrExecutionError(
+                        "external projected obligation is malformed"
+                    )
+                identifier = item.get("id")
+                design = item.get("design")
+                if (
+                    not isinstance(identifier, str)
+                    or identifier in existing_ids
+                    or not isinstance(design, Mapping)
+                ):
+                    raise PowdrrExecutionError(
+                        "external projected obligation identity is invalid"
+                    )
+                scenario = design.get("behavior_scenario")
+                if not isinstance(scenario, Mapping):
+                    raise PowdrrExecutionError(
+                        "external projected obligation has no scenario"
+                    )
+                enriched_obligations.append(dict(item))
+                existing_ids.add(identifier)
+                contracts.append(
+                    {
+                        "id": f"test:{identifier}",
+                        "obligation_ref": identifier,
+                        "population": str(scenario.get("given", "")),
+                        "operation": str(scenario.get("when", "")),
+                        "oracle": str(scenario.get("then", "")),
+                        "evidence_case": str(design.get("expected_test", "")),
+                    }
+                )
+            enriched["obligations"] = enriched_obligations
+            enriched["verification_contracts"] = contracts
+            enriched["fingerprint"] = content_fingerprint(
+                {key: value for key, value in enriched.items() if key != "fingerprint"}
+            )
+            design_path = feature_design.get("path")
+            if (
+                projected
+                and isinstance(design_path, str)
+                and design_path.strip()
+                and canonical_design.get("schema_version") == "feature-design-v2"
+            ):
+                path = Path(design_path).resolve()
+                if not path.is_relative_to(output_root.resolve()):
+                    raise PowdrrExecutionError(
+                        "external design path escapes the run artifacts"
+                    )
+                canonical_enriched = dict(canonical_design)
+                canonical_external = canonical_design.get(
+                    "external_contract_obligations", []
+                )
+                if not isinstance(canonical_external, list):
+                    raise PowdrrExecutionError(
+                        "canonical external obligations are malformed"
+                    )
+                canonical_enriched["external_contract_obligations"] = [
+                    *canonical_external,
+                    *[
+                        item
+                        for item in projected
+                        if isinstance(item, Mapping)
+                        and item.get("id")
+                        not in {
+                            existing.get("id")
+                            for existing in canonical_external
+                            if isinstance(existing, Mapping)
+                        }
+                    ],
+                ]
+                canonical_contracts = canonical_design.get(
+                    "verification_contracts", raw_contracts
+                )
+                if not isinstance(canonical_contracts, list):
+                    raise PowdrrExecutionError(
+                        "canonical verification contracts are malformed"
+                    )
+                canonical_enriched["verification_contracts"] = [
+                    *canonical_contracts,
+                    *contracts[len(raw_contracts) :],
+                ]
+                canonical_enriched["fingerprint"] = content_fingerprint(
+                    {
+                        key: value
+                        for key, value in canonical_enriched.items()
+                        if key != "fingerprint"
+                    }
+                )
+                path.write_text(
+                    json.dumps(canonical_enriched, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            state["external_contract_context"] = dict(context)
+            state["external_contract_requirements"] = [
+                dict(item)
+                for item in context.get("requirements", [])
+                if isinstance(item, Mapping)
+            ]
+            state["external_contract_notes"] = [
+                dict(item)
+                for item in context.get("unresolved_claims", [])
+                if isinstance(item, Mapping)
+            ]
+            return {"feature_design": enriched, "feature_obligations": enriched}
         if command[:2] == ["powdrr-lift", "design-interview-input"]:
             feature_endpoint._run(runner, worktree, command)
             work_item_name = feature_endpoint._command_option(
@@ -872,13 +1313,14 @@ class FeatureCommandRuntime:
                 clause.clause_id: {"multiple": False} for clause in ledger.clauses
             }
             for clause_id, split in zip(multiple_ids, split_results, strict=True):
-                if set(split) != {"statements"}:
+                if set(split) != {"statements", "validation_groups"}:
                     raise PowdrrExecutionError(
-                        "atomicity split may contain only ordered statements"
+                        "atomicity split requires statements and validation_groups"
                     )
                 compiler_decisions[clause_id] = {
                     "multiple": True,
                     "statements": split.get("statements"),
+                    "validation_groups": split.get("validation_groups"),
                 }
             try:
                 refined = apply_atomicity_decisions(ledger, compiler_decisions)
@@ -903,11 +1345,109 @@ class FeatureCommandRuntime:
             """Join the independently elicited semantic fields for one clause."""
             return _merge_semantic_design_values(parameters)
 
+        def record_benchmark_invariant_fallback(
+            clause: Mapping[str, Any],
+            *,
+            reason: str,
+            details: Mapping[str, Any] | None = None,
+        ) -> Mapping[str, Any]:
+            clause_id = clause.get("clause_id")
+            text = clause.get("text")
+            if not isinstance(clause_id, str) or not isinstance(text, str):
+                raise PowdrrExecutionError(
+                    "benchmark invariant fallback requires a source clause"
+                )
+            fallback = {
+                "clause_id": clause_id,
+                "source_text": text,
+                "reason": reason,
+                "disposition": "invariant",
+                "details": dict(details or {}),
+            }
+            fallbacks = state.setdefault("benchmark_invariant_fallbacks", {})
+            if not isinstance(fallbacks, dict):
+                raise PowdrrExecutionError(
+                    "benchmark invariant fallback state is malformed"
+                )
+            fallbacks[clause_id] = fallback
+            artifact_directory = output_root / "semantic-contracts" / clause_id
+            artifact_directory.mkdir(parents=True, exist_ok=True)
+            (artifact_directory / "invariant-fallback.json").write_text(
+                json.dumps(fallback, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            return fallback
+
+        def merge_as_source_invariant(clause: Mapping[str, Any]) -> Any:
+            text = clause.get("text")
+            clause_id = clause.get("clause_id")
+            if not isinstance(text, str) or not isinstance(clause_id, str):
+                raise PowdrrExecutionError(
+                    "benchmark invariant fallback requires a source clause"
+                )
+            fallback_design = {
+                "kind": "invariant",
+                "description": text,
+                "acceptance_criterion": text,
+                "expected_test": f"Verify the invariant stated by the source: {text}",
+                "population": "The scope stated by the source instruction",
+                "operation": "Preserve the source instruction as an invariant",
+                "oracle": text,
+                "evidence_case": f"Exact source instruction: {text}",
+                "partial_contract": {"routing": "include"},
+            }
+            dimensions = {name: "not_applicable" for name in BEHAVIOR_DIMENSIONS}
+            dimensions["normal_result"] = text
+            scenario = {
+                "status": "resolved",
+                "unresolved_dimensions": [],
+                "scenario": {
+                    "subject": "The source instruction",
+                    "given": f"The implementation is evaluated against: {text}",
+                    "when": "The instruction's behavior is exercised",
+                    "then": text,
+                    "dimensions": dimensions,
+                    "related_requirements": [],
+                    "assumptions": [],
+                    "capability_matrix": [],
+                },
+            }
+            return _merge_behavior_scenario_values(
+                {"clause": clause, "design": fallback_design, "scenario": scenario},
+                benchmark_mode=True,
+            )
+
         def merge_behavior_scenario_operation() -> Any:
+            clause = parameters.get("clause")
+            if not isinstance(clause, Mapping):
+                raise PowdrrExecutionError("behavior scenario has no source clause")
+            clause_id = clause.get("clause_id")
+            fallbacks = state.get("benchmark_invariant_fallbacks", {})
+            fallback = (
+                fallbacks.get(clause_id)
+                if isinstance(fallbacks, Mapping) and isinstance(clause_id, str)
+                else None
+            )
+            if config is not None and getattr(config, "benchmark_mode", False):
+                if isinstance(fallback, Mapping):
+                    return merge_as_source_invariant(clause)
+                try:
+                    return _merge_behavior_scenario_values(
+                        parameters,
+                        benchmark_mode=benchmark_mode(),
+                    )
+                except PowdrrExecutionError as error:
+                    record_benchmark_invariant_fallback(clause, reason=str(error))
+                    return merge_as_source_invariant(clause)
             return _merge_behavior_scenario_values(
                 parameters,
+                benchmark_mode=benchmark_mode(),
                 allow_clarification=bool(
-                    config is not None and getattr(config, "design_only", False)
+                    config is not None
+                    and (
+                        getattr(config, "design_only", False)
+                        or getattr(config, "capture_worker_prompts_only", False)
+                    )
                 ),
             )
 
@@ -1089,6 +1629,7 @@ class FeatureCommandRuntime:
                     resolved_decisions=resolved,
                     pending_specs=pending,
                     provider_results=raw_results,
+                    benchmark_mode=benchmark_mode(),
                 )
             except (SemanticContractError, SemanticDecisionError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
@@ -1116,7 +1657,9 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError("source extraction binding is malformed")
             try:
                 extractions = bind_source_extractions(
-                    requests=requests, provider_results=raw_results
+                    requests=requests,
+                    provider_results=raw_results,
+                    benchmark_mode=benchmark_mode(),
                 )
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
@@ -1154,7 +1697,11 @@ class FeatureCommandRuntime:
             ):
                 raise PowdrrExecutionError("behavior-family decision is malformed")
             try:
-                family = bind_behavior_family_decision(family_request, family_result)
+                family = bind_behavior_family_decision(
+                    family_request,
+                    family_result,
+                    benchmark_mode=benchmark_mode(),
+                )
                 contract = compile_source_contract(
                     clause=clause,
                     decisions=semantic_decisions(parameters.get("decisions")),
@@ -1189,7 +1736,9 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError("field entailment binding is malformed")
             try:
                 reviews = bind_field_entailment_reviews(
-                    requests=requests, provider_results=raw_results
+                    requests=requests,
+                    provider_results=raw_results,
+                    benchmark_mode=benchmark_mode(),
                 )
             except (
                 SemanticContractError,
@@ -1223,10 +1772,34 @@ class FeatureCommandRuntime:
                     )
                 outcome = finalize_source_faithfulness(contract, reviews)
                 if not outcome.get("accepted", False):
-                    raise PowdrrExecutionError(
-                        "source-faithfulness gate failed: "
-                        + json.dumps(outcome, sort_keys=True)
+                    if config is None or not getattr(config, "benchmark_mode", False):
+                        raise PowdrrExecutionError(
+                            "source-faithfulness gate failed: "
+                            + json.dumps(outcome, sort_keys=True)
+                        )
+                    fallback = record_benchmark_invariant_fallback(
+                        {
+                            "clause_id": contract.source_ref,
+                            "text": contract.proposition_text,
+                        },
+                        reason="source-faithfulness gate rejected the derived design",
+                        details=outcome,
                     )
+                    return {
+                        "accepted": True,
+                        "unresolved_fields": list(outcome.get("unresolved_fields", [])),
+                        "findings": [],
+                        "fallback": {
+                            "kind": "invariant",
+                            "artifact": str(
+                                output_root
+                                / "semantic-contracts"
+                                / contract.source_ref
+                                / "invariant-fallback.json"
+                            ),
+                            "reason": fallback["reason"],
+                        },
+                    }
                 return outcome
             except (
                 SemanticContractError,
@@ -1245,6 +1818,20 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "canonical design decisions are missing or malformed"
                 )
+            consistency_review = parameters.get("scenario_consistency_review")
+            if not isinstance(consistency_review, Mapping):
+                raise PowdrrExecutionError(
+                    "scenario consistency review is missing or malformed"
+                )
+            raw_design_decisions = _apply_scenario_consistency_updates(
+                raw_design_decisions,
+                consistency_review,
+                benchmark_mode=benchmark_mode(),
+            )
+            (output_root / "scenario-consistency-review.json").write_text(
+                json.dumps(dict(consistency_review), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
             work_item_name = feature_endpoint._require_flow_text(
                 parameters, "work_item_name"
             )
@@ -1338,6 +1925,27 @@ class FeatureCommandRuntime:
                 json.dumps(canonical_document, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            normative_assumptions = [
+                {"clause_id": clause_id, **dict(assumption)}
+                for clause_id, scenario in scenarios_by_clause_id.items()
+                if isinstance(scenario, Mapping)
+                for assumption in scenario.get("assumptions", ())
+                if isinstance(assumption, Mapping)
+            ]
+            assumptions_path = output_root / "normative-assumptions.json"
+            assumptions_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "normative-assumptions-v1",
+                        "benchmark_mode": benchmark_mode(),
+                        "assumptions": normative_assumptions,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             compatibility_packets = {
                 "packets": [
                     {
@@ -1374,6 +1982,7 @@ class FeatureCommandRuntime:
                 state["implementation_prompt_path"] = prompt_path
             state["canonical_feature_design_path"] = path
             state["feature_obligations_path"] = path
+            state["normative_assumptions_path"] = assumptions_path
             return {
                 "path": str(path),
                 "fingerprint": content_fingerprint(canonical_document),
@@ -1862,10 +2471,112 @@ def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, st
     }
 
 
+def _is_not_applicable_resolution(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip().casefold()
+    return normalized == "not_applicable" or normalized.startswith(
+        ("not_applicable ", "not_applicable-", "not_applicable—", "not_applicable:")
+    )
+
+
+def _apply_scenario_consistency_updates(
+    design_decisions: list[Any],
+    review: Mapping[str, Any],
+    *,
+    benchmark_mode: bool,
+) -> list[dict[str, Any]]:
+    """Apply review edits only to recorded defaults, never source requirements."""
+    consistency_review = review.get("consistency_review")
+    if not isinstance(consistency_review, Mapping):
+        raise PowdrrExecutionError("scenario consistency review is malformed")
+    updates = consistency_review.get("updates")
+    if not isinstance(updates, list) or any(
+        not isinstance(update, Mapping) for update in updates
+    ):
+        raise PowdrrExecutionError("scenario consistency updates are malformed")
+    if not benchmark_mode and updates:
+        raise PowdrrExecutionError(
+            "scenario consistency review cannot add defaults outside benchmark mode"
+        )
+
+    decisions = copy.deepcopy(design_decisions)
+    changed_targets: set[tuple[str, ...]] = set()
+    for raw_update in updates:
+        assert isinstance(raw_update, Mapping)
+        dimension = raw_update.get("dimension")
+        previous_resolution = raw_update.get("previous_resolution")
+        selector_values = [
+            raw_update.get(key) for key in ("subject", "given", "when", "then")
+        ]
+        if not isinstance(dimension, str) or not isinstance(previous_resolution, str):
+            raise PowdrrExecutionError(
+                "scenario consistency update has no dimension or prior resolution"
+            )
+        if not all(isinstance(item, str) and item.strip() for item in selector_values):
+            raise PowdrrExecutionError(
+                "scenario consistency update has no exact scenario selector"
+            )
+        selector = tuple(cast(str, item) for item in selector_values)
+        selector_key = (*selector, dimension, previous_resolution)
+        if selector_key in changed_targets:
+            raise PowdrrExecutionError(
+                "scenario consistency review repeats an assumption target"
+            )
+        changed_targets.add(selector_key)
+
+        candidate = dict(raw_update)
+        for key in ("subject", "given", "when", "then", "previous_resolution"):
+            candidate.pop(key, None)
+        try:
+            validated = validate_normative_assumptions([candidate])[0]
+        except (ValueError, IndexError) as error:
+            raise PowdrrExecutionError(
+                f"scenario consistency update is invalid: {error}"
+            ) from error
+
+        targets: list[tuple[dict[str, Any], list[Any], dict[str, Any], int]] = []
+        for decision in decisions:
+            if not isinstance(decision, dict):
+                continue
+            scenario = decision.get("behavior_scenario")
+            if not isinstance(scenario, dict):
+                continue
+            if (
+                tuple(scenario.get(key) for key in ("subject", "given", "when", "then"))
+                != selector
+            ):
+                continue
+            assumptions = scenario.get("assumptions")
+            dimensions = scenario.get("dimensions")
+            if not isinstance(assumptions, list) or not isinstance(dimensions, dict):
+                continue
+            for index, assumption in enumerate(assumptions):
+                if (
+                    isinstance(assumption, Mapping)
+                    and assumption.get("dimension") == dimension
+                    and assumption.get("resolution") == previous_resolution
+                    and dimensions.get(dimension)
+                    == "ASSUMED DEFAULT: " + previous_resolution
+                ):
+                    targets.append((scenario, assumptions, dimensions, index))
+        if not targets:
+            raise PowdrrExecutionError(
+                "scenario consistency update did not match an existing default"
+            )
+        for _scenario, assumptions, dimensions, index in targets:
+            assumptions[index] = validated
+            dimensions[dimension] = "ASSUMED DEFAULT: " + validated["resolution"]
+    return decisions
+
+
 def _merge_behavior_scenario_values(
-    parameters: Mapping[str, Any], *, allow_clarification: bool = False
+    parameters: Mapping[str, Any],
+    *,
+    allow_clarification: bool = False,
+    benchmark_mode: bool = False,
 ) -> dict[str, Any]:
-    """Bind a resolved scenario, or a visibly provisional design-only draft."""
+    """Bind a resolved scenario, a provisional draft, or recorded defaults."""
     clause = parameters.get("clause")
     design = parameters.get("design")
     result = parameters.get("scenario")
@@ -1886,14 +2597,127 @@ def _merge_behavior_scenario_values(
         raise PowdrrExecutionError(
             "behavior scenario status conflicts with unresolved_dimensions"
         )
-    if status == "needs_clarification" and not allow_clarification:
+    raw_scenario = dict(raw_scenario)
+    assumptions = raw_scenario.get("assumptions", [])
+    if status == "needs_clarification" and benchmark_mode:
+        dimensions = raw_scenario.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise PowdrrExecutionError("behavior scenario has no dimensions")
+        if not all(item in BEHAVIOR_DIMENSIONS for item in unresolved):
+            raise PowdrrExecutionError(
+                "behavior scenario names an unsupported unresolved dimension"
+            )
+        if not isinstance(assumptions, list):
+            raise PowdrrExecutionError("normative assumptions must be a list")
+        not_applicable_dimensions = {
+            str(item.get("dimension"))
+            for item in assumptions
+            if isinstance(item, Mapping)
+            and isinstance(item.get("dimension"), str)
+            and item.get("dimension") in BEHAVIOR_DIMENSIONS
+            and _is_not_applicable_resolution(item.get("resolution"))
+        }
+        concrete_assumption_dimensions = {
+            str(item.get("dimension"))
+            for item in assumptions
+            if isinstance(item, Mapping)
+            and isinstance(item.get("dimension"), str)
+            and item.get("dimension") not in not_applicable_dimensions
+        }
+        not_applicable_dimensions.update(
+            dimension
+            for dimension in unresolved
+            if dimension not in concrete_assumption_dimensions
+            and _is_not_applicable_resolution(dimensions.get(dimension))
+        )
+        effective_unresolved = [
+            dimension
+            for dimension in unresolved
+            if dimension not in not_applicable_dimensions
+        ]
+        effective_assumptions = [
+            item
+            for item in assumptions
+            if not (
+                isinstance(item, Mapping)
+                and item.get("dimension") in not_applicable_dimensions
+            )
+        ]
+        try:
+            resolved_assumptions = validate_normative_assumptions(
+                effective_assumptions, expected_dimensions=effective_unresolved
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"normative defaults did not resolve every clarification: {error}"
+            ) from error
+        resolved_dimensions = dict(dimensions)
+        for dimension in not_applicable_dimensions:
+            resolved_dimensions[dimension] = "not_applicable"
+        for assumption in resolved_assumptions:
+            resolved_dimensions[assumption["dimension"]] = (
+                "ASSUMED DEFAULT: " + assumption["resolution"]
+            )
+        raw_scenario["dimensions"] = resolved_dimensions
+        raw_scenario["assumptions"] = list(resolved_assumptions)
+        if resolved_assumptions:
+            raw_scenario["then"] = (
+                str(raw_scenario.get("then", ""))
+                + " Unspecified behavior was resolved using the recorded "
+                "normative defaults."
+            ).strip()
+        status = "resolved"
+    elif status == "needs_clarification" and not allow_clarification:
         raise PowdrrExecutionError(
             "behavior scenario needs clarification before implementation: "
             + ", ".join(str(item) for item in unresolved)
         )
+    elif assumptions and not benchmark_mode:
+        raise PowdrrExecutionError(
+            "behavior scenario contains normative assumptions, but "
+            "normative assumptions require benchmark mode"
+        )
+    elif status == "resolved" and benchmark_mode:
+        if not isinstance(assumptions, list):
+            raise PowdrrExecutionError("normative assumptions must be a list")
+        not_applicable_dimensions = {
+            str(item.get("dimension"))
+            for item in assumptions
+            if isinstance(item, Mapping)
+            and isinstance(item.get("dimension"), str)
+            and item.get("dimension") in BEHAVIOR_DIMENSIONS
+            and _is_not_applicable_resolution(item.get("resolution"))
+        }
+        effective_assumptions = [
+            item
+            for item in assumptions
+            if not (
+                isinstance(item, Mapping)
+                and item.get("dimension") in not_applicable_dimensions
+            )
+        ]
+        try:
+            resolved_assumptions = validate_normative_assumptions(effective_assumptions)
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"normative assumptions are malformed: {error}"
+            ) from error
+        dimensions = raw_scenario.get("dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise PowdrrExecutionError("behavior scenario has no dimensions")
+        resolved_dimensions = dict(dimensions)
+        for dimension in not_applicable_dimensions:
+            if dimension in BEHAVIOR_DIMENSIONS:
+                resolved_dimensions[dimension] = "not_applicable"
+        for assumption in resolved_assumptions:
+            expected = "ASSUMED DEFAULT: " + assumption["resolution"]
+            if dimensions.get(assumption["dimension"]) != expected:
+                raise PowdrrExecutionError(
+                    "assumption resolution does not match its behavior dimension"
+                )
+        raw_scenario["assumptions"] = list(resolved_assumptions)
+        raw_scenario["dimensions"] = resolved_dimensions
     if status == "needs_clarification":
-        from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
-
         if not all(item in BEHAVIOR_DIMENSIONS for item in unresolved):
             raise PowdrrExecutionError(
                 "behavior scenario names an unsupported unresolved dimension"
@@ -1928,6 +2752,18 @@ def _merge_behavior_scenario_values(
         "evidence": [evidence.strip()],
         "validator": evidence.strip(),
     }
+    partial_contract = design.get("partial_contract")
+    routing = (
+        partial_contract.get("routing")
+        if isinstance(partial_contract, Mapping)
+        else "include"
+    )
+    scenario["routing"] = routing
+    validation_group_id = clause.get("validation_group_id")
+    validation_relation = clause.get("validation_relation", "independent")
+    if isinstance(validation_group_id, str) and validation_group_id.strip():
+        scenario["validation_group_id"] = validation_group_id
+        scenario["validation_relation"] = validation_relation
     try:
         compiled = compile_behavior_scenarios((scenario,))[0]
     except ValueError as error:

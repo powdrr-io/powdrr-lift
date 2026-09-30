@@ -857,6 +857,7 @@ def _validate_steps(
                         "steps",
                         "max_admissions",
                         "max_epochs",
+                        "max_parallel",
                     },
                     f"{step_path}.{control}",
                     diagnostics,
@@ -1499,7 +1500,27 @@ def _validate_loop_declaration(
                 "max_admissions must be a positive integer",
             )
         )
-    elif (
+    max_parallel = declaration.get("max_parallel", 1)
+    if (
+        not isinstance(max_parallel, int)
+        or isinstance(max_parallel, bool)
+        or max_parallel <= 0
+        or max_parallel > 32
+    ):
+        diagnostics.append(
+            DocumentDiagnostic(
+                f"{path}.{kind}.max_parallel",
+                "max_parallel must be an integer from 1 to 32",
+            )
+        )
+    elif kind != "for_each" and max_parallel != 1:
+        diagnostics.append(
+            DocumentDiagnostic(
+                f"{path}.{kind}.max_parallel",
+                "parallel execution is supported only for for_each loops",
+            )
+        )
+    if (
         isinstance(values, list)
         and isinstance(max_items, int)
         and len(values) > max_items

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -57,6 +56,31 @@ class ClassifierDefinition:
 
 
 CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
+    "routing": ClassifierDefinition(
+        "What should the pipeline do with this exact atomic product statement?",
+        (
+            "Choose include for positive product behavior, interfaces, invariants, "
+            "definitions, or implementation guidance.",
+            "Choose include_prohibition for an explicit product behavior or scope "
+            "that must not be implemented or must be prevented.",
+            "Choose exclude for process instructions, background context, or text "
+            "that does not state implementation-relevant product meaning.",
+            "Choose unclear when the source does not support one of these routes "
+            "without guessing. Mixed statements should be split first when their "
+            "parts can be represented independently.",
+            "Do not decide the detailed product kind, strength, scope, or test "
+            "oracle in this routing decision.",
+        ),
+        (
+            ClassificationExample("Users can export reports.", "include"),
+            ClassificationExample("Prefer immutable defaults.", "include"),
+            ClassificationExample(
+                "Do not add automatic retries.", "include_prohibition"
+            ),
+            ClassificationExample("Run the unit tests before submitting.", "exclude"),
+            ClassificationExample("It should work well.", "unclear"),
+        ),
+    ),
     "disposition": ClassifierDefinition(
         "Which one disposition describes this exact proposition?",
         (
@@ -67,12 +91,20 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "with no product semantics.",
             "A product prohibition is non_goal, not nonactionable; a universal "
             "product rule is invariant.",
+            "A required rejection, exception, or error for invalid input is "
+            "positive product behavior and an actionable obligation. Do not use "
+            "non_goal merely because the input or outcome is forbidden; reserve "
+            "non_goal for an explicit instruction not to build or support "
+            "a capability.",
         ),
         (
             ClassificationExample("A Report is a domain record.", "entity"),
             ClassificationExample("The ExportJob represents one export.", "entity"),
             ClassificationExample("Users can export reports.", "feature"),
             ClassificationExample("The service creates a report.", "feature"),
+            ClassificationExample(
+                "DataVar rejects simultaneous default and factory.", "feature"
+            ),
             ClassificationExample("Expose get_state_data(state).", "interface"),
             ClassificationExample("Callbacks receive state_data.", "interface"),
             ClassificationExample("Every response has an ID.", "invariant"),
@@ -160,6 +192,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose one, some, every, or unspecified; do not infer universal "
             "coverage from normative tone.",
+            "Use unspecified when the proposition does not explicitly state how "
+            "many subjects or what proportion are covered; do not infer one from "
+            "singular grammar.",
         ),
         (
             ClassificationExample("One active report is selected.", "one"),
@@ -193,6 +228,8 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "modal.",
             "Preserve should separately from must even when both express required "
             "product behavior.",
+            "Imperative grammar alone does not state a modal strength; use "
+            "unspecified when the proposition contains no explicit modal.",
         ),
         (
             ClassificationExample("The method must return a snapshot.", "must"),
@@ -226,7 +263,12 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
     "has_precondition": ClassifierDefinition(
         "Does this exact proposition explicitly state a condition that must hold "
         "before or while the behavior applies?",
-        ("Choose present or absent; do not extract or invent the condition.",),
+        (
+            "Choose present or absent; do not extract or invent the condition.",
+            "Choose present only when a condition limits when, where, or for whom "
+            "the behavior applies; a purpose or result clause is not itself a "
+            "precondition.",
+        ),
         tuple(
             [
                 ClassificationExample(text, "present")
@@ -266,6 +308,11 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose present or absent; do not treat an ordinary condition as an "
             "exception.",
+            "An exception is an explicit carve-out from an otherwise included set "
+            "or behavior. A negative contrast that states what the behavior is not "
+            "does not by itself create an exception. Choose absent when no carve-out "
+            "is stated; reserve unresolved for wording whose meaning cannot be "
+            "determined.",
         ),
         tuple(
             [
@@ -303,7 +350,18 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
     "has_explicit_result": ClassifierDefinition(
         "Does this exact proposition explicitly state the observable result of the "
         "behavior?",
-        ("Choose present only when the result itself appears in the proposition.",),
+        (
+            "Choose present only when the proposition itself names an observable "
+            "outcome, returned value, state change, emitted item, or other effect.",
+            "Choose absent when the proposition only names an action, capability, "
+            "or availability without specifying its outcome.",
+            "Do not require a particular verb or output format; recognize the result "
+            "from the proposition's meaning, and do not infer unstated details.",
+            "A stated invariant or property is a result when it specifies an "
+            "observable state or value. Choose absent, rather than unresolved, when "
+            "the proposition does not state a distinct outcome; reserve unresolved "
+            "for text whose meaning cannot be determined.",
+        ),
         tuple(
             [
                 ClassificationExample(text, "present")
@@ -342,6 +400,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose current, future, current_and_future, event_bound, or unspecified.",
             "Do not infer future scope from every or all.",
+            "Use unspecified when the proposition gives no explicit temporal "
+            "marker; ordinary present-tense wording does not establish that the "
+            "behavior already exists.",
         ),
         (
             ClassificationExample(
@@ -399,6 +460,16 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "Choose explicit, implied_by_registered_term, or not_stated.",
             "Use implied_by_registered_term only when supplied accepted context "
             "defines the term.",
+            "Choose explicit when the proposition states what an operation, "
+            "component, or value does, produces, changes, or exposes. A named "
+            "capability alone is not explicit when its behavior is left open.",
+            "An asserted or requested behavior can be explicit even when some "
+            "implementation details or edge cases are unspecified. Use not_stated "
+            "when the proposition does not assert or require a behavior at all; "
+            "reserve unresolved for wording whose predicate cannot be identified.",
+            "When a product requirement names a capability and the behavior it "
+            "requires, classify that stated requirement as explicit; do not demand "
+            "complete acceptance criteria before resolving this decision.",
         ),
         (
             ClassificationExample("The endpoint returns CSV.", "explicit"),
@@ -532,6 +603,8 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Choose only from the supplied behavior-family labels.",
             "Classify the quoted behavior, not a broader implementation you imagine.",
+            "Use validate for enforcing declared constraints or rejecting invalid "
+            "declarations, even when the stated result is raising an exception.",
             "Use other when the requested behavior is clear but no registered family "
             "fits; use unresolved only when the source phrase itself is ambiguous.",
         ),
@@ -543,6 +616,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             ClassificationExample("List all active reports.", "list"),
             ClassificationExample("Find reports matching a query.", "search"),
             ClassificationExample("Reject keys that are not declared.", "validate"),
+            ClassificationExample(
+                "Invalid declarations raise InvalidDefinition.", "validate"
+            ),
             ClassificationExample(
                 "Convert the value into a normalized form.", "transform"
             ),
@@ -599,6 +675,7 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
 }
 
 SOURCE_DECISION_KINDS = (
+    "routing",
     "disposition",
     "polarity",
     "quantifier",
@@ -617,43 +694,36 @@ EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Return an exact case-sensitive substring, not a paraphrase.",
             "Do not return only a determiner or quantifier such as all, every, a, "
-            "or the.",
-            "Examples: 'All data should pickle' returns 'data'; 'Users can export "
-            "reports' returns 'Users'.",
+            "or the. Include the smallest noun phrase that identifies the subject.",
         ),
     ),
     "behavior": ClassifierDefinition(
         "Copy the smallest exact phrase naming the behavior, state, or prohibition.",
         (
             "Return an exact case-sensitive substring, not a paraphrase.",
-            "Keep meaning-bearing result modifiers in the behavior phrase.",
-            "Examples: return 'pickle', 'export reports as CSV', or 'add retries "
-            "to report exports'.",
+            "Keep meaning-bearing conditions and stated outcome modifiers in the "
+            "behavior phrase; do not add unstated steps or results.",
         ),
     ),
     "precondition": ClassifierDefinition(
         "Copy the smallest exact phrase stating the behavior's precondition.",
         (
             "Return an exact case-sensitive substring and include the complete "
-            "condition.",
-            "Example: 'Every active report can be exported' returns 'active'.",
+            "condition that must hold for the behavior to apply.",
         ),
     ),
     "exception": ClassifierDefinition(
         "Copy the smallest exact phrase stating the exception.",
         (
-            "Return an exact case-sensitive substring and include the exception "
-            "boundary.",
-            "Example: 'All reports except archived reports' returns 'except archived "
-            "reports'.",
+            "Return an exact case-sensitive substring and include the complete "
+            "exception boundary.",
         ),
     ),
     "explicit_result": ClassifierDefinition(
         "Copy the smallest exact phrase stating the behavior's observable result.",
         (
-            "Return an exact case-sensitive substring; do not invent an unstated "
-            "success predicate.",
-            "Example: 'The endpoint returns CSV' returns 'CSV'.",
+            "Return an exact case-sensitive substring naming the stated outcome; "
+            "do not invent an unstated success predicate.",
         ),
     ),
 }
@@ -662,14 +732,12 @@ EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
 def prepare_source_semantic_decisions(
     clause: Mapping[str, Any], *, created_at: str | None = None
 ) -> dict[str, Any]:
-    """Prepare the root disposition choice before dependent classifications."""
+    """Prepare the root routing choice before semantic detail classification."""
     clause_id, text, source_fingerprint = _clause_fields(clause)
-    spec = _decision_spec(clause_id, text, source_fingerprint, "disposition")
+    spec = _decision_spec(clause_id, text, source_fingerprint, "routing")
     return {
         "resolved_decisions": [],
-        "pending_specs": [
-            _classifier_request(spec, CLASSIFIER_DEFINITIONS["disposition"])
-        ],
+        "pending_specs": [_classifier_request(spec, CLASSIFIER_DEFINITIONS["routing"])],
     }
 
 
@@ -679,23 +747,73 @@ def prepare_dependent_source_semantic_decisions(
     *,
     created_at: str | None = None,
 ) -> dict[str, Any]:
-    """Create only decision-tree children applicable to the root disposition."""
+    """Create detail decisions only after the route has been selected."""
     clause_id, text, source_fingerprint = _clause_fields(clause)
     roots = [
         item if isinstance(item, SemanticDecision) else SemanticDecision.from_data(item)
         for item in root_decisions
     ]
-    if len(roots) != 1 or roots[0].decision_kind != "disposition":
-        raise SemanticContractError(
-            "decision tree requires exactly one disposition root"
-        )
+    if len(roots) != 1 or roots[0].decision_kind != "routing":
+        raise SemanticContractError("decision tree requires exactly one routing root")
     root = roots[0]
     if root.result.status != "resolved" or root.result.value is None:
         raise SemanticContractError("decision tree root must be resolved")
     timestamp = created_at or _created_at()
+    route = root.result.value
     resolved = [root.to_data()]
     pending: list[dict[str, Any]] = []
-    if root.result.value in {"context", "nonactionable"}:
+    if route in {"include", "unclear"}:
+        disposition_spec = _decision_spec(
+            clause_id, text, source_fingerprint, "disposition"
+        )
+        disposition_request = _classifier_request(
+            disposition_spec, CLASSIFIER_DEFINITIONS["disposition"]
+        )
+        if route == "include":
+            disposition_request["allowed_values"] = [
+                "entity",
+                "feature",
+                "interface",
+                "invariant",
+                "guidance",
+            ]
+            disposition_request["instructions"].append(
+                "The router selected include. Choose only the product kind; do not "
+                "reconsider whether this is product meaning."
+            )
+        else:
+            disposition_request["instructions"].append(
+                "The router selected unclear. Make a best-supported semantic "
+                "candidate for the headless review packet, but do not treat this "
+                "candidate as permission to implement without repository evidence."
+            )
+        pending.append(disposition_request)
+    elif route == "include_prohibition":
+        disposition_spec = _decision_spec(
+            clause_id, text, source_fingerprint, "disposition"
+        )
+        resolved.append(
+            disposition_spec.bind(
+                provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                provider_result={"status": "resolved", "value": "non_goal"},
+                evidence_refs=(f"source-proposition:{clause_id}",),
+                created_at=timestamp,
+            ).to_data()
+        )
+    else:
+        disposition_spec = _decision_spec(
+            clause_id, text, source_fingerprint, "disposition"
+        )
+        resolved.append(
+            disposition_spec.bind(
+                provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                provider_result={"status": "resolved", "value": "context"},
+                evidence_refs=(f"source-proposition:{clause_id}",),
+                created_at=timestamp,
+            ).to_data()
+        )
+
+    if route == "exclude":
         defaults = {
             "polarity": "descriptive",
             "quantifier": "unspecified",
@@ -705,6 +823,7 @@ def prepare_dependent_source_semantic_decisions(
             "has_explicit_result": "absent",
             "temporal_scope": "unspecified",
             "source_predicate": "not_stated",
+            "nonactionable_exclusion_safety": "product_semantics_present",
         }
         for kind, value in defaults.items():
             spec = _decision_spec(clause_id, text, source_fingerprint, kind)
@@ -716,45 +835,40 @@ def prepare_dependent_source_semantic_decisions(
                     created_at=timestamp,
                 ).to_data()
             )
-        if root.result.value == "context":
-            spec = _decision_spec(
-                clause_id, text, source_fingerprint, "nonactionable_exclusion_safety"
-            )
-            resolved.append(
-                spec.bind(
-                    provider=SemanticDecisionProvider(kind="deterministic-rule"),
-                    provider_result={
-                        "status": "resolved",
-                        "value": "product_semantics_present",
-                    },
-                    evidence_refs=(f"source-proposition:{clause_id}",),
-                    created_at=timestamp,
-                ).to_data()
-            )
-        else:
-            spec = _decision_spec(
-                clause_id, text, source_fingerprint, "nonactionable_exclusion_safety"
-            )
-            request = _classifier_request(
-                spec, CLASSIFIER_DEFINITIONS["nonactionable_exclusion_safety"]
-            )
-            request["allowed_values"] = ["process_only"]
-            request["instructions"].append(
-                "Independently verify that this exact clause contains no product "
-                "behavior or product non-goal."
-            )
-            pending.append(request)
     else:
         for kind in SOURCE_DECISION_KINDS:
-            if kind == "disposition":
+            if kind in {"routing", "disposition"}:
                 continue
             spec = _decision_spec(clause_id, text, source_fingerprint, kind)
+            if route == "include_prohibition" and kind == "polarity":
+                resolved.append(
+                    spec.bind(
+                        provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                        provider_result={"status": "resolved", "value": "prohibited"},
+                        evidence_refs=(f"source-proposition:{clause_id}",),
+                        created_at=timestamp,
+                    ).to_data()
+                )
+                continue
+            if kind == "nonactionable_exclusion_safety":
+                resolved.append(
+                    spec.bind(
+                        provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                        provider_result={
+                            "status": "resolved",
+                            "value": "product_semantics_present",
+                        },
+                        evidence_refs=(f"source-proposition:{clause_id}",),
+                        created_at=timestamp,
+                    ).to_data()
+                )
+                continue
             deterministic = resolve_deterministic_source_decision(kind, text)
             deterministic_value: str | None
             if (
                 deterministic is None
                 and kind == "polarity"
-                and root.result.value in {"feature", "interface", "invariant"}
+                and route in {"include", "unclear"}
                 and not any(
                     marker in text.casefold()
                     for marker in ("currently", "currently does", "already", "existing")
@@ -776,11 +890,9 @@ def prepare_dependent_source_semantic_decisions(
                 resolved.append(decision.to_data())
             else:
                 request = _classifier_request(spec, CLASSIFIER_DEFINITIONS[kind])
-                if root.result.value == "non_goal" and kind == "polarity":
-                    request["allowed_values"] = ["prohibited"]
                 request["instructions"].append(
-                    f"The already-resolved root disposition is {root.result.value!r}; "
-                    "do not choose a result that contradicts that branch."
+                    f"The router selected {route!r}; do not choose a result that "
+                    "contradicts that route."
                 )
                 pending.append(request)
     return {"resolved_decisions": resolved, "pending_specs": pending}
@@ -791,6 +903,7 @@ def bind_source_semantic_decisions(
     resolved_decisions: Sequence[Mapping[str, Any]],
     pending_specs: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> list[SemanticDecision]:
     if len(pending_specs) != len(provider_results):
@@ -802,11 +915,55 @@ def bind_source_semantic_decisions(
         if not isinstance(spec_raw, Mapping):
             raise SemanticContractError("semantic classifier request has no spec")
         spec = SemanticDecisionSpec.from_data(spec_raw)
+        provider = SemanticDecisionProvider(kind="planning-llm")
+        provider_result = result
+        evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
+        result_is_resolved = (
+            isinstance(result, Mapping)
+            and result.get("status") == "resolved"
+            and result.get("value")
+            in DECISION_VALUES.get(spec.decision_kind, frozenset())
+            and result.get("reason_code") is None
+            and set(result).issubset({"status", "value", "reason_code"})
+        )
+        values = {item.decision_kind: item.result.value for item in decisions}
+        result_conflicts_with_route = (
+            spec.decision_kind == "disposition"
+            and result_is_resolved
+            and not _disposition_matches_route(
+                str(result.get("value")), values.get("routing")
+            )
+        )
+        if (
+            spec.decision_kind == "disposition"
+            and values.get("routing") == "include"
+            and (not result_is_resolved or result_conflicts_with_route)
+        ):
+            # The router has already committed to product behavior. If the
+            # kind classifier cannot supply an included kind, preserve that
+            # obligation as an invariant instead of aborting or dropping it.
+            provider = SemanticDecisionProvider(kind="deterministic-rule")
+            provider_result = {"status": "resolved", "value": "invariant"}
+            evidence_refs = (
+                *evidence_refs,
+                "fallback:include-without-product-kind:invariant",
+            )
+        if benchmark_mode:
+            fallback = _normative_source_decision_default(spec, decisions)
+            if (
+                not result_is_resolved or result_conflicts_with_route
+            ) and fallback is not None:
+                provider = SemanticDecisionProvider(kind="deterministic-rule")
+                provider_result = {"status": "resolved", "value": fallback}
+                evidence_refs = (
+                    *evidence_refs,
+                    f"normative-default:{spec.decision_kind}:{fallback}",
+                )
         decisions.append(
             spec.bind(
-                provider=SemanticDecisionProvider(kind="planning-llm"),
-                provider_result=result,
-                evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+                provider=provider,
+                provider_result=provider_result,
+                evidence_refs=evidence_refs,
                 created_at=timestamp,
             )
         )
@@ -818,9 +975,121 @@ def bind_source_semantic_decisions(
     return ordered
 
 
+def _normative_source_decision_default(
+    spec: SemanticDecisionSpec, decisions: Sequence[SemanticDecision]
+) -> str | None:
+    """Keep unattended compilation moving with source-preserving defaults."""
+    values = {item.decision_kind: item.result.value for item in decisions}
+    root = values.get("disposition")
+    route = values.get("routing")
+    if spec.decision_kind == "routing":
+        # If the router cannot decide, retain the user's words as included
+        # guidance. Dropping an ambiguous clause would silently lose intent.
+        return "include"
+    if spec.decision_kind == "disposition":
+        if route == "include_prohibition":
+            return "non_goal"
+        if route == "include":
+            return "invariant"
+        if route == "exclude":
+            return "context"
+        # A broad guidance label carries the exact proposition without claiming
+        # whether it is a feature, API, invariant, or domain entity.
+        return "guidance"
+    if spec.decision_kind in {
+        "has_precondition",
+        "has_exception",
+        "has_explicit_result",
+    }:
+        return "absent"
+    if spec.decision_kind == "source_predicate" and root in {
+        "feature",
+        "interface",
+        "invariant",
+        "non_goal",
+    }:
+        return "explicit"
+    if spec.decision_kind == "source_predicate" and root == "guidance":
+        return "not_stated"
+    if spec.decision_kind == "nonactionable_exclusion_safety" and root in {
+        "feature",
+        "interface",
+        "invariant",
+        "guidance",
+        "non_goal",
+    }:
+        return "product_semantics_present"
+    if (
+        spec.decision_kind == "nonactionable_exclusion_safety"
+        and root == "nonactionable"
+    ):
+        return "process_only"
+    if spec.decision_kind == "polarity":
+        if root == "non_goal":
+            return "prohibited"
+        if root in {"feature", "interface", "invariant", "guidance"}:
+            deterministic = resolve_deterministic_source_decision(
+                "polarity", spec.proposition_text
+            )
+            if deterministic is not None:
+                return deterministic.value
+            return "required"
+        if root in {"context", "nonactionable"}:
+            return "descriptive"
+    if spec.decision_kind == "quantifier":
+        deterministic = resolve_deterministic_source_decision(
+            "quantifier", spec.proposition_text
+        )
+        return deterministic.value if deterministic is not None else "unspecified"
+    if spec.decision_kind == "requirement_strength":
+        deterministic = resolve_deterministic_source_decision(
+            "requirement_strength", spec.proposition_text
+        )
+        return deterministic.value if deterministic is not None else "unspecified"
+    if spec.decision_kind == "temporal_scope":
+        deterministic = resolve_deterministic_source_decision(
+            "temporal_scope", spec.proposition_text
+        )
+        return deterministic.value if deterministic is not None else "unspecified"
+    return None
+
+
+def _disposition_matches_route(disposition: str, route: str | None) -> bool:
+    if route == "include":
+        return disposition in {
+            "entity",
+            "feature",
+            "interface",
+            "invariant",
+            "guidance",
+        }
+    if route == "include_prohibition":
+        return disposition == "non_goal"
+    if route == "exclude":
+        return disposition == "context"
+    return True
+
+
 def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
     values = {item.decision_kind: item.result.value for item in decisions}
+    routing = values.get("routing")
     disposition = values.get("disposition")
+    if routing == "include" and disposition not in {
+        "entity",
+        "feature",
+        "interface",
+        "invariant",
+        "guidance",
+    }:
+        raise SemanticContractError("include route requires an included product kind")
+    if routing == "include_prohibition" and (
+        disposition != "non_goal" or values.get("polarity") != "prohibited"
+    ):
+        raise SemanticContractError(
+            "include_prohibition route requires a prohibited non-goal"
+        )
+    if routing == "exclude" and disposition != "context":
+        raise SemanticContractError("exclude route must not create product semantics")
     if disposition == "context":
         if values.get("polarity") != "descriptive":
             raise SemanticContractError("context branch must remain descriptive")
@@ -905,6 +1174,7 @@ def bind_source_extractions(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> list[BoundSourceExtraction]:
     if len(requests) != len(provider_results):
@@ -916,13 +1186,24 @@ def bind_source_extractions(
         if not isinstance(spec_raw, Mapping):
             raise SemanticContractError("source extraction request has no spec")
         spec = SourceExtractionSpec.from_data(spec_raw)
-        result.append(
-            spec.bind(
+        try:
+            extraction = spec.bind(
                 provider=SemanticDecisionProvider(kind="planning-llm"),
                 provider_result=provider_result,
                 created_at=timestamp,
             )
-        )
+        except (SemanticContractError, TypeError, AttributeError):
+            if not benchmark_mode:
+                raise
+            # The whole clause is an exact, unambiguous quote even when the
+            # model cannot isolate a narrower subject/behavior phrase. Keeping
+            # it verbatim is less lossy than aborting or inventing a paraphrase.
+            extraction = spec.bind(
+                provider=SemanticDecisionProvider(kind="deterministic-rule"),
+                provider_result={"quote": spec.proposition_text},
+                created_at=timestamp,
+            )
+        result.append(extraction)
     return result
 
 
@@ -945,6 +1226,23 @@ def prepare_behavior_family_decision(
     )
     request = _classifier_request(spec, CLASSIFIER_DEFINITIONS["behavior_family"])
     request["subject_text"] = behavior.span.text
+    decision_values = {
+        item.decision_kind: item.result.value
+        for item in (
+            value
+            if isinstance(value, SemanticDecision)
+            else SemanticDecision.from_data(value)
+            for value in decisions
+        )
+    }
+    explicitly_stated_behavior = decision_values.get("source_predicate") == "explicit"
+    if explicitly_stated_behavior:
+        request["fallback_to_other_if_unresolved"] = True
+        request["instructions"].append(
+            "The source explicitly states this behavior. If no registered "
+            "behavior-family label fits, choose other and preserve the exact "
+            "source phrase; do not treat a missing taxonomy label as ambiguity."
+        )
     root = next(
         (
             item
@@ -975,12 +1273,48 @@ def bind_behavior_family_decision(
     request: Mapping[str, Any],
     provider_result: Mapping[str, Any],
     *,
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> SemanticDecision:
     spec_raw = request.get("spec")
     if not isinstance(spec_raw, Mapping):
         raise SemanticContractError("behavior-family request has no spec")
     spec = SemanticDecisionSpec.from_data(spec_raw)
+    if request.get("allowed_values") == ["other"]:
+        # Context and process-only clauses use "other" as a schema placeholder;
+        # no model judgment is needed to classify a clause that creates no
+        # product behavior obligation.
+        return spec.bind(
+            provider=SemanticDecisionProvider(kind="deterministic-rule"),
+            provider_result={"status": "resolved", "value": "other"},
+            evidence_refs=(f"source-proposition:{spec.subject_ref}",),
+            created_at=created_at or _created_at(),
+        )
+    family_values = set(request.get("allowed_values", ()))
+    family_result_is_valid = (
+        isinstance(provider_result, Mapping)
+        and provider_result.get("status") == "resolved"
+        and provider_result.get("value") in family_values
+        and provider_result.get("reason_code") is None
+        and set(provider_result).issubset({"status", "value", "reason_code"})
+    )
+    use_generic_family = benchmark_mode and not family_result_is_valid
+    use_source_predicate_fallback = (
+        request.get("fallback_to_other_if_unresolved") is True
+        and provider_result.get("status") == "unresolved"
+    )
+    if (
+        use_generic_family or use_source_predicate_fallback
+    ) and "other" in family_values:
+        evidence_refs: tuple[str, ...] = (f"source-proposition:{spec.subject_ref}",)
+        if benchmark_mode:
+            evidence_refs = (*evidence_refs, "normative-default:behavior_family:other")
+        return spec.bind(
+            provider=SemanticDecisionProvider(kind="deterministic-rule"),
+            provider_result={"status": "resolved", "value": "other"},
+            evidence_refs=evidence_refs,
+            created_at=created_at or _created_at(),
+        )
     return spec.bind(
         provider=SemanticDecisionProvider(kind="planning-llm"),
         provider_result=provider_result,
@@ -1050,11 +1384,13 @@ def bind_field_entailment_reviews(
     *,
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
+    benchmark_mode: bool = False,
     created_at: str | None = None,
 ) -> list[FieldEntailmentReview]:
     return bind_field_reviews(
         requests=requests,
         provider_results=provider_results,
+        benchmark_mode=benchmark_mode,
         created_at=created_at or _created_at(),
     )
 
@@ -1101,30 +1437,8 @@ def _render_evidence_case(contract: PartialSemanticContract) -> str:
 def _classifier_request(
     spec: SemanticDecisionSpec, definition: ClassifierDefinition
 ) -> dict[str, Any]:
+    """Build a source-only classifier request without task-specific exemplars."""
     instructions = list(definition.instructions)
-    if definition.examples:
-        examples = []
-        for example in definition.examples:
-            if example.value is not None:
-                result = {
-                    "status": "resolved",
-                    "value": example.value,
-                    "reason_code": None,
-                }
-            else:
-                result = {
-                    "status": "unresolved",
-                    "value": None,
-                    "reason_code": example.unresolved_reason,
-                }
-            example_text = f"{example.proposition!r} => {json.dumps(result)}"
-            if example.context is not None:
-                example_text += f" (accepted context: {example.context})"
-            examples.append(example_text)
-        instructions.append(
-            "Worked examples (source proposition => exact result JSON):\n- "
-            + "\n- ".join(examples)
-        )
     return {
         "spec": spec.to_data(),
         "question": definition.question,

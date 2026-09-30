@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 852
+title: Route qualified semantic decisions through Jev
+intent:
+  problem: Selected semantic source classifications currently use the configured planning provider even when Jev returns a high-confidence typed decision.
+  goal: Route the best-qualified exception and temporal-scope decisions through Jev while preserving the configured provider as a fallback.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 107, end_line: 107}
+    summary: Import the Jev classifier adapter.
+    rationale: Connect Jev routing to the feature design-interview runtime.
+    related: {entities: [jev-semantic-classifier]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 490, end_line: 490}
+    summary: Construct the Jev classifier wrapper around the configured planning client.
+    rationale: Keep the planning provider available as fallback.
+    related: {entities: [jev-semantic-classifier], invariants: [jev-conservative-fallback]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 493, end_line: 493}
+    summary: Use the classifier wrapper for design-interview requests.
+    rationale: Route qualified semantic decisions through Jev.
+    related: {entities: [jev-semantic-classifier]}
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 501, end_line: 501}
+    summary: Use the classifier wrapper for configured planning judges.
+    rationale: Apply semantic decision routing to judge calls.
+    related: {entities: [jev-semantic-classifier]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: added
+    span: {start_line: 1, end_line: 158}
+    summary: Route high-confidence has_exception and temporal_scope decisions through Jev and fall back otherwise.
+    rationale: Use Jev for the source classifier kinds with the strongest exploratory agreement while preserving existing behavior for uncertain outputs.
+    related: {entities: [jev-semantic-classifier], invariants: [jev-conservative-fallback]}
+  - path: tests/test_jev_classifier.py
+    type: added
+    span: {start_line: 1, end_line: 74}
+    summary: Test Jev decision routing, confidence fallback, and provider scope.
+    rationale: Guard the confidence threshold and fallback behavior.
+    related: {entities: [jev-routing-tests], invariants: [jev-conservative-fallback]}
+entities:
+  - id: jev-semantic-classifier
+    type: Function
+    action: added
+  - id: jev-routing-tests
+    type: Test suite
+    action: added
+invariants:
+  - id: jev-conservative-fallback
+    action: added
+    description: Jev handles only has_exception and temporal_scope decisions when confidence is at least 0.98; missing credentials, failures, unsupported values, and lower confidence use the configured planning provider.
+    rationale: Limit live routing to high-confidence outputs and preserve the current provider as fallback.
+guidance: []

@@ -1,0 +1,43 @@
+{
+  "dataset_sha256": "37119e6a67403bed86b44cb969030a28c1d9386d727bc9864cee8be42d03b720",
+  "eligible_counts_by_teacher_stratum": {
+    "context": 10,
+    "entity": 16,
+    "feature": 85,
+    "guidance": 15,
+    "interface": 39,
+    "invariant": 41,
+    "non_goal": 5,
+    "nonactionable": 8,
+    "unresolved": 11
+  },
+  "eligible_example_count": 230,
+  "gold_status": "not_gold_until_both_reviews_and_adjudication_are_complete",
+  "heldout_source_family_ids": [
+    "family:deepswe-repository:https://github.com/celery/kombu",
+    "family:deepswe-repository:https://github.com/python-attrs/cattrs",
+    "family:deepswe-repository:https://github.com/tconbeer/sqlfmt"
+  ],
+  "max_per_stratum": 20,
+  "reviewers": [
+    "a",
+    "b"
+  ],
+  "sample_count": 125,
+  "sample_counts_by_teacher_stratum": {
+    "context": 10,
+    "entity": 16,
+    "feature": 20,
+    "guidance": 15,
+    "interface": 20,
+    "invariant": 20,
+    "non_goal": 5,
+    "nonactionable": 8,
+    "unresolved": 11
+  },
+  "schema_version": "root-disposition-human-annotation-batch-v1",
+  "seed": 20260928,
+  "source_example_count": 1618,
+  "status": "awaiting_independent_human_labels",
+  "stratification_field": "existing_teacher_label_or_unresolved"
+}

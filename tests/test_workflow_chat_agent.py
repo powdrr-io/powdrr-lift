@@ -2761,8 +2761,14 @@ def test_llm_exchange_recorder_reuses_client_serialized_messages(
     assert serialization_calls == 0
 
 
+@pytest.mark.parametrize(
+    ("structured_output_token_limit", "expected_max_tokens"),
+    [(None, 2048), (8192, 8192)],
+)
 def test_openai_client_serializes_messages_once_for_budget_and_request(
     monkeypatch: pytest.MonkeyPatch,
+    structured_output_token_limit: int | None,
+    expected_max_tokens: int,
 ) -> None:
     serialization_calls = 0
 
@@ -2808,6 +2814,7 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
         model="test-model",
         api_key="test-key",
         base_url="https://api.openai.com/v1",
+        structured_output_token_limit=structured_output_token_limit,
     )
 
     response_schema = {
@@ -2822,7 +2829,7 @@ def test_openai_client_serializes_messages_once_for_budget_and_request(
     ) == {"action": "complete"}
     assert serialization_calls == 1
     assert request_bodies[0]["messages"] == [{"role": "user", "content": "request"}]
-    assert request_bodies[0]["max_tokens"] == 2048
+    assert request_bodies[0]["max_tokens"] == expected_max_tokens
     assert request_bodies[0]["response_format"] == {
         "type": "json_schema",
         "json_schema": {

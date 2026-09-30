@@ -11,15 +11,7 @@ from powdrr_lift.core.behavior_contract import (
     compile_behavior_scenarios,
     render_behavior_matrix,
 )
-
-
-def _worker_objective(text: str) -> str:
-    """Remove source-level repository workflow instructions from the objective."""
-    # Branching, committing, and PR instructions belong to Workrr. They are
-    # frequently present in task descriptions, but must not compete with the
-    # worker policy rendered by the request compiler.
-    objective, separator, _process_instructions = text.partition("\nIMPORTANT:")
-    return (objective if separator else text).strip()
+from powdrr_lift.core.contract_closure import render_contract_closure
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +39,9 @@ class ImplementationPacket:
     required_tests: tuple[Mapping[str, Any], ...]
     repository: RepositoryContextPacket
     behavior_scenarios: tuple[BehaviorScenario, ...] = ()
+    contract_closure: Mapping[str, Any] | None = None
+    external_contract_requirements: tuple[Mapping[str, Any], ...] = ()
+    external_contract_notes: tuple[Mapping[str, Any], ...] = ()
 
     def for_obligation(self, ordinal: int) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
@@ -66,6 +61,9 @@ class ImplementationPacket:
                 if index < len(self.behavior_scenarios)
                 else ()
             ),
+            contract_closure=self.contract_closure,
+            external_contract_requirements=self.external_contract_requirements,
+            external_contract_notes=self.external_contract_notes,
         )
 
     def for_task(
@@ -75,7 +73,7 @@ class ImplementationPacket:
         acceptance_criteria: Sequence[str],
     ) -> ImplementationPacket:
         """Return a worker packet scoped to one compiled code task."""
-        task_objective = _worker_objective(objective).strip()
+        task_objective = objective.strip()
         if not task_objective:
             raise ValueError("task packet objective must not be empty")
         tests = tuple(
@@ -91,10 +89,13 @@ class ImplementationPacket:
             required_tests=tests,
             repository=self.repository,
             behavior_scenarios=self.behavior_scenarios,
+            contract_closure=self.contract_closure,
+            external_contract_requirements=self.external_contract_requirements,
+            external_contract_notes=self.external_contract_notes,
         )
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data = {
             "schema_version": "implementation-packet-v1",
             "objective": self.objective,
             "obligations": [
@@ -111,6 +112,17 @@ class ImplementationPacket:
             "repository": self.repository.to_data(),
             "behavior_scenarios": [item.to_data() for item in self.behavior_scenarios],
         }
+        if self.contract_closure is not None:
+            data["contract_closure"] = dict(self.contract_closure)
+        if self.external_contract_requirements:
+            data["external_contract_requirements"] = [
+                dict(item) for item in self.external_contract_requirements
+            ]
+        if self.external_contract_notes:
+            data["external_contract_notes"] = [
+                dict(item) for item in self.external_contract_notes
+            ]
+        return data
 
     @classmethod
     def from_data(cls, raw: Mapping[str, Any]) -> ImplementationPacket:
@@ -141,8 +153,23 @@ class ImplementationPacket:
             isinstance(item, Mapping) for item in raw_scenarios
         ):
             raise ValueError("implementation packet behavior scenarios are malformed")
+        raw_closure = raw.get("contract_closure")
+        if raw_closure is not None and not isinstance(raw_closure, Mapping):
+            raise ValueError("implementation packet contract closure is malformed")
+        raw_external_requirements = raw.get("external_contract_requirements", [])
+        if not isinstance(raw_external_requirements, list) or not all(
+            isinstance(item, Mapping) for item in raw_external_requirements
+        ):
+            raise ValueError(
+                "implementation packet external requirements are malformed"
+            )
+        raw_external_notes = raw.get("external_contract_notes", [])
+        if not isinstance(raw_external_notes, list) or not all(
+            isinstance(item, Mapping) for item in raw_external_notes
+        ):
+            raise ValueError("implementation packet external notes are malformed")
         packet = cls(
-            objective=_worker_objective(str(raw.get("objective", ""))),
+            objective=str(raw.get("objective", "")).strip(),
             obligations=obligations,
             required_tests=tests,
             repository=RepositoryContextPacket(
@@ -157,6 +184,13 @@ class ImplementationPacket:
                 ),
             ),
             behavior_scenarios=compile_behavior_scenarios(raw_scenarios),
+            contract_closure=(
+                dict(raw_closure) if isinstance(raw_closure, Mapping) else None
+            ),
+            external_contract_requirements=tuple(
+                dict(item) for item in raw_external_requirements
+            ),
+            external_contract_notes=tuple(dict(item) for item in raw_external_notes),
         )
         if not packet.objective.strip() or not packet.obligations:
             raise ValueError("implementation packet is missing required content")
@@ -180,20 +214,60 @@ class ImplementationPacket:
             )
         test_lines = test_lines or ["- none"]
         if self.behavior_scenarios:
-            return render_behavior_matrix(self.behavior_scenarios)
-        return "\n".join(
-            (
-                "Required behavioral tests:",
-                "Make every required behavioral test below pass. These tests "
-                "are the executable acceptance contract; do not weaken or "
-                "delete them.",
-                *test_lines,
-                "Run the focused required tests after implementation. If a "
-                "test is broken because of an import, fixture, API, assertion, "
-                "or other test defect, repair the test and implementation as "
-                "needed; never weaken the behavioral assertion.",
+            behavior_text = render_behavior_matrix(self.behavior_scenarios)
+        else:
+            behavior_text = "\n".join(
+                (
+                    "Required behavioral tests:",
+                    "Make every required behavioral test below pass. These tests "
+                    "are the executable acceptance contract; do not weaken or "
+                    "delete them.",
+                    *test_lines,
+                    "Run the focused required tests after implementation. If a "
+                    "test is broken because of an import, fixture, API, assertion, "
+                    "or other test defect, repair the test and implementation as "
+                    "needed; never weaken the behavioral assertion.",
+                )
             )
-        )
+        sections = [behavior_text]
+        if self.external_contract_requirements:
+            rendered = ["External contract requirements (accepted and scoped):"]
+            for index, requirement in enumerate(
+                self.external_contract_requirements, start=1
+            ):
+                rendered.append(f"{index}. {requirement.get('requirement', '')}")
+                rendered.append(
+                    "   Source: "
+                    f"{requirement.get('canonical_url', '')}"
+                    f" (profile: {requirement.get('profile', 'unspecified')})."
+                )
+                quote = requirement.get("source_quote")
+                if isinstance(quote, str) and quote.strip():
+                    rendered.append(f"   Supporting excerpt: {quote.strip()}")
+                rendered.append(
+                    f"   Scope rationale: {requirement.get('rationale', '')}"
+                )
+            sections.append("\n".join(rendered))
+        if self.external_contract_notes:
+            rendered_notes = [
+                "Unresolved external contract questions (do not assume an answer):"
+            ]
+            for index, note in enumerate(self.external_contract_notes, start=1):
+                claim = note.get("claim", {})
+                if not isinstance(claim, Mapping):
+                    claim = {}
+                rendered_notes.append(
+                    f"{index}. Candidate: {claim.get('candidate_requirement', '')}"
+                )
+                rendered_notes.append(
+                    f"   Source: {claim.get('canonical_url', '')}"
+                    f" (profile: {claim.get('profile', 'unspecified')})."
+                )
+                rendered_notes.append(f"   Uncertainty: {note.get('rationale', '')}")
+            sections.append("\n".join(rendered_notes))
+        if self.contract_closure is not None:
+            sections.append(render_contract_closure(self.contract_closure))
+        return "\n\n".join(section for section in sections if section)
 
 
 def compile_implementation_packet(
@@ -205,6 +279,9 @@ def compile_implementation_packet(
     validation_profiles: Sequence[str],
     existing_tests: Sequence[Mapping[str, Any]] = (),
     behavior_scenarios: Sequence[Mapping[str, Any]] = (),
+    contract_closure: Mapping[str, Any] | None = None,
+    external_contract_requirements: Sequence[Mapping[str, Any]] = (),
+    external_contract_notes: Sequence[Mapping[str, Any]] = (),
 ) -> ImplementationPacket:
     """Normalize worker inputs and reject incomplete executable contracts."""
     if not objective.strip():
@@ -230,7 +307,7 @@ def compile_implementation_packet(
         if isinstance(item.get("behavior_scenario"), Mapping)
     )
     return ImplementationPacket(
-        objective=_worker_objective(objective),
+        objective=objective.strip(),
         obligations=normalized_obligations,
         required_tests=tuple(normalized_tests),
         repository=RepositoryContextPacket(
@@ -250,6 +327,13 @@ def compile_implementation_packet(
         behavior_scenarios=compile_behavior_scenarios(
             (*embedded_scenarios, *behavior_scenarios)
         ),
+        contract_closure=(
+            dict(contract_closure) if contract_closure is not None else None
+        ),
+        external_contract_requirements=tuple(
+            dict(item) for item in external_contract_requirements
+        ),
+        external_contract_notes=tuple(dict(item) for item in external_contract_notes),
     )
 
 

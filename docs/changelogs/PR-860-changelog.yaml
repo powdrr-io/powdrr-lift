@@ -1,0 +1,131 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 860
+title: Make JEV calls visible and reuse uv's shared cache
+intent:
+  problem: Pier runs cannot distinguish successful JEV calls from silent fallback, and isolated workflow scenarios create disposable uv caches.
+  goal: Log correlated JEV call lifecycle events and use uv's persistent default cache for isolated scenarios.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 8, end_line: 9}
+    summary: Import timing and unique request ID support for JEV call logs.
+    rationale: Measure call latency and correlate lifecycle events.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import endpoint parsing for safe host-only JEV logs.
+    rationale: Avoid logging credentials or endpoint query data.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 53, end_line: 54}
+    summary: Assign a unique ID and safe endpoint host to each classifier request.
+    rationale: Correlate lifecycle messages without exposing request content.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 56, end_line: 70}
+    summary: Log why a JEV call was skipped before using the planning fallback.
+    rationale: Distinguish missing credentials and unsupported requests from an attempted call.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 72, end_line: 80}
+    summary: Log when a JEV HTTP request begins.
+    rationale: Provide visible evidence that execution reached the provider call.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 83, end_line: 89}
+    summary: Log when JEV returns a parsed response and classification mapping begins.
+    rationale: Separate provider response receipt from result mapping.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 91, end_line: 94}
+    summary: Track whether JEV errors occur during request or response mapping.
+    rationale: Report the failure phase and HTTP status when available.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 96, end_line: 103}
+    summary: Emit a correlated JEV fallback record with safe error details.
+    rationale: Show failed calls without logging prompts, results, or secrets.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 105, end_line: 112}
+    summary: Log accepted JEV classifications and use the mapped result.
+    rationale: Distinguish usable provider results from fallbacks.
+    related: {entities: [jev-classifier-client, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: src/powdrr_lift/workrr/task_scenario.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: Remove the unused environment module import.
+    rationale: Scenario code no longer rewrites UV_CACHE_DIR.
+    related: {entities: [workflow-task-scenario-runner, uv-cache]}
+  - path: src/powdrr_lift/workrr/task_scenario.py
+    type: modified
+    span: {start_line: 141, end_line: 143}
+    summary: Remove the disposable per-scenario uv cache override.
+    rationale: Reuse uv's persistent default cache unless the caller specifies another path.
+    related: {entities: [workflow-task-scenario-runner, uv-cache], invariants: [shared-uv-cache]}
+  - path: src/powdrr_lift/workrr/task_scenario.py
+    type: modified
+    span: {start_line: 301, end_line: 304}
+    summary: Remove cleanup that restored the temporary cache environment override.
+    rationale: Keep the caller's uv cache configuration untouched.
+    related: {entities: [workflow-task-scenario-runner, uv-cache], invariants: [shared-uv-cache]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 6, end_line: 7}
+    summary: Import pytest logging capture support.
+    rationale: Assert lifecycle output in classifier tests.
+    related: {entities: [jev-integration-tests, jev-request-lifecycle-events]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 58, end_line: 82}
+    summary: Test that successful JEV lifecycle markers share one request ID.
+    rationale: Keep the request correlation needed for Pier log monitoring.
+    related: {entities: [jev-integration-tests, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 181, end_line: 183}
+    summary: Capture warning logs in the JEV provider failure test.
+    rationale: Verify failure markers are visible.
+    related: {entities: [jev-integration-tests, jev-request-lifecycle-events]}
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 197, end_line: 198}
+    summary: Assert provider failures emit start and fallback markers.
+    rationale: Make unsuccessful JEV attempts distinguishable from successful calls in logs.
+    related: {entities: [jev-integration-tests, jev-request-lifecycle-events], invariants: [jev-call-observability]}
+entities:
+  - id: jev-classifier-client
+    type: Function
+    action: modified
+  - id: workflow-task-scenario-runner
+    type: Function
+    action: added
+  - id: jev-request-lifecycle-events
+    type: Log
+    action: added
+  - id: uv-cache
+    type: Cache
+    action: added
+  - id: jev-integration-tests
+    type: Test suite
+    action: modified
+invariants:
+  - id: jev-call-observability
+    action: added
+    description: Each JEV invocation emits a started event and then a response and accepted event or a fallback event, all sharing a request ID; skipped calls report a reason. Logs omit prompts, response content, and credentials.
+    rationale: Distinguish skipped calls, attempted requests, received responses, accepted classifications, and fallback behavior in Pier logs.
+  - id: shared-uv-cache
+    action: added
+    description: Temporary workflow scenarios use uv's persistent default cache unless the caller explicitly sets UV_CACHE_DIR.
+    rationale: Reuse dependency artifacts between scenario runs instead of writing them inside a deleted temporary workspace.
+guidance: []

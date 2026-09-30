@@ -1166,9 +1166,13 @@ def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
 
 
 def prepare_source_extractions(
-    clause: Mapping[str, Any], decisions: Sequence[SemanticDecision]
+    clause: Mapping[str, Any],
+    decisions: Sequence[SemanticDecision],
+    *,
+    proposition_text: str | None = None,
 ) -> list[dict[str, Any]]:
     clause_id, text, source_fingerprint = _clause_fields(clause)
+    extraction_text = proposition_text if proposition_text is not None else text
     values = {item.decision_kind: item.result.value for item in decisions}
     kinds = ["subject", "behavior"]
     for decision_kind, extraction_kind in (
@@ -1184,7 +1188,7 @@ def prepare_source_extractions(
             extraction_id=f"extraction:{clause_id}:{kind}",
             extraction_kind=kind,
             subject_ref=clause_id,
-            proposition_text=text,
+            proposition_text=extraction_text,
             source_fingerprint=source_fingerprint,
             contract_revision=f"{SOURCE_EXTRACTOR_REVISION}:{kind}",
         )
@@ -1204,6 +1208,7 @@ def bind_source_extractions(
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
     benchmark_mode: bool = False,
+    provider_kind: str = "planning-llm",
     created_at: str | None = None,
 ) -> list[BoundSourceExtraction]:
     if len(requests) != len(provider_results):
@@ -1217,7 +1222,7 @@ def bind_source_extractions(
         spec = SourceExtractionSpec.from_data(spec_raw)
         try:
             extraction = spec.bind(
-                provider=SemanticDecisionProvider(kind="planning-llm"),
+                provider=SemanticDecisionProvider(kind=provider_kind),
                 provider_result=provider_result,
                 created_at=timestamp,
             )
@@ -1234,6 +1239,53 @@ def bind_source_extractions(
             )
         result.append(extraction)
     return result
+
+
+def compile_deterministic_source_extractions(
+    clause: Mapping[str, Any],
+    decisions: Sequence[SemanticDecision],
+    source_text: str,
+    *,
+    created_at: str | None = None,
+) -> list[BoundSourceExtraction]:
+    """Bind exact instruction-ledger spans without model-selected quotations.
+
+    Atomic clauses may be model-split paraphrases, so use their stored source
+    offsets to recover the original instruction sentence. Each semantic field
+    points to that complete, auditable source span.
+    """
+    if not isinstance(source_text, str):
+        raise SemanticContractError("instruction source text is invalid")
+    raw_span = clause.get("source_span")
+    if not isinstance(raw_span, Mapping):
+        raise SemanticContractError("instruction clause has no source span")
+    start = raw_span.get("start")
+    end = raw_span.get("end")
+    if (
+        not isinstance(start, int)
+        or isinstance(start, bool)
+        or not isinstance(end, int)
+        or isinstance(end, bool)
+        or start < 0
+        or end <= start
+        or end > len(source_text)
+    ):
+        raise SemanticContractError("instruction clause source span is invalid")
+    source_excerpt = source_text[start:end]
+    if not source_excerpt.strip():
+        raise SemanticContractError("instruction clause source span is empty")
+    requests = prepare_source_extractions(
+        clause, decisions, proposition_text=source_excerpt
+    )
+    provider_results = [
+        {"quote": request["spec"]["proposition_text"]} for request in requests
+    ]
+    return bind_source_extractions(
+        requests=requests,
+        provider_results=provider_results,
+        provider_kind="deterministic-rule",
+        created_at=created_at,
+    )
 
 
 def prepare_behavior_family_decision(
@@ -1432,6 +1484,8 @@ def finalize_source_faithfulness(
 
 
 def _render_description(contract: PartialSemanticContract) -> str:
+    if contract.subject.span.text == contract.behavior.span.text:
+        return contract.subject.span.text
     return f"{contract.subject.span.text} {contract.behavior.span.text}."
 
 
@@ -1442,14 +1496,26 @@ def _render_acceptance(contract: PartialSemanticContract) -> str:
 
 
 def _render_expected_test(contract: PartialSemanticContract) -> str:
+    if contract.subject.span.text == contract.behavior.span.text:
+        return (
+            "Test the requested behavior in the source clause: "
+            f"{contract.proposition_text}"
+        )
     return f"Test {contract.behavior.span.text} for {contract.subject.span.text}."
 
 
 def _render_population(contract: PartialSemanticContract) -> str:
+    if contract.subject.span.text == contract.behavior.span.text:
+        return (
+            "the population described by the source clause: "
+            f"{contract.proposition_text}"
+        )
     return f"{contract.quantifier} {contract.subject.span.text}"
 
 
 def _render_operation(contract: PartialSemanticContract) -> str:
+    if contract.subject.span.text == contract.behavior.span.text:
+        return contract.behavior.span.text
     return f"{contract.behavior_family}: {contract.behavior.span.text}"
 
 
@@ -1517,6 +1583,7 @@ __all__ = [
     "bind_field_entailment_reviews",
     "bind_source_extractions",
     "bind_source_semantic_decisions",
+    "compile_deterministic_source_extractions",
     "compile_source_contract",
     "prepare_behavior_family_decision",
     "prepare_dependent_source_semantic_decisions",

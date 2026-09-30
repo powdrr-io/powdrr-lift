@@ -31,6 +31,7 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_behavior_family_decision,
     bind_source_extractions,
     bind_source_semantic_decisions,
+    compile_deterministic_source_extractions,
     compile_source_contract,
     prepare_behavior_family_decision,
     prepare_dependent_source_semantic_decisions,
@@ -394,6 +395,7 @@ def _clause(text: str = "All data should pickle.") -> dict[str, Any]:
     return {
         "clause_id": "instruction-001",
         "text": text,
+        "source_span": {"start": 0, "end": len(text)},
         "fingerprint": "sha256:clause",
     }
 
@@ -711,13 +713,27 @@ def test_exact_extractor_rejects_an_invented_or_case_changed_quote() -> None:
             provider_results=[{"quote": "Data"}, {"quote": "round trip"}],
             created_at=NOW,
         )
-
     with pytest.raises(SemanticContractError, match="determiner or quantifier"):
         bind_source_extractions(
             requests=requests[:1],
             provider_results=[{"quote": "All"}],
             created_at=NOW,
         )
+
+
+def test_deterministic_extractions_bind_the_complete_clause_span() -> None:
+    source_text = "On exit, data is removed."
+    clause = _clause("Data is removed on exit.") | {
+        "source_span": {"start": 0, "end": len(source_text)}
+    }
+    extractions = compile_deterministic_source_extractions(
+        clause, _bind_source_decisions(clause), source_text, created_at=NOW
+    )
+
+    assert {item.span.text for item in extractions} == {source_text}
+    assert all(item.span.start == 0 for item in extractions)
+    assert all(item.span.end == len(source_text) for item in extractions)
+    assert all(item.provider.kind == "deterministic-rule" for item in extractions)
 
 
 def test_modifier_presence_controls_exact_extraction_requests() -> None:
@@ -866,21 +882,13 @@ def test_procedrr_command_boundary_persists_intermediate_artifacts(
         ["bind_source_semantic_decisions"],
         {"clause": clause, "plan": child_plan, "results": child_results},
     )
-    extraction_plan = runtime.dispatch(
-        "prepare_source_extractions",
-        ["prepare_source_extractions"],
-        {"clause": clause, "decisions": bound["decisions"]},
-    )
     extracted = runtime.dispatch(
-        "bind_source_extractions",
-        ["bind_source_extractions"],
+        "compile_deterministic_source_extractions",
+        ["compile_deterministic_source_extractions"],
         {
             "clause": clause,
-            "requests": extraction_plan["requests"],
-            "results": [
-                {"result": {"quote": "data", "occurrence": None}},
-                {"result": {"quote": "pickle", "occurrence": None}},
-            ],
+            "decisions": bound["decisions"],
+            "source_text": clause["text"],
         },
     )
     family_request = runtime.dispatch(
@@ -912,8 +920,8 @@ def test_procedrr_command_boundary_persists_intermediate_artifacts(
     assert (artifact_root / "source-decisions.json").is_file()
     assert (artifact_root / "source-extractions.json").is_file()
     assert (artifact_root / "partial-contract.json").is_file()
-    assert projection["description"] == "data pickle."
-    assert projection["operation"] == "serialize: pickle"
+    assert projection["description"] == clause["text"]
+    assert projection["operation"] == clause["text"]
 
 
 def test_benchmark_source_faithfulness_failure_becomes_source_invariant(

@@ -70,6 +70,7 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_field_entailment_reviews,
     bind_source_extractions,
     bind_source_semantic_decisions,
+    compile_deterministic_source_extractions,
     compile_source_contract,
     finalize_source_faithfulness,
     prepare_behavior_family_decision,
@@ -357,6 +358,20 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("bind_source_extractions"),
+        ),
+        "compile_deterministic_source_extractions": CommandSpec(
+            name="compile_deterministic_source_extractions",
+            input_schema=object_schema(
+                {
+                    "clause": {},
+                    "decisions": {},
+                    "source_text": {"type": "string"},
+                },
+                required=("clause", "decisions"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("compile_deterministic_source_extractions"),
         ),
         "prepare_behavior_family_decision": CommandSpec(
             name="prepare_behavior_family_decision",
@@ -1670,6 +1685,26 @@ class FeatureCommandRuntime:
             )
             return {"path": str(path), "extractions": data}
 
+        def compile_deterministic_source_extractions_operation() -> Any:
+            clause = semantic_clause()
+            source_text = parameters.get("source_text")
+            if not isinstance(source_text, str):
+                source_text = load_instruction_ledger().source.text
+            try:
+                extractions = compile_deterministic_source_extractions(
+                    clause,
+                    semantic_decisions(parameters.get("decisions")),
+                    source_text,
+                )
+            except SemanticContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            data = [item.to_data() for item in extractions]
+            path = semantic_artifact_directory(clause) / "source-extractions.json"
+            path.write_text(
+                json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            return {"path": str(path), "extractions": data}
+
         def prepare_behavior_family_decision_operation() -> Any:
             extractions = semantic_extractions(parameters.get("extractions"))
             behaviors = [
@@ -2061,6 +2096,9 @@ class FeatureCommandRuntime:
                 ),
                 "bind_source_extractions": bind_handler(
                     bind_source_extractions_operation
+                ),
+                "compile_deterministic_source_extractions": bind_handler(
+                    compile_deterministic_source_extractions_operation
                 ),
                 "prepare_behavior_family_decision": bind_handler(
                     prepare_behavior_family_decision_operation

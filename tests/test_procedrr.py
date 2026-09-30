@@ -658,10 +658,9 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     dependent_operation = body[3]["operation"]
     classifier_loop = body[4]["for_each"]
     classifier_judge = classifier_loop["body"][0]["judge"]
-    extractor_loop = body[7]["for_each"]
-    extractor_judge = extractor_loop["body"][0]["judge"]
-    behavior_judge = body[10]["judge"]
-    scenario_judge = body[16]["judge"]
+    extraction_operation = body[6]["operation"]
+    behavior_judge = body[8]["judge"]
+    scenario_judge = body[14]["judge"]
 
     assert atomicity_judge["question"] == (
         "Does this one instruction clause contain more than one independently "
@@ -688,10 +687,8 @@ def test_design_interview_uses_single_field_source_classification() -> None:
         "reason_code",
     ]
     assert classifier_judge["context"] == ["dependent_decision_request"]
-    assert extractor_loop["snapshot"]["max_items"] == 5
-    assert extractor_judge["output"]["schema"]["required"] == [
-        "quote",
-        "occurrence",
+    assert extraction_operation["command"] == [
+        "compile_deterministic_source_extractions"
     ]
     assert behavior_judge["output"]["name"] == "behavior_family_result"
     assert "atomic_instruction_ledger" in scenario_judge["context"]

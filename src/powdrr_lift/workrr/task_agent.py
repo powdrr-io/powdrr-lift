@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, field, replace
@@ -426,6 +427,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             selection_schema = None
             parameter_messages_for = None
             parameter_schema_for = None
+            stage_started = time.perf_counter()
             messages = _build_task_messages(
                 self.workflow,
                 self.task,
@@ -439,6 +441,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 ),
                 observer_intervention=self.observer_intervention,
             )
+            self._record_prompt_timing("assemble_messages", stage_started)
             if self.clean_room_repair_pending and not self.clean_room_repair_used:
                 self.clean_room_repair_pending = False
                 self.clean_room_repair_used = True
@@ -476,6 +479,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 error_message = self.response_correction or (
                     "The previous workflow strategy failed to make progress."
                 )
+                stage_started = time.perf_counter()
                 selection_messages, selection_schema, manifest = (
                     build_clean_room_action_selection_prompt(
                         context=context_json,
@@ -484,6 +488,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                         model=self.model,
                     )
                 )
+                self._record_prompt_timing("build_repair_prompt", stage_started)
 
                 def parameter_schema_for(selected_action: str) -> Mapping[str, Any]:
                     return {
@@ -534,6 +539,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 self.repair_prompt_manifest = manifest
                 messages = selection_messages
             else:
+                stage_started = time.perf_counter()
                 self.repair_prompt_manifest = build_repair_prompt_manifest(
                     messages,
                     profile="normal_full_context",
@@ -549,8 +555,11 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     reasoning_mode="direct_action",
                     model=self.model,
                 )
+                self._record_prompt_timing("build_repair_manifest", stage_started)
             limits = model_limits_for(self.mapping_provider, self.model)
+            stage_started = time.perf_counter()
             estimated_input_tokens = _estimate_message_tokens(messages)
+            self._record_prompt_timing("estimate_input_tokens", stage_started)
             print(
                 f"Workflow task context: {estimated_input_tokens} estimated input "
                 f"tokens of {limits.context_window} allowed.",
@@ -558,6 +567,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 flush=True,
             )
             if self.config.verbose:
+                stage_started = time.perf_counter()
                 prompt_breakdown = json.dumps(
                     prompt_size_breakdown(messages), indent=2, sort_keys=True
                 )
@@ -566,6 +576,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     file=self.stderr,
                     flush=True,
                 )
+                self._record_prompt_timing("prompt_size_breakdown", stage_started)
             compaction_threshold = _context_compaction_threshold(
                 limits.context_window,
                 self.config.context_compaction_threshold,
@@ -636,6 +647,16 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 flush=True,
             )
             self.response_correction = None
+
+    def _record_prompt_timing(self, stage: str, started: float) -> None:
+        """Attach prompt preparation timing to the workflow event stream."""
+        self.events.append(
+            {
+                "kind": "prompt_timing",
+                "stage": stage,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+            }
+        )
 
     def _request_two_pass_action(
         self,
@@ -3440,12 +3461,13 @@ def _task_events_for_prompt(events: Sequence[Mapping[str, Any]]) -> dict[str, An
     most recent result is still important for choosing the next action. Errors
     remain attached to their event so a repair response has its cause.
     """
-    recent_events = list(events[-12:])
+    prompt_events = [event for event in events if event.get("kind") != "prompt_timing"]
+    recent_events = prompt_events[-12:]
     metadata = [_task_event_metadata(event) for event in recent_events]
     latest_result_event: dict[str, Any] | None = None
     latest_failure_event: dict[str, Any] | None = None
     latest_failure_result: Any = None
-    for event in reversed(events):
+    for event in reversed(prompt_events):
         if "result" in event:
             if latest_result_event is None:
                 latest_result_event = _task_event_metadata(event)

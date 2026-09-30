@@ -110,6 +110,73 @@ def test_atomicity_split_preserves_joint_validation_relationships() -> None:
     assert restored.fingerprint == split.fingerprint
 
 
+def test_atomicity_merges_overlapping_all_together_validation_groups() -> None:
+    ledger = compile_instruction_ledger("feature", "Add, validate, and commit safely.")
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [
+                    "The import creates a checkpoint.",
+                    "The import validates invariants.",
+                    "The import commits only on success.",
+                ],
+                "validation_groups": [
+                    "./members=1,2;relation=all_together",
+                    "members=1,3;relation=all_together",
+                ],
+            }
+        },
+    )
+
+    assert {item.validation_group_id for item in split.clauses} == {
+        "validation:instruction-001:1"
+    }
+    assert {item.validation_relation for item in split.clauses} == {"all_together"}
+
+
+def test_atomicity_discards_single_member_validation_group() -> None:
+    ledger = compile_instruction_ledger("feature", "Import returns a result.")
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": ["The import succeeds.", "The import returns a result."],
+                "validation_groups": ["members=1;relation=all_together"],
+            }
+        },
+    )
+
+    assert all(item.validation_group_id is None for item in split.clauses)
+
+
+def test_atomicity_rejects_overlapping_groups_with_different_relations() -> None:
+    ledger = compile_instruction_ledger("feature", "Add, validate, and commit safely.")
+
+    with pytest.raises(InstructionLedgerError, match="cannot be safely combined"):
+        apply_atomicity_decisions(
+            ledger,
+            {
+                "instruction-001": {
+                    "multiple": True,
+                    "statements": [
+                        "The import creates a checkpoint.",
+                        "The import validates invariants.",
+                        "The import commits only on success.",
+                    ],
+                    "validation_groups": [
+                        "members=1,2;relation=all_together",
+                        "members=1,3;relation=ordered",
+                    ],
+                }
+            },
+        )
+
+
 def test_atomicity_rejects_model_authored_structural_fields() -> None:
     ledger = compile_instruction_ledger("feature", "Data is fresh.")
 

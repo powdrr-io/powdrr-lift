@@ -333,6 +333,22 @@ def test_bootstrap_ignores_tracked_github_metadata(tmp_path: Path) -> None:
     )
 
 
+def test_bootstrap_skips_tracked_symlinks_to_directories(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    target = repo / "target-directory"
+    target.mkdir()
+    (target / "nested.py").write_text("value = 1\n", encoding="utf-8")
+    link = repo / "src" / "directory-link"
+    link.symlink_to("../target-directory", target_is_directory=True)
+    _git(repo, "add", "src/directory-link")
+    _git(repo, "commit", "-qm", "add directory symlink")
+
+    result = bootstrap_structrr(repo, output_path=tmp_path / "bootstrap.yaml")
+
+    assert result.validation.successful
+    assert "src/directory-link" not in result.evidence_files
+
+
 def test_bootstrap_is_deterministic_and_does_not_stage_output(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
 

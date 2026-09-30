@@ -794,7 +794,13 @@ def _tracked_files(root: Path) -> tuple[str, ...]:
         paths = [
             str(path.relative_to(root)) for path in root.rglob("*") if path.is_file()
         ]
-    return tuple(sorted(path for path in paths if _is_bootstrap_file(path)))
+    return tuple(
+        sorted(
+            path
+            for path in paths
+            if _is_bootstrap_file(path) and (root / path).is_file()
+        )
+    )
 
 
 def _is_bootstrap_file(path: str) -> bool:

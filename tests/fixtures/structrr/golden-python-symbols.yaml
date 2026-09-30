@@ -5,7 +5,7 @@ symbols:
     stable_key: python::src.powdrr_lift.structrr.bootstrap
     span:
       start_line: 1
-      end_line: 1476
+      end_line: 1482
   - path: src/powdrr_lift/structrr/bootstrap.py
     kind: function
     qualified_name: src.powdrr_lift.structrr.bootstrap.bootstrap_structrr
@@ -18,8 +18,8 @@ symbols:
     qualified_name: src.powdrr_lift.structrr.bootstrap._extract_python_source_model
     stable_key: python::src.powdrr_lift.structrr.bootstrap._extract_python_source_model
     span:
-      start_line: 1230
-      end_line: 1298
+      start_line: 1236
+      end_line: 1304
   - path: src/powdrr_lift/structrr/rebase.py
     kind: function
     qualified_name: src.powdrr_lift.structrr.rebase.rebase_structrr_snapshot

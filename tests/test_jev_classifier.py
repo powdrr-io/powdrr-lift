@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
+
 from powdrr_lift.workrr import jev_classifier
 from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 
@@ -51,6 +53,31 @@ def test_jev_uses_valid_choice_regardless_of_confidence(monkeypatch: Any) -> Non
 
     assert result == {"status": "resolved", "value": "present", "reason_code": None}
     assert fallback.calls == 0
+
+
+def test_jev_logs_correlated_successful_call(
+    monkeypatch: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    fallback = _Fallback()
+    monkeypatch.setattr(jev_classifier, "_call_jev", lambda *_: {"choice": "present"})
+    caplog.set_level("WARNING", logger="powdrr_lift.workrr.jev_classifier")
+
+    JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+        _messages("has_exception"), response_schema=_decision_schema()
+    )
+
+    events = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "powdrr_lift.workrr.jev_classifier"
+    ]
+    assert [event.split()[0] for event in events] == [
+        "JEV_REQUEST_STARTED",
+        "JEV_RESPONSE_RECEIVED",
+        "JEV_RESULT_ACCEPTED",
+    ]
+    request_ids = {event.split("request_id=", 1)[1].split()[0] for event in events}
+    assert len(request_ids) == 1
 
 
 def test_jev_routes_other_semantic_classifier_kinds(monkeypatch: Any) -> None:
@@ -151,7 +178,9 @@ def test_jev_abstention_falls_back(monkeypatch: Any) -> None:
     assert fallback.calls == 0
 
 
-def test_jev_provider_failure_falls_back(monkeypatch: Any) -> None:
+def test_jev_provider_failure_falls_back(
+    monkeypatch: Any, caplog: pytest.LogCaptureFixture
+) -> None:
     fallback = _Fallback()
 
     def fail(*_: Any) -> Any:
@@ -165,3 +194,5 @@ def test_jev_provider_failure_falls_back(monkeypatch: Any) -> None:
 
     assert result["value"] == "absent"
     assert fallback.calls == 1
+    assert "JEV_REQUEST_STARTED" in caplog.text
+    assert "JEV_FALLBACK" in caplog.text

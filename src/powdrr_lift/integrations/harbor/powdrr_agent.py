@@ -8,6 +8,7 @@ from typing import Any
 
 from powdrr_lift.integrations.harbor._env import (
     env_flag_is_enabled,
+    jev_allowed_domains,
     pip_install_command,
     provider_environment,
 )
@@ -102,15 +103,15 @@ class PowdrrAgent(BaseInstalledAgent):
         except ImportError:
             return None
 
-        return NetworkAllowlist(
-            domains=[
-                "api.deepinfra.com",
-                "files.pythonhosted.org",
-                "github.com",
-                "registry.npmjs.org",
-                "pypi.org",
-            ]
-        )
+        domains = [
+            "api.deepinfra.com",
+            *jev_allowed_domains(self._get_env("SYSTEM_ONE_BASE_URL")),
+            "files.pythonhosted.org",
+            "github.com",
+            "registry.npmjs.org",
+            "pypi.org",
+        ]
+        return NetworkAllowlist(domains=domains)
 
     def populate_context_post_run(self, context: AgentContext) -> None:
         """Powdrr writes its own telemetry bundle; no extra context is needed."""

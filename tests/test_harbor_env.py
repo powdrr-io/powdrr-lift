@@ -4,6 +4,7 @@ import pytest
 
 from powdrr_lift.integrations.harbor._env import (
     env_flag_is_enabled,
+    jev_allowed_domains,
     pip_install_command,
     provider_environment,
 )
@@ -37,3 +38,14 @@ def test_provider_environment_forwards_jev_and_research_credentials() -> None:
     }
 
     assert provider_environment(configured.get) == configured
+
+
+def test_jev_default_endpoint_is_always_allowed() -> None:
+    assert jev_allowed_domains() == ["api.typesafe.ai"]
+
+
+def test_custom_jev_endpoint_host_is_also_allowed() -> None:
+    assert jev_allowed_domains("https://jev.internal.example/v1") == [
+        "api.typesafe.ai",
+        "jev.internal.example",
+    ]

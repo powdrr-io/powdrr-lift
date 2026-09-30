@@ -1460,12 +1460,11 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument(
         "--clarification-policy",
         choices=("ask", "normative_defaults"),
-        default="ask",
+        default="normative_defaults",
         help=(
-            "Resolve underspecified behavior by asking (default), or use explicit "
-            "recorded defaults for unattended runs; uncertain product clauses are "
-            "retained verbatim as generic guidance instead of "
-            "blocking prompt generation."
+            "Benchmark runs use source-preserving defaults for unresolved semantic "
+            "decisions, retaining uncertain product clauses verbatim as invariants "
+            "so normal prompt generation can continue."
         ),
     )
     harbor_feature_parser.add_argument("--repo-root", type=Path)

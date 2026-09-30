@@ -48,7 +48,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
-    _capture_benchmark_fallback_prompt,
     _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
@@ -2366,80 +2365,20 @@ def test_prompt_capture_does_not_enter_coding_attempt_recovery_loop(
     assert "repair_issue" not in calls[0]
 
 
-def test_benchmark_fallback_captures_source_instruction_after_design_failure(
-    tmp_path: Path,
-) -> None:
-    source = "Keep the original instruction intact, even when classification fails."
-    config = FeatureEndpointConfig(
-        feature_description=source,
-        work_item_name="fallback prompt",
-        repo_root=tmp_path,
-        allowed_paths=("src", "tests"),
-        benchmark_mode=True,
-        capture_worker_prompts_only=True,
-    )
-    state: dict[str, Any] = {"validation_profile_names": ("pytest",)}
-
-    _capture_benchmark_fallback_prompt(
-        config,
-        runner=lambda *args, **kwargs: subprocess.CompletedProcess(
-            args[0], 0, "abc123\n", ""
-        ),
-        worktree=tmp_path,
-        output_root=tmp_path / "output",
-        slug="fallback-prompt",
-        state=state,
-        failure=PowdrrExecutionError("unresolved semantic clause"),
-    )
-
-    prompt_path = state["latest_worker_prompt_path"]
-    prompt = prompt_path.read_text(encoding="utf-8")
-    assert source in prompt
-    assert "classification did not complete" in prompt
-    assert state["request_path"].is_file()
-    fallback = json.loads(
-        (tmp_path / "output" / "benchmark-prompt-fallback.json").read_text()
-    )
-    assert fallback["semantic_analysis"] == "incomplete"
-    assert fallback["source_text_preserved_verbatim"] is True
-
-
-@pytest.mark.parametrize(
-    "failure",
-    [
-        "unresolved semantic classification: behavior_family, source_predicate",
-        "behavior-family decision could not be bound to the source clause",
-        "source-faithfulness gate rejected an entailment decision",
-        "scenario consistency requires clarification for error behavior",
-    ],
-    ids=("unresolved-classification", "family-binding", "faithfulness", "scenario"),
-)
-def test_benchmark_semantic_failures_still_capture_prompt(
+def test_benchmark_mode_selects_normative_defaults_automatically(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    failure: str,
 ) -> None:
-    from procedrr_evaluator.evaluator import EvaluationError
-
-    source = "Implement the explicitly requested behavior."
-    config = FeatureEndpointConfig(
-        feature_description=source,
-        work_item_name="semantic fallback",
-        repo_root=tmp_path,
-        allowed_paths=("src", "tests"),
-        planning_client=object(),  # type: ignore[arg-type]
-        benchmark_mode=True,
-        capture_worker_prompts_only=True,
-    )
+    observed: dict[str, Any] = {}
     flow_path = tmp_path / "design-interview.yaml"
     flow_path.write_text("steps: []\n", encoding="utf-8")
 
-    class FailedEvaluator:
+    class SuccessfulEvaluator:
         def __init__(self, *_: Any, **__: Any) -> None:
             pass
 
-        def evaluate(self, *_: Any, **__: Any) -> None:
-            raise EvaluationError(failure)
+        def evaluate(self, _flow: Any, inputs: Mapping[str, Any]) -> None:
+            observed.update(inputs)
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.feature_endpoint._validate_procedrr_flow",
@@ -2462,30 +2401,28 @@ def test_benchmark_semantic_failures_still_capture_prompt(
         lambda: SimpleNamespace(inventory=lambda *args: ()),
     )
     monkeypatch.setattr(
-        "powdrr_lift.workrr.feature_endpoint.Evaluator", FailedEvaluator
+        "powdrr_lift.workrr.feature_endpoint.Evaluator", SuccessfulEvaluator
     )
 
-    output_root = tmp_path / "output"
-    result = _execute_procedrr_flow(
-        config,
+    _execute_procedrr_flow(
+        FeatureEndpointConfig(
+            feature_description="Keep every source requirement.",
+            work_item_name="benchmark defaults",
+            repo_root=tmp_path,
+            allowed_paths=("src",),
+            planning_client=object(),  # type: ignore[arg-type]
+            capture_worker_prompts_only=True,
+            benchmark_mode=True,
+        ),
         runner=lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0], 0, "abc123\n", ""
         ),
         worktree=tmp_path,
-        output_root=output_root,
+        output_root=tmp_path / "output",
         branch="main",
     )
 
-    assert result.status == "prompt_captured_with_fallback"
-    assert result.request_path is not None and result.request_path.is_file()
-    prompt_index = json.loads(
-        (output_root / "artifacts" / "prompts" / "index.json").read_text()
-    )
-    prompt = (output_root / "artifacts" / prompt_index[0]["prompt_path"]).read_text()
-    assert source in prompt
-    fallback = json.loads((output_root / "benchmark-prompt-fallback.json").read_text())
-    assert fallback["reason"] == failure
-    assert json.loads((output_root / "failure.json").read_text())["message"] == failure
+    assert observed["clarification_policy"] == "normative_defaults"
 
 
 def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(

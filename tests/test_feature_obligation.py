@@ -157,6 +157,31 @@ def test_non_goal_cannot_invert_a_missing_capability_into_a_prohibition() -> Non
         compile_feature_design(ledger, "feature", semantic)
 
 
+def test_missing_persistence_behavior_is_actionable_when_model_calls_it_non_goal() -> (
+    None
+):
+    ledger = compile_instruction_ledger(
+        "feature",
+        "When fit runs with dataset.features configured, the selected raw feature "
+        "schema is not persisted.",
+    )
+    semantic = [
+        {
+            "design": {
+                "kind": "non_goal",
+                "description": "Persist the selected raw feature schema after fit.",
+                "acceptance_criterion": "The selected schema is persisted after fit.",
+                "expected_test": "Verify the selected schema is persisted after fit.",
+            }
+        }
+    ]
+
+    design = compile_feature_design(ledger, "feature", semantic)
+
+    assert design.projections[0].kind == "feature"
+    assert design.obligations[0].projection.kind == "feature"
+
+
 def test_required_rejection_is_compiled_as_an_actionable_obligation() -> None:
     ledger = compile_instruction_ledger(
         "state-data", "DataVar rejects simultaneous default and factory."

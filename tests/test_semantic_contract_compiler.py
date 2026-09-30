@@ -757,6 +757,26 @@ def test_prohibition_route_forces_negative_product_contract() -> None:
     assert values["polarity"] == "prohibited"
 
 
+def test_non_directive_cannot_wording_is_not_a_product_prohibition() -> None:
+    clause = _clause(
+        "An implementation hint says that a type cannot extend a base type "
+        "because it violates a required law."
+    )
+    plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    decisions = bind_source_semantic_decisions(
+        resolved_decisions=plan["resolved_decisions"],
+        pending_specs=plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "include_prohibition"}],
+        created_at=NOW,
+    )
+
+    routing = decisions[0]
+    assert routing.decision_kind == "routing"
+    assert routing.result.value == "include"
+    assert routing.provider.kind == "deterministic-rule"
+    assert "fallback:non-directive-negative-wording:include" in routing.evidence_refs
+
+
 def test_unclear_route_continues_as_headless_review_candidate() -> None:
     clause = _clause("It should work well.")
     plan = prepare_source_semantic_decisions(clause, created_at=NOW)

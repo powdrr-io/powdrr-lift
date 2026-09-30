@@ -33,6 +33,7 @@ from powdrr_lift.core.semantic_faithfulness import (
     prepare_field_entailment_reviews as prepare_field_reviews,
 )
 from powdrr_lift.workrr.semantic_classifier import (
+    has_explicit_prohibition_directive,
     resolve_deterministic_source_decision,
 )
 
@@ -63,6 +64,9 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "definitions, or implementation guidance.",
             "Choose include_prohibition for an explicit product behavior or scope "
             "that must not be implemented or must be prevented.",
+            "A word such as cannot is not, by itself, an instruction to prohibit a "
+            "capability. Implementation constraints and reasons remain included "
+            "product guidance unless the source explicitly directs exclusion.",
             "Choose exclude for process instructions, background context, or text "
             "that does not state implementation-relevant product meaning.",
             "Choose unclear when the source does not support one of these routes "
@@ -74,6 +78,11 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             ClassificationExample("Users can export reports.", "include"),
             ClassificationExample("Prefer immutable defaults.", "include"),
+            ClassificationExample(
+                "An implementation hint says that a type cannot extend a base type "
+                "because it violates a required law.",
+                "include",
+            ),
             ClassificationExample(
                 "Do not add automatic retries.", "include_prohibition"
             ),
@@ -111,6 +120,11 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             ClassificationExample("State data is isolated per machine.", "invariant"),
             ClassificationExample("Prefer immutable defaults.", "guidance"),
             ClassificationExample("Document lifecycle behavior clearly.", "guidance"),
+            ClassificationExample(
+                "An implementation hint says that a type cannot extend a base type "
+                "because it violates a required law.",
+                "guidance",
+            ),
             ClassificationExample("Do not add CSV export.", "non_goal"),
             ClassificationExample("Keep retries out of this feature.", "non_goal"),
             ClassificationExample(
@@ -926,6 +940,21 @@ def bind_source_semantic_decisions(
             and result.get("reason_code") is None
             and set(result).issubset({"status", "value", "reason_code"})
         )
+        if (
+            spec.decision_kind == "routing"
+            and result_is_resolved
+            and result.get("value") == "include_prohibition"
+            and not has_explicit_prohibition_directive(spec.proposition_text)
+        ):
+            # Negative wording can describe an implementation constraint (for
+            # example, an invalid inheritance relationship) without prohibiting
+            # the requested capability. Keep that statement in the product flow.
+            provider = SemanticDecisionProvider(kind="deterministic-rule")
+            provider_result = {"status": "resolved", "value": "include"}
+            evidence_refs = (
+                *evidence_refs,
+                "fallback:non-directive-negative-wording:include",
+            )
         values = {item.decision_kind: item.result.value for item in decisions}
         result_conflicts_with_route = (
             spec.decision_kind == "disposition"

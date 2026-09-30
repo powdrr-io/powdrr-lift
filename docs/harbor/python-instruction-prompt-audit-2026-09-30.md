@@ -86,15 +86,12 @@ shared environment, but design generation completed and JEV returned accepted
 responses.
 
 This task exposed a source-segmentation gap in Markdown numbered lists. The
-ledger duplicated the opening two-deliverable sentence with the same source
-span, assigned the same source span to two separate requirements, and emitted
-standalone list markers (`2.`, `3.`, and so on) as clauses. Those markers then
-produced generic or undefined design scenarios. The full instruction remains
-in the worker prompt and the individual substantive rules are mostly present,
-but the extra clauses create noise and make source-to-obligation traceability
-unreliable. The parser should treat numbered markers as structure, preserve
-paragraph/list-item spans accurately, and deduplicate only when source spans
-and text genuinely identify the same source clause.
+first run emitted standalone list markers (`2.`, `3.`, and so on) as clauses;
+the opening two-deliverable clause was also duplicated by the model's atomicity
+split. That split duplicated its statement, while atomicity children correctly
+inherit their parent source span. The parser should treat numbered markers as
+structure; atomicity processing should separately guard against repeated
+children.
 
 The instruction also provides two distinct deliverables (formatter behavior
 and a `sqlfmt.ddl` module), eight numbered formatting requirements, explicit
@@ -104,3 +101,15 @@ design retained both product areas and the out-of-scope clauses, while the
 commit directive remained non-product process context. This is a useful
 classification example for mixed product, API, test-oracle, exclusion, and
 workflow instructions within one Python task.
+
+The rerun after list-aware segmentation reduced the atomic ledger from 56 to 46
+clauses and the canonical design from 52 to 44 obligations. No standalone
+number markers appeared. The opening deliverable clause split into two distinct
+statements on this attempt, though duplicate split children still lack a
+deterministic guard. The prompt and Structrr diff were generated successfully;
+the diff contains three features, 39 invariants, 44 acceptance criteria, and 44
+required test cases, but still no entity or relationship changes. The original
+instruction is present verbatim in the prompt, but `instruction-044` (collect
+all table constraints, including bare CHECK and named CONSTRAINT forms) maps to
+a generic acceptance criterion and test oracle. This is a remaining semantic
+coverage gap beyond sentence segmentation.

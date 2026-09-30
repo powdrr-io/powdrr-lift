@@ -30,6 +30,28 @@ def test_instruction_ledger_normalizes_wrapped_prose_without_splitting_it() -> N
     assert ledger.clauses[0].source_span[1] <= ledger.clauses[1].source_span[0]
 
 
+def test_instruction_ledger_ignores_markdown_markers_and_preserves_offsets() -> None:
+    source = (
+        "Requirements\n\n"
+        "1. First behavior. Second behavior.\n"
+        "2. Third behavior.\n\n"
+        "Out of Scope\n\n"
+        "CREATE TABLE ... LIKE ... must pass through unchanged."
+    )
+
+    ledger = compile_instruction_ledger("feature", source)
+
+    assert [clause.text for clause in ledger.clauses] == [
+        "First behavior.",
+        "Second behavior.",
+        "Third behavior.",
+        "CREATE TABLE ... LIKE ... must pass through unchanged.",
+    ]
+    for clause in ledger.clauses:
+        start, end = clause.source_span
+        assert source[start:end] == clause.text
+
+
 def test_instruction_ledger_ids_and_fingerprint_do_not_depend_on_model_output() -> None:
     first = compile_instruction_ledger("feature", "First behavior. Second behavior.")
     second = compile_instruction_ledger("feature", "First behavior. Second behavior.")

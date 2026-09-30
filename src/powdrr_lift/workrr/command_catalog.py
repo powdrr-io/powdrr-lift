@@ -2015,6 +2015,7 @@ class FeatureCommandRuntime:
                     output_root=output_root,
                 )
                 state["implementation_prompt_path"] = prompt_path
+                state["structrr_diff_path"] = output_root / "structrr-diff.yaml"
             state["canonical_feature_design_path"] = path
             state["feature_obligations_path"] = path
             state["normative_assumptions_path"] = assumptions_path

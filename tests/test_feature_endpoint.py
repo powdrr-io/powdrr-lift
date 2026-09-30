@@ -99,8 +99,21 @@ def test_design_only_compiles_normal_worker_prompt_without_running_agent(
     )
     design = {
         "obligations": [
-            {"description": "Response.iter_json yields each array element."}
-        ]
+            {
+                "obligation_id": "obligation:instruction-001",
+                "clause_id": "instruction-001",
+                "kind": "feature",
+                "description": "Response.iter_json yields each array element.",
+                "acceptance_criterion": "Each array element is yielded.",
+                "expected_test": "Test iteration over JSON array elements.",
+            }
+        ],
+        "projections": [
+            {
+                "clause_id": "instruction-001",
+                "behavior_scenario": _test_behavior_scenario("iter-json"),
+            }
+        ],
     }
     test_cases = [{"description": "iter_json returns array elements"}]
     prompt_path = _compile_design_only_prompt(
@@ -127,6 +140,15 @@ def test_design_only_compiles_normal_worker_prompt_without_running_agent(
     assert "iter_json returns array elements" in prompt
     assert "python -m pytest" in prompt
     assert request["implementation_packet"] == packet
+    structrr_diff = yaml.safe_load(
+        (tmp_path / "artifacts" / "structrr-diff.yaml").read_text()
+    )
+    assert structrr_diff["features"][0]["description"] == (
+        "Response.iter_json yields each array element."
+    )
+    assert structrr_diff["acceptance_criteria"][0]["description"] == (
+        "Each array element is yielded."
+    )
     assert not list((tmp_path / "artifacts").glob("*attempt*"))
 
 

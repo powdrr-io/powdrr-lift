@@ -1,12 +1,12 @@
 # Agent-driven feature run
 
-`agent-feature-e2e` is the end-to-end proving ground for a feature. It prompts
+`scripts/agent_feature_e2e.py` is the end-to-end proving ground for a feature. It prompts
 the live Powdrr agent; it does not implement the feature itself.
 
 From a dedicated worktree with the required LLM credentials configured:
 
 ```bash
-uv run powdrr-lift agent-feature-e2e \
+uv run python scripts/agent_feature_e2e.py \
   --feature-name interaction-file-log \
   --feature-request 'I want to specify a feature where all human and LLM interactions are written to a file log
 

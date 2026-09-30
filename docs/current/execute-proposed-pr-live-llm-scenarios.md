@@ -51,7 +51,7 @@ diffable, and reusable.
 Generate that fixture from a live report with:
 
 ```bash
-uv run powdrr-lift extract-workflow-responses \
+uv run python scripts/extract_workflow_responses.py \
   --report /tmp/live-report.json \
   --output workflow-evals/scenarios/fixtures/interaction-file-log.yaml
 ```

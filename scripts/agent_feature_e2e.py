@@ -7,6 +7,7 @@ the specification, implementation plan, tests, and product edits.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import selectors
@@ -62,6 +63,49 @@ class AgentFeatureRunResult:
 
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the experimental, live end-to-end feature harness."""
+    from powdrr_lift.core import resolve_repo_root
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repo-root", type=Path)
+    parser.add_argument("--feature-name", default=DEFAULT_FEATURE_NAME)
+    parser.add_argument("--feature-request", default=DEFAULT_FEATURE_REQUEST)
+    parser.add_argument("--answer", action="append", default=[])
+    parser.add_argument("--provider", default="deepinfra-cheap")
+    parser.add_argument("--max-turns", type=int, default=40)
+    parser.add_argument("--workflow-roundtrips", type=int, default=128)
+    parser.add_argument("--start-iterations", type=int, default=10)
+    parser.add_argument("--phase-timeout", type=float)
+    parser.add_argument("--report", type=Path)
+    parser.add_argument("--transcript-dir", type=Path)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    result = run_agent_feature_e2e(
+        AgentFeatureRunConfig(
+            repo_root=resolve_repo_root(args.repo_root),
+            feature_request=args.feature_request,
+            feature_name=args.feature_name,
+            answers=tuple(args.answer),
+            max_turns=args.max_turns,
+            workflow_roundtrips=args.workflow_roundtrips,
+            start_iterations=args.start_iterations,
+            phase_timeout=args.phase_timeout,
+            provider=args.provider,
+            report_path=args.report or Path(".powdrr/agent-feature-run/report.json"),
+            transcript_dir=args.transcript_dir
+            or Path(".powdrr/agent-feature-run/transcripts"),
+        )
+    )
+    if args.json:
+        print(json.dumps(result.to_data(), indent=2, ensure_ascii=False))
+    else:
+        print(f"Agent feature run {result.status}; report: {result.report_path}")
+        for phase in result.phases:
+            print(f"{phase['name']}: returncode={phase['returncode']}")
+    return 0 if result.status == "passed" else 1
 
 
 def _rooted(path: Path, root: Path) -> Path:
@@ -404,3 +448,7 @@ def run_agent_feature_e2e(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     return AgentFeatureRunResult(status, tuple(phases), report_path)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

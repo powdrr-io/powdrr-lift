@@ -1,0 +1,179 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 855
+title: Move DeepSWE gold-reference evaluation to science tooling
+intent:
+  problem: Gold-reference evaluation commands were exposed by the Powdrr product CLI and their implementation lived in the runtime package.
+  goal: Keep benchmark-specific offline evaluation outside the product package while preserving a documented source-tree command for research use.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: deleted
+    span: {start_line: 1, end_line: 1}
+    summary: Remove benchmark reference evaluation from the runtime package.
+    rationale: The evaluator reads DeepSWE solution and verifier patches and belongs in offline science tooling.
+    related: {entities: [deepswe-reference-evaluator], invariants: [gold-reference-analysis-is-offline]}
+  - path: science/deepswe/design_evaluation.py
+    type: added
+    span: {start_line: 1, end_line: 20}
+    summary: Place the DeepSWE design and prompt evaluator in science tooling.
+    rationale: Keep gold-reference evaluation out of the shipped product runtime.
+    related: {entities: [deepswe-reference-evaluator], invariants: [gold-reference-analysis-is-offline]}
+  - path: science/deepswe/design_evaluation_cli.py
+    type: added
+    span: {start_line: 1, end_line: 23}
+    summary: Add standalone design and captured-prompt evaluation commands.
+    rationale: Preserve an explicit offline workflow for post-run benchmark analysis.
+    related: {entities: [deepswe-evaluation-script], invariants: [gold-reference-analysis-is-offline]}
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1510, end_line: 1514}
+    summary: Remove the two DeepSWE gold-reference evaluation subcommands.
+    rationale: Keep task-specific offline analysis out of the product CLI.
+    related: {entities: [deepswe-evaluation-script], invariants: [gold-reference-analysis-is-offline]}
+  - path: pyproject.toml
+    type: modified
+    span: {start_line: 55, end_line: 56}
+    summary: Add the repository root to pytest's import path for repository-local science and script modules.
+    rationale: Let tests cover tools that intentionally stay out of the installed product package.
+    related: {entities: [script-tool-tests]}
+  - path: docs/evaluations/deepswe-design-evaluation.md
+    type: modified
+    span: {start_line: 20, end_line: 23}
+    summary: Document the standalone science module command for post-run evaluation.
+    rationale: Keep research instructions usable after removing the product CLI commands.
+    related: {entities: [deepswe-evaluation-script]}
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 11, end_line: 15}
+    summary: Import evaluator behavior from science tooling.
+    rationale: Keep evaluation coverage aligned with its new module location.
+    related: {entities: [deepswe-evaluation-tests]}
+  - path: src/powdrr_lift/workrr/feature_run.py
+    type: deleted
+    span: {start_line: 1, end_line: 1}
+    summary: Remove the fixed live feature trial harness from the runtime package.
+    rationale: Keep the interaction-file-log trial and orchestration in repository-local scripts.
+    related: {entities: [agent-feature-trial-script]}
+  - path: scripts/agent_feature_e2e.py
+    type: added
+    span: {start_line: 1, end_line: 80}
+    summary: Keep the live end-to-end feature trial as an explicit repository script.
+    rationale: Separate a fixed live trial harness from normal product commands.
+    related: {entities: [agent-feature-trial-script]}
+  - path: src/powdrr_lift/workrr/error_analysis.py
+    type: deleted
+    span: {start_line: 1, end_line: 1}
+    summary: Remove the workflow-error research analyzer from the runtime package.
+    rationale: Keep diagnostic clustering and replay-candidate promotion in developer tooling.
+    related: {entities: [workflow-error-analysis-script]}
+  - path: scripts/workflow_error_analysis.py
+    type: added
+    span: {start_line: 1, end_line: 100}
+    summary: Provide workflow error clustering as a repository-local diagnostic script.
+    rationale: Keep error-log analysis outside normal product operations.
+    related: {entities: [workflow-error-analysis-script]}
+  - path: scripts/extract_workflow_responses.py
+    type: added
+    span: {start_line: 1, end_line: 28}
+    summary: Extract replay fixtures from captured scenario reports.
+    rationale: Keep test-fixture preparation in developer scripts.
+    related: {entities: [workflow-fixture-script]}
+  - path: scripts/llm_exchange_diff.py
+    type: added
+    span: {start_line: 1, end_line: 54}
+    summary: Compare recorded LLM exchange files with a unified diff.
+    rationale: Keep transcript inspection out of the product CLI.
+    related: {entities: [workflow-diagnostic-scripts]}
+  - path: scripts/render_workflow_prompts.py
+    type: added
+    span: {start_line: 1, end_line: 25}
+    summary: Render workflow prompt snapshots for local inspection.
+    rationale: Retain the prompt-rendering helper as developer tooling while CI uses the shared library.
+    related: {entities: [workflow-diagnostic-scripts]}
+  - path: scripts/__init__.py
+    type: added
+    span: {start_line: 1, end_line: 1}
+    summary: Mark repository-local maintenance tools as an importable scripts package.
+    rationale: Allow focused tests to import script entry points without adding them to the product package.
+    related: {entities: [workflow-diagnostic-scripts]}
+  - path: tests/test_agent_feature_run.py
+    type: modified
+    span: {start_line: 8, end_line: 12}
+    summary: Import live feature harness tests from the scripts directory.
+    rationale: Keep test coverage aligned with the harness relocation.
+    related: {entities: [script-tool-tests]}
+  - path: tests/test_workflow_error_analysis.py
+    type: modified
+    span: {start_line: 6, end_line: 10}
+    summary: Import diagnostic analyzer tests from the scripts directory.
+    rationale: Keep test coverage aligned with the analyzer relocation.
+    related: {entities: [script-tool-tests]}
+  - path: tests/test_workflow_scenario.py
+    type: modified
+    span: {start_line: 39, end_line: 58}
+    summary: Exercise replay-fixture extraction through its standalone script.
+    rationale: Keep fixture extraction out of the product CLI.
+    related: {entities: [script-tool-tests]}
+  - path: tests/test_cli.py
+    type: modified
+    span: {start_line: 335, end_line: 381}
+    summary: Exercise exchange diff through its standalone script.
+    rationale: Keep transcript-diff testing aligned with its new entry point.
+    related: {entities: [script-tool-tests]}
+  - path: tests/test_module_boundaries.py
+    type: modified
+    span: {start_line: 139, end_line: 144}
+    summary: Assert trial and error-analysis modules stay outside the runtime package.
+    rationale: Prevent developer harnesses from returning to the shipped package.
+    related: {entities: [script-tool-tests]}
+  - path: docs/agent-feature-e2e.md
+    type: modified
+    span: {start_line: 1, end_line: 12}
+    summary: Document the live trial as a repository-local script.
+    rationale: Keep the experimental harness runnable after removal from the product CLI.
+    related: {entities: [agent-feature-trial-script]}
+  - path: docs/current/execute-proposed-pr-live-llm-scenarios.md
+    type: modified
+    span: {start_line: 52, end_line: 57}
+    summary: Document the fixture extraction script.
+    rationale: Keep scenario authoring instructions aligned with the new script entry point.
+    related: {entities: [workflow-fixture-script]}
+  - path: docs/plans/workflow-definition-iteration.md
+    type: modified
+    span: {start_line: 350, end_line: 365}
+    summary: Refer to prompt rendering and error analysis as repository scripts.
+    rationale: Keep workflow tooling guidance out of the product command catalog.
+    related: {entities: [workflow-diagnostic-scripts]}
+entities:
+  - id: deepswe-reference-evaluator
+    type: Module
+    action: added
+  - id: deepswe-evaluation-script
+    type: Script
+    action: added
+  - id: deepswe-evaluation-tests
+    type: Test suite
+    action: added
+  - id: agent-feature-trial-script
+    type: Script
+    action: added
+  - id: workflow-error-analysis-script
+    type: Script
+    action: added
+  - id: workflow-fixture-script
+    type: Script
+    action: added
+  - id: workflow-diagnostic-scripts
+    type: Script
+    action: added
+  - id: script-tool-tests
+    type: Test suite
+    action: added
+entity_relationships: []
+invariants:
+  - id: gold-reference-analysis-is-offline
+    action: added
+    description: DeepSWE solution and verifier patches are read only by explicit science evaluation commands after a run; they are not part of the Powdrr product CLI or runtime package.
+    rationale: Keep benchmark gold data confined to post-run analysis.
+guidance: []

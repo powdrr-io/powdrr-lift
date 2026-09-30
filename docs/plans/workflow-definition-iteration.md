@@ -353,7 +353,7 @@ Provide a deterministic command that renders the exact prompt for each step
 using minimal synthetic state:
 
 ```bash
-powdrr-lift render-workflow-prompts \
+uv run python scripts/render_workflow_prompts.py \
   --definition skill-definitions/create-pull-request.yaml \
   --output-dir workflow-evals/snapshots/create-pull-request
 ```
@@ -465,10 +465,10 @@ workflow-scenario
 validate-workflow-definition
     Run static confusion-oriented checks in addition to schema validation.
 
-render-workflow-prompts
+scripts/render_workflow_prompts.py
     Produce normalized step prompt snapshots.
 
-analyze-workflow-errors
+scripts/workflow_error_analysis.py
     Cluster diagnostic records and identify replay candidates.
 
 tune-workflow
@@ -642,7 +642,7 @@ Before a record becomes a committed fixture:
 
 #### Deliverables
 
-- `analyze-workflow-errors` command.
+- `scripts/workflow_error_analysis.py` diagnostic script.
 - Error clustering and replay candidate generation.
 - Structured high-reasoning ambiguity reviewer.
 - Advisory wording suggestions.

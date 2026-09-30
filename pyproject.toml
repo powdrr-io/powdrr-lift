@@ -54,6 +54,7 @@ purelib = "docs/procedrr/skill-definitions"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
     "real_coding_loop: opt-in live-LLM coding-loop integration test",
     "live_provider: opt-in live provider smoke test",

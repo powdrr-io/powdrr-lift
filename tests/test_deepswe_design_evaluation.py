@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
-from powdrr_lift.workrr.deepswe_design_evaluation import (
+from science.deepswe.design_evaluation import (
     DeepSWEEvaluationError,
     evaluate_deepswe_design,
     evaluate_deepswe_worker_prompt,

@@ -253,9 +253,11 @@ class ImplementationPacket:
             rendered = ["Instruction obligation evidence expectations:"]
             for contract in self.obligation_evidence_contracts:
                 rendered.append(
-                    f"- {contract.obligation_id} ({contract.normative_strength.value}): "
+                    f"- {contract.obligation_id} "
+                    f"({contract.normative_strength.value}): "
                     f"diff={contract.diff_expectation.value}; "
-                    f"review routes={', '.join(route.value for route in contract.review_routes)}. "
+                    "review routes="
+                    f"{', '.join(route.value for route in contract.review_routes)}. "
                     f"{contract.rationale}"
                 )
             sections.append("\\n".join(rendered))

@@ -32,10 +32,10 @@ from powdrr_lift.structrr.intent_lineage import (
     audit_intent_lineage,
 )
 from powdrr_lift.structrr.obligation_evidence import (
+    OBLIGATION_EVIDENCE_SCHEMA_VERSION,
     DiffExpectation,
     EvidenceRoute,
     NormativeStrength,
-    OBLIGATION_EVIDENCE_SCHEMA_VERSION,
     ObligationEvidenceContract,
     assert_obligation_evidence_complete,
     compile_obligation_evidence_contract,

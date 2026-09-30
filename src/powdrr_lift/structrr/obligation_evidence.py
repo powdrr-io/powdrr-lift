@@ -144,11 +144,17 @@ def compile_obligation_evidence_contract(
     elif normalized_kind == "invariant":
         expectation = DiffExpectation.NONE
         routes = [EvidenceRoute.INVARIANT_REVIEW, EvidenceRoute.BEHAVIOR_VALIDATION]
-        rationale = "preservation or prohibition is established by targeted review and behavior evidence"
+        rationale = (
+            "preservation or prohibition is established by targeted review and "
+            "behavior evidence"
+        )
     elif normalized_kind == "non_goal":
         expectation = DiffExpectation.NONE
         routes = [EvidenceRoute.SCOPE_REVIEW]
-        rationale = "a non-goal constrains scope and does not require a positive structural operation"
+        rationale = (
+            "a non-goal constrains scope and does not require a positive "
+            "structural operation"
+        )
     elif normalized_kind == "guidance":
         expectation = DiffExpectation.EXPECTED
         routes = [EvidenceRoute.SCOPE_REVIEW, EvidenceRoute.INVARIANT_REVIEW]
@@ -162,11 +168,17 @@ def compile_obligation_evidence_contract(
             else DiffExpectation.EXPECTED
         )
         routes = [EvidenceRoute.STRUCTURAL_DIFF, EvidenceRoute.BEHAVIOR_VALIDATION]
-        rationale = "the behavior should be represented by an implementation change, which may modify an existing entity"
+        rationale = (
+            "the behavior should be represented by an implementation change, "
+            "which may modify an existing entity"
+        )
 
     if strength is NormativeStrength.UNSPECIFIED:
         expectation = DiffExpectation.UNRESOLVED
-        rationale += "; source wording has no explicit normative strength, so review must resolve whether omission is acceptable"
+        rationale += (
+            "; source wording has no explicit normative strength, so review "
+            "must resolve whether omission is acceptable"
+        )
 
     if (
         normalized_polarity == "prohibited"
@@ -176,7 +188,10 @@ def compile_obligation_evidence_contract(
     if strength is NormativeStrength.MAY:
         expectation = DiffExpectation.NONE
         routes = [EvidenceRoute.SCOPE_REVIEW]
-        rationale += "; source strength is permissive, so absence of a structural change is not a failure"
+        rationale += (
+            "; source strength is permissive, so absence of a structural "
+            "change is not a failure"
+        )
     elif strength is NormativeStrength.SHOULD:
         if expectation is DiffExpectation.REQUIRED:
             expectation = DiffExpectation.EXPECTED
@@ -190,7 +205,10 @@ def compile_obligation_evidence_contract(
     elif normalized_polarity == "descriptive":
         expectation = DiffExpectation.NONE
         routes = [EvidenceRoute.INVARIANT_REVIEW]
-        rationale += "; descriptive source context is reviewed for preservation, not implemented as a new operation"
+        rationale += (
+            "; descriptive source context is reviewed for preservation, not "
+            "implemented as a new operation"
+        )
 
     return ObligationEvidenceContract(
         obligation_id=obligation_id,
@@ -214,7 +232,8 @@ def assert_obligation_evidence_complete(
         missing = sorted(set(expected_obligation_ids) - set(actual))
         unexpected = sorted(set(actual) - set(expected_obligation_ids))
         raise ValueError(
-            f"obligation evidence coverage mismatch: missing={missing}, unexpected={unexpected}"
+            "obligation evidence coverage mismatch: "
+            f"missing={missing}, unexpected={unexpected}"
         )
 
 

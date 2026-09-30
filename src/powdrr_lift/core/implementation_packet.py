@@ -12,6 +12,7 @@ from powdrr_lift.core.behavior_contract import (
     render_behavior_matrix,
 )
 from powdrr_lift.core.contract_closure import render_contract_closure
+from powdrr_lift.structrr.obligation_evidence import ObligationEvidenceContract
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +43,7 @@ class ImplementationPacket:
     contract_closure: Mapping[str, Any] | None = None
     external_contract_requirements: tuple[Mapping[str, Any], ...] = ()
     external_contract_notes: tuple[Mapping[str, Any], ...] = ()
+    obligation_evidence_contracts: tuple[ObligationEvidenceContract, ...] = ()
 
     def for_obligation(self, ordinal: int) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
@@ -64,6 +66,9 @@ class ImplementationPacket:
             contract_closure=self.contract_closure,
             external_contract_requirements=self.external_contract_requirements,
             external_contract_notes=self.external_contract_notes,
+            obligation_evidence_contracts=self.obligation_evidence_contracts[
+                index : index + 1
+            ],
         )
 
     def for_task(
@@ -92,6 +97,7 @@ class ImplementationPacket:
             contract_closure=self.contract_closure,
             external_contract_requirements=self.external_contract_requirements,
             external_contract_notes=self.external_contract_notes,
+            obligation_evidence_contracts=self.obligation_evidence_contracts,
         )
 
     def to_data(self) -> dict[str, Any]:
@@ -121,6 +127,10 @@ class ImplementationPacket:
         if self.external_contract_notes:
             data["external_contract_notes"] = [
                 dict(item) for item in self.external_contract_notes
+            ]
+        if self.obligation_evidence_contracts:
+            data["obligation_evidence_contracts"] = [
+                item.to_data() for item in self.obligation_evidence_contracts
             ]
         return data
 
@@ -168,6 +178,11 @@ class ImplementationPacket:
             isinstance(item, Mapping) for item in raw_external_notes
         ):
             raise ValueError("implementation packet external notes are malformed")
+        raw_evidence_contracts = raw.get("obligation_evidence_contracts", [])
+        if not isinstance(raw_evidence_contracts, list) or not all(
+            isinstance(item, Mapping) for item in raw_evidence_contracts
+        ):
+            raise ValueError("implementation packet evidence contracts are malformed")
         packet = cls(
             objective=str(raw.get("objective", "")).strip(),
             obligations=obligations,
@@ -191,6 +206,10 @@ class ImplementationPacket:
                 dict(item) for item in raw_external_requirements
             ),
             external_contract_notes=tuple(dict(item) for item in raw_external_notes),
+            obligation_evidence_contracts=tuple(
+                ObligationEvidenceContract.from_data(item)
+                for item in raw_evidence_contracts
+            ),
         )
         if not packet.objective.strip() or not packet.obligations:
             raise ValueError("implementation packet is missing required content")
@@ -230,6 +249,18 @@ class ImplementationPacket:
                 )
             )
         sections = [behavior_text]
+        if self.obligation_evidence_contracts:
+            rendered = ["Instruction obligation evidence expectations:"]
+            for contract in self.obligation_evidence_contracts:
+                rendered.append(
+                    f"- {contract.obligation_id} "
+                    f"({contract.normative_strength.value}): "
+                    f"diff={contract.diff_expectation.value}; "
+                    "review routes="
+                    f"{', '.join(route.value for route in contract.review_routes)}. "
+                    f"{contract.rationale}"
+                )
+            sections.append("\\n".join(rendered))
         if self.external_contract_requirements:
             rendered = ["External contract requirements (accepted and scoped):"]
             for index, requirement in enumerate(
@@ -282,6 +313,7 @@ def compile_implementation_packet(
     contract_closure: Mapping[str, Any] | None = None,
     external_contract_requirements: Sequence[Mapping[str, Any]] = (),
     external_contract_notes: Sequence[Mapping[str, Any]] = (),
+    obligation_evidence_contracts: Sequence[Mapping[str, Any]] = (),
 ) -> ImplementationPacket:
     """Normalize worker inputs and reject incomplete executable contracts."""
     if not objective.strip():
@@ -306,6 +338,19 @@ def compile_implementation_packet(
         for item in required_tests
         if isinstance(item.get("behavior_scenario"), Mapping)
     )
+    evidence_contracts = tuple(
+        ObligationEvidenceContract.from_data(item)
+        for item in obligation_evidence_contracts
+    )
+    evidence_by_clause = {item.clause_id: item for item in evidence_contracts}
+    if evidence_contracts and len(evidence_by_clause) != len(evidence_contracts):
+        raise ValueError(
+            "implementation packet has duplicate evidence contract clauses"
+        )
+    if evidence_contracts and len(evidence_contracts) != len(normalized_obligations):
+        raise ValueError(
+            "implementation packet evidence contracts must cover every obligation"
+        )
     return ImplementationPacket(
         objective=objective.strip(),
         obligations=normalized_obligations,
@@ -334,6 +379,7 @@ def compile_implementation_packet(
             dict(item) for item in external_contract_requirements
         ),
         external_contract_notes=tuple(dict(item) for item in external_contract_notes),
+        obligation_evidence_contracts=evidence_contracts,
     )
 
 

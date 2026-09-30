@@ -42,7 +42,7 @@ steps:
       inputs:
         feature_description: {type: reference, value: feature_description}
         feature_design: {type: reference, value: feature_design}
-        clarification_policy: {type: reference, value: clarification_policy}
+        benchmark_mode: {type: reference, value: benchmark_mode}
       outputs:
         external_contract_sources: external_contract_sources
         external_contract_context: external_contract_context

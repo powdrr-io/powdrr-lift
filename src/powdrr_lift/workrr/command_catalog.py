@@ -224,12 +224,9 @@ def feature_command_catalog(
                 {
                     "claims": {"type": "array"},
                     "assessments": {"type": "array"},
-                    "clarification_policy": {
-                        "type": "string",
-                        "enum": ["ask", "normative_defaults"],
-                    },
+                    "benchmark_mode": {"type": "boolean"},
                 },
-                required=("claims", "assessments", "clarification_policy"),
+                required=("claims", "assessments", "benchmark_mode"),
                 additional_properties=False,
             ),
             output_schema={"type": "object"},
@@ -959,9 +956,7 @@ class FeatureCommandRuntime:
                 return bind_external_contract_assessments(
                     parameters.get("claims", []),
                     parameters.get("assessments", []),
-                    clarification_policy=str(
-                        parameters.get("clarification_policy", "ask")
-                    ),
+                    benchmark_mode=bool(parameters.get("benchmark_mode", False)),
                 )
             except (TypeError, ValueError) as error:
                 raise PowdrrExecutionError(str(error)) from error

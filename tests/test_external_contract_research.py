@@ -156,7 +156,7 @@ def test_external_contract_assessments_preserve_ask_and_record_defaults() -> Non
                 },
             }
         ],
-        clarification_policy="ask",
+        benchmark_mode=False,
     )
     assert ask_result["requirements"] == []
     assert ask_result["dispositions"][0]["unresolved"] is True
@@ -174,7 +174,7 @@ def test_external_contract_assessments_preserve_ask_and_record_defaults() -> Non
                 "assumption_basis": "The captured official directive definition.",
             }
         ],
-        clarification_policy="normative_defaults",
+        benchmark_mode=True,
     )
     assert defaulted["requirements"][0]["disposition"] == "assumed"
     assert defaulted["requirements"][0]["source_quote"] == claim["source_quote"]

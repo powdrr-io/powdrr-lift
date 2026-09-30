@@ -49,12 +49,13 @@ ledger's clause count is not the number of successfully compiled obligations.
 The later clauses below were reviewed as source examples, not claimed as
 successfully classified by a run that stopped earlier.
 
-The current design-only flow ends at `compile_canonical_feature_design`;
-despite the CLI help mentioning prompt evaluation, it does not itself render
-or validate the final worker prompt. Thus these runs exercise the instruction
-side of the pipeline and identify blockers to reaching prompt assembly. A
-successful design-only result would still need a separate production prompt
-compilation/check before it counted as an instruction-to-prompt success.
+At the audited source revision, the design-only flow ended at
+`compile_canonical_feature_design` and did not render the final worker prompt.
+The follow-up change in this PR now compiles the standard implementation
+request at that point, writes its prompt, packet, and request artifacts, and
+reports the prompt path. It does not start the coding-agent runner. The six
+captured runs predate that change and all stop earlier during instruction
+compilation, so none can retrospectively demonstrate the new prompt output.
 
 ## Confirmed gaps
 

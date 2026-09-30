@@ -1359,6 +1359,19 @@ class FeatureCommandRuntime:
                 json.dumps(compatibility_packets, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            if config is not None and getattr(config, "design_only", False):
+                prompt_path = feature_endpoint._compile_design_only_prompt(
+                    config=config,
+                    canonical_design=canonical_document,
+                    required_test_cases=required_test_cases,
+                    base_commit=feature_endpoint._git_output(
+                        runner, worktree, ["git", "rev-parse", "HEAD"]
+                    ),
+                    validation_profiles=tuple(state.get("validation_profiles", ())),
+                    existing_tests=tuple(state.get("provider_inventory", ())),
+                    output_root=output_root,
+                )
+                state["implementation_prompt_path"] = prompt_path
             state["canonical_feature_design_path"] = path
             state["feature_obligations_path"] = path
             return {

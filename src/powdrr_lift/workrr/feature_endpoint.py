@@ -152,6 +152,7 @@ class FeatureEndpointResult:
     feature_obligations_path: Path | None = None
     task_id: str | None = None
     failure: RunFailure | None = None
+    prompt_path: Path | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -173,6 +174,7 @@ class FeatureEndpointResult:
             ),
             "task_id": self.task_id,
             "failure": self.failure.to_data() if self.failure else None,
+            "prompt_path": str(self.prompt_path) if self.prompt_path else None,
         }
 
 
@@ -3107,6 +3109,7 @@ def _feature_endpoint_result(
         state.get("feature_obligations_path"),
         state.get("task_id"),
         failure,
+        state.get("implementation_prompt_path"),
     )
 
 
@@ -4620,6 +4623,82 @@ def _compile_code_task_plan(
         output_root, "code-task-plan.json", document
     )
     return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _compile_design_only_prompt(
+    *,
+    config: FeatureEndpointConfig,
+    canonical_design: Mapping[str, Any],
+    required_test_cases: Sequence[Mapping[str, Any]],
+    base_commit: str,
+    validation_profiles: Sequence[DiscoveredValidationProfile],
+    existing_tests: Sequence[Mapping[str, Any]],
+    output_root: Path,
+) -> Path:
+    """Render and persist the normal worker request without invoking a worker."""
+    obligations = canonical_design.get("obligations")
+    if not isinstance(obligations, list):
+        raise PowdrrExecutionError("canonical design has no obligation list")
+    descriptions = tuple(
+        str(item.get("description", "")).strip()
+        for item in obligations
+        if isinstance(item, Mapping) and str(item.get("description", "")).strip()
+    )
+    tests = tuple(
+        {"description": str(item.get("description", "")).strip()}
+        for item in required_test_cases
+        if str(item.get("description", "")).strip()
+    )
+    if not descriptions or not tests:
+        raise PowdrrExecutionError(
+            "design-only prompt requires obligations and required test cases"
+        )
+    profile_names = tuple(dict.fromkeys(item.name for item in validation_profiles))
+    try:
+        packet = compile_implementation_packet(
+            objective=config.feature_description,
+            obligations=descriptions,
+            required_tests=tests,
+            allowed_paths=config.allowed_paths,
+            validation_profiles=profile_names,
+            existing_tests=existing_tests,
+            behavior_scenarios=tuple(
+                scenario
+                for item in required_test_cases
+                if isinstance((scenario := item.get("behavior_scenario")), Mapping)
+            ),
+        )
+        unit = ExecutionUnit(
+            unit_id=f"{slugify_workflow_id(config.work_item_name)}-implementation",
+            objective=config.feature_description,
+            paths=config.allowed_paths,
+            validation_profiles=profile_names,
+            acceptance_criteria=tuple(item["description"] for item in tests),
+            source_refs=(f"canonical-design:{content_fingerprint(canonical_design)}",),
+        )
+        request = ImplementationRequest.from_execution_unit(
+            unit,
+            request_id=f"{slugify_workflow_id(config.work_item_name)}-implementation-preview",
+            base_commit=base_commit,
+            plan_fingerprint=content_fingerprint(canonical_design),
+            allowed_commands=_allowed_validation_commands(validation_profiles),
+            implementation_packet=packet,
+        )
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            f"design-only implementation prompt compilation failed: {error}"
+        ) from error
+    output_root.mkdir(parents=True, exist_ok=True)
+    request_path = output_root / "implementation-request.json"
+    prompt_path = output_root / "implementation-prompt.md"
+    request_path.write_text(request.to_json(), encoding="utf-8")
+    prompt_path.write_text(request.prompt.rstrip() + "\n", encoding="utf-8")
+    packet_path = output_root / "implementation-packet.json"
+    packet_path.write_text(
+        json.dumps(packet.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return prompt_path
 
 
 def _evaluate_deterministic_decision(parameters: Mapping[str, Any]) -> dict[str, str]:

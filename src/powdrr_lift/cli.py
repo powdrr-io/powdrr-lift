@@ -4635,6 +4635,8 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
         if args.design_only:
             print("Design compilation: passed; implementation review: not run")
             print(f"Generated design: {result.plan_path}")
+            if result.prompt_path is not None:
+                print(f"Generated worker prompt: {result.prompt_path}")
         else:
             print(f"Review passed: {result.review['passed']}")
     return 0 if result.status in {"completed", "design_generated"} else 1

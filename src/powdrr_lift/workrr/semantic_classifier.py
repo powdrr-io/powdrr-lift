@@ -32,6 +32,27 @@ def resolve_deterministic_source_decision(
     return None
 
 
+def has_explicit_prohibition_directive(proposition_text: str) -> bool:
+    """Return whether the source explicitly directs that product behavior be barred."""
+    normalized = " ".join(proposition_text.casefold().split())
+    return (
+        _first_match(
+            normalized,
+            (
+                r"\bdo not\b",
+                r"\bdon't\b",
+                r"\bmust not\b",
+                r"\bshould not\b",
+                r"\bshall not\b",
+                r"\bnever\b",
+                r"\bout of scope\b",
+                r"\bnot required\b",
+            ),
+        )
+        is not None
+    )
+
+
 def _resolve_polarity(text: str) -> DeterministicResolution | None:
     prohibited = _first_match(
         text,
@@ -137,4 +158,8 @@ def _first_match(text: str, patterns: tuple[str, ...]) -> str | None:
     return selected.group(0)
 
 
-__all__ = ["DeterministicResolution", "resolve_deterministic_source_decision"]
+__all__ = [
+    "DeterministicResolution",
+    "has_explicit_prohibition_directive",
+    "resolve_deterministic_source_decision",
+]

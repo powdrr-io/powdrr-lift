@@ -11,7 +11,7 @@ into work that improves performance across many tasks.
 | --- | --- | --- | --- |
 | `python-statemachine-state-data-scoping` | API expansion, lifecycle, callbacks, serialization, parser and diagram support | Prior run reviewed; not rerun in this audit | [run analysis](deepswe-python-statemachine-state-data-scoping.md) |
 | `fastapi-implicit-head-options` | HTTP routing behavior and response metadata | Parsed 33 clauses; stopped at scenario validation before worker prompt generation | Local Pier artifacts: `/private/tmp/powdrr-python-instruction-audit/fastapi-implicit-r4/python-audit-fastapi-implicit-r4/` |
-| `igel-persist-feature-schema` | Feature schema persistence after fit | Docker image setup failed before task processing; adapter pip install fix in progress | Local Pier artifacts: `/private/tmp/powdrr-python-instruction-audit/igel-feature-schema-r1/python-audit-igel-feature-schema-r1/` |
+| `igel-persist-feature-schema` | Feature schema persistence after fit | Adapter setup passed; all 24 clauses compiled, then non-goal classification stopped the run before worker prompt generation | Local Pier artifacts: `/private/tmp/powdrr-python-instruction-audit/igel-feature-schema-r2/python-audit-igel-feature-schema-r2/` |
 | `cattrs-partial-structuring-recovery` | New conversion result type and partial/error accumulation semantics | Planned | |
 | `numba-stencil-boundary-modes` | Numerical edge modes and compilation behavior | Planned | |
 
@@ -130,6 +130,16 @@ invented, and invalid model output has no bounded correction path that can
 preserve the instruction and continue to prompt generation. The task's F2P
 score was 0 because no patch was produced; this is not an implementation
 quality result.
+
+The Igel instruction describes the selected schema as “not persisted,” a
+product gap that the task asks the agent to address. A deterministic
+disposition rule treated that wording as a product prohibition and labeled
+the clause `non_goal`. The canonical design compiler correctly refused to
+accept that unsupported exclusion, but stopped instead of restoring the
+actionable requirement. The compiler now promotes explicit missing-persistence
+statements to feature obligations when a semantic classifier labels them
+`non_goal`. The regression test covers the exact task wording. This run also
+ended before worker prompt generation and provides no implementation score.
 
 ## Triage notes
 

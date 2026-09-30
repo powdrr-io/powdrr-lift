@@ -260,7 +260,7 @@ class ImplementationPacket:
                     f"{', '.join(route.value for route in contract.review_routes)}. "
                     f"{contract.rationale}"
                 )
-            sections.append("\\n".join(rendered))
+            sections.append("\n".join(rendered))
         if self.external_contract_requirements:
             rendered = ["External contract requirements (accepted and scoped):"]
             for index, requirement in enumerate(

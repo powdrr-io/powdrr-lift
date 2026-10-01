@@ -1,16 +1,36 @@
 version: 1
 name: implement-feature
 description: >-
-  Convert an accepted Structrr intent diff into obligation verification
-  contracts, baseline evidence, and independently verifiable code tasks. Every
-  review asks one question about one subject. Workrr owns evidence collection
-  and deterministic evaluation; a coding agent is invoked only for an accepted
-  task that requires repository edits.
+  Start with the shared design interview that compiles the initial worker
+  prompt and Structrr diff, then continue through obligation verification,
+  baseline evidence, and independently verifiable code tasks. Every review asks
+  one question about one subject. Workrr owns evidence collection and
+  deterministic evaluation; a coding agent is invoked only for an accepted task
+  that requires repository edits.
 inputs:
   - {name: feature_description, type: string, required: true}
   - {name: work_item_name, type: string, required: true}
   - {name: benchmark_mode, type: boolean, required: true}
 steps:
+  - call:
+      process: design-interview
+      inputs:
+        work_item_name: {type: reference, value: work_item_name}
+        feature_description: {type: reference, value: feature_description}
+        benchmark_mode: {type: reference, value: benchmark_mode}
+      outputs:
+        feature_design: feature_design
+        feature_obligations: feature_design
+  - operation:
+      tool: internal
+      command: [assert_feature_design_ready_for_implementation]
+      parameters:
+        feature_design: {type: reference, value: feature_design}
+      returns:
+        type: object
+        required: [passed]
+        properties: {passed: {type: boolean}}
+      bind: design_readiness
   - operation:
       tool: internal
       command: [ensure_current_structrr]
@@ -26,15 +46,6 @@ steps:
         baseline: {type: reference, value: baseline.path}
       returns: {type: array}
       bind: validation_profiles
-  - call:
-      process: design-interview
-      inputs:
-        work_item_name: {type: reference, value: work_item_name}
-        feature_description: {type: reference, value: feature_description}
-        benchmark_mode: {type: reference, value: benchmark_mode}
-      outputs:
-        feature_design: feature_design
-        feature_obligations: feature_design
   # External evidence is reviewed and projected before the accepted design is
   # planned, verified, and compiled into the worker packet.
   - call:

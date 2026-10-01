@@ -1,0 +1,111 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 886
+title: Review implementation invariants as a separate gate
+intent:
+  problem: Preserved invariants were judged in the same worklist as proposal fulfillment and retained guidance, and final acceptance did not persist a distinct invariant review receipt.
+  goal: Review each active invariant independently against the final candidate and bind its outcome to the accepted proposal and candidate diff.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 702, end_line: 732}
+    summary: Add a one-invariant-at-a-time final review loop and require its receipt before accepting implementation.
+    rationale: Separate preserved-behavior review from structural fulfillment and retained-guidance actualization.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 740, end_line: 740}
+    summary: Pass invariant outcomes to finalization and expose the separate review receipt.
+    rationale: Make candidate invariant review an observable required acceptance result.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 743, end_line: 743}
+    summary: Declare invariant review receipt fields in the finalization contract.
+    rationale: Require the workflow to receive the persisted invariant gate result.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 750, end_line: 752}
+    summary: Expose invariant receipt path, fingerprint, and pass status.
+    rationale: Make the separate review result available to downstream workflow steps.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5861, end_line: 5861}
+    summary: Compile active invariants into a separate worklist and persist proposal- and candidate-bound outcomes.
+    rationale: Ensure both baseline and newly proposed invariants receive explicit final review.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5863, end_line: 5865}
+    summary: Include the proposed feature intent when resolving active invariants.
+    rationale: Review newly added invariants in addition to retained baseline invariants.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5873, end_line: 5873}
+    summary: Collect the active intent clauses before splitting review routes.
+    rationale: Preserve the accepted intent set while routing invariants separately.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5878, end_line: 5888}
+    summary: Separate invariant clauses from other retained intent clauses.
+    rationale: Give invariants an independent review worklist.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5889, end_line: 5889}
+    summary: Reuse the resolved active clause index for review compilation.
+    rationale: Keep review records bound to their canonical clause definitions.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5917, end_line: 5930}
+    summary: Bind invariant review packets to the accepted proposal and candidate diff.
+    rationale: Keep invariant decisions scoped to the reviewed product state.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5958, end_line: 5958}
+    summary: Add the separate invariant review worklist to the final review artifact.
+    rationale: Make each preserved invariant an explicit final review obligation.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6001, end_line: 6045}
+    summary: Fail final acceptance on failed or unknown invariant outcomes and write a fingerprinted invariant receipt.
+    rationale: Make invariant review a required, auditable acceptance gate.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 65, end_line: 65}
+    summary: Import final implementation review coverage.
+    rationale: Exercise candidate invariant receipt enforcement.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1638, end_line: 1693}
+    summary: Cover the separate invariant workflow and pass, fail, and unknown receipt outcomes.
+    rationale: Prevent regressions that allow incomplete invariant review to pass.
+entities:
+  - id: candidate-invariant-review
+    type: Step
+    action: added
+  - id: candidate-invariant-review-final-gate
+    type: Code quality gate
+    action: added
+  - id: invariant-review-receipt
+    type: Log
+    action: added
+  - id: candidate-invariant-review-tests
+    type: Unit test
+    action: added
+entity_relationships:
+  - id: candidate-invariant-review-gates-implementation
+    type: depends_on
+    source: candidate-invariant-review-final-gate
+    target: candidate-invariant-review
+    action: added
+    description: Final implementation acceptance requires a passing candidate invariant review.
+  - id: invariant-review-test-coverage
+    type: verifies
+    source: candidate-invariant-review-tests
+    target: candidate-invariant-review-final-gate
+    action: added
+    description: Endpoint tests verify passing, failing, and unknown invariant outcomes.
+invariants:
+  - id: unknown-invariant-review-blocks-acceptance
+    action: added
+    description: Every active invariant receives one candidate-bound outcome; fail, unknown, missing, or malformed outcomes prevent final acceptance.
+    rationale: A separate review must not weaken the existing fail-closed acceptance behavior.
+guidance: []

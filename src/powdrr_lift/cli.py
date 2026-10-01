@@ -237,6 +237,9 @@ from powdrr_lift.workrr.replay import (
     replay_bundle_from_error_record,
     save_workflow_replay_bundle,
 )
+from powdrr_lift.workrr.repository_subject_binding import (
+    replay_subject_binding_events,
+)
 from powdrr_lift.workrr.scenario import (
     WorkflowScenarioError,
     extract_scripted_responses,
@@ -1539,6 +1542,17 @@ def build_parser() -> argparse.ArgumentParser:
     deepswe_prompt_eval_parser.add_argument("--judge-base-url")
     deepswe_prompt_eval_parser.add_argument("--json", action="store_true")
     deepswe_prompt_eval_parser.set_defaults(func=_run_deepswe_prompt_evaluation)
+
+    replay_subject_bindings_parser = subparsers.add_parser(
+        "replay-subject-bindings",
+        help=(
+            "Replay deterministic repository subject binding from a saved "
+            "Procedrr event log without model calls."
+        ),
+    )
+    replay_subject_bindings_parser.add_argument("--events", required=True, type=Path)
+    replay_subject_bindings_parser.add_argument("--output", type=Path)
+    replay_subject_bindings_parser.set_defaults(func=_run_replay_subject_bindings)
 
     extract_responses_parser = subparsers.add_parser(
         "extract-workflow-responses",
@@ -4708,6 +4722,22 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
         if result.status in {"completed", "design_generated", "prompt_captured"}
         else 1
     )
+
+
+def _run_replay_subject_bindings(args: argparse.Namespace) -> int:
+    try:
+        report = replay_subject_binding_events(args.events)
+    except (OSError, ValueError) as error:
+        print(f"Subject binding replay failed: {error}", file=sys.stderr)
+        return 1
+    rendered = json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    if args.output is None:
+        print(rendered, end="")
+    else:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+        print(f"Subject binding replay written to {args.output}")
+    return 0
 
 
 def _run_deepswe_design_evaluation(args: argparse.Namespace) -> int:

@@ -149,7 +149,7 @@ for index in range(6):
             "extra": {"actions": [{"command": f"echo {index}"}]},
         }] * (index + 1),
     }))
-    time.sleep(0.03)
+    time.sleep(0.2)
 """
 
     result = run_minisweagent(
@@ -157,7 +157,7 @@ for index in range(6):
         trajectory_path=trajectory,
         log_path=log,
         cwd=tmp_path,
-        timeout_seconds=0.08,
+        timeout_seconds=0.5,
         poll_interval=0.01,
     )
 

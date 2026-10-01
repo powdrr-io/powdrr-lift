@@ -223,14 +223,9 @@ def compile_instruction_ledger(
     """Capture and deterministically segment an instruction description."""
     source = InstructionSource.capture(work_item_name, feature_description)
     normalized, offsets = _normalize_with_offsets(feature_description)
-    pieces = [piece for piece in re.split(r"(?<=[.!?])\s+", normalized) if piece]
     clauses: list[InstructionClause] = []
-    search_start = 0
-    for ordinal, piece in enumerate(pieces, start=1):
-        start = normalized.find(piece, search_start)
-        if start < 0:
-            raise InstructionLedgerError("failed to map normalized clause to source")
-        end = start + len(piece)
+    for ordinal, (start, end) in enumerate(_sentence_spans(normalized), start=1):
+        piece = normalized[start:end]
         clauses.append(
             InstructionClause(
                 clause_id=f"instruction-{ordinal:03d}",
@@ -240,7 +235,6 @@ def compile_instruction_ledger(
                 source_span=(offsets[start], offsets[end - 1] + 1),
             )
         )
-        search_start = end
     ledger = InstructionLedger(source=source, clauses=tuple(clauses))
     ledger.validate()
     return ledger
@@ -458,22 +452,68 @@ def _atomic_validation_group(
 
 
 def _normalize_with_offsets(text: str) -> tuple[str, list[int]]:
+    """Collapse Markdown layout while retaining exact source offsets."""
+    retained: list[tuple[str, int]] = []
+    source_offset = 0
+    structural_headings = {"requirements", "constraints", "out of scope"}
+    for line in text.splitlines(keepends=True):
+        line_content = line.rstrip("\r\n")
+        heading = re.sub(r"^\s*#+\s*", "", line_content).strip().lower()
+        if heading in structural_headings:
+            source_offset += len(line)
+            continue
+        marker = re.match(r"^\s*(?:\d+[.)]|[-*+])\s+", line_content)
+        marker_end = marker.end() if marker else 0
+        retained.extend(
+            (character, source_offset + index)
+            for index, character in enumerate(line_content)
+            if index >= marker_end
+        )
+        if len(line_content) < len(line):
+            retained.append(("\n", source_offset + len(line_content)))
+        source_offset += len(line)
+
     normalized: list[str] = []
     offsets: list[int] = []
     index = 0
-    while index < len(text):
-        if text[index].isspace():
+    while index < len(retained):
+        if retained[index][0].isspace():
             start = index
-            while index < len(text) and text[index].isspace():
+            while index < len(retained) and retained[index][0].isspace():
                 index += 1
-            if normalized and index < len(text):
+            if normalized and index < len(retained):
                 normalized.append(" ")
-                offsets.append(start)
+                offsets.append(retained[start][1])
             continue
-        normalized.append(text[index])
-        offsets.append(index)
+        normalized.append(retained[index][0])
+        offsets.append(retained[index][1])
         index += 1
-    return "".join(normalized).strip(), offsets
+    while normalized and normalized[-1] == " ":
+        normalized.pop()
+        offsets.pop()
+    return "".join(normalized), offsets
+
+
+def _sentence_spans(text: str) -> list[tuple[int, int]]:
+    """Split sentence-like clauses without treating list markers or ellipses as ends."""
+    spans: list[tuple[int, int]] = []
+    start = 0
+    for match in re.finditer(r"(?<=[.!?])\s+", text):
+        punctuation = match.start() - 1
+        if text[punctuation] == "." and (
+            punctuation > 0
+            and (text[punctuation - 1] == "." or text[punctuation - 1].isdigit())
+            or punctuation + 1 < len(text)
+            and text[punctuation + 1] == "."
+        ):
+            continue
+        end = punctuation + 1
+        if start < end:
+            spans.append((start, end))
+        start = match.end()
+    if start < len(text):
+        spans.append((start, len(text)))
+    return spans
 
 
 def _fingerprint(value: Any) -> str:

@@ -1793,17 +1793,19 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     )
 
     class PlanningLLM:
-        source_values = iter(
-            (
-                "include",
-                "feature",
-                "absent",
-                "absent",
-                "absent",
-                "not_stated",
-                "product_semantics_present",
-            )
-        )
+        source_values = {
+            "routing": "include",
+            "disposition": "feature",
+            "polarity": "required",
+            "quantifier": "unspecified",
+            "requirement_strength": "must",
+            "has_precondition": "absent",
+            "has_exception": "absent",
+            "has_explicit_result": "absent",
+            "temporal_scope": "unspecified",
+            "source_predicate": "explicit",
+            "nonactionable_exclusion_safety": "product_semantics_present",
+        }
 
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
@@ -1815,9 +1817,18 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                 "route this exact instruction clause" in question
                 or "child decision" in question
             ):
+                decision_kind = next(
+                    (
+                        kind
+                        for kind in self.source_values
+                        if f'"decision_kind": "{kind}"' in question
+                    ),
+                    None,
+                )
+                assert decision_kind is not None, question
                 return {
                     "status": "resolved",
-                    "value": next(self.source_values),
+                    "value": self.source_values[decision_kind],
                     "reason_code": None,
                 }
             if "one registered behavior family" in question:

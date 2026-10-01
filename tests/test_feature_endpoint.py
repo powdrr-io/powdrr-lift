@@ -21,6 +21,7 @@ from powdrr_lift.core.decision_obligation import (
 )
 from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.structrr.actual_diff import StructrrActualDiff
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_lift.structrr.obligation_evidence import (
@@ -54,6 +55,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _candidate_structural_gate,
     _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
@@ -62,6 +64,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _compile_feature_obligations,
     _compile_obligation_verification_plans,
     _compile_required_test_case_edits,
+    _correct_candidate_from_structrr_diff,
     _create_pr_changelog,
     _derive_feature_test_contracts,
     _ensure_current_baseline,
@@ -1781,6 +1784,195 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [run_code_task_agent]" in flow
     assert "value: final_invariant_decisions" in flow
     assert "kind: verify_candidate_invariant" in flow
+    assert "command: [prepare_final_implementation_review]" in flow
+    assert "candidate_structural_gate_passed" in flow
+    assert "max_iterations: 2" in flow
+    assert "correct_candidate_from_structrr_diff" in flow
+
+
+@pytest.mark.parametrize(
+    ("status", "extraction_complete", "expected"),
+    [
+        ("fulfilled", True, True),
+        ("already_satisfied", True, True),
+        ("missing", True, False),
+        ("fulfilled", False, False),
+    ],
+)
+def test_candidate_structural_gate_requires_proposed_observations(
+    status: str, extraction_complete: bool, expected: bool
+) -> None:
+    baseline: dict[str, Any] = {"entities": []}
+    proposal = compile_proposal_revision(
+        "candidate-gate",
+        baseline,
+        {"entities": [{"id": "public-api", "action": "added", "type": "Function"}]},
+        acceptance_criteria=("The public API exists.",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src",),
+        source_refs=("instruction:api",),
+    )
+    actual_diff = StructrrActualDiff(
+        baseline_snapshot_fingerprint="baseline",
+        candidate_snapshot_fingerprint="candidate",
+        baseline_manifest_fingerprint="baseline-manifest",
+        candidate_manifest_fingerprint="candidate-manifest",
+        baseline_product_digest="baseline-product",
+        candidate_product_digest="candidate-product",
+        submission_base="base",
+        baseline_revision="base",
+        candidate_revision="candidate",
+        structural_operations=(),
+        source_observations=(),
+        declaration_changes=(),
+        behavioral_review_candidates=(),
+        extraction_complete=extraction_complete,
+        unknowns=(),
+    )
+
+    passed, blockers = _candidate_structural_gate(
+        proposal,
+        actual_diff,
+        {
+            "extraction_complete": extraction_complete,
+            "findings": [
+                {
+                    "operation_id": proposal.operations[0].operation_id,
+                    "status": status,
+                }
+            ],
+        },
+    )
+
+    assert passed is expected
+    assert bool(blockers) is not expected
+
+
+def test_candidate_structural_gate_rejects_unexplained_observations() -> None:
+    proposal = compile_proposal_revision(
+        "candidate-gate",
+        {"entities": []},
+        {"entities": []},
+        acceptance_criteria=("No unrelated entity is introduced.",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src",),
+        source_refs=("instruction:scope",),
+    )
+    actual_diff = StructrrActualDiff(
+        baseline_snapshot_fingerprint="baseline",
+        candidate_snapshot_fingerprint="candidate",
+        baseline_manifest_fingerprint="baseline-manifest",
+        candidate_manifest_fingerprint="candidate-manifest",
+        baseline_product_digest="baseline-product",
+        candidate_product_digest="candidate-product",
+        submission_base="base",
+        baseline_revision="base",
+        candidate_revision="candidate",
+        structural_operations=(),
+        source_observations=(),
+        declaration_changes=(),
+        behavioral_review_candidates=(),
+        extraction_complete=True,
+        unknowns=(),
+    )
+
+    passed, blockers = _candidate_structural_gate(
+        proposal,
+        actual_diff,
+        {
+            "extraction_complete": True,
+            "findings": [
+                {
+                    "finding_id": "observed:entity:unrelated:added",
+                    "status": "unexpected",
+                }
+            ],
+        },
+    )
+
+    assert passed is False
+    assert blockers == [
+        "unexplained structural operation: observed:entity:unrelated:added"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("review_outcomes", "expected_agent_attempts"),
+    [([True], 1), ([False, False], 2)],
+)
+def test_candidate_correction_retries_twice_then_continues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    review_outcomes: list[bool],
+    expected_agent_attempts: int,
+) -> None:
+    import powdrr_lift.workrr.feature_endpoint as endpoint
+
+    state: dict[str, Any] = {
+        "latest_candidate_review": {
+            "candidate_structural_gate_passed": False,
+            "candidate_comparison_blockers": ["missing proposed entity"],
+            "candidate_comparison_path": "comparison.json",
+            "actual_diff_path": "actual-diff.json",
+        },
+        "validation_profiles": (),
+    }
+    agent_attempts: list[dict[str, Any]] = []
+    generated_reviews = iter(review_outcomes)
+
+    def run_agent(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        agent_attempts.append(kwargs["parameters"])
+        return {"attempt": {"status": "completed"}}
+
+    def prepare_review(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        passed = next(generated_reviews)
+        review = {
+            "candidate_structural_gate_passed": passed,
+            "candidate_comparison_blockers": [] if passed else ["still missing"],
+            "candidate_comparison_path": "comparison.json",
+            "actual_diff_path": "actual-diff.json",
+        }
+        kwargs["state"]["latest_candidate_review"] = review
+        return review
+
+    monkeypatch.setattr(endpoint, "_run_code_agent_phase", run_agent)
+    monkeypatch.setattr(
+        endpoint, "_aggregate_validation", lambda *a, **k: {"passed": True}
+    )
+    monkeypatch.setattr(
+        endpoint, "_prepare_final_implementation_review", prepare_review
+    )
+    config = FeatureEndpointConfig(
+        feature_description="Add the proposed entity.",
+        work_item_name="candidate-correction",
+        repo_root=tmp_path,
+        allowed_paths=("src",),
+    )
+
+    result: dict[str, Any] = {}
+    for _ in range(2):
+        result = _correct_candidate_from_structrr_diff(
+            {"review": state["latest_candidate_review"]},
+            config=config,
+            worktree=tmp_path,
+            runner=lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "", ""),
+            output_root=tmp_path,
+            branch="feature",
+            slug="candidate-correction",
+            state=state,
+        )
+        if result["done"]:
+            break
+
+    assert len(agent_attempts) == expected_agent_attempts
+    assert result["done"] is True
+    assert result["review"]["candidate_structural_gate_passed"] is (
+        expected_agent_attempts == 1
+    )
 
 
 @pytest.mark.parametrize(
@@ -1793,6 +1985,11 @@ def test_final_invariant_review_is_separate_and_candidate_bound(
     review = {
         "proposal_fingerprint": "sha256:proposal",
         "diff_fingerprint": diff_fingerprint,
+        "candidate_structural_gate_passed": True,
+        "actual_diff_path": "/tmp/actual-diff.json",
+        "actual_diff_fingerprint": "sha256:actual-diff",
+        "candidate_comparison_path": "/tmp/comparison.json",
+        "candidate_comparison_fingerprint": "sha256:comparison",
         "semantic_worklist": {
             "specifications": [
                 {
@@ -1835,6 +2032,47 @@ def test_final_invariant_review_is_separate_and_candidate_bound(
     assert receipt["proposal_fingerprint"] == "sha256:proposal"
     assert receipt["candidate_fingerprint"] == diff_fingerprint
     assert receipt["outcomes"][0]["invariant_id"] == "stable-order"
+
+
+def test_structural_comparison_mismatch_does_not_block_finalization(
+    tmp_path: Path,
+) -> None:
+    review = {
+        "proposal_fingerprint": "sha256:proposal",
+        "diff_fingerprint": "sha256:candidate",
+        "candidate_structural_gate_passed": False,
+        "candidate_correction_attempts": 2,
+        "semantic_worklist": {
+            "specifications": [
+                {
+                    "decision_id": "operation:missing-entity",
+                    "category": "operation",
+                    "subject_id": "missing-entity",
+                    "evidence_fingerprint": "sha256:candidate",
+                }
+            ]
+        },
+        "invariant_worklist": {"specifications": []},
+        "operation_ids": ["missing-entity"],
+        "structural_operation_ids": ["missing-entity"],
+        "retained_clause_ids": [],
+        "unexplained_changes": [],
+    }
+
+    result = _finalize_implementation_review(
+        {
+            "review": review,
+            "deterministic_decisions": [{"outcome": "pass"}],
+            "semantic_decisions": [{"outcome": "fail", "explanation": "not observed"}],
+            "invariant_decisions": [],
+        },
+        output_root=tmp_path,
+    )
+
+    assert result["accepted"] is True
+    assert result["candidate_structural_gate_passed"] is False
+    assert result["candidate_correction_attempts"] == 2
+    assert result["actualization_passed"] is True
 
 
 def test_feature_flow_falls_back_to_source_tree_for_external_target(

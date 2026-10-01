@@ -780,6 +780,9 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert result.validation is not None
     assert result.validation.status.value == "passed"
     assert result.review["passed"] is True
+    assert result.review["candidate_structural_gate_passed"] is True
+    assert Path(result.review["actual_diff_path"]).is_file()
+    assert Path(result.review["candidate_comparison_path"]).is_file()
     assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
         'print("Hello, world!")\nprint("Hello from Powdrr!")\n'
     )

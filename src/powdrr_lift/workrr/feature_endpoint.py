@@ -48,10 +48,15 @@ from powdrr_lift.structrr.active_intent import (
     ActiveIntentResolutionError,
     resolve_active_intent,
 )
+from powdrr_lift.structrr.actual_diff import (
+    StructrrActualDiff,
+    compile_actual_structrr_diff,
+)
 from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_sections,
 )
+from powdrr_lift.structrr.candidate_comparison import compare_candidate_snapshot
 from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
@@ -69,6 +74,7 @@ from powdrr_lift.structrr.proposal_review import (
     write_review_receipt,
 )
 from powdrr_lift.structrr.rebase import snapshot_digest
+from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
 )
@@ -77,6 +83,7 @@ from powdrr_lift.structrr.verification_obligations import (
     compile_verification_obligations,
 )
 from powdrr_lift.workrr.actualization import reconcile_actualization
+from powdrr_lift.workrr.candidate_checkpoint import checkpoint_candidate_changes
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -358,6 +365,7 @@ def _execute_procedrr_flow(
         "task_id": config.task_id or config.work_item_name,
         "design_only": config.design_only,
         "capture_worker_prompts_only": config.capture_worker_prompts_only,
+        "submission_base": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
     }
     flow_path = (
         _validate_design_interview_flow(worktree)
@@ -415,6 +423,7 @@ def _execute_procedrr_flow(
         output_root=output_root,
         explicit_command=config.validation_command,
         benchmark_mode=config.benchmark_mode,
+        artifact_exclusions=_feature_structrr_artifact_exclusions(config),
     )
     if not validation_profiles and not config.benchmark_mode:
         raise PowdrrExecutionError(
@@ -422,6 +431,9 @@ def _execute_procedrr_flow(
             "--validation-command or declare project validation tooling."
         )
     state["validation_profiles"] = validation_profiles
+    state["source_baseline_manifest_path"] = (
+        output_root / "validation-bootstrap.manifest.json"
+    )
     state["validation_profile_names"] = tuple(
         profile.name for profile in validation_profiles
     )
@@ -2481,11 +2493,6 @@ def _run_code_agent_phase(
         if repair_mode
         else units
     )
-    if repair_mode and isinstance(provider, OpenCodeProvider):
-        # Repairs receive a fresh, narrowly scoped prompt. Reusing the long
-        # implementation session lets stale exploration and prior failed
-        # hypotheses drift into already-correct files.
-        provider.session_id = None
     for index, unit in enumerate(request_units, start=1):
         worker_packet = implementation_packet
         if isinstance(code_task, Mapping):
@@ -2570,8 +2577,6 @@ def _run_code_agent_phase(
         before_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
         state["opencode_attempt_number"] = attempt_number
-        if not repair_mode and isinstance(provider, OpenCodeProvider):
-            provider.session_id = None
         attempt = coding_runner.run(
             request,
             worktree_root=worktree,
@@ -4564,6 +4569,13 @@ def _structrr_taxonomy_path(worktree: Path) -> Path:
     )
 
 
+def _feature_structrr_artifact_exclusions(
+    config: FeatureEndpointConfig,
+) -> tuple[str, ...]:
+    """Exclude generated feature-planning artifacts from product snapshots."""
+    return (f"docs/proposals/{slugify_workflow_id(config.work_item_name)}",)
+
+
 def _ensure_current_baseline(
     worktree: Path, runner: Runner, *, bootstrap_path: Path | None = None
 ) -> Path:
@@ -4642,6 +4654,7 @@ def _bootstrap_validation_profiles(
     output_root: Path,
     explicit_command: tuple[str, ...],
     benchmark_mode: bool = False,
+    artifact_exclusions: Sequence[str] = (),
 ) -> tuple[DiscoveredValidationProfile, ...]:
     """Run Structrr bootstrap and adapt its detected tools for Workrr."""
     bootstrap = bootstrap_structrr(
@@ -4649,6 +4662,7 @@ def _bootstrap_validation_profiles(
         output_path=output_root / "validation-bootstrap.yaml",
         taxonomy_path=_structrr_taxonomy_path(worktree),
         benchmark_mode=benchmark_mode,
+        artifact_exclusions=artifact_exclusions,
     )
     if not bootstrap.validation.successful:
         raise PowdrrExecutionError(
@@ -4702,6 +4716,8 @@ def _require_clean_root(root: Path, runner: Runner) -> None:
 
 def _commit(runner: Runner, worktree: Path, message: str) -> None:
     _run(runner, worktree, ["git", "add", "-A"])
+    if not _run(runner, worktree, ["git", "status", "--porcelain"]).stdout.strip():
+        return
     _run(
         runner,
         worktree,
@@ -6005,6 +6021,7 @@ def _prepare_final_implementation_review(
     runner: Runner,
     output_root: Path,
     state: Mapping[str, Any],
+    config: FeatureEndpointConfig,
     **_: Any,
 ) -> dict[str, Any]:
     validation = parameters.get("validation")
@@ -6016,13 +6033,82 @@ def _prepare_final_implementation_review(
     request = state.get("request")
     if not isinstance(request, ImplementationRequest):
         raise PowdrrExecutionError("final review requires the implementation request")
+    submission_base = state.get("submission_base")
+    if not isinstance(submission_base, str) or not submission_base.strip():
+        raise PowdrrExecutionError("final review requires the original submission base")
+    try:
+        checkpoint = checkpoint_candidate_changes(
+            worktree,
+            submission_base=submission_base,
+            allowed_paths=config.allowed_paths,
+            artifact_exclusions=_feature_structrr_artifact_exclusions(config),
+            message=f"Implement {config.work_item_name}",
+            runner=runner,
+        )
+    except (OSError, ValueError) as error:
+        raise PowdrrExecutionError(f"candidate checkpoint failed: {error}") from error
+    checkpoint_path = _write_flow_artifact(
+        output_root, "candidate-checkpoint.json", checkpoint.to_data()
+    )[0]
     diff = _git_output(
-        runner, worktree, ["git", "diff", "--binary", request.base_commit, "--"]
+        runner,
+        worktree,
+        ["git", "diff", "--binary", submission_base, "HEAD", "--"],
     )
     diff_fingerprint = content_fingerprint(
         {"base_commit": request.base_commit, "patch": diff}
     )
     baseline_document = _load_yaml_mapping(Path(state["baseline_path"]))
+    baseline_manifest_path = state.get("source_baseline_manifest_path")
+    if not isinstance(baseline_manifest_path, Path):
+        raise PowdrrExecutionError(
+            "final review requires the immutable source-baseline manifest"
+        )
+    try:
+        baseline_manifest = SourceManifest.from_data(
+            json.loads(baseline_manifest_path.read_text(encoding="utf-8"))
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"source-baseline manifest is missing or invalid: {error}"
+        ) from error
+    candidate_bootstrap = bootstrap_structrr(
+        worktree,
+        output_path=output_root / "candidate-bootstrap.yaml",
+        taxonomy_path=_structrr_taxonomy_path(worktree),
+        benchmark_mode=config.benchmark_mode,
+        submission_base=baseline_manifest.submission_base,
+        artifact_exclusions=_feature_structrr_artifact_exclusions(config),
+    )
+    if not candidate_bootstrap.validation.successful:
+        raise PowdrrExecutionError(
+            "candidate Structrr bootstrap failed: "
+            f"{candidate_bootstrap.validation.issues}"
+        )
+    if candidate_bootstrap.source_manifest is None:
+        raise PowdrrExecutionError("candidate bootstrap omitted its source manifest")
+    actual_diff = compile_actual_structrr_diff(
+        baseline_document,
+        candidate_bootstrap.document,
+        baseline_manifest,
+        candidate_bootstrap.source_manifest,
+    )
+    candidate_comparison = compare_candidate_snapshot(
+        proposal,
+        baseline_document,
+        candidate_bootstrap.document,
+        extraction_complete=candidate_bootstrap.validation.successful,
+        actual_diff=actual_diff,
+    )
+    comparison_passed, comparison_blockers = _candidate_structural_gate(
+        proposal, actual_diff, candidate_comparison
+    )
+    diff_json_file = _write_flow_artifact(
+        output_root, "actual-structrr-diff.json", actual_diff.to_data()
+    )[0]
+    comparison_json_file = _write_flow_artifact(
+        output_root, "candidate-structrr-comparison.json", candidate_comparison
+    )[0]
     plan_document = _load_yaml_mapping(Path(state["plan_path"]))
     active_clauses = _resolve_feature_intent(
         worktree,
@@ -6118,18 +6204,40 @@ def _prepare_final_implementation_review(
                 "check": "task_receipts",
                 "passed": isinstance(parameters.get("task_receipts"), list),
             },
+            {
+                "decision_id": "final:structrr-comparison",
+                "check": "candidate_comparison_resolved_or_retries_exhausted",
+                "passed": comparison_passed
+                or int(state.get("candidate_correction_attempts", 0)) >= 2,
+                "blockers": comparison_blockers,
+            },
         ],
         "semantic_worklist": {"specifications": specifications},
         "invariant_worklist": {"specifications": invariant_specifications},
+        "actual_diff_path": diff_json_file,
+        "candidate_checkpoint_path": checkpoint_path,
+        "actual_diff_fingerprint": actual_diff.fingerprint,
+        "candidate_comparison_path": comparison_json_file,
+        "candidate_comparison_fingerprint": candidate_comparison["fingerprint"],
+        "candidate_structural_gate_passed": comparison_passed,
+        "candidate_comparison_blockers": comparison_blockers,
+        "candidate_correction_attempts": int(
+            state.get("candidate_correction_attempts", 0)
+        ),
         "proposal_fingerprint": proposal.fingerprint,
         "diff_fingerprint": diff_fingerprint,
         "observed_diff": diff,
         "changed_paths": _git_output(
             runner,
             worktree,
-            ["git", "diff", "--name-only", request.base_commit, "--"],
+            ["git", "diff", "--name-only", submission_base, "HEAD", "--"],
         ).splitlines(),
         "operation_ids": [item.operation_id for item in proposal.operations],
+        "structural_operation_ids": [
+            item.operation_id
+            for item in proposal.operations
+            if item.section in {"entities", "entity_relationships", "files"}
+        ],
         "retained_clause_ids": retained_clause_ids,
         "unexplained_changes": ["semantic-change-review"],
         "git_status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
@@ -6138,6 +6246,147 @@ def _prepare_final_implementation_review(
         output_root, "final-implementation-review.json", document
     )
     return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _correct_candidate_from_structrr_diff(
+    parameters: Mapping[str, Any],
+    *,
+    config: FeatureEndpointConfig,
+    worktree: Path,
+    runner: Runner,
+    output_root: Path,
+    branch: str,
+    slug: str,
+    state: dict[str, Any],
+    **_: Any,
+) -> dict[str, Any]:
+    """Use the existing coding-agent session for at most two diff repairs."""
+    review = state.get("latest_candidate_review")
+    if not isinstance(review, Mapping):
+        raise PowdrrExecutionError("candidate correction has no structural review")
+    if review.get("candidate_structural_gate_passed") is True:
+        return {"done": True, "review": dict(review)}
+    attempts = int(state.get("candidate_correction_attempts", 0))
+    if attempts >= 2:
+        return {"done": True, "review": dict(review)}
+
+    blockers = review.get("candidate_comparison_blockers", [])
+    prompt = (
+        "Correct the current feature implementation to better match its accepted "
+        "Structrr proposal. Keep the existing coding-agent session and current "
+        "worktree; preserve correct changes and edit only issues listed below. "
+        "Do not re-plan or restart the feature. After making focused corrections, "
+        "run the relevant validation commands.\n\n"
+        f"Attempt {attempts + 1} of 2.\n"
+        f"Comparison artifact: {review.get('candidate_comparison_path', '')}\n"
+        f"Actual diff artifact: {review.get('actual_diff_path', '')}\n"
+        "Reported differences:\n" + "\n".join(f"- {item}" for item in blockers)
+    )
+    state["candidate_correction_attempts"] = attempts + 1
+    _run_code_agent_phase(
+        config,
+        runner=runner,
+        worktree=worktree,
+        output_root=output_root / "candidate-corrections",
+        branch=branch,
+        slug=f"{slug}-structrr-correction-{attempts + 1}",
+        state=state,
+        parameters={"repair_request": prompt},
+    )
+    profiles = state.get("validation_profiles", ())
+    validation_results = [
+        _run_validation_profile(
+            {"profile": {"name": profile.name, "command": list(profile.command)}},
+            worktree=worktree,
+            state=state,
+        )
+        for profile in profiles
+        if isinstance(profile, DiscoveredValidationProfile)
+    ]
+    validation = _aggregate_validation(
+        {"results": validation_results}, worktree=worktree, state=state
+    )
+    refreshed = _prepare_final_implementation_review(
+        {"validation": validation, "task_receipts": []},
+        worktree=worktree,
+        runner=runner,
+        output_root=output_root,
+        state=state,
+        config=config,
+    )
+    state["latest_candidate_review"] = refreshed
+    done = (
+        refreshed.get("candidate_structural_gate_passed") is True or attempts + 1 >= 2
+    )
+    return {"done": done, "review": refreshed, "attempts": attempts + 1}
+
+
+def _get_candidate_correction_review(state: Mapping[str, Any]) -> dict[str, Any]:
+    review = state.get("latest_candidate_review")
+    if not isinstance(review, Mapping):
+        raise PowdrrExecutionError("candidate correction did not produce a review")
+    return dict(review)
+
+
+def _candidate_structural_gate(
+    proposal: ProposalRevision,
+    actual_diff: StructrrActualDiff,
+    comparison: Mapping[str, Any],
+) -> tuple[bool, list[str]]:
+    """Require observable proposal operations and explain all additions."""
+    structural_sections = {"entities", "entity_relationships", "files"}
+    structural_operation_ids = {
+        operation.operation_id
+        for operation in proposal.operations
+        if operation.section in structural_sections
+    }
+    findings = comparison.get("findings")
+    blockers: list[str] = []
+    if (
+        not actual_diff.extraction_complete
+        or comparison.get("extraction_complete") is not True
+    ):
+        blockers.append("candidate structural extraction is incomplete")
+    if not isinstance(findings, list):
+        blockers.append("candidate comparison findings are missing")
+        return False, blockers
+
+    observed_operation_ids: set[str] = set()
+    for finding in findings:
+        if not isinstance(finding, Mapping):
+            blockers.append("candidate comparison contains a malformed finding")
+            continue
+        status = finding.get("status")
+        operation_id = finding.get("operation_id")
+        if isinstance(operation_id, str) and operation_id in structural_operation_ids:
+            observed_operation_ids.add(operation_id)
+            if status not in {"fulfilled", "already_satisfied"}:
+                blockers.append(f"{operation_id}: {status or 'missing status'}")
+        elif status == "unexpected":
+            observed = finding.get("observed")
+            if _is_source_span_only_change(observed):
+                continue
+            blockers.append(
+                "unexplained structural operation: "
+                + str(finding.get("finding_id") or observed or "unknown")
+            )
+    for operation_id in sorted(structural_operation_ids - observed_operation_ids):
+        blockers.append(f"{operation_id}: no structural comparison finding")
+    return not blockers, blockers
+
+
+def _is_source_span_only_change(observed: Any) -> bool:
+    if not isinstance(observed, list) or not observed:
+        return False
+    return all(
+        isinstance(item, Mapping)
+        and item.get("area") == "source_subject"
+        and set(item.get("changed_fields", ())) <= {"span"}
+        for record in observed
+        for item in (
+            record.get("observed", [record]) if isinstance(record, Mapping) else []
+        )
+    )
 
 
 def _finalize_implementation_review(
@@ -6150,8 +6399,6 @@ def _finalize_implementation_review(
         decision_key="deterministic_decisions",
     )
     semantic = _flow_items(parameters.get("semantic_decisions"))
-    if semantic and not all(item.get("outcome") == "pass" for item in semantic):
-        result["accepted"] = False
     review = parameters.get("review")
     if not isinstance(review, Mapping):
         raise PowdrrExecutionError("final review is missing its actualization worklist")
@@ -6163,6 +6410,25 @@ def _finalize_implementation_review(
     )
     if len(specifications) != len(semantic):
         raise PowdrrExecutionError("actualization decisions are incomplete")
+    correction_exhausted = (
+        review.get("candidate_structural_gate_passed") is not True
+        and int(review.get("candidate_correction_attempts", 0)) >= 2
+    )
+    raw_structural_ids = review.get("structural_operation_ids")
+    unresolved_structural_ids = (
+        {item for item in raw_structural_ids if isinstance(item, str) and item}
+        if correction_exhausted and isinstance(raw_structural_ids, list)
+        else set()
+    )
+    if any(
+        decision.get("outcome") != "pass"
+        and not (
+            specification.get("category") == "operation"
+            and specification.get("subject_id") in unresolved_structural_ids
+        )
+        for specification, decision in zip(specifications, semantic, strict=True)
+    ):
+        result["accepted"] = False
     invariant_worklist = review.get("invariant_worklist")
     invariant_specifications = _flow_items(
         invariant_worklist.get("specifications")
@@ -6208,6 +6474,23 @@ def _finalize_implementation_review(
     result["invariant_review_passed"] = all(
         item.get("outcome") == "pass" for item in invariant_decisions
     )
+    result["candidate_structural_gate_passed"] = (
+        review.get("candidate_structural_gate_passed") is True
+    )
+    result["actual_diff_path"] = str(review.get("actual_diff_path", ""))
+    result["candidate_checkpoint_path"] = str(
+        review.get("candidate_checkpoint_path", "")
+    )
+    result["actual_diff_fingerprint"] = str(review.get("actual_diff_fingerprint", ""))
+    result["candidate_comparison_path"] = str(
+        review.get("candidate_comparison_path", "")
+    )
+    result["candidate_comparison_fingerprint"] = str(
+        review.get("candidate_comparison_fingerprint", "")
+    )
+    result["candidate_correction_attempts"] = int(
+        review.get("candidate_correction_attempts", 0)
+    )
     bound_decisions = [
         {
             "decision_id": specification.get("decision_id"),
@@ -6217,10 +6500,32 @@ def _finalize_implementation_review(
         }
         for specification, decision in zip(specifications, semantic, strict=True)
     ]
+    excluded_operation_ids = {
+        str(specification.get("subject_id"))
+        for specification in specifications
+        if specification.get("category") == "operation"
+        and specification.get("subject_id") in unresolved_structural_ids
+    }
+
+    def is_excluded_operation_decision(item: Mapping[str, Any]) -> bool:
+        decision_id = item.get("decision_id")
+        return (
+            isinstance(decision_id, str)
+            and decision_id.startswith("operation:")
+            and decision_id.removeprefix("operation:") in excluded_operation_ids
+        )
+
+    bound_decisions = [
+        item for item in bound_decisions if not is_excluded_operation_decision(item)
+    ]
     actualization = reconcile_actualization(
         proposal_fingerprint=str(review.get("proposal_fingerprint", "")),
         diff_fingerprint=str(review.get("diff_fingerprint", "")),
-        operation_ids=[str(item) for item in review.get("operation_ids", [])],
+        operation_ids=[
+            str(item)
+            for item in review.get("operation_ids", [])
+            if str(item) not in excluded_operation_ids
+        ],
         retained_clause_ids=[
             str(item) for item in review.get("retained_clause_ids", [])
         ],

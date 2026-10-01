@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from powdrr_lift.core.instruction_ledger import InstructionLedger
+from powdrr_lift.core.semantic_contract import PartialSemanticContract
 
 
 class FeatureObligationError(ValueError):
@@ -257,15 +258,49 @@ def compile_feature_design(
                 f"missing semantic design for {clause.clause_id}"
             )
         kind = _required_text(design, "kind")
+        source_contract_raw = semantic.get("partial_contract")
+        if not isinstance(source_contract_raw, Mapping):
+            source_contract_raw = design.get("partial_contract")
+        source_contract: PartialSemanticContract | None = None
+        if isinstance(source_contract_raw, Mapping):
+            try:
+                source_contract = PartialSemanticContract.from_data(source_contract_raw)
+            except (TypeError, ValueError) as exc:
+                raise FeatureObligationError(
+                    f"source semantic contract for {clause.clause_id} is invalid: {exc}"
+                ) from exc
+            if source_contract.source_ref != clause.clause_id:
+                raise FeatureObligationError(
+                    f"source semantic contract for {clause.clause_id} references "
+                    f"{source_contract.source_ref}"
+                )
+            if source_contract.source_fingerprint != clause.fingerprint:
+                raise FeatureObligationError(
+                    f"source semantic contract for {clause.clause_id} is stale"
+                )
+            if source_contract.proposition_text != clause.text:
+                raise FeatureObligationError(
+                    f"source semantic contract for {clause.clause_id} "
+                    "has different text"
+                )
+            kind = _kind_from_source_contract(source_contract, clause.clause_id)
+            if source_contract.routing == "exclude" and _is_nonactionable_clause(
+                clause.text
+            ):
+                kind = "nonactionable"
         # Rejecting an invalid input is required product behavior, not a
         # prohibition against implementing a capability. Keep it actionable
         # even if the semantic classifier routes it to non_goal.
-        if kind == "non_goal" and (
-            _is_rejection_requirement(clause.text)
-            or _describes_missing_capability(clause.text)
+        if (
+            source_contract is None
+            and kind == "non_goal"
+            and (
+                _is_rejection_requirement(clause.text)
+                or _describes_missing_capability(clause.text)
+            )
         ):
             kind = "feature"
-        if _is_nonactionable_clause(clause.text):
+        if source_contract is None and _is_nonactionable_clause(clause.text):
             kind = "nonactionable"
         projection = DesignProjection(
             clause_id=clause.clause_id,
@@ -335,6 +370,30 @@ def _is_explicit_product_prohibition(text: str) -> bool:
         "exclude ",
     )
     return any(marker in lowered for marker in markers)
+
+
+def _kind_from_source_contract(
+    contract: PartialSemanticContract, clause_id: str
+) -> str:
+    """Make the validated source route authoritative over later design labels."""
+    route = contract.routing
+    disposition = contract.disposition
+    if route == "include" and disposition in {
+        "entity",
+        "feature",
+        "interface",
+        "invariant",
+        "guidance",
+    }:
+        return disposition
+    if route == "include_prohibition" and disposition == "non_goal":
+        return disposition
+    if route in {"context", "exclude"} and disposition == "context":
+        return disposition
+    raise FeatureObligationError(
+        f"source semantic contract for {clause_id} has unsupported route "
+        f"{route!r} and disposition {disposition!r}"
+    )
 
 
 def _is_rejection_requirement(text: str) -> bool:

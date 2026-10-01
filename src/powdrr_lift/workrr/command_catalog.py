@@ -2046,14 +2046,6 @@ class FeatureCommandRuntime:
             work_item_name = feature_endpoint._require_flow_text(
                 parameters, "work_item_name"
             )
-            try:
-                design = compile_feature_design(
-                    ledger,
-                    work_item_name,
-                    raw_design_decisions,
-                )
-            except FeatureObligationError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
             decisions_by_clause_id = {
                 str(entry.get("item", {}).get("clause_id")): entry.get("result", {})
                 for entry in (raw_design_entries or [])
@@ -2072,6 +2064,229 @@ class FeatureCommandRuntime:
                     and isinstance(decision, Mapping)
                 }
             )
+            coverage_path = output_root / "instruction-coverage-audit.json"
+            source_records: list[dict[str, Any]] = []
+            source_errors: list[str] = []
+            for clause in ledger.clauses:
+                decision = decisions_by_clause_id.get(clause.clause_id)
+                raw_contract = (
+                    decision.get("partial_contract")
+                    if isinstance(decision, Mapping)
+                    else None
+                )
+                source_record: dict[str, Any] = {
+                    "clause_id": clause.clause_id,
+                    "clause_fingerprint": clause.fingerprint,
+                    "source_span": {
+                        "start": clause.source_span[0],
+                        "end": clause.source_span[1],
+                    },
+                }
+                try:
+                    if not isinstance(raw_contract, Mapping):
+                        raise ValueError("source semantic contract is missing")
+                    contract = PartialSemanticContract.from_data(raw_contract)
+                    contract_artifact = (
+                        output_root
+                        / "semantic-contracts"
+                        / clause.clause_id
+                        / "partial-contract.json"
+                    )
+                    if not contract_artifact.is_file():
+                        raise ValueError("source semantic contract artifact is missing")
+                    persisted_contract = json.loads(
+                        contract_artifact.read_text(encoding="utf-8")
+                    )
+                    if not isinstance(persisted_contract, Mapping):
+                        raise ValueError(
+                            "persisted source semantic contract is malformed"
+                        )
+                    if (
+                        PartialSemanticContract.from_data(
+                            persisted_contract
+                        ).fingerprint
+                        != contract.fingerprint
+                    ):
+                        raise ValueError("persisted source semantic contract is stale")
+                    source_record.update(
+                        {
+                            "source_contract_id": contract.contract_id,
+                            "source_contract_fingerprint": contract.fingerprint,
+                            "source_contract_artifact": str(contract_artifact),
+                            "routing": contract.routing,
+                            "disposition": contract.disposition,
+                        }
+                    )
+                    if contract.source_ref != clause.clause_id:
+                        raise ValueError("source reference does not match clause")
+                    if contract.source_fingerprint != clause.fingerprint:
+                        raise ValueError("source fingerprint does not match clause")
+                    if contract.proposition_text != clause.text:
+                        raise ValueError("source text does not match clause")
+                    _kind_from_semantic_contract(contract, clause.clause_id)
+                    source_record["status"] = "source_validated"
+                except (TypeError, ValueError, SemanticContractError) as exc:
+                    source_record["status"] = "failed"
+                    source_record["error"] = str(exc)
+                    source_errors.append(f"{clause.clause_id}: {exc}")
+                source_records.append(source_record)
+            if source_errors:
+                coverage_path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "instruction-coverage-audit-v1",
+                            "instruction_ledger_fingerprint": ledger.fingerprint,
+                            "instruction_ledger_artifact": str(
+                                state["instruction_ledger_path"]
+                            ),
+                            "status": "failed",
+                            "records": source_records,
+                            "errors": source_errors,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                raise PowdrrExecutionError(
+                    "instruction source audit failed: "
+                    + json.dumps(source_errors, sort_keys=True)
+                )
+            try:
+                design = compile_feature_design(
+                    ledger,
+                    work_item_name,
+                    raw_design_decisions,
+                )
+            except FeatureObligationError as exc:
+                for record in source_records:
+                    record["status"] = "design_compilation_failed"
+                    record["error"] = str(exc)
+                coverage_path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "instruction-coverage-audit-v1",
+                            "instruction_ledger_fingerprint": ledger.fingerprint,
+                            "instruction_ledger_artifact": str(
+                                state["instruction_ledger_path"]
+                            ),
+                            "status": "failed",
+                            "records": source_records,
+                            "errors": [str(exc)],
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                raise PowdrrExecutionError(str(exc)) from exc
+            obligation_clause_ids = {item.clause_id for item in design.obligations}
+            coverage_records: list[dict[str, Any]] = []
+            coverage_errors: list[str] = []
+            for clause in ledger.clauses:
+                decision = decisions_by_clause_id.get(clause.clause_id)
+                raw_contract = (
+                    decision.get("partial_contract")
+                    if isinstance(decision, Mapping)
+                    else None
+                )
+                final_record: dict[str, Any] = {
+                    "clause_id": clause.clause_id,
+                    "clause_fingerprint": clause.fingerprint,
+                    "source_span": {
+                        "start": clause.source_span[0],
+                        "end": clause.source_span[1],
+                    },
+                    "obligation_created": clause.clause_id in obligation_clause_ids,
+                }
+                if not isinstance(raw_contract, Mapping):
+                    final_record["status"] = "failed"
+                    final_record["error"] = "source semantic contract is missing"
+                    coverage_errors.append(
+                        f"{clause.clause_id}: source contract missing"
+                    )
+                else:
+                    try:
+                        contract = PartialSemanticContract.from_data(raw_contract)
+                        expected_kind = _kind_from_semantic_contract(
+                            contract, clause.clause_id
+                        )
+                        design_kind = next(
+                            item.kind
+                            for item in design.projections
+                            if item.clause_id == clause.clause_id
+                        )
+                        final_record.update(
+                            {
+                                "source_contract_id": contract.contract_id,
+                                "source_contract_fingerprint": contract.fingerprint,
+                                "source_contract_source_fingerprint": (
+                                    contract.source_fingerprint
+                                ),
+                                "source_contract_artifact": str(
+                                    output_root
+                                    / "semantic-contracts"
+                                    / clause.clause_id
+                                    / "partial-contract.json"
+                                ),
+                                "routing": contract.routing,
+                                "disposition": contract.disposition,
+                                "design_kind": design_kind,
+                            }
+                        )
+                        expected_obligation = contract.routing in {
+                            "include",
+                            "include_prohibition",
+                        }
+                        if contract.source_ref != clause.clause_id:
+                            raise ValueError("source reference does not match clause")
+                        if contract.source_fingerprint != clause.fingerprint:
+                            raise ValueError("source fingerprint does not match clause")
+                        if contract.proposition_text != clause.text:
+                            raise ValueError("source text does not match clause")
+                        allowed_design_kinds = {expected_kind}
+                        if contract.routing == "exclude":
+                            allowed_design_kinds.add("nonactionable")
+                        if design_kind not in allowed_design_kinds:
+                            raise ValueError(
+                                "compiled design kind does not match source disposition"
+                            )
+                        if expected_obligation != final_record["obligation_created"]:
+                            raise ValueError(
+                                "source route and compiled obligation coverage disagree"
+                            )
+                        final_record["status"] = "covered"
+                    except (StopIteration, TypeError, ValueError) as exc:
+                        final_record["status"] = "failed"
+                        final_record["error"] = str(exc)
+                        coverage_errors.append(f"{clause.clause_id}: {exc}")
+                coverage_records.append(final_record)
+            coverage_path = output_root / "instruction-coverage-audit.json"
+            coverage_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "instruction-coverage-audit-v1",
+                        "instruction_ledger_fingerprint": ledger.fingerprint,
+                        "instruction_ledger_artifact": str(
+                            state["instruction_ledger_path"]
+                        ),
+                        "status": "failed" if coverage_errors else "complete",
+                        "records": coverage_records,
+                        "errors": coverage_errors,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            if coverage_errors:
+                raise PowdrrExecutionError(
+                    "instruction coverage audit failed: "
+                    + json.dumps(coverage_errors, sort_keys=True)
+                )
             repository_bindings_by_clause = {
                 clause_id: decision["repository_binding"]
                 for clause_id, decision in decisions_by_clause_id.items()
@@ -2788,6 +3003,27 @@ def _benchmark_invariant_design(
         "evidence_case": f"Exact source instruction: {text}",
         "partial_contract": dict(partial_contract),
     }
+
+
+def _kind_from_semantic_contract(
+    contract: PartialSemanticContract, clause_id: str
+) -> str:
+    if contract.routing == "include" and contract.disposition in {
+        "entity",
+        "feature",
+        "interface",
+        "invariant",
+        "guidance",
+    }:
+        return contract.disposition
+    if contract.routing == "include_prohibition" and contract.disposition == "non_goal":
+        return "non_goal"
+    if contract.routing in {"context", "exclude"} and contract.disposition == "context":
+        return "context"
+    raise ValueError(
+        f"source semantic contract for {clause_id} has unsupported route "
+        f"{contract.routing!r} and disposition {contract.disposition!r}"
+    )
 
 
 def _obligation_evidence_provenance_record(

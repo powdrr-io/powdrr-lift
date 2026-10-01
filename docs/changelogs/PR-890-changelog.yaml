@@ -1,0 +1,76 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 890
+title: Guard instruction coverage with source contracts
+intent:
+  problem: The design compiler could drop an included source clause after a later classification labeled it context, and evidence completeness only checked obligations that survived that filtering. Downstream artifacts did not provide a per-clause audit tying the final obligation set to validated source contracts.
+  goal: Treat validated source contract routing as authoritative, reject stale or missing contract artifacts, and persist a clause-level coverage audit that fails if source routes and compiled obligations disagree.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 261, end_line: 299}
+    summary: Use the validated source contract disposition when compiling each clause projection.
+    rationale: Prevent later design labels and heuristic rewrites from silently removing an included source clause.
+  - path: src/powdrr_lift/core/semantic_contract.py
+    type: modified
+    span: {start_line: 450, end_line: 457}
+    summary: Reject persisted partial semantic contracts whose fingerprint is stale.
+    rationale: Ensure downstream decisions are based on the same contract content that was recorded upstream.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2067, end_line: 2285}
+    summary: Validate every source contract and persist a source-to-obligation coverage audit.
+    rationale: Keep route, contract, artifact, and final obligation coverage traceable, and stop compilation when any included clause is lost.
+  - path: tests/test_feature_obligation.py
+    type: modified
+    span: {start_line: 194, end_line: 275}
+    summary: Verify source contract disposition restores included clauses and stale contracts are rejected.
+    rationale: Cover the misclassification boundary that previously allowed included requirements to disappear.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 1016, end_line: 1044}
+    summary: Assert an end-to-end feature run records every clause and links each record to its contract artifact.
+    rationale: Verify the full instruction-to-design path and downstream provenance artifact, beyond isolated helper behavior.
+entities:
+  - id: source-contract-disposition-guard
+    type: Function
+    action: added
+  - id: instruction-coverage-audit
+    type: Log
+    action: added
+  - id: included-clause-regression-test
+    type: Unit test
+    action: added
+  - id: instruction-coverage-e2e-test
+    type: End-to-end test
+    action: added
+entity_relationships:
+  - id: contract-controls-projection
+    type: governs
+    source: source-contract-disposition-guard
+    target: instruction-coverage-audit
+    action: added
+    description: Validated source route and disposition determine whether each instruction clause becomes an obligation.
+  - id: e2e-checks-coverage-artifact
+    type: verifies
+    source: instruction-coverage-e2e-test
+    target: instruction-coverage-audit
+    action: added
+    description: The end-to-end test checks that every ledger clause is recorded and routed clauses match the compiled obligations.
+  - id: regression-test-checks-authority
+    type: verifies
+    source: included-clause-regression-test
+    target: source-contract-disposition-guard
+    action: added
+    description: The regression test verifies that an included source clause survives a conflicting later context label.
+invariants:
+  - id: included-routes-create-obligations
+    action: added
+    description: Every clause with a validated include or include_prohibition route creates an obligation; context and exclude routes do not.
+    rationale: Prevent source requirements from disappearing between semantic classification and evidence compilation.
+  - id: downstream-contract-fingerprint-is-current
+    action: added
+    description: A source semantic contract must match its stored fingerprint, source clause ID, source fingerprint, and exact source text before design compilation.
+    rationale: Prevent stale or mismatched provenance from being treated as current input.
+guidance: []

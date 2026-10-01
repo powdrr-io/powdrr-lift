@@ -113,6 +113,22 @@ def test_unclear_routes_continue_with_conservative_headless_assumption() -> None
     assert "Do not stop or leave the task incomplete" in rendered
 
 
+def test_context_routed_scenario_is_omitted_from_worker_checks() -> None:
+    scenario = _scenario()
+    scenario["scenario_id"] = "current-state-context"
+    scenario["routing"] = "context"
+    packet = compile_implementation_packet(
+        objective="implement the requested change",
+        obligations=("implement requested behavior",),
+        required_tests=({"description": "requested behavior"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    assert "current-state-context" not in packet.render()
+
+
 def test_behavior_scenario_rejects_an_omitted_dimension() -> None:
     scenario = _scenario()
     scenario["dimensions"] = {"normal_result": "not_applicable"}

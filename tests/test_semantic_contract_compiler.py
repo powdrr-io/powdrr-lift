@@ -148,17 +148,14 @@ def test_included_clause_with_missing_product_kind_falls_back_to_invariant(
     )
 
 
-def test_excluded_background_takes_context_branch_before_child_classifiers() -> None:
-    clause = _clause(
-        "States lack built-in data ownership, forcing manual variable management "
-        "without scoping or lifecycle."
-    )
+def test_context_route_takes_context_branch_before_child_classifiers() -> None:
+    clause = _clause("The library currently has no per-instance data ownership.")
     root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
     assert root_plan["pending_specs"][0]["spec"]["decision_kind"] == "routing"
     root = bind_source_semantic_decisions(
         resolved_decisions=[],
         pending_specs=root_plan["pending_specs"],
-        provider_results=[{"status": "resolved", "value": "exclude"}],
+        provider_results=[{"status": "resolved", "value": "context"}],
         created_at=NOW,
     )
     child_plan = prepare_dependent_source_semantic_decisions(
@@ -172,6 +169,31 @@ def test_excluded_background_takes_context_branch_before_child_classifiers() -> 
     assert child_values["polarity"] == "descriptive"
     assert child_values["requirement_strength"] == "descriptive"
     assert child_values["source_predicate"] == "not_stated"
+    assert child_values["disposition"] == "context"
+    assert child_values["routing"] == "context"
+
+
+def test_process_instruction_remains_excluded_from_product_routing() -> None:
+    clause = _clause("Run the unit tests before submitting.")
+    root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=[],
+        pending_specs=root_plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "exclude"}],
+        created_at=NOW,
+    )
+
+    child_plan = prepare_dependent_source_semantic_decisions(
+        clause, root, created_at=NOW
+    )
+
+    assert child_plan["pending_specs"] == []
+    child_values = {
+        item["decision_kind"]: item["result"]["value"]
+        for item in child_plan["resolved_decisions"]
+    }
+    assert child_values["routing"] == "exclude"
+    assert child_values["disposition"] == "context"
 
 
 def test_normative_defaults_resolve_uncertain_optional_source_modifiers() -> None:

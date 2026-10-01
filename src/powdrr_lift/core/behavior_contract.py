@@ -163,6 +163,7 @@ def compile_behavior_scenarios(
         if routing not in {
             "include",
             "include_prohibition",
+            "context",
             "exclude",
             "unclear",
         }:

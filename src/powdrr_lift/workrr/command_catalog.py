@@ -1373,6 +1373,7 @@ class FeatureCommandRuntime:
             *,
             reason: str,
             details: Mapping[str, Any] | None = None,
+            partial_contract: Mapping[str, Any] | None = None,
         ) -> Mapping[str, Any]:
             clause_id = clause.get("clause_id")
             text = clause.get("text")
@@ -1380,13 +1381,19 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "benchmark invariant fallback requires a source clause"
                 )
-            fallback = {
+            fallback: dict[str, Any] = {
                 "clause_id": clause_id,
                 "source_text": text,
                 "reason": reason,
                 "disposition": "invariant",
                 "details": dict(details or {}),
             }
+            if isinstance(partial_contract, Mapping):
+                fallback["partial_contract"] = dict(partial_contract)
+                fallback["source_contract_id"] = partial_contract.get("contract_id")
+                fallback["source_contract_fingerprint"] = partial_contract.get(
+                    "fingerprint"
+                )
             fallbacks = state.setdefault("benchmark_invariant_fallbacks", {})
             if not isinstance(fallbacks, dict):
                 raise PowdrrExecutionError(
@@ -1408,17 +1415,34 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "benchmark invariant fallback requires a source clause"
                 )
-            fallback_design = {
-                "kind": "invariant",
-                "description": text,
-                "acceptance_criterion": text,
-                "expected_test": f"Verify the invariant stated by the source: {text}",
-                "population": "The scope stated by the source instruction",
-                "operation": "Preserve the source instruction as an invariant",
-                "oracle": text,
-                "evidence_case": f"Exact source instruction: {text}",
-                "partial_contract": {"routing": "include"},
-            }
+            fallbacks = state.get("benchmark_invariant_fallbacks", {})
+            fallback = (
+                fallbacks.get(clause_id) if isinstance(fallbacks, Mapping) else None
+            )
+            partial_contract = (
+                fallback.get("partial_contract")
+                if isinstance(fallback, Mapping)
+                else None
+            )
+            if not isinstance(partial_contract, Mapping):
+                artifact_path = (
+                    output_root
+                    / "semantic-contracts"
+                    / clause_id
+                    / "partial-contract.json"
+                )
+                if artifact_path.is_file():
+                    loaded_contract = json.loads(
+                        artifact_path.read_text(encoding="utf-8")
+                    )
+                    if isinstance(loaded_contract, Mapping):
+                        partial_contract = loaded_contract
+            if not isinstance(partial_contract, Mapping):
+                raise PowdrrExecutionError(
+                    f"benchmark invariant fallback for {clause_id!r} has no "
+                    "source semantic contract"
+                )
+            fallback_design = _benchmark_invariant_design(clause, partial_contract)
             dimensions = {name: "not_applicable" for name in BEHAVIOR_DIMENSIONS}
             dimensions["normal_result"] = text
             scenario = {
@@ -1460,7 +1484,21 @@ class FeatureCommandRuntime:
                         benchmark_mode=benchmark_mode(),
                     )
                 except PowdrrExecutionError as error:
-                    record_benchmark_invariant_fallback(clause, reason=str(error))
+                    design = parameters.get("design")
+                    partial_contract = (
+                        design.get("partial_contract")
+                        if isinstance(design, Mapping)
+                        else None
+                    )
+                    record_benchmark_invariant_fallback(
+                        clause,
+                        reason=str(error),
+                        partial_contract=(
+                            partial_contract
+                            if isinstance(partial_contract, Mapping)
+                            else None
+                        ),
+                    )
                     return merge_as_source_invariant(clause)
             return _merge_behavior_scenario_values(
                 parameters,
@@ -1827,6 +1865,7 @@ class FeatureCommandRuntime:
                         },
                         reason="source-faithfulness gate rejected the derived design",
                         details=outcome,
+                        partial_contract=contract.to_data(),
                     )
                     return {
                         "accepted": True,
@@ -1913,6 +1952,26 @@ class FeatureCommandRuntime:
                 and isinstance(decision.get("behavior_scenario"), Mapping)
             }
             evidence_by_clause: dict[str, dict[str, Any]] = {}
+            evidence_provenance_by_clause: dict[str, dict[str, Any]] = {}
+            evidence_provenance_path = (
+                output_root / "obligation-evidence-provenance.json"
+            )
+
+            def write_evidence_provenance() -> None:
+                evidence_provenance_path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "obligation-evidence-provenance-v1",
+                            "instruction_ledger_fingerprint": ledger.fingerprint,
+                            "records": list(evidence_provenance_by_clause.values()),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
             for item in design.obligations:
                 decision = decisions_by_clause_id.get(item.clause_id)
                 partial = (
@@ -1920,9 +1979,27 @@ class FeatureCommandRuntime:
                     if isinstance(decision, Mapping)
                     else None
                 )
+                partial_contract_path = (
+                    output_root
+                    / "semantic-contracts"
+                    / item.clause_id
+                    / "partial-contract.json"
+                )
+                provenance = _obligation_evidence_provenance_record(
+                    obligation_id=item.obligation_id,
+                    clause_id=item.clause_id,
+                    design_kind=item.projection.kind,
+                    partial_contract_path=partial_contract_path,
+                    partial_contract=partial,
+                )
+                evidence_provenance_by_clause[item.clause_id] = provenance
                 if not isinstance(partial, Mapping):
+                    provenance["status"] = "failed"
+                    provenance["error"] = "source semantic contract is missing"
+                    write_evidence_provenance()
                     raise PowdrrExecutionError(
-                        f"obligation {item.clause_id!r} has no source semantic contract"
+                        "obligation evidence compilation failed: "
+                        + json.dumps(provenance, sort_keys=True)
                     )
                 try:
                     evidence_contract = compile_obligation_evidence_contract(
@@ -1935,10 +2012,19 @@ class FeatureCommandRuntime:
                         polarity=str(partial.get("polarity", "")),
                     )
                 except ValueError as exc:
+                    provenance["status"] = "failed"
+                    provenance["error"] = str(exc)
+                    write_evidence_provenance()
                     raise PowdrrExecutionError(
-                        f"could not classify evidence for {item.clause_id!r}: {exc}"
+                        "obligation evidence compilation failed: "
+                        + json.dumps(provenance, sort_keys=True)
                     ) from exc
                 evidence_by_clause[item.clause_id] = evidence_contract.to_data()
+                provenance["status"] = "compiled"
+                provenance["evidence_contract_fingerprint"] = (
+                    evidence_contract.to_data()["fingerprint"]
+                )
+                write_evidence_provenance()
             try:
                 assert_obligation_evidence_complete(
                     tuple(
@@ -2511,6 +2597,53 @@ class FeatureCommandRuntime:
                 )
             return pull_request_value
         raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")
+
+
+def _benchmark_invariant_design(
+    clause: Mapping[str, Any], partial_contract: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Keep source-contract fields when benchmark mode falls back to an invariant."""
+    text = clause.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise PowdrrExecutionError("benchmark invariant fallback has no source text")
+    if not isinstance(partial_contract, Mapping):
+        raise PowdrrExecutionError(
+            "benchmark invariant fallback has no source semantic contract"
+        )
+    return {
+        "kind": "invariant",
+        "description": text,
+        "acceptance_criterion": text,
+        "expected_test": f"Verify the invariant stated by the source: {text}",
+        "population": "The scope stated by the source instruction",
+        "operation": "Preserve the source instruction as an invariant",
+        "oracle": text,
+        "evidence_case": f"Exact source instruction: {text}",
+        "partial_contract": dict(partial_contract),
+    }
+
+
+def _obligation_evidence_provenance_record(
+    *,
+    obligation_id: str,
+    clause_id: str,
+    design_kind: str,
+    partial_contract_path: Path,
+    partial_contract: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Describe which source contract supplied evidence-classification fields."""
+    contract = partial_contract if isinstance(partial_contract, Mapping) else {}
+    return {
+        "obligation_id": obligation_id,
+        "clause_id": clause_id,
+        "design_kind": design_kind,
+        "partial_contract_path": str(partial_contract_path),
+        "source_contract_id": contract.get("contract_id"),
+        "source_contract_fingerprint": contract.get("fingerprint"),
+        "source_ref": contract.get("source_ref"),
+        "requirement_strength": contract.get("requirement_strength"),
+        "polarity": contract.get("polarity"),
+    }
 
 
 def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, str]:

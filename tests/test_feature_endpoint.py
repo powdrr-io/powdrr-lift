@@ -23,6 +23,10 @@ from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
+from powdrr_lift.structrr.obligation_evidence import (
+    NormativeStrength,
+    compile_obligation_evidence_contract,
+)
 from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.coding_agent import (
@@ -38,8 +42,10 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
     _apply_scenario_consistency_updates,
+    _benchmark_invariant_design,
     _merge_behavior_scenario_values,
     _merge_semantic_design_values,
+    _obligation_evidence_provenance_record,
     feature_command_catalog,
 )
 from powdrr_lift.workrr.feature_endpoint import (
@@ -251,6 +257,54 @@ def test_merge_semantic_design_accepts_trace_only_nonactionable_clause() -> None
     )
 
     assert design["kind"] == "nonactionable"
+
+
+def test_split_clause_invariant_fallback_preserves_source_contract_for_evidence() -> (
+    None
+):
+    partial_contract = {
+        "schema_version": "partial-semantic-contract-v2",
+        "contract_id": "contract:instruction-019",
+        "source_ref": "instruction-019",
+        "source_fingerprint": "sha256:source",
+        "fingerprint": "sha256:contract",
+        "routing": "include",
+        "disposition": "feature",
+        "requirement_strength": "unspecified",
+        "polarity": "required",
+    }
+
+    design = _benchmark_invariant_design(
+        {
+            "clause_id": "instruction-019",
+            "text": "Invalid declarations raise InvalidDefinition.",
+        },
+        partial_contract,
+    )
+    provenance = _obligation_evidence_provenance_record(
+        obligation_id="obligation:instruction-019",
+        clause_id="instruction-019",
+        design_kind=design["kind"],
+        partial_contract_path=Path(
+            "semantic-contracts/instruction-019/partial-contract.json"
+        ),
+        partial_contract=design["partial_contract"],
+    )
+    evidence_contract = compile_obligation_evidence_contract(
+        obligation_id="obligation:instruction-019",
+        clause_id="instruction-019",
+        requirement_strength=str(design["partial_contract"]["requirement_strength"]),
+        kind=design["kind"],
+        polarity=str(design["partial_contract"]["polarity"]),
+    )
+
+    assert design["kind"] == "invariant"
+    assert design["partial_contract"] == partial_contract
+    assert evidence_contract.normative_strength is NormativeStrength.UNSPECIFIED
+    assert provenance["source_contract_id"] == "contract:instruction-019"
+    assert provenance["source_contract_fingerprint"] == "sha256:contract"
+    assert provenance["requirement_strength"] == "unspecified"
+    assert provenance["polarity"] == "required"
 
 
 def test_design_only_preserves_unresolved_scenario_dimensions_as_draft_questions() -> (

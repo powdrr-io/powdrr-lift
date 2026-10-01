@@ -6190,6 +6190,11 @@ def _prepare_final_implementation_review(
             ["git", "diff", "--name-only", submission_base, "HEAD", "--"],
         ).splitlines(),
         "operation_ids": [item.operation_id for item in proposal.operations],
+        "structural_operation_ids": [
+            item.operation_id
+            for item in proposal.operations
+            if item.section in {"entities", "entity_relationships", "files"}
+        ],
         "retained_clause_ids": retained_clause_ids,
         "unexplained_changes": ["semantic-change-review"],
         "git_status": _git_output(runner, worktree, ["git", "status", "--porcelain"]),
@@ -6351,8 +6356,6 @@ def _finalize_implementation_review(
         decision_key="deterministic_decisions",
     )
     semantic = _flow_items(parameters.get("semantic_decisions"))
-    if semantic and not all(item.get("outcome") == "pass" for item in semantic):
-        result["accepted"] = False
     review = parameters.get("review")
     if not isinstance(review, Mapping):
         raise PowdrrExecutionError("final review is missing its actualization worklist")
@@ -6364,6 +6367,25 @@ def _finalize_implementation_review(
     )
     if len(specifications) != len(semantic):
         raise PowdrrExecutionError("actualization decisions are incomplete")
+    correction_exhausted = (
+        review.get("candidate_structural_gate_passed") is not True
+        and int(review.get("candidate_correction_attempts", 0)) >= 2
+    )
+    raw_structural_ids = review.get("structural_operation_ids")
+    unresolved_structural_ids = (
+        {item for item in raw_structural_ids if isinstance(item, str) and item}
+        if correction_exhausted and isinstance(raw_structural_ids, list)
+        else set()
+    )
+    if any(
+        decision.get("outcome") != "pass"
+        and not (
+            specification.get("category") == "operation"
+            and specification.get("subject_id") in unresolved_structural_ids
+        )
+        for specification, decision in zip(specifications, semantic, strict=True)
+    ):
+        result["accepted"] = False
     invariant_worklist = review.get("invariant_worklist")
     invariant_specifications = _flow_items(
         invariant_worklist.get("specifications")
@@ -6435,10 +6457,32 @@ def _finalize_implementation_review(
         }
         for specification, decision in zip(specifications, semantic, strict=True)
     ]
+    excluded_operation_ids = {
+        str(specification.get("subject_id"))
+        for specification in specifications
+        if specification.get("category") == "operation"
+        and specification.get("subject_id") in unresolved_structural_ids
+    }
+
+    def is_excluded_operation_decision(item: Mapping[str, Any]) -> bool:
+        decision_id = item.get("decision_id")
+        return (
+            isinstance(decision_id, str)
+            and decision_id.startswith("operation:")
+            and decision_id.removeprefix("operation:") in excluded_operation_ids
+        )
+
+    bound_decisions = [
+        item for item in bound_decisions if not is_excluded_operation_decision(item)
+    ]
     actualization = reconcile_actualization(
         proposal_fingerprint=str(review.get("proposal_fingerprint", "")),
         diff_fingerprint=str(review.get("diff_fingerprint", "")),
-        operation_ids=[str(item) for item in review.get("operation_ids", [])],
+        operation_ids=[
+            str(item)
+            for item in review.get("operation_ids", [])
+            if str(item) not in excluded_operation_ids
+        ],
         retained_clause_ids=[
             str(item) for item in review.get("retained_clause_ids", [])
         ],

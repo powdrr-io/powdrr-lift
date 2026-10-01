@@ -1988,9 +1988,19 @@ def test_structural_comparison_mismatch_does_not_block_finalization(
         "diff_fingerprint": "sha256:candidate",
         "candidate_structural_gate_passed": False,
         "candidate_correction_attempts": 2,
-        "semantic_worklist": {"specifications": []},
+        "semantic_worklist": {
+            "specifications": [
+                {
+                    "decision_id": "operation:missing-entity",
+                    "category": "operation",
+                    "subject_id": "missing-entity",
+                    "evidence_fingerprint": "sha256:candidate",
+                }
+            ]
+        },
         "invariant_worklist": {"specifications": []},
-        "operation_ids": [],
+        "operation_ids": ["missing-entity"],
+        "structural_operation_ids": ["missing-entity"],
         "retained_clause_ids": [],
         "unexplained_changes": [],
     }
@@ -1999,7 +2009,7 @@ def test_structural_comparison_mismatch_does_not_block_finalization(
         {
             "review": review,
             "deterministic_decisions": [{"outcome": "pass"}],
-            "semantic_decisions": [],
+            "semantic_decisions": [{"outcome": "fail", "explanation": "not observed"}],
             "invariant_decisions": [],
         },
         output_root=tmp_path,
@@ -2008,6 +2018,7 @@ def test_structural_comparison_mismatch_does_not_block_finalization(
     assert result["accepted"] is True
     assert result["candidate_structural_gate_passed"] is False
     assert result["candidate_correction_attempts"] == 2
+    assert result["actualization_passed"] is True
 
 
 def test_feature_flow_falls_back_to_source_tree_for_external_target(

@@ -1,0 +1,183 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 887
+title: Compare feature candidates against proposed Structrr diffs
+intent:
+  problem: The implementation flow reviewed its proposed diff and final source changes through separate paths without bootstrapping the completed candidate and comparing the two.
+  goal: Checkpoint the candidate, bootstrap its final structure, and require a source-derived comparison to account for every proposed structural operation before accepting the implementation.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 639, end_line: 639}
+    summary: Require source-derived candidate comparison evidence in the final review result.
+    rationale: Keep the workflow contract aligned with the endpoint review result.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 645, end_line: 651}
+    summary: Declare the candidate checkpoint, actual diff, comparison, and gate result fields.
+    rationale: Make each comparison artifact available to later workflow steps.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 750, end_line: 750}
+    summary: Require candidate structural evidence during finalization.
+    rationale: Prevent finalization from omitting the candidate comparison.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 760, end_line: 765}
+    summary: Declare candidate structural evidence in the finalization output contract.
+    rationale: Preserve an auditable result for downstream acceptance.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 51, end_line: 54}
+    summary: Import the actual Structrr diff compiler.
+    rationale: Derive candidate changes from source snapshots.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 59, end_line: 59}
+    summary: Import candidate snapshot comparison.
+    rationale: Compare actual structure with the proposal.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 77, end_line: 77}
+    summary: Import source manifest parsing.
+    rationale: Bind candidate review to the captured baseline source manifest.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 86, end_line: 86}
+    summary: Import candidate checkpoint handling.
+    rationale: Record the candidate before source-derived review.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 368, end_line: 368}
+    summary: Capture the original submission revision.
+    rationale: Anchor baseline and candidate source snapshots to the same submission.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 426, end_line: 426}
+    summary: Exclude generated proposal artifacts from the baseline bootstrap.
+    rationale: Keep planning artifacts out of the product structure comparison.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 434, end_line: 436}
+    summary: Retain the immutable baseline source manifest path.
+    rationale: Use the original source manifest when compiling the actual candidate diff.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4537, end_line: 4543}
+    summary: Define generated planning artifact exclusions for feature bootstraps.
+    rationale: Apply consistent exclusions to baseline and candidate snapshots.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4622, end_line: 4622}
+    summary: Accept artifact exclusions in validation profile bootstrapping.
+    rationale: Let the baseline bootstrap omit generated planning documents.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4630, end_line: 4630}
+    summary: Pass artifact exclusions to the Structrr bootstrap.
+    rationale: Ensure the source manifest reflects the intended product snapshot.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4684, end_line: 4685}
+    summary: Skip the final commit when a candidate checkpoint already left the worktree clean.
+    rationale: Avoid a failing redundant commit after checkpointing the candidate.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5988, end_line: 5988}
+    summary: Pass feature configuration to final candidate review.
+    rationale: Apply configured path limits and artifact exclusions during checkpointing.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6000, end_line: 6016}
+    summary: Checkpoint candidate changes and persist the checkpoint receipt.
+    rationale: Create a stable candidate revision for the source-derived comparison.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6018, end_line: 6020}
+    summary: Read the complete candidate patch through its checkpoint revision.
+    rationale: Include committed candidate work in review evidence.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6026, end_line: 6075}
+    summary: Bootstrap the candidate and compile its actual Structrr diff and comparison.
+    rationale: Base structural review on the altered source tree.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6171, end_line: 6176}
+    summary: Add the source-derived structural gate to deterministic final decisions.
+    rationale: Expose missing or unexplained candidate changes as review blockers.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6180, end_line: 6186}
+    summary: Persist paths and fingerprints for candidate comparison artifacts.
+    rationale: Make the review evidence traceable during finalization.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6193, end_line: 6193}
+    summary: Include committed candidate files in the changed path list.
+    rationale: Report the complete patch after checkpointing.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6206, end_line: 6266}
+    summary: Require every proposal operation to be observed and reject unexplained structural findings.
+    rationale: Fail closed when the candidate does not match its proposed diff.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6335, end_line: 6350}
+    summary: Return candidate evidence and block acceptance when the structural gate fails.
+    rationale: Make the source-derived comparison a required final acceptance condition.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 24, end_line: 24}
+    summary: Import the actual diff fixture type.
+    rationale: Construct source comparison cases for gate tests.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 52, end_line: 52}
+    summary: Import the candidate structural gate under test.
+    rationale: Exercise acceptance decisions directly.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1732, end_line: 1841}
+    summary: Test proposal fulfillment, incomplete extraction, and unexplained structural changes.
+    rationale: Prevent missing or unexpected findings from passing final review.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1854, end_line: 1858}
+    summary: Add candidate evidence to the passing finalization fixture.
+    rationale: Reflect the new required review contract.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 777, end_line: 779}
+    summary: Assert the full flow writes passing candidate comparison evidence.
+    rationale: Verify candidate bootstrap and comparison artifacts end to end.
+entities:
+  - id: candidate-source-structrr-comparison
+    type: Code quality gate
+    action: added
+  - id: candidate-bootstrap-review-artifacts
+    type: Log
+    action: added
+  - id: candidate-structural-gate-tests
+    type: Unit test
+    action: added
+entity_relationships:
+  - id: candidate-structural-gate-controls-finalization
+    type: depends_on
+    source: candidate-source-structrr-comparison
+    target: candidate-bootstrap-review-artifacts
+    action: added
+    description: Final implementation acceptance requires comparison artifacts derived from the bootstrapped candidate.
+  - id: candidate-structural-tests-verify-gate
+    type: verifies
+    source: candidate-structural-gate-tests
+    target: candidate-source-structrr-comparison
+    action: added
+    description: Endpoint tests cover fulfilled, missing, incomplete, and unexpected structural findings.
+invariants:
+  - id: candidate-comparison-fails-closed
+    action: added
+    description: Missing structural findings, incomplete extraction, unfulfilled proposal operations, and unexplained structural changes prevent final acceptance.
+    rationale: The candidate must account for proposed structural changes and expose all other observed changes for review.
+guidance: []

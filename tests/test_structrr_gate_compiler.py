@@ -62,6 +62,32 @@ def test_structural_gate_rejects_affected_intent_without_effect() -> None:
     )
 
 
+def test_structural_gate_accepts_supported_change_operations() -> None:
+    proposal = compile_proposal_revision(
+        "adapter",
+        {"entities": [{"id": "adapter", "description": "old"}]},
+        {
+            "entities": [
+                {
+                    "id": "adapter",
+                    "action": "changed",
+                    "description": "new",
+                    "intent_effect": "preserve API",
+                }
+            ]
+        },
+        acceptance_criteria=("the adapter works",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src/adapter.py",),
+        source_refs=("structrr:baseline.yaml",),
+    )
+
+    assert proposal.operations[0].action == "change"
+    _, failures = evaluate_structural_proposal_gate(proposal)
+    assert failures == ()
+
+
 def test_worklist_addresses_evidence_content_and_invalidates_new_snapshot() -> None:
     proposal = _proposal()
     first = compile_proposal_worklist(

@@ -121,9 +121,15 @@ def compile_proposal_revision(
             if not isinstance(item, Mapping):
                 continue
             raw_action = item.get("action")
-            if raw_action not in {"added", "deleted", "removed"}:
+            if raw_action not in {"added", "deleted", "removed", "changed"}:
                 continue
-            action = "remove" if raw_action in {"deleted", "removed"} else "add"
+            action = (
+                "remove"
+                if raw_action in {"deleted", "removed"}
+                else "change"
+                if raw_action == "changed"
+                else "add"
+            )
             raw_subject = item.get("id", f"item-{index}")
             subject_id = str(raw_subject)
             operation_id = f"{action}:{section}:{subject_id}"

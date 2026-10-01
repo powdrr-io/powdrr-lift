@@ -163,7 +163,7 @@ def evaluate_structural_proposal_gate(
     if verification_compilation is not None:
         failures.extend(verification_compilation.failures)
     for operation in proposal.operations:
-        if operation.action not in {"add", "remove"}:
+        if operation.action not in {"add", "remove", "change"}:
             failures.append(f"unsupported operation action: {operation.action}")
         if not operation.subject_id.strip():
             failures.append(f"operation has an empty subject: {operation.operation_id}")

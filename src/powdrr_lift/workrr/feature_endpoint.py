@@ -308,7 +308,6 @@ def run_feature_in_place(
         config.output_root or root / ".powdrr" / "feature-runs" / slug
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
-    _write_run_metadata(config, root, output_root)
     _exclude_telemetry_from_patch(root, output_root)
     try:
         _require_clean_root(root, runner)
@@ -316,6 +315,7 @@ def run_feature_in_place(
         if not branch:
             branch = "HEAD"
         initial_head = _git_output(runner, root, ["git", "rev-parse", "HEAD"])
+        _write_run_metadata(config, root, output_root, submission_base=initial_head)
         result = _execute_procedrr_flow(
             replace(config, open_pr=False, push_changes=False),
             runner=runner,
@@ -3455,14 +3455,21 @@ def _write_run_result(output_root: Path, result: FeatureEndpointResult) -> Path:
 
 
 def _write_run_metadata(
-    config: FeatureEndpointConfig, repo_root: Path, output_root: Path
+    config: FeatureEndpointConfig,
+    repo_root: Path,
+    output_root: Path,
+    *,
+    submission_base: str | None = None,
 ) -> Path:
     task_id = config.task_id or config.work_item_name
     return write_json_artifact(
         output_root,
         "run-metadata.json",
         collect_run_metadata(
-            task_id=task_id, repo_root=repo_root, output_root=output_root
+            task_id=task_id,
+            repo_root=repo_root,
+            output_root=output_root,
+            submission_base=submission_base,
         ),
     )
 

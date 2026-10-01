@@ -81,6 +81,14 @@ from powdrr_lift.structrr.rebase import (
     rebase_structrr_snapshot,
     snapshot_digest,
 )
+from powdrr_lift.structrr.source_manifest import (
+    SOURCE_EXTRACTOR_VERSION,
+    SOURCE_MANIFEST_SCHEMA_VERSION,
+    SourceFileObservation,
+    SourceManifest,
+    compare_source_manifests,
+    compile_source_manifest,
+)
 from powdrr_lift.structrr.verification_obligations import (
     VERIFICATION_OBLIGATION_SCHEMA_VERSION,
     AffectedIntentClosure,
@@ -143,6 +151,12 @@ __all__ = [
     "compile_review_worklist",
     "load_review_receipt",
     "write_review_receipt",
+    "SOURCE_EXTRACTOR_VERSION",
+    "SOURCE_MANIFEST_SCHEMA_VERSION",
+    "SourceFileObservation",
+    "SourceManifest",
+    "compare_source_manifests",
+    "compile_source_manifest",
     "AffectedIntentClosure",
     "VERIFICATION_OBLIGATION_SCHEMA_VERSION",
     "VerificationObligation",

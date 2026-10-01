@@ -717,6 +717,7 @@ def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
     (repo / "README.md").write_text("initial\n", encoding="utf-8")
     _git(repo, "add", "README.md")
     _git(repo, "commit", "-qm", "initial")
+    submission_base = _git(repo, "rev-parse", "HEAD").stdout.strip()
     output_root = repo / ".powdrr" / "feature-runs" / "failure-artifact"
     with pytest.raises(PowdrrExecutionError):
         run_feature_in_place(
@@ -731,6 +732,7 @@ def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
     metadata = json.loads((output_root / "run-metadata.json").read_text())
     failure = json.loads((output_root / "failure.json").read_text())
     assert metadata["task_id"] == "failure-artifact"
+    assert metadata["submission_base"] == submission_base
     assert failure["schema_version"] == "powdrr-run-failure-v1"
     assert failure["error_type"] == "PowdrrExecutionError"
 

@@ -284,10 +284,17 @@ def run_feature_endpoint(
             branch=branch,
         )
     except Exception as error:
-        _write_failure_artifact(
-            output_root,
-            _failure_for_exception(error, output_root, config),
-        )
+        failure = _failure_for_exception(error, output_root, config)
+        _write_failure_artifact(output_root, failure)
+        if config.benchmark_mode:
+            return _benchmark_issues_result(
+                config,
+                output_root=output_root,
+                branch=branch,
+                worktree=worktree,
+                error=error,
+                failure=failure,
+            )
         raise
 
 
@@ -316,6 +323,8 @@ def run_feature_in_place(
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     _exclude_telemetry_from_patch(root, output_root)
+    branch = "HEAD"
+    initial_head: str | None = None
     try:
         _require_clean_root(root, runner)
         branch = _git_output(runner, root, ["git", "branch", "--show-current"])
@@ -343,11 +352,16 @@ def run_feature_in_place(
             )
         return result
     except Exception as error:
-        _write_failure_artifact(
-            output_root,
-            _failure_for_exception(error, output_root, config),
+        failure = _failure_for_exception(error, output_root, config)
+        _write_failure_artifact(output_root, failure)
+        return _benchmark_issues_result(
+            config,
+            output_root=output_root,
+            branch=branch,
+            worktree=root,
+            error=error,
+            failure=failure,
         )
-        raise
 
 
 def _execute_procedrr_flow(
@@ -365,6 +379,8 @@ def _execute_procedrr_flow(
         "task_id": config.task_id or config.work_item_name,
         "design_only": config.design_only,
         "capture_worker_prompts_only": config.capture_worker_prompts_only,
+        "benchmark_mode": config.benchmark_mode,
+        "benchmark_gate_warnings": [],
         "submission_base": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
     }
     flow_path = (
@@ -392,6 +408,7 @@ def _execute_procedrr_flow(
     replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
     procedrr_event_path.touch()
     external_search_event_state = {"pending": False}
+    benchmark_gate_warnings: list[dict[str, Any]] = []
 
     def record_procedrr_event(event: Any) -> None:
         is_redacted_search_judge = (
@@ -407,6 +424,8 @@ def _execute_procedrr_flow(
         event_data = redact_external_contract_search_event(
             event.kind, event.data, external_search_event_state
         )
+        if event.kind == "benchmark_gate_warning":
+            benchmark_gate_warnings.append(dict(event_data))
         record = {
             "record_type": "procedrr.step",
             "kind": event.kind,
@@ -543,10 +562,29 @@ def _execute_procedrr_flow(
             artifact_paths=_artifact_paths(output_root),
         )
         _write_failure_artifact(output_root, failure)
-        result = _feature_endpoint_result(
-            state, branch, worktree, "review_failed", failure=failure
-        )
+        if config.benchmark_mode:
+            state["review"] = {
+                "passed": False,
+                "benchmark_mode": True,
+                "potential_issues": [
+                    *benchmark_gate_warnings,
+                    {
+                        "category": "execution_error",
+                        "type": type(error).__name__,
+                        "message": str(error),
+                    },
+                ],
+                "stopped_at": "procedrr_evaluation",
+            }
+            result = _feature_endpoint_result(
+                state, branch, worktree, "completed_with_issues", failure=failure
+            )
+        else:
+            result = _feature_endpoint_result(
+                state, branch, worktree, "review_failed", failure=failure
+            )
     else:
+        state["benchmark_gate_warnings"] = benchmark_gate_warnings
         if config.design_only:
             canonical_path = state.get("canonical_feature_design_path")
             if isinstance(canonical_path, Path):
@@ -562,6 +600,17 @@ def _execute_procedrr_flow(
                 "scope": "worker prompt compilation",
                 "implementation_review": "not_run",
             }
+        if config.benchmark_mode and benchmark_gate_warnings:
+            review = state.get("review")
+            if not isinstance(review, dict):
+                review = {"passed": True}
+            review.update(
+                {
+                    "benchmark_mode": True,
+                    "potential_issues": benchmark_gate_warnings,
+                }
+            )
+            state["review"] = review
         result = _feature_endpoint_result(
             state,
             branch,
@@ -573,6 +622,8 @@ def _execute_procedrr_flow(
                 if config.capture_worker_prompts_only
                 else "pr_opened"
                 if state.get("pull_request_url")
+                else "completed_with_issues"
+                if config.benchmark_mode and benchmark_gate_warnings
                 else "completed"
             ),
         )
@@ -3446,6 +3497,40 @@ def _feature_endpoint_result(
         state.get("implementation_prompt_path"),
         state.get("structrr_diff_path"),
     )
+
+
+def _benchmark_issues_result(
+    config: FeatureEndpointConfig,
+    *,
+    output_root: Path,
+    branch: str,
+    worktree: Path,
+    error: Exception,
+    failure: RunFailure | None = None,
+) -> FeatureEndpointResult:
+    result = _feature_endpoint_result(
+        {
+            "task_id": config.task_id or config.work_item_name,
+            "review": {
+                "passed": False,
+                "benchmark_mode": True,
+                "potential_issues": [
+                    {
+                        "category": "execution_error",
+                        "type": type(error).__name__,
+                        "message": str(error),
+                    }
+                ],
+                "stopped_at": "feature_flow",
+            },
+        },
+        branch,
+        worktree,
+        "completed_with_issues",
+        failure=failure,
+    )
+    _write_run_result(output_root, result)
+    return result
 
 
 def _write_run_result(output_root: Path, result: FeatureEndpointResult) -> Path:

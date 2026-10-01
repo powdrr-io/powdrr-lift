@@ -1197,7 +1197,9 @@ def test_implement_feature_rejects_worker_out_of_scope_edits(
         )
     )
 
-    assert result.status == "review_failed"
+    assert result.status == "completed_with_issues"
+    assert result.review["benchmark_mode"] is True
+    assert result.review["potential_issues"]
     assert result.worktree is not None
     assert (result.worktree / "unexpected.py").read_text(
         encoding="utf-8"

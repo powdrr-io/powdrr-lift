@@ -768,7 +768,7 @@ def test_harbor_feature_cli_propagates_task_id(
     assert captured["config"].task_id == "benchmark/task-123"
 
 
-def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
+def test_in_place_failure_is_reported_without_failing_run(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
@@ -779,22 +779,25 @@ def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
     _git(repo, "commit", "-qm", "initial")
     submission_base = _git(repo, "rev-parse", "HEAD").stdout.strip()
     output_root = repo / ".powdrr" / "feature-runs" / "failure-artifact"
-    with pytest.raises(PowdrrExecutionError):
-        run_feature_in_place(
-            FeatureEndpointConfig(
-                feature_description="Add the second greeting.",
-                work_item_name="failure-artifact",
-                repo_root=repo,
-                allowed_paths=("hello_world.py",),
-                output_root=output_root,
-            )
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description="Add the second greeting.",
+            work_item_name="failure-artifact",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            output_root=output_root,
         )
+    )
     metadata = json.loads((output_root / "run-metadata.json").read_text())
     failure = json.loads((output_root / "failure.json").read_text())
     assert metadata["task_id"] == "failure-artifact"
     assert metadata["submission_base"] == submission_base
     assert failure["schema_version"] == "powdrr-run-failure-v1"
     assert failure["error_type"] == "PowdrrExecutionError"
+    assert result.status == "completed_with_issues"
+    assert result.review["potential_issues"][0]["type"] == "PowdrrExecutionError"
+    run_result = json.loads((output_root / "run-result.json").read_text())
+    assert run_result["status"] == "completed_with_issues"
 
 
 def test_feature_endpoint_result_preserves_early_failure_without_checkpoints(

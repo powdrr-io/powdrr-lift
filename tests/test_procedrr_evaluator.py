@@ -15,6 +15,31 @@ import pytest
 from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
 from powdrr_lift.workrr.procedrr import StructuredToolExecutor
 from procedrr_evaluator import EvaluationError, Evaluator
+from procedrr_evaluator.evaluator import EvaluationEvent, ValidationGateError
+
+
+def test_benchmark_gate_records_issue_and_continues() -> None:
+    state: dict[str, Any] = {"benchmark_mode": True, "ready": False}
+    events: list[EvaluationEvent] = []
+
+    Evaluator(FakeLLM(), lambda *_: None)._gate(
+        {"subject": "ready", "equals": True}, state, events, "steps[0].gate"
+    )
+
+    assert state["benchmark_gate_warnings"] == [
+        {"subject": "ready", "expected": True, "observed": False}
+    ]
+    assert events[0].kind == "benchmark_gate_warning"
+
+
+def test_non_benchmark_gate_still_raises() -> None:
+    with pytest.raises(ValidationGateError):
+        Evaluator(FakeLLM(), lambda *_: None)._gate(
+            {"subject": "ready", "equals": True},
+            {"ready": False},
+            [],
+            "steps[0].gate",
+        )
 
 
 class FakeLLM:

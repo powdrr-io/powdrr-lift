@@ -3758,6 +3758,9 @@ def _write_structrr_plan_from_obligations(
     validation_profiles: Sequence[Any] = (),
 ) -> Path:
     """Render the Structrr diff directly from canonical feature obligations."""
+    source_subjects, inventory_status = _load_bootstrap_source_subjects(
+        path.parent / "validation-bootstrap.yaml"
+    )
     sections: dict[str, list[dict[str, Any]]] = {
         "features": [],
         "invariants": [],
@@ -3765,6 +3768,8 @@ def _write_structrr_plan_from_obligations(
         "acceptance_criteria": [],
         "expected_tests": [],
     }
+    entity_changes: dict[str, dict[str, str]] = {}
+    binding_diagnostics: list[dict[str, Any]] = []
     for item in obligations:
         if not isinstance(item, Mapping):
             raise PowdrrExecutionError("structured feature obligation is malformed")
@@ -3807,6 +3812,27 @@ def _write_structrr_plan_from_obligations(
                 "invalid instruction reference"
             )
         lineage = {"instruction_ref": instruction_ref} if instruction_ref else {}
+        binding = _resolve_bootstrap_subject_binding(
+            " ".join((description_text, acceptance_text, expected_test_text)),
+            source_subjects,
+        )
+        binding_diagnostics.append(
+            {
+                "obligation_id": obligation_id,
+                "inventory_status": inventory_status,
+                **binding,
+            }
+        )
+        related = (
+            {"entities": [binding["entity_id"]]}
+            if binding.get("status") == "bound"
+            else {}
+        )
+        if binding.get("status") == "bound":
+            entity_changes[str(binding["entity_id"])] = {
+                "id": str(binding["entity_id"]),
+                "action": "modified",
+            }
         section = (
             "invariants"
             if kind_text == "invariant"
@@ -3820,6 +3846,7 @@ def _write_structrr_plan_from_obligations(
                 "description": description_text,
                 "action": "added",
                 **lineage,
+                **({"related": related} if related else {}),
                 "intent_effect": (
                     "records the compiler-owned design consequence of one "
                     "instruction obligation"
@@ -3831,6 +3858,7 @@ def _write_structrr_plan_from_obligations(
                 "id": f"acceptance-{obligation_id}",
                 "description": acceptance_text,
                 **lineage,
+                **({"related": related} if related else {}),
                 "intent_effect": "defines proof of one instruction obligation",
             }
         )
@@ -3890,9 +3918,103 @@ def _write_structrr_plan_from_obligations(
         "human-decisions": [],
         "proposed_prs": [],
     }
+    document["entities"] = list(entity_changes.values())
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     parse_change_log(path.read_text(encoding="utf-8"))
+    diagnostics_path = path.parent / "repository-entity-bindings.json"
+    diagnostics_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "repository-entity-bindings-v1",
+                "inventory_status": inventory_status,
+                "obligations": binding_diagnostics,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return path
+
+
+def _load_bootstrap_source_subjects(
+    path: Path,
+) -> tuple[list[Mapping[str, Any]], str]:
+    """Read source symbols from the Structrr bootstrap artifact, if available."""
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return [], "unavailable"
+    if not isinstance(document, Mapping):
+        return [], "invalid"
+    subjects = document.get("source_subjects")
+    if not isinstance(subjects, list):
+        return [], "missing_source_subjects"
+    valid = [
+        item
+        for item in subjects
+        if isinstance(item, Mapping)
+        and isinstance(item.get("id"), str)
+        and isinstance(item.get("qualified_name"), str)
+        and isinstance(item.get("kind"), str)
+    ]
+    return valid, "available"
+
+
+def _resolve_bootstrap_subject_binding(
+    obligation_text: str, source_subjects: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Bind only a unique source symbol explicitly named in the obligation."""
+    qualified_candidates: list[str] = []
+    leaf_candidates: list[str] = []
+    for subject in source_subjects:
+        qualified_name = str(subject.get("qualified_name", ""))
+        if qualified_name and re.search(
+            rf"(?<![\w]){re.escape(qualified_name)}(?![\w])", obligation_text
+        ):
+            qualified_candidates.append(str(subject["id"]))
+            continue
+        leaf_name = str(subject.get("name") or qualified_name.rsplit(".", 1)[-1])
+        if not leaf_name:
+            continue
+        escaped_name = re.escape(leaf_name)
+        explicit_code_reference = (
+            re.search(rf"`[^`]*\b{escaped_name}\b[^`]*`", obligation_text)
+            or re.search(rf"(?<![\w.]){escaped_name}\s*\(", obligation_text)
+            or re.search(rf"\.{escaped_name}(?![\w])", obligation_text)
+            or ("_" in leaf_name and re.search(rf"\b{escaped_name}\b", obligation_text))
+        )
+        if explicit_code_reference:
+            leaf_candidates.append(str(subject["id"]))
+    qualified_candidates = sorted(set(qualified_candidates))
+    if qualified_candidates:
+        candidates = qualified_candidates
+    else:
+        candidates = sorted(set(leaf_candidates))
+        if len(candidates) == 1:
+            return {
+                "status": "unmatched",
+                "reason": "candidate_requires_semantic_validation",
+                "candidate_ids": candidates,
+            }
+    if len(candidates) == 1:
+        return {
+            "status": "bound",
+            "entity_id": candidates[0],
+            "candidate_ids": candidates,
+        }
+    if candidates:
+        return {
+            "status": "ambiguous",
+            "reason": "multiple_explicit_source_symbols",
+            "candidate_ids": candidates,
+        }
+    return {
+        "status": "unmatched",
+        "reason": "no_explicit_source_symbol",
+        "candidate_ids": [],
+    }
 
 
 def _interview_edits(value: Any) -> list[dict[str, Any]]:

@@ -70,6 +70,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _plan_text_items,
     _proposal_execution_units,
     _remove_temporary_feature_artifacts,
+    _resolve_bootstrap_subject_binding,
     _run_code_task_agent,
     _task_structrr_changes,
     _update_plan_from_sentence_trace,
@@ -1365,6 +1366,95 @@ def test_structrr_diff_records_instruction_lineage(tmp_path: Path) -> None:
         _task_structrr_changes(
             plan, {"source_clause_refs": ["instruction-002"]}, "structrr-diff:x"
         )
+
+
+def test_bootstrap_entity_binding_requires_one_explicit_symbol() -> None:
+    subjects = [
+        {
+            "id": "python:src/client.py::client.fetch",
+            "qualified_name": "client.fetch",
+            "kind": "function",
+        },
+        {
+            "id": "python:src/cache.py::cache.fetch",
+            "qualified_name": "cache.fetch",
+            "kind": "function",
+        },
+    ]
+    assert _resolve_bootstrap_subject_binding(
+        "Update client.fetch behavior", subjects
+    ) == {
+        "status": "bound",
+        "entity_id": "python:src/client.py::client.fetch",
+        "candidate_ids": ["python:src/client.py::client.fetch"],
+    }
+    ambiguous = _resolve_bootstrap_subject_binding("Update fetch() behavior", subjects)
+    assert ambiguous["status"] == "ambiguous"
+    assert ambiguous["candidate_ids"] == [
+        "python:src/cache.py::cache.fetch",
+        "python:src/client.py::client.fetch",
+    ]
+    assert (
+        _resolve_bootstrap_subject_binding("Update behavior", subjects)["status"]
+        == "unmatched"
+    )
+
+
+def test_structrr_diff_links_only_unique_bootstrap_subjects(tmp_path: Path) -> None:
+    output = tmp_path / "artifacts"
+    output.mkdir()
+    (output / "validation-bootstrap.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "source_subjects": [
+                    {
+                        "id": "python:src/client.py::client.fetch",
+                        "qualified_name": "client.fetch",
+                        "kind": "function",
+                    },
+                    {
+                        "id": "python:src/cache.py::cache.fetch",
+                        "qualified_name": "cache.fetch",
+                        "kind": "function",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    obligation = {
+        "id": "instruction-001",
+        "design": {
+            "clause_id": "instruction-001",
+            "kind": "feature",
+            "description": "Update client.fetch behavior.",
+            "acceptance_criterion": "client.fetch returns the result.",
+            "expected_test": "Test client.fetch output.",
+            "behavior_scenario": _test_behavior_scenario("client-fetch"),
+        },
+    }
+    path = _write_structrr_plan_from_obligations(
+        output / "structrr-diff.yaml",
+        FeatureEndpointConfig(
+            repo_root=tmp_path,
+            work_item_name="entity-linking",
+            feature_description="Update client.fetch.",
+            allowed_paths=("src",),
+        ),
+        [obligation],
+        (),
+    )
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    diagnostics = json.loads(
+        (output / "repository-entity-bindings.json").read_text(encoding="utf-8")
+    )
+    assert document["entities"] == [
+        {"id": "python:src/client.py::client.fetch", "action": "modified"}
+    ]
+    assert document["features"][0]["related"]["entities"] == [
+        "python:src/client.py::client.fetch"
+    ]
+    assert diagnostics["obligations"][0]["status"] == "bound"
 
 
 def test_feature_test_contracts_do_not_retain_unrelated_inventory_selectors() -> None:

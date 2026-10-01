@@ -19,6 +19,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from powdrr_lift.core.behavior_contract import BehaviorScenario
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
 from powdrr_lift.core.intent_packet import IntentPacket
@@ -197,10 +198,21 @@ class ImplementationRequest:
         )
         product_changes = ""
         if unit.planned_additions or unit.planned_deletions:
+            behavior_scenarios = (
+                implementation_packet.behavior_scenarios
+                if implementation_packet is not None
+                else ()
+            )
+            additions = _format_planned_changes(
+                unit.planned_additions, behavior_scenarios
+            )
+            deletions = _format_planned_changes(
+                unit.planned_deletions, behavior_scenarios
+            )
             product_changes = (
                 "\nRequired product changes:\n"
-                f"Additions: {_format_planned_changes(unit.planned_additions)}\n"
-                f"Deletions: {_format_planned_changes(unit.planned_deletions)}\n"
+                f"Additions: {additions}\n"
+                f"Deletions: {deletions}\n"
             )
         non_goals = (
             "\nNon-goals:\n" + "\n".join(f"- {item}" for item in unit.non_goals) + "\n"
@@ -289,13 +301,66 @@ class ImplementationRequest:
         )
 
 
-def _format_planned_changes(changes: Sequence[Mapping[str, Any]]) -> str:
+def _format_planned_changes(
+    changes: Sequence[Mapping[str, Any]],
+    behavior_scenarios: Sequence[BehaviorScenario] = (),
+) -> str:
     if not changes:
         return "- None declared. Do not invent additional product changes."
+    scenario_text = {
+        _normalize_planned_change_text(text)
+        for scenario in behavior_scenarios
+        for text in _scenario_requirement_text(scenario)
+    }
+    compact_changes = []
+    for change in changes:
+        compact = dict(change)
+        if scenario_text:
+            for field_name in ("description", "summary"):
+                text = compact.get(field_name)
+                if (
+                    isinstance(text, str)
+                    and _normalize_planned_change_text(text) in scenario_text
+                ):
+                    compact.pop(field_name)
+        compact_changes.append(compact)
     return "\n".join(
-        f"- {json.dumps(dict(change), sort_keys=True, ensure_ascii=False)}"
-        for change in changes
+        f"- {json.dumps(change, sort_keys=True, ensure_ascii=False)}"
+        for change in compact_changes
     )
+
+
+def _nested_strings(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Mapping):
+        return tuple(text for item in value.values() for text in _nested_strings(item))
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return tuple(text for item in value for text in _nested_strings(item))
+    return ()
+
+
+def _scenario_requirement_text(scenario: BehaviorScenario) -> tuple[str, ...]:
+    data = scenario.to_data()
+    requirement_fields = (
+        "subject",
+        "given",
+        "when",
+        "then",
+        "dimensions",
+        "related_requirements",
+        "capability_matrix",
+        "assumptions",
+    )
+    return tuple(
+        text
+        for field_name in requirement_fields
+        for text in _nested_strings(data.get(field_name))
+    )
+
+
+def _normalize_planned_change_text(value: str) -> str:
+    return " ".join(value.casefold().split()).rstrip(" .!?;:")
 
 
 def _render_allowed_command_forms(commands: Sequence[str]) -> str:

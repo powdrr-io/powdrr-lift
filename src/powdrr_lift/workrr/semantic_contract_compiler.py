@@ -64,11 +64,16 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "definitions, or implementation guidance.",
             "Choose include_prohibition for an explicit product behavior or scope "
             "that must not be implemented or must be prevented.",
+            "Choose context for a statement describing the present state, a current "
+            "limitation, or a problem that explains the request but does not itself "
+            "require a product change. Context is retained as context and does not "
+            "become an obligation.",
             "A word such as cannot is not, by itself, an instruction to prohibit a "
             "capability. Implementation constraints and reasons remain included "
             "product guidance unless the source explicitly directs exclusion.",
-            "Choose exclude for process instructions, background context, or text "
-            "that does not state implementation-relevant product meaning.",
+            "Choose exclude for process instructions or text unrelated to the "
+            "product. Use context for product facts or problems that explain the "
+            "request without stating required behavior.",
             "Choose unclear when the source does not support one of these routes "
             "without guessing. Mixed statements should be split first when their "
             "parts can be represented independently.",
@@ -85,6 +90,10 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             ),
             ClassificationExample(
                 "Do not add automatic retries.", "include_prohibition"
+            ),
+            ClassificationExample(
+                "The library currently has no per-instance data ownership.",
+                "context",
             ),
             ClassificationExample("Run the unit tests before submitting.", "exclude"),
             ClassificationExample("It should work well.", "unclear"),
@@ -827,7 +836,7 @@ def prepare_dependent_source_semantic_decisions(
             ).to_data()
         )
 
-    if route == "exclude":
+    if route in {"context", "exclude"}:
         defaults = {
             "polarity": "descriptive",
             "quantifier": "unspecified",
@@ -1020,7 +1029,7 @@ def _normative_source_decision_default(
             return "non_goal"
         if route == "include":
             return "invariant"
-        if route == "exclude":
+        if route in {"context", "exclude"}:
             return "context"
         # A broad guidance label carries the exact proposition without claiming
         # whether it is a feature, API, invariant, or domain entity.
@@ -1094,7 +1103,7 @@ def _disposition_matches_route(disposition: str, route: str | None) -> bool:
         }
     if route == "include_prohibition":
         return disposition == "non_goal"
-    if route == "exclude":
+    if route in {"context", "exclude"}:
         return disposition == "context"
     return True
 
@@ -1117,8 +1126,10 @@ def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
         raise SemanticContractError(
             "include_prohibition route requires a prohibited non-goal"
         )
-    if routing == "exclude" and disposition != "context":
-        raise SemanticContractError("exclude route must not create product semantics")
+    if routing in {"context", "exclude"} and disposition != "context":
+        raise SemanticContractError(
+            f"{routing} route must not create product semantics"
+        )
     if disposition == "context":
         if values.get("polarity") != "descriptive":
             raise SemanticContractError("context branch must remain descriptive")

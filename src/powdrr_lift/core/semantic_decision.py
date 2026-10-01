@@ -16,7 +16,9 @@ SEMANTIC_DECISION_SCHEMA_VERSION = "semantic-decision-v1"
 SEMANTIC_DECISION_SPEC_SCHEMA_VERSION = "semantic-decision-spec-v1"
 
 DECISION_VALUES: dict[str, frozenset[str]] = {
-    "routing": frozenset({"include", "include_prohibition", "exclude", "unclear"}),
+    "routing": frozenset(
+        {"include", "include_prohibition", "context", "exclude", "unclear"}
+    ),
     "disposition": frozenset(
         {
             "entity",

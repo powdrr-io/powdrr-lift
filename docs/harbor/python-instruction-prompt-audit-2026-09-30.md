@@ -113,3 +113,14 @@ instruction is present verbatim in the prompt, but `instruction-044` (collect
 all table constraints, including bare CHECK and named CONSTRAINT forms) maps to
 a generic acceptance criterion and test oracle. This is a remaining semantic
 coverage gap beyond sentence segmentation.
+
+The atomicity compiler now rejects duplicate split children after Unicode,
+Markdown, whitespace, and case normalization. It keeps the original parent
+clause and records a `duplicate_child` diagnostic with the repeated child
+indexes and source span; Markdown-only output that normalizes to empty is also
+rejected. Identical generated text under distinct source spans remains intact.
+The compiler cannot yet prove that paraphrased children cover every source
+detail: split responses contain rewritten statements but no source-alignment
+spans, and accepted children currently inherit their parent's span. A future
+split contract needs validated source ranges before deterministic coverage
+checks can be added.

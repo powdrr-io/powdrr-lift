@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from powdrr_lift.core.instruction_ledger import (
+    InstructionClause,
     InstructionLedger,
     InstructionLedgerError,
     apply_atomicity_decisions,
@@ -76,6 +77,21 @@ def test_instruction_ledger_round_trips_and_rejects_stale_fingerprints() -> None
         InstructionLedger.from_data(stale)
 
 
+def test_instruction_ledger_rejects_clause_span_outside_source() -> None:
+    ledger = compile_instruction_ledger("feature", "One behavior.")
+    clause = ledger.clauses[0]
+    invalid_clause = InstructionClause(
+        clause_id=clause.clause_id,
+        source_id=clause.source_id,
+        ordinal=clause.ordinal,
+        text=clause.text,
+        source_span=(clause.source_span[0], len(ledger.source.text) + 1),
+    )
+
+    with pytest.raises(InstructionLedgerError, match="exceeds source text"):
+        InstructionLedger(source=ledger.source, clauses=(invalid_clause,)).validate()
+
+
 def test_atomicity_split_gets_compiler_owned_ids() -> None:
     ledger = compile_instruction_ledger("feature", "Data is fresh and removed.")
 
@@ -103,6 +119,85 @@ def test_atomicity_split_gets_compiler_owned_ids() -> None:
         "Data is fresh on entry.",
         "Data is removed on exit.",
     ]
+
+
+def test_atomicity_duplicate_children_fall_back_to_parent_with_diagnostic() -> None:
+    ledger = compile_instruction_ledger("feature", "Check the result and report it.")
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [
+                    "The result is valid.",
+                    "- **the result is valid.**",
+                ],
+                "validation_groups": [],
+            }
+        },
+    )
+
+    assert split.clauses == ledger.clauses
+    assert [item.to_data() for item in split.split_diagnostics] == [
+        {
+            "source_clause_id": "instruction-001",
+            "reason_code": "duplicate_child",
+            "child_indexes": [1, 2],
+            "source_span": {
+                "start": ledger.clauses[0].source_span[0],
+                "end": ledger.clauses[0].source_span[1],
+            },
+        }
+    ]
+    restored = InstructionLedger.from_data(split.to_data())
+    assert restored.fingerprint == split.fingerprint
+    assert restored.split_diagnostics == split.split_diagnostics
+
+
+def test_atomicity_empty_markdown_child_falls_back_to_parent() -> None:
+    ledger = compile_instruction_ledger("feature", "Check the result and report it.")
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [">", "Report the result."],
+                "validation_groups": [],
+            }
+        },
+    )
+
+    assert split.clauses == ledger.clauses
+    assert split.split_diagnostics[0].reason_code == "empty_child"
+    assert split.split_diagnostics[0].child_indexes == (1,)
+
+
+def test_atomicity_keeps_same_generated_children_for_distinct_source_spans() -> None:
+    ledger = compile_instruction_ledger("feature", "First behavior. Second behavior.")
+    repeated_split = {
+        "multiple": True,
+        "statements": ["Shared result A.", "Shared result B."],
+        "validation_groups": [],
+    }
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": repeated_split,
+            "instruction-002": repeated_split,
+        },
+    )
+
+    assert [item.text for item in split.clauses] == [
+        "Shared result A.",
+        "Shared result B.",
+        "Shared result A.",
+        "Shared result B.",
+    ]
+    assert split.clauses[0].source_span != split.clauses[2].source_span
+    assert not split.split_diagnostics
 
 
 def test_atomicity_split_preserves_joint_validation_relationships() -> None:

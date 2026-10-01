@@ -1359,6 +1359,9 @@ class FeatureCommandRuntime:
                 "path": str(ledger_path),
                 "fingerprint": refined.fingerprint,
                 "clauses": [item.to_data() for item in refined.clauses],
+                "split_diagnostics": [
+                    item.to_data() for item in refined.split_diagnostics
+                ],
             }
 
         def merge_semantic_design_operation() -> Any:

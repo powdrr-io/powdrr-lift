@@ -404,7 +404,7 @@ class PartialSemanticContract:
         temporal_raw = raw.get("temporal_scope")
         if not isinstance(temporal_raw, Mapping):
             raise SemanticContractError("partial contract temporal scope is invalid")
-        return cls(
+        contract = cls(
             contract_id=_required_string(raw, "contract_id"),
             source_ref=_required_string(raw, "source_ref"),
             source_fingerprint=_required_string(raw, "source_fingerprint"),
@@ -450,6 +450,11 @@ class PartialSemanticContract:
                 if isinstance(item, Mapping)
             ),
         )
+        if raw.get("fingerprint") != contract.fingerprint:
+            raise SemanticContractError(
+                "partial semantic contract fingerprint is stale"
+            )
+        return contract
 
 
 def compile_partial_semantic_contract(

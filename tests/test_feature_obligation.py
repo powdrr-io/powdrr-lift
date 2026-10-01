@@ -7,6 +7,15 @@ from powdrr_lift.core.feature_obligation import (
     compile_feature_design,
 )
 from powdrr_lift.core.instruction_ledger import compile_instruction_ledger
+from powdrr_lift.core.semantic_contract import (
+    BoundSourceExtraction,
+    PartialSemanticContract,
+    UnresolvedSemanticField,
+)
+from powdrr_lift.core.semantic_decision import (
+    ExactSourceSpan,
+    SemanticDecisionProvider,
+)
 
 
 def _semantic(count: int) -> list[dict[str, object]]:
@@ -180,6 +189,85 @@ def test_missing_persistence_behavior_is_actionable_when_model_calls_it_non_goal
 
     assert design.projections[0].kind == "feature"
     assert design.obligations[0].projection.kind == "feature"
+
+
+def test_source_contract_restores_an_included_clause_mislabeled_as_context() -> None:
+    ledger = compile_instruction_ledger(
+        "feature", "States lack data ownership. Add data ownership support."
+    )
+    semantic = _semantic(2)
+    for index, clause in enumerate(ledger.clauses):
+        text = clause.text
+        span = ExactSourceSpan(clause.clause_id, 0, len(text), text)
+        subject = BoundSourceExtraction(
+            extraction_id=f"subject-{index}",
+            extraction_kind="subject",
+            subject_ref=clause.clause_id,
+            input_fingerprint="input",
+            provider=SemanticDecisionProvider(kind="deterministic-rule"),
+            span=span,
+            created_at="test",
+        )
+        behavior = BoundSourceExtraction(
+            extraction_id=f"behavior-{index}",
+            extraction_kind="behavior",
+            subject_ref=clause.clause_id,
+            input_fingerprint="input",
+            provider=SemanticDecisionProvider(kind="deterministic-rule"),
+            span=span,
+            created_at="test",
+        )
+        contract = PartialSemanticContract(
+            contract_id=f"contract:{clause.clause_id}",
+            source_ref=clause.clause_id,
+            source_fingerprint=clause.fingerprint,
+            proposition_text=text,
+            routing="include",
+            disposition="feature",
+            polarity="required",
+            requirement_strength="unspecified",
+            quantifier="unspecified",
+            subject=subject,
+            behavior=behavior,
+            behavior_family="other",
+            preconditions=(),
+            exceptions=(),
+            explicit_result=None,
+            temporal_scope="unspecified",
+            source_predicate="not_stated",
+            field_provenance=(),
+            unresolved=(UnresolvedSemanticField("predicate", "source_underspecified"),),
+        )
+        semantic[index]["partial_contract"] = contract.to_data()
+    semantic[0]["design"] = {
+        "kind": "context",
+        "description": "Background context.",
+        "acceptance_criterion": "No obligation.",
+        "expected_test": "No test.",
+    }
+
+    design = compile_feature_design(ledger, "feature", semantic)
+
+    assert design.projections[0].kind == "feature"
+    assert [item.clause_id for item in design.obligations] == [
+        "instruction-001",
+        "instruction-002",
+    ]
+
+
+def test_source_contract_fingerprint_must_match_the_instruction_clause() -> None:
+    ledger = compile_instruction_ledger("feature", "Add data ownership support.")
+    semantic = _semantic(1)
+    semantic[0]["partial_contract"] = {
+        "schema_version": "partial-semantic-contract-v2",
+        "contract_id": "contract:instruction-001",
+        "source_ref": "instruction-001",
+        "source_fingerprint": "sha256:stale",
+        "proposition_text": "Add data ownership support.",
+    }
+
+    with pytest.raises(FeatureObligationError, match="source semantic contract"):
+        compile_feature_design(ledger, "feature", semantic)
 
 
 def test_required_rejection_is_compiled_as_an_actionable_obligation() -> None:

@@ -1014,6 +1014,27 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
     assert canonical_design_path.is_file()
     canonical_design = json.loads(canonical_design_path.read_text(encoding="utf-8"))
     assert canonical_design["schema_version"] == "feature-design-v2"
+    coverage_path = (
+        repo
+        / ".powdrr"
+        / "feature-runs"
+        / "python-statemachine-state-data-scoping"
+        / "instruction-coverage-audit.json"
+    )
+    assert coverage_path.is_file()
+    coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
+    assert coverage["status"] == "complete"
+    assert coverage["instruction_ledger_fingerprint"] == ledger["fingerprint"]
+    assert [item["clause_id"] for item in coverage["records"]] == [
+        item["clause_id"] for item in ledger["clauses"]
+    ]
+    for record in coverage["records"]:
+        assert record["status"] == "covered"
+        assert record["source_contract_fingerprint"]
+        assert Path(record["source_contract_artifact"]).is_file()
+        assert record["obligation_created"] is (
+            record["routing"] in {"include", "include_prohibition"}
+        )
     assert [item["obligation_id"] for item in canonical_design["obligations"]] == [
         f"obligation:instruction-{index:03d}"
         for index in range(1, len(canonical_design["obligations"]) + 1)

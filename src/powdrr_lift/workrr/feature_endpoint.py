@@ -6279,6 +6279,12 @@ def _instruction_coverage_worklist(
         raise PowdrrExecutionError("final review requires the instruction ledger")
     try:
         ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        design_path = state.get("canonical_feature_design_path")
+        if not isinstance(design_path, Path):
+            raise PowdrrExecutionError(
+                "final review requires the canonical feature design"
+            )
+        design = json.loads(design_path.read_text(encoding="utf-8"))
         audit = json.loads(
             (output_root / "instruction-coverage-audit.json").read_text(
                 encoding="utf-8"
@@ -6293,7 +6299,11 @@ def _instruction_coverage_worklist(
         raise PowdrrExecutionError(
             f"instruction coverage evidence is unavailable: {error}"
         ) from error
-    if not isinstance(ledger, Mapping) or not isinstance(audit, Mapping):
+    if (
+        not isinstance(ledger, Mapping)
+        or not isinstance(design, Mapping)
+        or not isinstance(audit, Mapping)
+    ):
         raise PowdrrExecutionError("instruction coverage evidence is malformed")
     if audit.get("status") != "complete":
         raise PowdrrExecutionError("instruction source coverage audit is incomplete")
@@ -6314,6 +6324,16 @@ def _instruction_coverage_worklist(
     clauses = ledger.get("clauses")
     if not isinstance(clauses, list):
         raise PowdrrExecutionError("instruction ledger has no clause list")
+    projections = {
+        item.get("clause_id"): item
+        for item in design.get("projections", [])
+        if isinstance(item, Mapping) and isinstance(item.get("clause_id"), str)
+    }
+    obligations = {
+        item.get("clause_id"): item
+        for item in design.get("obligations", [])
+        if isinstance(item, Mapping) and isinstance(item.get("clause_id"), str)
+    }
     output: list[dict[str, Any]] = []
     for clause in clauses:
         if not isinstance(clause, Mapping):
@@ -6327,14 +6347,34 @@ def _instruction_coverage_worklist(
             raise PowdrrExecutionError(
                 f"instruction clause {clause_id!r} has no successful source audit"
             )
-        if audit_record.get("design_kind") == "invariant":
-            # Invariants have their own candidate-bound review and receipt.
+        if audit_record.get("obligation_created") is not True:
+            # Trace-only clauses have no implementation obligation. Invariants
+            # with obligations are handled by their dedicated candidate review.
             continue
+        obligation = obligations.get(clause_id)
+        projection = projections.get(clause_id)
+        if not isinstance(obligation, Mapping) or not isinstance(projection, Mapping):
+            raise PowdrrExecutionError(
+                f"instruction clause {clause_id!r} has no canonical obligation"
+            )
+        if audit_record.get("design_kind") == "invariant":
+            continue
+        acceptance_criterion = obligation.get("acceptance_criterion")
+        if (
+            not isinstance(acceptance_criterion, str)
+            or not acceptance_criterion.strip()
+        ):
+            raise PowdrrExecutionError(
+                f"instruction clause {clause_id!r} has no acceptance criterion"
+            )
         output.append(
             {
                 "decision_id": f"instruction:{clause_id}",
                 "clause_id": clause_id,
                 "clause": dict(clause),
+                "obligation": dict(obligation),
+                "design_projection": dict(projection),
+                "acceptance_criterion": acceptance_criterion,
                 "source_coverage": dict(audit_record),
                 "obligation_evidence": evidence_records.get(clause_id),
                 "candidate_evidence": {
@@ -6346,15 +6386,11 @@ def _instruction_coverage_worklist(
                     if isinstance(validation, Mapping)
                     else None,
                 },
-                "review_instruction": (
-                    "Judge whether this original instruction is sufficiently fulfilled "
-                    "in the final candidate using all supplied evidence. A matching "
-                    "diff is not required when the behavior is already satisfied or "
-                    "an equivalent implementation meets the instruction."
-                ),
                 "evidence_fingerprint": content_fingerprint(
                     {
                         "clause_fingerprint": clause.get("fingerprint"),
+                        "obligation": obligation,
+                        "design_projection": projection,
                         "source_coverage": audit_record,
                         "obligation_evidence": evidence_records.get(clause_id),
                         "actual_diff_fingerprint": actual_diff_fingerprint,

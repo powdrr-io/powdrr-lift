@@ -729,9 +729,8 @@ steps:
                   outcome: {type: string, enum: [pass, fail, unknown]}
                   explanation: {type: string, minLength: 1}
             validation: {kind: json_schema}
-  # Evaluate each original instruction against its compiled obligation and all
-  # final candidate evidence. This allows equivalent and already-satisfied
-  # outcomes without requiring a literal planned diff.
+  # Evaluate one compiled obligation's acceptance criterion against final
+  # candidate evidence. Trace-only clauses and invariants use separate routes.
   - for_each:
       snapshot: {name: final_implementation_review.instruction_coverage_worklist.specifications, max_items: 4096}
       item_binding: instruction_coverage_decision
@@ -739,14 +738,16 @@ steps:
       body:
         - judge:
             kind: verify_instruction_coverage
+            # This is the same planning judge channel used by the other semantic reviews.
             provider: planning
-            question: Is this original instruction sufficiently fulfilled by the final candidate?
-            subject: instruction_coverage_decision.review_instruction
+            question: Does the final candidate meet this obligation's acceptance criterion?
+            subject: instruction_coverage_decision.acceptance_criterion
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Evaluate one original instruction clause using its source contract, normative strength, diff expectation, proposal comparison, and validation evidence.
+              - Evaluate only the supplied acceptance criterion for this one compiled obligation.
+              - Use the source clause and design projection to interpret the criterion, then inspect the proposal comparison, actual candidate diff, and validation evidence.
               - The source audit proves that the instruction was represented in the design; it does not prove implementation fulfillment.
-              - Treat the diff as one evidence source. Accept equivalent implementations and already-satisfied behavior when candidate evidence establishes the instruction.
+              - Treat the diff as one evidence source. Accept equivalent implementations and already-satisfied behavior when candidate evidence establishes the criterion.
               - Return fulfilled, equivalent, or already_satisfied only with concrete candidate evidence. Return partial, unmet, or unknown when the evidence supports those outcomes.
               - MUST clauses need fulfillment, equivalence, or already-satisfied evidence. SHOULD clauses may be waived only with an explanation that states why.
               - Keep invariant judgments in the separate invariant review; do not infer invariant preservation from this result.

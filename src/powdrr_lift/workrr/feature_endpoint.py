@@ -6179,6 +6179,15 @@ def _prepare_final_implementation_review(
         }
         for clause_id in invariant_clause_ids
     ]
+    instruction_coverage_specifications = _instruction_coverage_worklist(
+        output_root=output_root,
+        state=state,
+        actual_diff_path=diff_json_file,
+        actual_diff_fingerprint=actual_diff.fingerprint,
+        comparison_path=comparison_json_file,
+        comparison_fingerprint=candidate_comparison["fingerprint"],
+        validation=validation,
+    )
     specifications.append(
         {
             "decision_id": "unexplained:semantic-change-review",
@@ -6214,6 +6223,12 @@ def _prepare_final_implementation_review(
         ],
         "semantic_worklist": {"specifications": specifications},
         "invariant_worklist": {"specifications": invariant_specifications},
+        "instruction_coverage_worklist": {
+            "specifications": instruction_coverage_specifications,
+            "instruction_ledger_fingerprint": state.get(
+                "instruction_ledger_fingerprint"
+            ),
+        },
         "actual_diff_path": diff_json_file,
         "candidate_checkpoint_path": checkpoint_path,
         "actual_diff_fingerprint": actual_diff.fingerprint,
@@ -6246,6 +6261,114 @@ def _prepare_final_implementation_review(
         output_root, "final-implementation-review.json", document
     )
     return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _instruction_coverage_worklist(
+    *,
+    output_root: Path,
+    state: Mapping[str, Any],
+    actual_diff_path: str,
+    actual_diff_fingerprint: str,
+    comparison_path: str,
+    comparison_fingerprint: str,
+    validation: Any,
+) -> list[dict[str, Any]]:
+    """Bind each original instruction clause to final candidate evidence."""
+    ledger_path = state.get("instruction_ledger_path")
+    if not isinstance(ledger_path, Path):
+        raise PowdrrExecutionError("final review requires the instruction ledger")
+    try:
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        audit = json.loads(
+            (output_root / "instruction-coverage-audit.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        provenance = json.loads(
+            (output_root / "obligation-evidence-provenance.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    except (OSError, json.JSONDecodeError) as error:
+        raise PowdrrExecutionError(
+            f"instruction coverage evidence is unavailable: {error}"
+        ) from error
+    if not isinstance(ledger, Mapping) or not isinstance(audit, Mapping):
+        raise PowdrrExecutionError("instruction coverage evidence is malformed")
+    if audit.get("status") != "complete":
+        raise PowdrrExecutionError("instruction source coverage audit is incomplete")
+    audit_records = {
+        item.get("clause_id"): item
+        for item in audit.get("records", [])
+        if isinstance(item, Mapping) and isinstance(item.get("clause_id"), str)
+    }
+    evidence_records = (
+        {
+            item.get("clause_id"): item
+            for item in provenance.get("records", [])
+            if isinstance(item, Mapping) and isinstance(item.get("clause_id"), str)
+        }
+        if isinstance(provenance, Mapping)
+        else {}
+    )
+    clauses = ledger.get("clauses")
+    if not isinstance(clauses, list):
+        raise PowdrrExecutionError("instruction ledger has no clause list")
+    output: list[dict[str, Any]] = []
+    for clause in clauses:
+        if not isinstance(clause, Mapping):
+            raise PowdrrExecutionError("instruction ledger has a malformed clause")
+        clause_id = clause.get("clause_id")
+        audit_record = audit_records.get(clause_id)
+        if (
+            not isinstance(audit_record, Mapping)
+            or audit_record.get("status") != "covered"
+        ):
+            raise PowdrrExecutionError(
+                f"instruction clause {clause_id!r} has no successful source audit"
+            )
+        if audit_record.get("design_kind") == "invariant":
+            # Invariants have their own candidate-bound review and receipt.
+            continue
+        output.append(
+            {
+                "decision_id": f"instruction:{clause_id}",
+                "clause_id": clause_id,
+                "clause": dict(clause),
+                "source_coverage": dict(audit_record),
+                "obligation_evidence": evidence_records.get(clause_id),
+                "candidate_evidence": {
+                    "actual_diff_path": actual_diff_path,
+                    "actual_diff_fingerprint": actual_diff_fingerprint,
+                    "comparison_path": comparison_path,
+                    "comparison_fingerprint": comparison_fingerprint,
+                    "validation": dict(validation)
+                    if isinstance(validation, Mapping)
+                    else None,
+                },
+                "review_instruction": (
+                    "Judge whether this original instruction is sufficiently fulfilled "
+                    "in the final candidate using all supplied evidence. A matching "
+                    "diff is not required when the behavior is already satisfied or "
+                    "an equivalent implementation meets the instruction."
+                ),
+                "evidence_fingerprint": content_fingerprint(
+                    {
+                        "clause_fingerprint": clause.get("fingerprint"),
+                        "source_coverage": audit_record,
+                        "obligation_evidence": evidence_records.get(clause_id),
+                        "actual_diff_fingerprint": actual_diff_fingerprint,
+                        "comparison_fingerprint": comparison_fingerprint,
+                        "validation": validation,
+                    }
+                ),
+            }
+        )
+    if len(audit_records) != len(clauses):
+        raise PowdrrExecutionError(
+            "source audit does not cover every instruction clause"
+        )
+    return output
 
 
 def _correct_candidate_from_structrr_diff(
@@ -6447,6 +6570,89 @@ def _finalize_implementation_review(
         raise PowdrrExecutionError("invariant review decisions are malformed")
     if any(item.get("outcome") != "pass" for item in invariant_decisions):
         result["accepted"] = False
+    coverage_worklist = review.get("instruction_coverage_worklist")
+    coverage_specs = _flow_items(
+        coverage_worklist.get("specifications")
+        if isinstance(coverage_worklist, Mapping)
+        else None
+    )
+    coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
+    if len(coverage_specs) != len(coverage_decisions):
+        raise PowdrrExecutionError("instruction coverage decisions are incomplete")
+    coverage_outcomes = []
+    coverage_complete = True
+    for specification, decision in zip(coverage_specs, coverage_decisions, strict=True):
+        outcome = decision.get("outcome")
+        explanation = decision.get("explanation")
+        if (
+            outcome
+            not in {
+                "fulfilled",
+                "equivalent",
+                "already_satisfied",
+                "waived",
+                "partial",
+                "unmet",
+                "unknown",
+            }
+            or not isinstance(explanation, str)
+            or not explanation.strip()
+        ):
+            raise PowdrrExecutionError("instruction coverage decision is malformed")
+        if outcome == "waived" and not explanation.strip():
+            raise PowdrrExecutionError("instruction waiver requires a rationale")
+        evidence = specification.get("obligation_evidence")
+        strength = (
+            evidence.get("normative_strength")
+            if isinstance(evidence, Mapping)
+            else None
+        )
+        resolved = outcome in {"fulfilled", "equivalent", "already_satisfied"}
+        if strength == "must" and not resolved:
+            coverage_complete = False
+        elif strength == "should" and outcome not in {
+            "fulfilled",
+            "equivalent",
+            "already_satisfied",
+            "waived",
+        }:
+            coverage_complete = False
+        elif strength is None and outcome in {"partial", "unmet", "unknown"}:
+            coverage_complete = False
+        coverage_outcomes.append(
+            {
+                "clause_id": specification.get("clause_id"),
+                "clause_fingerprint": (specification.get("clause") or {}).get(
+                    "fingerprint"
+                )
+                if isinstance(specification.get("clause"), Mapping)
+                else None,
+                "outcome": outcome,
+                "explanation": explanation,
+                "normative_strength": strength,
+                "evidence_fingerprint": specification.get("evidence_fingerprint"),
+            }
+        )
+    coverage_receipt = {
+        "schema_version": "procedrr-instruction-coverage-receipt-v1",
+        "instruction_ledger_fingerprint": (
+            coverage_worklist.get("instruction_ledger_fingerprint")
+            if isinstance(coverage_worklist, Mapping)
+            else None
+        ),
+        "candidate_fingerprint": review.get("diff_fingerprint"),
+        "complete": coverage_complete,
+        "outcomes": coverage_outcomes,
+    }
+    coverage_receipt["fingerprint"] = content_fingerprint(coverage_receipt)
+    coverage_receipt_path = output_root / "instruction-coverage-receipt.json"
+    coverage_receipt_path.write_text(
+        json.dumps(coverage_receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    result["instruction_coverage_receipt_path"] = str(coverage_receipt_path)
+    result["instruction_coverage_fingerprint"] = coverage_receipt["fingerprint"]
+    result["instruction_coverage_complete"] = coverage_complete
     invariant_receipt = {
         "schema_version": "procedrr-invariant-review-receipt-v1",
         "proposal_fingerprint": review.get("proposal_fingerprint"),
@@ -6552,6 +6758,7 @@ def _finalize_implementation_review(
             "decisions": _flow_items(parameters.get("deterministic_decisions")),
             "semantic_decisions": semantic,
             "actualization_report": actualization,
+            "instruction_coverage_receipt": coverage_receipt,
         },
     )
     result["receipt_path"] = receipt_path

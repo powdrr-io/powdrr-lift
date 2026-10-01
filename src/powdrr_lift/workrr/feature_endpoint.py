@@ -6407,6 +6407,72 @@ def _instruction_coverage_worklist(
     return output
 
 
+def _instruction_coverage_gaps(
+    specifications: list[Mapping[str, Any]],
+    decisions: list[Mapping[str, Any]],
+) -> list[tuple[Mapping[str, Any], Mapping[str, Any]]]:
+    """Return unresolved source obligations after validating the review set."""
+    if len(specifications) != len(decisions):
+        raise PowdrrExecutionError("instruction coverage decisions are incomplete")
+    gaps: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
+    resolved_outcomes = {"fulfilled", "equivalent", "already_satisfied"}
+    accepted_outcomes = resolved_outcomes | {"waived"}
+    valid_strengths = {"must", "should", "may", "unspecified"}
+    valid_outcomes = accepted_outcomes | {"partial", "unmet", "unknown"}
+    for specification, decision in zip(specifications, decisions, strict=True):
+        outcome = decision.get("outcome")
+        explanation = decision.get("explanation")
+        evidence = _coverage_contract(specification)
+        strength = (
+            evidence.get("normative_strength")
+            if isinstance(evidence, Mapping)
+            else None
+        )
+        if (
+            outcome not in valid_outcomes
+            or not isinstance(explanation, str)
+            or not explanation.strip()
+        ):
+            raise PowdrrExecutionError("instruction coverage decision is malformed")
+        if strength not in valid_strengths:
+            raise PowdrrExecutionError(
+                "instruction coverage evidence contract has invalid strength"
+            )
+        if strength == "must":
+            covered = outcome in resolved_outcomes
+        else:
+            # SHOULD, MAY, and unspecified requirements need either evidence of
+            # fulfillment or an explicit, reasoned decision to waive them.
+            covered = outcome in accepted_outcomes
+        if not covered:
+            gaps.append((specification, decision))
+    return gaps
+
+
+def _instruction_text(specification: Mapping[str, Any]) -> str:
+    clause = specification.get("clause")
+    text = clause.get("text") if isinstance(clause, Mapping) else None
+    return text if isinstance(text, str) else ""
+
+
+def _coverage_contract(specification: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    evidence = specification.get("obligation_evidence")
+    if not isinstance(evidence, Mapping):
+        return None
+    contract = evidence.get("evidence_contract", evidence)
+    return contract if isinstance(contract, Mapping) else None
+
+
+def _coverage_expectation(specification: Mapping[str, Any]) -> str:
+    evidence = _coverage_contract(specification)
+    if not isinstance(evidence, Mapping):
+        return "unknown"
+    return (
+        f"{evidence.get('normative_strength', 'unknown')}/"
+        f"{evidence.get('diff_expectation', 'unknown')}"
+    )
+
+
 def _correct_candidate_from_structrr_diff(
     parameters: Mapping[str, Any],
     *,
@@ -6419,27 +6485,50 @@ def _correct_candidate_from_structrr_diff(
     state: dict[str, Any],
     **_: Any,
 ) -> dict[str, Any]:
-    """Use the existing coding-agent session for at most two diff repairs."""
-    review = state.get("latest_candidate_review")
+    """Use the existing coding-agent session for at most two focused repairs."""
+    review = parameters.get("review")
     if not isinstance(review, Mapping):
         raise PowdrrExecutionError("candidate correction has no structural review")
-    if review.get("candidate_structural_gate_passed") is True:
-        return {"done": True, "review": dict(review)}
     attempts = int(state.get("candidate_correction_attempts", 0))
     if attempts >= 2:
         return {"done": True, "review": dict(review)}
 
-    blockers = review.get("candidate_comparison_blockers", [])
+    coverage_specs = _flow_items(
+        (review.get("instruction_coverage_worklist") or {}).get("specifications")
+        if isinstance(review.get("instruction_coverage_worklist"), Mapping)
+        else None
+    )
+    coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
+    coverage_gaps = _instruction_coverage_gaps(coverage_specs, coverage_decisions)
+    structural_gaps = review.get("candidate_comparison_blockers", [])
+    if review.get("candidate_structural_gate_passed") is True and not coverage_gaps:
+        return {"done": True, "review": dict(review), "attempts": attempts}
+
+    correction_items = [
+        *(f"Structrr comparison: {item}" for item in structural_gaps),
+        *(
+            "Instruction obligation "
+            f"{specification.get('clause_id')}: "
+            f"source instruction={_instruction_text(specification)}; "
+            f"acceptance criterion={specification.get('acceptance_criterion')}; "
+            f"evidence expectation={_coverage_expectation(specification)}; "
+            f"(review outcome: {decision.get('outcome')}; "
+            f"evidence assessment: {decision.get('explanation')})"
+            for specification, decision in coverage_gaps
+        ),
+    ]
     prompt = (
-        "Correct the current feature implementation to better match its accepted "
-        "Structrr proposal. Keep the existing coding-agent session and current "
-        "worktree; preserve correct changes and edit only issues listed below. "
-        "Do not re-plan or restart the feature. After making focused corrections, "
-        "run the relevant validation commands.\n\n"
+        "Correct the current feature implementation to address the reported gaps "
+        "against its accepted Structrr proposal and original instruction obligations. "
+        "Keep the existing coding-agent session and current worktree; preserve "
+        "correct changes and edit only the reported gaps. Do not re-plan or restart "
+        "the feature. Equivalent implementations and behavior already present in "
+        "the candidate do not need to be changed. After focused corrections, run "
+        "the relevant validation commands.\n\n"
         f"Attempt {attempts + 1} of 2.\n"
         f"Comparison artifact: {review.get('candidate_comparison_path', '')}\n"
         f"Actual diff artifact: {review.get('actual_diff_path', '')}\n"
-        "Reported differences:\n" + "\n".join(f"- {item}" for item in blockers)
+        "Reported gaps:\n" + "\n".join(f"- {item}" for item in correction_items)
     )
     state["candidate_correction_attempts"] = attempts + 1
     _run_code_agent_phase(
@@ -6474,10 +6563,15 @@ def _correct_candidate_from_structrr_diff(
         config=config,
     )
     state["latest_candidate_review"] = refreshed
-    done = (
-        refreshed.get("candidate_structural_gate_passed") is True or attempts + 1 >= 2
-    )
-    return {"done": done, "review": refreshed, "attempts": attempts + 1}
+    # Coverage is judged again from the refreshed worklist on the next loop
+    # iteration. Stop only when both review routes pass, or after two repairs.
+    done = attempts + 1 >= 2
+    return {
+        "done": done,
+        "review": refreshed,
+        "attempts": attempts + 1,
+        "correction_reasons": correction_items,
+    }
 
 
 def _get_candidate_correction_review(state: Mapping[str, Any]) -> dict[str, Any]:
@@ -6485,6 +6579,11 @@ def _get_candidate_correction_review(state: Mapping[str, Any]) -> dict[str, Any]
     if not isinstance(review, Mapping):
         raise PowdrrExecutionError("candidate correction did not produce a review")
     return dict(review)
+
+
+def _start_candidate_correction(state: Mapping[str, Any]) -> dict[str, Any]:
+    """Initialize the bounded correction loop with the current candidate review."""
+    return {"done": False, "review": _get_candidate_correction_review(state)}
 
 
 def _candidate_structural_gate(
@@ -6613,48 +6712,18 @@ def _finalize_implementation_review(
         else None
     )
     coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
-    if len(coverage_specs) != len(coverage_decisions):
-        raise PowdrrExecutionError("instruction coverage decisions are incomplete")
+    coverage_gaps = _instruction_coverage_gaps(coverage_specs, coverage_decisions)
+    coverage_complete = not coverage_gaps
     coverage_outcomes = []
-    coverage_complete = True
     for specification, decision in zip(coverage_specs, coverage_decisions, strict=True):
         outcome = decision.get("outcome")
         explanation = decision.get("explanation")
-        if (
-            outcome
-            not in {
-                "fulfilled",
-                "equivalent",
-                "already_satisfied",
-                "waived",
-                "partial",
-                "unmet",
-                "unknown",
-            }
-            or not isinstance(explanation, str)
-            or not explanation.strip()
-        ):
-            raise PowdrrExecutionError("instruction coverage decision is malformed")
-        if outcome == "waived" and not explanation.strip():
-            raise PowdrrExecutionError("instruction waiver requires a rationale")
-        evidence = specification.get("obligation_evidence")
+        evidence = _coverage_contract(specification)
         strength = (
             evidence.get("normative_strength")
             if isinstance(evidence, Mapping)
             else None
         )
-        resolved = outcome in {"fulfilled", "equivalent", "already_satisfied"}
-        if strength == "must" and not resolved:
-            coverage_complete = False
-        elif strength == "should" and outcome not in {
-            "fulfilled",
-            "equivalent",
-            "already_satisfied",
-            "waived",
-        }:
-            coverage_complete = False
-        elif strength is None and outcome in {"partial", "unmet", "unknown"}:
-            coverage_complete = False
         coverage_outcomes.append(
             {
                 "clause_id": specification.get("clause_id"),

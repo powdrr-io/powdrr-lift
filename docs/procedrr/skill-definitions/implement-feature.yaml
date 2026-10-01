@@ -636,12 +636,13 @@ steps:
         validation: {type: reference, value: validation}
       returns:
         type: object
-        required: [path, fingerprint, deterministic_decisions, semantic_worklist, proposal_fingerprint, diff_fingerprint, observed_diff, operation_ids, retained_clause_ids, actual_diff_path, actual_diff_fingerprint, candidate_checkpoint_path, candidate_comparison_path, candidate_comparison_fingerprint, candidate_structural_gate_passed, candidate_comparison_blockers, candidate_correction_attempts]
+        required: [path, fingerprint, deterministic_decisions, semantic_worklist, instruction_coverage_worklist, proposal_fingerprint, diff_fingerprint, observed_diff, operation_ids, retained_clause_ids, actual_diff_path, actual_diff_fingerprint, candidate_checkpoint_path, candidate_comparison_path, candidate_comparison_fingerprint, candidate_structural_gate_passed, candidate_comparison_blockers, candidate_correction_attempts]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
           deterministic_decisions: {type: array, minItems: 1}
           semantic_worklist: {type: object}
+          instruction_coverage_worklist: {type: object}
           actual_diff_path: {type: string, minLength: 1}
           actual_diff_fingerprint: {type: string, minLength: 1}
           candidate_checkpoint_path: {type: string, minLength: 1}
@@ -728,6 +729,40 @@ steps:
                   outcome: {type: string, enum: [pass, fail, unknown]}
                   explanation: {type: string, minLength: 1}
             validation: {kind: json_schema}
+  # Evaluate one compiled obligation's acceptance criterion against final
+  # candidate evidence. Trace-only clauses and invariants use separate routes.
+  - for_each:
+      snapshot: {name: final_implementation_review.instruction_coverage_worklist.specifications, max_items: 4096}
+      item_binding: instruction_coverage_decision
+      collect: {binding: instruction_coverage_decisions, mode: list, value: instruction_coverage_result}
+      body:
+        - judge:
+            kind: verify_instruction_coverage
+            # This is the same planning judge channel used by the other semantic reviews.
+            provider: planning
+            question: Does the final candidate meet this obligation's acceptance criterion?
+            subject: instruction_coverage_decision.acceptance_criterion
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Evaluate only the supplied acceptance criterion for this one compiled obligation.
+              - Use the source clause and design projection to interpret the criterion, then inspect the proposal comparison, actual candidate diff, and validation evidence.
+              - The source audit proves that the instruction was represented in the design; it does not prove implementation fulfillment.
+              - Treat the diff as one evidence source. Accept equivalent implementations and already-satisfied behavior when candidate evidence establishes the criterion.
+              - Return fulfilled, equivalent, or already_satisfied only with concrete candidate evidence. Return partial, unmet, or unknown when the evidence supports those outcomes.
+              - MUST clauses need fulfillment, equivalence, or already-satisfied evidence. SHOULD clauses may be waived only with an explanation that states why.
+              - Keep invariant judgments in the separate invariant review; do not infer invariant preservation from this result.
+              - Do not judge sibling clauses or issue an aggregate verdict. Do not return IDs or fingerprints.
+            context: [instruction_coverage_decision, feature_description, plan, validation, final_implementation_review]
+            output:
+              name: instruction_coverage_result
+              schema:
+                type: object
+                required: [outcome, explanation]
+                additionalProperties: false
+                properties:
+                  outcome: {type: string, enum: [fulfilled, equivalent, already_satisfied, waived, partial, unmet, unknown]}
+                  explanation: {type: string, minLength: 1}
+            validation: {kind: json_schema}
   # Preserved invariants receive their own candidate-bound review. This pass
   # runs independently from proposal operation and retained-guidance review.
   - for_each:
@@ -767,9 +802,10 @@ steps:
         deterministic_decisions: {type: reference, value: final_deterministic_decisions}
         semantic_decisions: {type: reference, value: final_semantic_decisions}
         invariant_decisions: {type: reference, value: final_invariant_decisions}
+        instruction_coverage_decisions: {type: reference, value: instruction_coverage_decisions}
       returns:
         type: object
-        required: [accepted, receipt_path, actualization_report_path, actualization_fingerprint, actualization_passed, invariant_review_receipt_path, invariant_review_fingerprint, invariant_review_passed, candidate_structural_gate_passed, candidate_checkpoint_path, actual_diff_path, actual_diff_fingerprint, candidate_comparison_path, candidate_comparison_fingerprint, candidate_correction_attempts]
+        required: [accepted, receipt_path, actualization_report_path, actualization_fingerprint, actualization_passed, invariant_review_receipt_path, invariant_review_fingerprint, invariant_review_passed, instruction_coverage_receipt_path, instruction_coverage_fingerprint, instruction_coverage_complete, candidate_structural_gate_passed, candidate_checkpoint_path, actual_diff_path, actual_diff_fingerprint, candidate_comparison_path, candidate_comparison_fingerprint, candidate_correction_attempts]
         properties:
           accepted: {type: boolean}
           receipt_path: {type: string, minLength: 1}
@@ -779,6 +815,9 @@ steps:
           invariant_review_receipt_path: {type: string, minLength: 1}
           invariant_review_fingerprint: {type: string, minLength: 1}
           invariant_review_passed: {type: boolean}
+          instruction_coverage_receipt_path: {type: string, minLength: 1}
+          instruction_coverage_fingerprint: {type: string, minLength: 1}
+          instruction_coverage_complete: {type: boolean}
           candidate_structural_gate_passed: {type: boolean}
           candidate_checkpoint_path: {type: string, minLength: 1}
           actual_diff_path: {type: string, minLength: 1}

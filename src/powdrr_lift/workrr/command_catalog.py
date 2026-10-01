@@ -2391,6 +2391,7 @@ class FeatureCommandRuntime:
                         + json.dumps(provenance, sort_keys=True)
                     ) from exc
                 evidence_by_clause[item.clause_id] = evidence_contract.to_data()
+                provenance["evidence_contract"] = evidence_contract.to_data()
                 provenance["status"] = "compiled"
                 provenance["evidence_contract_fingerprint"] = (
                     evidence_contract.to_data()["fingerprint"]

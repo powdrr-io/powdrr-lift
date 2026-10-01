@@ -2075,6 +2075,53 @@ def test_structural_comparison_mismatch_does_not_block_finalization(
     assert result["actualization_passed"] is True
 
 
+def test_instruction_coverage_records_unmet_must_without_blocking_finalization(
+    tmp_path: Path,
+) -> None:
+    review = {
+        "proposal_fingerprint": "sha256:proposal",
+        "diff_fingerprint": "sha256:candidate",
+        "candidate_structural_gate_passed": True,
+        "semantic_worklist": {"specifications": []},
+        "invariant_worklist": {"specifications": []},
+        "instruction_coverage_worklist": {
+            "instruction_ledger_fingerprint": "sha256:ledger",
+            "specifications": [
+                {
+                    "clause_id": "clause-1",
+                    "clause": {"fingerprint": "sha256:clause"},
+                    "obligation_evidence": {"normative_strength": "must"},
+                    "evidence_fingerprint": "sha256:evidence",
+                }
+            ],
+        },
+        "operation_ids": [],
+        "retained_clause_ids": [],
+        "unexplained_changes": [],
+    }
+
+    result = _finalize_implementation_review(
+        {
+            "review": review,
+            "deterministic_decisions": [{"outcome": "pass"}],
+            "semantic_decisions": [],
+            "invariant_decisions": [],
+            "instruction_coverage_decisions": [
+                {"outcome": "unmet", "explanation": "Required behavior is absent."}
+            ],
+        },
+        output_root=tmp_path,
+    )
+
+    receipt = json.loads(
+        Path(result["instruction_coverage_receipt_path"]).read_text(encoding="utf-8")
+    )
+    assert result["accepted"] is True
+    assert result["instruction_coverage_complete"] is False
+    assert receipt["instruction_ledger_fingerprint"] == "sha256:ledger"
+    assert receipt["outcomes"][0]["outcome"] == "unmet"
+
+
 def test_feature_flow_falls_back_to_source_tree_for_external_target(
     tmp_path: Path,
 ) -> None:

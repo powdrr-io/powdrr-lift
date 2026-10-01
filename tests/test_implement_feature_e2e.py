@@ -387,6 +387,12 @@ class DeterministicPlanningClient:
                 "evidence_case": "Run the hello_world test.",
             }
         if required == {"outcome", "explanation"}:
+            outcome_schema = properties.get("outcome", {})
+            if "fulfilled" in outcome_schema.get("enum", ()):
+                return {
+                    "outcome": "fulfilled",
+                    "explanation": "The final candidate satisfies the instruction.",
+                }
             return {
                 "outcome": (
                     "pass"

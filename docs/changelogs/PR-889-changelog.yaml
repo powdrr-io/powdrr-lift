@@ -1,0 +1,128 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 889
+title: Preserve semantic provenance through evidence compilation
+intent:
+  problem: Benchmark invariant fallbacks discarded the validated source semantic contract, so evidence compilation could receive empty strength and polarity fields and failures lacked a trace to the source contract.
+  goal: Carry the source contract through invariant fallback, persist per-obligation evidence provenance, and retain enough provenance in failure artifacts to trace classification errors.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1376, end_line: 1376}
+    summary: Accept the validated partial semantic contract when recording a benchmark invariant fallback.
+    rationale: Preserve the source data that downstream evidence classification needs.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1384, end_line: 1384}
+    summary: Store fallback records as extensible provenance objects.
+    rationale: Retain contract identity and fields alongside fallback details.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1391, end_line: 1396}
+    summary: Persist the partial contract, source contract ID, and fingerprint in fallback records.
+    rationale: Keep evidence inputs traceable back to the exact source contract.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1418, end_line: 1445}
+    summary: Resolve the preserved contract when building the source-invariant fallback design.
+    rationale: Prevent a fallback from replacing semantic fields with routing-only data.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1487, end_line: 1501}
+    summary: Pass the contract into benchmark fallback when scenario compilation fails.
+    rationale: Preserve source semantics across both source-faithfulness and scenario-fallback paths.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1868, end_line: 1868}
+    summary: Attach the validated contract to source-faithfulness fallback records.
+    rationale: Keep provenance intact when the faithfulness gate selects the fallback.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1955, end_line: 1974}
+    summary: Initialize and persist the evidence provenance artifact with ledger identity.
+    rationale: Keep per-obligation compilation records available even when a later obligation fails.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1982, end_line: 1995}
+    summary: Bind each evidence record to its obligation, clause, and partial semantic contract.
+    rationale: Make the provenance of strength and polarity explicit.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1997, end_line: 1999}
+    summary: Persist missing-contract failures with their obligation provenance.
+    rationale: Make missing source inputs directly diagnosable.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2001, end_line: 2002}
+    summary: Include the provenance record in missing-contract failure messages.
+    rationale: Connect a compilation error to its source obligation.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2015, end_line: 2017}
+    summary: Persist classification errors together with their source-contract fields.
+    rationale: Retain the input values that caused evidence compilation to fail.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2019, end_line: 2020}
+    summary: Include provenance in evidence-classification failure messages.
+    rationale: Make classification failures traceable without reconstructing runtime inputs.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2023, end_line: 2027}
+    summary: Record successful classifications and evidence-contract fingerprints.
+    rationale: Trace the derived evidence contract back to its source contract.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2602, end_line: 2648}
+    summary: Centralize fallback design construction and source provenance record creation.
+    rationale: Reuse the fallback-to-evidence mapping and make it directly testable.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 26, end_line: 29}
+    summary: Import evidence classification types for the fallback regression test.
+    rationale: Assert the retained source strength is accepted by the evidence compiler.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 45, end_line: 45}
+    summary: Import the benchmark invariant fallback helper for regression coverage.
+    rationale: Exercise the same fallback construction used by the production path.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 48, end_line: 48}
+    summary: Import the provenance-record helper for regression coverage.
+    rationale: Verify source contract identity survives into downstream provenance.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 262, end_line: 309}
+    summary: Cover a split-clause invariant fallback retaining strength, polarity, contract identity, and fingerprint through evidence classification.
+    rationale: Prevent a repeat of the missing-strength failure in the instruction-to-prompt pipeline.
+entities:
+  - id: benchmark-invariant-fallback
+    type: Step
+    action: added
+  - id: obligation-evidence-provenance
+    type: Log
+    action: added
+  - id: split-clause-evidence-regression-test
+    type: Unit test
+    action: added
+entity_relationships:
+  - id: fallback-emits-evidence-provenance
+    type: produces
+    source: benchmark-invariant-fallback
+    target: obligation-evidence-provenance
+    action: added
+    description: The fallback carries its source semantic contract into the per-obligation evidence provenance record.
+  - id: regression-test-covers-fallback
+    type: verifies
+    source: split-clause-evidence-regression-test
+    target: benchmark-invariant-fallback
+    action: added
+    description: The regression test verifies that split-clause fallback preserves evidence classification fields.
+invariants:
+  - id: invariant-fallback-preserves-source-contract
+    action: added
+    description: Benchmark invariant fallback preserves the source semantic contract fields used by evidence compilation.
+    rationale: A fallback may change the design disposition but must not discard source provenance required by downstream compilation.
+guidance: []

@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 from powdrr_lift.cli import main
+from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
+from powdrr_lift.core.implementation_packet import compile_implementation_packet
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -183,6 +185,66 @@ def test_empty_product_change_lists_are_omitted_from_worker_prompt() -> None:
 
     assert "Required product changes:" not in request.prompt
     assert "None declared" not in request.prompt
+
+
+def test_scenario_backed_prompt_omits_only_repeated_plan_descriptions() -> None:
+    repeated = "The adapter parses input."
+    scenario = {
+        "scenario_id": "parse-input",
+        "subject": "adapter",
+        "given": "valid input",
+        "when": "the adapter parses it",
+        "then": repeated,
+        "dimensions": {
+            name: repeated if name == "normal_result" else "not_applicable"
+            for name in BEHAVIOR_DIMENSIONS
+        },
+        "evidence": ["tests/test_adapter.py::test_parse"],
+        "validator": "pytest -q tests/test_adapter.py::test_parse",
+        "capability_matrix": [],
+    }
+    packet = compile_implementation_packet(
+        objective="Add the adapter.",
+        obligations=(repeated,),
+        required_tests=({"description": "the adapter parses input"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+    request = ImplementationRequest.from_execution_unit(
+        ExecutionUnit(
+            unit_id="add-adapter",
+            objective="Add the adapter.",
+            paths=("src/", "tests/"),
+            validation_profiles=("pytest",),
+            planned_additions=(
+                {
+                    "section": "features",
+                    "id": "parse-input",
+                    "action": "added",
+                    "description": repeated,
+                    "intent_effect": "Preserve generated source metadata.",
+                },
+                {
+                    "section": "features",
+                    "id": "legacy-compatibility",
+                    "action": "added",
+                    "description": "The adapter preserves legacy compatibility.",
+                },
+            ),
+        ),
+        request_id="request-1",
+        base_commit="abc123",
+        plan_fingerprint="plan-1",
+        implementation_packet=packet,
+    )
+
+    assert request.prompt.count(repeated) == 1
+    assert '"id": "parse-input"' in request.prompt
+    assert '"intent_effect": "Preserve generated source metadata."' in request.prompt
+    assert (
+        '"description": "The adapter preserves legacy compatibility."' in request.prompt
+    )
 
 
 def test_opencode_provider_pins_requested_model(

@@ -21,6 +21,7 @@ from powdrr_lift.core.decision_obligation import (
 )
 from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.structrr.actual_diff import StructrrActualDiff
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_lift.structrr.proposal import compile_proposal_revision
@@ -48,6 +49,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _candidate_structural_gate,
     _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
@@ -1727,6 +1729,116 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "command: [run_code_task_agent]" in flow
     assert "value: final_invariant_decisions" in flow
     assert "kind: verify_candidate_invariant" in flow
+    assert "command: [prepare_final_implementation_review]" in flow
+    assert "candidate_structural_gate_passed" in flow
+
+
+@pytest.mark.parametrize(
+    ("status", "extraction_complete", "expected"),
+    [
+        ("fulfilled", True, True),
+        ("already_satisfied", True, True),
+        ("missing", True, False),
+        ("fulfilled", False, False),
+    ],
+)
+def test_candidate_structural_gate_requires_proposed_observations(
+    status: str, extraction_complete: bool, expected: bool
+) -> None:
+    baseline: dict[str, Any] = {"entities": []}
+    proposal = compile_proposal_revision(
+        "candidate-gate",
+        baseline,
+        {"entities": [{"id": "public-api", "action": "added", "type": "Function"}]},
+        acceptance_criteria=("The public API exists.",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src",),
+        source_refs=("instruction:api",),
+    )
+    actual_diff = StructrrActualDiff(
+        baseline_snapshot_fingerprint="baseline",
+        candidate_snapshot_fingerprint="candidate",
+        baseline_manifest_fingerprint="baseline-manifest",
+        candidate_manifest_fingerprint="candidate-manifest",
+        baseline_product_digest="baseline-product",
+        candidate_product_digest="candidate-product",
+        submission_base="base",
+        baseline_revision="base",
+        candidate_revision="candidate",
+        structural_operations=(),
+        source_observations=(),
+        declaration_changes=(),
+        behavioral_review_candidates=(),
+        extraction_complete=extraction_complete,
+        unknowns=(),
+    )
+
+    passed, blockers = _candidate_structural_gate(
+        proposal,
+        actual_diff,
+        {
+            "extraction_complete": extraction_complete,
+            "findings": [
+                {
+                    "operation_id": proposal.operations[0].operation_id,
+                    "status": status,
+                }
+            ],
+        },
+    )
+
+    assert passed is expected
+    assert bool(blockers) is not expected
+
+
+def test_candidate_structural_gate_rejects_unexplained_observations() -> None:
+    proposal = compile_proposal_revision(
+        "candidate-gate",
+        {"entities": []},
+        {"entities": []},
+        acceptance_criteria=("No unrelated entity is introduced.",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src",),
+        source_refs=("instruction:scope",),
+    )
+    actual_diff = StructrrActualDiff(
+        baseline_snapshot_fingerprint="baseline",
+        candidate_snapshot_fingerprint="candidate",
+        baseline_manifest_fingerprint="baseline-manifest",
+        candidate_manifest_fingerprint="candidate-manifest",
+        baseline_product_digest="baseline-product",
+        candidate_product_digest="candidate-product",
+        submission_base="base",
+        baseline_revision="base",
+        candidate_revision="candidate",
+        structural_operations=(),
+        source_observations=(),
+        declaration_changes=(),
+        behavioral_review_candidates=(),
+        extraction_complete=True,
+        unknowns=(),
+    )
+
+    passed, blockers = _candidate_structural_gate(
+        proposal,
+        actual_diff,
+        {
+            "extraction_complete": True,
+            "findings": [
+                {
+                    "finding_id": "observed:entity:unrelated:added",
+                    "status": "unexpected",
+                }
+            ],
+        },
+    )
+
+    assert passed is False
+    assert blockers == [
+        "unexplained structural operation: observed:entity:unrelated:added"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1739,6 +1851,11 @@ def test_final_invariant_review_is_separate_and_candidate_bound(
     review = {
         "proposal_fingerprint": "sha256:proposal",
         "diff_fingerprint": diff_fingerprint,
+        "candidate_structural_gate_passed": True,
+        "actual_diff_path": "/tmp/actual-diff.json",
+        "actual_diff_fingerprint": "sha256:actual-diff",
+        "candidate_comparison_path": "/tmp/comparison.json",
+        "candidate_comparison_fingerprint": "sha256:comparison",
         "semantic_worklist": {
             "specifications": [
                 {

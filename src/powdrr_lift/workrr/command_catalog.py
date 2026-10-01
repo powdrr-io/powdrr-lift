@@ -70,6 +70,7 @@ from powdrr_lift.workrr.repository_subject_binding import (
     add_candidate_source_excerpts,
     bind_candidate_relation_decisions,
     finalize_subject_binding,
+    infer_contextual_qualified_names,
     prepare_candidate_relation_decisions,
     prepare_subject_lookup_query,
     retrieve_subject_candidates,
@@ -1756,9 +1757,28 @@ class FeatureCommandRuntime:
                     context = build_python_lookup_context(worktree, inventory)
                     state["semantic_repository_lookup_context"] = context
                 contract = semantic_contract(parameters.get("contract"))
+                ledger = load_instruction_ledger()
+                clause = next(
+                    (
+                        item
+                        for item in ledger.clauses
+                        if item.clause_id == contract.source_ref
+                    ),
+                    None,
+                )
+                contextual_names = (
+                    infer_contextual_qualified_names(
+                        ledger.source.text,
+                        clause.source_span[0],
+                        contract.proposition_text,
+                    )
+                    if clause is not None
+                    else ()
+                )
                 query = prepare_subject_lookup_query(
                     contract,
                     inventory,
+                    explicit_names=contextual_names,
                     structrr_context_fingerprint=context.fingerprint,
                 )
                 candidates = retrieve_subject_candidates(query, inventory, context)

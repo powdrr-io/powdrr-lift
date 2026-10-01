@@ -710,6 +710,8 @@ def feature_command_catalog(
                 "run_final_obligation_evidence",
                 "finalize_obligation_closure",
                 "prepare_final_implementation_review",
+                "correct_candidate_from_structrr_diff",
+                "get_candidate_correction_review",
                 "finalize_implementation_review",
             )
         },
@@ -2301,7 +2303,7 @@ class FeatureCommandRuntime:
             "prepare_final_implementation_review",
         }:
             handler = getattr(feature_endpoint, f"_{name}")
-            return handler(
+            result = handler(
                 parameters,
                 config=config,
                 runner=runner,
@@ -2311,6 +2313,22 @@ class FeatureCommandRuntime:
                 slug=slug,
                 state=state,
             )
+            if name == "prepare_final_implementation_review":
+                state["latest_candidate_review"] = result
+            return result
+        if name == "correct_candidate_from_structrr_diff":
+            return feature_endpoint._correct_candidate_from_structrr_diff(
+                parameters,
+                config=config,
+                runner=runner,
+                worktree=worktree,
+                output_root=output_root,
+                branch=branch,
+                slug=slug,
+                state=state,
+            )
+        if name == "get_candidate_correction_review":
+            return feature_endpoint._get_candidate_correction_review(state)
         if name == "evaluate_deterministic_decision":
             return feature_endpoint._evaluate_deterministic_decision(parameters)
         if name in {

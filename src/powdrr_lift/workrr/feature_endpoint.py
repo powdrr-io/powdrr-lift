@@ -2493,11 +2493,6 @@ def _run_code_agent_phase(
         if repair_mode
         else units
     )
-    if repair_mode and isinstance(provider, OpenCodeProvider):
-        # Repairs receive a fresh, narrowly scoped prompt. Reusing the long
-        # implementation session lets stale exploration and prior failed
-        # hypotheses drift into already-correct files.
-        provider.session_id = None
     for index, unit in enumerate(request_units, start=1):
         worker_packet = implementation_packet
         if isinstance(code_task, Mapping):
@@ -2582,8 +2577,6 @@ def _run_code_agent_phase(
         before_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
         state["opencode_attempt_number"] = attempt_number
-        if not repair_mode and isinstance(provider, OpenCodeProvider):
-            provider.session_id = None
         attempt = coding_runner.run(
             request,
             worktree_root=worktree,
@@ -6017,7 +6010,7 @@ def _prepare_final_implementation_review(
     diff = _git_output(
         runner,
         worktree,
-        ["git", "diff", "--binary", request.base_commit, "HEAD", "--"],
+        ["git", "diff", "--binary", submission_base, "HEAD", "--"],
     )
     diff_fingerprint = content_fingerprint(
         {"base_commit": request.base_commit, "patch": diff}
@@ -6170,8 +6163,9 @@ def _prepare_final_implementation_review(
             },
             {
                 "decision_id": "final:structrr-comparison",
-                "check": "candidate_structural_comparison",
-                "passed": comparison_passed,
+                "check": "candidate_comparison_resolved_or_retries_exhausted",
+                "passed": comparison_passed
+                or int(state.get("candidate_correction_attempts", 0)) >= 2,
                 "blockers": comparison_blockers,
             },
         ],
@@ -6184,13 +6178,16 @@ def _prepare_final_implementation_review(
         "candidate_comparison_fingerprint": candidate_comparison["fingerprint"],
         "candidate_structural_gate_passed": comparison_passed,
         "candidate_comparison_blockers": comparison_blockers,
+        "candidate_correction_attempts": int(
+            state.get("candidate_correction_attempts", 0)
+        ),
         "proposal_fingerprint": proposal.fingerprint,
         "diff_fingerprint": diff_fingerprint,
         "observed_diff": diff,
         "changed_paths": _git_output(
             runner,
             worktree,
-            ["git", "diff", "--name-only", request.base_commit, "HEAD", "--"],
+            ["git", "diff", "--name-only", submission_base, "HEAD", "--"],
         ).splitlines(),
         "operation_ids": [item.operation_id for item in proposal.operations],
         "retained_clause_ids": retained_clause_ids,
@@ -6201,6 +6198,86 @@ def _prepare_final_implementation_review(
         output_root, "final-implementation-review.json", document
     )
     return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _correct_candidate_from_structrr_diff(
+    parameters: Mapping[str, Any],
+    *,
+    config: FeatureEndpointConfig,
+    worktree: Path,
+    runner: Runner,
+    output_root: Path,
+    branch: str,
+    slug: str,
+    state: dict[str, Any],
+    **_: Any,
+) -> dict[str, Any]:
+    """Use the existing coding-agent session for at most two diff repairs."""
+    review = state.get("latest_candidate_review")
+    if not isinstance(review, Mapping):
+        raise PowdrrExecutionError("candidate correction has no structural review")
+    if review.get("candidate_structural_gate_passed") is True:
+        return {"done": True, "review": dict(review)}
+    attempts = int(state.get("candidate_correction_attempts", 0))
+    if attempts >= 2:
+        return {"done": True, "review": dict(review)}
+
+    blockers = review.get("candidate_comparison_blockers", [])
+    prompt = (
+        "Correct the current feature implementation to better match its accepted "
+        "Structrr proposal. Keep the existing coding-agent session and current "
+        "worktree; preserve correct changes and edit only issues listed below. "
+        "Do not re-plan or restart the feature. After making focused corrections, "
+        "run the relevant validation commands.\n\n"
+        f"Attempt {attempts + 1} of 2.\n"
+        f"Comparison artifact: {review.get('candidate_comparison_path', '')}\n"
+        f"Actual diff artifact: {review.get('actual_diff_path', '')}\n"
+        "Reported differences:\n" + "\n".join(f"- {item}" for item in blockers)
+    )
+    state["candidate_correction_attempts"] = attempts + 1
+    _run_code_agent_phase(
+        config,
+        runner=runner,
+        worktree=worktree,
+        output_root=output_root / "candidate-corrections",
+        branch=branch,
+        slug=f"{slug}-structrr-correction-{attempts + 1}",
+        state=state,
+        parameters={"repair_request": prompt},
+    )
+    profiles = state.get("validation_profiles", ())
+    validation_results = [
+        _run_validation_profile(
+            {"profile": {"name": profile.name, "command": list(profile.command)}},
+            worktree=worktree,
+            state=state,
+        )
+        for profile in profiles
+        if isinstance(profile, DiscoveredValidationProfile)
+    ]
+    validation = _aggregate_validation(
+        {"results": validation_results}, worktree=worktree, state=state
+    )
+    refreshed = _prepare_final_implementation_review(
+        {"validation": validation, "task_receipts": []},
+        worktree=worktree,
+        runner=runner,
+        output_root=output_root,
+        state=state,
+        config=config,
+    )
+    state["latest_candidate_review"] = refreshed
+    done = (
+        refreshed.get("candidate_structural_gate_passed") is True or attempts + 1 >= 2
+    )
+    return {"done": done, "review": refreshed, "attempts": attempts + 1}
+
+
+def _get_candidate_correction_review(state: Mapping[str, Any]) -> dict[str, Any]:
+    review = state.get("latest_candidate_review")
+    if not isinstance(review, Mapping):
+        raise PowdrrExecutionError("candidate correction did not produce a review")
+    return dict(review)
 
 
 def _candidate_structural_gate(
@@ -6346,8 +6423,9 @@ def _finalize_implementation_review(
     result["candidate_comparison_fingerprint"] = str(
         review.get("candidate_comparison_fingerprint", "")
     )
-    if not result["candidate_structural_gate_passed"]:
-        result["accepted"] = False
+    result["candidate_correction_attempts"] = int(
+        review.get("candidate_correction_attempts", 0)
+    )
     bound_decisions = [
         {
             "decision_id": specification.get("decision_id"),

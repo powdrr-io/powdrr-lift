@@ -58,6 +58,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _compile_feature_obligations,
     _compile_obligation_verification_plans,
     _compile_required_test_case_edits,
+    _correct_candidate_from_structrr_diff,
     _create_pr_changelog,
     _derive_feature_test_contracts,
     _ensure_current_baseline,
@@ -1731,6 +1732,8 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "kind: verify_candidate_invariant" in flow
     assert "command: [prepare_final_implementation_review]" in flow
     assert "candidate_structural_gate_passed" in flow
+    assert "max_iterations: 2" in flow
+    assert "correct_candidate_from_structrr_diff" in flow
 
 
 @pytest.mark.parametrize(
@@ -1842,6 +1845,83 @@ def test_candidate_structural_gate_rejects_unexplained_observations() -> None:
 
 
 @pytest.mark.parametrize(
+    ("review_outcomes", "expected_agent_attempts"),
+    [([True], 1), ([False, False], 2)],
+)
+def test_candidate_correction_retries_twice_then_continues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    review_outcomes: list[bool],
+    expected_agent_attempts: int,
+) -> None:
+    import powdrr_lift.workrr.feature_endpoint as endpoint
+
+    state: dict[str, Any] = {
+        "latest_candidate_review": {
+            "candidate_structural_gate_passed": False,
+            "candidate_comparison_blockers": ["missing proposed entity"],
+            "candidate_comparison_path": "comparison.json",
+            "actual_diff_path": "actual-diff.json",
+        },
+        "validation_profiles": (),
+    }
+    agent_attempts: list[dict[str, Any]] = []
+    generated_reviews = iter(review_outcomes)
+
+    def run_agent(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        agent_attempts.append(kwargs["parameters"])
+        return {"attempt": {"status": "completed"}}
+
+    def prepare_review(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        passed = next(generated_reviews)
+        review = {
+            "candidate_structural_gate_passed": passed,
+            "candidate_comparison_blockers": [] if passed else ["still missing"],
+            "candidate_comparison_path": "comparison.json",
+            "actual_diff_path": "actual-diff.json",
+        }
+        kwargs["state"]["latest_candidate_review"] = review
+        return review
+
+    monkeypatch.setattr(endpoint, "_run_code_agent_phase", run_agent)
+    monkeypatch.setattr(
+        endpoint, "_aggregate_validation", lambda *a, **k: {"passed": True}
+    )
+    monkeypatch.setattr(
+        endpoint, "_prepare_final_implementation_review", prepare_review
+    )
+    config = FeatureEndpointConfig(
+        feature_description="Add the proposed entity.",
+        work_item_name="candidate-correction",
+        repo_root=tmp_path,
+        allowed_paths=("src",),
+    )
+
+    result: dict[str, Any] = {}
+    for _ in range(2):
+        result = _correct_candidate_from_structrr_diff(
+            {"review": state["latest_candidate_review"]},
+            config=config,
+            worktree=tmp_path,
+            runner=lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "", ""),
+            output_root=tmp_path,
+            branch="feature",
+            slug="candidate-correction",
+            state=state,
+        )
+        if result["done"]:
+            break
+
+    assert len(agent_attempts) == expected_agent_attempts
+    assert result["done"] is True
+    assert result["review"]["candidate_structural_gate_passed"] is (
+        expected_agent_attempts == 1
+    )
+
+
+@pytest.mark.parametrize(
     ("outcome", "accepted"), [("pass", True), ("unknown", False), ("fail", False)]
 )
 def test_final_invariant_review_is_separate_and_candidate_bound(
@@ -1898,6 +1978,36 @@ def test_final_invariant_review_is_separate_and_candidate_bound(
     assert receipt["proposal_fingerprint"] == "sha256:proposal"
     assert receipt["candidate_fingerprint"] == diff_fingerprint
     assert receipt["outcomes"][0]["invariant_id"] == "stable-order"
+
+
+def test_structural_comparison_mismatch_does_not_block_finalization(
+    tmp_path: Path,
+) -> None:
+    review = {
+        "proposal_fingerprint": "sha256:proposal",
+        "diff_fingerprint": "sha256:candidate",
+        "candidate_structural_gate_passed": False,
+        "candidate_correction_attempts": 2,
+        "semantic_worklist": {"specifications": []},
+        "invariant_worklist": {"specifications": []},
+        "operation_ids": [],
+        "retained_clause_ids": [],
+        "unexplained_changes": [],
+    }
+
+    result = _finalize_implementation_review(
+        {
+            "review": review,
+            "deterministic_decisions": [{"outcome": "pass"}],
+            "semantic_decisions": [],
+            "invariant_decisions": [],
+        },
+        output_root=tmp_path,
+    )
+
+    assert result["accepted"] is True
+    assert result["candidate_structural_gate_passed"] is False
+    assert result["candidate_correction_attempts"] == 2
 
 
 def test_feature_flow_falls_back_to_source_tree_for_external_target(

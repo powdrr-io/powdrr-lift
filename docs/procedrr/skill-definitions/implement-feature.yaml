@@ -636,7 +636,7 @@ steps:
         validation: {type: reference, value: validation}
       returns:
         type: object
-        required: [path, fingerprint, deterministic_decisions, semantic_worklist, proposal_fingerprint, diff_fingerprint, observed_diff, operation_ids, retained_clause_ids, actual_diff_path, actual_diff_fingerprint, candidate_checkpoint_path, candidate_comparison_path, candidate_comparison_fingerprint, candidate_structural_gate_passed, candidate_comparison_blockers]
+        required: [path, fingerprint, deterministic_decisions, semantic_worklist, proposal_fingerprint, diff_fingerprint, observed_diff, operation_ids, retained_clause_ids, actual_diff_path, actual_diff_fingerprint, candidate_checkpoint_path, candidate_comparison_path, candidate_comparison_fingerprint, candidate_structural_gate_passed, candidate_comparison_blockers, candidate_correction_attempts]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
@@ -649,6 +649,28 @@ steps:
           candidate_comparison_fingerprint: {type: string, minLength: 1}
           candidate_structural_gate_passed: {type: boolean}
           candidate_comparison_blockers: {type: array}
+          candidate_correction_attempts: {type: integer, minimum: 0, maximum: 2}
+      bind: candidate_review
+  - repeat:
+      max_iterations: 2
+      until: {subject: candidate_review.candidate_structural_gate_passed, equals: true}
+      body:
+        - operation:
+            tool: internal
+            command: [correct_candidate_from_structrr_diff]
+            parameters:
+              review: {type: reference, value: candidate_review}
+            returns:
+              type: object
+              required: [done, review]
+              properties:
+                done: {type: boolean}
+                review: {type: object}
+            bind: candidate_correction
+  - operation:
+      tool: internal
+      command: [get_candidate_correction_review]
+      returns: {type: object}
       bind: final_implementation_review
   - for_each:
       snapshot: {name: final_implementation_review.deterministic_decisions, max_items: 4096}
@@ -747,7 +769,7 @@ steps:
         invariant_decisions: {type: reference, value: final_invariant_decisions}
       returns:
         type: object
-        required: [accepted, receipt_path, actualization_report_path, actualization_fingerprint, actualization_passed, invariant_review_receipt_path, invariant_review_fingerprint, invariant_review_passed, candidate_structural_gate_passed, candidate_checkpoint_path, actual_diff_path, actual_diff_fingerprint, candidate_comparison_path, candidate_comparison_fingerprint]
+        required: [accepted, receipt_path, actualization_report_path, actualization_fingerprint, actualization_passed, invariant_review_receipt_path, invariant_review_fingerprint, invariant_review_passed, candidate_structural_gate_passed, candidate_checkpoint_path, actual_diff_path, actual_diff_fingerprint, candidate_comparison_path, candidate_comparison_fingerprint, candidate_correction_attempts]
         properties:
           accepted: {type: boolean}
           receipt_path: {type: string, minLength: 1}
@@ -763,6 +785,7 @@ steps:
           actual_diff_fingerprint: {type: string, minLength: 1}
           candidate_comparison_path: {type: string, minLength: 1}
           candidate_comparison_fingerprint: {type: string, minLength: 1}
+          candidate_correction_attempts: {type: integer, minimum: 0, maximum: 2}
       bind: final_review
   - gate:
       subject: final_review.accepted

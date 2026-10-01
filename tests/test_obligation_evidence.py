@@ -141,6 +141,15 @@ def test_worker_packet_explains_structural_and_invariant_evidence_routes() -> No
     )
 
     rendered = packet.render()
+    assert (
+        "Instruction obligation evidence expectations:\n"
+        "- obligation:instruction-001 (must): diff=required; review routes="
+        "structural_diff, behavior_validation. the requested entity or interface "
+        "must be present in the candidate diff\n"
+        "- obligation:instruction-002 (must): diff=none; review routes="
+        "invariant_review, behavior_validation. preservation or prohibition is "
+        "established by targeted review and behavior evidence"
+    ) in rendered
     assert "diff=required" in rendered
     assert "diff=none" in rendered
     assert "invariant_review" in rendered

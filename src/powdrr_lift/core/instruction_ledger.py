@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -111,9 +112,28 @@ class InstructionClause:
 
 
 @dataclass(frozen=True, slots=True)
+class AtomicitySplitDiagnostic:
+    """A model split rejected by a deterministic ledger guard."""
+
+    source_clause_id: str
+    reason_code: str
+    child_indexes: tuple[int, ...]
+    source_span: tuple[int, int]
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "source_clause_id": self.source_clause_id,
+            "reason_code": self.reason_code,
+            "child_indexes": list(self.child_indexes),
+            "source_span": {"start": self.source_span[0], "end": self.source_span[1]},
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class InstructionLedger:
     source: InstructionSource
     clauses: tuple[InstructionClause, ...]
+    split_diagnostics: tuple[AtomicitySplitDiagnostic, ...] = ()
 
     @property
     def fingerprint(self) -> str:
@@ -125,6 +145,10 @@ class InstructionLedger:
             "source": self.source.to_data(),
             "clauses": [item.to_data() for item in self.clauses],
         }
+        if self.split_diagnostics:
+            data["split_diagnostics"] = [
+                item.to_data() for item in self.split_diagnostics
+            ]
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
@@ -168,7 +192,41 @@ class InstructionLedger:
                     derivation=_required_string(item, "derivation"),
                 )
             )
-        ledger = cls(source=source, clauses=tuple(clauses))
+        raw_diagnostics = raw.get("split_diagnostics", [])
+        if not isinstance(raw_diagnostics, list):
+            raise InstructionLedgerError("instruction split diagnostics must be a list")
+        diagnostics: list[AtomicitySplitDiagnostic] = []
+        for item in raw_diagnostics:
+            if not isinstance(item, dict) or not isinstance(
+                item.get("child_indexes"), list
+            ):
+                raise InstructionLedgerError(
+                    "instruction split diagnostic is malformed"
+                )
+            span = item.get("source_span")
+            if not isinstance(span, dict):
+                raise InstructionLedgerError(
+                    "instruction split diagnostic span is missing"
+                )
+            diagnostics.append(
+                AtomicitySplitDiagnostic(
+                    source_clause_id=_required_string(item, "source_clause_id"),
+                    reason_code=_required_string(item, "reason_code"),
+                    child_indexes=tuple(
+                        _required_int({"index": value}, "index")
+                        for value in item["child_indexes"]
+                    ),
+                    source_span=(
+                        _required_int(span, "start"),
+                        _required_int(span, "end"),
+                    ),
+                )
+            )
+        ledger = cls(
+            source=source,
+            clauses=tuple(clauses),
+            split_diagnostics=tuple(diagnostics),
+        )
         if raw.get("fingerprint") != ledger.fingerprint:
             raise InstructionLedgerError("instruction ledger fingerprint is stale")
         ledger.validate()
@@ -197,6 +255,19 @@ class InstructionLedger:
                 raise InstructionLedgerError(
                     "instruction clause span exceeds source text"
                 )
+        for diagnostic in self.split_diagnostics:
+            start, end = diagnostic.source_span
+            if (
+                not diagnostic.source_clause_id.strip()
+                or diagnostic.reason_code not in {"duplicate_child", "empty_child"}
+                or len(diagnostic.child_indexes)
+                < (1 if diagnostic.reason_code == "empty_child" else 2)
+                or any(index < 1 for index in diagnostic.child_indexes)
+                or start < 0
+                or end <= start
+                or end > len(self.source.text)
+            ):
+                raise InstructionLedgerError("instruction split diagnostic is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +317,7 @@ def apply_atomicity_decisions(
 ) -> InstructionLedger:
     """Apply bounded split results while keeping all IDs compiler-owned."""
     output: list[InstructionClause] = []
+    diagnostics = list(ledger.split_diagnostics)
     for clause in ledger.clauses:
         raw = decisions.get(clause.clause_id, {"multiple": False})
         decision = AtomicityDecision.from_data(raw)
@@ -262,6 +334,18 @@ def apply_atomicity_decisions(
                 f"atomicity split for {clause.clause_id} must contain "
                 f"2-{MAX_ATOMIC_SPLIT_CHILDREN} statements"
             )
+        duplicate_indexes, empty_indexes = _split_statement_issues(statements)
+        if duplicate_indexes or empty_indexes:
+            output.append(clause)
+            diagnostics.append(
+                AtomicitySplitDiagnostic(
+                    source_clause_id=clause.clause_id,
+                    reason_code=("empty_child" if empty_indexes else "duplicate_child"),
+                    child_indexes=empty_indexes or duplicate_indexes,
+                    source_span=clause.source_span,
+                )
+            )
+            continue
         validation_groups = _normalize_validation_groups(
             raw.get("validation_groups", []), len(statements)
         )
@@ -309,9 +393,49 @@ def apply_atomicity_decisions(
         )
         for index, clause in enumerate(output, start=1)
     )
-    result = InstructionLedger(source=ledger.source, clauses=renumbered)
+    result = InstructionLedger(
+        source=ledger.source,
+        clauses=renumbered,
+        split_diagnostics=tuple(diagnostics),
+    )
     result.validate()
     return result
+
+
+def _split_statement_issues(
+    statements: list[str],
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    first_by_text: dict[str, int] = {}
+    duplicates: set[int] = set()
+    empty: set[int] = set()
+    for index, statement in enumerate(statements, start=1):
+        normalized = _normalize_split_statement(statement)
+        if not normalized:
+            empty.add(index)
+            continue
+        first = first_by_text.get(normalized)
+        if first is None:
+            first_by_text[normalized] = index
+        else:
+            duplicates.update((first, index))
+    return tuple(sorted(duplicates)), tuple(sorted(empty))
+
+
+def _normalize_split_statement(statement: str) -> str:
+    """Normalize surface-only Markdown differences before duplicate checks."""
+    normalized = unicodedata.normalize("NFKC", statement)
+    normalized = re.sub(
+        r"(?m)^\s{0,3}(?:#{1,6}\s+|(?:[-*+]|\d+[.)])\s+|>\s?)", "", normalized
+    )
+    normalized = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", normalized)
+    normalized = normalized.replace("`", "")
+    normalized = re.sub(
+        r"(?<!\w)(\*{1,2}|_{1,2}|~~)(?=\S)(.*?\S)\1(?!\w)",
+        r"\2",
+        normalized,
+        flags=re.DOTALL,
+    )
+    return " ".join(normalized.split()).casefold()
 
 
 def _normalize_validation_groups(
@@ -551,6 +675,7 @@ def _required_int(raw: dict[str, Any], key: str) -> int:
 
 __all__ = [
     "AtomicityDecision",
+    "AtomicitySplitDiagnostic",
     "InstructionClause",
     "InstructionLedger",
     "InstructionLedgerError",

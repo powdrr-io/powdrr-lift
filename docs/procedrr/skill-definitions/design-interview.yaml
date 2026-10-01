@@ -268,6 +268,7 @@ steps:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
           clauses: {type: array, minItems: 1}
+          split_diagnostics: {type: array}
       bind: atomic_instruction_ledger
   - for_each:
       snapshot: {name: atomic_instruction_ledger.clauses, max_items: 128}

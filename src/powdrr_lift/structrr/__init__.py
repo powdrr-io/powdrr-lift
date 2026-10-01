@@ -18,6 +18,11 @@ from powdrr_lift.structrr.active_intent import (
     resolve_active_intent,
     validate_active_intent_section,
 )
+from powdrr_lift.structrr.actual_diff import (
+    ACTUAL_DIFF_SCHEMA_VERSION,
+    StructrrActualDiff,
+    compile_actual_structrr_diff,
+)
 from powdrr_lift.structrr.bootstrap import (
     BOOTSTRAP_SECTION_VERSIONS,
     BootstrapIssue,
@@ -29,6 +34,7 @@ from powdrr_lift.structrr.bootstrap import (
 )
 from powdrr_lift.structrr.candidate_comparison import (
     CANDIDATE_COMPARISON_SCHEMA_VERSION,
+    CandidateScopeDecision,
     compare_candidate_snapshot,
 )
 from powdrr_lift.structrr.intent_lineage import (
@@ -98,6 +104,9 @@ from powdrr_lift.structrr.verification_obligations import (
 )
 
 __all__ = [
+    "ACTUAL_DIFF_SCHEMA_VERSION",
+    "StructrrActualDiff",
+    "compile_actual_structrr_diff",
     "BootstrapIssue",
     "BootstrapResult",
     "BootstrapValidationReport",
@@ -106,6 +115,7 @@ __all__ = [
     "validate_bootstrap_sections",
     "validate_bootstrap_document",
     "CANDIDATE_COMPARISON_SCHEMA_VERSION",
+    "CandidateScopeDecision",
     "compare_candidate_snapshot",
     "ACTIVE_INTENT_SECTION_VERSION",
     "ActiveIntentReference",

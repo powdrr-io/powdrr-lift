@@ -73,6 +73,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _feature_endpoint_result,
     _finalize_implementation_review,
     _finalize_proposal_review,
+    _instruction_coverage_gaps,
     _load_implementation_plan,
     _load_procedrr_replay_responses,
     _materialize_feature_intents,
@@ -767,7 +768,7 @@ def test_harbor_feature_cli_propagates_task_id(
     assert captured["config"].task_id == "benchmark/task-123"
 
 
-def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
+def test_in_place_failure_is_reported_without_failing_run(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
@@ -778,22 +779,25 @@ def test_in_place_failure_writes_typed_failure_artifact(tmp_path: Path) -> None:
     _git(repo, "commit", "-qm", "initial")
     submission_base = _git(repo, "rev-parse", "HEAD").stdout.strip()
     output_root = repo / ".powdrr" / "feature-runs" / "failure-artifact"
-    with pytest.raises(PowdrrExecutionError):
-        run_feature_in_place(
-            FeatureEndpointConfig(
-                feature_description="Add the second greeting.",
-                work_item_name="failure-artifact",
-                repo_root=repo,
-                allowed_paths=("hello_world.py",),
-                output_root=output_root,
-            )
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description="Add the second greeting.",
+            work_item_name="failure-artifact",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            output_root=output_root,
         )
+    )
     metadata = json.loads((output_root / "run-metadata.json").read_text())
     failure = json.loads((output_root / "failure.json").read_text())
     assert metadata["task_id"] == "failure-artifact"
     assert metadata["submission_base"] == submission_base
     assert failure["schema_version"] == "powdrr-run-failure-v1"
     assert failure["error_type"] == "PowdrrExecutionError"
+    assert result.status == "completed_with_issues"
+    assert result.review["potential_issues"][0]["type"] == "PowdrrExecutionError"
+    run_result = json.loads((output_root / "run-result.json").read_text())
+    assert run_result["status"] == "completed_with_issues"
 
 
 def test_feature_endpoint_result_preserves_early_failure_without_checkpoints(
@@ -1975,6 +1979,75 @@ def test_candidate_correction_retries_twice_then_continues(
     )
 
 
+def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import powdrr_lift.workrr.feature_endpoint as endpoint
+
+    specification = {
+        "clause_id": "clause-1",
+        "acceptance_criterion": "The command preserves both greetings.",
+        "obligation_evidence": {"normative_strength": "must"},
+    }
+    review = {
+        "candidate_structural_gate_passed": True,
+        "candidate_comparison_blockers": [],
+        "candidate_comparison_path": "comparison.json",
+        "actual_diff_path": "actual-diff.json",
+        "instruction_coverage_worklist": {"specifications": [specification]},
+    }
+    state: dict[str, Any] = {
+        "latest_candidate_review": review,
+        "validation_profiles": (),
+    }
+    agent_calls: list[dict[str, Any]] = []
+
+    def run_agent(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        agent_calls.append(kwargs["parameters"])
+        return {"attempt": {"status": "completed"}}
+
+    def prepare_review(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        del args
+        refreshed = dict(review)
+        kwargs["state"]["latest_candidate_review"] = refreshed
+        return refreshed
+
+    monkeypatch.setattr(endpoint, "_run_code_agent_phase", run_agent)
+    monkeypatch.setattr(
+        endpoint, "_aggregate_validation", lambda *a, **k: {"passed": True}
+    )
+    monkeypatch.setattr(
+        endpoint, "_prepare_final_implementation_review", prepare_review
+    )
+
+    result = _correct_candidate_from_structrr_diff(
+        {
+            "review": review,
+            "instruction_coverage_decisions": [
+                {"outcome": "unmet", "explanation": "The second greeting is missing."}
+            ],
+        },
+        config=FeatureEndpointConfig(
+            feature_description="Preserve both greetings.",
+            work_item_name="instruction-repair",
+            repo_root=tmp_path,
+            allowed_paths=("src",),
+        ),
+        worktree=tmp_path,
+        runner=lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "", ""),
+        output_root=tmp_path,
+        branch="feature",
+        slug="instruction-repair",
+        state=state,
+    )
+
+    assert len(agent_calls) == 1
+    assert "The command preserves both greetings." in agent_calls[0]["repair_request"]
+    assert "The second greeting is missing." in agent_calls[0]["repair_request"]
+    assert result["done"] is False
+
+
 @pytest.mark.parametrize(
     ("outcome", "accepted"), [("pass", True), ("unknown", False), ("fail", False)]
 )
@@ -2120,6 +2193,31 @@ def test_instruction_coverage_records_unmet_must_without_blocking_finalization(
     assert result["instruction_coverage_complete"] is False
     assert receipt["instruction_ledger_fingerprint"] == "sha256:ledger"
     assert receipt["outcomes"][0]["outcome"] == "unmet"
+
+
+@pytest.mark.parametrize(
+    ("strength", "outcome", "has_gap"),
+    [
+        ("must", "waived", True),
+        ("must", "equivalent", False),
+        ("should", "waived", False),
+        ("may", "waived", False),
+        ("unspecified", "unknown", True),
+        ("unspecified", "waived", False),
+    ],
+)
+def test_instruction_coverage_reducer_requires_unresolved_strength_decision(
+    strength: str, outcome: str, has_gap: bool
+) -> None:
+    specification = {
+        "clause_id": "clause-1",
+        "obligation_evidence": {"normative_strength": strength},
+    }
+    decision = {"outcome": outcome, "explanation": "Reviewed the candidate."}
+
+    gaps = _instruction_coverage_gaps([specification], [decision])
+
+    assert bool(gaps) is has_gap
 
 
 def test_feature_flow_falls_back_to_source_tree_for_external_target(

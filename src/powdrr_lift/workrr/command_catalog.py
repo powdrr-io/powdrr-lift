@@ -747,6 +747,7 @@ def feature_command_catalog(
                 "finalize_obligation_closure",
                 "prepare_final_implementation_review",
                 "correct_candidate_from_structrr_diff",
+                "start_candidate_correction",
                 "get_candidate_correction_review",
                 "finalize_implementation_review",
             )
@@ -2837,6 +2838,8 @@ class FeatureCommandRuntime:
             )
         if name == "get_candidate_correction_review":
             return feature_endpoint._get_candidate_correction_review(state)
+        if name == "start_candidate_correction":
+            return feature_endpoint._start_candidate_correction(state)
         if name == "evaluate_deterministic_decision":
             return feature_endpoint._evaluate_deterministic_decision(parameters)
         if name in {

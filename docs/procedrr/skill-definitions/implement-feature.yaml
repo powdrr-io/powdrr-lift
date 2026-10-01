@@ -652,15 +652,60 @@ steps:
           candidate_comparison_blockers: {type: array}
           candidate_correction_attempts: {type: integer, minimum: 0, maximum: 2}
       bind: candidate_review
+  - operation:
+      tool: internal
+      command: [start_candidate_correction]
+      returns:
+        type: object
+        required: [done, review]
+        properties:
+          done: {type: boolean}
+          review: {type: object}
+      bind: candidate_correction
   - repeat:
       max_iterations: 2
-      until: {subject: candidate_review.candidate_structural_gate_passed, equals: true}
+      until: {subject: candidate_correction.done, equals: true}
       body:
+        - operation:
+            tool: internal
+            command: [get_candidate_correction_review]
+            returns: {type: object}
+            bind: correction_review
+        - for_each:
+            snapshot: {name: correction_review.instruction_coverage_worklist.specifications, max_items: 4096}
+            item_binding: correction_instruction_decision
+            collect: {binding: correction_instruction_decisions, mode: list, value: correction_instruction_result}
+            body:
+              - judge:
+                  kind: verify_instruction_coverage
+                  provider: planning
+                  question: Does the final candidate meet this obligation's acceptance criterion?
+                  subject: correction_instruction_decision.acceptance_criterion
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Evaluate only this one obligation's acceptance criterion against the current candidate evidence.
+                    - Consider its source clause and design projection, then inspect the proposal comparison, actual diff, and validation evidence.
+                    - Treat the diff as one evidence source; equivalent or already-satisfied behavior can fulfill the criterion without the planned change appearing literally.
+                    - Return fulfilled, equivalent, or already_satisfied only with concrete candidate evidence.
+                    - For SHOULD, MAY, or unspecified strength, return waived only when the explanation gives a reason omission is acceptable. MUST obligations cannot be waived.
+                    - Do not judge sibling obligations or propose a repair; Powdrr uses unresolved results to form the repair prompt.
+                  context: [correction_instruction_decision, feature_description, plan, validation, correction_review]
+                  output:
+                    name: correction_instruction_result
+                    schema:
+                      type: object
+                      required: [outcome, explanation]
+                      additionalProperties: false
+                      properties:
+                        outcome: {type: string, enum: [fulfilled, equivalent, already_satisfied, waived, partial, unmet, unknown]}
+                        explanation: {type: string, minLength: 1}
+                  validation: {kind: json_schema}
         - operation:
             tool: internal
             command: [correct_candidate_from_structrr_diff]
             parameters:
-              review: {type: reference, value: candidate_review}
+              review: {type: reference, value: correction_review}
+              instruction_coverage_decisions: {type: reference, value: correction_instruction_decisions}
             returns:
               type: object
               required: [done, review]
@@ -749,7 +794,8 @@ steps:
               - The source audit proves that the instruction was represented in the design; it does not prove implementation fulfillment.
               - Treat the diff as one evidence source. Accept equivalent implementations and already-satisfied behavior when candidate evidence establishes the criterion.
               - Return fulfilled, equivalent, or already_satisfied only with concrete candidate evidence. Return partial, unmet, or unknown when the evidence supports those outcomes.
-              - MUST clauses need fulfillment, equivalence, or already-satisfied evidence. SHOULD clauses may be waived only with an explanation that states why.
+              - MUST clauses need fulfillment, equivalence, or already-satisfied evidence and cannot be waived. SHOULD and MAY clauses may be waived only with an explanation that states why omission is acceptable.
+              - For unspecified strength, use the source wording and evidence contract to resolve the obligation; return waived only with an explicit rationale.
               - Keep invariant judgments in the separate invariant review; do not infer invariant preservation from this result.
               - Do not judge sibling clauses or issue an aggregate verdict. Do not return IDs or fingerprints.
             context: [instruction_coverage_decision, feature_description, plan, validation, final_implementation_review]

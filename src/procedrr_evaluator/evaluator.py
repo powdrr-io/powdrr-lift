@@ -186,7 +186,7 @@ class Evaluator:
                     EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
                 )
             elif "gate" in step:
-                self._gate(step["gate"], state, step_path)
+                self._gate(step["gate"], state, events, step_path)
             else:
                 raise EvaluationError(f"{step_path} has no supported control")
 
@@ -836,12 +836,27 @@ class Evaluator:
             )
 
     def _gate(
-        self, gate: Mapping[str, Any], state: Mapping[str, Any], path: str
+        self,
+        gate: Mapping[str, Any],
+        state: dict[str, Any],
+        events: list[EvaluationEvent],
+        path: str,
     ) -> None:
-        if _resolve_binding(state, str(gate["subject"])) != gate["equals"]:
-            subject = str(gate["subject"])
-            root = subject.split(".", 1)[0]
-            raise ValidationGateError(_resolve_binding(state, root))
+        subject = str(gate["subject"])
+        observed = _resolve_binding(state, subject)
+        if observed == gate["equals"]:
+            return
+        if state.get("benchmark_mode") is True:
+            warning = {
+                "subject": subject,
+                "expected": gate["equals"],
+                "observed": observed,
+            }
+            state.setdefault("benchmark_gate_warnings", []).append(warning)
+            events.append(EvaluationEvent("benchmark_gate_warning", path, warning))
+            return
+        root = subject.split(".", 1)[0]
+        raise ValidationGateError(_resolve_binding(state, root))
 
     @staticmethod
     def _limit(

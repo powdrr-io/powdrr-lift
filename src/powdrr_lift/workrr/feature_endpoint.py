@@ -284,10 +284,17 @@ def run_feature_endpoint(
             branch=branch,
         )
     except Exception as error:
-        _write_failure_artifact(
-            output_root,
-            _failure_for_exception(error, output_root, config),
-        )
+        failure = _failure_for_exception(error, output_root, config)
+        _write_failure_artifact(output_root, failure)
+        if config.benchmark_mode:
+            return _benchmark_issues_result(
+                config,
+                output_root=output_root,
+                branch=branch,
+                worktree=worktree,
+                error=error,
+                failure=failure,
+            )
         raise
 
 
@@ -316,6 +323,8 @@ def run_feature_in_place(
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     _exclude_telemetry_from_patch(root, output_root)
+    branch = "HEAD"
+    initial_head: str | None = None
     try:
         _require_clean_root(root, runner)
         branch = _git_output(runner, root, ["git", "branch", "--show-current"])
@@ -343,11 +352,16 @@ def run_feature_in_place(
             )
         return result
     except Exception as error:
-        _write_failure_artifact(
-            output_root,
-            _failure_for_exception(error, output_root, config),
+        failure = _failure_for_exception(error, output_root, config)
+        _write_failure_artifact(output_root, failure)
+        return _benchmark_issues_result(
+            config,
+            output_root=output_root,
+            branch=branch,
+            worktree=root,
+            error=error,
+            failure=failure,
         )
-        raise
 
 
 def _execute_procedrr_flow(
@@ -365,6 +379,8 @@ def _execute_procedrr_flow(
         "task_id": config.task_id or config.work_item_name,
         "design_only": config.design_only,
         "capture_worker_prompts_only": config.capture_worker_prompts_only,
+        "benchmark_mode": config.benchmark_mode,
+        "benchmark_gate_warnings": [],
         "submission_base": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
     }
     flow_path = (
@@ -392,6 +408,7 @@ def _execute_procedrr_flow(
     replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
     procedrr_event_path.touch()
     external_search_event_state = {"pending": False}
+    benchmark_gate_warnings: list[dict[str, Any]] = []
 
     def record_procedrr_event(event: Any) -> None:
         is_redacted_search_judge = (
@@ -407,6 +424,8 @@ def _execute_procedrr_flow(
         event_data = redact_external_contract_search_event(
             event.kind, event.data, external_search_event_state
         )
+        if event.kind == "benchmark_gate_warning":
+            benchmark_gate_warnings.append(dict(event_data))
         record = {
             "record_type": "procedrr.step",
             "kind": event.kind,
@@ -543,10 +562,29 @@ def _execute_procedrr_flow(
             artifact_paths=_artifact_paths(output_root),
         )
         _write_failure_artifact(output_root, failure)
-        result = _feature_endpoint_result(
-            state, branch, worktree, "review_failed", failure=failure
-        )
+        if config.benchmark_mode:
+            state["review"] = {
+                "passed": False,
+                "benchmark_mode": True,
+                "potential_issues": [
+                    *benchmark_gate_warnings,
+                    {
+                        "category": "execution_error",
+                        "type": type(error).__name__,
+                        "message": str(error),
+                    },
+                ],
+                "stopped_at": "procedrr_evaluation",
+            }
+            result = _feature_endpoint_result(
+                state, branch, worktree, "completed_with_issues", failure=failure
+            )
+        else:
+            result = _feature_endpoint_result(
+                state, branch, worktree, "review_failed", failure=failure
+            )
     else:
+        state["benchmark_gate_warnings"] = benchmark_gate_warnings
         if config.design_only:
             canonical_path = state.get("canonical_feature_design_path")
             if isinstance(canonical_path, Path):
@@ -562,6 +600,17 @@ def _execute_procedrr_flow(
                 "scope": "worker prompt compilation",
                 "implementation_review": "not_run",
             }
+        if config.benchmark_mode and benchmark_gate_warnings:
+            review = state.get("review")
+            if not isinstance(review, dict):
+                review = {"passed": True}
+            review.update(
+                {
+                    "benchmark_mode": True,
+                    "potential_issues": benchmark_gate_warnings,
+                }
+            )
+            state["review"] = review
         result = _feature_endpoint_result(
             state,
             branch,
@@ -573,6 +622,8 @@ def _execute_procedrr_flow(
                 if config.capture_worker_prompts_only
                 else "pr_opened"
                 if state.get("pull_request_url")
+                else "completed_with_issues"
+                if config.benchmark_mode and benchmark_gate_warnings
                 else "completed"
             ),
         )
@@ -3446,6 +3497,40 @@ def _feature_endpoint_result(
         state.get("implementation_prompt_path"),
         state.get("structrr_diff_path"),
     )
+
+
+def _benchmark_issues_result(
+    config: FeatureEndpointConfig,
+    *,
+    output_root: Path,
+    branch: str,
+    worktree: Path,
+    error: Exception,
+    failure: RunFailure | None = None,
+) -> FeatureEndpointResult:
+    result = _feature_endpoint_result(
+        {
+            "task_id": config.task_id or config.work_item_name,
+            "review": {
+                "passed": False,
+                "benchmark_mode": True,
+                "potential_issues": [
+                    {
+                        "category": "execution_error",
+                        "type": type(error).__name__,
+                        "message": str(error),
+                    }
+                ],
+                "stopped_at": "feature_flow",
+            },
+        },
+        branch,
+        worktree,
+        "completed_with_issues",
+        failure=failure,
+    )
+    _write_run_result(output_root, result)
+    return result
 
 
 def _write_run_result(output_root: Path, result: FeatureEndpointResult) -> Path:
@@ -6407,6 +6492,72 @@ def _instruction_coverage_worklist(
     return output
 
 
+def _instruction_coverage_gaps(
+    specifications: list[Mapping[str, Any]],
+    decisions: list[Mapping[str, Any]],
+) -> list[tuple[Mapping[str, Any], Mapping[str, Any]]]:
+    """Return unresolved source obligations after validating the review set."""
+    if len(specifications) != len(decisions):
+        raise PowdrrExecutionError("instruction coverage decisions are incomplete")
+    gaps: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
+    resolved_outcomes = {"fulfilled", "equivalent", "already_satisfied"}
+    accepted_outcomes = resolved_outcomes | {"waived"}
+    valid_strengths = {"must", "should", "may", "unspecified"}
+    valid_outcomes = accepted_outcomes | {"partial", "unmet", "unknown"}
+    for specification, decision in zip(specifications, decisions, strict=True):
+        outcome = decision.get("outcome")
+        explanation = decision.get("explanation")
+        evidence = _coverage_contract(specification)
+        strength = (
+            evidence.get("normative_strength")
+            if isinstance(evidence, Mapping)
+            else None
+        )
+        if (
+            outcome not in valid_outcomes
+            or not isinstance(explanation, str)
+            or not explanation.strip()
+        ):
+            raise PowdrrExecutionError("instruction coverage decision is malformed")
+        if strength not in valid_strengths:
+            raise PowdrrExecutionError(
+                "instruction coverage evidence contract has invalid strength"
+            )
+        if strength == "must":
+            covered = outcome in resolved_outcomes
+        else:
+            # SHOULD, MAY, and unspecified requirements need either evidence of
+            # fulfillment or an explicit, reasoned decision to waive them.
+            covered = outcome in accepted_outcomes
+        if not covered:
+            gaps.append((specification, decision))
+    return gaps
+
+
+def _instruction_text(specification: Mapping[str, Any]) -> str:
+    clause = specification.get("clause")
+    text = clause.get("text") if isinstance(clause, Mapping) else None
+    return text if isinstance(text, str) else ""
+
+
+def _coverage_contract(specification: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    evidence = specification.get("obligation_evidence")
+    if not isinstance(evidence, Mapping):
+        return None
+    contract = evidence.get("evidence_contract", evidence)
+    return contract if isinstance(contract, Mapping) else None
+
+
+def _coverage_expectation(specification: Mapping[str, Any]) -> str:
+    evidence = _coverage_contract(specification)
+    if not isinstance(evidence, Mapping):
+        return "unknown"
+    return (
+        f"{evidence.get('normative_strength', 'unknown')}/"
+        f"{evidence.get('diff_expectation', 'unknown')}"
+    )
+
+
 def _correct_candidate_from_structrr_diff(
     parameters: Mapping[str, Any],
     *,
@@ -6419,27 +6570,50 @@ def _correct_candidate_from_structrr_diff(
     state: dict[str, Any],
     **_: Any,
 ) -> dict[str, Any]:
-    """Use the existing coding-agent session for at most two diff repairs."""
-    review = state.get("latest_candidate_review")
+    """Use the existing coding-agent session for at most two focused repairs."""
+    review = parameters.get("review")
     if not isinstance(review, Mapping):
         raise PowdrrExecutionError("candidate correction has no structural review")
-    if review.get("candidate_structural_gate_passed") is True:
-        return {"done": True, "review": dict(review)}
     attempts = int(state.get("candidate_correction_attempts", 0))
     if attempts >= 2:
         return {"done": True, "review": dict(review)}
 
-    blockers = review.get("candidate_comparison_blockers", [])
+    coverage_specs = _flow_items(
+        (review.get("instruction_coverage_worklist") or {}).get("specifications")
+        if isinstance(review.get("instruction_coverage_worklist"), Mapping)
+        else None
+    )
+    coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
+    coverage_gaps = _instruction_coverage_gaps(coverage_specs, coverage_decisions)
+    structural_gaps = review.get("candidate_comparison_blockers", [])
+    if review.get("candidate_structural_gate_passed") is True and not coverage_gaps:
+        return {"done": True, "review": dict(review), "attempts": attempts}
+
+    correction_items = [
+        *(f"Structrr comparison: {item}" for item in structural_gaps),
+        *(
+            "Instruction obligation "
+            f"{specification.get('clause_id')}: "
+            f"source instruction={_instruction_text(specification)}; "
+            f"acceptance criterion={specification.get('acceptance_criterion')}; "
+            f"evidence expectation={_coverage_expectation(specification)}; "
+            f"(review outcome: {decision.get('outcome')}; "
+            f"evidence assessment: {decision.get('explanation')})"
+            for specification, decision in coverage_gaps
+        ),
+    ]
     prompt = (
-        "Correct the current feature implementation to better match its accepted "
-        "Structrr proposal. Keep the existing coding-agent session and current "
-        "worktree; preserve correct changes and edit only issues listed below. "
-        "Do not re-plan or restart the feature. After making focused corrections, "
-        "run the relevant validation commands.\n\n"
+        "Correct the current feature implementation to address the reported gaps "
+        "against its accepted Structrr proposal and original instruction obligations. "
+        "Keep the existing coding-agent session and current worktree; preserve "
+        "correct changes and edit only the reported gaps. Do not re-plan or restart "
+        "the feature. Equivalent implementations and behavior already present in "
+        "the candidate do not need to be changed. After focused corrections, run "
+        "the relevant validation commands.\n\n"
         f"Attempt {attempts + 1} of 2.\n"
         f"Comparison artifact: {review.get('candidate_comparison_path', '')}\n"
         f"Actual diff artifact: {review.get('actual_diff_path', '')}\n"
-        "Reported differences:\n" + "\n".join(f"- {item}" for item in blockers)
+        "Reported gaps:\n" + "\n".join(f"- {item}" for item in correction_items)
     )
     state["candidate_correction_attempts"] = attempts + 1
     _run_code_agent_phase(
@@ -6474,10 +6648,15 @@ def _correct_candidate_from_structrr_diff(
         config=config,
     )
     state["latest_candidate_review"] = refreshed
-    done = (
-        refreshed.get("candidate_structural_gate_passed") is True or attempts + 1 >= 2
-    )
-    return {"done": done, "review": refreshed, "attempts": attempts + 1}
+    # Coverage is judged again from the refreshed worklist on the next loop
+    # iteration. Stop only when both review routes pass, or after two repairs.
+    done = attempts + 1 >= 2
+    return {
+        "done": done,
+        "review": refreshed,
+        "attempts": attempts + 1,
+        "correction_reasons": correction_items,
+    }
 
 
 def _get_candidate_correction_review(state: Mapping[str, Any]) -> dict[str, Any]:
@@ -6485,6 +6664,11 @@ def _get_candidate_correction_review(state: Mapping[str, Any]) -> dict[str, Any]
     if not isinstance(review, Mapping):
         raise PowdrrExecutionError("candidate correction did not produce a review")
     return dict(review)
+
+
+def _start_candidate_correction(state: Mapping[str, Any]) -> dict[str, Any]:
+    """Initialize the bounded correction loop with the current candidate review."""
+    return {"done": False, "review": _get_candidate_correction_review(state)}
 
 
 def _candidate_structural_gate(
@@ -6613,48 +6797,18 @@ def _finalize_implementation_review(
         else None
     )
     coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
-    if len(coverage_specs) != len(coverage_decisions):
-        raise PowdrrExecutionError("instruction coverage decisions are incomplete")
+    coverage_gaps = _instruction_coverage_gaps(coverage_specs, coverage_decisions)
+    coverage_complete = not coverage_gaps
     coverage_outcomes = []
-    coverage_complete = True
     for specification, decision in zip(coverage_specs, coverage_decisions, strict=True):
         outcome = decision.get("outcome")
         explanation = decision.get("explanation")
-        if (
-            outcome
-            not in {
-                "fulfilled",
-                "equivalent",
-                "already_satisfied",
-                "waived",
-                "partial",
-                "unmet",
-                "unknown",
-            }
-            or not isinstance(explanation, str)
-            or not explanation.strip()
-        ):
-            raise PowdrrExecutionError("instruction coverage decision is malformed")
-        if outcome == "waived" and not explanation.strip():
-            raise PowdrrExecutionError("instruction waiver requires a rationale")
-        evidence = specification.get("obligation_evidence")
+        evidence = _coverage_contract(specification)
         strength = (
             evidence.get("normative_strength")
             if isinstance(evidence, Mapping)
             else None
         )
-        resolved = outcome in {"fulfilled", "equivalent", "already_satisfied"}
-        if strength == "must" and not resolved:
-            coverage_complete = False
-        elif strength == "should" and outcome not in {
-            "fulfilled",
-            "equivalent",
-            "already_satisfied",
-            "waived",
-        }:
-            coverage_complete = False
-        elif strength is None and outcome in {"partial", "unmet", "unknown"}:
-            coverage_complete = False
         coverage_outcomes.append(
             {
                 "clause_id": specification.get("clause_id"),

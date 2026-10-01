@@ -3812,10 +3812,14 @@ def _write_structrr_plan_from_obligations(
                 "invalid instruction reference"
             )
         lineage = {"instruction_ref": instruction_ref} if instruction_ref else {}
-        binding = _resolve_bootstrap_subject_binding(
-            " ".join((description_text, acceptance_text, expected_test_text)),
-            source_subjects,
-        )
+        raw_binding = design.get("repository_binding")
+        if isinstance(raw_binding, Mapping):
+            binding = _validated_repository_binding(raw_binding, source_subjects)
+        else:
+            binding = _resolve_bootstrap_subject_binding(
+                " ".join((description_text, acceptance_text, expected_test_text)),
+                source_subjects,
+            )
         binding_diagnostics.append(
             {
                 "obligation_id": obligation_id,
@@ -4014,6 +4018,44 @@ def _resolve_bootstrap_subject_binding(
         "status": "unmatched",
         "reason": "no_explicit_source_symbol",
         "candidate_ids": [],
+    }
+
+
+def _validated_repository_binding(
+    binding: Mapping[str, Any], source_subjects: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Accept a semantic binding only when its ID exists in this bootstrap."""
+    status = binding.get("status")
+    candidate_ids = binding.get("candidate_ids", [])
+    if not isinstance(candidate_ids, list) or not all(
+        isinstance(item, str) for item in candidate_ids
+    ):
+        candidate_ids = []
+    common = {
+        "candidate_ids": candidate_ids,
+        "retrieval_status": binding.get("retrieval_status", "complete"),
+        "validation_source": "candidate_relation_judgment",
+    }
+    if status == "bound":
+        entity_id = binding.get("binding_ref")
+        known_ids = {
+            item.get("id")
+            for item in source_subjects
+            if isinstance(item.get("id"), str)
+        }
+        if isinstance(entity_id, str) and entity_id in known_ids:
+            return {"status": "bound", "entity_id": entity_id, **common}
+        return {
+            "status": "unmatched",
+            "reason": "binding_not_in_bootstrap_inventory",
+            **common,
+        }
+    return {
+        "status": "ambiguous"
+        if binding.get("reason_code") == "multiple_candidates"
+        else "unmatched",
+        "reason": binding.get("reason_code", "no_candidate"),
+        **common,
     }
 
 
@@ -5358,6 +5400,7 @@ def _compile_design_only_structrr_diff(
                     "expected_test": item.get("expected_test"),
                     "clause_id": clause_id,
                     "behavior_scenario": behavior_scenario,
+                    "repository_binding": projection.get("repository_binding"),
                 },
             }
         )

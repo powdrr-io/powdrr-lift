@@ -196,6 +196,12 @@ class DeterministicPlanningClient:
                 },
             }
         if required == {"status", "value", "reason_code"}:
+            if "candidate_relation_request" in text:
+                return {
+                    "status": "resolved",
+                    "value": "insufficient_evidence",
+                    "reason_code": None,
+                }
             decision_kind = _find_json_value(text, "decision_kind")
             if _find_json_value(text, "candidate_field") is not None:
                 return {"status": "resolved", "value": "entailed", "reason_code": None}

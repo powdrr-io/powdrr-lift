@@ -50,7 +50,11 @@ class RunFailure:
 
 
 def collect_run_metadata(
-    *, task_id: str, repo_root: Path, output_root: Path
+    *,
+    task_id: str,
+    repo_root: Path,
+    output_root: Path,
+    submission_base: str | None = None,
 ) -> dict[str, Any]:
     """Collect reproducibility metadata without making the run depend on Git."""
     try:
@@ -70,6 +74,7 @@ def collect_run_metadata(
         "opencode_version": _command_version("opencode", repo_root),
         "repo_root": str(repo_root),
         "output_root": str(output_root),
+        "submission_base": submission_base,
     }
 
 

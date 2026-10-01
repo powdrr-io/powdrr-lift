@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -13,8 +14,13 @@ from typing import Any
 import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
+from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.entity_taxonomy import EntityTaxonomy, load_entity_taxonomy
 from powdrr_lift.core.spec_paths import is_specification_path
+from powdrr_lift.structrr.source_manifest import (
+    SourceManifest,
+    compile_source_manifest,
+)
 
 _SCHEMA = "https://powdrr.io/schema/changelog-v2"
 _BOOTSTRAP_SCHEMA = "https://powdrr.io/schema/structrr-bootstrap-v1"
@@ -22,8 +28,12 @@ _DEFAULT_OUTPUT_DIRECTORY = Path("docs/structrr/current")
 _IGNORED_PREFIXES = (
     ".git/",
     ".github/",
+    ".powdrr/",
     "docs/structrr/current/",
     ".worktrees/",
+    ".pytest_cache/",
+    "__pycache__/",
+    ".venv/",
     "node_modules/",
     "vendor/",
 )
@@ -97,6 +107,8 @@ class BootstrapResult:
     document: dict[str, Any]
     validation: BootstrapValidationReport
     evidence_files: tuple[str, ...] = field(default_factory=tuple)
+    source_manifest: SourceManifest | None = None
+    manifest_path: Path | None = None
 
 
 def bootstrap_structrr(
@@ -107,6 +119,9 @@ def bootstrap_structrr(
     title: str | None = None,
     taxonomy_path: str | Path = "software_development_entity_taxonomy.md",
     benchmark_mode: bool = False,
+    include_untracked: bool = False,
+    artifact_exclusions: Sequence[str] = (),
+    submission_base: str | None = None,
 ) -> BootstrapResult:
     """Build and validate a Structrr snapshot from tracked repository evidence.
 
@@ -117,7 +132,11 @@ def bootstrap_structrr(
     """
     root = Path(repo_root).resolve()
     taxonomy = load_entity_taxonomy(root, taxonomy_path)
-    tracked_files = _tracked_files(root)
+    tracked_files = _tracked_files(
+        root,
+        include_untracked=include_untracked,
+        artifact_exclusions=artifact_exclusions,
+    )
     spec_paths = tuple(path for path in tracked_files if is_specification_path(path))
     spec_documents = _load_spec_documents(root, spec_paths)
     document = _build_document(
@@ -131,6 +150,29 @@ def bootstrap_structrr(
         benchmark_mode=benchmark_mode,
     )
     validation = validate_bootstrap_document(document, root=root, taxonomy=taxonomy)
+    source_revision_result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    source_revision = source_revision_result.stdout.strip()
+    if source_revision_result.returncode != 0 or not source_revision:
+        source_revision = "unavailable"
+    source_manifest = compile_source_manifest(
+        str(root),
+        tracked_files,
+        submission_base=submission_base or source_revision,
+        source_revision=source_revision,
+        taxonomy_fingerprint=content_fingerprint(
+            {"entity_types": list(taxonomy.entity_types)}
+        ),
+        excluded_paths=(
+            *_IGNORED_PREFIXES,
+            "docs/changelogs/",
+            *artifact_exclusions,
+        ),
+    )
     selected_output = (
         Path(output_path) if output_path is not None else _default_output_path(root)
     )
@@ -143,11 +185,19 @@ def bootstrap_structrr(
             yaml.safe_dump(document, sort_keys=False, allow_unicode=False),
             encoding="utf-8",
         )
+    manifest_path = resolved_output.with_suffix(".manifest.json")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(source_manifest.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return BootstrapResult(
         output_path=resolved_output,
         document=document,
         validation=validation,
         evidence_files=tracked_files,
+        source_manifest=source_manifest,
+        manifest_path=manifest_path,
     )
 
 
@@ -781,9 +831,17 @@ def _validated_mapping_list(
     return entries
 
 
-def _tracked_files(root: Path) -> tuple[str, ...]:
+def _tracked_files(
+    root: Path,
+    *,
+    include_untracked: bool = False,
+    artifact_exclusions: Sequence[str] = (),
+) -> tuple[str, ...]:
+    arguments = ["git", "-C", str(root), "ls-files"]
+    if include_untracked:
+        arguments.extend(["--cached", "--others", "--exclude-standard"])
     result = subprocess.run(
-        ["git", "-C", str(root), "ls-files"],
+        arguments,
         capture_output=True,
         text=True,
         check=False,
@@ -798,8 +856,19 @@ def _tracked_files(root: Path) -> tuple[str, ...]:
         sorted(
             path
             for path in paths
-            if _is_bootstrap_file(path) and (root / path).is_file()
+            if _is_bootstrap_file(path)
+            and not _is_artifact_excluded(path, artifact_exclusions)
+            and (root / path).is_file()
         )
+    )
+
+
+def _is_artifact_excluded(path: str, exclusions: Sequence[str]) -> bool:
+    normalized = path.replace("\\", "/").strip("/")
+    return any(
+        normalized == exclusion.strip("/")
+        or normalized.startswith(exclusion.strip("/") + "/")
+        for exclusion in exclusions
     )
 
 

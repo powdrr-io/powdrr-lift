@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -347,6 +348,37 @@ def test_bootstrap_skips_tracked_symlinks_to_directories(tmp_path: Path) -> None
 
     assert result.validation.successful
     assert "src/directory-link" not in result.evidence_files
+
+
+def test_bootstrap_can_include_new_candidate_files_and_exclude_runtime_plans(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    new_source = repo / "src" / "new_behavior.py"
+    new_source.write_text("def new_behavior(): pass\n", encoding="utf-8")
+    planning_artifact = repo / "docs" / "proposals" / "candidate" / "structrr-diff.yaml"
+    planning_artifact.parent.mkdir(parents=True)
+    planning_artifact.write_text(
+        "features:\n  - id: proposed-only\n    action: added\n",
+        encoding="utf-8",
+    )
+
+    result = bootstrap_structrr(
+        repo,
+        output_path=tmp_path / "candidate.yaml",
+        include_untracked=True,
+        artifact_exclusions=("docs/proposals/candidate/structrr-diff.yaml",),
+    )
+
+    assert result.validation.successful
+    assert "src/new_behavior.py" in result.evidence_files
+    assert "docs/proposals/candidate/structrr-diff.yaml" not in result.evidence_files
+    assert result.source_manifest is not None
+    assert result.source_manifest.coverage_complete is True
+    assert "src/new_behavior.py" in {item.path for item in result.source_manifest.files}
+    assert result.manifest_path == tmp_path / "candidate.manifest.json"
+    persisted_manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    assert persisted_manifest["fingerprint"] == result.source_manifest.fingerprint
 
 
 def test_bootstrap_is_deterministic_and_does_not_stage_output(tmp_path: Path) -> None:

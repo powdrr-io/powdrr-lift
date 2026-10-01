@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core.repository_inventory import (
@@ -32,6 +34,7 @@ def prepare_subject_lookup_query(
     explicit_names: Sequence[str] = (),
     structrr_context_fingerprint: str = "",
 ) -> LookupQuery:
+    inferred_names = extract_explicit_repository_names(contract.proposition_text)
     return LookupQuery(
         source_ref=contract.source_ref,
         source_text=contract.proposition_text,
@@ -39,7 +42,7 @@ def prepare_subject_lookup_query(
         disposition=contract.disposition,
         behavior_family=contract.behavior_family,
         inventory_fingerprint=inventory.fingerprint,
-        explicit_names=tuple(explicit_names),
+        explicit_names=tuple(dict.fromkeys((*explicit_names, *inferred_names))),
         structrr_context_fingerprint=structrr_context_fingerprint,
     )
 
@@ -49,7 +52,90 @@ def retrieve_subject_candidates(
     inventory: RepositoryInventory,
     context: StructrrLookupContext | None = None,
 ) -> CandidateSet:
-    return retrieve_candidates(query, inventory, context)
+    explicit_names = {name.casefold() for name in query.explicit_names}
+    subject_text = query.subject_text.casefold().strip()
+    subject_terms = frozenset(query.normalized_terms)
+    accepted_aliases = {
+        alias.casefold()
+        for alias in (
+            context.aliases.get(query.subject_text.casefold(), ()) if context else ()
+        )
+    }
+    relevant_records = tuple(
+        record
+        for record in inventory.records
+        if (
+            record.canonical_name.casefold() in explicit_names
+            or record.qualified_name.casefold() in explicit_names
+            or any(
+                record.qualified_name.casefold().endswith("." + name)
+                for name in explicit_names
+            )
+            or record.canonical_name.casefold() == subject_text
+            or record.qualified_name.casefold() == subject_text
+            or record.canonical_name.casefold() in accepted_aliases
+            or frozenset(record.normalized_terms) == subject_terms
+        )
+    )
+    lookup_inventory = RepositoryInventory(
+        inventory.commit_ref,
+        inventory.structrr_revision,
+        inventory.adapter_revisions,
+        relevant_records,
+    )
+    try:
+        candidates = retrieve_candidates(query, lookup_inventory, context)
+        if candidates.inventory_fingerprint != inventory.fingerprint:
+            candidates = CandidateSet(
+                candidates.query_fingerprint,
+                inventory.fingerprint,
+                candidates.candidates,
+                retrieval_status=candidates.retrieval_status,
+            )
+        return candidates
+    except InventoryError as exc:
+        if str(exc) != "candidate_overflow":
+            raise
+        return CandidateSet(
+            query.fingerprint,
+            inventory.fingerprint,
+            (),
+            retrieval_status="candidate_overflow",
+        )
+
+
+def extract_explicit_repository_names(source_text: str) -> tuple[str, ...]:
+    """Extract code-like names from source text for deterministic retrieval."""
+    names: set[str] = set()
+    generic = {"call", "get", "set", "run", "open", "main", "__init__"}
+
+    def add_name(value: str, *, allow_generic: bool = False) -> None:
+        if re.fullmatch(r"[A-Za-z_]\w*", value) is None:
+            return
+        if value.casefold() in generic and not allow_generic:
+            return
+        names.add(value)
+
+    for quoted in re.findall(r"`([^`]+)`", source_text):
+        for dotted_name in re.findall(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+", quoted):
+            names.add(dotted_name)
+            add_name(dotted_name.rsplit(".", 1)[-1])
+        for identifier in re.findall(r"(?<![\w.])[A-Za-z_]\w*(?![\w.])", quoted):
+            add_name(identifier, allow_generic=True)
+    for dotted_name in re.findall(
+        r"(?<![\w.])[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+(?!\w)", source_text
+    ):
+        names.add(dotted_name)
+        add_name(dotted_name.rsplit(".", 1)[-1])
+    for call_name in re.findall(r"(?<![\w.])([A-Za-z_]\w*)\s*\(", source_text):
+        add_name(call_name)
+    for identifier in re.findall(
+        r"(?<![\w])[A-Za-z_]\w*_[A-Za-z0-9_]+(?![\w])", source_text
+    ):
+        add_name(identifier)
+    for identifier in re.findall(r"\b[A-Z][A-Z0-9_]*\d+[A-Z0-9_]*\b", source_text):
+        add_name(identifier, allow_generic=True)
+    return tuple(sorted(names, key=lambda name: (name.casefold(), name)))
 
 
 def prepare_candidate_relation_decisions(
@@ -103,6 +189,68 @@ def prepare_candidate_relation_decisions(
     return requests
 
 
+def add_candidate_source_excerpts(
+    requests: Sequence[Mapping[str, Any]],
+    repository_root: Path,
+    *,
+    max_lines: int = 16,
+    max_characters: int = 1600,
+) -> list[dict[str, Any]]:
+    """Attach bounded source excerpts for exact candidate review."""
+    root = repository_root.resolve()
+    enriched: list[dict[str, Any]] = []
+    for request in requests:
+        copied = dict(request)
+        raw_candidate = request.get("candidate")
+        if not isinstance(raw_candidate, Mapping):
+            enriched.append(copied)
+            continue
+        candidate = dict(raw_candidate)
+        raw_record = candidate.get("record")
+        if isinstance(raw_record, Mapping):
+            record = dict(raw_record)
+            path_value = record.get("path")
+            span = record.get("span")
+            if isinstance(path_value, str) and isinstance(span, Mapping):
+                try:
+                    start_line = int(span["start_line"])
+                    end_line = int(span["end_line"])
+                    source_path = (root / path_value).resolve(strict=True)
+                    if (
+                        source_path.is_relative_to(root)
+                        and source_path.is_file()
+                        and start_line > 0
+                        and end_line >= start_line
+                    ):
+                        lines = source_path.read_text(encoding="utf-8").splitlines()
+                        excerpt = "\n".join(
+                            lines[
+                                start_line - 1 : min(
+                                    end_line, start_line + max_lines - 1
+                                )
+                            ]
+                        )
+                        excerpt = excerpt[:max_characters]
+                        if excerpt:
+                            candidate["source_excerpt"] = {
+                                "path": path_value,
+                                "start_line": start_line,
+                                "text": excerpt,
+                            }
+                except (
+                    OSError,
+                    RuntimeError,
+                    UnicodeError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                ):
+                    pass
+        copied["candidate"] = candidate
+        enriched.append(copied)
+    return enriched
+
+
 def bind_candidate_relation_decisions(
     requests: Sequence[Mapping[str, Any]],
     provider_results: Sequence[Mapping[str, Any]],
@@ -154,8 +302,10 @@ def finalize_subject_binding(
 
 __all__ = [
     "CANDIDATE_RELATION_REVISION",
+    "add_candidate_source_excerpts",
     "bind_candidate_relation_decisions",
     "finalize_subject_binding",
+    "extract_explicit_repository_names",
     "prepare_candidate_relation_decisions",
     "prepare_subject_lookup_query",
     "retrieve_subject_candidates",

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from powdrr_lift.core.repository_inventory import (
     InventoryError,
@@ -13,6 +14,7 @@ from powdrr_lift.core.repository_inventory import (
     aggregate_candidate_relations,
     build_inventory,
     enumerate_population,
+    inventory_from_source_subjects,
     normalize_terms,
     retrieve_candidates,
 )
@@ -21,7 +23,9 @@ from powdrr_lift.workrr.command_catalog import (
     feature_command_catalog,
 )
 from powdrr_lift.workrr.repository_subject_binding import (
+    add_candidate_source_excerpts,
     bind_candidate_relation_decisions,
+    extract_explicit_repository_names,
     finalize_subject_binding,
     prepare_candidate_relation_decisions,
 )
@@ -86,6 +90,32 @@ def test_relation_aggregation_never_chooses_between_multiple_matches() -> None:
     assert result == {"status": "unresolved", "reason_code": "multiple_candidates"}
 
 
+def test_one_match_with_an_uncertain_candidate_does_not_bind() -> None:
+    candidates = _inventory(_record("DataA"), _record("DataB"))
+    query = LookupQuery(
+        "instruction-001",
+        "data",
+        "data",
+        "invariant",
+        "serialize",
+        candidates.fingerprint,
+    )
+    candidate_set = retrieve_candidates(query, candidates)
+    decisions = {
+        candidate.record.inventory_id: (
+            "matches"
+            if candidate.record.canonical_name == "DataA"
+            else "insufficient_evidence"
+        )
+        for candidate in candidate_set.candidates
+    }
+    result = aggregate_candidate_relations(candidate_set, decisions, quantifier="one")
+    assert result == {
+        "status": "unresolved",
+        "reason_code": "repository_evidence_missing",
+    }
+
+
 def test_population_receipt_validates_current_members() -> None:
     inventory = _inventory(_record("Data"))
     receipt = enumerate_population(
@@ -119,6 +149,91 @@ def test_python_adapter_collects_symbols_without_model_input(tmp_path: Path) -> 
         "pickle_data",
     }
     assert inventory.fingerprint.startswith("sha256:")
+
+
+def test_structrr_source_subjects_preserve_identity_and_locations() -> None:
+    inventory = inventory_from_source_subjects(
+        [
+            {
+                "id": "python:src/client.py::client.fetch",
+                "qualified_name": "client.fetch",
+                "kind": "function",
+                "language": "python",
+                "path": "src/client.py",
+                "span": {"start_line": 4, "end_line": 9},
+                "file_entity_id": "file:src/client.py",
+            }
+        ],
+        commit_ref="working-tree",
+        structrr_revision="bootstrap:current",
+    )
+    record = inventory.records[0]
+    assert record.inventory_id == "python:src/client.py::client.fetch"
+    assert record.canonical_name == "fetch"
+    assert record.span == (4, 9)
+    assert record.component_refs == ("file:src/client.py",)
+
+
+def test_explicit_repository_names_extract_code_identifiers() -> None:
+    names = extract_explicit_repository_names(
+        "Use `sqlite_utils.Database` and enable_safe_import(); "
+        "B620 calls requests.get and urllib.request.urlopen; do not call()."
+    )
+    assert "sqlite_utils.Database" in names
+    assert "Database" in names
+    assert "enable_safe_import" in names
+    assert "B620" in names
+    assert "urlopen" in names
+    assert "get" not in names
+    assert "call" not in names
+
+
+def test_candidate_relation_requests_include_bounded_repository_source(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    source = repository / "src" / "client.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("class Client:\n    def fetch(self):\n        return 42\n")
+    requests = [
+        {
+            "candidate": {
+                "record": {
+                    "path": "src/client.py",
+                    "span": {"start_line": 1, "end_line": 3},
+                }
+            }
+        }
+    ]
+
+    enriched = add_candidate_source_excerpts(requests, repository)
+
+    assert enriched[0]["candidate"]["source_excerpt"] == {
+        "path": "src/client.py",
+        "start_line": 1,
+        "text": "class Client:\n    def fetch(self):\n        return 42",
+    }
+
+
+def test_candidate_source_excerpt_rejects_paths_outside_repository(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    outside = tmp_path / "secret.py"
+    outside.write_text("private source")
+    request = {
+        "candidate": {
+            "record": {
+                "path": "../secret.py",
+                "span": {"start_line": 1, "end_line": 1},
+            }
+        }
+    }
+
+    enriched = add_candidate_source_excerpts([request], repository)
+
+    assert "source_excerpt" not in enriched[0]["candidate"]
 
 
 def test_workrr_prepares_and_aggregates_one_c09_decision_per_candidate() -> None:
@@ -164,3 +279,45 @@ def test_inventory_is_available_through_the_procedrr_command_boundary(
     )
     assert result["schema_version"] == "semantic-repository-inventory-v1"
     assert any(item["canonical_name"] == "DataRecord" for item in result["records"])
+
+
+def test_command_inventory_prefers_bootstrap_source_subjects(tmp_path: Path) -> None:
+    (tmp_path / "models.py").write_text("class LocalOnly:\n    pass\n")
+    (tmp_path / "validation-bootstrap.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "source_subjects": [
+                    {
+                        "id": "python:pkg/api.py::pkg.api.RemoteRecord",
+                        "qualified_name": "pkg.api.RemoteRecord",
+                        "kind": "class",
+                        "language": "python",
+                        "path": "pkg/api.py",
+                        "span": {"start_line": 3, "end_line": 8},
+                        "file_entity_id": "file:pkg/api.py",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    runtime = FeatureCommandRuntime(
+        config=None,
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="feature/test",
+        slug="inventory",
+        state={},
+        catalog=feature_command_catalog(),
+    )
+    result = runtime.dispatch(
+        "build_semantic_repository_inventory",
+        ["build_semantic_repository_inventory"],
+        {},
+    )
+    records = result["records"]
+    assert [item["inventory_id"] for item in records] == [
+        "python:pkg/api.py::pkg.api.RemoteRecord"
+    ]
+    assert records[0]["component_refs"] == ["file:pkg/api.py"]

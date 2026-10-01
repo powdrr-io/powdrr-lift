@@ -264,12 +264,14 @@ class CandidateSet:
     query_fingerprint: str
     inventory_fingerprint: str
     candidates: tuple[Candidate, ...]
+    retrieval_status: str = "complete"
 
     def to_data(self) -> dict[str, Any]:
         return {
             "query_fingerprint": self.query_fingerprint,
             "inventory_fingerprint": self.inventory_fingerprint,
             "candidates": [candidate.to_data() for candidate in self.candidates],
+            "retrieval_status": self.retrieval_status,
         }
 
     @classmethod
@@ -285,6 +287,7 @@ class CandidateSet:
                 for item in candidates
                 if isinstance(item, Mapping)
             ),
+            str(raw.get("retrieval_status", "complete")),
         )
 
 
@@ -369,6 +372,61 @@ def build_inventory(
     )
 
 
+def inventory_from_source_subjects(
+    source_subjects: Sequence[Mapping[str, Any]],
+    *,
+    commit_ref: str,
+    structrr_revision: str,
+) -> RepositoryInventory:
+    """Adapt validated Structrr source subjects to semantic lookup records."""
+    records: list[InventoryRecord] = []
+    seen_ids: set[str] = set()
+    for index, subject in enumerate(source_subjects):
+        inventory_id = _string(subject, "id")
+        qualified_name = _string(subject, "qualified_name")
+        kind = _string(subject, "kind")
+        language = _string(subject, "language")
+        path = _string(subject, "path")
+        span = subject.get("span")
+        if not isinstance(span, Mapping):
+            raise InventoryError(f"source subject {index} has no span")
+        try:
+            start_line = int(span["start_line"])
+            end_line = int(span["end_line"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise InventoryError(f"source subject {index} has an invalid span") from exc
+        if inventory_id in seen_ids:
+            raise InventoryError(f"duplicate source subject ID: {inventory_id}")
+        seen_ids.add(inventory_id)
+        canonical_name = qualified_name.rsplit(".", 1)[-1]
+        file_entity_id = subject.get("file_entity_id")
+        records.append(
+            InventoryRecord(
+                inventory_id=inventory_id,
+                kind=kind,
+                canonical_name=canonical_name,
+                qualified_name=qualified_name,
+                normalized_terms=normalize_terms(canonical_name),
+                aliases=(),
+                path=path,
+                span=(start_line, end_line),
+                language=language,
+                component_refs=(file_entity_id,)
+                if isinstance(file_entity_id, str) and file_entity_id
+                else (),
+                structrr_refs=(inventory_id,),
+            )
+        )
+    if not records:
+        raise InventoryError("Structrr source subject inventory is empty")
+    return RepositoryInventory(
+        commit_ref=commit_ref,
+        structrr_revision=structrr_revision,
+        adapter_revisions=("structrr-source-subject-adapter-v1",),
+        records=tuple(sorted(records, key=lambda record: record.inventory_id)),
+    )
+
+
 def retrieve_candidates(
     query: LookupQuery,
     inventory: RepositoryInventory,
@@ -380,6 +438,7 @@ def retrieve_candidates(
         normalize_terms(alias)
         for alias in context.aliases.get(query.subject_text.casefold(), ())
     }
+    explicit_names = {name.casefold() for name in query.explicit_names}
     found: dict[str, CandidateEvidence] = {}
     for record in inventory.records:
         record_terms = set(record.normalized_terms)
@@ -395,6 +454,15 @@ def retrieve_candidates(
             reasons.append(("exact_normalized_token_set", 85))
         if alias_terms.intersection({frozenset(record_terms)}):
             reasons.append(("structrr_alias", 95))
+        if (
+            record.canonical_name.casefold() in explicit_names
+            or record.qualified_name.casefold() in explicit_names
+            or any(
+                record.qualified_name.casefold().endswith("." + name)
+                for name in explicit_names
+            )
+        ):
+            reasons.append(("explicit_source_identifier", 90))
         overlap = len(terms.intersection(record_terms))
         if overlap:
             reasons.append(("lexical_overlap", min(overlap * 5, 20)))
@@ -422,6 +490,8 @@ def aggregate_candidate_relations(
     quantifier: str,
     population_refs: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
+    if candidate_set.retrieval_status != "complete":
+        return {"status": "unresolved", "reason_code": candidate_set.retrieval_status}
     if set(decisions) != {
         candidate.record.inventory_id for candidate in candidate_set.candidates
     }:
@@ -436,8 +506,10 @@ def aggregate_candidate_relations(
         for candidate in candidate_set.candidates
         if decisions[candidate.record.inventory_id] == "insufficient_evidence"
     ]
-    if len(matches) == 1:
+    if len(matches) == 1 and not uncertain:
         return {"status": "bound", "binding_ref": matches[0].record.inventory_id}
+    if len(matches) == 1 and uncertain:
+        return {"status": "unresolved", "reason_code": "repository_evidence_missing"}
     if not matches and uncertain:
         return {"status": "unresolved", "reason_code": "repository_evidence_missing"}
     if not matches:
@@ -505,6 +577,7 @@ __all__ = [
     "aggregate_candidate_relations",
     "build_inventory",
     "enumerate_population",
+    "inventory_from_source_subjects",
     "normalize_terms",
     "retrieve_candidates",
 ]

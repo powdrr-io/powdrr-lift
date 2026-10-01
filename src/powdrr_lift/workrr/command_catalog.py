@@ -34,6 +34,7 @@ from powdrr_lift.core.repository_inventory import (
     RepositoryInventory,
     build_inventory,
     enumerate_population,
+    inventory_from_source_subjects,
 )
 from powdrr_lift.core.semantic_contract import (
     BoundSourceExtraction,
@@ -64,6 +65,7 @@ from powdrr_lift.workrr.external_contract_research import (
     search_external_contract_sources,
 )
 from powdrr_lift.workrr.repository_subject_binding import (
+    add_candidate_source_excerpts,
     bind_candidate_relation_decisions,
     finalize_subject_binding,
     prepare_candidate_relation_decisions,
@@ -494,6 +496,31 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("finalize_subject_binding"),
         ),
+        "prepare_repository_subject_binding": CommandSpec(
+            name="prepare_repository_subject_binding",
+            input_schema=object_schema(
+                {"contract": {}},
+                required=("contract",),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("prepare_repository_subject_binding"),
+        ),
+        "finalize_repository_subject_binding": CommandSpec(
+            name="finalize_repository_subject_binding",
+            input_schema=object_schema(
+                {
+                    "candidates": {},
+                    "requests": {},
+                    "results": {},
+                    "quantifier": {},
+                },
+                required=("candidates", "requests", "results", "quantifier"),
+                additional_properties=False,
+            ),
+            output_schema={"type": "object"},
+            logic=implementations.get("finalize_repository_subject_binding"),
+        ),
         "enumerate_subject_population": CommandSpec(
             name="enumerate_subject_population",
             input_schema=object_schema(
@@ -545,7 +572,12 @@ def feature_command_catalog(
         "merge_behavior_scenario": CommandSpec(
             name="merge_behavior_scenario",
             input_schema=object_schema(
-                {"clause": {}, "design": {}, "scenario": {}},
+                {
+                    "clause": {},
+                    "design": {},
+                    "scenario": {},
+                    "repository_binding": {},
+                },
                 required=("clause", "design", "scenario"),
                 additional_properties=False,
             ),
@@ -1441,6 +1473,19 @@ class FeatureCommandRuntime:
             )
 
         def merge_behavior_scenario_operation() -> Any:
+            call_parameters = parameters
+            repository_binding = parameters.get("repository_binding")
+            if isinstance(repository_binding, Mapping):
+                design = parameters.get("design")
+                if not isinstance(design, Mapping):
+                    raise PowdrrExecutionError("behavior scenario has no source design")
+                call_parameters = {
+                    **parameters,
+                    "design": {
+                        **dict(design),
+                        "repository_binding": dict(repository_binding),
+                    },
+                }
             clause = parameters.get("clause")
             if not isinstance(clause, Mapping):
                 raise PowdrrExecutionError("behavior scenario has no source clause")
@@ -1456,14 +1501,14 @@ class FeatureCommandRuntime:
                     return merge_as_source_invariant(clause)
                 try:
                     return _merge_behavior_scenario_values(
-                        parameters,
+                        call_parameters,
                         benchmark_mode=benchmark_mode(),
                     )
                 except PowdrrExecutionError as error:
                     record_benchmark_invariant_fallback(clause, reason=str(error))
                     return merge_as_source_invariant(clause)
             return _merge_behavior_scenario_values(
-                parameters,
+                call_parameters,
                 benchmark_mode=benchmark_mode(),
                 allow_clarification=bool(
                     config is not None
@@ -1555,13 +1600,43 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(str(exc)) from exc
 
         def build_semantic_repository_inventory_operation() -> Any:
+            cached = state.get("semantic_repository_inventory")
+            if isinstance(cached, Mapping):
+                return dict(cached)
             try:
-                inventory = build_inventory(
-                    worktree,
-                    commit_ref="working-tree",
-                    structrr_revision="structrr:current",
-                )
-                return inventory.to_data()
+                bootstrap_path = output_root / "validation-bootstrap.yaml"
+                if bootstrap_path.exists():
+                    bootstrap = feature_endpoint._load_yaml_mapping(bootstrap_path)
+                    source_subjects = bootstrap.get("source_subjects")
+                    if not isinstance(source_subjects, list) or not all(
+                        isinstance(item, Mapping) for item in source_subjects
+                    ):
+                        raise InventoryError(
+                            "Structrr bootstrap has malformed source_subjects"
+                        )
+                    if source_subjects:
+                        inventory = inventory_from_source_subjects(
+                            source_subjects,
+                            commit_ref="working-tree",
+                            structrr_revision=str(
+                                bootstrap.get("snapshot_digest", "structrr:bootstrap")
+                            ),
+                        )
+                    else:
+                        inventory = build_inventory(
+                            worktree,
+                            commit_ref="working-tree",
+                            structrr_revision="structrr:current",
+                        )
+                else:
+                    inventory = build_inventory(
+                        worktree,
+                        commit_ref="working-tree",
+                        structrr_revision="structrr:current",
+                    )
+                data = inventory.to_data()
+                state["semantic_repository_inventory"] = data
+                return data
             except (InventoryError, OSError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
@@ -1612,11 +1687,65 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError("candidate relation decisions are malformed")
             try:
                 decisions = [SemanticDecision.from_data(item) for item in raw_decisions]
-                return finalize_subject_binding(
-                    semantic_candidates(parameters.get("candidates")),
+                candidates = semantic_candidates(parameters.get("candidates"))
+                result = finalize_subject_binding(
+                    candidates,
                     decisions,
                     quantifier=str(parameters.get("quantifier")),
                 )
+                return {
+                    **result,
+                    "candidate_ids": [
+                        item.record.inventory_id for item in candidates.candidates
+                    ],
+                    "retrieval_status": candidates.retrieval_status,
+                }
+            except (InventoryError, SemanticDecisionError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def prepare_repository_subject_binding_operation() -> Any:
+            try:
+                inventory = semantic_inventory(
+                    build_semantic_repository_inventory_operation()
+                )
+                contract = semantic_contract(parameters.get("contract"))
+                query = prepare_subject_lookup_query(contract, inventory)
+                candidates = retrieve_subject_candidates(query, inventory)
+                requests = add_candidate_source_excerpts(
+                    prepare_candidate_relation_decisions(query, candidates), worktree
+                )
+                return {
+                    "query": query.to_data(),
+                    "candidates": candidates.to_data(),
+                    "requests": requests,
+                }
+            except (InventoryError, SemanticContractError, OSError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def finalize_repository_subject_binding_operation() -> Any:
+            requests = parameters.get("requests")
+            raw_results = feature_endpoint._collected_results(parameters.get("results"))
+            if (
+                not isinstance(requests, list)
+                or not all(isinstance(item, Mapping) for item in requests)
+                or raw_results is None
+            ):
+                raise PowdrrExecutionError("repository subject review is malformed")
+            try:
+                candidates = semantic_candidates(parameters.get("candidates"))
+                decisions = bind_candidate_relation_decisions(requests, raw_results)
+                result = finalize_subject_binding(
+                    candidates,
+                    decisions,
+                    quantifier=str(parameters.get("quantifier")),
+                )
+                return {
+                    **result,
+                    "candidate_ids": [
+                        item.record.inventory_id for item in candidates.candidates
+                    ],
+                    "retrieval_status": candidates.retrieval_status,
+                }
             except (InventoryError, SemanticDecisionError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
@@ -1904,6 +2033,12 @@ class FeatureCommandRuntime:
                     and isinstance(decision, Mapping)
                 }
             )
+            repository_bindings_by_clause = {
+                clause_id: decision["repository_binding"]
+                for clause_id, decision in decisions_by_clause_id.items()
+                if isinstance(decision, Mapping)
+                and isinstance(decision.get("repository_binding"), Mapping)
+            }
             scenarios_by_clause_id = {
                 clause.clause_id: decision.get("behavior_scenario")
                 for clause, decision in zip(
@@ -1953,6 +2088,9 @@ class FeatureCommandRuntime:
             for index, item in enumerate(design.obligations, start=1):
                 projection = item.projection.to_data()
                 projection["evidence_contract"] = evidence_by_clause[item.clause_id]
+                repository_binding = repository_bindings_by_clause.get(item.clause_id)
+                if repository_binding is not None:
+                    projection["repository_binding"] = dict(repository_binding)
                 obligations.append(
                     {
                         "id": f"sentence-{index}",
@@ -2008,7 +2146,30 @@ class FeatureCommandRuntime:
                     canonical_obligation["evidence_contract"] = evidence_by_clause[
                         clause_id
                     ]
+                    repository_binding = repository_bindings_by_clause.get(clause_id)
+                    if repository_binding is not None:
+                        canonical_obligation["repository_binding"] = dict(
+                            repository_binding
+                        )
+            for projection in canonical_document["projections"]:
+                clause_id = projection.get("clause_id")
+                if isinstance(clause_id, str):
+                    repository_binding = repository_bindings_by_clause.get(clause_id)
+                    if repository_binding is not None:
+                        projection["repository_binding"] = dict(repository_binding)
             canonical_document["verification_contracts"] = verification_contracts
+            (output_root / "repository-subject-bindings.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "repository-subject-bindings-v1",
+                        "bindings": repository_bindings_by_clause,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             path = output_root / "canonical-feature-design.json"
             path.write_text(
                 json.dumps(canonical_document, indent=2, sort_keys=True) + "\n",
@@ -2187,6 +2348,12 @@ class FeatureCommandRuntime:
                 ),
                 "finalize_subject_binding": bind_handler(
                     finalize_subject_binding_operation
+                ),
+                "prepare_repository_subject_binding": bind_handler(
+                    prepare_repository_subject_binding_operation
+                ),
+                "finalize_repository_subject_binding": bind_handler(
+                    finalize_repository_subject_binding_operation
                 ),
                 "enumerate_subject_population": bind_handler(
                     enumerate_subject_population_operation

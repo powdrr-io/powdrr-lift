@@ -657,6 +657,12 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "capability_matrix": [],
                     },
                 }
+            if "exact subject of the instruction proposition" in question:
+                return {
+                    "status": "resolved",
+                    "value": "insufficient_evidence",
+                    "reason_code": None,
+                }
             if "recorded defaults coherent" in question:
                 return {"consistency_review": {"updates": []}}
             raise AssertionError(question)
@@ -752,6 +758,25 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                         "routing": "include",
                         "disposition": "feature",
                     },
+                }
+            if command[0] == "prepare_repository_subject_binding":
+                return {
+                    "query": {},
+                    "candidates": {
+                        "query_fingerprint": "sha256:query",
+                        "inventory_fingerprint": "sha256:inventory",
+                        "candidates": [],
+                        "retrieval_status": "complete",
+                    },
+                    "requests": [],
+                }
+            if command[0] == "finalize_repository_subject_binding":
+                return {
+                    "status": "unresolved",
+                    "binding_ref": None,
+                    "reason_code": "no_candidate",
+                    "candidate_ids": [],
+                    "retrieval_status": "complete",
                 }
             if command[0] == "prepare_field_entailment_reviews":
                 return {"requests": [{"source_text": "Add a thing", "spec": {}}]}

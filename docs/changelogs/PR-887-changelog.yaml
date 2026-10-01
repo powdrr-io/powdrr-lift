@@ -134,14 +134,39 @@ files:
     rationale: Report the complete patch after checkpointing.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 6203, end_line: 6343}
+    span: {start_line: 6208, end_line: 6348}
     summary: Compare source-derived candidate structure with the proposal, direct up to two repairs through the current session, and refresh final evidence.
     rationale: Make the comparison actionable while allowing the workflow to proceed after bounded correction attempts.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 6412, end_line: 6428}
+    span: {start_line: 6434, end_line: 6450}
     summary: Return the candidate comparison and correction count in finalization evidence.
     rationale: Keep remaining differences visible without blocking acceptance solely on the comparison result.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6193, end_line: 6197}
+    summary: Record which proposal operations belong to the structural comparison.
+    rationale: Identify unresolved structural operations after the correction limit.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6110, end_line: 6111}
+    summary: Stop treating structural comparison outcomes as immediate final acceptance failures.
+    rationale: Allow the bounded corrective process to finish before evaluating remaining obligations.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6370, end_line: 6388}
+    summary: Exclude unresolved structural operation decisions from blocking actualization after two correction attempts.
+    rationale: Preserve other final review checks while allowing continuation with comparison differences recorded.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6460, end_line: 6477}
+    summary: Filter exhausted structural operations from the actualization decision set.
+    rationale: Keep actualization reporting consistent with the bounded continuation policy.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6481, end_line: 6485}
+    summary: Exclude exhausted structural operations from actualization requirements.
+    rationale: Prevent unresolved structural differences from independently stopping finalization.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
     span: {start_line: 2484, end_line: 2488}
@@ -169,7 +194,7 @@ files:
     rationale: Reflect the required candidate evidence contract.
   - path: tests/test_feature_endpoint.py
     type: modified
-    span: {start_line: 1983, end_line: 2012}
+    span: {start_line: 1983, end_line: 2023}
     summary: Assert that an unresolved comparison alone does not block finalization.
     rationale: Preserve continuation behavior after the retry limit.
   - path: tests/test_feature_endpoint.py

@@ -49,6 +49,37 @@ def prepare_subject_lookup_query(
     )
 
 
+def infer_contextual_qualified_names(
+    source_text: str, source_offset: int, proposition_text: str
+) -> tuple[str, ...]:
+    """Qualify a dunder method with the nearest preceding type declaration.
+
+    DeepSWE specifications often declare a value type and then describe its
+    methods in following sentences. The atomic clause for ``__str__`` may not
+    repeat the class name, so retaining the source offset lets lookup use that
+    local declaration without treating every repository ``__str__`` as a
+    plausible target.
+    """
+    if source_offset < 0 or source_offset > len(source_text):
+        return ()
+    method_names = tuple(
+        name
+        for name in extract_explicit_repository_names(proposition_text)
+        if re.fullmatch(r"__[A-Za-z0-9]+__", name)
+    )
+    if len(method_names) != 1:
+        return ()
+    declarations = tuple(
+        re.finditer(r"\b([A-Z][A-Za-z0-9_]*)\s*:", source_text[:source_offset])
+    )
+    if not declarations:
+        return ()
+    type_name = declarations[-1].group(1)
+    if type_name in {"DDL", "SQL", "API", "JSON"}:
+        return ()
+    return (f"{type_name}.{method_names[0]}",)
+
+
 def retrieve_subject_candidates(
     query: LookupQuery,
     inventory: RepositoryInventory,
@@ -160,12 +191,28 @@ def extract_explicit_repository_names(source_text: str) -> tuple[str, ...]:
 def narrow_qualified_candidates(
     query: LookupQuery, candidate_set: CandidateSet
 ) -> CandidateSet:
-    """Keep exact qualified-name matches when source text identifies one."""
+    """Keep exact qualified-name matches when source text identifies one.
+
+    Qualified names can occur in the full proposition while the extracted
+    subject is only a generic method name (for example, ``Widget.__str__``).
+    An explicit qualifier is also negative evidence: if that subject is not
+    present in the repository, do not fall back to unrelated methods with the
+    same canonical name.
+    """
+    explicit_names = tuple(dict.fromkeys((*query.explicit_names, query.subject_text)))
     qualified_hints = tuple(
         name.casefold()
-        for name in extract_explicit_repository_names(query.subject_text)
+        for explicit_name in explicit_names
+        for name in extract_explicit_repository_names(explicit_name)
         if "." in name
+        and name.rsplit(".", 1)[-1].casefold()
+        in {
+            candidate.record.canonical_name.casefold()
+            for candidate in candidate_set.candidates
+        }
     )
+    if not qualified_hints:
+        return candidate_set
     matching = tuple(
         candidate
         for candidate in candidate_set.candidates
@@ -175,8 +222,6 @@ def narrow_qualified_candidates(
             for name in qualified_hints
         )
     )
-    if not matching:
-        return candidate_set
     return CandidateSet(
         candidate_set.query_fingerprint,
         candidate_set.inventory_fingerprint,
@@ -516,6 +561,7 @@ __all__ = [
     "bind_candidate_relation_decisions",
     "finalize_subject_binding",
     "extract_explicit_repository_names",
+    "infer_contextual_qualified_names",
     "prepare_candidate_relation_decisions",
     "prepare_subject_lookup_query",
     "narrow_qualified_candidates",

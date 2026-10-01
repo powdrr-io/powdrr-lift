@@ -29,6 +29,7 @@ from powdrr_lift.workrr.repository_subject_binding import (
     bind_candidate_relation_decisions,
     extract_explicit_repository_names,
     finalize_subject_binding,
+    infer_contextual_qualified_names,
     prepare_candidate_relation_decisions,
     replay_subject_binding_events,
     retrieve_subject_candidates,
@@ -253,6 +254,23 @@ def test_explicit_repository_names_extract_code_identifiers() -> None:
     assert "call" not in names
 
 
+def test_infers_dunder_method_qualifier_from_local_instruction_scope() -> None:
+    source = (
+        "Required Module pkg.models\n"
+        "Widget: name (str). __str__ returns its name.\n"
+        "Other: value (int).\n"
+    )
+    method_start = source.index("__str__")
+
+    names = infer_contextual_qualified_names(
+        source,
+        method_start,
+        "__str__ returns the declared name.",
+    )
+
+    assert names == ("Widget.__str__",)
+
+
 def test_candidate_relation_requests_include_bounded_repository_source(
     tmp_path: Path,
 ) -> None:
@@ -350,12 +368,45 @@ def test_qualified_source_name_narrows_duplicate_method_candidates() -> None:
         "invariant",
         "transform",
         inventory.fingerprint,
-        explicit_names=("Token.__str__", "__str__"),
+        explicit_names=("sqlfmt.ddl", "Token.__str__", "__str__"),
     )
     candidates = retrieve_subject_candidates(query, inventory)
     assert [candidate.record.qualified_name for candidate in candidates.candidates] == [
         "sqlfmt.tokens.Token.__str__"
     ]
+
+
+def test_missing_qualified_subject_does_not_fall_back_to_generic_method_matches() -> (
+    None
+):
+    records = tuple(
+        InventoryRecord(
+            inventory_id=f"python:{name.lower()}.py::{name}",
+            kind="method",
+            canonical_name="__str__",
+            qualified_name=name,
+            normalized_terms=("str",),
+            aliases=(),
+            path=f"{name.lower().replace('.', '/')}.py",
+            span=(1, 3),
+            language="python",
+        )
+        for name in ("pkg.Token.__str__", "pkg.Query.__str__")
+    )
+    inventory = _inventory(*records)
+    query = LookupQuery(
+        "instruction-033",
+        "DdlColumn.__str__ must preserve the declared type expression.",
+        "__str__",
+        "invariant",
+        "render",
+        inventory.fingerprint,
+        explicit_names=("DdlColumn.__str__", "DdlColumn", "__str__"),
+    )
+
+    candidates = retrieve_subject_candidates(query, inventory)
+
+    assert candidates.candidates == ()
 
 
 def test_unresolved_candidate_does_not_abort_binding_or_bind_a_match() -> None:

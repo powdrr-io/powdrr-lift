@@ -1,0 +1,101 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 894
+title: Qualify generic Python methods from instruction context
+intent:
+  problem: Generic method names in DeepSWE instructions can retrieve unrelated same-named repository methods, especially when the type is named in a nearby declaration rather than repeated in each requirement.
+  goal: Carry local type context into Python subject lookup and filter candidates by the resulting qualified symbol, leaving newly introduced symbols unresolved.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 52, end_line: 82}
+    summary: Infer a qualified dunder method name from the nearest preceding type declaration.
+    rationale: Connect atomic method requirements to their declared type without treating unrelated same-named methods as candidates.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 194, end_line: 202}
+    summary: Use the proposition's explicit names as candidate narrowing hints.
+    rationale: Prevent fallback to unrelated generic methods when the requested qualified symbol is absent.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 205, end_line: 206}
+    summary: Extract qualified candidate hints from both the prepared subject and explicit names.
+    rationale: Carry contextual qualified names into deterministic candidate selection.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 208, end_line: 212}
+    summary: Recognize qualified hints only when their terminal symbol matches a candidate.
+    rationale: Avoid treating a dotted module name as a qualified source symbol.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 214, end_line: 215}
+    summary: Retain candidates only when a qualified symbol hint exists.
+    rationale: Preserve ordinary lookup when no qualified symbol was identified.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 178, end_line: 179}
+    summary: Remove fallback to unrelated candidates when an explicit qualified symbol has no match.
+    rationale: Keep newly introduced symbols unresolved instead of binding a same-named method.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 564, end_line: 564}
+    summary: Export the contextual qualification helper.
+    rationale: Make instruction-context inference available at the command boundary.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 73, end_line: 73}
+    summary: Import the contextual subject inference helper.
+    rationale: Preserve surrounding declaration context during repository subject lookup.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1760, end_line: 1777}
+    summary: Resolve the source clause and infer a contextual qualified subject from its source offset.
+    rationale: Connect generic dunder requirements to the task's preceding type declaration.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1781, end_line: 1781}
+    summary: Pass inferred qualified names into repository subject lookup.
+    rationale: Use task-local type context when narrowing repository candidates.
+  - path: tests/test_repository_inventory.py
+    type: modified
+    span: {start_line: 32, end_line: 32}
+    summary: Import the contextual qualification helper for regression coverage.
+    rationale: Exercise the new source-context inference behavior.
+  - path: tests/test_repository_inventory.py
+    type: modified
+    span: {start_line: 257, end_line: 273}
+    summary: Verify a dunder method is qualified by its local type declaration.
+    rationale: Cover contextual type inference for split task instructions.
+  - path: tests/test_repository_inventory.py
+    type: modified
+    span: {start_line: 371, end_line: 371}
+    summary: Include a dotted module name alongside an explicit qualified method hint.
+    rationale: Ensure module names do not suppress valid symbol qualification.
+  - path: tests/test_repository_inventory.py
+    type: modified
+    span: {start_line: 379, end_line: 411}
+    summary: Verify a missing qualified method does not fall back to unrelated generic methods.
+    rationale: Prevent false candidate links for newly introduced symbols.
+entities:
+  - id: contextual-python-subject-inference
+    type: Step
+    action: added
+  - id: qualified-candidate-filter
+    type: Step
+    action: added
+  - id: contextual-subject-regression-test
+    type: Unit test
+    action: added
+entity_relationships:
+  - id: regression-test-verifies-qualified-candidate-filter
+    type: verifies
+    source: contextual-subject-regression-test
+    target: qualified-candidate-filter
+    action: added
+    description: The regression test checks that absent qualified symbols do not bind to unrelated generic methods.
+invariants:
+  - id: missing-qualified-symbol-remains-unresolved
+    description: An explicit qualified subject with no repository match cannot fall back to unrelated candidates that share only its generic method name.
+    action: added
+guidance: []

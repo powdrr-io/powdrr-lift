@@ -53,6 +53,20 @@ def retrieve_subject_candidates(
     context: StructrrLookupContext | None = None,
 ) -> CandidateSet:
     explicit_names = {name.casefold() for name in query.explicit_names}
+    alias_targets = {
+        targets[0].casefold()
+        for name in explicit_names
+        if context is not None
+        and len(targets := context.symbol_aliases.get(name, ())) == 1
+    }
+    relationship_sources = explicit_names | alias_targets
+    import_targets = {
+        relation.partition("|")[2].casefold()
+        for name in relationship_sources
+        if context is not None
+        for relation in context.relationships.get(name, ())
+        if relation.startswith("imports|")
+    }
     subject_text = query.subject_text.casefold().strip()
     subject_terms = frozenset(query.normalized_terms)
     accepted_aliases = {
@@ -75,6 +89,8 @@ def retrieve_subject_candidates(
             or record.qualified_name.casefold() == subject_text
             or record.canonical_name.casefold() in accepted_aliases
             or frozenset(record.normalized_terms) == subject_terms
+            or record.qualified_name.casefold() in alias_targets
+            or record.qualified_name.casefold() in import_targets
         )
     )
     lookup_inventory = RepositoryInventory(
@@ -141,6 +157,7 @@ def extract_explicit_repository_names(source_text: str) -> tuple[str, ...]:
 def prepare_candidate_relation_decisions(
     query: LookupQuery,
     candidate_set: CandidateSet,
+    context: StructrrLookupContext | None = None,
 ) -> list[dict[str, Any]]:
     requests: list[dict[str, Any]] = []
     for candidate in candidate_set.candidates:
@@ -153,39 +170,53 @@ def prepare_candidate_relation_decisions(
             candidate_set_fingerprint=candidate.record.evidence_fingerprint,
             contract_revision=CANDIDATE_RELATION_REVISION,
         )
-        requests.append(
-            {
-                "spec": spec.to_data(),
-                "question": (
-                    "Does this one repository candidate denote the exact "
-                    "source subject?"
+        request = {
+            "spec": spec.to_data(),
+            "question": (
+                "Does this one repository candidate denote the exact source subject?"
+            ),
+            "instructions": [
+                (
+                    "Choose matches only when the candidate evidence supports "
+                    "the exact source subject."
                 ),
-                "instructions": [
-                    (
-                        "Choose matches only when the candidate evidence supports "
-                        "the exact source subject."
+                ("Choose does_not_match when evidence contradicts the source subject."),
+                (
+                    "Choose insufficient_evidence when the candidate cannot "
+                    "be confirmed."
+                ),
+                (
+                    "Do not compare this candidate with other candidates or "
+                    "choose a winner."
+                ),
+            ],
+            "candidate": candidate.to_data(),
+            "allowed_values": [
+                "matches",
+                "does_not_match",
+                "insufficient_evidence",
+            ],
+        }
+        if context is not None:
+            relationship_evidence = context.relationships.get(
+                candidate.record.qualified_name.casefold(), ()
+            )
+            request["repository_relationships"] = list(
+                sorted(
+                    relationship_evidence,
+                    key=lambda item: (
+                        {
+                            "imports": 0,
+                            "referenced_by_test": 1,
+                            "imported_by": 2,
+                            "contained_by": 3,
+                            "contains": 4,
+                        }.get(item.partition("|")[0], 4),
+                        item,
                     ),
-                    (
-                        "Choose does_not_match when evidence contradicts the "
-                        "source subject."
-                    ),
-                    (
-                        "Choose insufficient_evidence when the candidate cannot "
-                        "be confirmed."
-                    ),
-                    (
-                        "Do not compare this candidate with other candidates or "
-                        "choose a winner."
-                    ),
-                ],
-                "candidate": candidate.to_data(),
-                "allowed_values": [
-                    "matches",
-                    "does_not_match",
-                    "insufficient_evidence",
-                ],
-            }
-        )
+                )[:16]
+            )
+        requests.append(request)
     return requests
 
 

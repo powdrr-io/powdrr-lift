@@ -32,7 +32,9 @@ from powdrr_lift.core.repository_inventory import (
     InventoryError,
     LookupQuery,
     RepositoryInventory,
+    StructrrLookupContext,
     build_inventory,
+    build_python_lookup_context,
     enumerate_population,
     inventory_from_source_subjects,
 )
@@ -1748,11 +1750,20 @@ class FeatureCommandRuntime:
                 inventory = semantic_inventory(
                     build_semantic_repository_inventory_operation()
                 )
+                context = state.get("semantic_repository_lookup_context")
+                if not isinstance(context, StructrrLookupContext):
+                    context = build_python_lookup_context(worktree, inventory)
+                    state["semantic_repository_lookup_context"] = context
                 contract = semantic_contract(parameters.get("contract"))
-                query = prepare_subject_lookup_query(contract, inventory)
-                candidates = retrieve_subject_candidates(query, inventory)
+                query = prepare_subject_lookup_query(
+                    contract,
+                    inventory,
+                    structrr_context_fingerprint=context.fingerprint,
+                )
+                candidates = retrieve_subject_candidates(query, inventory, context)
                 requests = add_candidate_source_excerpts(
-                    prepare_candidate_relation_decisions(query, candidates), worktree
+                    prepare_candidate_relation_decisions(query, candidates, context),
+                    worktree,
                 )
                 return {
                     "query": query.to_data(),

@@ -13,6 +13,7 @@ from powdrr_lift.core.repository_inventory import (
     StructrrLookupContext,
     aggregate_candidate_relations,
     build_inventory,
+    build_python_lookup_context,
     enumerate_population,
     inventory_from_source_subjects,
     normalize_terms,
@@ -28,6 +29,7 @@ from powdrr_lift.workrr.repository_subject_binding import (
     extract_explicit_repository_names,
     finalize_subject_binding,
     prepare_candidate_relation_decisions,
+    retrieve_subject_candidates,
 )
 
 
@@ -172,6 +174,67 @@ def test_structrr_source_subjects_preserve_identity_and_locations() -> None:
     assert record.canonical_name == "fetch"
     assert record.span == (4, 9)
     assert record.component_refs == ("file:src/client.py",)
+
+
+def test_python_relationship_context_resolves_import_aliases_and_test_imports(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repo"
+    (repository / "src/pkg").mkdir(parents=True)
+    (repository / "tests").mkdir()
+    (repository / "src/pkg/__init__.py").write_text(
+        "from .api import Client as PublicClient\n"
+    )
+    (repository / "src/pkg/api.py").write_text(
+        "class Client:\n    def fetch(self):\n        return 1\n"
+    )
+    (repository / "tests/test_api.py").write_text("from pkg.api import Client\n")
+    inventory = build_inventory(
+        repository,
+        commit_ref="working-tree",
+        structrr_revision="test",
+    )
+
+    context = build_python_lookup_context(repository, inventory)
+    query = LookupQuery(
+        "instruction-001",
+        "Use the public client.",
+        "PublicClient",
+        "feature",
+        "create",
+        inventory.fingerprint,
+        explicit_names=("PublicClient",),
+    )
+    candidates = retrieve_subject_candidates(query, inventory, context)
+    requests = prepare_candidate_relation_decisions(query, candidates, context)
+
+    assert [candidate.record.qualified_name for candidate in candidates.candidates] == [
+        "src.pkg.api.Client"
+    ]
+    assert "resolved_import_alias" in candidates.candidates[0].evidence.reasons
+    assert requests[0]["repository_relationships"] == [
+        "referenced_by_test|tests.test_api",
+        "imported_by|src.pkg",
+        "contained_by|src.pkg.api",
+    ]
+    assert context.fingerprint.startswith("sha256:")
+
+    package_query = LookupQuery(
+        "instruction-002",
+        "Extend the pkg API.",
+        "pkg",
+        "feature",
+        "create",
+        inventory.fingerprint,
+        explicit_names=("pkg",),
+    )
+    package_candidates = retrieve_subject_candidates(package_query, inventory, context)
+    implementation = next(
+        candidate
+        for candidate in package_candidates.candidates
+        if candidate.record.qualified_name == "src.pkg.api.Client"
+    )
+    assert "repository_import_relationship" in implementation.evidence.reasons
 
 
 def test_explicit_repository_names_extract_code_identifiers() -> None:

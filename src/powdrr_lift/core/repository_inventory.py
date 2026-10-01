@@ -162,11 +162,24 @@ class StructrrLookupContext:
     aliases: Mapping[str, tuple[str, ...]] = None  # type: ignore[assignment]
     populations: Mapping[str, tuple[str, ...]] = None  # type: ignore[assignment]
     relationships: Mapping[str, tuple[str, ...]] = None  # type: ignore[assignment]
+    symbol_aliases: Mapping[str, tuple[str, ...]] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "aliases", self.aliases or {})
         object.__setattr__(self, "populations", self.populations or {})
         object.__setattr__(self, "relationships", self.relationships or {})
+        object.__setattr__(self, "symbol_aliases", self.symbol_aliases or {})
+
+    @property
+    def fingerprint(self) -> str:
+        return _fingerprint(
+            {
+                "aliases": self.aliases,
+                "populations": self.populations,
+                "relationships": self.relationships,
+                "symbol_aliases": self.symbol_aliases,
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,6 +344,17 @@ class PythonInventoryAdapter:
             module = (
                 relative.removesuffix(".py").replace("/", ".").removesuffix(".__init__")
             )
+            yield InventoryRecord(
+                inventory_id=f"python:{relative}::{module}",
+                kind="module",
+                canonical_name=module.rsplit(".", 1)[-1],
+                qualified_name=module,
+                normalized_terms=normalize_terms(module.rsplit(".", 1)[-1]),
+                aliases=(),
+                path=relative,
+                span=(1, max(1, len(path.read_text(encoding="utf-8").splitlines()))),
+                language="python",
+            )
             for node in ast.walk(tree):
                 if not isinstance(
                     node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
@@ -349,6 +373,169 @@ class PythonInventoryAdapter:
                     span=(node.lineno, getattr(node, "end_lineno", node.lineno)),
                     language="python",
                 )
+
+
+def build_python_lookup_context(
+    repository_root: Path, inventory: RepositoryInventory
+) -> StructrrLookupContext:
+    """Derive bounded import, containment, and test links from Python source."""
+    root = repository_root.resolve()
+    records_by_qualified_name = {
+        record.qualified_name: record for record in inventory.records
+    }
+    modules_by_path = {
+        record.path: record
+        for record in inventory.records
+        if record.kind == "module" and record.language == "python"
+    }
+    import_names: dict[str, list[InventoryRecord]] = {}
+    for record in modules_by_path.values():
+        path = Path(record.path)
+        module_path = (
+            ".".join(path.with_suffix("").parts[:-1])
+            if path.name == "__init__.py"
+            else ".".join(path.with_suffix("").parts)
+        )
+        qualified_parts = record.qualified_name.split(".")
+        options = {record.qualified_name, module_path}
+        if path.parts and path.parts[0] in {"src", "lib"}:
+            options.add(
+                ".".join(path.with_suffix("").parts[1:]).removesuffix(".__init__")
+            )
+            options.add(".".join(path.with_suffix("").parts[1:]))
+        if qualified_parts and qualified_parts[0] in {"src", "lib"}:
+            options.add(".".join(qualified_parts[1:]))
+        for name in options:
+            if name:
+                import_names.setdefault(name, []).append(record)
+
+    relationships: dict[str, set[str]] = {}
+    aliases: dict[str, set[str]] = {}
+    for name, records in import_names.items():
+        aliases.setdefault(name.casefold(), set()).update(
+            record.qualified_name for record in records
+        )
+
+    def add_relationship(source: str, relation: str, target: str) -> None:
+        relationships.setdefault(source.casefold(), set()).add(f"{relation}|{target}")
+
+    for record in inventory.records:
+        parent_name = record.qualified_name.rpartition(".")[0]
+        if parent_name in records_by_qualified_name:
+            add_relationship(parent_name, "contains", record.qualified_name)
+            add_relationship(record.qualified_name, "contained_by", parent_name)
+
+    def resolve_module(name: str) -> InventoryRecord | None:
+        candidates = import_names.get(name, ())
+        return candidates[0] if len(candidates) == 1 else None
+
+    def resolve_relative_module(
+        source_path: Path, node: ast.ImportFrom
+    ) -> InventoryRecord | None:
+        package_path = source_path.parent
+        for _ in range(node.level - 1):
+            package_path = package_path.parent
+        if node.module:
+            package_path = package_path.joinpath(*node.module.split("."))
+        if not package_path.is_relative_to(root):
+            return None
+        relative = package_path.relative_to(root).as_posix()
+        candidates = (
+            f"{relative}/__init__.py",
+            f"{relative}.py",
+        )
+        for candidate in candidates:
+            record = modules_by_path.get(candidate)
+            if record is not None:
+                return record
+        return None
+
+    for relative, source_record in modules_by_path.items():
+        source_path = root / relative
+        try:
+            if not source_path.resolve(strict=True).is_relative_to(root):
+                continue
+        except (OSError, RuntimeError):
+            continue
+        try:
+            tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=relative)
+        except (OSError, SyntaxError, UnicodeError):
+            continue
+        is_test = _is_python_test_path(relative)
+        for node in ast.walk(tree):
+            imports: list[tuple[str, str, InventoryRecord, bool]] = []
+            if isinstance(node, ast.Import):
+                for item in node.names:
+                    target = resolve_module(item.name)
+                    if target is not None:
+                        local_name = item.asname or item.name.split(".", 1)[0]
+                        alias_is_exact = item.asname is not None or "." not in item.name
+                        imports.append((local_name, item.name, target, alias_is_exact))
+            elif isinstance(node, ast.ImportFrom):
+                target_module = (
+                    resolve_relative_module(source_path, node)
+                    if node.level
+                    else resolve_module(node.module or "")
+                )
+                for item in node.names:
+                    if item.name == "*":
+                        continue
+                    target = None
+                    alias_is_exact = False
+                    if target_module is not None:
+                        target = records_by_qualified_name.get(
+                            f"{target_module.qualified_name}.{item.name}"
+                        )
+                        alias_is_exact = target is not None
+                        if target is None:
+                            target = resolve_module(
+                                f"{target_module.qualified_name}.{item.name}"
+                            )
+                            alias_is_exact = target is not None
+                    if target is None:
+                        target = target_module
+                    if target is not None:
+                        local_name = item.asname or item.name
+                        imports.append((local_name, item.name, target, alias_is_exact))
+            for local_name, imported_name, target, alias_is_exact in imports:
+                add_relationship(
+                    source_record.qualified_name,
+                    "imports",
+                    target.qualified_name,
+                )
+                if not is_test:
+                    add_relationship(
+                        target.qualified_name,
+                        "imported_by",
+                        source_record.qualified_name,
+                    )
+                if alias_is_exact:
+                    aliases.setdefault(local_name.casefold(), set()).add(
+                        target.qualified_name
+                    )
+                    aliases.setdefault(imported_name.casefold(), set()).add(
+                        target.qualified_name
+                    )
+                if is_test and alias_is_exact:
+                    add_relationship(
+                        target.qualified_name,
+                        "referenced_by_test",
+                        source_record.qualified_name,
+                    )
+
+    return StructrrLookupContext(
+        relationships={
+            key: tuple(sorted(values)) for key, values in relationships.items()
+        },
+        symbol_aliases={key: tuple(sorted(values)) for key, values in aliases.items()},
+    )
+
+
+def _is_python_test_path(path: str) -> bool:
+    parts = Path(path).parts
+    return any(part in {"tests", "test", "hardening_tests"} for part in parts) or (
+        Path(path).name.startswith("test_") or Path(path).stem.endswith("_test")
+    )
 
 
 def build_inventory(
@@ -439,6 +626,18 @@ def retrieve_candidates(
         for alias in context.aliases.get(query.subject_text.casefold(), ())
     }
     explicit_names = {name.casefold() for name in query.explicit_names}
+    symbol_alias_targets = {
+        targets[0].casefold()
+        for name in explicit_names
+        if len(targets := context.symbol_aliases.get(name, ())) == 1
+    }
+    relationship_sources = explicit_names | symbol_alias_targets
+    import_targets = {
+        relationship.partition("|")[2].casefold()
+        for name in relationship_sources
+        for relationship in context.relationships.get(name, ())
+        if relationship.startswith("imports|")
+    }
     found: dict[str, CandidateEvidence] = {}
     for record in inventory.records:
         record_terms = set(record.normalized_terms)
@@ -463,6 +662,10 @@ def retrieve_candidates(
             )
         ):
             reasons.append(("explicit_source_identifier", 90))
+        if record.qualified_name.casefold() in symbol_alias_targets:
+            reasons.append(("resolved_import_alias", 88))
+        if record.qualified_name.casefold() in import_targets:
+            reasons.append(("repository_import_relationship", 80))
         overlap = len(terms.intersection(record_terms))
         if overlap:
             reasons.append(("lexical_overlap", min(overlap * 5, 20)))
@@ -575,6 +778,7 @@ __all__ = [
     "RepositoryInventory",
     "StructrrLookupContext",
     "aggregate_candidate_relations",
+    "build_python_lookup_context",
     "build_inventory",
     "enumerate_population",
     "inventory_from_source_subjects",

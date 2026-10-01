@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 892
+change_id: 893
 title: Keep uncertain Python subject bindings safe
 intent:
   problem: Qualified Python symbols can retrieve several same-named candidates, and an unresolved candidate judgment currently aborts design generation even when the remaining evidence can be retained safely.

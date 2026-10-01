@@ -515,6 +515,7 @@ def feature_command_catalog(
                     "candidates": {},
                     "requests": {},
                     "results": {},
+                    "query": {},
                     "quantifier": {},
                 },
                 required=("candidates", "requests", "results", "quantifier"),
@@ -1785,10 +1786,17 @@ class FeatureCommandRuntime:
             try:
                 candidates = semantic_candidates(parameters.get("candidates"))
                 decisions = bind_candidate_relation_decisions(requests, raw_results)
+                raw_query = parameters.get("query")
+                subject_text = (
+                    LookupQuery.from_data(raw_query).subject_text
+                    if isinstance(raw_query, Mapping)
+                    else ""
+                )
                 result = finalize_subject_binding(
                     candidates,
                     decisions,
                     quantifier=str(parameters.get("quantifier")),
+                    subject_text=subject_text,
                 )
                 return {
                     **result,

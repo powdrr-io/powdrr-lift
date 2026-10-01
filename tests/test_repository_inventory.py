@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,7 @@ from powdrr_lift.workrr.repository_subject_binding import (
     extract_explicit_repository_names,
     finalize_subject_binding,
     prepare_candidate_relation_decisions,
+    replay_subject_binding_events,
     retrieve_subject_candidates,
 )
 
@@ -319,6 +321,171 @@ def test_workrr_prepares_and_aggregates_one_c09_decision_per_candidate() -> None
     result = finalize_subject_binding(candidates, decisions, quantifier="every")
     assert result["status"] == "bound"
     assert result["binding_ref"] == record.inventory_id
+
+
+def test_qualified_source_name_narrows_duplicate_method_candidates() -> None:
+    records = tuple(
+        InventoryRecord(
+            inventory_id=f"python:{name.lower()}.py::{name}",
+            kind="method",
+            canonical_name="__str__",
+            qualified_name=name,
+            normalized_terms=("str",),
+            aliases=(),
+            path=f"{name.lower().replace('.', '/')}.py",
+            span=(1, 3),
+            language="python",
+        )
+        for name in (
+            "sqlfmt.tokens.Token.__str__",
+            "sqlfmt.query.Query.__str__",
+            "sqlfmt.node.Node.__str__",
+        )
+    )
+    inventory = _inventory(*records)
+    query = LookupQuery(
+        "instruction-032",
+        "Token.__str__ must omit the constraint marker when disabled.",
+        "Token.__str__",
+        "invariant",
+        "transform",
+        inventory.fingerprint,
+        explicit_names=("Token.__str__", "__str__"),
+    )
+    candidates = retrieve_subject_candidates(query, inventory)
+    assert [candidate.record.qualified_name for candidate in candidates.candidates] == [
+        "sqlfmt.tokens.Token.__str__"
+    ]
+
+
+def test_unresolved_candidate_does_not_abort_binding_or_bind_a_match() -> None:
+    inventory = _inventory(_record("DataA"), _record("DataB"))
+    query = LookupQuery(
+        "instruction-001",
+        "data should be stored",
+        "data",
+        "interface",
+        "persist",
+        inventory.fingerprint,
+    )
+    candidates = retrieve_candidates(query, inventory)
+    requests = prepare_candidate_relation_decisions(query, candidates)
+    decisions = bind_candidate_relation_decisions(
+        requests,
+        [
+            {"status": "resolved", "value": "matches", "reason_code": None},
+            {"status": "unresolved", "value": None, "reason_code": "no_candidate"},
+        ],
+    )
+    result = finalize_subject_binding(candidates, decisions, quantifier="one")
+    assert result["status"] == "unresolved"
+    assert result["reason_code"] == "repository_evidence_missing"
+    assert result["uncertain_candidate_ids"] == [
+        candidates.candidates[1].record.inventory_id
+    ]
+
+
+def test_multiple_shared_symbol_matches_remain_unresolved() -> None:
+    records = tuple(
+        InventoryRecord(
+            inventory_id=f"python:{name.lower()}.py::{name}",
+            kind="method",
+            canonical_name="__str__",
+            qualified_name=name,
+            normalized_terms=("str",),
+            aliases=(),
+            path=f"{name.lower().replace('.', '/')}.py",
+            span=(1, 3),
+            language="python",
+        )
+        for name in ("pkg.Token.__str__", "pkg.Query.__str__")
+    )
+    inventory = _inventory(*records)
+    query = LookupQuery(
+        "instruction-032",
+        "__str__ must render the token",
+        "__str__",
+        "invariant",
+        "render",
+        inventory.fingerprint,
+    )
+    candidates = retrieve_candidates(query, inventory)
+    decisions = bind_candidate_relation_decisions(
+        prepare_candidate_relation_decisions(query, candidates),
+        [
+            {"status": "resolved", "value": "matches", "reason_code": None},
+            {"status": "resolved", "value": "matches", "reason_code": None},
+        ],
+    )
+    result = finalize_subject_binding(candidates, decisions, quantifier="one")
+    assert result["status"] == "unresolved"
+    assert result["reason_code"] == "repository_evidence_missing"
+    assert result["uncertain_candidate_ids"] == [
+        candidate.record.inventory_id for candidate in candidates.candidates
+    ]
+
+
+def test_subject_binding_replay_uses_saved_candidates_and_results(
+    tmp_path: Path,
+) -> None:
+    records = tuple(
+        InventoryRecord(
+            inventory_id=f"python:{name.lower()}.py::{name}",
+            kind="method",
+            canonical_name="__str__",
+            qualified_name=name,
+            normalized_terms=("str",),
+            aliases=(),
+            path=f"{name.lower().replace('.', '/')}.py",
+            span=(1, 3),
+            language="python",
+        )
+        for name in ("pkg.Token.__str__", "pkg.Query.__str__")
+    )
+    inventory = _inventory(*records)
+    query = LookupQuery(
+        "instruction-032",
+        "__str__ must render the token",
+        "__str__",
+        "invariant",
+        "render",
+        inventory.fingerprint,
+        structrr_context_fingerprint="sha256:test-context",
+    )
+    candidates = retrieve_candidates(query, inventory)
+    requests = prepare_candidate_relation_decisions(query, candidates)
+    event_records = [
+        {
+            "bind": "repository_binding_plan",
+            "path": "steps[5].for_each[0][0][10]",
+            "output": {
+                "query": query.to_data(),
+                "candidates": candidates.to_data(),
+                "requests": requests,
+            },
+        }
+    ]
+    event_records.extend(
+        {
+            "output": "candidate_relation_result",
+            "path": f"steps[5].for_each[0][0][11].for_each[0][{index}][0]",
+            "value": {
+                "status": "resolved",
+                "value": "matches",
+                "reason_code": None,
+            },
+        }
+        for index in range(len(requests))
+    )
+    events_path = tmp_path / "procedrr-events.jsonl"
+    events_path.write_text(
+        "".join(json.dumps(record) + "\n" for record in event_records),
+        encoding="utf-8",
+    )
+    replay = replay_subject_binding_events(events_path)
+    assert replay["binding_count"] == 1
+    assert replay["bindings"][0]["status"] == "unresolved"
+    assert len(replay["bindings"][0]["uncertain_candidate_ids"]) == 2
 
 
 def test_inventory_is_available_through_the_procedrr_command_boundary(

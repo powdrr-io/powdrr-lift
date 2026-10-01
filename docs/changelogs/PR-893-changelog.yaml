@@ -1,0 +1,170 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 893
+title: Keep uncertain Python subject bindings safe
+intent:
+  problem: Qualified Python symbols can retrieve several same-named candidates, and an unresolved candidate judgment currently aborts design generation even when the remaining evidence can be retained safely.
+  goal: Narrow candidates using qualified subject names, keep uncertain bindings unbound without stopping design generation, and replay binding decisions from saved Procedrr events.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 524, end_line: 525}
+    summary: Clarify that shared generic names do not make every candidate an exact match.
+    rationale: Require qualified source or relationship evidence to distinguish candidates.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 550, end_line: 550}
+    summary: Pass the prepared source query into subject binding finalization.
+    rationale: Apply qualification checks to the extracted subject text.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 560, end_line: 560}
+    summary: Expose uncertain candidate IDs in the binding result schema.
+    rationale: Keep abstentions diagnosable in generated artifacts.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 240, end_line: 242}
+    summary: Import the offline subject binding replay operation.
+    rationale: Make saved binding decisions available through the CLI.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 1546, end_line: 1556}
+    summary: Register replay-subject-bindings with event-log and output options.
+    rationale: Allow binding changes to be checked without model calls.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4727, end_line: 4742}
+    summary: Run event-log binding replay and write its JSON report.
+    rationale: Provide a reproducible report for saved candidate decisions.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 518, end_line: 518}
+    summary: Allow finalization to receive the lookup query.
+    rationale: Keep subject qualification available at the internal command boundary.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1789, end_line: 1794}
+    summary: Read the subject text from the saved query.
+    rationale: Ground deterministic binding in the extracted source subject.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1799, end_line: 1799}
+    summary: Pass subject text to binding finalization.
+    rationale: Apply qualified-name checks before accepting a binding.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Add JSON parsing for saved event logs.
+    rationale: Support offline replay and deterministic ambiguity handling.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: Add candidate name counting for binding safeguards.
+    rationale: Support offline replay and deterministic ambiguity handling.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 106, end_line: 106}
+    summary: Apply qualified subject candidate narrowing after retrieval.
+    rationale: Prefer exact qualified symbols when the extracted subject names one.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 160, end_line: 187}
+    summary: Add qualified-name candidate narrowing.
+    rationale: Reduce duplicate method candidates while preserving the original set when no qualified match exists.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 194, end_line: 197}
+    summary: Count shared canonical names before preparing candidate reviews.
+    rationale: Identify generic-name ambiguity for explicit judge guidance.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 208, end_line: 208}
+    summary: Type the extensible candidate review request.
+    rationale: Permit shared-name context in the review input.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 227, end_line: 232}
+    summary: Tell candidate review to abstain when generic names do not identify one subject.
+    rationale: Prevent shared method names from becoming multiple exact matches.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 260, end_line: 261}
+    summary: Mark candidate requests whose canonical name is shared.
+    rationale: Make the ambiguity visible to the judge.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 360, end_line: 360}
+    summary: Accept the source subject text during finalization.
+    rationale: Apply exact qualification independently of broad proposition terms.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 368, end_line: 404}
+    summary: Keep unresolved and multiply matching generic candidates unbound.
+    rationale: Preserve uncertainty without aborting design generation or selecting an ambiguous subject.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 410, end_line: 510}
+    summary: Replay candidate binding from saved Procedrr plans and judgment results.
+    rationale: Exercise deterministic binding changes without rerunning the full interview.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 521, end_line: 521}
+    summary: Export qualified candidate narrowing.
+    rationale: Make the deterministic filter reusable in live binding and replay.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 523, end_line: 523}
+    summary: Export the saved-event replay operation.
+    rationale: Connect replay logic to the CLI.
+  - path: tests/test_repository_inventory.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import JSON support for a saved event-log fixture.
+    rationale: Construct replay input in the regression test.
+  - path: tests/test_repository_inventory.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Import the replay operation under test.
+    rationale: Verify offline binding replay.
+  - path: tests/test_repository_inventory.py
+    type: modified
+    span: {start_line: 326, end_line: 490}
+    summary: Cover qualified narrowing, unresolved candidates, generic-name ambiguity, and saved-event replay.
+    rationale: Guard the binding behavior found missing in the DeepSWE audit runs.
+entities:
+  - id: repository-subject-binding
+    type: Function
+    action: added
+  - id: repository-binding-replay
+    type: Subcommand
+    action: added
+  - id: subject-binding-regression-tests
+    type: Unit test
+    action: added
+  - id: design-interview-subject-review
+    type: Step
+    action: added
+entity_relationships:
+  - id: replay-reuses-saved-binding-evidence
+    type: consumes
+    source: repository-binding-replay
+    target: repository-subject-binding
+    action: added
+    description: The replay subcommand reuses saved candidate sets and classifier results to evaluate deterministic binding behavior without new model calls.
+  - id: binding-tests-cover-ambiguity
+    type: verifies
+    source: subject-binding-regression-tests
+    target: repository-subject-binding
+    action: added
+    description: Regression tests verify qualified narrowing, safe abstention, and offline replay.
+invariants:
+  - id: uncertain-candidates-never-create-bindings
+    action: added
+    description: An unresolved candidate judgment remains explicitly uncertain and cannot be selected as the repository subject.
+    rationale: Design generation should retain unresolved links without inventing repository identity or aborting the run.
+  - id: shared-generic-names-require-disambiguation
+    action: added
+    description: Multiple candidates with the same generic symbol name do not all become exact subject matches solely from that shared name.
+    rationale: Common methods such as __str__ need qualified source or relationship evidence to distinguish their owners.
+guidance: []

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -101,6 +103,7 @@ def retrieve_subject_candidates(
     )
     try:
         candidates = retrieve_candidates(query, lookup_inventory, context)
+        candidates = narrow_qualified_candidates(query, candidates)
         if candidates.inventory_fingerprint != inventory.fingerprint:
             candidates = CandidateSet(
                 candidates.query_fingerprint,
@@ -154,12 +157,44 @@ def extract_explicit_repository_names(source_text: str) -> tuple[str, ...]:
     return tuple(sorted(names, key=lambda name: (name.casefold(), name)))
 
 
+def narrow_qualified_candidates(
+    query: LookupQuery, candidate_set: CandidateSet
+) -> CandidateSet:
+    """Keep exact qualified-name matches when source text identifies one."""
+    qualified_hints = tuple(
+        name.casefold()
+        for name in extract_explicit_repository_names(query.subject_text)
+        if "." in name
+    )
+    matching = tuple(
+        candidate
+        for candidate in candidate_set.candidates
+        if any(
+            candidate.record.qualified_name.casefold() == name
+            or candidate.record.qualified_name.casefold().endswith("." + name)
+            for name in qualified_hints
+        )
+    )
+    if not matching:
+        return candidate_set
+    return CandidateSet(
+        candidate_set.query_fingerprint,
+        candidate_set.inventory_fingerprint,
+        matching,
+        retrieval_status=candidate_set.retrieval_status,
+    )
+
+
 def prepare_candidate_relation_decisions(
     query: LookupQuery,
     candidate_set: CandidateSet,
     context: StructrrLookupContext | None = None,
 ) -> list[dict[str, Any]]:
     requests: list[dict[str, Any]] = []
+    name_counts = Counter(
+        candidate.record.canonical_name.casefold()
+        for candidate in candidate_set.candidates
+    )
     for candidate in candidate_set.candidates:
         spec = SemanticDecisionSpec(
             decision_id=f"decision:{query.source_ref}:candidate:{candidate.record.inventory_id}",
@@ -170,7 +205,7 @@ def prepare_candidate_relation_decisions(
             candidate_set_fingerprint=candidate.record.evidence_fingerprint,
             contract_revision=CANDIDATE_RELATION_REVISION,
         )
-        request = {
+        request: dict[str, Any] = {
             "spec": spec.to_data(),
             "question": (
                 "Does this one repository candidate denote the exact source subject?"
@@ -188,6 +223,12 @@ def prepare_candidate_relation_decisions(
                 (
                     "Do not compare this candidate with other candidates or "
                     "choose a winner."
+                ),
+                (
+                    "A generic name shared by multiple candidates is not enough "
+                    "to mark every candidate as a match. Use qualified source "
+                    "names and repository relationships; abstain when they do "
+                    "not identify this candidate uniquely."
                 ),
             ],
             "candidate": candidate.to_data(),
@@ -216,6 +257,8 @@ def prepare_candidate_relation_decisions(
                     ),
                 )[:16]
             )
+        if name_counts[candidate.record.canonical_name.casefold()] > 1:
+            request["shared_candidate_name"] = True
         requests.append(request)
     return requests
 
@@ -314,6 +357,7 @@ def finalize_subject_binding(
     *,
     quantifier: str,
     population_refs: Mapping[str, str] | None = None,
+    subject_text: str = "",
 ) -> dict[str, Any]:
     if len(decisions) != len(candidate_set.candidates):
         raise InventoryError("candidate relation decision coverage is incomplete")
@@ -321,14 +365,149 @@ def finalize_subject_binding(
         candidate.record.inventory_id: decision.result.value
         for candidate, decision in zip(candidate_set.candidates, decisions, strict=True)
     }
-    if any(value is None for value in by_candidate_id.values()):
-        raise InventoryError("candidate relation decision is unresolved")
-    return aggregate_candidate_relations(
+    qualified_hints = tuple(
+        name.casefold()
+        for name in extract_explicit_repository_names(subject_text)
+        if "." in name
+    )
+    uniquely_qualified = [
+        candidate.record.inventory_id
+        for candidate in candidate_set.candidates
+        if any(
+            candidate.record.qualified_name.casefold() == name
+            or candidate.record.qualified_name.casefold().endswith("." + name)
+            for name in qualified_hints
+        )
+    ]
+    if len(uniquely_qualified) == 1:
+        selected_id = uniquely_qualified[0]
+        by_candidate_id = {
+            candidate_id: (
+                "matches" if candidate_id == selected_id else "does_not_match"
+            )
+            for candidate_id in by_candidate_id
+        }
+    else:
+        shared_names = Counter(
+            candidate.record.canonical_name.casefold()
+            for candidate in candidate_set.candidates
+        )
+        for candidate in candidate_set.candidates:
+            candidate_id = candidate.record.inventory_id
+            if (
+                shared_names[candidate.record.canonical_name.casefold()] > 1
+                and by_candidate_id[candidate_id] == "matches"
+            ):
+                by_candidate_id[candidate_id] = "insufficient_evidence"
+            elif by_candidate_id[candidate_id] is None:
+                by_candidate_id[candidate_id] = "insufficient_evidence"
+    result = aggregate_candidate_relations(
         candidate_set,
         {key: str(value) for key, value in by_candidate_id.items()},
         quantifier=quantifier,
         population_refs=population_refs,
     )
+    uncertain_candidate_ids = [
+        candidate_id
+        for candidate_id, value in by_candidate_id.items()
+        if value == "insufficient_evidence"
+    ]
+    if uncertain_candidate_ids:
+        result["uncertain_candidate_ids"] = uncertain_candidate_ids
+    return result
+
+
+def replay_subject_binding_events(events_path: Path) -> dict[str, Any]:
+    """Replay deterministic binding over saved candidate sets and judge results."""
+    grouped_plans: dict[str, Mapping[str, Any]] = {}
+    grouped_results: dict[str, list[Mapping[str, Any]]] = {}
+    scope_pattern = re.compile(r"^(.*?\.for_each\[0\]\[\d+\])")
+    try:
+        lines = events_path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise InventoryError(f"cannot read Procedrr events: {events_path}") from exc
+    for line_number, line in enumerate(lines, start=1):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise InventoryError(
+                f"Procedrr event line {line_number} is not valid JSON"
+            ) from exc
+        if not isinstance(record, Mapping):
+            continue
+        path_value = record.get("path")
+        if not isinstance(path_value, str):
+            continue
+        scope_match = scope_pattern.match(path_value)
+        if scope_match is None:
+            continue
+        scope = scope_match.group(1)
+        if record.get("bind") == "repository_binding_plan":
+            value = record.get("output")
+            if isinstance(value, Mapping):
+                grouped_plans[scope] = value
+        elif record.get("output") == "candidate_relation_result":
+            value = record.get("value")
+            if isinstance(value, Mapping):
+                grouped_results.setdefault(scope, []).append(value)
+
+    bindings: list[dict[str, Any]] = []
+    for scope, plan in grouped_plans.items():
+        raw_query = plan.get("query")
+        raw_candidates = plan.get("candidates")
+        raw_requests = plan.get("requests")
+        if not (
+            isinstance(raw_query, Mapping)
+            and isinstance(raw_candidates, Mapping)
+            and isinstance(raw_requests, list)
+            and all(isinstance(item, Mapping) for item in raw_requests)
+        ):
+            raise InventoryError(f"saved repository binding plan is malformed: {scope}")
+        query = LookupQuery.from_data(raw_query)
+        candidates = CandidateSet.from_data(raw_candidates)
+        requests = [dict(item) for item in raw_requests]
+        results = grouped_results.get(scope, [])
+        if len(requests) != len(results):
+            raise InventoryError(
+                f"saved candidate result count is incomplete: {query.source_ref}"
+            )
+        original_decisions = bind_candidate_relation_decisions(requests, results)
+        decisions_by_id = {
+            str(
+                request.get("candidate", {}).get("record", {}).get("inventory_id")
+            ): decision
+            for request, decision in zip(requests, original_decisions, strict=True)
+        }
+        narrowed_candidates = narrow_qualified_candidates(query, candidates)
+        narrowed_decisions = [
+            decisions_by_id[candidate.record.inventory_id]
+            for candidate in narrowed_candidates.candidates
+        ]
+        result = finalize_subject_binding(
+            narrowed_candidates,
+            narrowed_decisions,
+            quantifier="one",
+            subject_text=query.subject_text,
+        )
+        bindings.append(
+            {
+                "source_ref": query.source_ref,
+                "status": result["status"],
+                "binding_ref": result.get("binding_ref"),
+                "reason_code": result.get("reason_code"),
+                "candidate_ids": [
+                    candidate.record.inventory_id
+                    for candidate in narrowed_candidates.candidates
+                ],
+                "uncertain_candidate_ids": result.get("uncertain_candidate_ids", []),
+            }
+        )
+    return {
+        "schema_version": "repository-binding-replay-v1",
+        "events_path": str(events_path),
+        "binding_count": len(bindings),
+        "bindings": bindings,
+    }
 
 
 __all__ = [
@@ -339,5 +518,7 @@ __all__ = [
     "extract_explicit_repository_names",
     "prepare_candidate_relation_decisions",
     "prepare_subject_lookup_query",
+    "narrow_qualified_candidates",
     "retrieve_subject_candidates",
+    "replay_subject_binding_events",
 ]

@@ -62,6 +62,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _evaluate_proposal_command,
     _execute_procedrr_flow,
     _feature_endpoint_result,
+    _finalize_implementation_review,
     _finalize_proposal_review,
     _load_implementation_plan,
     _load_procedrr_replay_responses,
@@ -1634,6 +1635,62 @@ def test_feature_flow_is_shared_and_validated() -> None:
     )
     assert "provider: opencode" not in flow
     assert "command: [run_code_task_agent]" in flow
+    assert "value: final_invariant_decisions" in flow
+    assert "kind: verify_candidate_invariant" in flow
+
+
+@pytest.mark.parametrize(
+    ("outcome", "accepted"), [("pass", True), ("unknown", False), ("fail", False)]
+)
+def test_final_invariant_review_is_separate_and_candidate_bound(
+    tmp_path: Path, outcome: str, accepted: bool
+) -> None:
+    diff_fingerprint = "sha256:candidate-diff"
+    review = {
+        "proposal_fingerprint": "sha256:proposal",
+        "diff_fingerprint": diff_fingerprint,
+        "semantic_worklist": {
+            "specifications": [
+                {
+                    "decision_id": "unexplained:semantic-change-review",
+                    "evidence_fingerprint": diff_fingerprint,
+                }
+            ]
+        },
+        "invariant_worklist": {
+            "specifications": [
+                {
+                    "decision_id": "invariant:stable-order",
+                    "invariant_id": "stable-order",
+                    "evidence_fingerprint": diff_fingerprint,
+                }
+            ]
+        },
+        "operation_ids": [],
+        "retained_clause_ids": [],
+        "unexplained_changes": ["semantic-change-review"],
+    }
+
+    result = _finalize_implementation_review(
+        {
+            "review": review,
+            "deterministic_decisions": [{"outcome": "pass"}],
+            "semantic_decisions": [{"outcome": "pass", "explanation": "accounted"}],
+            "invariant_decisions": [
+                {"outcome": outcome, "explanation": "reviewed candidate paths"}
+            ],
+        },
+        output_root=tmp_path,
+    )
+
+    receipt = json.loads(
+        Path(result["invariant_review_receipt_path"]).read_text(encoding="utf-8")
+    )
+    assert result["accepted"] is accepted
+    assert result["invariant_review_passed"] is accepted
+    assert receipt["proposal_fingerprint"] == "sha256:proposal"
+    assert receipt["candidate_fingerprint"] == diff_fingerprint
+    assert receipt["outcomes"][0]["invariant_id"] == "stable-order"
 
 
 def test_feature_flow_falls_back_to_source_tree_for_external_target(

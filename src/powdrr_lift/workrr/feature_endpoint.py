@@ -5858,8 +5858,11 @@ def _prepare_final_implementation_review(
         {"base_commit": request.base_commit, "patch": diff}
     )
     baseline_document = _load_yaml_mapping(Path(state["baseline_path"]))
+    plan_document = _load_yaml_mapping(Path(state["plan_path"]))
     active_clauses = _resolve_feature_intent(
-        worktree, baseline_document=baseline_document
+        worktree,
+        baseline_document=baseline_document,
+        feature_document=plan_document,
     )
     removed_clause_ids = {
         operation.subject_id
@@ -5867,10 +5870,21 @@ def _prepare_final_implementation_review(
         if operation.action == "remove"
         and operation.section in {"invariants", "guidance", "active_intent"}
     }
-    retained_clause_ids = sorted(
+    retained_clauses = tuple(
         clause.clause_id
         for clause in active_clauses
         if clause.clause_id not in removed_clause_ids
+    )
+    clauses_by_id = {clause.clause_id: clause for clause in active_clauses}
+    retained_clause_ids = sorted(
+        clause_id
+        for clause_id in retained_clauses
+        if clauses_by_id[clause_id].kind != "invariant"
+    )
+    invariant_clause_ids = sorted(
+        clause_id
+        for clause_id in retained_clauses
+        if clauses_by_id[clause_id].kind == "invariant"
     )
     specifications = [
         {
@@ -5886,7 +5900,6 @@ def _prepare_final_implementation_review(
         }
         for operation in proposal.operations
     ]
-    clauses_by_id = {clause.clause_id: clause for clause in active_clauses}
     specifications.extend(
         {
             "decision_id": f"intent:{clause_id}",
@@ -5901,6 +5914,20 @@ def _prepare_final_implementation_review(
         }
         for clause_id in retained_clause_ids
     )
+    invariant_specifications = [
+        {
+            "decision_id": f"invariant:{clause_id}",
+            "invariant_id": clause_id,
+            "predicate": (
+                "the final candidate preserves invariant "
+                f"{clause_id} across the changed and relevant unchanged paths"
+            ),
+            "invariant": clauses_by_id[clause_id].to_data(),
+            "proposal_fingerprint": proposal.fingerprint,
+            "evidence_fingerprint": diff_fingerprint,
+        }
+        for clause_id in invariant_clause_ids
+    ]
     specifications.append(
         {
             "decision_id": "unexplained:semantic-change-review",
@@ -5928,6 +5955,7 @@ def _prepare_final_implementation_review(
             },
         ],
         "semantic_worklist": {"specifications": specifications},
+        "invariant_worklist": {"specifications": invariant_specifications},
         "proposal_fingerprint": proposal.fingerprint,
         "diff_fingerprint": diff_fingerprint,
         "observed_diff": diff,
@@ -5970,6 +5998,51 @@ def _finalize_implementation_review(
     )
     if len(specifications) != len(semantic):
         raise PowdrrExecutionError("actualization decisions are incomplete")
+    invariant_worklist = review.get("invariant_worklist")
+    invariant_specifications = _flow_items(
+        invariant_worklist.get("specifications")
+        if isinstance(invariant_worklist, Mapping)
+        else None
+    )
+    invariant_decisions = _flow_items(parameters.get("invariant_decisions"))
+    if len(invariant_specifications) != len(invariant_decisions):
+        raise PowdrrExecutionError("invariant review decisions are incomplete")
+    if any(
+        item.get("outcome") not in {"pass", "fail", "unknown"}
+        or not isinstance(item.get("explanation"), str)
+        or not item["explanation"].strip()
+        for item in invariant_decisions
+    ):
+        raise PowdrrExecutionError("invariant review decisions are malformed")
+    if any(item.get("outcome") != "pass" for item in invariant_decisions):
+        result["accepted"] = False
+    invariant_receipt = {
+        "schema_version": "procedrr-invariant-review-receipt-v1",
+        "proposal_fingerprint": review.get("proposal_fingerprint"),
+        "candidate_fingerprint": review.get("diff_fingerprint"),
+        "outcomes": [
+            {
+                "invariant_id": specification.get("invariant_id"),
+                "outcome": decision.get("outcome"),
+                "explanation": decision.get("explanation"),
+                "evidence_fingerprint": specification.get("evidence_fingerprint"),
+            }
+            for specification, decision in zip(
+                invariant_specifications, invariant_decisions, strict=True
+            )
+        ],
+    }
+    invariant_receipt["fingerprint"] = content_fingerprint(invariant_receipt)
+    invariant_receipt_path = output_root / "invariant-review-receipt.json"
+    invariant_receipt_path.write_text(
+        json.dumps(invariant_receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    result["invariant_review_receipt_path"] = str(invariant_receipt_path)
+    result["invariant_review_fingerprint"] = invariant_receipt["fingerprint"]
+    result["invariant_review_passed"] = all(
+        item.get("outcome") == "pass" for item in invariant_decisions
+    )
     bound_decisions = [
         {
             "decision_id": specification.get("decision_id"),

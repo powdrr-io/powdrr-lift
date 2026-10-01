@@ -699,6 +699,37 @@ steps:
                   outcome: {type: string, enum: [pass, fail, unknown]}
                   explanation: {type: string, minLength: 1}
             validation: {kind: json_schema}
+  # Preserved invariants receive their own candidate-bound review. This pass
+  # runs independently from proposal operation and retained-guidance review.
+  - for_each:
+      snapshot: {name: final_implementation_review.invariant_worklist.specifications, max_items: 4096}
+      item_binding: final_invariant_decision
+      collect: {binding: final_invariant_decisions, mode: list, value: final_invariant_result}
+      body:
+        - judge:
+            kind: verify_candidate_invariant
+            provider: planning
+            question: Does this one invariant hold in the final candidate based on its supplied evidence?
+            subject: final_invariant_decision.predicate
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Evaluate exactly the one invariant in final_invariant_decision.
+              - Inspect the candidate diff and relevant validation evidence; a declaration or worker explanation is not implementation evidence.
+              - Consider relevant unchanged code paths when the invariant concerns preserved behavior.
+              - Return unknown when the supplied evidence does not establish preservation.
+              - Do not evaluate sibling invariants or issue an aggregate verdict.
+              - Do not return IDs or fingerprints; Powdrr binds them.
+            context: [final_invariant_decision, feature_description, plan, validation, final_implementation_review]
+            output:
+              name: final_invariant_result
+              schema:
+                type: object
+                required: [outcome, explanation]
+                additionalProperties: false
+                properties:
+                  outcome: {type: string, enum: [pass, fail, unknown]}
+                  explanation: {type: string, minLength: 1}
+            validation: {kind: json_schema}
   - operation:
       tool: internal
       command: [finalize_implementation_review]
@@ -706,15 +737,19 @@ steps:
         review: {type: reference, value: final_implementation_review}
         deterministic_decisions: {type: reference, value: final_deterministic_decisions}
         semantic_decisions: {type: reference, value: final_semantic_decisions}
+        invariant_decisions: {type: reference, value: final_invariant_decisions}
       returns:
         type: object
-        required: [accepted, receipt_path, actualization_report_path, actualization_fingerprint, actualization_passed]
+        required: [accepted, receipt_path, actualization_report_path, actualization_fingerprint, actualization_passed, invariant_review_receipt_path, invariant_review_fingerprint, invariant_review_passed]
         properties:
           accepted: {type: boolean}
           receipt_path: {type: string, minLength: 1}
           actualization_report_path: {type: string, minLength: 1}
           actualization_fingerprint: {type: string, minLength: 1}
           actualization_passed: {type: boolean}
+          invariant_review_receipt_path: {type: string, minLength: 1}
+          invariant_review_fingerprint: {type: string, minLength: 1}
+          invariant_review_passed: {type: boolean}
       bind: final_review
   - gate:
       subject: final_review.accepted

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import io
 import json
 import subprocess
@@ -54,7 +55,7 @@ def test_harbor_feature_returns_success_for_completed_run_with_issues(
             review={"passed": False},
         ),
     )
-    args = SimpleNamespace(
+    args = argparse.Namespace(
         repo_root=tmp_path,
         planning_provider="test-provider",
         planning_api_key=None,

@@ -312,22 +312,59 @@ def _format_planned_changes(
         for scenario in behavior_scenarios
         for text in _scenario_requirement_text(scenario)
     }
-    compact_changes = []
+    compact_changes: list[str] = []
     for change in changes:
-        compact = dict(change)
+        change_id = change.get("id")
+        action = change.get("action")
+        source_ref = change.get("instruction_ref")
+        description = change.get("description") or change.get("summary")
+        extra_fields = {
+            key: value
+            for key, value in change.items()
+            if key
+            not in {
+                "id",
+                "action",
+                "description",
+                "summary",
+                "instruction_ref",
+                "section",
+                "intent_effect",
+            }
+        }
         if scenario_text:
-            for field_name in ("description", "summary"):
-                text = compact.get(field_name)
-                if (
-                    isinstance(text, str)
-                    and _normalize_planned_change_text(text) in scenario_text
-                ):
-                    compact.pop(field_name)
-        compact_changes.append(compact)
-    return "\n".join(
-        f"- {json.dumps(change, sort_keys=True, ensure_ascii=False)}"
-        for change in compact_changes
-    )
+            if (
+                isinstance(description, str)
+                and _normalize_planned_change_text(description) in scenario_text
+            ):
+                description = None
+        label_parts = [str(change_id)] if isinstance(change_id, str) else []
+        if isinstance(source_ref, str):
+            label_parts.append(source_ref)
+        label = f"[{'; '.join(label_parts)}]" if label_parts else ""
+        if isinstance(action, str):
+            label = f"{label} ({action})".strip()
+        rendered_extras = (
+            f" {json.dumps(extra_fields, sort_keys=True, ensure_ascii=False)}"
+            if extra_fields
+            else ""
+        )
+        if isinstance(description, str) and description.strip():
+            prefix = f"{label}: " if label else ""
+            compact_changes.append(f"- {prefix}{description}{rendered_extras}")
+        elif label:
+            compact_changes.append(f"- {label}{rendered_extras}")
+        elif extra_fields:
+            compact_changes.append(
+                f"- {json.dumps(extra_fields, sort_keys=True, ensure_ascii=False)}"
+            )
+        else:
+            # Preserve unusual, non-compiler-owned fields rather than dropping
+            # information the worker may need to understand the operation.
+            compact_changes.append(
+                f"- {json.dumps(dict(change), sort_keys=True, ensure_ascii=False)}"
+            )
+    return "\n".join(compact_changes)
 
 
 def _nested_strings(value: Any) -> tuple[str, ...]:

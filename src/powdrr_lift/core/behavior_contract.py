@@ -211,12 +211,13 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         item for item in scenarios if item.routing in {"include", "include_prohibition"}
     ]
     unclear_scenarios = [item for item in scenarios if item.routing == "unclear"]
+    related_requirements: list[str] = []
+    seen_related_requirements: set[str] = set()
     for index, item in enumerate(implementation_scenarios, start=1):
         detail = (
-            f"{index}. [{item.scenario_id}] {item.subject}: "
-            f"Given {_worker_text(item.given)}; "
-            f"when {item.when}; "
-            f"expect {_worker_text(item.then)}."
+            f"{index}. [{item.scenario_id}] Given {_worker_text(item.given)}, "
+            f"when {item.when}, expect {_worker_text(item.then)} "
+            f"(subject: {item.subject})."
         )
         capabilities = [
             f"{value['behavior']} {value['capability']}"
@@ -227,7 +228,13 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
             detail += " Capabilities: " + "; ".join(capabilities) + "."
         lines.append(detail)
         for relationship in item.related_requirements:
-            lines.append(f"   Related requirement: {relationship}")
+            normalized = " ".join(relationship.casefold().split())
+            if normalized not in seen_related_requirements:
+                seen_related_requirements.add(normalized)
+                related_requirements.append(relationship)
+    if related_requirements:
+        lines.extend(("", "Additional cross-requirement constraints:"))
+        lines.extend(f"- {relationship}" for relationship in related_requirements)
     related_groups: dict[tuple[str, str], list[str]] = {}
     for item in scenarios:
         if item.validation_group_id is not None:

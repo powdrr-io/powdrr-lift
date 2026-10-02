@@ -209,6 +209,53 @@ def test_worker_prompt_evaluation_checks_exact_captured_prompt_and_references(
     assert report["findings"][1]["evidence_quote"] == ""
 
 
+def test_worker_prompt_judge_must_check_for_contradictions_across_sections(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    prompt = (
+        "Product contract: Adds value.\n"
+        "Validation cases: Adding a value is optional; either add it or skip it."
+    )
+    _capture_prompt_artifacts(run_dir, prompt)
+
+    class ContradictionJudge(FakeJudge):
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, str]:
+            self.calls.append(messages)
+            assert "every relevant section" in messages[0]["content"]
+            assert (
+                "A correct quotation in one section does not cure"
+                in messages[0]["content"]
+            )
+            payload = json.loads(messages[1]["content"])
+            candidate = "\n".join(
+                item["prompt"] for item in payload["candidate_worker_prompts"]
+            )
+            assert "Adding a value is optional" in candidate
+            return {
+                "decision": "contradicted",
+                "evidence_quote": "Adding a value is optional",
+                "reason": "A later section weakens the required behavior.",
+            }
+
+    judge = ContradictionJudge()
+    report = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=judge,
+        rubric_path=rubric_path,
+    )
+
+    assert report["findings"][0]["decision"] == "contradicted"
+    assert report["summary"]["critical_failures"] == ["api-adds-value"]
+    assert report["summary"]["passed"] is False
+
+
 def test_worker_prompt_evaluation_rejects_stale_capture_fingerprint(
     tmp_path: Path,
 ) -> None:

@@ -675,6 +675,13 @@ def test_design_interview_uses_single_field_source_classification() -> None:
         "statements",
         "validation_groups",
     ]
+    split_rules = " ".join(split_judge["instructions"])
+    assert "Splitting a source clause does not weaken its requiredness" in split_rules
+    assert (
+        "Do not infer alternatives from two modes, populations, scopes" in split_rules
+    )
+    assert "either approach satisfies this request" in split_rules
+    assert "not alternatives; preserve each branch condition" in split_rules
 
     assert classifier_loop["snapshot"]["max_items"] == 16
     assert root_judge["question"].startswith("Decide how the pipeline should route")

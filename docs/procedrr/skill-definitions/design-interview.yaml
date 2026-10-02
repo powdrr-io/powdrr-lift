@@ -202,6 +202,20 @@ steps:
               - Keep a trigger, condition, exception, or required outcome attached to the obligation it qualifies.
               - Group statements that must pass together in the same scenario, form an ordered sequence, represent source-authorized alternatives, or describe conditional branches.
               - >-
+                Splitting a source clause does not weaken its requiredness: every
+                resulting product behavior remains required unless the source
+                explicitly permits satisfying the request by choosing only one
+                of those behaviors. A missing validation group means separate
+                checks, not optional behavior.
+              - >-
+                Use alternatives only when the source explicitly makes the
+                outcomes interchangeable and says that any one is sufficient.
+                Do not infer alternatives from two modes, populations, scopes,
+                or sibling behaviors being listed together. When each named
+                mode or population has its own behavior, preserve each behavior
+                as required. Use conditional for branches whose conditions
+                select which required behavior applies.
+              - >-
                 Encode each validation group as "members=1,2;relation=all_together".
                 Members are two or more one-based statement indexes; relation is
                 all_together, ordered, alternatives, or conditional. Leave
@@ -226,6 +240,15 @@ steps:
                 Example: "If credentials are valid, return 200; otherwise return
                 401" has two conditional branches, not alternatives; preserve each
                 branch condition in its statement and link them as conditional.
+              - >-
+                Example: "Store a summary for archived records and a full payload
+                for active records" describes two required population-specific
+                behaviors, not alternatives. Keep both required; do not group them
+                as alternatives merely because the behaviors differ.
+              - >-
+                Example: "Either cache the result or recompute it; either approach
+                satisfies this request" explicitly permits alternatives. Use an
+                alternatives group only when choosing one is sufficient.
               - >-
                 Make every statement independently understandable: repeat the
                 source subject and governing action when needed; never emit a

@@ -14,6 +14,7 @@ from powdrr_lift.core.semantic_contract import (
 )
 from powdrr_lift.core.semantic_decision import (
     DECISION_VALUES,
+    SEMANTIC_DIMENSION_DECISION_KINDS,
     SemanticDecision,
 )
 from powdrr_lift.core.semantic_faithfulness import (
@@ -28,6 +29,8 @@ from powdrr_lift.workrr.command_catalog import (
 )
 from powdrr_lift.workrr.semantic_contract_compiler import (
     CLASSIFIER_DEFINITIONS,
+    SEMANTIC_DIMENSION_DEFINITIONS,
+    applicable_source_semantic_dimensions,
     bind_behavior_family_decision,
     bind_source_extractions,
     bind_source_semantic_decisions,
@@ -62,6 +65,145 @@ def test_every_source_classifier_has_a_question_and_decision_rules() -> None:
         assert definition.question, kind
         assert definition.instructions, kind
         assert DECISION_VALUES[kind]
+    assert set(SEMANTIC_DIMENSION_DEFINITIONS) == set(SEMANTIC_DIMENSION_DECISION_KINDS)
+    assert all(
+        definition.examples for definition in SEMANTIC_DIMENSION_DEFINITIONS.values()
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("Deeply duplicate the nested settings.", "copy_depth"),
+        (
+            "Changes made through the handle are reflected in storage.",
+            "mutation_propagation",
+        ),
+        ("Each call returns a distinct instance.", "object_identity"),
+        ("The value survives until the next transition.", "persistence_boundary"),
+        ("The factory is used when the argument is omitted.", "argument_presence"),
+    ],
+)
+def test_dimension_screen_covers_generic_paraphrases(
+    source: str, expected: str
+) -> None:
+    assert expected in applicable_source_semantic_dimensions(source)
+
+
+def test_dimension_screen_skips_ordinary_clauses() -> None:
+    assert (
+        applicable_source_semantic_dimensions("The endpoint supports report export.")
+        == ()
+    )
+
+
+def test_dimension_classifiers_are_requested_only_for_relevant_clauses() -> None:
+    clause = _clause("Create a fresh copy of the defaults.")
+    root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=root_plan["resolved_decisions"],
+        pending_specs=root_plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "include"}],
+        created_at=NOW,
+    )
+    plan = prepare_dependent_source_semantic_decisions(clause, root, created_at=NOW)
+
+    dimension_requests = [
+        item
+        for item in plan["pending_specs"]
+        if item["spec"]["decision_kind"] in SEMANTIC_DIMENSION_DECISION_KINDS
+    ]
+    assert [item["spec"]["decision_kind"] for item in dimension_requests] == [
+        "copy_depth"
+    ]
+    assert dimension_requests[0]["subject_text"] == clause["text"]
+
+
+def test_context_clause_does_not_activate_semantic_dimension_classifiers() -> None:
+    clause = _clause("The current defaults are copied from the configuration.")
+    root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
+    root = bind_source_semantic_decisions(
+        resolved_decisions=root_plan["resolved_decisions"],
+        pending_specs=root_plan["pending_specs"],
+        provider_results=[{"status": "resolved", "value": "context"}],
+        created_at=NOW,
+    )
+
+    plan = prepare_dependent_source_semantic_decisions(clause, root, created_at=NOW)
+
+    assert not any(
+        item["spec"]["decision_kind"] in SEMANTIC_DIMENSION_DECISION_KINDS
+        for item in plan["pending_specs"]
+    )
+
+
+def test_unspecified_source_dimension_survives_contract_compilation() -> None:
+    clause = _clause("Create a fresh copy of the defaults.")
+    decisions = _bind_source_decisions(
+        clause, disposition="feature", overrides={"copy_depth": "unspecified"}
+    )
+    extractions = compile_deterministic_source_extractions(
+        clause, decisions, clause["text"], created_at=NOW
+    )
+    behavior_request = prepare_behavior_family_decision(
+        clause, next(item for item in extractions if item.extraction_kind == "behavior")
+    )
+    family = bind_behavior_family_decision(
+        behavior_request,
+        {"status": "resolved", "value": "create"},
+        created_at=NOW,
+    )
+    contract = compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=family,
+    )
+
+    data = contract.to_data()
+    assert data["semantic_dimensions"] == {"copy_depth": "unspecified"}
+    assert {item["field"] for item in data["unresolved"]} >= {
+        "semantic_dimensions.copy_depth"
+    }
+
+
+def test_explicit_semantic_dimension_answers_survive_contract_compilation() -> None:
+    clause = _clause(
+        "Recursively copy settings; writes through the view update storage; "
+        "each call gets a distinct mapping object; data persists until exit; "
+        "reject when both arguments are supplied, even if one is null."
+    )
+    expected = {
+        "copy_depth": "recursive",
+        "mutation_propagation": "write_through",
+        "object_identity": "distinct_objects",
+        "persistence_boundary": "boundary_stated",
+        "argument_presence": "argument_supplied",
+    }
+    decisions = _bind_source_decisions(
+        clause, disposition="feature", overrides=expected
+    )
+    extractions = compile_deterministic_source_extractions(
+        clause, decisions, clause["text"], created_at=NOW
+    )
+    behavior = next(item for item in extractions if item.extraction_kind == "behavior")
+    family_request = prepare_behavior_family_decision(clause, behavior, decisions)
+    family = bind_behavior_family_decision(
+        family_request,
+        {"status": "resolved", "value": "other"},
+        created_at=NOW,
+    )
+    contract = compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=family,
+    )
+
+    assert dict(contract.semantic_dimensions) == expected
+    assert not any(
+        item.field.startswith("semantic_dimensions.") for item in contract.unresolved
+    )
 
 
 def test_split_clause_classifier_receives_parent_sentence_as_context() -> None:
@@ -440,6 +582,8 @@ def _clause(text: str = "All data should pickle.") -> dict[str, Any]:
 
 
 def _source_result(kind: str, *, disposition: str = "invariant") -> str:
+    if kind in SEMANTIC_DIMENSION_DECISION_KINDS:
+        return "unspecified"
     return {
         "routing": "include",
         "disposition": disposition,
@@ -531,7 +675,7 @@ def test_pipeline_compiles_source_anchored_partial_contract() -> None:
     )
 
     data = contract.to_data()
-    assert data["schema_version"] == "partial-semantic-contract-v2"
+    assert data["schema_version"] == "partial-semantic-contract-v3"
     assert data["routing"] == "include"
     assert data["disposition"] == "invariant"
     assert data["quantifier"] == "every"

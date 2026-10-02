@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -17,6 +18,7 @@ from powdrr_lift.core.semantic_contract import (
 )
 from powdrr_lift.core.semantic_decision import (
     DECISION_VALUES,
+    SEMANTIC_DIMENSION_DECISION_KINDS,
     SemanticDecision,
     SemanticDecisionProvider,
     SemanticDecisionSpec,
@@ -712,6 +714,167 @@ SOURCE_DECISION_KINDS = (
     "nonactionable_exclusion_safety",
 )
 
+SOURCE_SEMANTIC_DIMENSION_KINDS = SEMANTIC_DIMENSION_DECISION_KINDS
+
+SEMANTIC_DIMENSION_DEFINITIONS: dict[str, ClassifierDefinition] = {
+    "copy_depth": ClassifierDefinition(
+        "What copy depth does this exact proposition state?",
+        (
+            "Choose recursive only when nested contents are explicitly copied; "
+            "choose outer_container only when the source explicitly limits copying "
+            "to the outer container or says shallow copy.",
+            "Freshness, a snapshot, or the word copy alone does not establish depth; "
+            "choose unspecified in those cases.",
+        ),
+        (
+            ClassificationExample("Recursively copy nested settings.", "recursive"),
+            ClassificationExample(
+                "Make a deep copy of the configuration.", "recursive"
+            ),
+            ClassificationExample("Shallow-copy the outer mapping.", "outer_container"),
+            ClassificationExample(
+                "Initialize from a fresh copy of defaults.", "unspecified"
+            ),
+            ClassificationExample("Return a snapshot of the settings.", "unspecified"),
+        ),
+    ),
+    "mutation_propagation": ClassifierDefinition(
+        "How does this exact proposition say mutations through the provided view "
+        "propagate?",
+        (
+            "Choose write_through only when writes or mutations through the view "
+            "are explicitly reflected in the backing value.",
+            "Choose detached_mapping only when the source explicitly says the "
+            "mapping is independent or writes do not affect the backing value.",
+            "Availability, persistence, and a snapshot do not alone establish "
+            "mutation propagation; otherwise choose unspecified.",
+        ),
+        (
+            ClassificationExample(
+                "Writes through the view update the backing store.", "write_through"
+            ),
+            ClassificationExample(
+                "Mutations to the returned mapping do not affect stored data.",
+                "detached_mapping",
+            ),
+            ClassificationExample("Callbacks receive state data.", "unspecified"),
+            ClassificationExample(
+                "Data remains available during callbacks.", "unspecified"
+            ),
+        ),
+    ),
+    "object_identity": ClassifierDefinition(
+        "What object-identity relation does this exact proposition state?",
+        (
+            "Choose same_object only for an explicit same or identical object/instance "
+            "guarantee; choose distinct_objects only for an explicit separate, new, "
+            "or distinct object/instance guarantee.",
+            "Equal values, fresh data, snapshots, and separate mappings do not "
+            "establish identity unless the source says so; otherwise choose "
+            "unspecified.",
+        ),
+        (
+            ClassificationExample(
+                "Both callbacks receive the same dictionary instance.", "same_object"
+            ),
+            ClassificationExample(
+                "Each request receives a distinct mapping object.", "distinct_objects"
+            ),
+            ClassificationExample(
+                "The method returns equal data for each caller.", "unspecified"
+            ),
+            ClassificationExample("A fresh copy is created on entry.", "unspecified"),
+        ),
+    ),
+    "persistence_boundary": ClassifierDefinition(
+        "Does this exact proposition state when or for how long the behavior persists?",
+        (
+            "Choose boundary_stated only when an explicit event, lifecycle interval, "
+            "or temporal limit is stated; choose unspecified when the source only "
+            "says persists, survives, or remains available without a boundary.",
+            "Do not infer object identity or mutation propagation from availability "
+            "across an interval.",
+        ),
+        (
+            ClassificationExample(
+                "Data remains available through on_enter and on_exit.",
+                "boundary_stated",
+            ),
+            ClassificationExample(
+                "Values persist until the state is exited.", "boundary_stated"
+            ),
+            ClassificationExample("The data persists.", "unspecified"),
+            ClassificationExample("The value survives serialization.", "unspecified"),
+        ),
+    ),
+    "argument_presence": ClassifierDefinition(
+        "Does this exact proposition define behavior by whether an argument is "
+        "supplied or non-null?",
+        (
+            "Choose argument_supplied only when argument presence or omission is "
+            "the stated condition; choose non_null_value only when the source "
+            "explicitly tests or requires a non-null value.",
+            "Rejecting two options together does not establish whether presence or "
+            "non-null value controls the rule. Choose unspecified when that boundary "
+            "is not stated.",
+        ),
+        (
+            ClassificationExample(
+                "Reject when both arguments are supplied, even if one is null.",
+                "argument_supplied",
+            ),
+            ClassificationExample(
+                "Use the default only when its value is not None.", "non_null_value"
+            ),
+            ClassificationExample(
+                "Reject simultaneous default and factory values.", "unspecified"
+            ),
+            ClassificationExample("The factory is optional.", "unspecified"),
+        ),
+    ),
+}
+
+_DIMENSION_APPLICABILITY_PATTERNS: dict[str, re.Pattern[str]] = {
+    "copy_depth": re.compile(
+        r"\b(copy|copies|copied|copying|clone|clones|cloned|duplicate|"
+        r"duplicates|duplicated|replicate|replicates|snapshot|snapshots)\b",
+        re.I,
+    ),
+    "mutation_propagation": re.compile(
+        r"\b(write[- ]through|reflect|reflected|propagate|propagates|"
+        r"propagated|mutation|mutate|mutates|mutated|backing|view|views|"
+        r"alias|aliases|shared)\b",
+        re.I,
+    ),
+    "object_identity": re.compile(
+        r"\b(identity|identical|same|distinct|separate|new)\s+"
+        r"(object|instance|mapping|dictionary|reference|view)\b|"
+        r"\bobject identity\b",
+        re.I,
+    ),
+    "persistence_boundary": re.compile(
+        r"\b(persist|persists|persisted|survive|survives|survived|retain|"
+        r"retains|retained|remain|remains|remained|available through|"
+        r"available during|until|throughout)\b",
+        re.I,
+    ),
+    "argument_presence": re.compile(
+        r"\b(default|factory|argument|parameter|non-null|not None|null|"
+        r"None|supplied|provided|omitted|omit)\b",
+        re.I,
+    ),
+}
+
+
+def applicable_source_semantic_dimensions(text: str) -> tuple[str, ...]:
+    """Conservatively identify semantic dimensions a source clause may resolve."""
+    return tuple(
+        kind
+        for kind in SOURCE_SEMANTIC_DIMENSION_KINDS
+        if _DIMENSION_APPLICABILITY_PATTERNS[kind].search(text)
+    )
+
+
 EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
     "subject": ClassifierDefinition(
         "Copy the smallest exact phrase naming what this proposition applies to.",
@@ -943,6 +1106,21 @@ def prepare_dependent_source_semantic_decisions(
                     "contradicts that route."
                 )
                 pending.append(request)
+        for kind in applicable_source_semantic_dimensions(text):
+            spec = _decision_spec(
+                clause_id,
+                text,
+                source_fingerprint,
+                kind,
+                context_text=context_text,
+            )
+            request = _classifier_request(spec, SEMANTIC_DIMENSION_DEFINITIONS[kind])
+            request["instructions"].append(
+                "Resolve only this semantic dimension from the exact proposition. "
+                "A value of unspecified means the source leaves this dimension "
+                "open; it is not permission to invent a source guarantee."
+            )
+            pending.append(request)
     return {"resolved_decisions": resolved, "pending_specs": pending}
 
 
@@ -1031,7 +1209,10 @@ def bind_source_semantic_decisions(
             )
         )
     ordered = sorted(
-        decisions, key=lambda item: SOURCE_DECISION_KINDS.index(item.decision_kind)
+        decisions,
+        key=lambda item: (
+            SOURCE_DECISION_KINDS + SOURCE_SEMANTIC_DIMENSION_KINDS
+        ).index(item.decision_kind),
     )
     if len(ordered) > 1:
         _validate_decision_tree(ordered)

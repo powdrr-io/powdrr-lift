@@ -235,6 +235,7 @@ def test_source_contract_restores_an_included_clause_mislabeled_as_context() -> 
             explicit_result=None,
             temporal_scope="unspecified",
             source_predicate="not_stated",
+            semantic_dimensions=(),
             field_provenance=(),
             unresolved=(UnresolvedSemanticField("predicate", "source_underspecified"),),
         )
@@ -259,7 +260,7 @@ def test_source_contract_fingerprint_must_match_the_instruction_clause() -> None
     ledger = compile_instruction_ledger("feature", "Add data ownership support.")
     semantic = _semantic(1)
     semantic[0]["partial_contract"] = {
-        "schema_version": "partial-semantic-contract-v2",
+        "schema_version": "partial-semantic-contract-v3",
         "contract_id": "contract:instruction-001",
         "source_ref": "instruction-001",
         "source_fingerprint": "sha256:stale",

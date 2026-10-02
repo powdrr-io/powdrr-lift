@@ -44,6 +44,7 @@ def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
         "error_behavior": {"nested_errors": "preserve locations"},
         "continuation": {"later_records": "continue"},
     }
+    scenario["source_dimensions"] = {"copy_depth": "recursive"}
     packet = compile_implementation_packet(
         objective="process nested results",
         obligations=("preserve nested error details",),
@@ -58,6 +59,7 @@ def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     assert "when process this record followed by a valid record" in rendered
     assert "expect errors: preserved with location; later_record: processed" in rendered
     assert "Related requirement:" not in rendered
+    assert "copy_depth = recursive" in rendered
     assert "nested_errors: preserve locations" not in rendered
     assert "later_records: continue" not in rendered
     assert "not_applicable" not in rendered

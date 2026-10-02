@@ -777,7 +777,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "partial_contract_path": "partial-contract.json",
                     "partial_contract_fingerprint": "sha256:contract",
                     "partial_contract": {
-                        "schema_version": "partial-semantic-contract-v2",
+                        "schema_version": "partial-semantic-contract-v3",
                         "contract_id": "contract:instruction-001",
                         "source_ref": "instruction-001",
                         "source_fingerprint": "sha256:clause",

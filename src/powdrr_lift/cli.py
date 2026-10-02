@@ -4719,7 +4719,13 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             print(f"Review passed: {result.review['passed']}")
     return (
         0
-        if result.status in {"completed", "design_generated", "prompt_captured"}
+        if result.status
+        in {
+            "completed",
+            "completed_with_issues",
+            "design_generated",
+            "prompt_captured",
+        }
         else 1
     )
 

@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import argparse
 import io
 import json
 import subprocess
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
 from powdrr_lift import parse_change_log, parse_validation_report
-from powdrr_lift.cli import _stage_generated_file, main
+from powdrr_lift.cli import _run_harbor_feature, _stage_generated_file, main
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
 from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
 from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
@@ -24,6 +26,63 @@ def test_harbor_feature_defaults_to_benchmark_mode_without_policy_option() -> No
     assert exc_info.value.code == 0
     assert "benchmark mode" in stdout.getvalue()
     assert "--clarification-policy" not in stdout.getvalue()
+
+
+def test_harbor_feature_returns_success_for_completed_run_with_issues(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mapping = SimpleNamespace(provider="test-provider", model="test-model")
+    monkeypatch.setattr(
+        "powdrr_lift.cli.resolve_workflow_provider", lambda _provider: "test-provider"
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.default_llm_mappings",
+        lambda _provider: {"standard_reasoning": mapping},
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.resolve_provider_credentials",
+        lambda *_args: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.build_workflow_client", lambda *_args, **_kwargs: object()
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.run_feature_in_place",
+        lambda _config: SimpleNamespace(
+            status="completed_with_issues",
+            branch="main",
+            worktree=tmp_path,
+            review={"passed": False},
+        ),
+    )
+    args = argparse.Namespace(
+        repo_root=tmp_path,
+        planning_provider="test-provider",
+        planning_api_key=None,
+        planning_base_url=None,
+        planning_model=None,
+        feature_description="Do the work.",
+        work_item_name="benchmark-task",
+        allowed_paths=["."],
+        validation_command=None,
+        opencode_executable="opencode",
+        opencode_model="model",
+        code_agent="minisweagent",
+        minisweagent_executable="mini",
+        minisweagent_model=None,
+        code_agent_prompt_prefix="",
+        code_agent_prompt_suffix="",
+        output_root=None,
+        task_id=None,
+        design_only=False,
+        capture_worker_prompts_only=False,
+        json=False,
+    )
+
+    with redirect_stdout(io.StringIO()):
+        exit_code = _run_harbor_feature(args)
+
+    assert exit_code == 0
 
 
 def test_cli_init_writes_template(

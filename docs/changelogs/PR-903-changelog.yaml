@@ -1,0 +1,236 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 903
+title: Preserve source scope in semantic classification
+intent:
+  problem: Split instruction clauses can lose the original sentence that disambiguates their subject or scope, and behavior extraction can omit source-stated qualifiers.
+  goal: Give semantic classifiers bounded original-sentence context while keeping each target proposition explicit, bind that context into decision identity, and preserve scope-bearing phrases in extracted behavior.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 136, end_line: 136}
+    summary: Require original text from instruction-ledger compilation.
+    rationale: Source spans need their original sentence to recover context.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 140, end_line: 140}
+    summary: Return source text in the instruction-ledger schema.
+    rationale: Later workflow steps need source text paired with clause spans.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 290, end_line: 290}
+    summary: Require source text from the refined instruction ledger.
+    rationale: Preserve the source through atomicity splitting.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 294, end_line: 294}
+    summary: Return source text in the refined-ledger schema.
+    rationale: Semantic decisions need the original sentence for split clauses.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 308, end_line: 308}
+    summary: Pass source text to root decision preparation.
+    rationale: The compiler uses the source span to find the containing sentence.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 331, end_line: 331}
+    summary: Restrict root judges to the target proposition when using context.
+    rationale: Context must not transfer sibling obligations.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 373, end_line: 373}
+    summary: Pass source text to dependent decision preparation.
+    rationale: Detail decisions need the same bounded source context.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 397, end_line: 397}
+    summary: Restrict dependent judges to the target proposition when using context.
+    rationale: Context must not widen the child decision.
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Version semantic-decision specs for context-aware inputs.
+    rationale: The serialized request schema now records context.
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 308, end_line: 308}
+    summary: Add optional context text to decision specs.
+    rationale: Store context separately from the proposition being labeled.
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 325, end_line: 325}
+    summary: Validate optional decision context.
+    rationale: Reject empty context values when supplied.
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 342, end_line: 342}
+    summary: Include context in decision input fingerprints.
+    rationale: Different contexts must not share classifier identity.
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 357, end_line: 357}
+    summary: Serialize context in decision specs.
+    rationale: Replayed inputs must preserve their original context.
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 375, end_line: 375}
+    summary: Require the context field in the versioned spec schema.
+    rationale: Match the serialized contract to the revised spec.
+  - path: src/powdrr_lift/core/semantic_decision.py
+    type: modified
+    span: {start_line: 390, end_line: 390}
+    summary: Deserialize optional decision context.
+    rationale: Round-trip context-aware request specs.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 327, end_line: 329}
+    summary: Accept optional source text in root-decision preparation.
+    rationale: Allow the operation to reconstruct the containing source sentence.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 337, end_line: 341}
+    summary: Accept optional source text in dependent-decision preparation.
+    rationale: Keep root and dependent decision inputs consistent.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1308, end_line: 1308}
+    summary: Return original text from instruction-ledger compilation.
+    rationale: Preserve source needed to reconstruct split clauses.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1421, end_line: 1421}
+    summary: Return original text from atomicity splitting.
+    rationale: Keep the containing sentence available downstream.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1651, end_line: 1655}
+    summary: Forward source text to root decision preparation.
+    rationale: Make context available when building root classifier requests.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1662, end_line: 1668}
+    summary: Forward source text to dependent decision preparation.
+    rationale: Make context available for each dependent classifier request.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Use the stable classifier-input context serializer.
+    rationale: Keep supporting context distinct from the target proposition.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 729, end_line: 731}
+    summary: Preserve source-stated scope modifiers during behavior extraction.
+    rationale: Scope and boundary phrases can change which behavior is required.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 759, end_line: 762}
+    summary: Accept source text when preparing root decisions.
+    rationale: Root routing needs access to the original sentence.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 766, end_line: 769}
+    summary: Bind containing-sentence context into root specs.
+    rationale: Route split propositions with their original scope available.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 780, end_line: 780}
+    summary: Accept source text when preparing dependent decisions.
+    rationale: Detail classification also needs bounded local context.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 785, end_line: 785}
+    summary: Recover the sentence containing the dependent clause.
+    rationale: Preserve context after atomicity splitting.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 801, end_line: 805}
+    summary: Bind context into disposition decisions.
+    rationale: Classify the proposition with context while retaining target scope.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 831, end_line: 835}
+    summary: Bind context into deterministic disposition specs.
+    rationale: Keep deterministic decision identity consistent with model-backed decisions.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 871, end_line: 877}
+    summary: Bind context into dependent decision specs.
+    rationale: Fingerprint every child decision with the context used to prepare it.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1578, end_line: 1581}
+    summary: Serialize classifier input with distinct context and proposition sections.
+    rationale: Context can resolve meaning without replacing the target being labeled.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1586, end_line: 1591}
+    summary: Allow decision-spec construction to include context.
+    rationale: Keep request construction and fingerprinted identity aligned.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1600, end_line: 1600}
+    summary: Store context on compiler-owned specs.
+    rationale: Preserve exact request context for fingerprinting and replay.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1604, end_line: 1625}
+    summary: Recover the containing sentence from a clause source span.
+    rationale: Split child text may omit governing words from its original sentence.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 706, end_line: 706}
+    summary: Add source text to the instruction-ledger workflow fixture.
+    rationale: Exercise the revised workflow response contract.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 723, end_line: 723}
+    summary: Add source text to the atomicity-ledger workflow fixture.
+    rationale: Exercise the revised workflow response contract after splitting.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 67, end_line: 83}
+    summary: Check that split-clause requests include source context and the exact proposition.
+    rationale: Prevent context from replacing or widening the target clause.
+  - path: tests/test_semantic_decision.py
+    type: modified
+    span: {start_line: 128, end_line: 136}
+    summary: Check that context changes decision fingerprints and round-trips.
+    rationale: Prevent reuse of decisions prepared with different local context.
+entities:
+  - id: semantic-decision-spec-context
+    type: Class
+    action: added
+  - id: source-context-classifier-request
+    type: Function
+    action: added
+  - id: source-context-classifier-regression
+    type: Regression test
+    action: added
+  - id: decision-context-fingerprint-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: context-regression-verifies-classifier-request
+    type: verifies
+    source: source-context-classifier-regression
+    target: source-context-classifier-request
+    action: added
+    description: The regression checks that source context and the exact target proposition are both present in the classifier request.
+  - id: fingerprint-regression-verifies-decision-spec
+    type: verifies
+    source: decision-context-fingerprint-regression
+    target: semantic-decision-spec-context
+    action: added
+    description: The regression checks that bounded context participates in semantic decision identity.
+invariants:
+  - id: semantic-context-does-not-widen-target
+    description: A containing source sentence may disambiguate a target clause but does not expand the proposition being classified or transfer sibling obligations.
+    action: added
+  - id: decision-context-is-fingerprinted
+    description: Semantic decision specs with different source context have different input fingerprints.
+    action: added
+guidance:
+  - id: retain-source-scope-phrases
+    description: Exact behavior extraction should retain source-stated owners, recipients, modes, lifecycle boundaries, precedence rules, and exclusions that constrain behavior.
+    action: added

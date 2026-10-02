@@ -703,6 +703,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 return {
                     "path": "instruction-ledger.json",
                     "fingerprint": "sha256:ledger",
+                    "source_text": "Add a thing",
                     "clauses": [
                         {
                             "clause_id": "instruction-001",
@@ -719,6 +720,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 return {
                     "path": "instruction-ledger.json",
                     "fingerprint": "sha256:atomic-ledger",
+                    "source_text": "Add a thing",
                     "clauses": [
                         {
                             "clause_id": "instruction-001",

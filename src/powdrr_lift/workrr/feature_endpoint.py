@@ -5373,7 +5373,7 @@ def _compile_code_task_plan(
     return {"path": path, "fingerprint": fingerprint, **document}
 
 
-def _compile_design_only_prompt(
+def _compile_initial_worker_prompt(
     *,
     config: FeatureEndpointConfig,
     canonical_design: Mapping[str, Any],
@@ -5383,7 +5383,7 @@ def _compile_design_only_prompt(
     existing_tests: Sequence[Mapping[str, Any]],
     output_root: Path,
 ) -> Path:
-    """Render and persist the normal worker request without invoking a worker."""
+    """Compile the shared design-stage worker request without invoking a worker."""
     obligations = canonical_design.get("obligations")
     if not isinstance(obligations, list):
         raise PowdrrExecutionError("canonical design has no obligation list")
@@ -5399,9 +5399,29 @@ def _compile_design_only_prompt(
     )
     if not descriptions or not tests:
         raise PowdrrExecutionError(
-            "design-only prompt requires obligations and required test cases"
+            "design-stage prompt requires obligations and required test cases"
         )
+    output_root.mkdir(parents=True, exist_ok=True)
     profile_names = tuple(dict.fromkeys(item.name for item in validation_profiles))
+    diff_path = _compile_initial_structrr_diff(
+        config=config,
+        canonical_design=canonical_design,
+        inventory=existing_tests,
+        validation_profiles=validation_profiles,
+        output_root=output_root,
+    )
+    diff_document = _load_yaml_mapping(diff_path)
+    planned_additions: list[dict[str, Any]] = []
+    planned_deletions: list[dict[str, Any]] = []
+    for section in ("features", "invariants", "guidance"):
+        for item in _mapping_values(diff_document.get(section)):
+            action = item.get("action")
+            if action not in {"added", "deleted", "removed"}:
+                continue
+            change = {"section": section, **dict(item)}
+            (planned_additions if action == "added" else planned_deletions).append(
+                change
+            )
     try:
         packet = compile_implementation_packet(
             objective=config.feature_description,
@@ -5422,7 +5442,12 @@ def _compile_design_only_prompt(
             paths=config.allowed_paths,
             validation_profiles=profile_names,
             acceptance_criteria=tuple(item["description"] for item in tests),
-            source_refs=(f"canonical-design:{content_fingerprint(canonical_design)}",),
+            planned_additions=tuple(planned_additions),
+            planned_deletions=tuple(planned_deletions),
+            source_refs=(
+                f"canonical-design:{content_fingerprint(canonical_design)}",
+                f"structrr-diff:{diff_path.name}",
+            ),
         )
         request = ImplementationRequest.from_execution_unit(
             unit,
@@ -5436,7 +5461,6 @@ def _compile_design_only_prompt(
         raise PowdrrExecutionError(
             f"design-only implementation prompt compilation failed: {error}"
         ) from error
-    output_root.mkdir(parents=True, exist_ok=True)
     request_path = output_root / "implementation-request.json"
     prompt_path = output_root / "implementation-prompt.md"
     request_path.write_text(request.to_json(), encoding="utf-8")
@@ -5446,17 +5470,40 @@ def _compile_design_only_prompt(
         json.dumps(packet.to_data(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    _compile_design_only_structrr_diff(
-        config=config,
-        canonical_design=canonical_design,
-        inventory=existing_tests,
-        validation_profiles=validation_profiles,
-        output_root=output_root,
-    )
     return prompt_path
 
 
-def _compile_design_only_structrr_diff(
+def _assert_feature_design_ready_for_implementation(
+    canonical_design: Mapping[str, Any],
+) -> None:
+    """Reject draft clarification markers after the shared design stage."""
+    projections = canonical_design.get("projections")
+    if not isinstance(projections, list):
+        raise PowdrrExecutionError("canonical feature design has no projections")
+    unresolved: list[str] = []
+    for projection in projections:
+        if not isinstance(projection, Mapping):
+            continue
+        clause_id = projection.get("clause_id")
+        scenario = projection.get("behavior_scenario")
+        dimensions = (
+            scenario.get("dimensions") if isinstance(scenario, Mapping) else None
+        )
+        if not isinstance(dimensions, Mapping):
+            continue
+        unresolved.extend(
+            f"{clause_id}:{name}"
+            for name, value in dimensions.items()
+            if isinstance(value, str) and value.startswith("NEEDS CLARIFICATION:")
+        )
+    if unresolved:
+        raise PowdrrExecutionError(
+            "behavior scenario needs clarification before implementation: "
+            + ", ".join(unresolved)
+        )
+
+
+def _compile_initial_structrr_diff(
     *,
     config: FeatureEndpointConfig,
     canonical_design: Mapping[str, Any],

@@ -606,6 +606,20 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("compile_canonical_feature_design"),
         ),
+        "assert_feature_design_ready_for_implementation": CommandSpec(
+            name="assert_feature_design_ready_for_implementation",
+            input_schema=object_schema(
+                {"feature_design": {}},
+                required=("feature_design",),
+                additional_properties=False,
+            ),
+            output_schema=object_schema(
+                {"passed": {"type": "boolean"}},
+                required=("passed",),
+                additional_properties=False,
+            ),
+            logic=implementations.get("assert_feature_design_ready_for_implementation"),
+        ),
         "plan_structrr_diff": CommandSpec(
             name="plan_structrr_diff",
             input_schema=object_schema(
@@ -1555,13 +1569,7 @@ class FeatureCommandRuntime:
             return _merge_behavior_scenario_values(
                 call_parameters,
                 benchmark_mode=benchmark_mode(),
-                allow_clarification=bool(
-                    config is not None
-                    and (
-                        getattr(config, "design_only", False)
-                        or getattr(config, "capture_worker_prompts_only", False)
-                    )
-                ),
+                allow_clarification=True,
             )
 
         def semantic_artifact_directory(clause: Mapping[str, Any]) -> Path:
@@ -2060,6 +2068,36 @@ class FeatureCommandRuntime:
                 SemanticDecisionError,
             ) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
+
+        def assert_feature_design_ready_for_implementation() -> Any:
+            feature_design = parameters.get("feature_design")
+            if not isinstance(feature_design, Mapping):
+                raise PowdrrExecutionError(
+                    "implementation readiness requires a canonical feature design"
+                )
+            canonical_design: Mapping[str, Any] = feature_design
+            if not isinstance(canonical_design.get("projections"), list):
+                path_value = feature_design.get("path")
+                if not isinstance(path_value, str):
+                    raise PowdrrExecutionError(
+                        "implementation readiness requires canonical design projections"
+                    )
+                try:
+                    loaded = json.loads(Path(path_value).read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError) as exc:
+                    raise PowdrrExecutionError(
+                        "cannot read canonical design for implementation readiness: "
+                        f"{exc}"
+                    ) from exc
+                if not isinstance(loaded, Mapping):
+                    raise PowdrrExecutionError(
+                        "canonical feature design artifact is malformed"
+                    )
+                canonical_design = loaded
+            feature_endpoint._assert_feature_design_ready_for_implementation(
+                canonical_design
+            )
+            return {"passed": True}
 
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
@@ -2561,8 +2599,8 @@ class FeatureCommandRuntime:
                 json.dumps(compatibility_packets, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
-            if config is not None and getattr(config, "design_only", False):
-                prompt_path = feature_endpoint._compile_design_only_prompt(
+            if config is not None:
+                prompt_path = feature_endpoint._compile_initial_worker_prompt(
                     config=config,
                     canonical_design=canonical_document,
                     required_test_cases=required_test_cases,
@@ -2708,6 +2746,9 @@ class FeatureCommandRuntime:
                 ),
                 "compile_canonical_feature_design": bind_handler(
                     compile_canonical_feature_design_operation
+                ),
+                "assert_feature_design_ready_for_implementation": bind_handler(
+                    assert_feature_design_ready_for_implementation
                 ),
                 "apply_sentence_design_trace": bind_handler(
                     apply_sentence_design_trace

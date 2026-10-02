@@ -1,0 +1,170 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 898
+title: Make product implementation extend the shared design stage
+intent:
+  problem: Product implementation began with validation setup before the design-only prompt and diff were compiled, so the two modes did not share the same initial prompt-building path.
+  goal: Run the same design interview, initial Structrr diff, and diff-backed worker prompt first in both modes, then continue product-specific readiness checks and implementation steps.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 4, end_line: 9}
+    summary: Start product implementation with the shared design interview and follow it with a readiness gate.
+    rationale: Make product mode use the same initial design stage as design-only mode before its additional validation and implementation steps.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 15, end_line: 33}
+    summary: Add the shared design interview and product readiness operation at the beginning of the workflow.
+    rationale: Make design the first common stage before product-specific implementation steps.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 29, end_line: 37}
+    summary: Remove the later duplicate placement of the design interview.
+    rationale: Keep the interview at the start of product flow.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5376, end_line: 5376}
+    summary: Rename the design-only prompt compiler as the shared initial worker prompt compiler.
+    rationale: Make the design-stage prompt builder available to product mode.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5386, end_line: 5386}
+    summary: Describe the shared design-stage prompt compilation behavior.
+    rationale: Document the common prompt stage.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5402, end_line: 5402}
+    summary: Update the prompt validation error to describe the shared stage.
+    rationale: Keep diagnostics accurate for product mode.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5404, end_line: 5404}
+    summary: Create the artifact output directory before compiling the initial diff.
+    rationale: Persist prompt and diff artifacts in the shared stage.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5406, end_line: 5424}
+    summary: Compile the initial Structrr diff and map its additions and deletions into the worker request.
+    rationale: Ensure the initial prompt contains the planned changes represented by the design diff.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5445, end_line: 5450}
+    summary: Attach planned diff changes and the diff artifact reference to the execution unit.
+    rationale: Render traceable product changes in the initial worker prompt.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5439, end_line: 5439}
+    summary: Move output directory creation ahead of initial diff compilation.
+    rationale: Avoid duplicate directory setup after diff generation.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5449, end_line: 5455}
+    summary: Remove the old design-only post-prompt diff compilation call.
+    rationale: Compile the diff before prompt creation in the shared stage.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5476, end_line: 5506}
+    summary: Compile one initial worker prompt backed by the initial Structrr diff, and reject unresolved design drafts before implementation.
+    rationale: Keep the design-stage prompt and change set identical across modes while allowing implementation to enforce resolved requirements.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 609, end_line: 622}
+    summary: Register the product design-readiness command.
+    rationale: Let the product workflow verify canonical design projections after the shared interview.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1572, end_line: 1572}
+    summary: Allow the shared interview to compile provisional clarification drafts in either mode.
+    rationale: Produce the same initial design-stage result before product-only readiness validation.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2072, end_line: 2101}
+    summary: Implement readiness validation using canonical projections, loading the artifact when given a public summary.
+    rationale: Reject unresolved dimensions at the product workflow boundary while supporting the interview's summary output.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2602, end_line: 2603}
+    summary: Compile the initial worker prompt for both design-only and product configurations.
+    rationale: Route both modes through the same prompt-and-diff builder.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2750, end_line: 2752}
+    summary: Bind the product readiness operation to its runtime handler.
+    rationale: Make the declarative product workflow command executable.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 58, end_line: 58}
+    summary: Import the readiness helper for product draft validation coverage.
+    rationale: Exercise the implementation gate directly.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 63, end_line: 63}
+    summary: Replace the design-only prompt compiler import with the shared compiler.
+    rationale: Test the unified prompt builder.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 65, end_line: 65}
+    summary: Import the shared initial worker prompt compiler.
+    rationale: Exercise the same function from both modes.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 103, end_line: 103}
+    summary: Rename the prompt compilation test to cover both modes.
+    rationale: Verify product and design-only parity.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 132, end_line: 132}
+    summary: Use the shared compiler in the prompt parity test.
+    rationale: Verify the common path directly.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 155, end_line: 156}
+    summary: Assert that the rendered prompt includes required product changes.
+    rationale: Ensure Structrr additions reach prompt text.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 158, end_line: 158}
+    summary: Assert that planned additions preserve their Structrr section.
+    rationale: Verify diff data is attached to the request.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 162, end_line: 162}
+    summary: Capture the initial Structrr diff artifact for parity comparison.
+    rationale: Compare outputs from design-only and product configurations.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 171, end_line: 243}
+    summary: Cover identical initial prompts and diffs in both modes, shared workflow ordering, and product readiness validation.
+    rationale: Guard the common design-stage prefix and the product-only rejection of unresolved drafts.
+entities:
+  - id: shared-design-stage-prompt-builder
+    type: Step
+    action: added
+  - id: product-design-readiness-gate
+    type: Step
+    action: added
+  - id: shared-design-stage-regression-tests
+    type: Unit test
+    action: added
+entity_relationships:
+  - id: regression-tests-verify-shared-design-stage
+    type: verifies
+    source: shared-design-stage-regression-tests
+    target: shared-design-stage-prompt-builder
+    action: added
+    description: Tests assert that design-only and product modes render the same initial prompt and Structrr diff.
+  - id: regression-tests-verify-product-readiness
+    type: verifies
+    source: shared-design-stage-regression-tests
+    target: product-design-readiness-gate
+    action: added
+    description: Tests assert that unresolved design drafts are rejected before implementation.
+invariants:
+  - id: common-design-stage-prefix
+    description: Design-only and product modes compile the same initial prompt and Structrr diff from the shared design interview.
+    action: added
+  - id: product-implementation-requires-resolved-design
+    description: Product implementation cannot continue while canonical behavior dimensions contain clarification markers.
+    action: added
+guidance: []

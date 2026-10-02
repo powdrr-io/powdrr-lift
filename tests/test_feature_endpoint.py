@@ -55,13 +55,14 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_category_edits,
     _aggregate_intent_review,
     _apply_sentence_design_trace,
+    _assert_feature_design_ready_for_implementation,
     _candidate_structural_gate,
     _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
     _compile_code_task_preconditions,
-    _compile_design_only_prompt,
     _compile_feature_obligations,
+    _compile_initial_worker_prompt,
     _compile_obligation_verification_plans,
     _compile_required_test_case_edits,
     _correct_candidate_from_structrr_diff,
@@ -99,7 +100,7 @@ from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 
 
-def test_design_only_compiles_normal_worker_prompt_without_running_agent(
+def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
     tmp_path: Path,
 ) -> None:
     config = FeatureEndpointConfig(
@@ -128,7 +129,7 @@ def test_design_only_compiles_normal_worker_prompt_without_running_agent(
         ],
     }
     test_cases = [{"description": "iter_json returns array elements"}]
-    prompt_path = _compile_design_only_prompt(
+    prompt_path = _compile_initial_worker_prompt(
         config=config,
         canonical_design=design,
         required_test_cases=test_cases,
@@ -151,10 +152,14 @@ def test_design_only_compiles_normal_worker_prompt_without_running_agent(
     )
     assert "iter_json returns array elements" in prompt
     assert "python -m pytest" in prompt
+    assert "Required product changes:" in prompt
+    assert "Response.iter_json yields each array element." in prompt
     assert request["implementation_packet"] == packet
+    assert request["planned_additions"][0]["section"] == "features"
     structrr_diff = yaml.safe_load(
         (tmp_path / "artifacts" / "structrr-diff.yaml").read_text()
     )
+    initial_diff_text = (tmp_path / "artifacts" / "structrr-diff.yaml").read_text()
     assert structrr_diff["features"][0]["description"] == (
         "Response.iter_json yields each array element."
     )
@@ -162,6 +167,79 @@ def test_design_only_compiles_normal_worker_prompt_without_running_agent(
         "Each array element is yielded."
     )
     assert not list((tmp_path / "artifacts").glob("*attempt*"))
+
+    product_stage_path = _compile_initial_worker_prompt(
+        config=FeatureEndpointConfig(
+            feature_description=config.feature_description,
+            work_item_name=config.work_item_name,
+            repo_root=tmp_path,
+            allowed_paths=config.allowed_paths,
+            design_only=False,
+        ),
+        canonical_design=design,
+        required_test_cases=test_cases,
+        base_commit="base-commit",
+        validation_profiles=(
+            DiscoveredValidationProfile(
+                "pytest", ("python", "-m", "pytest"), "project"
+            ),
+        ),
+        existing_tests=(),
+        output_root=tmp_path / "artifacts",
+    )
+    assert product_stage_path.read_text() == prompt
+    assert (tmp_path / "artifacts" / "structrr-diff.yaml").read_text() == (
+        initial_diff_text
+    )
+
+
+def test_product_flow_starts_with_shared_design_interview() -> None:
+    flow_path = (
+        Path(__file__).parents[1]
+        / "docs"
+        / "procedrr"
+        / "skill-definitions"
+        / "implement-feature.yaml"
+    )
+    flow = yaml.safe_load(flow_path.read_text(encoding="utf-8"))
+
+    assert flow["steps"][0]["call"]["process"] == "design-interview"
+    parse_and_validate(
+        flow_path.read_text(encoding="utf-8"),
+        command_catalog=feature_command_catalog(),
+    )
+
+
+def test_product_readiness_gate_rejects_unresolved_design_drafts() -> None:
+    resolved = {
+        "projections": [
+            {
+                "clause_id": "instruction-001",
+                "behavior_scenario": {
+                    "dimensions": {"error_behavior": "not_applicable"}
+                },
+            }
+        ]
+    }
+    _assert_feature_design_ready_for_implementation(resolved)
+
+    provisional = {
+        "projections": [
+            {
+                "clause_id": "instruction-002",
+                "behavior_scenario": {
+                    "dimensions": {
+                        "error_behavior": "NEEDS CLARIFICATION: source is silent."
+                    }
+                },
+            }
+        ]
+    }
+    with pytest.raises(
+        PowdrrExecutionError,
+        match="instruction-002:error_behavior",
+    ):
+        _assert_feature_design_ready_for_implementation(provisional)
 
 
 def _test_behavior_scenario(identifier: str) -> dict[str, Any]:

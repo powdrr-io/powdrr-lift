@@ -64,6 +64,23 @@ def test_every_source_classifier_has_a_question_and_decision_rules() -> None:
         assert DECISION_VALUES[kind]
 
 
+def test_split_clause_classifier_receives_parent_sentence_as_context() -> None:
+    source = "Callbacks receive merged ancestor data; the getter reads local data."
+    clause = {
+        **_clause("the getter reads local data."),
+        "source_span": {"start": 0, "end": len(source)},
+    }
+    plan = prepare_source_semantic_decisions(clause, source_text=source, created_at=NOW)
+    request = plan["pending_specs"][0]
+
+    assert "Containing source sentence: " + source in request["subject_text"]
+    assert (
+        "Proposition to classify:\nthe getter reads local data."
+        in request["subject_text"]
+    )
+    assert request["spec"]["context_text"] == source
+
+
 def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     clause = _clause("Archived records retain their original field values.")
     root_request = prepare_source_semantic_decisions(clause, created_at=NOW)[

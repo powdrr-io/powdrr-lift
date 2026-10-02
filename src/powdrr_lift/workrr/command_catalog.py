@@ -324,7 +324,9 @@ def feature_command_catalog(
         "prepare_source_semantic_decisions": CommandSpec(
             name="prepare_source_semantic_decisions",
             input_schema=object_schema(
-                {"clause": {}}, required=("clause",), additional_properties=False
+                {"clause": {}, "source_text": {"type": "string"}},
+                required=("clause",),
+                additional_properties=False,
             ),
             output_schema={},
             logic=implementations.get("prepare_source_semantic_decisions"),
@@ -332,7 +334,11 @@ def feature_command_catalog(
         "prepare_dependent_source_semantic_decisions": CommandSpec(
             name="prepare_dependent_source_semantic_decisions",
             input_schema=object_schema(
-                {"clause": {}, "decisions": {}},
+                {
+                    "clause": {},
+                    "decisions": {},
+                    "source_text": {"type": "string"},
+                },
                 required=("clause", "decisions"),
                 additional_properties=False,
             ),
@@ -1299,6 +1305,7 @@ class FeatureCommandRuntime:
             return {
                 "path": str(path),
                 "fingerprint": ledger.fingerprint,
+                "source_text": ledger.source.text,
                 "clauses": [item.to_data() for item in ledger.clauses],
             }
 
@@ -1411,6 +1418,7 @@ class FeatureCommandRuntime:
             return {
                 "path": str(ledger_path),
                 "fingerprint": refined.fingerprint,
+                "source_text": refined.source.text,
                 "clauses": [item.to_data() for item in refined.clauses],
                 "split_diagnostics": [
                     item.to_data() for item in refined.split_diagnostics
@@ -1640,14 +1648,24 @@ class FeatureCommandRuntime:
 
         def prepare_source_semantic_decisions_operation() -> Any:
             try:
-                return prepare_source_semantic_decisions(semantic_clause())
+                source_text = parameters.get("source_text")
+                return prepare_source_semantic_decisions(
+                    semantic_clause(),
+                    source_text=source_text if isinstance(source_text, str) else None,
+                )
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
         def prepare_dependent_source_semantic_decisions_operation() -> Any:
             try:
                 return prepare_dependent_source_semantic_decisions(
-                    semantic_clause(), semantic_decisions(parameters.get("decisions"))
+                    semantic_clause(),
+                    semantic_decisions(parameters.get("decisions")),
+                    source_text=(
+                        parameters.get("source_text")
+                        if isinstance(parameters.get("source_text"), str)
+                        else None
+                    ),
                 )
             except (SemanticContractError, SemanticDecisionError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc

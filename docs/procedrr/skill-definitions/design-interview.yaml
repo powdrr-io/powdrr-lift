@@ -133,10 +133,11 @@ steps:
         feature_description: {type: reference, value: feature_description}
       returns:
         type: object
-        required: [path, fingerprint, clauses]
+        required: [path, fingerprint, source_text, clauses]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
+          source_text: {type: string, minLength: 1}
           clauses: {type: array, minItems: 1}
       bind: instruction_ledger
   - for_each:
@@ -286,10 +287,11 @@ steps:
         splits: {type: reference, value: atomicity_splits}
       returns:
         type: object
-        required: [path, fingerprint, clauses]
+        required: [path, fingerprint, source_text, clauses]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
+          source_text: {type: string, minLength: 1}
           clauses: {type: array, minItems: 1}
           split_diagnostics: {type: array}
       bind: atomic_instruction_ledger
@@ -303,6 +305,7 @@ steps:
             command: [prepare_source_semantic_decisions]
             parameters:
               clause: {type: reference, value: instruction_clause}
+              source_text: {type: reference, value: atomic_instruction_ledger.source_text}
             returns:
               type: object
               required: [resolved_decisions, pending_specs]
@@ -325,6 +328,7 @@ steps:
                   prompt_system: Return only the declared JSON object.
                   instructions:
                     - Follow the request's question, instructions, and allowed_values exactly.
+                    - Treat any containing source sentence as context for this exact proposition. Do not classify sibling clauses or transfer their obligations to this proposition.
                     - Use the complete instruction ledger to distinguish a report of current behavior or a problem statement from requested target behavior. When a sibling clause explicitly specifies the correction to a described limitation, keep the limitation as context and route the corrective clause as product work; do not turn the existing defect into a requirement to preserve it.
                     - This is the root of a decision tree. Choose include for product behavior, interfaces, invariants, entity definitions, or implementation guidance; include_prohibition for explicit product prohibitions; exclude for process instructions or background with no implementation obligation; unclear when meaning or route cannot be determined without guessing. A required rejection, exception, or error for invalid input is product behavior and must route to include, not include_prohibition.
                     - Do not classify detailed product kind, polarity, strength, scope, behavior family, or validation oracle here.
@@ -366,6 +370,7 @@ steps:
             command: [prepare_dependent_source_semantic_decisions]
             parameters:
               clause: {type: reference, value: instruction_clause}
+              source_text: {type: reference, value: atomic_instruction_ledger.source_text}
               decisions: {type: reference, value: bound_root_decision.decisions}
             returns:
               type: object
@@ -389,6 +394,7 @@ steps:
                   prompt_system: Return only the declared JSON object.
                   instructions:
                     - Follow the request's question, instructions, allowed_values, and parent routing decision exactly.
+                    - Treat any containing source sentence as context for this exact proposition. Do not classify sibling clauses or transfer their obligations to this proposition.
                     - Never select a child value that contradicts the parent branch; abstain when no child value fits.
                     - Return resolved with exactly one allowed value or unresolved with one closed reason_code.
                     - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.

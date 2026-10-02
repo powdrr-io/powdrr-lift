@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from powdrr_lift.core.classifier_input import format_classifier_input
 from powdrr_lift.core.semantic_contract import (
     BoundSourceExtraction,
     PartialSemanticContract,
@@ -725,7 +726,9 @@ EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
         (
             "Return an exact case-sensitive substring, not a paraphrase.",
             "Keep meaning-bearing conditions and stated outcome modifiers in the "
-            "behavior phrase; do not add unstated steps or results.",
+            "behavior phrase; preserve any stated owner, recipient, mode, "
+            "lifecycle boundary, precedence rule, and exclusion that limits the "
+            "behavior. Do not add unstated steps or results.",
         ),
     ),
     "precondition": ClassifierDefinition(
@@ -753,11 +756,17 @@ EXTRACTION_DEFINITIONS: dict[str, ClassifierDefinition] = {
 
 
 def prepare_source_semantic_decisions(
-    clause: Mapping[str, Any], *, created_at: str | None = None
+    clause: Mapping[str, Any],
+    *,
+    source_text: str | None = None,
+    created_at: str | None = None,
 ) -> dict[str, Any]:
     """Prepare the root routing choice before semantic detail classification."""
     clause_id, text, source_fingerprint = _clause_fields(clause)
-    spec = _decision_spec(clause_id, text, source_fingerprint, "routing")
+    context_text = _containing_source_sentence(clause, source_text)
+    spec = _decision_spec(
+        clause_id, text, source_fingerprint, "routing", context_text=context_text
+    )
     return {
         "resolved_decisions": [],
         "pending_specs": [_classifier_request(spec, CLASSIFIER_DEFINITIONS["routing"])],
@@ -768,10 +777,12 @@ def prepare_dependent_source_semantic_decisions(
     clause: Mapping[str, Any],
     root_decisions: Sequence[SemanticDecision | Mapping[str, Any]],
     *,
+    source_text: str | None = None,
     created_at: str | None = None,
 ) -> dict[str, Any]:
     """Create detail decisions only after the route has been selected."""
     clause_id, text, source_fingerprint = _clause_fields(clause)
+    context_text = _containing_source_sentence(clause, source_text)
     roots = [
         item if isinstance(item, SemanticDecision) else SemanticDecision.from_data(item)
         for item in root_decisions
@@ -787,7 +798,11 @@ def prepare_dependent_source_semantic_decisions(
     pending: list[dict[str, Any]] = []
     if route in {"include", "unclear"}:
         disposition_spec = _decision_spec(
-            clause_id, text, source_fingerprint, "disposition"
+            clause_id,
+            text,
+            source_fingerprint,
+            "disposition",
+            context_text=context_text,
         )
         disposition_request = _classifier_request(
             disposition_spec, CLASSIFIER_DEFINITIONS["disposition"]
@@ -813,7 +828,11 @@ def prepare_dependent_source_semantic_decisions(
         pending.append(disposition_request)
     elif route == "include_prohibition":
         disposition_spec = _decision_spec(
-            clause_id, text, source_fingerprint, "disposition"
+            clause_id,
+            text,
+            source_fingerprint,
+            "disposition",
+            context_text=context_text,
         )
         resolved.append(
             disposition_spec.bind(
@@ -849,7 +868,13 @@ def prepare_dependent_source_semantic_decisions(
             "nonactionable_exclusion_safety": "product_semantics_present",
         }
         for kind, value in defaults.items():
-            spec = _decision_spec(clause_id, text, source_fingerprint, kind)
+            spec = _decision_spec(
+                clause_id,
+                text,
+                source_fingerprint,
+                kind,
+                context_text=context_text,
+            )
             resolved.append(
                 spec.bind(
                     provider=SemanticDecisionProvider(kind="deterministic-rule"),
@@ -1550,12 +1575,20 @@ def _classifier_request(
         "question": definition.question,
         "instructions": instructions,
         "allowed_values": sorted(DECISION_VALUES[spec.decision_kind]),
-        "subject_text": spec.proposition_text,
+        "subject_text": format_classifier_input(
+            spec.proposition_text,
+            {"source_sentence": spec.context_text} if spec.context_text else None,
+        ),
     }
 
 
 def _decision_spec(
-    clause_id: str, text: str, source_fingerprint: str, kind: str
+    clause_id: str,
+    text: str,
+    source_fingerprint: str,
+    kind: str,
+    *,
+    context_text: str | None = None,
 ) -> SemanticDecisionSpec:
     return SemanticDecisionSpec(
         decision_id=f"decision:{clause_id}:{kind}",
@@ -1564,7 +1597,30 @@ def _decision_spec(
         proposition_text=text,
         source_fingerprint=source_fingerprint,
         contract_revision=f"{SOURCE_CLASSIFIER_REVISION}:{kind}",
+        context_text=context_text,
     )
+
+
+def _containing_source_sentence(
+    clause: Mapping[str, Any], source_text: str | None
+) -> str | None:
+    """Return the exact original sentence containing a possibly split clause."""
+    span = clause.get("source_span")
+    if not isinstance(source_text, str) or not isinstance(span, Mapping):
+        return None
+    start, end = span.get("start"), span.get("end")
+    if (
+        not isinstance(start, int)
+        or isinstance(start, bool)
+        or not isinstance(end, int)
+        or isinstance(end, bool)
+        or start < 0
+        or end <= start
+        or end > len(source_text)
+    ):
+        return None
+    sentence = source_text[start:end].strip()
+    return sentence if sentence and sentence != clause.get("text") else None
 
 
 def _clause_fields(clause: Mapping[str, Any]) -> tuple[str, str, str]:

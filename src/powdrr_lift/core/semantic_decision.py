@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 SEMANTIC_DECISION_SCHEMA_VERSION = "semantic-decision-v1"
-SEMANTIC_DECISION_SPEC_SCHEMA_VERSION = "semantic-decision-spec-v1"
+SEMANTIC_DECISION_SPEC_SCHEMA_VERSION = "semantic-decision-spec-v2"
 
 DECISION_VALUES: dict[str, frozenset[str]] = {
     "routing": frozenset(
@@ -305,6 +305,7 @@ class SemanticDecisionSpec:
     proposition_text: str
     source_fingerprint: str
     contract_revision: str
+    context_text: str | None = None
     candidate_set_fingerprint: str | None = None
     accepted_definition_revision: str | None = None
 
@@ -321,6 +322,7 @@ class SemanticDecisionSpec:
         if self.decision_kind not in DECISION_VALUES:
             raise SemanticDecisionError("semantic decision kind is invalid")
         for optional_name, optional_value in (
+            ("context_text", self.context_text),
             ("candidate_set_fingerprint", self.candidate_set_fingerprint),
             ("accepted_definition_revision", self.accepted_definition_revision),
         ):
@@ -337,6 +339,7 @@ class SemanticDecisionSpec:
                 "decision_kind": self.decision_kind,
                 "proposition_text": self.proposition_text,
                 "source_fingerprint": self.source_fingerprint,
+                "context_text": self.context_text,
                 "candidate_set_fingerprint": self.candidate_set_fingerprint,
                 "accepted_definition_revision": self.accepted_definition_revision,
                 "contract_revision": self.contract_revision,
@@ -351,6 +354,7 @@ class SemanticDecisionSpec:
             "subject_ref": self.subject_ref,
             "proposition_text": self.proposition_text,
             "source_fingerprint": self.source_fingerprint,
+            "context_text": self.context_text,
             "candidate_set_fingerprint": self.candidate_set_fingerprint,
             "accepted_definition_revision": self.accepted_definition_revision,
             "contract_revision": self.contract_revision,
@@ -368,6 +372,7 @@ class SemanticDecisionSpec:
                 "subject_ref",
                 "proposition_text",
                 "source_fingerprint",
+                "context_text",
                 "candidate_set_fingerprint",
                 "accepted_definition_revision",
                 "contract_revision",
@@ -382,6 +387,7 @@ class SemanticDecisionSpec:
             subject_ref=_required_string(raw, "subject_ref"),
             proposition_text=_required_string(raw, "proposition_text"),
             source_fingerprint=_required_string(raw, "source_fingerprint"),
+            context_text=_optional_string(raw, "context_text"),
             candidate_set_fingerprint=_optional_string(
                 raw, "candidate_set_fingerprint"
             ),

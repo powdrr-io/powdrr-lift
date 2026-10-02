@@ -125,6 +125,15 @@ def test_input_fingerprint_invalidates_a_changed_source_or_contract() -> None:
         )
 
 
+def test_input_fingerprint_includes_bounded_source_context() -> None:
+    from dataclasses import replace
+
+    spec = _spec()
+    contextual = replace(spec, context_text="The original sentence containing it.")
+    assert contextual.input_fingerprint != spec.input_fingerprint
+    assert SemanticDecisionSpec.from_data(contextual.to_data()) == contextual
+
+
 def test_exact_source_span_is_case_sensitive_and_occurrence_bounded() -> None:
     span = resolve_exact_source_span(
         source_ref="instruction-001",

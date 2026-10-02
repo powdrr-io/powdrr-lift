@@ -1,0 +1,68 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 902
+title: Preserve requirement meaning in atomic splits and prompt evaluation
+intent:
+  problem: Atomic instruction splitting can describe different required modes or populations as alternatives, and prompt evaluation can mark a criterion supported after finding its statement without checking contradictory instructions elsewhere in the same prompt.
+  goal: Preserve the requiredness of every split behavior unless the source explicitly permits choosing one, and evaluate each criterion against all relevant worker-facing prompt sections.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 204, end_line: 217}
+    summary: Clarify that splitting preserves source requiredness and alternatives need explicit source permission.
+    rationale: Prevent mode-specific and population-specific behaviors from being treated as optional merely because they differ.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 243, end_line: 251}
+    summary: Add contrastive examples for distinct required populations and explicitly permitted alternatives.
+    rationale: Teach the generic classifier to distinguish requirements by scope from a user-authorized choice.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 599, end_line: 609}
+    summary: Require whole-prompt consistency checks when grading each behavior criterion.
+    rationale: A correct source quotation cannot mask a conflicting instruction elsewhere in the worker prompt.
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 678, end_line: 684}
+    summary: Assert atomicity classifier guidance distinguishes joint requirements, modes, and explicit alternatives.
+    rationale: Keep the source-requiredness decision rule visible in the production classifier instructions.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 212, end_line: 258}
+    summary: Verify a later optionalizing instruction makes a prompt criterion fail evaluation.
+    rationale: Prevent the evaluator from accepting prompts that state a requirement correctly in one section and weaken it in another.
+entities:
+  - id: design-interview-atomicity-classifier
+    type: Skill
+    action: added
+  - id: worker-prompt-criterion-evaluator
+    type: Function
+    action: added
+  - id: atomicity-requiredness-regression-test
+    type: Regression test
+    action: added
+  - id: whole-prompt-contradiction-regression-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: atomicity-test-checks-requiredness-guidance
+    type: verifies
+    source: atomicity-requiredness-regression-test
+    target: design-interview-atomicity-classifier
+    action: added
+    description: The test verifies classifier guidance preserves each required behavior when clauses are split.
+  - id: prompt-evaluation-test-checks-contradictions
+    type: verifies
+    source: whole-prompt-contradiction-regression-test
+    target: worker-prompt-criterion-evaluator
+    action: added
+    description: The test verifies contradictory prompt sections cause a critical criterion failure.
+invariants:
+  - id: splitting-preserves-source-requiredness
+    description: Split statements remain required unless the source explicitly permits satisfying the request by choosing one alternative.
+    action: altered
+  - id: prompt-criterion-must-be-consistent
+    description: A worker prompt criterion is supported only when every relevant prompt section is compatible with the expected behavior.
+    action: added
+guidance: []

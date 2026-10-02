@@ -596,10 +596,17 @@ def _judge_worker_prompt_criterion(
                 "explicitly preserve this source requirement's externally observable "
                 "behavior. Use the reference solution and verifier only to understand "
                 "the intended behavior; do not require the reference implementation's "
-                "internal design. Return supported only when a candidate prompt states "
-                "the behavior clearly. For supported or contradicted, quote exact text "
-                "from one candidate prompt. Return missing if absent and ambiguous if "
-                "the prompts do not resolve the behavior."
+                "internal design. Review every relevant section of every candidate "
+                "prompt. Return supported only when the behavior is stated clearly and "
+                "the rest of the prompt does not weaken, exclude, narrow, or "
+                "contradict "
+                "it. A correct quotation in one section does not cure an incompatible "
+                "instruction elsewhere. Distinguish requirements that all apply from "
+                "permitted alternatives: different modes, populations, or conditions "
+                "do not make requirements optional by themselves. For supported or "
+                "contradicted, quote exact text from one candidate prompt. Return "
+                "missing if absent and ambiguous if the prompts do not resolve the "
+                "behavior."
             ),
         },
         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},

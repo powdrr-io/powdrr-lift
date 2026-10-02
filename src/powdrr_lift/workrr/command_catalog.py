@@ -3391,12 +3391,6 @@ def _merge_behavior_scenario_values(
             )
         raw_scenario["dimensions"] = resolved_dimensions
         raw_scenario["assumptions"] = list(resolved_assumptions)
-        if resolved_assumptions:
-            raw_scenario["then"] = (
-                str(raw_scenario.get("then", ""))
-                + " Unspecified behavior was resolved using the recorded "
-                "normative defaults."
-            ).strip()
         status = "resolved"
     elif status == "needs_clarification" and not allow_clarification:
         raise PowdrrExecutionError(

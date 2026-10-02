@@ -160,8 +160,8 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     assert "Required product changes:" in request.prompt
     assert "Acceptance criteria:\n- the adapter is bounded" in request.prompt
     assert "Required operations" not in request.prompt
-    assert '"id": "worker-adapter"' in request.prompt
-    assert '"id": "old-adapter"' in request.prompt
+    assert "[worker-adapter] (added)" in request.prompt
+    assert "[old-adapter] (removed)" in request.prompt
     assert "Validation profiles that will run: unit-tests" in request.prompt
     assert "Workrr" not in request.prompt
     assert (
@@ -240,10 +240,11 @@ def test_scenario_backed_prompt_omits_only_repeated_plan_descriptions() -> None:
     )
 
     assert request.prompt.count(repeated) == 1
-    assert '"id": "parse-input"' in request.prompt
-    assert '"intent_effect": "Preserve generated source metadata."' in request.prompt
+    assert "[parse-input] (added)" in request.prompt
+    assert "intent_effect" not in request.prompt
     assert (
-        '"description": "The adapter preserves legacy compatibility."' in request.prompt
+        "[legacy-compatibility] (added): The adapter preserves legacy compatibility."
+        in request.prompt
     )
 
 

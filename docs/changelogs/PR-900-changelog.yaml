@@ -1,0 +1,128 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 900
+title: Improve implementation prompt formatting
+intent:
+  problem: Generated implementation prompts repeat requirements and expose compiler metadata, while malformed scenario prose and repeated empty repository evidence make checks hard to scan.
+  goal: Improve worker-facing readability and traceability while preserving the product behavior and source decisions represented by the prompt packet.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 214, end_line: 215}
+    summary: Initialize a shared list for deduplicated related requirements.
+    rationale: Avoid repeating the same cross-requirement text for multiple checks.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 218, end_line: 220}
+    summary: Render scenario checks as complete Given/When/expect sentences.
+    rationale: Prevent malformed scenarios when the subject is a generated phrase.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 231, end_line: 237}
+    summary: Render behavior checks as complete sentences and collect repeated cross-requirement constraints once.
+    rationale: Keep scenario intent readable and reduce duplicated relationship prose without dropping unique constraints.
+  - path: src/powdrr_lift/core/contract_closure.py
+    type: modified
+    span: {start_line: 465, end_line: 465}
+    summary: Initialize a collection for operations without matching declarations.
+    rationale: Render missing inventory results together after processing concrete evidence.
+  - path: src/powdrr_lift/core/contract_closure.py
+    type: modified
+    span: {start_line: 468, end_line: 468}
+    summary: Omit the per-operation heading until repository matches are available.
+    rationale: Keep unmatched entries out of the actionable evidence list.
+  - path: src/powdrr_lift/core/contract_closure.py
+    type: modified
+    span: {start_line: 470, end_line: 488}
+    summary: Collect unmatched operations and simplify rendering of matched evidence.
+    rationale: Avoid repeated empty inventory text while retaining concrete paths and symbols.
+  - path: src/powdrr_lift/core/contract_closure.py
+    type: modified
+    span: {start_line: 490, end_line: 492}
+    summary: Preserve statically visible calls in the concise evidence entry.
+    rationale: Retain repository context that can guide implementation.
+  - path: src/powdrr_lift/core/contract_closure.py
+    type: modified
+    span: {start_line: 481, end_line: 497}
+    summary: Keep useful evidence details and bounded-search guidance.
+    rationale: Preserve available repository locations and inspection limits.
+  - path: src/powdrr_lift/core/contract_closure.py
+    type: modified
+    span: {start_line: 500, end_line: 506}
+    summary: Emit one concise note naming operations without a matching declaration.
+    rationale: Replace repeated boilerplate with an actionable grouped instruction.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 315, end_line: 315}
+    summary: Type the accumulated readable change entries.
+    rationale: Store the worker-facing lines rather than serialized metadata objects.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 317, end_line: 334}
+    summary: Select concise change identifiers and exclude compiler-only fields.
+    rationale: Keep source identifiers while removing internal intent and section labels.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 336, end_line: 367}
+    summary: Render change labels and descriptions as readable lines.
+    rationale: Avoid JSON-like worker instructions while preserving other meaningful fields.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3394, end_line: 3399}
+    summary: Remove duplicated normative-default prose from scenario outcomes.
+    rationale: The separate assumption section already carries this information.
+  - path: tests/test_behavior_contract.py
+    type: modified
+    span: {start_line: 279, end_line: 281}
+    summary: Assert cross-requirement constraints remain visible in their consolidated section.
+    rationale: Preserve coverage for an explicit relationship while allowing the revised label.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 163, end_line: 164}
+    summary: Assert planned changes use concise identifier and action labels.
+    rationale: Keep product-change traceability without JSON serialization.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 243, end_line: 244}
+    summary: Assert scenario-backed changes omit compiler-only intent metadata.
+    rationale: Protect the worker-facing prompt from internal compiler explanation fields.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 246, end_line: 247}
+    summary: Assert non-repeated change descriptions remain readable.
+    rationale: Ensure compact formatting does not remove unique product requirements.
+entities:
+  - id: behavior-check-prompt-renderer
+    type: Function
+    action: added
+  - id: repository-evidence-prompt-renderer
+    type: Function
+    action: added
+  - id: planned-change-prompt-renderer
+    type: Function
+    action: added
+  - id: behavior-check-rendering-test
+    type: Unit test
+    action: added
+  - id: coding-agent-prompt-rendering-test
+    type: Unit test
+    action: added
+entity_relationships:
+  - id: behavior-check-test-verifies-readable-rendering
+    type: verifies
+    source: behavior-check-rendering-test
+    target: behavior-check-prompt-renderer
+    action: added
+    description: The test verifies scenario checks and explicit cross-requirement constraints remain readable in the worker prompt.
+  - id: coding-agent-test-verifies-compact-change-rendering
+    type: verifies
+    source: coding-agent-prompt-rendering-test
+    target: planned-change-prompt-renderer
+    action: added
+    description: The test verifies traceable change labels remain while compiler-only metadata is omitted.
+invariants:
+  - id: worker-facing-prompt-preserves-product-contract
+    description: Formatting removes duplicated prose and compiler-only metadata without changing requirement strength, alternatives, or product behavior.
+    action: altered
+guidance: []

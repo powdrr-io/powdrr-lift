@@ -276,9 +276,9 @@ def test_worker_check_preserves_explicit_cross_requirement_relationships() -> No
     rendered = packet.render()
 
     assert (
-        "Related requirement: The public operation exposes this result through "
-        "the existing adapter."
-    ) in rendered
+        "The public operation exposes this result through the existing adapter."
+        in rendered
+    )
     restored = type(packet).from_data(packet.to_data())
     assert restored.render() == rendered
 

@@ -462,45 +462,48 @@ def render_contract_closure(raw: Mapping[str, Any]) -> str:
     if not isinstance(operations, list):
         raise ContractClosureError("contract closure operations are malformed")
     lines = ["Repository evidence relevant to the requested behavior:"]
+    unmatched: list[str] = []
     for operation in operations:
         if not isinstance(operation, Mapping):
             continue
-        lines.append(f"- {operation.get('subject', 'Behavior')}")
         surfaces = operation.get("surfaces", [])
-        if surfaces:
-            for surface in surfaces:
-                if not isinstance(surface, Mapping):
-                    continue
-                location = (
-                    f"{surface.get('path')}:{surface.get('span', {}).get('start_line')}"
-                )
-                detail = str(surface.get("signature") or surface.get("qualified_name"))
+        if not surfaces:
+            subject = operation.get("subject")
+            if isinstance(subject, str) and subject.strip():
+                unmatched.append(subject.strip())
+            continue
+        lines.append(f"- {operation.get('subject', 'Behavior')}")
+        for surface in surfaces:
+            if not isinstance(surface, Mapping):
+                continue
+            span = surface.get("span", {})
+            start_line = span.get("start_line") if isinstance(span, Mapping) else None
+            location = f"{surface.get('path')}:{start_line}"
+            detail = str(surface.get("signature") or surface.get("qualified_name"))
+            lines.append(f"  - Existing {surface.get('kind')} {detail} at {location}.")
+            if surface.get("docstring"):
+                lines.append(f"    Existing contract: {surface['docstring']}")
+            if surface.get("bases"):
+                lines.append("    Declared bases: " + ", ".join(surface["bases"]) + ".")
+            if surface.get("calls"):
                 lines.append(
-                    f"  - Existing {surface.get('kind')} {detail} at {location}."
+                    "    Statically visible calls: "
+                    + ", ".join(surface["calls"][:12])
+                    + "."
                 )
-                if surface.get("docstring"):
-                    lines.append(f"    Existing contract: {surface['docstring']}")
-                if surface.get("bases"):
-                    lines.append(
-                        "    Declared bases: " + ", ".join(surface["bases"]) + "."
-                    )
-                if surface.get("calls"):
-                    lines.append(
-                        "    Statically visible calls: "
-                        + ", ".join(surface["calls"][:12])
-                        + "."
-                    )
-        else:
-            lines.append(
-                "  - No matching declaration was found in the source inventory; "
-                "the operation may be new or named through an alias."
-            )
         search = operation.get("surface_search")
         if isinstance(search, Mapping) and search.get("truncated") is True:
             lines.append(
                 "  - The evidence list was bounded; inspect additional matching "
                 "implementations in the repository."
             )
+    if unmatched:
+        lines.append(
+            "- No matching declaration was found for: "
+            + ", ".join(unmatched)
+            + ". These may be new operations or aliases; inspect related code "
+            "and tests."
+        )
     lines.extend(
         (
             "Use this evidence to inspect the relevant implementation and tests. "

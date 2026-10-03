@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import json
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
@@ -3289,7 +3289,7 @@ def _apply_scenario_consistency_updates(
                 f"scenario consistency update is invalid: {error}"
             ) from error
 
-        targets: list[tuple[dict[str, Any], list[Any], dict[str, Any], int]] = []
+        targets: list[tuple[dict[str, Any], list[Any], dict[str, Any] | None, int]] = []
         for decision in decisions:
             if not isinstance(decision, dict):
                 continue
@@ -3310,18 +3310,26 @@ def _apply_scenario_consistency_updates(
                 or not isinstance(source_dimensions, dict)
             ):
                 continue
-            target_dimensions = (
-                source_dimensions
-                if dimension in SEMANTIC_DIMENSION_DECISION_KINDS
-                else dimensions
-            )
+            semantic_dimension = dimension in SEMANTIC_DIMENSION_DECISION_KINDS
+            if semantic_dimension and source_dimensions.get(dimension) not in {
+                "unspecified",
+                "unresolved",
+            }:
+                continue
+            target_dimensions = None if semantic_dimension else dimensions
             for index, assumption in enumerate(assumptions):
                 if (
                     isinstance(assumption, Mapping)
                     and assumption.get("dimension") == dimension
                     and assumption.get("resolution") == previous_resolution
-                    and target_dimensions.get(dimension)
-                    == "ASSUMED DEFAULT: " + previous_resolution
+                    and (
+                        semantic_dimension
+                        or (
+                            target_dimensions is not None
+                            and target_dimensions.get(dimension)
+                            == "ASSUMED DEFAULT: " + previous_resolution
+                        )
+                    )
                 ):
                     targets.append((scenario, assumptions, target_dimensions, index))
         if not targets:
@@ -3330,7 +3338,8 @@ def _apply_scenario_consistency_updates(
             )
         for _scenario, assumptions, dimensions, index in targets:
             assumptions[index] = validated
-            dimensions[dimension] = "ASSUMED DEFAULT: " + validated["resolution"]
+            if dimensions is not None:
+                dimensions[dimension] = "ASSUMED DEFAULT: " + validated["resolution"]
     return decisions
 
 
@@ -3381,6 +3390,14 @@ def _merge_behavior_scenario_values(
             and item.get("dimension") in SUPPORTED_ASSUMPTION_DIMENSIONS
             and _is_not_applicable_resolution(item.get("resolution"))
         }
+        applicability = raw_scenario.get("semantic_dimension_applicability", {})
+        if isinstance(applicability, Mapping):
+            not_applicable_dimensions.update(
+                name
+                for name, value in applicability.items()
+                if name in SEMANTIC_DIMENSION_DECISION_KINDS
+                and value == "not_applicable"
+            )
         concrete_assumption_dimensions = {
             str(item.get("dimension"))
             for item in assumptions
@@ -3422,25 +3439,26 @@ def _merge_behavior_scenario_values(
             ) from error
         resolved_dimensions = dict(dimensions)
         source_dimensions = dict(raw_scenario.get("source_dimensions", {}))
+        semantic_dimension_applicability = dict(
+            raw_scenario.get("semantic_dimension_applicability", {})
+        )
         for dimension in not_applicable_dimensions:
-            target_dimensions = (
-                source_dimensions
-                if dimension in SEMANTIC_DIMENSION_DECISION_KINDS
-                else resolved_dimensions
-            )
-            target_dimensions[dimension] = "not_applicable"
+            if dimension in SEMANTIC_DIMENSION_DECISION_KINDS:
+                semantic_dimension_applicability[dimension] = "not_applicable"
+            else:
+                resolved_dimensions[dimension] = "not_applicable"
         for assumption in resolved_assumptions:
-            target_dimensions = (
-                source_dimensions
-                if assumption["dimension"] in SEMANTIC_DIMENSION_DECISION_KINDS
-                else resolved_dimensions
-            )
-            target_dimensions[assumption["dimension"]] = (
-                "ASSUMED DEFAULT: " + assumption["resolution"]
-            )
+            if assumption["dimension"] not in SEMANTIC_DIMENSION_DECISION_KINDS:
+                resolved_dimensions[assumption["dimension"]] = (
+                    "ASSUMED DEFAULT: " + assumption["resolution"]
+                )
         raw_scenario["dimensions"] = resolved_dimensions
         if source_dimensions:
             raw_scenario["source_dimensions"] = source_dimensions
+        if semantic_dimension_applicability:
+            raw_scenario["semantic_dimension_applicability"] = (
+                semantic_dimension_applicability
+            )
         raw_scenario["assumptions"] = list(resolved_assumptions)
         status = "resolved"
     elif status == "needs_clarification" and not allow_clarification:
@@ -3464,6 +3482,14 @@ def _merge_behavior_scenario_values(
             and item.get("dimension") in SUPPORTED_ASSUMPTION_DIMENSIONS
             and _is_not_applicable_resolution(item.get("resolution"))
         }
+        applicability = raw_scenario.get("semantic_dimension_applicability", {})
+        if isinstance(applicability, Mapping):
+            not_applicable_dimensions.update(
+                name
+                for name, value in applicability.items()
+                if name in SEMANTIC_DIMENSION_DECISION_KINDS
+                and value == "not_applicable"
+            )
         effective_assumptions = [
             item
             for item in assumptions
@@ -3483,22 +3509,21 @@ def _merge_behavior_scenario_values(
             raise PowdrrExecutionError("behavior scenario has no dimensions")
         resolved_dimensions = dict(dimensions)
         source_dimensions = dict(raw_scenario.get("source_dimensions", {}))
+        semantic_dimension_applicability = dict(
+            raw_scenario.get("semantic_dimension_applicability", {})
+        )
         for dimension in not_applicable_dimensions:
             if dimension in SUPPORTED_ASSUMPTION_DIMENSIONS:
-                target_dimensions = (
-                    source_dimensions
-                    if dimension in SEMANTIC_DIMENSION_DECISION_KINDS
-                    else resolved_dimensions
-                )
-                target_dimensions[dimension] = "not_applicable"
+                if dimension in SEMANTIC_DIMENSION_DECISION_KINDS:
+                    semantic_dimension_applicability[dimension] = "not_applicable"
+                else:
+                    resolved_dimensions[dimension] = "not_applicable"
         for assumption in resolved_assumptions:
             expected = "ASSUMED DEFAULT: " + assumption["resolution"]
-            target_dimensions = (
-                source_dimensions
-                if assumption["dimension"] in SEMANTIC_DIMENSION_DECISION_KINDS
-                else resolved_dimensions
-            )
-            if target_dimensions.get(assumption["dimension"]) != expected:
+            if (
+                assumption["dimension"] not in SEMANTIC_DIMENSION_DECISION_KINDS
+                and resolved_dimensions.get(assumption["dimension"]) != expected
+            ):
                 raise PowdrrExecutionError(
                     "assumption resolution does not match its behavior dimension"
                 )
@@ -3506,6 +3531,10 @@ def _merge_behavior_scenario_values(
         raw_scenario["dimensions"] = resolved_dimensions
         if source_dimensions:
             raw_scenario["source_dimensions"] = source_dimensions
+        if semantic_dimension_applicability:
+            raw_scenario["semantic_dimension_applicability"] = (
+                semantic_dimension_applicability
+            )
     if status == "needs_clarification":
         if not all(item in SUPPORTED_ASSUMPTION_DIMENSIONS for item in unresolved):
             raise PowdrrExecutionError(
@@ -3519,22 +3548,21 @@ def _merge_behavior_scenario_values(
             )
         draft_dimensions = dict(dimensions)
         draft_source_dimensions = dict(raw_scenario.get("source_dimensions", {}))
+        draft_unresolved_dimensions = list(unresolved)
         for name in unresolved:
-            target_dimensions = (
-                draft_source_dimensions
-                if name in SEMANTIC_DIMENSION_DECISION_KINDS
-                else draft_dimensions
-            )
-            target_dimensions[name] = (
-                f"NEEDS CLARIFICATION: the task specification does not resolve {name}."
-            )
+            if name not in SEMANTIC_DIMENSION_DECISION_KINDS:
+                draft_dimensions[name] = (
+                    "NEEDS CLARIFICATION: the task specification does not "
+                    f"resolve {name}."
+                )
         draft_scenario["dimensions"] = draft_dimensions
         if draft_source_dimensions:
             draft_scenario["source_dimensions"] = draft_source_dimensions
+        draft_scenario["unresolved_dimensions"] = draft_unresolved_dimensions
         draft_scenario["then"] = (
             str(draft_scenario.get("then", ""))
-            + " This design is provisional; resolve the marked dimensions "
-            "before implementation."
+            + " This design is provisional; resolve these dimensions before "
+            "implementation: " + ", ".join(str(item) for item in unresolved) + "."
         ).strip()
         raw_scenario = draft_scenario
     clause_id = clause.get("clause_id")
@@ -3550,8 +3578,10 @@ def _merge_behavior_scenario_values(
         "validator": evidence.strip(),
     }
     partial_contract = design.get("partial_contract")
+    if isinstance(partial_contract, Mapping):
+        _validate_scenario_semantic_decisions(partial_contract, scenario)
     routing = (
-        partial_contract.get("routing")
+        partial_contract.get("routing", "include")
         if isinstance(partial_contract, Mapping)
         else "include"
     )
@@ -3568,6 +3598,78 @@ def _merge_behavior_scenario_values(
             f"behavior scenario is incomplete: {error}"
         ) from error
     return {**dict(design), "behavior_scenario": compiled.to_data()}
+
+
+def _validate_scenario_semantic_decisions(
+    partial_contract: Mapping[str, Any], scenario: Mapping[str, Any]
+) -> None:
+    """Keep source classifier results exact and separate from scenario choices."""
+    expected = partial_contract.get("semantic_dimensions", {})
+    actual = scenario.get("source_dimensions", {})
+    if not isinstance(expected, Mapping) or not isinstance(actual, Mapping):
+        raise PowdrrExecutionError("scenario source semantic dimensions are malformed")
+    expected_dimensions = {str(name): str(value) for name, value in expected.items()}
+    actual_dimensions = {str(name): str(value) for name, value in actual.items()}
+    if actual_dimensions != expected_dimensions:
+        raise PowdrrExecutionError(
+            "scenario source semantic dimensions do not preserve the accepted "
+            "classifier decisions"
+        )
+
+    assumptions = scenario.get("assumptions", [])
+    if not isinstance(assumptions, list):
+        raise PowdrrExecutionError("scenario semantic assumptions are malformed")
+    assumed_dimensions = {
+        str(item.get("dimension"))
+        for item in assumptions
+        if isinstance(item, Mapping) and isinstance(item.get("dimension"), str)
+    }
+    concrete_source_dimensions = {
+        name
+        for name, value in expected_dimensions.items()
+        if value not in {"unspecified", "unresolved"}
+    }
+    if concrete_source_dimensions & assumed_dimensions:
+        raise PowdrrExecutionError(
+            "scenario adds a normative assumption for a source-resolved "
+            "semantic dimension"
+        )
+
+    applicability = scenario.get("semantic_dimension_applicability", {})
+    if not isinstance(applicability, Mapping):
+        raise PowdrrExecutionError(
+            "scenario semantic dimension applicability is malformed"
+        )
+    for name, value in applicability.items():
+        if (
+            name not in expected_dimensions
+            or expected_dimensions[name]
+            not in {
+                "unspecified",
+                "unresolved",
+            }
+            or value != "not_applicable"
+        ):
+            raise PowdrrExecutionError(
+                "scenario semantic dimension applicability conflicts with its "
+                "source classifier decision"
+            )
+    unresolved = scenario.get("unresolved_dimensions", ())
+    if not isinstance(unresolved, Sequence) or isinstance(unresolved, (str, bytes)):
+        raise PowdrrExecutionError("scenario unresolved dimensions are malformed")
+    unresolved_semantic_dimensions = set(unresolved) & set(expected_dimensions)
+    if unresolved_semantic_dimensions & (assumed_dimensions | set(applicability)):
+        raise PowdrrExecutionError(
+            "scenario cannot mark a semantic dimension both unresolved and resolved"
+        )
+    if unresolved_semantic_dimensions - {
+        name
+        for name, value in expected_dimensions.items()
+        if value in {"unspecified", "unresolved"}
+    }:
+        raise PowdrrExecutionError(
+            "scenario marks a source-resolved semantic dimension unresolved"
+        )
 
 
 __all__ = ["FeatureCommandRuntime", "feature_command_catalog"]

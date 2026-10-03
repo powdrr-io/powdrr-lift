@@ -478,11 +478,15 @@ def test_normative_defaults_resolve_and_record_each_unresolved_dimension() -> No
 def test_normative_default_can_resolve_a_source_semantic_dimension() -> None:
     parameters = {
         "clause": {"clause_id": "instruction-001"},
-        "design": {"expected_test": "focused test"},
+        "design": {
+            "expected_test": "focused test",
+            "partial_contract": {"semantic_dimensions": {"copy_depth": "unspecified"}},
+        },
         "scenario": {
             "status": "needs_clarification",
             "unresolved_dimensions": ["copy_depth"],
             "scenario": {
+                "routing": "include",
                 "subject": "settings",
                 "given": "nested defaults",
                 "when": "a new instance is initialized",
@@ -496,7 +500,7 @@ def test_normative_default_can_resolve_a_source_semantic_dimension() -> None:
                     "compatibility": "not_applicable",
                     "negative_boundaries": "not_applicable",
                 },
-                "source_dimensions": {"copy_depth": "unresolved by source"},
+                "source_dimensions": {"copy_depth": "unspecified"},
                 "capability_matrix": [],
                 "assumptions": [
                     {
@@ -516,10 +520,45 @@ def test_normative_default_can_resolve_a_source_semantic_dimension() -> None:
         "behavior_scenario"
     ]
 
-    assert scenario["source_dimensions"]["copy_depth"] == (
-        "ASSUMED DEFAULT: Copy the outer mapping only."
-    )
+    assert scenario["source_dimensions"]["copy_depth"] == "unspecified"
     assert scenario["assumptions"][0]["dimension"] == "copy_depth"
+
+
+def test_scenario_cannot_rewrite_a_source_semantic_decision() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {
+            "expected_test": "focused test",
+            "partial_contract": {
+                "semantic_dimensions": {"object_identity": "unspecified"}
+            },
+        },
+        "scenario": {
+            "status": "resolved",
+            "unresolved_dimensions": [],
+            "scenario": {
+                "subject": "settings",
+                "given": "the same values are returned",
+                "when": "the settings are read",
+                "then": "the same object is returned",
+                "dimensions": {
+                    "normal_result": "the settings are returned",
+                    "error_behavior": "not_applicable",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "source_dimensions": {"object_identity": "same_object"},
+                "related_requirements": [],
+                "capability_matrix": [],
+            },
+        },
+    }
+
+    with pytest.raises(PowdrrExecutionError, match="do not preserve"):
+        _merge_behavior_scenario_values(parameters)
 
 
 def test_not_applicable_source_dimension_stays_in_source_dimensions() -> None:
@@ -543,7 +582,8 @@ def test_not_applicable_source_dimension_stays_in_source_dimensions() -> None:
                     "compatibility": "not_applicable",
                     "negative_boundaries": "not_applicable",
                 },
-                "source_dimensions": {"copy_depth": "not_applicable"},
+                "source_dimensions": {"copy_depth": "unspecified"},
+                "semantic_dimension_applicability": {"copy_depth": "not_applicable"},
                 "capability_matrix": [],
                 "assumptions": [
                     {
@@ -563,7 +603,10 @@ def test_not_applicable_source_dimension_stays_in_source_dimensions() -> None:
         "behavior_scenario"
     ]
 
-    assert scenario["source_dimensions"]["copy_depth"] == "not_applicable"
+    assert scenario["source_dimensions"]["copy_depth"] == "unspecified"
+    assert scenario["semantic_dimension_applicability"]["copy_depth"] == (
+        "not_applicable"
+    )
     assert scenario["dimensions"]["normal_result"] == "the value is returned"
     assert not scenario.get("assumptions")
 
@@ -719,7 +762,7 @@ def test_scenario_consistency_can_update_a_source_dimension_default() -> None:
                 "when": "a new instance is initialized",
                 "then": "a copy is created",
                 "dimensions": {},
-                "source_dimensions": {"copy_depth": "ASSUMED DEFAULT: recursive copy"},
+                "source_dimensions": {"copy_depth": "unspecified"},
                 "assumptions": [
                     {
                         "dimension": "copy_depth",
@@ -758,9 +801,8 @@ def test_scenario_consistency_can_update_a_source_dimension_default() -> None:
     )
 
     scenario = updated[0]["behavior_scenario"]
-    assert scenario["source_dimensions"]["copy_depth"] == (
-        "ASSUMED DEFAULT: outer mapping copy"
-    )
+    assert scenario["source_dimensions"]["copy_depth"] == "unspecified"
+    assert scenario["assumptions"][0]["resolution"] == "outer mapping copy"
 
 
 def test_scenario_consistency_cannot_add_defaults_outside_benchmark_mode() -> None:

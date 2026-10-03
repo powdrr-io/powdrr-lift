@@ -87,11 +87,23 @@ outputs:
                   type: object
                   additionalProperties: false
                   properties:
-                    copy_depth: {type: string, minLength: 1}
-                    mutation_propagation: {type: string, minLength: 1}
-                    object_identity: {type: string, minLength: 1}
-                    persistence_boundary: {type: string, minLength: 1}
-                    argument_presence: {type: string, minLength: 1}
+                    copy_depth: {type: string, enum: [outer_container, recursive, unspecified, unresolved]}
+                    mutation_propagation: {type: string, enum: [write_through, detached_mapping, unspecified, unresolved]}
+                    object_identity: {type: string, enum: [same_object, distinct_objects, unspecified, unresolved]}
+                    persistence_boundary: {type: string, enum: [boundary_stated, unspecified, unresolved]}
+                    argument_presence: {type: string, enum: [argument_supplied, non_null_value, unspecified, unresolved]}
+                semantic_dimension_applicability:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    copy_depth: {type: string, enum: [not_applicable]}
+                    mutation_propagation: {type: string, enum: [not_applicable]}
+                    object_identity: {type: string, enum: [not_applicable]}
+                    persistence_boundary: {type: string, enum: [not_applicable]}
+                    argument_presence: {type: string, enum: [not_applicable]}
+                unresolved_dimensions:
+                  type: array
+                  items: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries, copy_depth, mutation_propagation, object_identity, persistence_boundary, argument_presence]}
                 dimensions:
                   type: object
                   required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
@@ -708,14 +720,17 @@ steps:
                 cannot apply to this behavior, and ask for clarification only for a
                 materially applicable dimension left open by the entire ledger.
               - >-
-                If the partial contract contains semantic_dimensions, preserve each
-                concrete source-resolved label in scenario.source_dimensions. A
-                value of unspecified or unresolved is a material gap only when it
-                can change implementation; list that named dimension in
-                unresolved_dimensions and mark it "unresolved by source" in
-                source_dimensions. A missing semantic_dimensions key means that
-                dimension was not applicable to the source clause. Never turn an
-                unspecified value into a source guarantee.
+                Copy every partial_contract.semantic_dimensions value exactly into
+                scenario.source_dimensions, including unspecified and unresolved.
+                Do not replace source labels with a default or scenario conclusion.
+                If a named dimension does not apply to this scenario, record
+                not_applicable in semantic_dimension_applicability while keeping
+                its source label unchanged. A missing semantic_dimensions key means
+                the source classifier did not request that dimension. When an
+                unspecified or unresolved source dimension materially affects
+                implementation, list it in unresolved_dimensions; in benchmark
+                mode, resolve it with a separate assumption. Never present an
+                assumption as a source guarantee.
               - Describe one scenario with concrete given, when, and then values.
               - Explicitly cover normal result/state, errors and propagation, continuation, unsupported capabilities, cancellation/cleanup, compatibility, and negative boundaries.
               - For each dimension, write a concrete requirement or the exact value not_applicable when that dimension genuinely does not apply.
@@ -797,11 +812,20 @@ steps:
                         type: object
                         additionalProperties: false
                         properties:
-                          copy_depth: {type: string, minLength: 1}
-                          mutation_propagation: {type: string, minLength: 1}
-                          object_identity: {type: string, minLength: 1}
-                          persistence_boundary: {type: string, minLength: 1}
-                          argument_presence: {type: string, minLength: 1}
+                          copy_depth: {type: string, enum: [outer_container, recursive, unspecified, unresolved]}
+                          mutation_propagation: {type: string, enum: [write_through, detached_mapping, unspecified, unresolved]}
+                          object_identity: {type: string, enum: [same_object, distinct_objects, unspecified, unresolved]}
+                          persistence_boundary: {type: string, enum: [boundary_stated, unspecified, unresolved]}
+                          argument_presence: {type: string, enum: [argument_supplied, non_null_value, unspecified, unresolved]}
+                      semantic_dimension_applicability:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          copy_depth: {type: string, enum: [not_applicable]}
+                          mutation_propagation: {type: string, enum: [not_applicable]}
+                          object_identity: {type: string, enum: [not_applicable]}
+                          persistence_boundary: {type: string, enum: [not_applicable]}
+                          argument_presence: {type: string, enum: [not_applicable]}
                       dimensions:
                         type: object
                         required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
@@ -866,7 +890,7 @@ steps:
       instructions:
         - Review the complete source ledger and all compiled behavior scenarios together before any worker prompt is created.
         - Compare assumptions only where scenarios govern the same behavior or explicitly relate to one another; a shared dimension name alone does not make two defaults conflict.
-        - Preserve every source-supported requirement and every dimension resolved by the source. This review may update only an existing normative assumption, never a source-grounded result or scenario obligation.
+        - Preserve every source-supported requirement and every dimension resolved by the source. This review may update only an existing normative assumption, never a source-grounded result or scenario obligation. Keep source_dimensions and semantic_dimension_applicability unchanged.
         - If related assumptions prescribe incompatible outcomes for the same behavior, revise the minimum set of assumptions to one concrete outcome consistent with every applicable source requirement and linked scenario.
         - Do not add speculative cases or new requirements. If a conflict has no identifiable normative answer, choose one conservative interoperable outcome and record the basis and low confidence rather than leaving competing defaults.
         - In non-benchmark mode, return no updates; do not invent or reconcile assumptions on the user's behalf.

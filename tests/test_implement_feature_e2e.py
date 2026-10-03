@@ -175,6 +175,7 @@ class DeterministicPlanningClient:
         if required == {"statements", "validation_groups"}:
             raise AssertionError("a non-multiple clause must not be split")
         if required == {"status", "unresolved_dimensions", "scenario"}:
+            semantic_dimensions = _find_json_value(text, "semantic_dimensions")
             return {
                 "status": "resolved",
                 "unresolved_dimensions": [],
@@ -184,6 +185,11 @@ class DeterministicPlanningClient:
                     "when": "the requested operation is performed",
                     "then": "the stated acceptance outcome is observed",
                     "related_requirements": [],
+                    "source_dimensions": (
+                        dict(semantic_dimensions)
+                        if isinstance(semantic_dimensions, Mapping)
+                        else {}
+                    ),
                     "dimensions": {
                         "normal_result": "the stated acceptance outcome is observed",
                         "error_behavior": "not_applicable",

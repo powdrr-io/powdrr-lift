@@ -13,7 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
@@ -23,7 +23,7 @@ from powdrr_lift.core.behavior_contract import BehaviorScenario
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
 from powdrr_lift.core.intent_packet import IntentPacket
-from powdrr_lift.minisweagent_monitor import run_minisweagent
+from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot, run_minisweagent
 from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
@@ -641,6 +641,7 @@ class MiniSWEAgentProvider:
     provider_name: str = "minisweagent"
     prompt_prefix: str = ""
     prompt_suffix: str = ""
+    progress_callback: Callable[[str], None] | None = None
     session_trajectory: Path | None = field(default=None, init=False)
 
     def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
@@ -720,6 +721,47 @@ class MiniSWEAgentProvider:
             assert self.diagnostics_root is not None
             self.diagnostics_root.mkdir(parents=True, exist_ok=True)
             command.extend(("--output", str(output_path)))
+        if self.progress_callback is not None:
+            self.progress_callback("MiniSWE started.")
+        last_reported_signature: tuple[object, ...] | None = None
+        last_reported_at = 0.0
+
+        def report_progress(snapshot: MiniSWEAgentSnapshot) -> None:
+            nonlocal last_reported_signature, last_reported_at
+            signature = (
+                snapshot.state,
+                snapshot.message_count,
+                snapshot.model_call_count,
+                snapshot.tool_call_count,
+                snapshot.last_action,
+            )
+            if (
+                signature == last_reported_signature
+                and snapshot.elapsed_seconds - last_reported_at < 30
+            ):
+                return
+            elapsed = _format_elapsed(snapshot.elapsed_seconds)
+            if (
+                last_reported_signature is not None
+                and signature[1:4] == last_reported_signature[1:4]
+            ):
+                message = (
+                    f"MiniSWE is still running ({elapsed} elapsed; no new step for "
+                    f"{_format_elapsed(snapshot.seconds_since_progress)})."
+                )
+            else:
+                model_call_word = "call" if snapshot.model_call_count == 1 else "calls"
+                tool_call_word = "call" if snapshot.tool_call_count == 1 else "calls"
+                message = (
+                    f"MiniSWE {snapshot.state} ({elapsed} elapsed; "
+                    f"{snapshot.model_call_count} model {model_call_word}, "
+                    f"{snapshot.tool_call_count} tool {tool_call_word})."
+                )
+            if self.progress_callback is not None:
+                self.progress_callback(message)
+            last_reported_signature = signature
+            last_reported_at = snapshot.elapsed_seconds
+
         completed = run_minisweagent(
             command,
             trajectory_path=(
@@ -735,6 +777,9 @@ class MiniSWEAgentProvider:
             cwd=worktree_root,
             env=environment,
             timeout_seconds=self.timeout_seconds,
+            on_snapshot=(
+                report_progress if self.progress_callback is not None else None
+            ),
         )
         if output_path is not None and output_path.exists():
             self.session_trajectory = output_path
@@ -781,6 +826,12 @@ def _mini_trajectory_exit_status(path: Path) -> str | None:
     return status if isinstance(status, str) else None
 
 
+def _format_elapsed(seconds: float) -> str:
+    whole_seconds = max(0, int(seconds))
+    minutes, remaining_seconds = divmod(whole_seconds, 60)
+    return f"{minutes}m {remaining_seconds:02d}s"
+
+
 def build_coding_agent_provider(
     target: str,
     *,
@@ -793,6 +844,7 @@ def build_coding_agent_provider(
     permission_policy: OpenCodePermissionPolicy,
     prompt_prefix: str = "",
     prompt_suffix: str = "",
+    progress_callback: Callable[[str], None] | None = None,
 ) -> CodingAgentProvider:
     """Build the configured provider behind the common coding-agent boundary."""
     if target == "opencode":
@@ -813,6 +865,7 @@ def build_coding_agent_provider(
             diagnostics_root=diagnostics_root,
             prompt_prefix=prompt_prefix,
             prompt_suffix=prompt_suffix,
+            progress_callback=progress_callback,
         )
     raise ValueError(f"unsupported code agent target {target!r}")
 

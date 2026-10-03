@@ -152,6 +152,7 @@ class FeatureEndpointConfig:
     push_changes: bool = True
     cleanup_temporary_artifacts: bool = False
     planning_client: WorkflowLLMClient | None = None
+    progress_callback: Callable[[str], None] | None = None
     task_id: str | None = None
     design_only: bool = False
     capture_worker_prompts_only: bool = False
@@ -436,6 +437,25 @@ def _execute_procedrr_flow(
             record["replay_key"] = replay_key
         with procedrr_event_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
+        if config.progress_callback is not None:
+            label = event.path.rsplit(".", 1)[-1].replace("_", " ")
+            if event.kind == "operation":
+                subject = str(event.data.get("tool") or label).replace("_", " ")
+                message = f"Completed {subject}"
+            elif event.kind == "process":
+                subject = str(event.data.get("name") or label).replace("_", " ")
+                message = f"Completed workflow phase: {subject}"
+            elif event.kind == "judge":
+                message = "Completed planning decision"
+            elif event.kind == "specialize":
+                message = "Prepared workflow instructions"
+            elif event.kind == "recovery":
+                message = "Recovering from a workflow issue"
+            elif event.kind == "terminal":
+                message = f"Workflow {event.data.get('status', 'finished')}"
+            else:
+                message = f"Workflow update: {label}"
+            config.progress_callback(message)
 
     validation_profiles = _bootstrap_validation_profiles(
         worktree,
@@ -2519,6 +2539,7 @@ def _run_code_agent_phase(
                 ),
                 prompt_prefix=config.code_agent_prompt_prefix,
                 prompt_suffix=config.code_agent_prompt_suffix,
+                progress_callback=config.progress_callback,
             )
         except ValueError as error:
             raise PowdrrExecutionError(str(error)) from error

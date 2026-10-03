@@ -266,8 +266,8 @@ class PowdrrAgent(BaseInstalledAgent):
         if command_log:
             quoted_log = shlex.quote(command_log)
             command_text = (
-                f"{command_text} > {quoted_log} 2>&1; "
-                f"status=$?; tail -300 {quoted_log}; exit $status"
+                f"{command_text} 2>&1 | tee {quoted_log}; "
+                "status=${PIPESTATUS[0]}; exit $status"
             )
         await self.exec_as_agent(
             environment,

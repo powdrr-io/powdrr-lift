@@ -1,0 +1,122 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 911
+title: Generate reviewed semantic case variants
+intent:
+  problem: The semantic evaluation corpus has base cases but no repeatable path to generate paraphrases and minimal contrasts while preserving gold meaning and split boundaries.
+  goal: Generate candidate wording automatically, independently review its meaning and annotations, and reject variants that lack source-grounded evidence or safe lineage.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 118
+    end_line: 129
+  summary: Document variant generation, review, evidence, and contrast lineage rules.
+  rationale: Make the automated variant workflow and its semantic limits reproducible.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 164
+  summary: Reject ambiguous lineage declarations and validate paraphrase and contrast parent references.
+  rationale: Keep lineage references well formed and unambiguous.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 166
+  summary: Identify which lineage reference is malformed.
+  rationale: Make validation errors actionable.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 227
+    end_line: 229
+  summary: Resolve contrast cases to their referenced base case.
+  rationale: Apply parent checks consistently to both variant kinds.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 232
+    end_line: 232
+  summary: Use the resolved parent reference in missing-base errors.
+  rationale: Keep validation diagnostics accurate.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 235
+  summary: Use the resolved parent reference in missing-base errors.
+  rationale: Keep validation diagnostics accurate.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 237
+    end_line: 240
+  summary: Require variants to point directly to a base case.
+  rationale: Prevent chained lineage from bypassing split checks.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 248
+    end_line: 259
+  summary: Preserve family, domain, and split for every variant and preserve all gold fields for paraphrases.
+  rationale: Let contrast cases change meaning while holding evaluation grouping fixed.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 269
+  summary: Reject contrast cases that reuse all base expected decisions.
+  rationale: Ensure contrast pairs exercise a changed decision boundary.
+- path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 249
+  summary: Generate provider-neutral paraphrase and contrast candidates and retain reviewed variants with exact source evidence.
+  rationale: Automate corpus expansion while keeping candidate wording separate from gold annotation.
+- path: tests/test_semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 16
+  summary: Import the variant generator into the case corpus test module.
+  rationale: Exercise the expansion workflow alongside corpus validation.
+- path: tests/test_semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 142
+  summary: Extend the lineage fixture to satisfy minimum domain coverage.
+  rationale: Ensure the test reaches its intended parent-gold assertion.
+- path: tests/test_semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 309
+  summary: Cover contrast lineage, decision changes, review evidence rejection, and split preservation.
+  rationale: Keep variant generation and corpus integrity safeguards executable.
+entities:
+- id: semantic-prompt-variant-generator
+  type: Source file
+  action: added
+- id: generate-semantic-prompt-variants
+  type: Function
+  action: added
+- id: json-completion-client
+  type: Interface
+  action: added
+entity_relationships: []
+invariants:
+- id: semantic-variant-review-requires-source-evidence
+  action: added
+  description: An accepted generated variant must have an approval rationale and an exact quote from its candidate source text.
+- id: semantic-contrast-changes-decision
+  action: added
+  description: A contrast points directly to a base case, stays in the same group, domain, and split, and changes at least one expected decision.
+guidance:
+- id: model-review-is-not-gold-truth
+  action: added
+  description: Automated reviewer approval reduces routine review effort but does not establish semantic truth; route disagreements and suspicious candidates to human review.

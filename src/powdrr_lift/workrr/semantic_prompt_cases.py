@@ -150,10 +150,20 @@ def validate_semantic_prompt_cases(
         split_counts[split] += 1
 
         variant_of = case.get("variant_of")
-        if variant_of is not None:
-            if not isinstance(variant_of, str) or not variant_of.strip():
+        contrast_of = case.get("contrast_of")
+        if variant_of is not None and contrast_of is not None:
+            raise SemanticPromptCaseError(
+                f"case {case_id} cannot be both a paraphrase and a contrast"
+            )
+        for field, reference in (
+            ("variant_of", variant_of),
+            ("contrast_of", contrast_of),
+        ):
+            if reference is not None and (
+                not isinstance(reference, str) or not reference.strip()
+            ):
                 raise SemanticPromptCaseError(
-                    f"case {case_id} has an invalid variant_of reference"
+                    f"case {case_id} has an invalid {field} reference"
                 )
 
     _validate_variant_parents(cases, group_splits)
@@ -214,15 +224,20 @@ def _validate_variant_parents(
     }
     for case in cases:
         variant_of = case.get("variant_of")
-        if variant_of is None:
+        contrast_of = case.get("contrast_of")
+        reference = variant_of or contrast_of
+        if reference is None:
             continue
         case_id = str(case["case_id"])
-        parent = by_id.get(variant_of)
+        parent = by_id.get(reference)
         if parent is None:
             raise SemanticPromptCaseError(
-                f"case {case_id} refers to missing base case {variant_of}"
+                f"case {case_id} refers to missing base case {reference}"
             )
-        if parent.get("variant_of") is not None:
+        if (
+            parent.get("variant_of") is not None
+            or parent.get("contrast_of") is not None
+        ):
             raise SemanticPromptCaseError(
                 f"case {case_id} must refer directly to a base case"
             )
@@ -230,20 +245,28 @@ def _validate_variant_parents(
             raise SemanticPromptCaseError(
                 f"variant {case_id} does not share its base case group"
             )
-        for field in (
-            "family",
-            "domain",
-            "split",
-            "target_proposition",
-            "expected_decisions",
-            "explicitly_unspecified",
-            "required_prompt_claims",
-            "forbidden_prompt_claims",
-        ):
+        shared_fields = ["family", "domain", "split"]
+        if variant_of is not None:
+            shared_fields.extend(
+                [
+                    "target_proposition",
+                    "expected_decisions",
+                    "explicitly_unspecified",
+                    "required_prompt_claims",
+                    "forbidden_prompt_claims",
+                ]
+            )
+        for field in shared_fields:
             if case.get(field) != parent.get(field):
                 raise SemanticPromptCaseError(
                     f"variant {case_id} changes its base case {field}"
                 )
+        if contrast_of is not None and case.get("expected_decisions") == parent.get(
+            "expected_decisions"
+        ):
+            raise SemanticPromptCaseError(
+                f"contrast {case_id} does not change any expected decision"
+            )
         if group_splits.get(str(case.get("group_id"))) != parent.get("split"):
             raise SemanticPromptCaseError(
                 f"variant {case_id} does not share its base case split"

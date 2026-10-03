@@ -115,6 +115,18 @@ family/domain coverage gaps, contradictory prompt claims, and case groups or
 domains that cross splits. Paraphrase variants must keep their base case's gold
 decisions and remain in its split and group.
 
+`semantic_prompt_variants.py` generates one paraphrase and one minimal
+contrast proposal per base case through a provider-neutral JSON client. Pass
+separately configured generation and review clients to
+`generate_semantic_prompt_variants`. The generator supplies wording only. The
+reviewer checks paraphrase meaning or independently annotates the contrast,
+including its gold decisions and prompt claims. Accepted variants include the
+review rationale and an exact source quote; invalid or rejected proposals are
+returned separately with a reason. Contrast cases use `contrast_of`, must
+change at least one gold decision, and share their base case's group, domain,
+and split. A model reviewer is an automated quality gate, not proof of semantic
+truth; disagreement or suspicious variants still need targeted human review.
+
 Validate the case corpus with:
 
 ```bash

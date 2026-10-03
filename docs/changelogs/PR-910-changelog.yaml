@@ -1,0 +1,77 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 910
+title: Add semantic prompt evaluation fixtures
+intent:
+  problem: The semantic-quality plan lacks a reusable classifier case corpus and prompt-level comparison rubrics beyond the state-machine task, making regressions hard to detect across instruction domains.
+  goal: Add a validated, split-safe corpus for the six planned confusion families and grounded rubrics for two additional DeepSWE worker-prompt comparisons.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 22
+  summary: Document the three-task prompt baseline and capture/evaluation workflow.
+  rationale: Make the comparison task selection and matching rubric use reproducible.
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 70
+    end_line: 87
+  summary: Add explicit rubric paths for the state-machine, JSONPath, and duration-encoding prompt evaluations.
+  rationale: Evaluate each captured worker prompt against the correct offline task references.
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 105
+    end_line: 127
+  summary: Document the synthetic case corpus and its split validation rules.
+  rationale: Explain how the machine-readable cases complement real task prompt evaluations.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 75
+  summary: Add a task-grounded rubric covering JSONPath selectors, filter semantics, errors, and Starlark bindings.
+  rationale: Measure whether worker prompts retain the large Go API's required behavior without supplying solution evidence during generation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 75
+  summary: Add a task-grounded rubric for duration components, data-dependent resolution, scaling, and integration.
+  rationale: Extend prompt-level evaluation to transformer configuration and data-dependent feature behavior.
+- path: docs/evaluations/semantic-prompt-cases-v1.jsonl
+  type: modified
+  span:
+    start_line: 1
+    end_line: 72
+  summary: Add 72 base cases across six semantic confusion families and three domains, with configuration/cache held out.
+  rationale: Provide source-grounded positive and negative controls for requirement relations, conditions, scope, lifecycle, copying, and argument presence.
+- path: src/powdrr_lift/workrr/semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 256
+  summary: Load and validate JSONL semantic cases, family/domain coverage, held-out domains, and variant group split integrity.
+  rationale: Reject malformed annotations and evaluation leakage before scoring classifier or prompt output.
+- path: tests/test_semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 170
+  summary: Test corpus coverage, positive controls, malformed data, and group/domain leakage rejection.
+  rationale: Keep the evaluation fixture contract executable and prevent split leakage regressions.
+entities: []
+entity_relationships: []
+invariants:
+- id: semantic-case-groups-stay-in-one-split
+  action: added
+  description: Base cases and their paraphrase variants share one group and split, and each domain belongs to only one split.
+- id: evaluation-rubrics-use-fixed-task-references
+  action: added
+  description: The two new prompt rubrics are anchored to exact task instruction excerpts, solution symbols, and verifier test names and remain offline evaluation inputs.
+guidance:
+- Capture the three worker prompts with fresh Pier and output roots before claiming a measured prompt-quality baseline.
+- Generate and validate paraphrase and minimal-contrast variants before reporting the full synthetic case score.

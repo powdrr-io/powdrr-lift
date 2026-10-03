@@ -1,9 +1,25 @@
 # Evaluating DeepSWE design-only runs
 
-The first evaluator targets `python-statemachine-state-data-scoping`. Run the
-Harbor adapter with `POWDRR_DESIGN_ONLY=1` to compile the real Procedrr design
-without starting a coding agent. Retrieve the artifact directory, then point the
-evaluation command at it and the local DeepSWE task directory:
+The initial prompt-level comparison covers three tasks with different
+instruction shapes and implementation domains:
+
+| Task | Domain | Rubric |
+| --- | --- | --- |
+| `python-statemachine-state-data-scoping` | Python state ownership, lifecycle, copy, and validation rules | `deepswe-python-statemachine-state-data.yaml` |
+| `ytt-jsonpath-query-api` | Go API with a large set of selectors, conditional behavior, and error semantics | `deepswe-ytt-jsonpath-query-api.yaml` |
+| `skrub-duration-encoding` | Python transformer configuration, data dependent resolution, and integration behavior | `deepswe-skrub-duration-encoding.yaml` |
+
+For prompt captures, run the Harbor adapter with
+`POWDRR_CAPTURE_WORKER_PROMPTS_ONLY=1` to compile the real Procedrr design and
+worker request without starting a coding agent. Retrieve the artifact directory,
+then evaluate it against the matching task and rubric. Use a fresh Pier job root
+and output root for every capture; record the installed Powdrr revision and
+provider configuration with the artifacts.
+
+The design-only evaluator targets `python-statemachine-state-data-scoping`.
+Run the Harbor adapter with `POWDRR_DESIGN_ONLY=1` to compile the real Procedrr
+design without starting a coding agent. Retrieve the artifact directory, then
+point the evaluation command at it and the local DeepSWE task directory:
 
 ```bash
 /Users/gregory/.local/share/uv/tools/datacurve-pier/bin/pier run \
@@ -51,8 +67,26 @@ Evaluate the captured prompts after generation:
 ```bash
 uv run powdrr-lift evaluate-deepswe-prompt \
   --task-dir /path/to/deep-swe/tasks/python-statemachine-state-data-scoping \
-  --run-dir /tmp/state-data-design-run \
-  --report /tmp/state-data-design-run/prompt-quality-evaluation.json
+  --run-dir /tmp/state-data-prompt-run \
+  --rubric docs/evaluations/deepswe-python-statemachine-state-data.yaml \
+  --report /tmp/state-data-prompt-run/prompt-quality-evaluation.json
+```
+
+For the two comparison tasks, set `--task-dir` to the corresponding task and
+pass the matching rubric explicitly, for example:
+
+```bash
+uv run powdrr-lift evaluate-deepswe-prompt \
+  --task-dir /path/to/deep-swe/tasks/ytt-jsonpath-query-api \
+  --run-dir /path/to/captured-ytt-run \
+  --rubric docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml \
+  --report /path/to/captured-ytt-run/prompt-quality-evaluation.json
+
+uv run powdrr-lift evaluate-deepswe-prompt \
+  --task-dir /path/to/deep-swe/tasks/skrub-duration-encoding \
+  --run-dir /path/to/captured-skrub-run \
+  --rubric docs/evaluations/deepswe-skrub-duration-encoding.yaml \
+  --report /path/to/captured-skrub-run/prompt-quality-evaluation.json
 ```
 
 The evaluator verifies task identity, exact instruction-ledger source text,
@@ -68,3 +102,26 @@ state-owned versus callback-merged data, absent versus explicitly empty
 declarations, callback mutation persistence, and shallow versus deep history.
 Design and prompt reports measure different stages; neither alone predicts a
 live coding score.
+
+## Synthetic classifier cases
+
+`semantic-prompt-cases-v1.jsonl` contains independently written source cases
+for the six planned confusion families. Each row records the source text,
+target proposition, allowed context, gold decisions, explicitly unspecified
+details, and required or forbidden prompt claims. Cases from the
+`configuration_cache` domain are held out; state-management and reporting/query
+cases are in development. The loader rejects missing fields, duplicate IDs,
+family/domain coverage gaps, contradictory prompt claims, and case groups or
+domains that cross splits. Paraphrase variants must keep their base case's gold
+decisions and remain in its split and group.
+
+Validate the case corpus with:
+
+```bash
+PYTHONPATH=src /Users/gregory/code/powdrr-lift/.venv/bin/python \
+  -m powdrr_lift.workrr.semantic_prompt_cases
+```
+
+The synthetic cases complement the three real task prompt evaluations. They do
+not use solution or verifier patches as source labels; those references remain
+exclusive to the offline prompt evaluator.

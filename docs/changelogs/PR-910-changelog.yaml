@@ -18,7 +18,7 @@ files:
   type: modified
   span:
     start_line: 70
-    end_line: 87
+    end_line: 89
   summary: Add explicit rubric paths for the state-machine, JSONPath, and duration-encoding prompt evaluations.
   rationale: Evaluate each captured worker prompt against the correct offline task references.
 - path: docs/evaluations/deepswe-design-evaluation.md

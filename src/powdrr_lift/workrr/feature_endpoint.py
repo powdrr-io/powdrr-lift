@@ -2539,6 +2539,7 @@ def _run_code_agent_phase(
                 ),
                 prompt_prefix=config.code_agent_prompt_prefix,
                 prompt_suffix=config.code_agent_prompt_suffix,
+                progress_callback=config.progress_callback,
             )
         except ValueError as error:
             raise PowdrrExecutionError(str(error)) from error

@@ -10,6 +10,7 @@ from powdrr_lift.cli import main
 from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
+from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -283,12 +284,14 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
 ) -> None:
     worktree = _git_repo(tmp_path)
     diagnostics = tmp_path / "diagnostics"
+    progress_messages: list[str] = []
     provider = MiniSWEAgentProvider(
         executable="mini",
         model="openai/gpt-5",
         diagnostics_root=diagnostics,
         prompt_prefix="Use the repository's local conventions.",
         prompt_suffix="Stop after implementing the requested change.",
+        progress_callback=progress_messages.append,
     )
     captured: dict[str, object] = {}
 
@@ -297,6 +300,22 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     ) -> subprocess.CompletedProcess[str]:
         captured["command"] = command
         captured["kwargs"] = kwargs
+        assert isinstance(kwargs, dict)
+        snapshot_callback = kwargs.get("on_snapshot")
+        assert callable(snapshot_callback)
+        snapshot_callback(
+            MiniSWEAgentSnapshot(
+                state="active",
+                elapsed_seconds=10,
+                seconds_since_progress=0,
+                message_count=3,
+                model_call_count=2,
+                tool_call_count=1,
+                last_action="pytest -q",
+                exit_status=None,
+                reason="trajectory is advancing",
+            )
+        )
         if "--output" in command:
             output = command[command.index("--output") + 1]
             Path(output).write_text(
@@ -327,6 +346,10 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     environment = kwargs["env"]
     assert isinstance(environment, dict)
     assert environment["MSWEA_CONFIGURED"] == "true"
+    assert progress_messages == [
+        "MiniSWE started.",
+        "MiniSWE active (0m 10s elapsed; 2 model calls, 1 tool call).",
+    ]
 
 
 def test_minisweagent_provider_continues_saved_session_on_next_attempt(

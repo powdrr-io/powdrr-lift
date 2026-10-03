@@ -3781,6 +3781,7 @@ def _merge_behavior_scenario_values(
     }
     partial_contract = design.get("partial_contract")
     if isinstance(partial_contract, Mapping):
+        _canonicalize_scenario_source_dimensions(partial_contract, scenario)
         _validate_scenario_semantic_decisions(partial_contract, scenario)
     routing = (
         partial_contract.get("routing", "include")
@@ -3800,6 +3801,28 @@ def _merge_behavior_scenario_values(
             f"behavior scenario is incomplete: {error}"
         ) from error
     return {**dict(design), "behavior_scenario": compiled.to_data()}
+
+
+def _canonicalize_scenario_source_dimensions(
+    partial_contract: Mapping[str, Any], scenario: dict[str, Any]
+) -> None:
+    """Use the accepted contract as the sole source for classifier dimensions."""
+    source_dimensions = partial_contract.get("semantic_dimensions", {})
+    if not isinstance(source_dimensions, Mapping):
+        raise PowdrrExecutionError("contract source semantic dimensions are malformed")
+
+    canonical_dimensions = {
+        str(name): str(value) for name, value in source_dimensions.items()
+    }
+    scenario["source_dimensions"] = canonical_dimensions
+
+    applicability = scenario.get("semantic_dimension_applicability", {})
+    if isinstance(applicability, Mapping):
+        scenario["semantic_dimension_applicability"] = {
+            str(name): value
+            for name, value in applicability.items()
+            if name in canonical_dimensions
+        }
 
 
 def _validate_scenario_semantic_decisions(

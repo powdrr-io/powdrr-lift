@@ -1,0 +1,199 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 908
+title: Validate scenario claims against accepted instruction semantics
+intent:
+  problem: Scenario elaboration can add behavior to then statements, dimensions, related requirements, assumptions, and capability matrices that was not stated by the instruction or accepted semantic decisions.
+  goal: Review each generated scenario claim against its source and accepted decisions, reject contradicted or unsupported obligations, preserve assumption-backed gaps, and retain verifiable provenance downstream.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 79
+    end_line: 85
+  summary: Add scenario claim review and enforcement to the design interview workflow.
+  rationale: Gate generated behavior on source entailment before it becomes a downstream implementation obligation.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 890
+    end_line: 980
+  summary: Review scenario claims in a bounded atomic loop and enforce the resulting gate.
+  rationale: Require one semantic classification per claim and cap review work while preventing unsupported scenario additions from reaching the prompt.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 59
+    end_line: 59
+  summary: Add provenance for scenario faithfulness decisions.
+  rationale: Carry the review artifact reference with the compiled behavior scenario.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 94
+  summary: Serialize and validate scenario faithfulness provenance.
+  rationale: Ensure downstream consumers receive a complete artifact path and fingerprint.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 241
+  summary: Validate scenario faithfulness provenance during behavior compilation.
+  rationale: Reject malformed provenance before a scenario is rendered or compiled into an implementation packet.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 329
+    end_line: 329
+  summary: Preserve provenance when constructing compiled behavior scenarios.
+  rationale: Keep the artifact reference attached after validation.
+- path: src/powdrr_lift/core/semantic_faithfulness.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Add time-bound semantic decision support for scenario reviews.
+  rationale: Bind claim judgments using the existing semantic decision model.
+- path: src/powdrr_lift/core/semantic_faithfulness.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Define a revision and bound for scenario claim reviews.
+  rationale: Version review decisions and cap classifier work on generated claims.
+- path: src/powdrr_lift/core/semantic_faithfulness.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 558
+  summary: Prepare and bind scenario claim reviews with deterministic quote checks, assumption handling, and fail-closed outcomes.
+  rationale: Ensure generated claims are supported by source clauses and accepted semantics before they become implementation requirements.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 57
+  summary: Register scenario claim review functions with the command catalog.
+  rationale: Make preparation, finalization, and enforcement available to the declarative design workflow.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 459
+    end_line: 488
+  summary: Define typed operations for scenario faithfulness review.
+  rationale: Validate the inputs and outputs used by the new workflow gate.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 1620
+    end_line: 1716
+  summary: Verify review artifact provenance and enforce scenario faithfulness.
+  rationale: Prevent tampered, mismatched, or rejected scenario claims from continuing to prompt generation.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 2224
+    end_line: 2287
+  summary: Prepare reviews and persist content-fingerprinted scenario artifacts.
+  rationale: Preserve auditable decisions and their source, contract, scenario, and context fingerprints.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 2932
+    end_line: 2940
+  summary: Dispatch scenario faithfulness operations through the runtime.
+  rationale: Connect the declarative workflow commands to their validated implementations.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 138
+  summary: Test scenario provenance round trips through the behavior contract.
+  rationale: Protect the artifact reference passed to downstream consumers.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2667
+    end_line: 2672
+  summary: Support atomic scenario claim judgments in the design-flow fixture.
+  rationale: Exercise the new workflow path with deterministic classifier outputs.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 116
+  summary: Handle scenario claim decisions in the deterministic planning client.
+  rationale: Keep end-to-end runs stable while testing the additional review step.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 840
+    end_line: 842
+  summary: Expose workflow failure details in the end-to-end assertion.
+  rationale: Make review-gate failures diagnosable in future regression runs.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 639
+    end_line: 639
+  summary: Allow planning-provider classification in the design workflow.
+  rationale: Validate the provider configuration used by atomic scenario reviews.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 814
+    end_line: 837
+  summary: Test evaluation of the design interview with scenario claim review operations.
+  rationale: Verify the expanded checked-in workflow remains executable.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import the partial semantic contract for scenario faithfulness fixtures.
+  rationale: Type the test helper that builds a source-anchored semantic contract.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Import scenario faithfulness operations into semantic contract tests.
+  rationale: Exercise the new source-support decisions alongside semantic compilation.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Import scenario claim review preparation for focused tests.
+  rationale: Test candidate extraction and deterministic source quote handling.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 648
+    end_line: 805
+  summary: Test scenario claim coverage, exact source quotes, contradictions, assumptions, and unsupported claims.
+  rationale: Verify the gate's accepted and rejected outcomes using concrete source evidence.
+entities:
+- id: scenario-claim-review
+  type: Function
+  action: added
+- id: scenario-faithfulness-artifact
+  type: Build artifact
+  action: added
+- id: behavior-scenario-faithfulness-reference
+  type: Class
+  action: added
+entity_relationships: []
+invariants:
+- id: generated-scenario-claims-require-source-support
+  description: Scenario claims that are contradicted or not stated by source clauses and accepted semantic decisions cannot become implementation obligations unless the missing detail is explicitly recorded as an assumption.
+  action: added
+- id: scenario-review-artifact-must-match-compiled-inputs
+  description: A scenario faithfulness artifact must match the clause, partial contract, generated scenario, accepted outcome, and content fingerprint before downstream use.
+  action: added
+- id: scenario-claim-review-is-bounded
+  description: Scenario claims are reviewed individually with a maximum of 32 classifier requests per scenario; overflow fails closed.
+  action: added
+guidance: []

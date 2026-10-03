@@ -3,6 +3,18 @@
 from __future__ import annotations
 
 import shlex
+from urllib.parse import urlsplit
+
+PROVIDER_ENVIRONMENT_KEYS = (
+    "DEEPINFRA_API_KEY",
+    "DEEPINFRA_API_TOKEN",
+    "DEEPINFRA_BASE_URL",
+    "SYSTEM_ONE_API_KEY",
+    "SYSTEM_ONE_BASE_URL",
+    "TYPESAFEAI_API_KEY",
+    "TYPESAFE_API_KEY",
+    "TAVILY_API_KEY",
+)
 
 
 def pip_install_command(package: str, *options: str) -> str:
@@ -23,3 +35,22 @@ def pip_install_command(package: str, *options: str) -> str:
 def env_flag_is_enabled(value: str | None) -> bool:
     """Return whether an environment value uses a supported true spelling."""
     return (value or "").casefold() in {"1", "true", "yes"}
+
+
+def network_allowlist_domains(
+    system_one_base_url: str | None = None,
+) -> tuple[str, ...]:
+    """Return hosts required by package installation and configured providers."""
+    domains = {
+        "api.deepinfra.com",
+        "api.typesafe.ai",
+        "files.pythonhosted.org",
+        "github.com",
+        "pypi.org",
+        "registry.npmjs.org",
+    }
+    if system_one_base_url:
+        host = urlsplit(system_one_base_url).hostname
+        if host:
+            domains.add(host.casefold())
+    return tuple(sorted(domains))

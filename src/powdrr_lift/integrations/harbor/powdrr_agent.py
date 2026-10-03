@@ -7,7 +7,9 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from powdrr_lift.integrations.harbor._env import (
+    PROVIDER_ENVIRONMENT_KEYS,
     env_flag_is_enabled,
+    network_allowlist_domains,
     pip_install_command,
 )
 
@@ -93,7 +95,7 @@ class PowdrrAgent(BaseInstalledAgent):
         )
 
     def network_allowlist(self) -> Any:
-        """Allow package installation and the configured DeepInfra provider."""
+        """Allow package installation and configured model providers."""
         try:
             from pier.models.agent.network import (  # type: ignore[import-not-found]
                 NetworkAllowlist,
@@ -102,13 +104,9 @@ class PowdrrAgent(BaseInstalledAgent):
             return None
 
         return NetworkAllowlist(
-            domains=[
-                "api.deepinfra.com",
-                "files.pythonhosted.org",
-                "github.com",
-                "registry.npmjs.org",
-                "pypi.org",
-            ]
+            domains=list(
+                network_allowlist_domains(self._get_env("SYSTEM_ONE_BASE_URL"))
+            )
         )
 
     def populate_context_post_run(self, context: AgentContext) -> None:
@@ -240,11 +238,7 @@ class PowdrrAgent(BaseInstalledAgent):
             command.append("--capture-worker-prompts-only")
         provider_env = {
             key: value
-            for key in (
-                "DEEPINFRA_API_KEY",
-                "DEEPINFRA_API_TOKEN",
-                "DEEPINFRA_BASE_URL",
-            )
+            for key in PROVIDER_ENVIRONMENT_KEYS
             if (value := self._get_env(key)) is not None
         }
         for key in ("POWDRR_INSTALL_SPEC", "POWDRR_VERSION", "POWDRR_REVISION"):

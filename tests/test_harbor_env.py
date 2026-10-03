@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 
 from powdrr_lift.integrations.harbor._env import (
+    PROVIDER_ENVIRONMENT_KEYS,
     env_flag_is_enabled,
+    network_allowlist_domains,
     pip_install_command,
 )
 
@@ -27,3 +29,24 @@ def test_pip_install_command_omits_user_flag_inside_virtualenv() -> None:
         "then python3 -m pip install --user --upgrade some-package==1.2.3; "
         "else python3 -m pip install --upgrade some-package==1.2.3; fi"
     )
+
+
+def test_network_allowlist_includes_default_classification_provider() -> None:
+    assert "api.typesafe.ai" in network_allowlist_domains()
+
+
+def test_network_allowlist_includes_configured_classification_host() -> None:
+    domains = network_allowlist_domains("https://models.example.test/v1")
+
+    assert "models.example.test" in domains
+    assert "api.typesafe.ai" in domains
+
+
+def test_provider_credentials_are_forwarded_to_the_classifier_process() -> None:
+    assert {
+        "SYSTEM_ONE_API_KEY",
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_BASE_URL",
+        "TAVILY_API_KEY",
+    } <= set(PROVIDER_ENVIRONMENT_KEYS)

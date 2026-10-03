@@ -2664,6 +2664,12 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
+            if "this scenario claim" in question:
+                return {
+                    "status": "resolved",
+                    "value": "entailed",
+                    "reason_code": None,
+                }
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
             if (

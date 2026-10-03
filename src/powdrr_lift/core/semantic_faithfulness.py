@@ -6,6 +6,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from powdrr_lift.core.semantic_contract import PartialSemanticContract
@@ -17,6 +18,8 @@ from powdrr_lift.core.semantic_decision import (
 )
 
 FAITHFULNESS_REVISION = "source-faithfulness-v1"
+SCENARIO_CLAIM_REVISION = "scenario-claim-faithfulness-v1"
+MAX_SCENARIO_CLAIMS = 32
 REVIEWABLE_FIELDS = (
     "behavior_family",
     "temporal_scope",
@@ -133,6 +136,424 @@ class FaithfulnessOutcome:
             "unresolved_fields": list(self.unresolved_fields),
             "findings": list(self.findings),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioClaimReview:
+    """A review of one deduplicated claim added during scenario elaboration."""
+
+    claim_id: str
+    field_paths: tuple[str, ...]
+    candidate_value: str
+    assumption_backed_paths: tuple[str, ...]
+    decision: SemanticDecision
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "claim_id": self.claim_id,
+            "field_paths": list(self.field_paths),
+            "candidate_value": self.candidate_value,
+            "assumption_backed_paths": list(self.assumption_backed_paths),
+            "decision": self.decision.to_data(),
+        }
+
+
+def prepare_scenario_claim_reviews(
+    contract: PartialSemanticContract,
+    *,
+    scenario: Mapping[str, Any],
+    ledger_clauses: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Prepare bounded reviews for claims scenario generation adds downstream."""
+    source_clauses = _scenario_source_clauses(contract, ledger_clauses)
+    source_context = {
+        "source_clauses": source_clauses,
+        "accepted_decisions": {
+            "routing": contract.routing,
+            "disposition": contract.disposition,
+            "polarity": contract.polarity,
+            "requirement_strength": contract.requirement_strength,
+            "quantifier": contract.quantifier,
+            "behavior_family": contract.behavior_family,
+            "subject": contract.subject.span.text,
+            "behavior": contract.behavior.span.text,
+            "preconditions": [item.span.text for item in contract.preconditions],
+            "exceptions": [item.span.text for item in contract.exceptions],
+            "explicit_result": (
+                contract.explicit_result.span.text
+                if contract.explicit_result is not None
+                else None
+            ),
+            "temporal_scope": contract.temporal_scope,
+            "semantic_dimensions": dict(contract.semantic_dimensions),
+        },
+    }
+    context_text = json.dumps(
+        source_context, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    # Context and excluded clauses do not create downstream obligations, so
+    # their descriptive scenario text is not subject to obligation review.
+    candidates = (
+        []
+        if contract.routing in {"context", "exclude"}
+        or contract.disposition in {"context", "nonactionable"}
+        else _scenario_claim_candidates(scenario)
+    )
+    deduplicated: dict[str, dict[str, Any]] = {}
+    for path, value in candidates:
+        normalized = _normalize_claim(value)
+        if not normalized or _is_nonclaim_scenario_value(value):
+            continue
+        existing = deduplicated.get(normalized)
+        if existing is None:
+            existing = {
+                "candidate_value": value,
+                "field_paths": [],
+                "assumption_backed_paths": [],
+            }
+            deduplicated[normalized] = existing
+        existing["field_paths"].append(path)
+        if _scenario_claim_has_assumption(path, value, scenario):
+            existing["assumption_backed_paths"].append(path)
+
+    deterministic: list[dict[str, Any]] = []
+    provider_claims: list[dict[str, Any]] = []
+    for item in deduplicated.values():
+        value = str(item["candidate_value"])
+        claim = {
+            **item,
+            "claim_id": "claim:"
+            + _fingerprint(
+                {"paths": item["field_paths"], "value": _normalize_claim(value)}
+            )[7:23],
+        }
+        exact_quote = any(
+            len(_normalize_claim(value)) >= 16
+            and _normalize_claim(value) in _normalize_claim(clause["text"])
+            for clause in source_clauses
+        )
+        spec = SemanticDecisionSpec(
+            decision_id=(
+                f"decision:{contract.contract_id}:scenario:{claim['claim_id']}:entailment"
+            ),
+            decision_kind="entailment",
+            subject_ref=contract.source_ref,
+            proposition_text=contract.proposition_text,
+            source_fingerprint=contract.source_fingerprint,
+            context_text=context_text,
+            candidate_set_fingerprint=_fingerprint(
+                {
+                    "scenario_fingerprint": _fingerprint(scenario),
+                    "claim_id": claim["claim_id"],
+                    "field_paths": claim["field_paths"],
+                    "candidate_value": value,
+                    "contract_fingerprint": contract.fingerprint,
+                }
+            ),
+            contract_revision=SCENARIO_CLAIM_REVISION,
+        )
+        claim["spec"] = spec.to_data()
+        if exact_quote:
+            deterministic.append(claim)
+        else:
+            provider_claims.append(claim)
+
+    overflow = len(provider_claims) > MAX_SCENARIO_CLAIMS
+    if overflow:
+        provider_claims = []
+    decision_specs = {
+        str(claim["claim_id"]): claim["spec"]
+        for claim in (*deterministic, *provider_claims)
+    }
+    deterministic_claims = [
+        {key: value for key, value in claim.items() if key != "spec"}
+        for claim in deterministic
+    ]
+    requests = (
+        [
+            {
+                "source_text": contract.proposition_text,
+                "context_text": context_text,
+                "claim": {key: value for key, value in claim.items() if key != "spec"},
+            }
+            for claim in provider_claims
+        ]
+        if not overflow
+        else []
+    )
+    return {
+        "source_ref": contract.source_ref,
+        "source_fingerprint": contract.source_fingerprint,
+        "contract_fingerprint": contract.fingerprint,
+        "scenario_fingerprint": _fingerprint(scenario),
+        "context_fingerprint": _fingerprint(source_context),
+        "deterministic_claims": deterministic_claims,
+        "decision_specs": decision_specs,
+        "requests": requests,
+        "overflow": overflow,
+        "candidate_count": len(deduplicated),
+    }
+
+
+def finalize_scenario_claim_reviews(
+    plan: Mapping[str, Any],
+    provider_results: Sequence[Mapping[str, Any]],
+    *,
+    benchmark_mode: bool = False,
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    """Bind claim entailment decisions and reject unsupported scenario additions."""
+    requests = plan.get("requests")
+    deterministic = plan.get("deterministic_claims")
+    decision_specs = plan.get("decision_specs")
+    if (
+        not isinstance(requests, list)
+        or not isinstance(deterministic, list)
+        or not isinstance(decision_specs, Mapping)
+    ):
+        raise FaithfulnessError("scenario claim review plan is malformed")
+    if len(requests) != len(provider_results):
+        raise FaithfulnessError("scenario claim review count is invalid")
+    if plan.get("overflow") is True:
+        return {
+            "accepted": False,
+            "findings": [{"reason_code": "scenario_claim_limit_exceeded"}],
+            "unresolved_fields": [],
+            "reviews": [],
+        }
+
+    claims: list[tuple[Mapping[str, Any], Mapping[str, Any] | None]] = [
+        (claim, None) for claim in deterministic if isinstance(claim, Mapping)
+    ]
+    if len(claims) != len(deterministic):
+        raise FaithfulnessError("deterministic scenario claims are malformed")
+    for request, raw_result in zip(requests, provider_results, strict=True):
+        if not isinstance(request, Mapping) or not isinstance(
+            request.get("claim"), Mapping
+        ):
+            raise FaithfulnessError("scenario claim request is malformed")
+        if set(raw_result) != {"status", "value", "reason_code"}:
+            if benchmark_mode:
+                raw_result = {
+                    "status": "unresolved",
+                    "value": None,
+                    "reason_code": "invalid_response",
+                }
+            else:
+                raise FaithfulnessError("scenario claim result is malformed")
+        claims.append((request["claim"], raw_result))
+
+    reviews: list[ScenarioClaimReview] = []
+    for scenario_claim, scenario_result in claims:
+        claim_id = scenario_claim.get("claim_id")
+        spec_raw = decision_specs.get(claim_id)
+        if not isinstance(spec_raw, Mapping):
+            raise FaithfulnessError("scenario claim has no decision spec")
+        spec = SemanticDecisionSpec.from_data(spec_raw)
+        if spec.decision_kind != "entailment":
+            raise FaithfulnessError("scenario claim has an invalid decision kind")
+        evidence_refs: tuple[str, ...]
+        if scenario_result is None:
+            provider = SemanticDecisionProvider(kind="deterministic-rule")
+            provider_result_data: dict[str, Any] = {
+                "status": "resolved",
+                "value": "entailed",
+            }
+            evidence_refs = (
+                f"source-proposition:{spec.subject_ref}",
+                f"scenario-claim:{scenario_claim['claim_id']}:exact-source-quote",
+            )
+        else:
+            provider = SemanticDecisionProvider(kind="planning-llm")
+            provider_result_data = {
+                key: scenario_result.get(key)
+                for key in ("status", "value", "reason_code")
+            }
+            if benchmark_mode and (
+                provider_result_data["status"] != "resolved"
+                or provider_result_data["value"] not in DECISION_VALUES["entailment"]
+                or provider_result_data["reason_code"] is not None
+            ):
+                provider = SemanticDecisionProvider(kind="deterministic-rule")
+                provider_result_data = {
+                    "status": "resolved",
+                    "value": "not_stated",
+                    "reason_code": None,
+                }
+            evidence_refs = (f"source-proposition:{spec.subject_ref}",)
+        decision = spec.bind(
+            provider=provider,
+            provider_result=provider_result_data,
+            evidence_refs=evidence_refs,
+            created_at=created_at or datetime.now(UTC).isoformat(),
+        )
+        reviews.append(
+            ScenarioClaimReview(
+                claim_id=str(scenario_claim["claim_id"]),
+                field_paths=tuple(str(item) for item in scenario_claim["field_paths"]),
+                candidate_value=str(scenario_claim["candidate_value"]),
+                assumption_backed_paths=tuple(
+                    str(item) for item in scenario_claim["assumption_backed_paths"]
+                ),
+                decision=decision,
+            )
+        )
+
+    findings: list[dict[str, Any]] = []
+    unresolved_fields: list[str] = []
+    for review in reviews:
+        bound_result = review.decision.result
+        if bound_result.status != "resolved":
+            unresolved_fields.extend(review.field_paths)
+            findings.append(
+                {
+                    "claim_id": review.claim_id,
+                    "field_paths": list(review.field_paths),
+                    "reason_code": bound_result.reason_code or "classifier_abstained",
+                    "classification": "unresolved",
+                }
+            )
+        elif bound_result.value == "contradicted":
+            findings.append(
+                {
+                    "claim_id": review.claim_id,
+                    "field_paths": list(review.field_paths),
+                    "reason_code": "intent_contradiction",
+                    "classification": "contradicted",
+                }
+            )
+        elif bound_result.value == "not_stated":
+            assumption_paths = set(review.assumption_backed_paths)
+            unbacked_paths = set(review.field_paths) - assumption_paths
+            if unbacked_paths:
+                unresolved_fields.extend(sorted(unbacked_paths))
+                findings.append(
+                    {
+                        "claim_id": review.claim_id,
+                        "field_paths": sorted(unbacked_paths),
+                        "reason_code": "source_underspecified",
+                        "classification": "not_stated",
+                    }
+                )
+        elif bound_result.value != "entailed":
+            raise FaithfulnessError("scenario claim has an invalid entailment value")
+
+    return {
+        "accepted": not findings,
+        "findings": findings,
+        "unresolved_fields": sorted(set(unresolved_fields)),
+        "reviews": [review.to_data() for review in reviews],
+    }
+
+
+def _scenario_source_clauses(
+    contract: PartialSemanticContract, ledger_clauses: Sequence[Mapping[str, Any]]
+) -> list[dict[str, str]]:
+    clauses: list[dict[str, str]] = []
+    for item in ledger_clauses:
+        clause_id = item.get("clause_id")
+        text = item.get("text")
+        if isinstance(clause_id, str) and clause_id.strip() and isinstance(text, str):
+            clauses.append({"clause_id": clause_id, "text": text})
+    if not any(item["clause_id"] == contract.source_ref for item in clauses):
+        clauses.insert(
+            0,
+            {"clause_id": contract.source_ref, "text": contract.proposition_text},
+        )
+    return clauses
+
+
+def _scenario_claim_candidates(scenario: Mapping[str, Any]) -> list[tuple[str, str]]:
+    candidates: list[tuple[str, str]] = []
+    subject = scenario.get("subject")
+    if isinstance(subject, str):
+        candidates.append(("subject", subject))
+    then = scenario.get("then")
+    if isinstance(then, str):
+        candidates.append(("then", then))
+    dimensions = scenario.get("dimensions", {})
+    if isinstance(dimensions, Mapping):
+        candidates.extend(
+            (f"dimensions.{name}", value)
+            for name, value in dimensions.items()
+            if isinstance(name, str) and isinstance(value, str)
+        )
+    related = scenario.get("related_requirements", [])
+    if isinstance(related, list):
+        candidates.extend(
+            (f"related_requirements[{index}]", value)
+            for index, value in enumerate(related)
+            if isinstance(value, str)
+        )
+    assumptions = scenario.get("assumptions", [])
+    if isinstance(assumptions, list):
+        candidates.extend(
+            (f"assumptions[{index}].resolution", resolution)
+            for index, item in enumerate(assumptions)
+            if isinstance(item, Mapping)
+            and isinstance((resolution := item.get("resolution")), str)
+        )
+    capabilities = scenario.get("capability_matrix", [])
+    if isinstance(capabilities, list):
+        for index, item in enumerate(capabilities):
+            if not isinstance(item, Mapping):
+                continue
+            capability = item.get("capability")
+            behavior = item.get("behavior")
+            evidence = item.get("evidence", [])
+            if (
+                isinstance(capability, str)
+                and isinstance(behavior, str)
+                and isinstance(evidence, list)
+                and all(isinstance(value, str) for value in evidence)
+            ):
+                detail = "; ".join(str(value) for value in evidence)
+                candidates.append(
+                    (
+                        f"capability_matrix[{index}]",
+                        f"{capability}: {behavior}; evidence: {detail}",
+                    )
+                )
+    return candidates
+
+
+def _scenario_claim_has_assumption(
+    field_path: str, candidate: str, scenario: Mapping[str, Any]
+) -> bool:
+    assumptions = scenario.get("assumptions", [])
+    if not isinstance(assumptions, list):
+        return False
+    parts = field_path.split(".")
+    dimension = parts[1] if len(parts) == 2 and parts[0] == "dimensions" else None
+    if field_path.startswith("assumptions[") and field_path.endswith("].resolution"):
+        return True
+    normalized = _normalize_claim(candidate)
+    for item in assumptions:
+        if not isinstance(item, Mapping):
+            continue
+        item_dimension = item.get("dimension")
+        resolution = item.get("resolution")
+        if not isinstance(item_dimension, str) or not isinstance(resolution, str):
+            continue
+        if dimension == item_dimension:
+            return True
+        if field_path == "then" and _normalize_claim(resolution) in normalized:
+            return True
+    return False
+
+
+def _is_nonclaim_scenario_value(value: str) -> bool:
+    normalized = _normalize_claim(value)
+    return (
+        normalized in {"not_applicable", "not applicable"}
+        or normalized.startswith("needs clarification:")
+        or normalized.startswith("needs clarification ")
+        or normalized.startswith("assumed default:")
+    )
+
+
+def _normalize_claim(value: str) -> str:
+    return " ".join(value.split()).casefold()
 
 
 def prepare_field_entailment_reviews(

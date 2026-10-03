@@ -636,7 +636,7 @@ def test_checked_in_design_interview_definition_parses() -> None:
 
     collect_judges(document["steps"])
     assert judge_providers["classify_one"]
-    assert set(judge_providers["classify_one"]) == {"jev"}
+    assert set(judge_providers["classify_one"]) == {"jev", "planning"}
     assert set(judge_providers["construct_one"]) == {"planning"}
     assert document["name"] == "design-interview"
     assert validate_single_decision(document) == ()

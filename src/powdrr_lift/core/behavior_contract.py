@@ -56,6 +56,7 @@ class BehaviorScenario:
     source_dimensions: Mapping[str, Any] = field(default_factory=dict)
     semantic_dimension_applicability: Mapping[str, str] = field(default_factory=dict)
     unresolved_dimensions: tuple[str, ...] = ()
+    faithfulness_ref: Mapping[str, str] = field(default_factory=dict)
     schema_version: str = "behavior-scenario-v1"
     validation_group_id: str | None = None
     validation_relation: str = "independent"
@@ -89,6 +90,8 @@ class BehaviorScenario:
             )
         if self.unresolved_dimensions:
             data["unresolved_dimensions"] = list(self.unresolved_dimensions)
+        if self.faithfulness_ref:
+            data["faithfulness_ref"] = dict(self.faithfulness_ref)
         if self.validation_group_id is not None:
             data["validation_group_id"] = self.validation_group_id
             data["validation_relation"] = self.validation_relation
@@ -220,6 +223,22 @@ def compile_behavior_scenarios(
             raise BehaviorContractError(
                 f"scenario {scenario_id} has an unsupported unresolved dimension"
             )
+        faithfulness_raw = item.get("faithfulness_ref", {})
+        if not isinstance(faithfulness_raw, Mapping):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} faithfulness_ref is malformed"
+            )
+        if faithfulness_raw and set(faithfulness_raw) != {
+            "artifact_path",
+            "fingerprint",
+        }:
+            raise BehaviorContractError(
+                f"scenario {scenario_id} faithfulness_ref is malformed"
+            )
+        faithfulness_ref = {
+            str(name): _text(value, f"scenario {scenario_id} faithfulness ref {name}")
+            for name, value in faithfulness_raw.items()
+        }
         assumption_dimensions = {item["dimension"] for item in assumptions}
         for name, value in source_dimensions.items():
             if (
@@ -307,6 +326,7 @@ def compile_behavior_scenarios(
                 source_dimensions=source_dimensions,
                 semantic_dimension_applicability=semantic_dimension_applicability,
                 unresolved_dimensions=unresolved_dimensions,
+                faithfulness_ref=faithfulness_ref,
                 validation_group_id=validation_group_id,
                 validation_relation=str(validation_relation),
                 routing=str(routing),

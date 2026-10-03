@@ -122,6 +122,20 @@ def test_semantic_dimension_applicability_and_unresolved_state_are_rendered() ->
     assert "Unresolved dimensions: object_identity" in packet.render()
 
 
+def test_behavior_scenario_round_trips_faithfulness_artifact_provenance() -> None:
+    scenario = _scenario()
+    scenario["faithfulness_ref"] = {
+        "artifact_path": (
+            "/run/semantic-contracts/instruction-001/scenario-faithfulness.json"
+        ),
+        "fingerprint": "sha256:scenario-faithfulness",
+    }
+
+    compiled = compile_behavior_scenarios((scenario,))[0]
+
+    assert compiled.to_data()["faithfulness_ref"] == scenario["faithfulness_ref"]
+
+
 def test_worker_prompt_preserves_joint_validation_groups() -> None:
     first = _scenario()
     first["scenario_id"] = "status-200"

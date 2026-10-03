@@ -10,6 +10,7 @@ import pytest
 
 from powdrr_lift.core.semantic_contract import (
     BoundSourceExtraction,
+    PartialSemanticContract,
     SemanticContractError,
 )
 from powdrr_lift.core.semantic_decision import (
@@ -20,8 +21,10 @@ from powdrr_lift.core.semantic_decision import (
 from powdrr_lift.core.semantic_faithfulness import (
     FaithfulnessError,
     bind_field_entailment_reviews,
+    finalize_scenario_claim_reviews,
     finalize_source_faithfulness,
     prepare_field_entailment_reviews,
+    prepare_scenario_claim_reviews,
 )
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
@@ -639,6 +642,164 @@ def _bind_source_decisions(
         pending_specs=plan["pending_specs"],
         provider_results=results,
         created_at=NOW,
+    )
+
+
+def _faithfulness_contract(source: str) -> PartialSemanticContract:
+    clause = _clause(source)
+    decisions = _bind_source_decisions(
+        clause,
+        disposition="feature",
+        overrides={"copy_depth": "unspecified"},
+    )
+    requests = prepare_source_extractions(clause, decisions)
+    extractions = bind_source_extractions(
+        requests=requests,
+        provider_results=[{"quote": source}, {"quote": source}],
+        created_at=NOW,
+    )
+    behavior = next(item for item in extractions if item.extraction_kind == "behavior")
+    family_request = prepare_behavior_family_decision(clause, behavior)
+    family = bind_behavior_family_decision(
+        family_request,
+        {"status": "resolved", "value": "other"},
+        created_at=NOW,
+    )
+    return compile_source_contract(
+        clause=clause,
+        decisions=decisions,
+        extractions=extractions,
+        behavior_family=family,
+    )
+
+
+def test_scenario_claim_review_covers_later_prompt_fields_and_exact_quotes() -> None:
+    source = "The API returns a shallow copy of each mapping."
+    contract = _faithfulness_contract(source)
+    scenario = {
+        "then": source,
+        "dimensions": {
+            "normal_result": "The API returns the original mapping.",
+            "error_behavior": "not_applicable",
+        },
+        "related_requirements": ["The getter exposes merged ancestor values."],
+        "capability_matrix": [
+            {
+                "capability": "nested mappings",
+                "behavior": "support",
+                "evidence": ["Nested mappings are returned by identity."],
+            }
+        ],
+    }
+
+    plan = prepare_scenario_claim_reviews(
+        contract,
+        scenario=scenario,
+        ledger_clauses=[{"clause_id": contract.source_ref, "text": source}],
+    )
+
+    assert len(plan["deterministic_claims"]) == 1
+    assert plan["deterministic_claims"][0]["candidate_value"] == source
+    reviewed_paths = {
+        path for request in plan["requests"] for path in request["claim"]["field_paths"]
+    }
+    assert {
+        "dimensions.normal_result",
+        "related_requirements[0]",
+        "capability_matrix[0]",
+    } <= reviewed_paths
+
+
+def test_scenario_claim_review_separates_contradictions_and_assumptions() -> None:
+    source = "The API initializes values from defaults."
+    contract = _faithfulness_contract(source)
+    scenario = {
+        "then": (
+            "The API returns the same mapping instance after recursively copying it."
+        ),
+        "dimensions": {
+            "normal_result": "The API returns the same mapping instance.",
+            "error_behavior": "not_applicable",
+            "copy_depth": "The operation makes a recursive copy of nested values.",
+        },
+        "assumptions": [
+            {
+                "dimension": "copy_depth",
+                "resolution": "Use a recursive copy of nested values.",
+                "rationale": "The source does not define copy depth.",
+                "basis": "conservative_default",
+                "basis_reference": "No specific normative source identified.",
+                "confidence": "low",
+            }
+        ],
+        "related_requirements": [],
+        "capability_matrix": [],
+    }
+    plan = prepare_scenario_claim_reviews(
+        contract,
+        scenario=scenario,
+        ledger_clauses=[{"clause_id": contract.source_ref, "text": source}],
+    )
+    provider_results = [
+        {
+            "status": "resolved",
+            "value": (
+                "contradicted"
+                if "then" in request["claim"]["field_paths"]
+                else "not_stated"
+            ),
+            "reason_code": None,
+        }
+        for request in plan["requests"]
+    ]
+
+    outcome = finalize_scenario_claim_reviews(
+        plan, provider_results, benchmark_mode=True, created_at=NOW
+    )
+
+    assert not outcome["accepted"]
+    assert any(
+        finding["reason_code"] == "intent_contradiction"
+        for finding in outcome["findings"]
+    )
+    assumption_review = next(
+        review
+        for review in outcome["reviews"]
+        if "dimensions.copy_depth" in review["field_paths"]
+    )
+    assert assumption_review["decision"]["result"]["value"] == "not_stated"
+    assert "dimensions.copy_depth" in assumption_review["assumption_backed_paths"]
+
+
+def test_unstated_scenario_claim_without_recorded_assumption_is_rejected() -> None:
+    source = "The API initializes values from defaults."
+    contract = _faithfulness_contract(source)
+    scenario = {
+        "then": "The API always returns the same object instance.",
+        "dimensions": {"normal_result": "The API returns its defaults."},
+    }
+    plan = prepare_scenario_claim_reviews(
+        contract,
+        scenario=scenario,
+        ledger_clauses=[{"clause_id": contract.source_ref, "text": source}],
+    )
+    results = [
+        {
+            "status": "resolved",
+            "value": "not_stated",
+            "reason_code": None,
+        }
+        for request in plan["requests"]
+    ]
+
+    outcome = finalize_scenario_claim_reviews(
+        plan, results, benchmark_mode=True, created_at=NOW
+    )
+
+    assert not outcome["accepted"]
+    assert any(
+        finding["reason_code"] == "source_underspecified"
+        for finding in outcome["findings"]
     )
 
 

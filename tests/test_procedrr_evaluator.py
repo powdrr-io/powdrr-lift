@@ -811,6 +811,30 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 return {"reviews": [{}]}
             if command[0] == "finalize_source_faithfulness":
                 return {"accepted": True, "unresolved_fields": [], "findings": []}
+            if command[0] == "prepare_scenario_claim_reviews":
+                return {
+                    "source_ref": "instruction-001",
+                    "source_fingerprint": "sha256:clause",
+                    "contract_fingerprint": "sha256:contract",
+                    "scenario_fingerprint": "sha256:scenario",
+                    "context_fingerprint": "sha256:context",
+                    "deterministic_claims": [],
+                    "decision_specs": {},
+                    "requests": [],
+                    "overflow": False,
+                    "candidate_count": 0,
+                }
+            if command[0] == "finalize_scenario_claim_reviews":
+                return {
+                    "accepted": True,
+                    "findings": [],
+                    "unresolved_fields": [],
+                    "reviews": [],
+                    "artifact_path": "scenario-faithfulness.json",
+                    "artifact_fingerprint": "sha256:scenario-faithfulness",
+                }
+            if command[0] == "enforce_scenario_claim_faithfulness":
+                return parameters["design"]
             if command[0] == "compile_canonical_feature_design":
                 return {
                     "path": "canonical-feature-design.json",

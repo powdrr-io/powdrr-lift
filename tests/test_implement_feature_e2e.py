@@ -106,6 +106,14 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"status", "value", "reason_code"} and (
+            "scenario claim" in text
+        ):
+            return {
+                "status": "resolved",
+                "value": "entailed",
+                "reason_code": None,
+            }
         if required == {"decision"}:
             return {"decision": "skip"}
         if required == {"decision", "rationale", "queries"}:
@@ -829,7 +837,9 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
         )
     )
 
-    assert result.status == "completed"
+    assert result.status == "completed", (
+        result.failure.message if result.failure else None
+    )
     assert result.validation is not None
     assert result.validation.status.value == "passed"
     assert result.review["passed"] is True

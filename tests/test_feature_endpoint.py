@@ -524,7 +524,7 @@ def test_normative_default_can_resolve_a_source_semantic_dimension() -> None:
     assert scenario["assumptions"][0]["dimension"] == "copy_depth"
 
 
-def test_scenario_cannot_rewrite_a_source_semantic_decision() -> None:
+def test_classifier_dimensions_override_scenario_echoes() -> None:
     parameters = {
         "clause": {"clause_id": "instruction-001"},
         "design": {
@@ -557,8 +557,57 @@ def test_scenario_cannot_rewrite_a_source_semantic_decision() -> None:
         },
     }
 
-    with pytest.raises(PowdrrExecutionError, match="do not preserve"):
-        _merge_behavior_scenario_values(parameters)
+    scenario = _merge_behavior_scenario_values(parameters)["behavior_scenario"]
+
+    assert scenario["source_dimensions"] == {"object_identity": "unspecified"}
+
+
+def test_unrequested_dimension_applicability_is_dropped() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {
+            "expected_test": "focused test",
+            "partial_contract": {
+                "semantic_dimensions": {"argument_presence": "unspecified"}
+            },
+        },
+        "scenario": {
+            "status": "resolved",
+            "unresolved_dimensions": [],
+            "scenario": {
+                "subject": "a state",
+                "given": "string keys and defaults",
+                "when": "a data mapping is supplied",
+                "then": "the mapping is accepted",
+                "dimensions": {
+                    "normal_result": "the mapping is accepted",
+                    "error_behavior": "not_applicable",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "source_dimensions": {"argument_presence": "unspecified"},
+                "semantic_dimension_applicability": {
+                    "argument_presence": "not_applicable",
+                    "copy_depth": "not_applicable",
+                    "mutation_propagation": "not_applicable",
+                    "object_identity": "not_applicable",
+                    "persistence_boundary": "not_applicable",
+                },
+                "related_requirements": [],
+                "capability_matrix": [],
+            },
+        },
+    }
+
+    scenario = _merge_behavior_scenario_values(parameters)["behavior_scenario"]
+
+    assert scenario["source_dimensions"] == {"argument_presence": "unspecified"}
+    assert scenario["semantic_dimension_applicability"] == {
+        "argument_presence": "not_applicable"
+    }
 
 
 def test_not_applicable_source_dimension_stays_in_source_dimensions() -> None:

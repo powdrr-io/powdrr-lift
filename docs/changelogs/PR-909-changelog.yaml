@@ -1,0 +1,123 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 909
+title: Forward classifier credentials and allow provider egress
+intent:
+  problem: Harbor's isolated task container cannot reach JEV, and the Powdrr subprocess does not receive JEV or Tavily credentials, causing silent classifier fallback during prompt generation. Scenario generation also echoes classifier-owned semantic dimensions, and its output can fail validation even when the accepted contract already contains the authoritative decisions.
+  goal: Make clean benchmark captures exercise the intended classifier path and preserve accepted semantic decisions deterministically through scenario generation.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/integrations/harbor/_env.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 17
+  summary: Define the provider environment keys forwarded to Powdrr's subprocess.
+  rationale: Keep credential forwarding explicit and auditable.
+- path: src/powdrr_lift/integrations/harbor/_env.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 56
+  summary: Build a normalized provider egress allowlist including default and configured JEV hosts.
+  rationale: Ensure isolated task containers can reach the classifier endpoint used by the workflow.
+- path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Import the provider environment key allowlist.
+  rationale: Use the declared set when forwarding runtime credentials.
+- path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import the provider egress helper.
+  rationale: Use shared tested policy for the Harbor adapter.
+- path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 98
+  summary: Update the provider egress policy description.
+  rationale: Reflect that the adapter now permits both configured model providers.
+- path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 109
+  summary: Apply the provider egress allowlist to Pier's task networking policy.
+  rationale: Permit JEV and configured System One endpoints alongside existing package and DeepInfra hosts.
+- path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+  type: modified
+  span:
+    start_line: 241
+    end_line: 241
+  summary: Forward configured provider credentials and endpoint settings to the workflow subprocess.
+  rationale: Prevent missing-key fallback when task-level credentials were supplied to the Harbor agent.
+- path: tests/test_harbor_env.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Import provider environment names for forwarding policy checks.
+  rationale: Verify explicit classifier and research credentials are retained.
+- path: tests/test_harbor_env.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Import network allowlist helper for unit coverage.
+  rationale: Test egress and credential forwarding rules without starting Docker.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3784
+    end_line: 3784
+  summary: Invoke deterministic semantic dimension provenance normalization before scenario validation.
+  rationale: Make the accepted contract authoritative for classifier-owned scenario metadata.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3806
+    end_line: 3827
+  summary: Populate scenario source dimensions from the accepted semantic contract and discard applicability labels for dimensions the classifier did not request.
+  rationale: Keep classifier provenance authoritative while preventing model-generated metadata from making otherwise valid scenarios fail contract validation.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 527
+    end_line: 527
+  summary: Replace the rejection assertion with a check that contract-owned dimensions override scenario echoes.
+  rationale: Ensure model output cannot rewrite accepted classifier decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 560
+    end_line: 610
+  summary: Cover dropping applicability labels for dimensions not requested by the classifier.
+  rationale: Reproduce the failure found during a clean state-machine prompt capture and prevent the scenario model from controlling classifier-owned metadata.
+- path: tests/test_harbor_env.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 52
+  summary: Test default and configured classifier hosts and the provider credential allowlist.
+  rationale: Catch silent egress or subprocess forwarding regressions before benchmark runs.
+entities: []
+entity_relationships: []
+invariants:
+- id: default-semantic-classifier-host-is-allowlisted
+  action: added
+  description: The default JEV endpoint host api.typesafe.ai is included in the Harbor task egress allowlist.
+- id: configured-classifier-host-is-allowlisted
+  action: added
+  description: When SYSTEM_ONE_BASE_URL is configured, its host is included in the Harbor task egress allowlist.
+- id: provider-subprocess-environment-is-explicit
+  action: added
+  description: Only the declared planning, classifier, research, and Powdrr revision environment variables are forwarded to the workflow subprocess.
+- id: scenario-source-dimensions-are-contract-derived
+  action: added
+  description: Scenario source dimensions are copied from the accepted partial semantic contract, and applicability is retained only for dimensions present in that contract.
+guidance: []

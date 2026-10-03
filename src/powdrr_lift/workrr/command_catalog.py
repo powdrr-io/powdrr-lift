@@ -53,6 +53,8 @@ from powdrr_lift.core.semantic_faithfulness import (
     FaithfulnessError,
     FieldEntailmentReview,
     FieldEntailmentSpec,
+    finalize_scenario_claim_reviews,
+    prepare_scenario_claim_reviews,
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.obligation_evidence import (
@@ -453,6 +455,36 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("finalize_source_faithfulness"),
+        ),
+        "prepare_scenario_claim_reviews": CommandSpec(
+            name="prepare_scenario_claim_reviews",
+            input_schema=object_schema(
+                {"contract": {}, "ledger_clauses": {"type": "array"}, "scenario": {}},
+                required=("contract", "ledger_clauses", "scenario"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_scenario_claim_reviews"),
+        ),
+        "finalize_scenario_claim_reviews": CommandSpec(
+            name="finalize_scenario_claim_reviews",
+            input_schema=object_schema(
+                {"plan": {}, "results": {"type": "array"}},
+                required=("plan", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("finalize_scenario_claim_reviews"),
+        ),
+        "enforce_scenario_claim_faithfulness": CommandSpec(
+            name="enforce_scenario_claim_faithfulness",
+            input_schema=object_schema(
+                {"clause": {}, "design": {}, "faithfulness": {}},
+                required=("clause", "design", "faithfulness"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("enforce_scenario_claim_faithfulness"),
         ),
         "build_semantic_repository_inventory": CommandSpec(
             name="build_semantic_repository_inventory",
@@ -1585,6 +1617,103 @@ class FeatureCommandRuntime:
                 allow_clarification=True,
             )
 
+        def enforce_scenario_claim_faithfulness_operation() -> Any:
+            clause = parameters.get("clause")
+            design = parameters.get("design")
+            faithfulness = parameters.get("faithfulness")
+            if not isinstance(clause, Mapping) or not isinstance(design, Mapping):
+                raise PowdrrExecutionError(
+                    "scenario faithfulness enforcement is missing its source design"
+                )
+            if not isinstance(faithfulness, Mapping) or not isinstance(
+                faithfulness.get("accepted"), bool
+            ):
+                raise PowdrrExecutionError(
+                    "scenario faithfulness result is missing or malformed"
+                )
+            artifact_path = faithfulness.get("artifact_path")
+            artifact_fingerprint = faithfulness.get("artifact_fingerprint")
+            if not all(
+                isinstance(value, str) and value.strip()
+                for value in (artifact_path, artifact_fingerprint)
+            ):
+                raise PowdrrExecutionError(
+                    "scenario faithfulness result has no provenance artifact"
+                )
+            artifact_file = Path(str(artifact_path)).resolve()
+            if not artifact_file.is_relative_to(output_root.resolve()):
+                raise PowdrrExecutionError(
+                    "scenario faithfulness artifact escapes the run artifacts"
+                )
+            try:
+                artifact = json.loads(artifact_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise PowdrrExecutionError(
+                    "scenario faithfulness artifact cannot be read"
+                ) from exc
+            if not isinstance(artifact, Mapping):
+                raise PowdrrExecutionError(
+                    "scenario faithfulness artifact is malformed"
+                )
+            artifact_without_fingerprint = {
+                key: value for key, value in artifact.items() if key != "fingerprint"
+            }
+            source_id = clause.get("clause_id")
+            partial_contract = design.get("partial_contract")
+            scenario = design.get("behavior_scenario")
+            if (
+                not isinstance(partial_contract, Mapping)
+                or not isinstance(scenario, Mapping)
+                or artifact.get("fingerprint") != artifact_fingerprint
+                or content_fingerprint(artifact_without_fingerprint)
+                != artifact_fingerprint
+                or artifact.get("source_ref") != source_id
+                or artifact.get("contract_fingerprint")
+                != partial_contract.get("fingerprint")
+                or artifact.get("scenario_fingerprint") != content_fingerprint(scenario)
+                or artifact.get("accepted") != faithfulness.get("accepted")
+            ):
+                raise PowdrrExecutionError(
+                    "scenario faithfulness provenance does not match the design"
+                )
+            if faithfulness.get("accepted") is not True:
+                if not benchmark_mode():
+                    raise PowdrrExecutionError(
+                        "scenario-faithfulness gate failed: "
+                        + json.dumps(faithfulness.get("findings", []), sort_keys=True)
+                    )
+                partial_contract = design.get("partial_contract")
+                record_benchmark_invariant_fallback(
+                    clause,
+                    reason="scenario-faithfulness gate rejected generated claims",
+                    details=faithfulness,
+                    partial_contract=(
+                        partial_contract
+                        if isinstance(partial_contract, Mapping)
+                        else None
+                    ),
+                )
+                design = merge_as_source_invariant(clause)
+            scenario = design.get("behavior_scenario")
+            if not isinstance(scenario, Mapping):
+                raise PowdrrExecutionError(
+                    "scenario faithfulness enforcement has no compiled scenario"
+                )
+            scenario_with_provenance = {
+                **dict(scenario),
+                "faithfulness_ref": {
+                    "artifact_path": artifact_path,
+                    "fingerprint": artifact_fingerprint,
+                },
+            }
+            try:
+                compiled = compile_behavior_scenarios((scenario_with_provenance,))[0]
+            except ValueError as exc:
+                raise PowdrrExecutionError(
+                    f"scenario faithfulness provenance is invalid: {exc}"
+                ) from exc
+            return {**dict(design), "behavior_scenario": compiled.to_data()}
+
         def semantic_artifact_directory(clause: Mapping[str, Any]) -> Path:
             clause_id = clause.get("clause_id")
             if not isinstance(clause_id, str) or not clause_id.strip():
@@ -2091,6 +2220,70 @@ class FeatureCommandRuntime:
                 SemanticDecisionError,
             ) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
+
+        def prepare_scenario_claim_reviews_operation() -> Any:
+            contract = semantic_contract(parameters.get("contract"))
+            clauses = parameters.get("ledger_clauses")
+            scenario = parameters.get("scenario")
+            if not isinstance(clauses, list) or not all(
+                isinstance(item, Mapping) for item in clauses
+            ):
+                raise PowdrrExecutionError("scenario source ledger is malformed")
+            if not isinstance(scenario, Mapping):
+                raise PowdrrExecutionError("scenario claim input is malformed")
+            try:
+                return prepare_scenario_claim_reviews(
+                    contract, scenario=scenario, ledger_clauses=clauses
+                )
+            except (SemanticContractError, FaithfulnessError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def finalize_scenario_claim_reviews_operation() -> Any:
+            plan = parameters.get("plan")
+            raw_results = feature_endpoint._collected_results(parameters.get("results"))
+            if (
+                not isinstance(plan, Mapping)
+                or raw_results is None
+                or not all(isinstance(item, Mapping) for item in raw_results)
+            ):
+                raise PowdrrExecutionError("scenario claim reviews are malformed")
+            try:
+                outcome = finalize_scenario_claim_reviews(
+                    plan,
+                    raw_results,
+                    benchmark_mode=benchmark_mode(),
+                )
+            except (FaithfulnessError, SemanticDecisionError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            source_ref = plan.get("source_ref")
+            if not isinstance(source_ref, str) or not source_ref.strip():
+                raise PowdrrExecutionError(
+                    "scenario claim plan has no source reference"
+                )
+            artifact = {
+                "schema_version": "scenario-faithfulness-v1",
+                "source_ref": source_ref,
+                "source_fingerprint": plan.get("source_fingerprint"),
+                "contract_fingerprint": plan.get("contract_fingerprint"),
+                "scenario_fingerprint": plan.get("scenario_fingerprint"),
+                "context_fingerprint": plan.get("context_fingerprint"),
+                "candidate_count": plan.get("candidate_count"),
+                **outcome,
+            }
+            fingerprint = content_fingerprint(artifact)
+            artifact["fingerprint"] = fingerprint
+            path = semantic_artifact_directory({"clause_id": source_ref}) / (
+                "scenario-faithfulness.json"
+            )
+            path.write_text(
+                json.dumps(artifact, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            return {
+                **outcome,
+                "artifact_path": str(path),
+                "artifact_fingerprint": fingerprint,
+            }
 
         def assert_feature_design_ready_for_implementation() -> Any:
             feature_design = parameters.get("feature_design")
@@ -2735,6 +2928,15 @@ class FeatureCommandRuntime:
                 ),
                 "finalize_source_faithfulness": bind_handler(
                     finalize_source_faithfulness_operation
+                ),
+                "prepare_scenario_claim_reviews": bind_handler(
+                    prepare_scenario_claim_reviews_operation
+                ),
+                "finalize_scenario_claim_reviews": bind_handler(
+                    finalize_scenario_claim_reviews_operation
+                ),
+                "enforce_scenario_claim_faithfulness": bind_handler(
+                    enforce_scenario_claim_faithfulness_operation
                 ),
                 "build_semantic_repository_inventory": bind_handler(
                     build_semantic_repository_inventory_operation

@@ -83,6 +83,15 @@ outputs:
                 related_requirements:
                   type: array
                   items: {type: string, minLength: 1}
+                source_dimensions:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    copy_depth: {type: string, minLength: 1}
+                    mutation_propagation: {type: string, minLength: 1}
+                    object_identity: {type: string, minLength: 1}
+                    persistence_boundary: {type: string, minLength: 1}
+                    argument_presence: {type: string, minLength: 1}
                 dimensions:
                   type: object
                   required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
@@ -118,7 +127,7 @@ outputs:
                     required: [dimension, resolution, rationale, basis, basis_reference, confidence]
                     additionalProperties: false
                     properties:
-                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries, copy_depth, mutation_propagation, object_identity, persistence_boundary, argument_presence]}
                       resolution: {type: string, minLength: 1}
                       rationale: {type: string, minLength: 1}
                       basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
@@ -346,7 +355,7 @@ steps:
                         status: {type: string, enum: [resolved, unresolved]}
                         value:
                           type: [string, 'null']
-                          enum: [include, include_prohibition, exclude, unclear, entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
+                          enum: [include, include_prohibition, exclude, unclear, entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, outer_container, recursive, write_through, detached_mapping, same_object, distinct_objects, boundary_stated, argument_supplied, non_null_value, null]
                         reason_code:
                           type: [string, 'null']
                           enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
@@ -409,7 +418,7 @@ steps:
                         status: {type: string, enum: [resolved, unresolved]}
                         value:
                           type: [string, 'null']
-                          enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, null]
+                          enum: [entity, feature, interface, invariant, guidance, non_goal, nonactionable, context, required, prohibited, permitted, descriptive, one, some, every, unspecified, must, should, may, present, absent, current, future, current_and_future, event_bound, explicit, implied_by_registered_term, not_stated, process_only, product_semantics_present, mixed, outer_container, recursive, write_through, detached_mapping, same_object, distinct_objects, boundary_stated, argument_supplied, non_null_value, null]
                         reason_code:
                           type: [string, 'null']
                           enum: [source_ambiguous, source_underspecified, no_candidate, multiple_candidates, repository_evidence_missing, unsupported_concept, classifier_abstained, invalid_response, conflicting_evidence, null]
@@ -698,6 +707,15 @@ steps:
                 text when applicable, use not_applicable only for dimensions that
                 cannot apply to this behavior, and ask for clarification only for a
                 materially applicable dimension left open by the entire ledger.
+              - >-
+                If the partial contract contains semantic_dimensions, preserve each
+                concrete source-resolved label in scenario.source_dimensions. A
+                value of unspecified or unresolved is a material gap only when it
+                can change implementation; list that named dimension in
+                unresolved_dimensions and mark it "unresolved by source" in
+                source_dimensions. A missing semantic_dimensions key means that
+                dimension was not applicable to the source clause. Never turn an
+                unspecified value into a source guarantee.
               - Describe one scenario with concrete given, when, and then values.
               - Explicitly cover normal result/state, errors and propagation, continuation, unsupported capabilities, cancellation/cleanup, compatibility, and negative boundaries.
               - For each dimension, write a concrete requirement or the exact value not_applicable when that dimension genuinely does not apply.
@@ -762,7 +780,7 @@ steps:
                   status: {type: string, enum: [resolved, needs_clarification]}
                   unresolved_dimensions:
                     type: array
-                    items: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                    items: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries, copy_depth, mutation_propagation, object_identity, persistence_boundary, argument_presence]}
                   scenario:
                     type: object
                     required: [subject, given, when, then, dimensions, related_requirements]
@@ -775,6 +793,15 @@ steps:
                       related_requirements:
                         type: array
                         items: {type: string, minLength: 1}
+                      source_dimensions:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          copy_depth: {type: string, minLength: 1}
+                          mutation_propagation: {type: string, minLength: 1}
+                          object_identity: {type: string, minLength: 1}
+                          persistence_boundary: {type: string, minLength: 1}
+                          argument_presence: {type: string, minLength: 1}
                       dimensions:
                         type: object
                         required: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]
@@ -794,7 +821,7 @@ steps:
                           required: [dimension, resolution, rationale, basis, basis_reference, confidence]
                           additionalProperties: false
                           properties:
-                            dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                            dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries, copy_depth, mutation_propagation, object_identity, persistence_boundary, argument_presence]}
                             resolution: {type: string, minLength: 1}
                             rationale: {type: string, minLength: 1}
                             basis: {type: string, enum: [repository_convention, industry_standard, ecosystem_convention, language_or_framework_default, conservative_default]}
@@ -869,7 +896,7 @@ steps:
                       given: {type: string, minLength: 1}
                       when: {type: string, minLength: 1}
                       then: {type: string, minLength: 1}
-                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries]}
+                      dimension: {type: string, enum: [normal_result, error_behavior, continuation, unsupported_behavior, cancellation_cleanup, compatibility, negative_boundaries, copy_depth, mutation_propagation, object_identity, persistence_boundary, argument_presence]}
                       previous_resolution: {type: string, minLength: 1}
                       resolution: {type: string, minLength: 1}
                       rationale: {type: string, minLength: 1}

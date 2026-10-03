@@ -345,7 +345,7 @@ def test_split_clause_invariant_fallback_preserves_source_contract_for_evidence(
     None
 ):
     partial_contract = {
-        "schema_version": "partial-semantic-contract-v2",
+        "schema_version": "partial-semantic-contract-v3",
         "contract_id": "contract:instruction-019",
         "source_ref": "instruction-019",
         "source_fingerprint": "sha256:source",
@@ -473,6 +473,99 @@ def test_normative_defaults_resolve_and_record_each_unresolved_dimension() -> No
     )
     assert resolved["assumptions"][0]["confidence"] == "medium"
     assert "NEEDS CLARIFICATION" not in resolved["then"]
+
+
+def test_normative_default_can_resolve_a_source_semantic_dimension() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["copy_depth"],
+            "scenario": {
+                "subject": "settings",
+                "given": "nested defaults",
+                "when": "a new instance is initialized",
+                "then": "a copy is created",
+                "dimensions": {
+                    "normal_result": "a copy is created",
+                    "error_behavior": "not_applicable",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "source_dimensions": {"copy_depth": "unresolved by source"},
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "copy_depth",
+                        "resolution": "Copy the outer mapping only.",
+                        "rationale": "No source depth is specified.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    }
+                ],
+            },
+        },
+    }
+
+    scenario = _merge_behavior_scenario_values(parameters, benchmark_mode=True)[
+        "behavior_scenario"
+    ]
+
+    assert scenario["source_dimensions"]["copy_depth"] == (
+        "ASSUMED DEFAULT: Copy the outer mapping only."
+    )
+    assert scenario["assumptions"][0]["dimension"] == "copy_depth"
+
+
+def test_not_applicable_source_dimension_stays_in_source_dimensions() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["copy_depth"],
+            "scenario": {
+                "subject": "settings",
+                "given": "an existing mapping",
+                "when": "the mapping is read",
+                "then": "the value is returned",
+                "dimensions": {
+                    "normal_result": "the value is returned",
+                    "error_behavior": "not_applicable",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "source_dimensions": {"copy_depth": "not_applicable"},
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "copy_depth",
+                        "resolution": "not_applicable",
+                        "rationale": "No copy is performed by this behavior.",
+                        "basis": "conservative_default",
+                        "basis_reference": "The scenario only reads the mapping.",
+                        "confidence": "high",
+                    }
+                ],
+            },
+        },
+    }
+
+    scenario = _merge_behavior_scenario_values(parameters, benchmark_mode=True)[
+        "behavior_scenario"
+    ]
+
+    assert scenario["source_dimensions"]["copy_depth"] == "not_applicable"
+    assert scenario["dimensions"]["normal_result"] == "the value is returned"
+    assert not scenario.get("assumptions")
 
 
 def test_normative_defaults_keep_not_applicable_dimensions_out_of_assumptions() -> None:
@@ -614,6 +707,60 @@ def test_scenario_consistency_updates_only_rewrite_existing_defaults() -> None:
     assert scenario["dimensions"]["continuation"] == "ASSUMED DEFAULT: continue"
     assert scenario["assumptions"][0]["resolution"] == "continue"
     assert decisions[0]["behavior_scenario"]["assumptions"][0]["resolution"] == "stop"
+
+
+def test_scenario_consistency_can_update_a_source_dimension_default() -> None:
+    decisions: list[dict[str, Any]] = [
+        {
+            "behavior_scenario": {
+                "scenario_id": "scenario:copy",
+                "subject": "settings",
+                "given": "nested defaults",
+                "when": "a new instance is initialized",
+                "then": "a copy is created",
+                "dimensions": {},
+                "source_dimensions": {"copy_depth": "ASSUMED DEFAULT: recursive copy"},
+                "assumptions": [
+                    {
+                        "dimension": "copy_depth",
+                        "resolution": "recursive copy",
+                        "rationale": "Initial default.",
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    }
+                ],
+            }
+        }
+    ]
+    review = {
+        "consistency_review": {
+            "updates": [
+                {
+                    "subject": "settings",
+                    "given": "nested defaults",
+                    "when": "a new instance is initialized",
+                    "then": "a copy is created",
+                    "dimension": "copy_depth",
+                    "previous_resolution": "recursive copy",
+                    "resolution": "outer mapping copy",
+                    "rationale": "Use the narrowest compatible default.",
+                    "basis": "conservative_default",
+                    "basis_reference": "No specific normative source identified.",
+                    "confidence": "low",
+                }
+            ]
+        }
+    }
+
+    updated = _apply_scenario_consistency_updates(
+        decisions, review, benchmark_mode=True
+    )
+
+    scenario = updated[0]["behavior_scenario"]
+    assert scenario["source_dimensions"]["copy_depth"] == (
+        "ASSUMED DEFAULT: outer mapping copy"
+    )
 
 
 def test_scenario_consistency_cannot_add_defaults_outside_benchmark_mode() -> None:

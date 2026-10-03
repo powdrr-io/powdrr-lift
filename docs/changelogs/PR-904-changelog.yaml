@@ -1,0 +1,560 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 904
+title: Classify source semantic dimensions selectively
+intent:
+  problem: Source clauses can mention copying, mutation propagation, object identity, persistence boundaries, or argument presence without those details reaching the worker prompt; downstream scenario generation can then guess or repeat them as guarantees.
+  goal: Classify only semantic dimensions suggested by the source, preserve explicit values and source gaps through the behavior contract, and require an explicit assumption before filling a material gap.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 86
+    end_line: 94
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 358
+    end_line: 358
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 421
+    end_line: 421
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 710
+    end_line: 718
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 783
+    end_line: 783
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 796
+    end_line: 804
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 824
+    end_line: 824
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 899
+    end_line: 899
+  summary: Add source semantic dimensions to classifier labels, scenario review, and output schemas.
+  rationale: Keep semantic labels and unresolved gaps available to the scenario judge without turning source silence into a guarantee.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 31
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 79
+    end_line: 80
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 172
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 215
+    end_line: 215
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 261
+    end_line: 269
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 283
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 387
+    end_line: 387
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 460
+    end_line: 460
+  summary: Validate, serialize, and render semantic dimensions and their assumptions on behavior scenarios.
+  rationale: Preserve these source constraints in the implementation packet consumed downstream.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 276
+    end_line: 276
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 359
+    end_line: 359
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 444
+    end_line: 451
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 511
+    end_line: 518
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 562
+    end_line: 577
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 596
+    end_line: 596
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_contract.py
+  type: modified
+  span:
+    start_line: 600
+    end_line: 600
+  summary: Version the partial contract and retain semantic dimension decisions, provenance, and unresolved reasons.
+  rationale: Carry classifier evidence and source underspecification into scenario generation.
+- path: src/powdrr_lift/core/semantic_decision.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 23
+  summary: Define allowed labels for five source semantic dimensions.
+  rationale: Keep the new decisions within the existing typed classifier envelope.
+- path: src/powdrr_lift/core/semantic_decision.py
+  type: modified
+  span:
+    start_line: 79
+    end_line: 87
+  summary: Define allowed labels for five source semantic dimensions.
+  rationale: Keep the new decisions within the existing typed classifier envelope.
+- path: src/powdrr_lift/core/semantic_decision.py
+  type: modified
+  span:
+    start_line: 582
+    end_line: 582
+  summary: Define allowed labels for five source semantic dimensions.
+  rationale: Keep the new decisions within the existing typed classifier envelope.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 388
+    end_line: 388
+  summary: Include source semantic dimensions in worker scenario requirements.
+  rationale: Ensure the final implementation prompt receives the source-resolved constraints.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 51
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3306
+    end_line: 3311
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3313
+    end_line: 3317
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3323
+    end_line: 3323
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3326
+    end_line: 3326
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3370
+    end_line: 3370
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3381
+    end_line: 3381
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3391
+    end_line: 3401
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3424
+    end_line: 3424
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3426
+    end_line: 3431
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3433
+    end_line: 3438
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3442
+    end_line: 3443
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3464
+    end_line: 3464
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3485
+    end_line: 3485
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3487
+    end_line: 3493
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3496
+    end_line: 3501
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3507
+    end_line: 3508
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3510
+    end_line: 3510
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3521
+    end_line: 3521
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3523
+    end_line: 3528
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3532
+    end_line: 3533
+  summary: Merge semantic dimension clarifications and defaults into their source-dimension fields.
+  rationale: Keep semantic assumptions separate from the standard behavior matrix and preserve them through consistency review.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Add conservative applicability screening and targeted classifiers for copy depth, mutation propagation, object identity, persistence boundary, and argument presence.
+  rationale: Ask only for meanings the source may express while keeping each classifier focused on its exact proposition.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Add conservative applicability screening and targeted classifiers for copy depth, mutation propagation, object identity, persistence boundary, and argument presence.
+  rationale: Ask only for meanings the source may express while keeping each classifier focused on its exact proposition.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 717
+    end_line: 877
+  summary: Add conservative applicability screening and targeted classifiers for copy depth, mutation propagation, object identity, persistence boundary, and argument presence.
+  rationale: Ask only for meanings the source may express while keeping each classifier focused on its exact proposition.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 1109
+    end_line: 1123
+  summary: Add conservative applicability screening and targeted classifiers for copy depth, mutation propagation, object identity, persistence boundary, and argument presence.
+  rationale: Ask only for meanings the source may express while keeping each classifier focused on its exact proposition.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 1212
+    end_line: 1215
+  summary: Add conservative applicability screening and targeted classifiers for copy depth, mutation propagation, object identity, persistence boundary, and argument presence.
+  rationale: Ask only for meanings the source may express while keeping each classifier focused on its exact proposition.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Verify source semantic dimensions render in the behavior packet.
+  rationale: Protect the downstream visibility of source-resolved semantics.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Verify source semantic dimensions render in the behavior packet.
+  rationale: Protect the downstream visibility of source-resolved semantics.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 348
+    end_line: 348
+  summary: Cover benchmark defaults, semantic-dimension consistency updates, and not-applicable handling.
+  rationale: Ensure source dimensions survive clarification and benchmark resolution without being written into unrelated behavior fields.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 478
+    end_line: 570
+  summary: Cover benchmark defaults, semantic-dimension consistency updates, and not-applicable handling.
+  rationale: Ensure source dimensions survive clarification and benchmark resolution without being written into unrelated behavior fields.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 712
+    end_line: 765
+  summary: Cover benchmark defaults, semantic-dimension consistency updates, and not-applicable handling.
+  rationale: Ensure source dimensions survive clarification and benchmark resolution without being written into unrelated behavior fields.
+- path: tests/test_feature_obligation.py
+  type: modified
+  span:
+    start_line: 238
+    end_line: 238
+  summary: Update source contract fixtures for the versioned semantic dimension field.
+  rationale: Keep source contract validation fixtures aligned with the revised contract schema.
+- path: tests/test_feature_obligation.py
+  type: modified
+  span:
+    start_line: 263
+    end_line: 263
+  summary: Update source contract fixtures for the versioned semantic dimension field.
+  rationale: Keep source contract validation fixtures aligned with the revised contract schema.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 780
+    end_line: 780
+  summary: Update the design interview evaluator fixture for the expanded semantic labels.
+  rationale: Keep the production workflow fixture consistent with its classifier output schema.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Test selective applicability, all five semantic classifiers, and source-underspecified contract output.
+  rationale: Verify both the decision requests and their downstream contract representation.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 33
+  summary: Test selective applicability, all five semantic classifiers, and source-underspecified contract output.
+  rationale: Verify both the decision requests and their downstream contract representation.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 206
+  summary: Test selective applicability, all five semantic classifiers, and source-underspecified contract output.
+  rationale: Verify both the decision requests and their downstream contract representation.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 585
+    end_line: 586
+  summary: Test selective applicability, all five semantic classifiers, and source-underspecified contract output.
+  rationale: Verify both the decision requests and their downstream contract representation.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 678
+    end_line: 678
+  summary: Test selective applicability, all five semantic classifiers, and source-underspecified contract output.
+  rationale: Verify both the decision requests and their downstream contract representation.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Teach the deterministic planning test double to classify the five source semantic dimensions.
+  rationale: Keep the end-to-end workflow fixture deterministic and prevent unsupported mock responses from turning classifier fallback into a workflow failure.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 215
+    end_line: 223
+  summary: Teach the deterministic planning test double to classify the five source semantic dimensions.
+  rationale: Keep the end-to-end workflow fixture deterministic and prevent unsupported mock responses from turning classifier fallback into a workflow failure.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 595
+    end_line: 625
+  summary: Teach the deterministic planning test double to classify the five source semantic dimensions.
+  rationale: Keep the end-to-end workflow fixture deterministic and prevent unsupported mock responses from turning classifier fallback into a workflow failure.
+entities:
+- id: applicable-source-semantic-dimensions
+  type: Function
+  action: added
+- id: partial-semantic-contract
+  type: Class
+  action: modified
+- id: behavior-scenario-source-dimensions
+  type: Class
+  action: added
+entity_relationships: []
+invariants:
+- id: semantic-dimension-applicability-is-source-triggered
+  description: A source semantic dimension classifier is requested only when the source clause contains language that may express that dimension.
+  action: added
+- id: unspecified-semantic-dimensions-are-not-source-guarantees
+  description: An unspecified or unresolved source dimension remains a gap and can be completed only through an explicit, recorded scenario assumption when it materially affects implementation.
+  action: added
+guidance: []

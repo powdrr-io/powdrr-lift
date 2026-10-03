@@ -14,6 +14,13 @@ from typing import Any
 
 SEMANTIC_DECISION_SCHEMA_VERSION = "semantic-decision-v1"
 SEMANTIC_DECISION_SPEC_SCHEMA_VERSION = "semantic-decision-spec-v2"
+SEMANTIC_DIMENSION_DECISION_KINDS = (
+    "copy_depth",
+    "mutation_propagation",
+    "object_identity",
+    "persistence_boundary",
+    "argument_presence",
+)
 
 DECISION_VALUES: dict[str, frozenset[str]] = {
     "routing": frozenset(
@@ -68,6 +75,15 @@ DECISION_VALUES: dict[str, frozenset[str]] = {
     "has_explicit_result": frozenset({"present", "absent"}),
     "temporal_scope": frozenset(
         {"current", "future", "current_and_future", "event_bound", "unspecified"}
+    ),
+    "copy_depth": frozenset({"outer_container", "recursive", "unspecified"}),
+    "mutation_propagation": frozenset(
+        {"write_through", "detached_mapping", "unspecified"}
+    ),
+    "object_identity": frozenset({"same_object", "distinct_objects", "unspecified"}),
+    "persistence_boundary": frozenset({"boundary_stated", "unspecified"}),
+    "argument_presence": frozenset(
+        {"argument_supplied", "non_null_value", "unspecified"}
     ),
     "source_predicate": frozenset(
         {"explicit", "implied_by_registered_term", "not_stated"}
@@ -563,6 +579,7 @@ def _fingerprint(value: Any) -> str:
 __all__ = [
     "DECISION_VALUES",
     "PROVIDER_KINDS",
+    "SEMANTIC_DIMENSION_DECISION_KINDS",
     "SEMANTIC_DECISION_SCHEMA_VERSION",
     "SEMANTIC_DECISION_SPEC_SCHEMA_VERSION",
     "UNRESOLVED_REASON_CODES",

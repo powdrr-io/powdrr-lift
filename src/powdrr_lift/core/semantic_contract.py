@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from powdrr_lift.core.semantic_decision import (
+    SEMANTIC_DIMENSION_DECISION_KINDS,
     ExactSourceSpan,
     SemanticDecision,
     SemanticDecisionError,
@@ -16,7 +17,7 @@ from powdrr_lift.core.semantic_decision import (
     resolve_exact_source_span,
 )
 
-PARTIAL_SEMANTIC_CONTRACT_SCHEMA_VERSION = "partial-semantic-contract-v2"
+PARTIAL_SEMANTIC_CONTRACT_SCHEMA_VERSION = "partial-semantic-contract-v3"
 SOURCE_EXTRACTION_SCHEMA_VERSION = "source-extraction-v1"
 SOURCE_EXTRACTION_SPEC_SCHEMA_VERSION = "source-extraction-spec-v1"
 
@@ -272,6 +273,7 @@ class PartialSemanticContract:
     explicit_result: BoundSourceExtraction | None
     temporal_scope: str
     source_predicate: str
+    semantic_dimensions: tuple[tuple[str, str], ...]
     field_provenance: tuple[tuple[str, str], ...]
     unresolved: tuple[UnresolvedSemanticField, ...]
 
@@ -354,6 +356,7 @@ class PartialSemanticContract:
                 "source_classification": self.source_predicate,
                 "ontology_ref": None,
             },
+            "semantic_dimensions": dict(self.semantic_dimensions),
             "field_provenance": dict(self.field_provenance),
             "unresolved": [item.to_data() for item in self.unresolved],
         }
@@ -438,6 +441,14 @@ class PartialSemanticContract:
             )
             if isinstance(raw.get("predicate"), Mapping)
             else "not_stated",
+            semantic_dimensions=tuple(
+                sorted(
+                    (str(key), str(value))
+                    for key, value in raw.get("semantic_dimensions", {}).items()
+                )
+            )
+            if isinstance(raw.get("semantic_dimensions", {}), Mapping)
+            else (),
             field_provenance=tuple(
                 (str(key), str(value)) for key, value in provenance_raw.items()
             ),
@@ -497,6 +508,14 @@ def compile_partial_semantic_contract(
             "partial contract cannot compile unresolved source decisions: "
             f"{sorted(unresolved_decisions)}"
         )
+    semantic_dimensions: dict[str, str] = {}
+    for kind, decision in decision_by_kind.items():
+        if kind not in SEMANTIC_DIMENSION_DECISION_KINDS:
+            continue
+        if decision.result.status == "unresolved":
+            semantic_dimensions[kind] = "unresolved"
+        elif decision.result.value is not None:
+            semantic_dimensions[kind] = decision.result.value
     routing = _decision_value(decision_by_kind, "routing")
     disposition = _decision_value(decision_by_kind, "disposition")
     exclusion_safety = _decision_value(
@@ -540,6 +559,22 @@ def compile_partial_semantic_contract(
         UnresolvedSemanticField("behavior.ontology_ref", "no_candidate"),
         UnresolvedSemanticField("predicate", "source_underspecified"),
     ]
+    unresolved.extend(
+        UnresolvedSemanticField(
+            field=f"semantic_dimensions.{kind}",
+            reason_code=(
+                decision.result.reason_code or "classifier_abstained"
+                if decision.result.status == "unresolved"
+                else "source_underspecified"
+            ),
+        )
+        for kind, decision in decision_by_kind.items()
+        if kind in SEMANTIC_DIMENSION_DECISION_KINDS
+        and (
+            decision.result.status == "unresolved"
+            or decision.result.value == "unspecified"
+        )
+    )
     return PartialSemanticContract(
         contract_id=f"contract:{source_ref}",
         source_ref=source_ref,
@@ -558,10 +593,11 @@ def compile_partial_semantic_contract(
         explicit_result=explicit_results[0] if explicit_results else None,
         temporal_scope=_decision_value(decision_by_kind, "temporal_scope"),
         source_predicate=_decision_value(decision_by_kind, "source_predicate"),
+        semantic_dimensions=tuple(sorted(semantic_dimensions.items())),
         field_provenance=tuple(
             (kind, decision.decision_id)
             for kind, decision in sorted(decision_by_kind.items())
-            if kind in required_decisions
+            if kind in required_decisions | set(SEMANTIC_DIMENSION_DECISION_KINDS)
         )
         + tuple(
             (kind, item.extraction_id)

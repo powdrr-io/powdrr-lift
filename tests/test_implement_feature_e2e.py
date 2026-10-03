@@ -14,6 +14,7 @@ import pytest
 import yaml
 
 from powdrr_lift.core.decision_obligation import evidence_fingerprint
+from powdrr_lift.core.semantic_decision import SEMANTIC_DIMENSION_DECISION_KINDS
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     run_feature_in_place,
@@ -211,6 +212,15 @@ class DeterministicPlanningClient:
             if decision_kind == "routing":
                 route = "exclude" if process_only else "include"
                 return {"status": "resolved", "value": route, "reason_code": None}
+            if decision_kind in SEMANTIC_DIMENSION_DECISION_KINDS:
+                dimension_value = _deterministic_semantic_dimension_value(
+                    decision_kind, lowered
+                )
+                return {
+                    "status": "resolved",
+                    "value": dimension_value,
+                    "reason_code": None,
+                }
             values = {
                 "disposition": (
                     "nonactionable"
@@ -580,6 +590,37 @@ class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
 def _find_json_value(text: str, key: str) -> Any:
     values = _find_json_values(text, key)
     return values[-1] if values else None
+
+
+def _deterministic_semantic_dimension_value(kind: str, proposition: str) -> str:
+    """Classify fixture propositions without inventing unstated guarantees."""
+    if kind == "copy_depth":
+        has_deep = "deep" in proposition or "recursive" in proposition
+        has_shallow = "shallow" in proposition or "outer container" in proposition
+        if has_deep != has_shallow:
+            return "recursive" if has_deep else "outer_container"
+    elif kind == "mutation_propagation":
+        if "writes through" in proposition or "reflected in the backing" in proposition:
+            return "write_through"
+        if "do not affect the backing" in proposition:
+            return "detached_mapping"
+    elif kind == "object_identity":
+        if "same object" in proposition or "same instance" in proposition:
+            return "same_object"
+        if "distinct object" in proposition or "separate instance" in proposition:
+            return "distinct_objects"
+    elif kind == "persistence_boundary":
+        if any(
+            marker in proposition
+            for marker in ("persists through", "survives until", "cleared at each")
+        ):
+            return "boundary_stated"
+    elif kind == "argument_presence":
+        if "even if one is null" in proposition or "whether supplied" in proposition:
+            return "argument_supplied"
+        if "not none" in proposition or "non-null" in proposition:
+            return "non_null_value"
+    return "unspecified"
 
 
 def _find_json_values(text: str, key: str) -> list[Any]:

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+
+from powdrr_lift.core.semantic_decision import SEMANTIC_DIMENSION_DECISION_KINDS
 
 BEHAVIOR_DIMENSIONS = (
     "normal_result",
@@ -23,6 +25,9 @@ ASSUMPTION_BASES = frozenset(
         "language_or_framework_default",
         "conservative_default",
     }
+)
+SUPPORTED_ASSUMPTION_DIMENSIONS = frozenset(
+    (*BEHAVIOR_DIMENSIONS, *SEMANTIC_DIMENSION_DECISION_KINDS)
 )
 
 
@@ -45,6 +50,7 @@ class BehaviorScenario:
     related_requirements: tuple[str, ...] = ()
     capability_matrix: tuple[Mapping[str, Any], ...] = ()
     assumptions: tuple[Mapping[str, str], ...] = ()
+    source_dimensions: Mapping[str, Any] = field(default_factory=dict)
     schema_version: str = "behavior-scenario-v1"
     validation_group_id: str | None = None
     validation_relation: str = "independent"
@@ -70,6 +76,8 @@ class BehaviorScenario:
         }
         if self.assumptions:
             data["assumptions"] = [dict(item) for item in self.assumptions]
+        if self.source_dimensions:
+            data["source_dimensions"] = dict(self.source_dimensions)
         if self.validation_group_id is not None:
             data["validation_group_id"] = self.validation_group_id
             data["validation_relation"] = self.validation_relation
@@ -139,6 +147,29 @@ def compile_behavior_scenarios(
             validate_capability_matrix(raw_capabilities) if raw_capabilities else ()
         )
         assumptions = validate_normative_assumptions(item.get("assumptions", []))
+        source_dimensions_raw = item.get("source_dimensions", {})
+        if not isinstance(source_dimensions_raw, Mapping):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} source_dimensions must be an object"
+            )
+        if set(source_dimensions_raw) - set(SEMANTIC_DIMENSION_DECISION_KINDS):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} has an unsupported source dimension"
+            )
+        source_dimensions = {
+            str(name): _text(value, f"scenario {scenario_id} source dimension {name}")
+            for name, value in source_dimensions_raw.items()
+        }
+        assumption_dimensions = {item["dimension"] for item in assumptions}
+        for name, value in source_dimensions.items():
+            if (
+                value.startswith("ASSUMED DEFAULT: ")
+                and name not in assumption_dimensions
+            ):
+                raise BehaviorContractError(
+                    f"scenario {scenario_id} source dimension {name} has no "
+                    "matching assumption"
+                )
         validation_group_id = item.get("validation_group_id")
         validation_relation = item.get("validation_relation", "independent")
         routing = item.get("routing", "include")
@@ -181,6 +212,7 @@ def compile_behavior_scenarios(
                 related_requirements=related_requirements,
                 capability_matrix=capabilities,
                 assumptions=assumptions,
+                source_dimensions=source_dimensions,
                 validation_group_id=validation_group_id,
                 validation_relation=str(validation_relation),
                 routing=str(routing),
@@ -226,6 +258,15 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         ]
         if capabilities:
             detail += " Capabilities: " + "; ".join(capabilities) + "."
+        if item.source_dimensions:
+            detail += (
+                " Source semantic dimensions: "
+                + "; ".join(
+                    f"{name} = {value}"
+                    for name, value in sorted(item.source_dimensions.items())
+                )
+                + "."
+            )
         lines.append(detail)
         for relationship in item.related_requirements:
             normalized = " ".join(relationship.casefold().split())
@@ -279,8 +320,6 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         (item.scenario_id, value["dimension"], value["resolution"])
         for item in scenarios
         for value in item.assumptions
-        if value["dimension"]
-        in {"error_behavior", "negative_boundaries", "unsupported_behavior"}
     ]
     if assumptions:
         lines.extend(("", "Defaults for behavior the source leaves unspecified:"))
@@ -345,7 +384,7 @@ def validate_normative_assumptions(
         if not isinstance(item, Mapping):
             raise BehaviorContractError(f"assumption {index} must be an object")
         dimension = _text(item.get("dimension"), f"assumption {index} dimension")
-        if dimension not in BEHAVIOR_DIMENSIONS:
+        if dimension not in SUPPORTED_ASSUMPTION_DIMENSIONS:
             raise BehaviorContractError(
                 f"assumption {index} names unsupported dimension {dimension!r}"
             )
@@ -418,6 +457,7 @@ def _texts(value: Any, label: str) -> tuple[str, ...]:
 
 __all__ = [
     "BEHAVIOR_DIMENSIONS",
+    "SUPPORTED_ASSUMPTION_DIMENSIONS",
     "ASSUMPTION_BASES",
     "BehaviorContractError",
     "BehaviorScenario",

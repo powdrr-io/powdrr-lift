@@ -152,6 +152,7 @@ class FeatureEndpointConfig:
     push_changes: bool = True
     cleanup_temporary_artifacts: bool = False
     planning_client: WorkflowLLMClient | None = None
+    progress_callback: Callable[[str], None] | None = None
     task_id: str | None = None
     design_only: bool = False
     capture_worker_prompts_only: bool = False
@@ -436,6 +437,18 @@ def _execute_procedrr_flow(
             record["replay_key"] = replay_key
         with procedrr_event_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
+        if config.progress_callback is not None:
+            label = event.path.rsplit(".", 1)[-1].replace("_", " ")
+            descriptions = {
+                "judge": "Planning decision",
+                "operation": "Completed action",
+                "process": "Completed workflow phase",
+                "specialize": "Prepared workflow step",
+                "recovery": "Recovering workflow",
+                "terminal": "Workflow",
+            }
+            description = descriptions.get(event.kind, "Workflow update")
+            config.progress_callback(f"{description}: {label}")
 
     validation_profiles = _bootstrap_validation_profiles(
         worktree,

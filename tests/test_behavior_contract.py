@@ -68,6 +68,60 @@ def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     assert restored.render() == rendered
 
 
+def test_source_semantic_result_remains_distinct_from_its_default() -> None:
+    scenario = _scenario()
+    scenario["source_dimensions"] = {"copy_depth": "unspecified"}
+    scenario["assumptions"] = [
+        {
+            "dimension": "copy_depth",
+            "resolution": "copy the outer mapping only",
+            "rationale": "The source does not specify copy depth.",
+            "basis": "conservative_default",
+            "basis_reference": "No specific normative source identified.",
+            "confidence": "low",
+        }
+    ]
+
+    compiled = compile_behavior_scenarios((scenario,))[0]
+    rendered = compile_implementation_packet(
+        objective="initialize settings",
+        obligations=("initialize settings from defaults",),
+        required_tests=({"description": "settings initialization"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    ).render()
+
+    assert dict(compiled.source_dimensions) == {"copy_depth": "unspecified"}
+    assert "copy_depth = unspecified" in rendered
+    assert "copy_depth: copy the outer mapping only" in rendered
+
+
+def test_semantic_dimension_applicability_and_unresolved_state_are_rendered() -> None:
+    scenario = _scenario()
+    scenario["source_dimensions"] = {
+        "copy_depth": "unspecified",
+        "object_identity": "unresolved",
+    }
+    scenario["semantic_dimension_applicability"] = {"copy_depth": "not_applicable"}
+    scenario["unresolved_dimensions"] = ["object_identity"]
+
+    compiled = compile_behavior_scenarios((scenario,))[0]
+    packet = compile_implementation_packet(
+        objective="read settings",
+        obligations=("read the settings",),
+        required_tests=({"description": "settings read"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    assert compiled.to_data()["source_dimensions"] == scenario["source_dimensions"]
+    assert "copy_depth = unspecified" in packet.render()
+    assert "copy_depth = not_applicable" in packet.render()
+    assert "Unresolved dimensions: object_identity" in packet.render()
+
+
 def test_worker_prompt_preserves_joint_validation_groups() -> None:
     first = _scenario()
     first["scenario_id"] = "status-200"

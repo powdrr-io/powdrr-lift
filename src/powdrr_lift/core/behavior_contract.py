@@ -6,7 +6,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from powdrr_lift.core.semantic_decision import SEMANTIC_DIMENSION_DECISION_KINDS
+from powdrr_lift.core.semantic_decision import (
+    DECISION_VALUES,
+    SEMANTIC_DIMENSION_DECISION_KINDS,
+)
 
 BEHAVIOR_DIMENSIONS = (
     "normal_result",
@@ -51,6 +54,8 @@ class BehaviorScenario:
     capability_matrix: tuple[Mapping[str, Any], ...] = ()
     assumptions: tuple[Mapping[str, str], ...] = ()
     source_dimensions: Mapping[str, Any] = field(default_factory=dict)
+    semantic_dimension_applicability: Mapping[str, str] = field(default_factory=dict)
+    unresolved_dimensions: tuple[str, ...] = ()
     schema_version: str = "behavior-scenario-v1"
     validation_group_id: str | None = None
     validation_relation: str = "independent"
@@ -78,6 +83,12 @@ class BehaviorScenario:
             data["assumptions"] = [dict(item) for item in self.assumptions]
         if self.source_dimensions:
             data["source_dimensions"] = dict(self.source_dimensions)
+        if self.semantic_dimension_applicability:
+            data["semantic_dimension_applicability"] = dict(
+                self.semantic_dimension_applicability
+            )
+        if self.unresolved_dimensions:
+            data["unresolved_dimensions"] = list(self.unresolved_dimensions)
         if self.validation_group_id is not None:
             data["validation_group_id"] = self.validation_group_id
             data["validation_relation"] = self.validation_relation
@@ -160,15 +171,96 @@ def compile_behavior_scenarios(
             str(name): _text(value, f"scenario {scenario_id} source dimension {name}")
             for name, value in source_dimensions_raw.items()
         }
+        for name, value in source_dimensions.items():
+            if value not in DECISION_VALUES[name] | {"unresolved"}:
+                raise BehaviorContractError(
+                    f"scenario {scenario_id} source dimension {name} is not "
+                    "a classifier label"
+                )
+        applicability_raw = item.get("semantic_dimension_applicability", {})
+        if not isinstance(applicability_raw, Mapping):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} semantic_dimension_applicability "
+                "must be an object"
+            )
+        if set(applicability_raw) - set(SEMANTIC_DIMENSION_DECISION_KINDS):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} has an unsupported semantic "
+                "dimension applicability"
+            )
+        semantic_dimension_applicability = {
+            str(name): _text(value, f"scenario {scenario_id} applicability {name}")
+            for name, value in applicability_raw.items()
+        }
+        if any(
+            value != "not_applicable"
+            for value in semantic_dimension_applicability.values()
+        ):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} semantic dimension applicability "
+                "must be not_applicable"
+            )
+        if set(semantic_dimension_applicability) - set(source_dimensions):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} marks a semantic dimension "
+                "inapplicable without a source decision"
+            )
+        unresolved_raw = item.get("unresolved_dimensions", ())
+        if not isinstance(unresolved_raw, Sequence) or isinstance(
+            unresolved_raw, (str, bytes)
+        ):
+            raise BehaviorContractError(
+                f"scenario {scenario_id} unresolved_dimensions must be an array"
+            )
+        unresolved_dimensions = tuple(
+            _text(value, f"scenario {scenario_id} unresolved dimension")
+            for value in unresolved_raw
+        )
+        if set(unresolved_dimensions) - SUPPORTED_ASSUMPTION_DIMENSIONS:
+            raise BehaviorContractError(
+                f"scenario {scenario_id} has an unsupported unresolved dimension"
+            )
         assumption_dimensions = {item["dimension"] for item in assumptions}
         for name, value in source_dimensions.items():
             if (
-                value.startswith("ASSUMED DEFAULT: ")
-                and name not in assumption_dimensions
+                value not in {"unspecified", "unresolved"}
+                and name in assumption_dimensions
             ):
                 raise BehaviorContractError(
-                    f"scenario {scenario_id} source dimension {name} has no "
-                    "matching assumption"
+                    f"scenario {scenario_id} has an assumption for source-resolved "
+                    f"semantic dimension {name}"
+                )
+            if name in semantic_dimension_applicability and value not in {
+                "unspecified",
+                "unresolved",
+            }:
+                raise BehaviorContractError(
+                    f"scenario {scenario_id} marks source-resolved semantic "
+                    f"dimension {name} not_applicable"
+                )
+            if (
+                name in semantic_dimension_applicability
+                and name in assumption_dimensions
+            ):
+                raise BehaviorContractError(
+                    f"scenario {scenario_id} cannot assume a semantic dimension "
+                    f"marked not_applicable: {name}"
+                )
+            if name in unresolved_dimensions and value not in {
+                "unspecified",
+                "unresolved",
+            }:
+                raise BehaviorContractError(
+                    f"scenario {scenario_id} marks source-resolved semantic "
+                    f"dimension {name} unresolved"
+                )
+            if name in unresolved_dimensions and (
+                name in semantic_dimension_applicability
+                or name in assumption_dimensions
+            ):
+                raise BehaviorContractError(
+                    f"scenario {scenario_id} cannot both resolve and leave "
+                    f"semantic dimension {name} unresolved"
                 )
         validation_group_id = item.get("validation_group_id")
         validation_relation = item.get("validation_relation", "independent")
@@ -213,6 +305,8 @@ def compile_behavior_scenarios(
                 capability_matrix=capabilities,
                 assumptions=assumptions,
                 source_dimensions=source_dimensions,
+                semantic_dimension_applicability=semantic_dimension_applicability,
+                unresolved_dimensions=unresolved_dimensions,
                 validation_group_id=validation_group_id,
                 validation_relation=str(validation_relation),
                 routing=str(routing),
@@ -266,6 +360,21 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                     for name, value in sorted(item.source_dimensions.items())
                 )
                 + "."
+            )
+        if item.semantic_dimension_applicability:
+            detail += (
+                " Semantic dimensions not applicable to this scenario: "
+                + "; ".join(
+                    f"{name} = {value}"
+                    for name, value in sorted(
+                        item.semantic_dimension_applicability.items()
+                    )
+                )
+                + "."
+            )
+        if item.unresolved_dimensions:
+            detail += (
+                " Unresolved dimensions: " + ", ".join(item.unresolved_dimensions) + "."
             )
         lines.append(detail)
         for relationship in item.related_requirements:

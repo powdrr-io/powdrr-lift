@@ -386,6 +386,8 @@ def _scenario_requirement_text(scenario: BehaviorScenario) -> tuple[str, ...]:
         "then",
         "dimensions",
         "source_dimensions",
+        "semantic_dimension_applicability",
+        "unresolved_dimensions",
         "related_requirements",
         "capability_matrix",
         "assumptions",

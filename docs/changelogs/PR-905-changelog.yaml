@@ -1,0 +1,442 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 905
+title: Preserve accepted semantic decisions in behavior scenarios
+intent:
+  problem: Scenario generation can replace classifier decisions with assumptions or
+    scenario-specific applicability, obscuring what the instruction actually stated
+    and repeating derived conclusions as source facts.
+  goal: Carry source semantic decisions unchanged into behavior scenarios, represent
+    applicability and unresolved status separately, and validate scenario output against
+    the accepted classifier result.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 90
+    end_line: 106
+  summary: Preserve source semantic decisions through scenario generation and review.
+  rationale: Keep source labels separate from scenario conclusions, assumptions, and
+    unresolved status.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 723
+    end_line: 733
+  summary: Preserve source semantic decisions through scenario generation and review.
+  rationale: Keep source labels separate from scenario conclusions, assumptions, and
+    unresolved status.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 815
+    end_line: 828
+  summary: Preserve source semantic decisions through scenario generation and review.
+  rationale: Keep source labels separate from scenario conclusions, assumptions, and
+    unresolved status.
+- path: docs/procedrr/skill-definitions/design-interview.yaml
+  type: modified
+  span:
+    start_line: 893
+    end_line: 893
+  summary: Preserve source semantic decisions through scenario generation and review.
+  rationale: Keep source labels separate from scenario conclusions, assumptions, and
+    unresolved status.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 12
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 58
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 91
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 222
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 259
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 262
+    end_line: 263
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 308
+    end_line: 309
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/core/behavior_contract.py
+  type: modified
+  span:
+    start_line: 364
+    end_line: 378
+  summary: Validate, serialize, and render semantic scenario state.
+  rationale: Carry accepted source labels and separate scenario applicability and
+    unresolved metadata downstream.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 390
+  summary: Include semantic applicability and unresolved state in scenario requirements.
+  rationale: Carry validated scenario metadata into worker instructions.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3292
+    end_line: 3292
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3313
+    end_line: 3319
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3325
+    end_line: 3332
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3341
+    end_line: 3342
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3393
+    end_line: 3400
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3442
+    end_line: 3444
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3446
+    end_line: 3449
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3451
+    end_line: 3454
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3458
+    end_line: 3461
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3485
+    end_line: 3492
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3512
+    end_line: 3514
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3517
+    end_line: 3520
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3523
+    end_line: 3526
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3534
+    end_line: 3537
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3551
+    end_line: 3551
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3553
+    end_line: 3557
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3561
+    end_line: 3561
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3564
+    end_line: 3565
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3581
+    end_line: 3582
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3584
+    end_line: 3584
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3603
+    end_line: 3674
+  summary: Preserve accepted semantic decisions while merging and validating behavior
+    scenarios.
+  rationale: Prevent scenario generation and benchmark reconciliation from rewriting
+    source classifier output.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 124
+  summary: Test source/default separation and serialization of semantic applicability
+    and unresolved state.
+  rationale: Verify the behavior contract presents source and scenario results distinctly.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 481
+    end_line: 484
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 489
+    end_line: 489
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 503
+    end_line: 503
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 523
+    end_line: 523
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 527
+    end_line: 563
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 585
+    end_line: 586
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 606
+    end_line: 609
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 765
+    end_line: 765
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 804
+    end_line: 805
+  summary: Test that scenario merging and consistency updates preserve source semantic
+    decisions.
+  rationale: Guard the source-to-scenario boundary for assumptions, applicability,
+    and unresolved decisions.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 178
+  summary: Propagate source semantic decisions in the deterministic planning fixture.
+  rationale: Keep the end-to-end fixture aligned with the production scenario contract.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 192
+  summary: Propagate source semantic decisions in the deterministic planning fixture.
+  rationale: Keep the end-to-end fixture aligned with the production scenario contract.
+entities:
+- id: behavior-scenario-semantic-state
+  type: Class
+  action: added
+- id: validate-scenario-semantic-decisions
+  type: Function
+  action: added
+- id: scenario-source-decision-preservation-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: scenario-source-decisions-match-the-partial-contract
+  description: Behavior scenario source_dimensions exactly preserve semantic decisions
+    accepted by the partial contract.
+  action: added
+- id: assumptions-do-not-rewrite-source-decisions
+  description: Scenario assumptions resolve gaps separately and never replace or contradict
+    concrete source classifier labels.
+  action: added
+- id: scenario-applicability-is-separate-from-source-state
+  description: Scenario-level not-applicable and unresolved states are represented
+    independently from source semantic decision labels.
+  action: added
+guidance: []

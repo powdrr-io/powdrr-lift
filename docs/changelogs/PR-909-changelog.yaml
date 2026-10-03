@@ -74,15 +74,29 @@ files:
   type: modified
   span:
     start_line: 3784
-    end_line: 3823
+    end_line: 3784
+  summary: Invoke deterministic semantic dimension provenance normalization before scenario validation.
+  rationale: Make the accepted contract authoritative for classifier-owned scenario metadata.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 3806
+    end_line: 3827
   summary: Populate scenario source dimensions from the accepted semantic contract and discard applicability labels for dimensions the classifier did not request.
   rationale: Keep classifier provenance authoritative while preventing model-generated metadata from making otherwise valid scenarios fail contract validation.
 - path: tests/test_feature_endpoint.py
   type: modified
   span:
     start_line: 527
-    end_line: 609
-  summary: Cover deterministic source-dimension provenance and dropping applicability labels for unrequested dimensions.
+    end_line: 527
+  summary: Replace the rejection assertion with a check that contract-owned dimensions override scenario echoes.
+  rationale: Ensure model output cannot rewrite accepted classifier decisions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 560
+    end_line: 610
+  summary: Cover dropping applicability labels for dimensions not requested by the classifier.
   rationale: Reproduce the failure found during a clean state-machine prompt capture and prevent the scenario model from controlling classifier-owned metadata.
 - path: tests/test_harbor_env.py
   type: modified

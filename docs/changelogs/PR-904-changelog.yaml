@@ -518,6 +518,27 @@ files:
     end_line: 678
   summary: Test selective applicability, all five semantic classifiers, and source-underspecified contract output.
   rationale: Verify both the decision requests and their downstream contract representation.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Teach the deterministic planning test double to classify the five source semantic dimensions.
+  rationale: Keep the end-to-end workflow fixture deterministic and prevent unsupported mock responses from turning classifier fallback into a workflow failure.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 215
+    end_line: 223
+  summary: Teach the deterministic planning test double to classify the five source semantic dimensions.
+  rationale: Keep the end-to-end workflow fixture deterministic and prevent unsupported mock responses from turning classifier fallback into a workflow failure.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 595
+    end_line: 625
+  summary: Teach the deterministic planning test double to classify the five source semantic dimensions.
+  rationale: Keep the end-to-end workflow fixture deterministic and prevent unsupported mock responses from turning classifier fallback into a workflow failure.
 entities:
 - id: applicable-source-semantic-dimensions
   type: Function

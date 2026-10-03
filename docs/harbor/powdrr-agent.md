@@ -69,5 +69,8 @@ task ID and detected Powdrr/OpenCode versions. Failures also write
 sibling artifacts available for debugging. The telemetry directory is
 Git-excluded, so it remains available to Harbor without entering the candidate
 patch. Harbor synchronizes that directory as the agent session log bundle.
+During a benchmark run, stdout shows task start, brief workflow progress, and
+the final result. Detailed console diagnostics and analytics are captured in
+`.powdrr/feature-runs/<task>/console.log`.
 
 The selected model API must be included in Harbor/Pier's network allowlist.

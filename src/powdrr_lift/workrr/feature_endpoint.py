@@ -439,16 +439,23 @@ def _execute_procedrr_flow(
             stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
         if config.progress_callback is not None:
             label = event.path.rsplit(".", 1)[-1].replace("_", " ")
-            descriptions = {
-                "judge": "Planning decision",
-                "operation": "Completed action",
-                "process": "Completed workflow phase",
-                "specialize": "Prepared workflow step",
-                "recovery": "Recovering workflow",
-                "terminal": "Workflow",
-            }
-            description = descriptions.get(event.kind, "Workflow update")
-            config.progress_callback(f"{description}: {label}")
+            if event.kind == "operation":
+                subject = str(event.data.get("tool") or label).replace("_", " ")
+                message = f"Completed {subject}"
+            elif event.kind == "process":
+                subject = str(event.data.get("name") or label).replace("_", " ")
+                message = f"Completed workflow phase: {subject}"
+            elif event.kind == "judge":
+                message = "Completed planning decision"
+            elif event.kind == "specialize":
+                message = "Prepared workflow instructions"
+            elif event.kind == "recovery":
+                message = "Recovering from a workflow issue"
+            elif event.kind == "terminal":
+                message = f"Workflow {event.data.get('status', 'finished')}"
+            else:
+                message = f"Workflow update: {label}"
+            config.progress_callback(message)
 
     validation_profiles = _bootstrap_validation_profiles(
         worktree,

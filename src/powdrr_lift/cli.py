@@ -4659,8 +4659,19 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     console = sys.stdout
     if args.json:
-        return _run_harbor_feature_with_streams(
+        result = _run_harbor_feature_with_streams(
             args, repo_root, console=console, progress_stream=sys.stderr
+        )
+        return (
+            0
+            if result.status
+            in {
+                "completed",
+                "completed_with_issues",
+                "design_generated",
+                "prompt_captured",
+            }
+            else 1
         )
 
     work_item = slugify_workflow_id(args.work_item_name)
@@ -4669,11 +4680,14 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     log_path = output_root / "console.log"
-    print(f"Starting benchmark task: {args.task_id or args.work_item_name}", file=console)
+    print(
+        f"Starting benchmark task: {args.task_id or args.work_item_name}", file=console
+    )
     try:
-        with log_path.open("a", encoding="utf-8", buffering=1) as log_stream:
-            with contextlib.redirect_stdout(log_stream), contextlib.redirect_stderr(
-                log_stream
+        with log_path.open("w", encoding="utf-8", buffering=1) as log_stream:
+            with (
+                contextlib.redirect_stdout(log_stream),
+                contextlib.redirect_stderr(log_stream),
             ):
                 result = _run_harbor_feature_with_streams(
                     args,
@@ -4688,10 +4702,26 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
     print(f"Benchmark task {result.status}.", file=console)
     if args.design_only:
         print(f"Design artifact: {result.plan_path}", file=console)
+    elif args.capture_worker_prompts_only:
+        print(
+            "Worker prompt compilation completed; coding agent was not run.",
+            file=console,
+        )
+        print(f"Latest request: {result.request_path}", file=console)
     else:
         print(f"Review passed: {result.review['passed']}", file=console)
     print(f"Run logs: {output_root}", file=console)
-    return 0 if result.status in {"completed", "design_generated"} else 1
+    return (
+        0
+        if result.status
+        in {
+            "completed",
+            "completed_with_issues",
+            "design_generated",
+            "prompt_captured",
+        }
+        else 1
+    )
 
 
 def _run_harbor_feature_with_streams(
@@ -4755,12 +4785,7 @@ def _run_harbor_feature_with_streams(
     )
     if args.json:
         print(json.dumps(result.to_data(), indent=2, sort_keys=True))
-    return 0 if result.status in {
-        "completed",
-        "completed_with_issues",
-        "design_generated",
-        "prompt_captured",
-    } else 1
+    return result
 
 
 def _run_replay_subject_bindings(args: argparse.Namespace) -> int:
@@ -4869,6 +4894,8 @@ def _run_deepswe_prompt_evaluation(args: argparse.Namespace) -> int:
         )
         print(f"Report: {report_path}")
     return 0 if report["summary"]["passed"] else 1
+
+
 def _extract_workflow_responses(args: argparse.Namespace) -> int:
     try:
         responses = extract_scripted_responses(args.report)

@@ -153,7 +153,9 @@ export POWDRR_BRANCH="codex/your-powdrr-branch"
 ```
 
 `--no-delete` keeps the Docker container available for debugging after a
-failure. The two artifact paths preserve the Powdrr run bundle and wrapper
-command log in the Pier job directory. Use a fresh `-o` directory for each
-run. The branch must be pushed before starting the run, and `PYTHONPATH` must
-point at the host worktree so Pier can import the custom agent.
+failure. The Powdrr run bundle contains detailed diagnostics in
+`console.log`; the wrapper command log mirrors only the concise progress shown
+in the terminal. The two artifact paths preserve both in the Pier job
+directory. Use a fresh `-o` directory for each run. The branch must be pushed
+before starting the run, and `PYTHONPATH` must point at the host worktree so
+Pier can import the custom agent.

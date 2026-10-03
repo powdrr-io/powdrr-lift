@@ -147,6 +147,31 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
 
 ## Get Started
 
+### Install the latest code from GitHub
+
+After you have access to the `powdrr-io/powdrr-lift` GitHub repository and
+configured SSH authentication for GitHub, install the current `main` branch with
+[`uv`](https://docs.astral.sh/uv/):
+
+```bash
+if ! command -v uv >/dev/null 2>&1; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+uv tool install --force --upgrade --python 3.12 \
+  --with-executables-from mini-swe-agent \
+  --from 'git+ssh://git@github.com/powdrr-io/powdrr-lift.git@main' \
+  powdrr-lift
+```
+
+This installs Powdrr and its Python dependencies in an isolated tool environment,
+including the pinned mini-SWE-agent dependency, and makes both `powdrr-lift` and
+`mini` available on your `PATH`. `uv` installs Python 3.12 if it is not already
+available. GitHub access must work with `git clone` over SSH, and Git must be
+installed. Rerun the command to refresh Powdrr from `main`. Before running a
+workflow, configure credentials for the model provider you plan to use; installing
+the CLI does not configure a provider account or download optional local models.
+
 ### For Codex Proxy Recording
 
 Use the built-in proxy when you want Codex to send OpenAI requests through a local
@@ -294,11 +319,6 @@ invocation starts from the primary checkout.
   the same worktree before the parent step continues.
 - The skill loader can validate a directory of skills and ensure every
   referenced skill exists.
-
-### For Mac
-```bash
-brew install powdrr-lift
-```
 
 ### Available Skills
 

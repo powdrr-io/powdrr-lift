@@ -73,5 +73,9 @@ invariants:
   action: added
   description: The two new prompt rubrics are anchored to exact task instruction excerpts, solution symbols, and verifier test names and remain offline evaluation inputs.
 guidance:
-- Capture the three worker prompts with fresh Pier and output roots before claiming a measured prompt-quality baseline.
-- Generate and validate paraphrase and minimal-contrast variants before reporting the full synthetic case score.
+- id: capture-prompt-baseline-before-scoring
+  action: added
+  description: Capture the three worker prompts with fresh Pier and output roots before claiming a measured prompt-quality baseline.
+- id: generate-validated-case-variants
+  action: added
+  description: Generate and validate paraphrase and minimal-contrast variants before reporting the full synthetic case score.

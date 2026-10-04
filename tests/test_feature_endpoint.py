@@ -2871,11 +2871,22 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
         == "Test the requested behavior in the source clause: Add the feature."
     )
     assumptions = json.loads((tmp_path / "normative-assumptions.json").read_text())
+    uncertainty_decisions = json.loads(
+        (tmp_path / "uncertainty-decisions.json").read_text()
+    )
     assert assumptions == {
         "assumptions": [],
         "benchmark_mode": False,
         "uncertainty_policy": "clarify",
         "schema_version": "normative-assumptions-v1",
+    }
+    assert uncertainty_decisions == {
+        "decisions": [],
+        "instruction_ledger_fingerprint": json.loads(
+            (tmp_path / "instruction-ledger.json").read_text()
+        )["fingerprint"],
+        "schema_version": "uncertainty-decisions-v1",
+        "uncertainty_policy": "clarify",
     }
 
 

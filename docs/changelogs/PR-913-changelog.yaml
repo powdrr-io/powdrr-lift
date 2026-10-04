@@ -1,0 +1,108 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 913
+title: Check model access before feature runs
+intent:
+  problem: Feature runs can spend time planning before discovering that a model credential, model access, or coding-agent executable is unavailable.
+  goal: Provide a preflight command that checks configured planning and coding routes, the coding-agent executable, and optional GitHub publication access before a feature run.
+human-decisions: []
+structured_files: []
+files:
+  - path: README.md
+    type: modified
+    span: {start_line: 175, end_line: 189}
+    summary: Document the credential preflight command, authenticated request behavior, and configuration options.
+    rationale: Give adopters a way to check model access before a feature run.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 173, end_line: 177}
+    summary: Import the reusable credential preflight checks.
+    rationale: Connect the CLI to shared route and executable checkers.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 274, end_line: 299}
+    summary: Add the check-credentials command and options for planning, coding, executable, GitHub, and JSON checks.
+    rationale: Expose provider preflight from the installed CLI.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3188, end_line: 3304}
+    summary: Resolve both model profiles, check the selected executable, optionally inspect GitHub write permission, and report per-role status.
+    rationale: Check all configured prerequisites and return a nonzero status when a required check fails.
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: added
+    span: {start_line: 1, end_line: 169}
+    summary: Implement bounded model-access probes, executable discovery, model selection, and safe credential diagnostics.
+    rationale: Share testable provider checks across future execution preflights.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 1033, end_line: 1033}
+    summary: Add a configurable timeout to provider-client construction.
+    rationale: Bound credential probes without changing existing client timeout defaults.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 1054, end_line: 1054}
+    summary: Pass the configured timeout to Anthropic clients.
+    rationale: Apply caller timeout limits to Anthropic provider requests.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 1063, end_line: 1063}
+    summary: Pass the configured timeout to OpenAI-compatible clients.
+    rationale: Apply caller timeout limits to OpenAI-compatible provider requests.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 1073, end_line: 1073}
+    summary: Add a configurable timeout to workflow-client construction.
+    rationale: Make bounded requests available through the workflow client factory.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 1089, end_line: 1089}
+    summary: Allow provider clients to use a caller-selected request timeout.
+    rationale: Propagate request limits through workflow-client construction.
+  - path: tests/test_credential_check.py
+    type: added
+    span: {start_line: 1, end_line: 164}
+    summary: Cover successful probes, missing credentials, provider HTTP classifications, model overrides, and CLI route reporting.
+    rationale: Verify preflight behavior without live provider requests.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1880, end_line: 1880}
+    summary: Extend the fake OpenAI client with the default timeout parameter.
+    rationale: Keep the test double compatible with provider factory construction.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1882, end_line: 1882}
+    summary: Update the fake provider client to accept the additive timeout option.
+    rationale: Keep the client configuration test aligned with the production constructor.
+entities:
+  - id: check-credentials-command
+    type: Command
+    action: added
+  - id: model-access-preflight
+    type: Function
+    action: added
+  - id: credential-check-regression-tests
+    type: Unit test
+    action: added
+entity_relationships:
+  - id: credential-tests-verify-preflight
+    type: verifies
+    source: credential-check-regression-tests
+    target: model-access-preflight
+    action: added
+    description: Regression tests cover successful access, missing credentials, and provider rejection classifications.
+  - id: cli-exposes-model-preflight
+    type: exposes
+    source: check-credentials-command
+    target: model-access-preflight
+    action: added
+    description: The CLI invokes the reusable model access checks for planning and coding roles.
+invariants:
+  - id: credential-values-are-not-reported
+    description: Credential preflight output may identify the credential source but never includes the credential value.
+    action: added
+  - id: credential-probes-are-bounded
+    description: Each remote model access probe uses a 10 second client timeout.
+    action: added
+guidance:
+  - id: use-preflight-before-feature-runs
+    description: Run powdrr-lift check-credentials with the same provider and model options as the planned feature run.
+    action: added

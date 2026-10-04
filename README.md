@@ -172,6 +172,21 @@ installed. Rerun the command to refresh Powdrr from `main`. Before running a
 workflow, configure credentials for the model provider you plan to use; installing
 the CLI does not configure a provider account or download optional local models.
 
+Before a feature run, check that Powdrr can reach its planning and coding model
+routes and find the selected coding-agent executable:
+
+```bash
+powdrr-lift check-credentials --repo-root .
+```
+
+The check makes a small authenticated model request for each route. It reports
+the provider, model, credential source, and any access failure without printing
+credential values. If the run will create a pull request, include `--open-pr` to
+also check GitHub authentication and the current repository's write permission.
+Use `--json` for machine-readable results. Provider and model options are
+available through `--planning-provider`, `--planning-model`, `--coding-provider`,
+and `--coding-model`; use the same values for the corresponding feature run.
+
 ### For Codex Proxy Recording
 
 Use the built-in proxy when you want Codex to send OpenAI requests through a local

@@ -1030,6 +1030,7 @@ def build_provider_client(
     local_model_path: Path | None = None,
     local_context: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
     progress_stream: TextIO | None = None,
+    timeout: float = 120.0,
 ) -> WorkflowLLMClient:
     definition = provider_definition(provider)
     if definition.client_kind == "local":
@@ -1050,6 +1051,7 @@ def build_provider_client(
             api_key=api_key,
             base_url=base_url,
             limits=limits,
+            timeout=timeout,
         )
     return OpenAIChatClient(
         model=model,
@@ -1058,6 +1060,7 @@ def build_provider_client(
         limits=limits,
         progress_stream=progress_stream,
         reasoning_effort="none" if provider.startswith("deepinfra") else None,
+        timeout=timeout,
     )
 
 
@@ -1067,6 +1070,7 @@ def build_workflow_client(
     model: str,
     model_cache_dir: Path,
     progress_stream: TextIO | None = None,
+    timeout: float = 120.0,
 ) -> WorkflowLLMClient:
     """Build the workflow-facing client for resolved provider credentials."""
     provider = provider_definition(credentials.provider)
@@ -1082,6 +1086,7 @@ def build_workflow_client(
             else None
         ),
         local_context=local_context,
+        timeout=timeout,
         progress_stream=progress_stream,
     )
 

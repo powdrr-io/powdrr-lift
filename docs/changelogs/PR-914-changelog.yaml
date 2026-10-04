@@ -1,0 +1,233 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 914
+title: Separate uncertainty policy from benchmark mode
+intent:
+  problem: Normative defaults are coupled to Harbor benchmark mode, whose other behaviors are unsuitable for ordinary headless feature execution.
+  goal: Make clarification and normative-default handling explicit in the feature flow while preserving benchmark-specific execution behavior.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Add the explicit uncertainty policy to design interview inputs.
+    rationale: Let callers select normative defaults independently of benchmark execution.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 739, end_line: 742}
+    summary: Instruct the design interviewer to record an assumption when normative defaults are selected.
+    rationale: Preserve source-faithfulness while resolving uncertainty.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 761, end_line: 761}
+    summary: Require empty assumptions only when the policy is clarification.
+    rationale: Decouple assumption generation from benchmark mode.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 763, end_line: 763}
+    summary: Apply normative-default prompt rules when that uncertainty policy is selected.
+    rationale: Continue with recorded defaults in headless execution.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 778, end_line: 778}
+    summary: Preserve clarification behavior when the clarify policy is selected.
+    rationale: Keep existing interactive behavior as the default.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 796, end_line: 796}
+    summary: Include uncertainty policy in the scenario prompt context.
+    rationale: Make the selected policy available during scenario compilation.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 882, end_line: 882}
+    summary: Pass uncertainty policy to behavior scenario merging.
+    rationale: Validate assumptions according to the selected policy.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 997, end_line: 997}
+    summary: Limit consistency updates to existing assumptions when clarification is selected.
+    rationale: Do not create or reconcile defaults under the clarification policy.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1000, end_line: 1000}
+    summary: Include uncertainty policy in consistency review context.
+    rationale: Keep consistency review aligned with the active policy.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1039, end_line: 1039}
+    summary: Pass uncertainty policy into canonical design compilation.
+    rationale: Persist the effective policy with compiled assumptions.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Add uncertainty policy as a required implementation flow input.
+    rationale: Make uncertainty treatment an explicit execution choice.
+  - path: docs/procedrr/skill-definitions/implement-feature.yaml
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Forward uncertainty policy to the shared design interview.
+    rationale: Apply one policy throughout feature planning.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 627, end_line: 630}
+    summary: Validate uncertainty policy in the scenario merge command schema.
+    rationale: Restrict scenario merging to supported policy values.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 645, end_line: 648}
+    summary: Validate uncertainty policy in the canonical design command schema.
+    rationale: Restrict canonical compilation to supported policy values.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1016, end_line: 1020}
+    summary: Resolve Harbor benchmark runs to normative-default uncertainty handling.
+    rationale: Keep Harbor defaults while separating them from benchmark gates.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1608, end_line: 1608}
+    summary: Pass the effective policy into benchmark scenario compilation.
+    rationale: Keep Harbor scenario resolution aligned with the shared policy.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1630, end_line: 1630}
+    summary: Pass the effective policy into ordinary scenario compilation.
+    rationale: Allow non-benchmark runs to resolve normative defaults.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2351, end_line: 2351}
+    summary: Apply the effective policy to consistency review updates.
+    rationale: Permit revisions to recorded defaults independently of benchmark mode.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2805, end_line: 2805}
+    summary: Persist effective uncertainty policy in normative-assumptions.json.
+    rationale: Make the policy visible alongside recorded assumptions.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3460, end_line: 3460}
+    summary: Accept uncertainty policy in consistency-update validation.
+    rationale: Distinguish default revisions from benchmark execution semantics.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3472, end_line: 3472}
+    summary: Allow consistency changes for normative-default policy outside benchmark mode.
+    rationale: Prevent clarification runs from silently revising assumptions.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3474, end_line: 3474}
+    summary: Update the consistency-update rejection message for clarify policy.
+    rationale: Identify the controlling policy in validation failures.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3570, end_line: 3570}
+    summary: Add uncertainty policy to scenario merge validation.
+    rationale: Make default resolution an explicit scenario compiler input.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3596, end_line: 3597}
+    summary: Resolve unresolved dimensions under normative-default policy or Harbor benchmark mode.
+    rationale: Share the default logic without changing benchmark-specific gates.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3691, end_line: 3691}
+    summary: Reject assumptions when normative defaults and benchmark compatibility are disabled.
+    rationale: Keep assumptions explicit and policy-controlled.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3694, end_line: 3694}
+    summary: Identify normative-default policy as the prerequisite for recorded assumptions.
+    rationale: Report the explicit policy required for assumptions.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3696, end_line: 3696}
+    summary: Validate resolved assumptions under the effective uncertainty policy.
+    rationale: Apply exact coverage validation outside benchmark mode.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 160, end_line: 160}
+    summary: Add uncertainty_policy to feature endpoint configuration.
+    rationale: Carry the selected policy through feature execution.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 379, end_line: 380}
+    summary: Reject unsupported uncertainty policy values.
+    rationale: Fail clearly on invalid configuration.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 387, end_line: 389}
+    summary: Record effective uncertainty policy in feature flow state.
+    rationale: Preserve the selected policy in run metadata.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 579, end_line: 583}
+    summary: Pass uncertainty policy into the feature workflow.
+    rationale: Apply normative defaults without activating benchmark mode.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 467, end_line: 469}
+    summary: Exercise normative defaults through the explicit uncertainty policy.
+    rationale: Verify the new policy path directly.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 478, end_line: 524}
+    summary: Verify normative defaults resolve when benchmark mode is false.
+    rationale: Prevent uncertainty handling from regressing to benchmark coupling.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 905, end_line: 905}
+    summary: Assert clarify policy rejects consistency updates.
+    rationale: Keep human clarification behavior explicit.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2859, end_line: 2859}
+    summary: Supply clarify policy to the feature design flow test.
+    rationale: Match the new required flow input.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2877, end_line: 2877}
+    summary: Expect persisted effective policy in the assumptions artifact.
+    rationale: Verify policy metadata is recorded with decisions.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 3456, end_line: 3456}
+    summary: Verify Harbor maps to normative-default policy.
+    rationale: Preserve Harbor uncertainty behavior while retaining benchmark mode.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 937, end_line: 937}
+    summary: Supply clarify policy to direct design-interview evaluation.
+    rationale: Match the new required flow input.
+entities:
+  - id: feature-uncertainty-policy
+    type: Configuration key
+    action: added
+  - id: normative-default-scenario-resolution
+    type: Function
+    action: added
+  - id: uncertainty-policy-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: uncertainty-policy-controls-scenario-resolution
+    type: controls
+    source: feature-uncertainty-policy
+    target: normative-default-scenario-resolution
+    action: added
+    description: The selected policy determines whether unresolved dimensions become validated normative assumptions or remain clarification drafts.
+  - id: uncertainty-tests-verify-policy-separation
+    type: verifies
+    source: uncertainty-policy-regression-tests
+    target: normative-default-scenario-resolution
+    action: added
+    description: Regression tests cover normative defaults with benchmark mode disabled and preserve Harbor behavior.
+invariants:
+  - id: benchmark-mode-remains-independent
+    description: benchmark_mode continues to govern Harbor validation, acceptance, and fallback behavior; normative-default handling does not enable those behaviors.
+    action: added
+  - id: clarification-remains-the-default
+    description: Feature execution defaults to clarification unless normative_default is selected; Harbor benchmark execution maps to normative_default.
+    action: added
+guidance:
+  - id: select-normative-default-policy-for-headless-runs
+    description: Select uncertainty_policy as normative_default for headless runs that continue through unspecified behavior, and inspect normative-assumptions.json for recorded decisions.
+    action: added

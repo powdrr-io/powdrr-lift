@@ -157,6 +157,7 @@ class FeatureEndpointConfig:
     design_only: bool = False
     capture_worker_prompts_only: bool = False
     benchmark_mode: bool = False
+    uncertainty_policy: str = "clarify"
 
 
 @dataclass(frozen=True, slots=True)
@@ -375,12 +376,17 @@ def _execute_procedrr_flow(
 ) -> FeatureEndpointResult:
     if config.design_only and config.capture_worker_prompts_only:
         raise ValueError("design-only and worker-prompt capture modes are exclusive")
+    if config.uncertainty_policy not in {"clarify", "normative_default"}:
+        raise ValueError("uncertainty_policy must be 'clarify' or 'normative_default'")
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {
         "task_id": config.task_id or config.work_item_name,
         "design_only": config.design_only,
         "capture_worker_prompts_only": config.capture_worker_prompts_only,
         "benchmark_mode": config.benchmark_mode,
+        "uncertainty_policy": (
+            "normative_default" if config.benchmark_mode else config.uncertainty_policy
+        ),
         "benchmark_gate_warnings": [],
         "submission_base": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
     }
@@ -570,6 +576,11 @@ def _execute_procedrr_flow(
                 "feature_description": config.feature_description,
                 "work_item_name": config.work_item_name,
                 "benchmark_mode": config.benchmark_mode,
+                "uncertainty_policy": (
+                    "normative_default"
+                    if config.benchmark_mode
+                    else config.uncertainty_policy
+                ),
             },
         )
     except EvaluationError as error:

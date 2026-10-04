@@ -464,15 +464,62 @@ def test_normative_defaults_resolve_and_record_each_unresolved_dimension() -> No
         },
     }
 
-    resolved = _merge_behavior_scenario_values(parameters, benchmark_mode=True)[
-        "behavior_scenario"
-    ]
+    resolved = _merge_behavior_scenario_values(
+        parameters, uncertainty_policy="normative_default"
+    )["behavior_scenario"]
 
     assert resolved["dimensions"]["error_behavior"] == (
         "ASSUMED DEFAULT: Propagate the native literal parser error."
     )
     assert resolved["assumptions"][0]["confidence"] == "medium"
     assert "NEEDS CLARIFICATION" not in resolved["then"]
+
+
+def test_normative_default_policy_is_independent_of_benchmark_mode() -> None:
+    parameters = {
+        "clause": {"clause_id": "instruction-001"},
+        "design": {"expected_test": "focused test"},
+        "scenario": {
+            "status": "needs_clarification",
+            "unresolved_dimensions": ["continuation"],
+            "scenario": {
+                "subject": "Batch operation",
+                "given": "multiple items are supplied",
+                "when": "one item fails",
+                "then": "later items are handled",
+                "dimensions": {
+                    "normal_result": "results are returned",
+                    "error_behavior": "not_applicable",
+                    "continuation": "unresolved by source",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "not_applicable",
+                    "negative_boundaries": "not_applicable",
+                },
+                "capability_matrix": [],
+                "assumptions": [
+                    {
+                        "dimension": "continuation",
+                        "resolution": "Continue processing remaining items.",
+                        "rationale": (
+                            "Preserve useful results after an isolated failure."
+                        ),
+                        "basis": "conservative_default",
+                        "basis_reference": "No specific normative source identified.",
+                        "confidence": "low",
+                    }
+                ],
+            },
+        },
+    }
+
+    resolved = _merge_behavior_scenario_values(
+        parameters,
+        uncertainty_policy="normative_default",
+        benchmark_mode=False,
+    )["behavior_scenario"]
+
+    assert resolved["assumptions"][0]["resolution"].startswith("Continue")
 
 
 def test_normative_default_can_resolve_a_source_semantic_dimension() -> None:
@@ -855,7 +902,7 @@ def test_scenario_consistency_can_update_a_source_dimension_default() -> None:
 
 
 def test_scenario_consistency_cannot_add_defaults_outside_benchmark_mode() -> None:
-    with pytest.raises(PowdrrExecutionError, match="outside benchmark mode"):
+    with pytest.raises(PowdrrExecutionError, match="under clarify policy"):
         _apply_scenario_consistency_updates(
             [{}],
             {"consistency_review": {"updates": [{"dimension": "continuation"}]}},
@@ -2809,6 +2856,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             "work_item_name": "demo",
             "feature_description": "Add the feature.",
             "benchmark_mode": False,
+            "uncertainty_policy": "clarify",
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
@@ -2826,6 +2874,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     assert assumptions == {
         "assumptions": [],
         "benchmark_mode": False,
+        "uncertainty_policy": "clarify",
         "schema_version": "normative-assumptions-v1",
     }
 
@@ -3404,6 +3453,7 @@ def test_benchmark_mode_selects_normative_defaults_automatically(
     )
 
     assert observed["benchmark_mode"] is True
+    assert observed["uncertainty_policy"] == "normative_default"
 
 
 def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(

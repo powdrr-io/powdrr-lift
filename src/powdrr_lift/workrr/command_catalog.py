@@ -624,6 +624,10 @@ def feature_command_catalog(
                     "design": {},
                     "scenario": {},
                     "repository_binding": {},
+                    "uncertainty_policy": {
+                        "type": "string",
+                        "enum": ["clarify", "normative_default"],
+                    },
                 },
                 required=("clause", "design", "scenario"),
                 additional_properties=False,
@@ -638,6 +642,10 @@ def feature_command_catalog(
                     "work_item_name": {},
                     "design_decisions": {},
                     "scenario_consistency_review": {},
+                    "uncertainty_policy": {
+                        "type": "string",
+                        "enum": ["clarify", "normative_default"],
+                    },
                 },
                 required=(
                     "work_item_name",
@@ -1004,6 +1012,11 @@ class FeatureCommandRuntime:
 
         def benchmark_mode() -> bool:
             return bool(getattr(config, "benchmark_mode", False))
+
+        def uncertainty_policy() -> str:
+            if benchmark_mode():
+                return "normative_default"
+            return str(getattr(config, "uncertainty_policy", "clarify"))
 
         if name == "ensure_current_structrr":
             state["baseline_path"] = feature_endpoint._ensure_current_baseline(
@@ -1592,6 +1605,7 @@ class FeatureCommandRuntime:
                 try:
                     return _merge_behavior_scenario_values(
                         call_parameters,
+                        uncertainty_policy=uncertainty_policy(),
                         benchmark_mode=benchmark_mode(),
                     )
                 except PowdrrExecutionError as error:
@@ -1613,6 +1627,7 @@ class FeatureCommandRuntime:
                     return merge_as_source_invariant(clause)
             return _merge_behavior_scenario_values(
                 call_parameters,
+                uncertainty_policy=uncertainty_policy(),
                 benchmark_mode=benchmark_mode(),
                 allow_clarification=True,
             )
@@ -2333,6 +2348,7 @@ class FeatureCommandRuntime:
             raw_design_decisions = _apply_scenario_consistency_updates(
                 raw_design_decisions,
                 consistency_review,
+                uncertainty_policy=uncertainty_policy(),
                 benchmark_mode=benchmark_mode(),
             )
             (output_root / "scenario-consistency-review.json").write_text(
@@ -2786,6 +2802,7 @@ class FeatureCommandRuntime:
                     {
                         "schema_version": "normative-assumptions-v1",
                         "benchmark_mode": benchmark_mode(),
+                        "uncertainty_policy": uncertainty_policy(),
                         "assumptions": normative_assumptions,
                     },
                     indent=2,
@@ -3440,6 +3457,7 @@ def _apply_scenario_consistency_updates(
     design_decisions: list[Any],
     review: Mapping[str, Any],
     *,
+    uncertainty_policy: str = "clarify",
     benchmark_mode: bool,
 ) -> list[dict[str, Any]]:
     """Apply review edits only to recorded defaults, never source requirements."""
@@ -3451,9 +3469,9 @@ def _apply_scenario_consistency_updates(
         not isinstance(update, Mapping) for update in updates
     ):
         raise PowdrrExecutionError("scenario consistency updates are malformed")
-    if not benchmark_mode and updates:
+    if uncertainty_policy != "normative_default" and not benchmark_mode and updates:
         raise PowdrrExecutionError(
-            "scenario consistency review cannot add defaults outside benchmark mode"
+            "scenario consistency review cannot add defaults under clarify policy"
         )
 
     decisions = copy.deepcopy(design_decisions)
@@ -3549,6 +3567,7 @@ def _merge_behavior_scenario_values(
     parameters: Mapping[str, Any],
     *,
     allow_clarification: bool = False,
+    uncertainty_policy: str = "clarify",
     benchmark_mode: bool = False,
 ) -> dict[str, Any]:
     """Bind a resolved scenario, a provisional draft, or recorded defaults."""
@@ -3574,7 +3593,8 @@ def _merge_behavior_scenario_values(
         )
     raw_scenario = dict(raw_scenario)
     assumptions = raw_scenario.get("assumptions", [])
-    if status == "needs_clarification" and benchmark_mode:
+    resolves_defaults = uncertainty_policy == "normative_default" or benchmark_mode
+    if status == "needs_clarification" and resolves_defaults:
         dimensions = raw_scenario.get("dimensions")
         if not isinstance(dimensions, Mapping):
             raise PowdrrExecutionError("behavior scenario has no dimensions")
@@ -3668,12 +3688,12 @@ def _merge_behavior_scenario_values(
             "behavior scenario needs clarification before implementation: "
             + ", ".join(str(item) for item in unresolved)
         )
-    elif assumptions and not benchmark_mode:
+    elif assumptions and not resolves_defaults:
         raise PowdrrExecutionError(
             "behavior scenario contains normative assumptions, but "
-            "normative assumptions require benchmark mode"
+            "normative assumptions require the normative_default uncertainty policy"
         )
-    elif status == "resolved" and benchmark_mode:
+    elif status == "resolved" and resolves_defaults:
         if not isinstance(assumptions, list):
             raise PowdrrExecutionError("normative assumptions must be a list")
         not_applicable_dimensions = {

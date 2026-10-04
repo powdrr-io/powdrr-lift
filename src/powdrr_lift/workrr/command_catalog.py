@@ -97,6 +97,10 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     prepare_source_semantic_decisions,
     project_partial_contract_to_legacy_design,
 )
+from powdrr_lift.workrr.uncertainty_decisions import (
+    records_for_scenario,
+    update_decision_artifact,
+)
 from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
 
 
@@ -1352,6 +1356,13 @@ class FeatureCommandRuntime:
             )
             state["instruction_ledger_path"] = path
             state["instruction_ledger_fingerprint"] = ledger.fingerprint
+            uncertainty_path = update_decision_artifact(
+                output_root / "uncertainty-decisions.json",
+                (),
+                uncertainty_policy=uncertainty_policy(),
+                instruction_ledger_fingerprint=ledger.fingerprint,
+            )
+            state["uncertainty_decisions_path"] = uncertainty_path
             return {
                 "path": str(path),
                 "fingerprint": ledger.fingerprint,
@@ -1371,6 +1382,34 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     f"instruction ledger cannot be loaded: {exc}"
                 ) from exc
+
+        def persist_uncertainty_scenario(
+            clause: Mapping[str, Any],
+            scenario: Mapping[str, Any],
+            *,
+            phase: str,
+            repository_location: Mapping[str, Any] | None = None,
+        ) -> None:
+            ledger = load_instruction_ledger()
+            try:
+                records = records_for_scenario(
+                    clause,
+                    ledger.source.text,
+                    scenario,
+                    phase=phase,
+                    repository_location=repository_location,
+                )
+                path = update_decision_artifact(
+                    output_root / "uncertainty-decisions.json",
+                    records,
+                    uncertainty_policy=uncertainty_policy(),
+                    instruction_ledger_fingerprint=ledger.fingerprint,
+                )
+            except (OSError, TypeError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"could not persist uncertainty decisions: {error}"
+                ) from error
+            state["uncertainty_decisions_path"] = path
 
         def collected_atomicity_decisions() -> list[dict[str, Any]]:
             raw_decisions = feature_endpoint._collected_results(
@@ -1727,7 +1766,19 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     f"scenario faithfulness provenance is invalid: {exc}"
                 ) from exc
-            return {**dict(design), "behavior_scenario": compiled.to_data()}
+            compiled_scenario = compiled.to_data()
+            repository_location = design.get("repository_binding")
+            persist_uncertainty_scenario(
+                clause,
+                compiled_scenario,
+                phase="design_interview",
+                repository_location=(
+                    repository_location
+                    if isinstance(repository_location, Mapping)
+                    else None
+                ),
+            )
+            return {**dict(design), "behavior_scenario": compiled_scenario}
 
         def semantic_artifact_directory(clause: Mapping[str, Any]) -> Path:
             clause_id = clause.get("clause_id")
@@ -2351,6 +2402,23 @@ class FeatureCommandRuntime:
                 uncertainty_policy=uncertainty_policy(),
                 benchmark_mode=benchmark_mode(),
             )
+            for clause, scenario_decision in zip(
+                ledger.clauses, raw_design_decisions, strict=True
+            ):
+                scenario = scenario_decision.get("behavior_scenario")
+                if not isinstance(scenario, Mapping):
+                    continue
+                repository_location = scenario_decision.get("repository_binding")
+                persist_uncertainty_scenario(
+                    clause.to_data(),
+                    scenario,
+                    phase="scenario_consistency_review",
+                    repository_location=(
+                        repository_location
+                        if isinstance(repository_location, Mapping)
+                        else None
+                    ),
+                )
             (output_root / "scenario-consistency-review.json").write_text(
                 json.dumps(dict(consistency_review), indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",

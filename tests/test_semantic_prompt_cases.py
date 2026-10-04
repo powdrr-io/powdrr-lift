@@ -11,6 +11,9 @@ from powdrr_lift.workrr.semantic_prompt_cases import (
     load_semantic_prompt_cases,
     validate_semantic_prompt_cases,
 )
+from powdrr_lift.workrr.semantic_prompt_variants import (
+    generate_semantic_prompt_variants,
+)
 
 CASE_PATH = (
     Path(__file__).resolve().parents[1]
@@ -136,6 +139,7 @@ def test_variant_must_preserve_base_gold_decisions() -> None:
             expected_decisions={"requirement_relation": "allowed_alternatives"},
         ),
         _case("third", domain="domain-b"),
+        _case("fourth", domain="domain-c"),
     ]
 
     with pytest.raises(
@@ -146,6 +150,161 @@ def test_variant_must_preserve_base_gold_decisions() -> None:
             minimum_cases_per_family=1,
             expected_families=frozenset({"joint_vs_alternatives"}),
         )
+
+
+def test_contrast_must_change_a_gold_decision_and_keep_lineage() -> None:
+    cases = [
+        _case("base"),
+        _case(
+            "contrast",
+            contrast_of="base",
+            group_id="base",
+            expected_decisions={"requirement_relation": "allowed_alternatives"},
+        ),
+        _case("third", domain="domain-b"),
+        _case("fourth", domain="domain-c"),
+    ]
+
+    summary = validate_semantic_prompt_cases(
+        cases,
+        minimum_cases_per_family=1,
+        expected_families=frozenset({"joint_vs_alternatives"}),
+    )
+
+    assert summary["case_count"] == 4
+
+
+def test_contrast_cannot_reuse_base_gold_decisions() -> None:
+    cases = [
+        _case("base"),
+        _case("contrast", contrast_of="base", group_id="base"),
+        _case("third", domain="domain-b"),
+        _case("fourth", domain="domain-c"),
+    ]
+
+    with pytest.raises(SemanticPromptCaseError, match="does not change any expected"):
+        validate_semantic_prompt_cases(
+            cases,
+            minimum_cases_per_family=1,
+            expected_families=frozenset({"joint_vs_alternatives"}),
+        )
+
+
+def test_case_cannot_be_both_paraphrase_and_contrast() -> None:
+    cases = [
+        _case("base"),
+        _case("variant", variant_of="base", contrast_of="base", group_id="base"),
+        _case("third", domain="domain-b"),
+        _case("fourth", domain="domain-c"),
+    ]
+
+    with pytest.raises(
+        SemanticPromptCaseError, match="both a paraphrase and a contrast"
+    ):
+        validate_semantic_prompt_cases(
+            cases,
+            minimum_cases_per_family=1,
+            expected_families=frozenset({"joint_vs_alternatives"}),
+        )
+
+
+class _VariantGenerator:
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        case = json.loads(messages[1]["content"])["case"]
+        return {
+            "variants": [
+                {
+                    "kind": "paraphrase",
+                    "source_text": (
+                        "The session keeps both the current user "
+                        "and selected workspace."
+                    ),
+                    "target_proposition": case["target_proposition"],
+                },
+                {
+                    "kind": "contrast",
+                    "source_text": (
+                        "The session keeps either the current user "
+                        "or selected workspace."
+                    ),
+                    "target_proposition": "The session keeps either field.",
+                },
+            ]
+        }
+
+
+class _VariantReviewer:
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        payload = json.loads(messages[1]["content"])
+        if payload["kind"] == "paraphrase":
+            return {
+                "accepted": True,
+                "rationale": "The candidate preserves the joint requirement.",
+                "evidence_quote": "both the current user and selected workspace",
+            }
+        decisions = dict(payload["base"]["expected_decisions"])
+        current_relation = decisions.get("requirement_relation")
+        decisions["requirement_relation"] = (
+            "all_required"
+            if current_relation == "allowed_alternatives"
+            else "allowed_alternatives"
+        )
+        return {
+            "accepted": True,
+            "rationale": "Either is explicitly permitted in this contrast.",
+            "evidence_quote": "either the current user or selected workspace",
+            "expected_decisions": decisions,
+            "explicitly_unspecified": [],
+            "required_prompt_claims": ["Either field is sufficient."],
+            "forbidden_prompt_claims": ["Both fields are required."],
+        }
+
+
+def test_variant_generation_reviews_candidates_and_preserves_split_groups() -> None:
+    cases = load_semantic_prompt_cases(CASE_PATH)
+    result = generate_semantic_prompt_variants(
+        cases,
+        generator=_VariantGenerator(),
+        reviewer=_VariantReviewer(),
+    )
+
+    assert len(result["cases"]) == 2 * len(cases)
+    assert result["rejected"] == []
+    generated = result["cases"]
+    bases_by_id = {case["case_id"]: case for case in cases}
+    assert all(
+        case["group_id"]
+        == bases_by_id[case.get("variant_of", case.get("contrast_of"))]["group_id"]
+        for case in generated
+    )
+    assert all(
+        case["split"] == "held_out"
+        for case in generated
+        if case["domain"] == "configuration_cache"
+    )
+
+
+def test_variant_generation_rejects_nonverbatim_review_evidence() -> None:
+    class BadReviewer:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            return {
+                "accepted": True,
+                "rationale": "Looks equivalent.",
+                "evidence_quote": "invented evidence not in source",
+            }
+
+    cases = load_semantic_prompt_cases(CASE_PATH)
+    result = generate_semantic_prompt_variants(
+        cases,
+        generator=_VariantGenerator(),
+        reviewer=BadReviewer(),
+    )
+
+    assert not result["cases"]
+    assert len(result["rejected"]) == 2 * len(cases)
+    assert all(
+        "exact source_text substring" in item["reason"] for item in result["rejected"]
+    )
 
 
 def test_required_claim_cannot_also_be_forbidden() -> None:

@@ -1,0 +1,88 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 915
+title: Persist uncertainty decisions incrementally
+intent:
+  problem: Normative decisions are only written during canonical design compilation, so later planning failures can lose accepted uncertainty resolutions and consistency revisions.
+  goal: Persist source-linked uncertainty decisions when behavior scenarios are accepted and retain prior decisions when consistency review changes them.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/uncertainty_decisions.py
+    type: added
+    span: {start_line: 1, end_line: 207}
+    summary: Build stable, source-linked decision records and atomically upsert them with revision history.
+    rationale: Preserve the accepted default, its exact source context, and superseded decisions across later failures.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 100, end_line: 103}
+    summary: Import uncertainty decision record and persistence helpers.
+    rationale: Connect durable decision tracking to feature workflow operations.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1359, end_line: 1365}
+    summary: Initialize uncertainty-decisions.json with policy and instruction ledger identity.
+    rationale: Ensure each design run starts with a durable decision ledger, including runs without defaults.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1386, end_line: 1413}
+    summary: Bind accepted assumptions to source quotes and persist them atomically.
+    rationale: Make accepted defaults inspectable before subsequent planning steps run.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1769, end_line: 1781}
+    summary: Persist assumptions after behavior scenario faithfulness validation succeeds.
+    rationale: Save accepted scenario decisions before later design review can fail.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 2405, end_line: 2421}
+    summary: Upsert decisions after consistency review applies revisions.
+    rationale: Keep revised defaults current while retaining each superseded choice.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2874, end_line: 2876}
+    summary: Read the uncertainty decision artifact from the completed design flow.
+    rationale: Verify the artifact is created for a run with no normative assumptions.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2883, end_line: 2890}
+    summary: Assert the empty decision ledger includes schema, policy, and source ledger fingerprint.
+    rationale: Verify initialized artifact metadata is reproducible.
+  - path: tests/test_uncertainty_decisions.py
+    type: added
+    span: {start_line: 1, end_line: 158}
+    summary: Cover exact source quote capture, decision provenance, incremental persistence, and revision history.
+    rationale: Ensure defaults remain traceable and superseded choices are not discarded.
+entities:
+  - id: uncertainty-decision-ledger
+    type: Dataset
+    action: added
+  - id: source-linked-decision-recorder
+    type: Function
+    action: added
+  - id: uncertainty-decision-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: recorder-persists-decisions
+    type: persists
+    source: source-linked-decision-recorder
+    target: uncertainty-decision-ledger
+    action: added
+    description: Accepted scenario assumptions are atomically recorded with source references and revision history.
+  - id: regression-tests-verify-ledger
+    type: verifies
+    source: uncertainty-decision-regression-tests
+    target: source-linked-decision-recorder
+    action: added
+    description: Tests verify source quote preservation, stable decision identity, and revision retention.
+invariants:
+  - id: accepted-decisions-survive-later-failure
+    description: Each validated uncertainty decision is persisted after faithfulness review and before later consistency or canonical compilation steps.
+    action: added
+  - id: decision-revisions-are-auditable
+    description: When a decision's default or rationale changes, the prior decision details remain in revision_history and the replacement becomes current.
+    action: added
+guidance:
+  - id: inspect-uncertainty-decision-ledger
+    description: Inspect uncertainty-decisions.json in the feature run artifact directory to review source-linked defaults and any consistency-review revisions.
+    action: added

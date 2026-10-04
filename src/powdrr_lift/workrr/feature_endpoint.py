@@ -2605,6 +2605,39 @@ def _run_code_agent_phase(
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
             implementation_packet=worker_packet,
         )
+        instruction_ledger_path = state.get("instruction_ledger_path")
+        if (
+            isinstance(instruction_ledger_path, Path)
+            and instruction_ledger_path.is_file()
+        ):
+            try:
+                instruction_ledger = json.loads(
+                    instruction_ledger_path.read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError) as error:
+                raise PowdrrExecutionError(
+                    f"instruction ledger cannot be loaded for worker context: {error}"
+                ) from error
+            ledger_clauses = (
+                instruction_ledger.get("clauses")
+                if isinstance(instruction_ledger, Mapping)
+                else None
+            )
+            if isinstance(ledger_clauses, list):
+                clause_context = "\n".join(
+                    f"- {item.get('clause_id')}: {item.get('text')}"
+                    for item in ledger_clauses
+                    if isinstance(item, Mapping)
+                )
+                if clause_context:
+                    request = replace(
+                        request,
+                        prompt=(
+                            f"{request.prompt}\n\nInstruction clause IDs for "
+                            "uncertainty_decision source_ref values:\n"
+                            f"{clause_context}"
+                        ),
+                    )
         request = replace(
             request,
             implementation_packet=worker_packet,

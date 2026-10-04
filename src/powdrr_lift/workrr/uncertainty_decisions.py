@@ -103,6 +103,92 @@ def records_for_scenario(
     return records
 
 
+def records_for_worker_events(
+    events: Sequence[Mapping[str, Any]],
+    clauses: Sequence[Mapping[str, Any]],
+    source_text: str,
+    *,
+    phase: str,
+) -> list[dict[str, Any]]:
+    """Validate explicit worker decision events against the request ledger.
+
+    Workers may emit JSONL records with ``type: uncertainty_decision``. A
+    decision is accepted only when it points to a real instruction clause and
+    carries the complete provenance required by the durable ledger.
+    """
+    clauses_by_id = {
+        str(item["clause_id"]): item
+        for item in clauses
+        if isinstance(item.get("clause_id"), str)
+    }
+    records: list[dict[str, Any]] = []
+    for event in events:
+        if event.get("type") != "uncertainty_decision":
+            continue
+        clause_id = event.get("source_ref")
+        if not isinstance(clause_id, str) or clause_id not in clauses_by_id:
+            raise ValueError("worker uncertainty decision references an unknown clause")
+        clause = clauses_by_id[clause_id]
+        span = clause.get("source_span")
+        if not isinstance(span, Mapping):
+            raise ValueError("worker uncertainty decision source span is missing")
+        start, end = span.get("start"), span.get("end")
+        if (
+            not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(end, int)
+            or isinstance(end, bool)
+            or start < 0
+            or end <= start
+            or end > len(source_text)
+        ):
+            raise ValueError("worker uncertainty decision source span is invalid")
+        required = (
+            "dimension",
+            "uncertainty",
+            "selected_default",
+            "rationale",
+            "basis",
+            "basis_reference",
+            "confidence",
+        )
+        if any(
+            not isinstance(event.get(key), str) or not event[key].strip()
+            for key in required
+        ):
+            raise ValueError("worker uncertainty decision fields are incomplete")
+        dimension = str(event["dimension"])
+        record: dict[str, Any] = {
+            "id": f"uncertainty:{clause_id}:{dimension}",
+            "originating_phase": phase,
+            "last_updated_phase": phase,
+            "source_ref": clause_id,
+            "source_fingerprint": clause.get("fingerprint"),
+            "source_quote": source_text[start:end],
+            "source_location": {
+                "kind": "request_text",
+                "start_offset": start,
+                "end_offset": end,
+            },
+            "uncertainty": str(event["uncertainty"]),
+            "dimension": dimension,
+            "selected_default": str(event["selected_default"]),
+            "rationale": str(event["rationale"]),
+            "basis": str(event["basis"]),
+            "basis_reference": str(event["basis_reference"]),
+            "confidence": str(event["confidence"]),
+            "scenario": dict(event.get("scenario", {}))
+            if isinstance(event.get("scenario"), Mapping)
+            else {},
+            "revision_history": [],
+        }
+        repository_location = event.get("repository_location")
+        if isinstance(repository_location, Mapping):
+            record["repository_location"] = dict(repository_location)
+        records.append(record)
+    return records
+
+
 def update_decision_artifact(
     path: Path,
     incoming_records: Sequence[Mapping[str, Any]],
@@ -204,4 +290,9 @@ def update_decision_artifact(
     return path
 
 
-__all__ = ["SCHEMA_VERSION", "records_for_scenario", "update_decision_artifact"]
+__all__ = [
+    "SCHEMA_VERSION",
+    "records_for_scenario",
+    "records_for_worker_events",
+    "update_decision_artifact",
+]

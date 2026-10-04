@@ -116,7 +116,13 @@ class ImplementationRequest:
             "you validate locally, run only a focused selector using one of the "
             "listed command forms. The surrounding workflow will rerun the "
             "affected validators "
-            "and invalidate evidence affected by your diff."
+            "and invalidate evidence affected by your diff. If you encounter "
+            "undefined product behavior and choose a normative default, emit "
+            "a JSONL stdout event with type=uncertainty_decision and fields "
+            "source_ref (instruction clause ID), dimension, uncertainty, "
+            "selected_default, rationale, basis, basis_reference, confidence, "
+            "and optional scenario and repository_location. Do not report "
+            "decisions already resolved by the product contract."
         )
 
     @classmethod
@@ -240,7 +246,12 @@ class ImplementationRequest:
             "are permitted only in declared ephemeral paths. Stay in the current "
             "working directory; do not cd to, inspect, or select sibling "
             "worktrees or paths outside it. Do not alter files outside the "
-            "request."
+            "request. Emit any uncertainty decisions as JSONL stdout events "
+            "using type=uncertainty_decision with source_ref (instruction "
+            "clause ID), dimension, uncertainty, selected_default, rationale, "
+            "basis, basis_reference, confidence, and optional scenario and "
+            "repository_location. Do not report decisions already resolved "
+            "by the product contract."
         )
         product_objective = (
             implementation_packet.objective

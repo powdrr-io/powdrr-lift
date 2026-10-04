@@ -6,6 +6,7 @@ from typing import Any
 
 from powdrr_lift.workrr.uncertainty_decisions import (
     records_for_scenario,
+    records_for_worker_events,
     update_decision_artifact,
 )
 
@@ -156,3 +157,64 @@ def test_decision_artifact_is_incremental_and_retains_revisions(
             "superseded_in_phase": "scenario_consistency_review",
         }
     ]
+
+
+def test_worker_decision_event_is_bound_to_exact_instruction_clause() -> None:
+    source = "Add export support with a stable format."
+    clause = {
+        "clause_id": "instruction-001",
+        "fingerprint": "clause-fingerprint",
+        "source_span": {"start": 0, "end": len(source)},
+    }
+    event = {
+        "type": "uncertainty_decision",
+        "source_ref": "instruction-001",
+        "dimension": "serialization_format",
+        "uncertainty": "The export format is undefined.",
+        "selected_default": "Use JSON.",
+        "rationale": "JSON is supported by existing tooling.",
+        "basis": "repository_convention",
+        "basis_reference": "Existing project export artifacts use JSON.",
+        "confidence": "high",
+        "repository_location": {"path": "src/export.py", "symbol": "write"},
+    }
+
+    [record] = records_for_worker_events(
+        [event], [clause], source, phase="implementation"
+    )
+
+    assert record["id"] == "uncertainty:instruction-001:serialization_format"
+    assert record["source_quote"] == source
+    assert record["source_location"] == {
+        "kind": "request_text",
+        "start_offset": 0,
+        "end_offset": len(source),
+    }
+    assert record["selected_default"] == "Use JSON."
+    assert record["repository_location"] == event["repository_location"]
+
+
+def test_worker_decision_event_rejects_unknown_clause() -> None:
+    event = {
+        "type": "uncertainty_decision",
+        "source_ref": "instruction-999",
+        "dimension": "format",
+        "uncertainty": "Undefined.",
+        "selected_default": "JSON.",
+        "rationale": "Common default.",
+        "basis": "conservative_default",
+        "basis_reference": "No specific source identified.",
+        "confidence": "low",
+    }
+
+    try:
+        records_for_worker_events(
+            [event],
+            [{"clause_id": "instruction-001", "source_span": {"start": 0, "end": 3}}],
+            "ABC",
+            phase="implementation",
+        )
+    except ValueError as error:
+        assert "unknown clause" in str(error)
+    else:
+        raise AssertionError("unknown worker source reference should be rejected")

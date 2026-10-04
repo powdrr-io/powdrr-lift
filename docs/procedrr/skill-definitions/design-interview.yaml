@@ -11,6 +11,7 @@ inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}
   - {name: benchmark_mode, type: boolean, required: true}
+  - {name: uncertainty_policy, type: string, enum: [clarify, normative_default], required: true}
 outputs:
   feature_design:
     type: object
@@ -735,9 +736,10 @@ steps:
                 its source label unchanged. A missing semantic_dimensions key means
                 the source classifier did not request that dimension. When an
                 unspecified or unresolved source dimension materially affects
-                implementation, list it in unresolved_dimensions; in benchmark
-                mode, resolve it with a separate assumption. Never present an
-                assumption as a source guarantee.
+                implementation, list it in unresolved_dimensions. When
+                uncertainty_policy is normative_default, resolve it with a
+                separate assumption. Never present an assumption as a source
+                guarantee.
               - Describe one scenario with concrete given, when, and then values.
               - Explicitly cover normal result/state, errors and propagation, continuation, unsupported capabilities, cancellation/cleanup, compatibility, and negative boundaries.
               - For each dimension, write a concrete requirement or the exact value not_applicable when that dimension genuinely does not apply.
@@ -756,9 +758,9 @@ steps:
                 Return an empty list only when this behavior change has no
                 capability boundary.
               - Do not return selectors, IDs, evidence paths, validator commands, or extra fields; Powdrr binds those from the compiled test contract.
-              - Return scenario.assumptions as an empty list unless benchmark_mode is true.
+              - Return scenario.assumptions as an empty list unless uncertainty_policy is normative_default.
             prompt_rules:
-              - when: {binding: benchmark_mode, equals: true}
+              - when: {binding: uncertainty_policy, equals: normative_default}
                 instructions:
                   - Keep status as needs_clarification and list every materially applicable dimension the source leaves unresolved; do not pretend an assumption came from the user or source.
                   - Treat defaults as narrow gap-filling, not permission to expand the specification. Mark a dimension unresolved only when its answer could materially change implementation of this clause; otherwise preserve its concrete requirement or mark it not_applicable.
@@ -773,7 +775,7 @@ steps:
                   - Prefer evidence in the source and accepted design, then repository conventions only when the supplied context supports them, then an identifiable official standard or ecosystem convention, then an established language or framework default, and finally a conservative interoperable default.
                   - Never fabricate a normative citation. If no identifiable source is available, use conservative_default and state that no specific normative source was identified in basis_reference.
                   - State confidence honestly; low confidence is allowed but must still choose a concrete, conservative default for the benchmark run.
-              - when: {binding: benchmark_mode, equals: false}
+              - when: {binding: uncertainty_policy, equals: clarify}
                 instructions:
                   - Do not resolve uncertainty with assumptions. Leave scenario.assumptions empty and report materially unresolved dimensions for human clarification.
               - when: {binding: partial_semantic_design.partial_contract.routing, equals: exclude}
@@ -791,7 +793,7 @@ steps:
                   - This clause is delivery-process metadata only and must not create a product obligation.
                   - Return status resolved, list no unresolved dimensions, and set every dimension to "not_applicable (process metadata only)".
                   - Set given to "The delivery instruction is recorded", when to "The feature design is compiled", and then to "No product implementation obligation is generated".
-            context: [instruction_clause, atomic_instruction_ledger, partial_semantic_design, source_faithfulness, benchmark_mode]
+            context: [instruction_clause, atomic_instruction_ledger, partial_semantic_design, source_faithfulness, uncertainty_policy]
             output:
               name: behavior_scenario_result
               schema:
@@ -877,6 +879,7 @@ steps:
               clause: {type: reference, value: instruction_clause}
               design: {type: reference, value: partial_semantic_design}
               scenario: {type: reference, value: behavior_scenario_result}
+              uncertainty_policy: {type: reference, value: uncertainty_policy}
               repository_binding: {type: reference, value: repository_subject_binding}
             returns:
               type: object
@@ -991,10 +994,10 @@ steps:
         - Preserve every source-supported requirement and every dimension resolved by the source. This review may update only an existing normative assumption, never a source-grounded result or scenario obligation. Keep source_dimensions and semantic_dimension_applicability unchanged.
         - If related assumptions prescribe incompatible outcomes for the same behavior, revise the minimum set of assumptions to one concrete outcome consistent with every applicable source requirement and linked scenario.
         - Do not add speculative cases or new requirements. If a conflict has no identifiable normative answer, choose one conservative interoperable outcome and record the basis and low confidence rather than leaving competing defaults.
-        - In non-benchmark mode, return no updates; do not invent or reconcile assumptions on the user's behalf.
+        - When uncertainty_policy is clarify, return no updates; do not invent or reconcile assumptions on the user's behalf.
         - For each changed assumption, quote the target scenario's subject, given, when, then, dimension, and previous resolution exactly so the compiler can bind the update without model-generated IDs.
         - Return an empty updates list when the recorded assumptions are already coherent.
-      context: [work_item_name, atomic_instruction_ledger, semantic_designs, benchmark_mode]
+      context: [work_item_name, atomic_instruction_ledger, semantic_designs, uncertainty_policy]
       output:
         name: scenario_consistency_review
         schema:
@@ -1033,6 +1036,7 @@ steps:
         work_item_name: {type: reference, value: work_item_name}
         design_decisions: {type: reference, value: semantic_designs}
         scenario_consistency_review: {type: reference, value: scenario_consistency_review}
+        uncertainty_policy: {type: reference, value: uncertainty_policy}
       returns:
         type: object
         required: [path, fingerprint, obligations, verification_contracts, required_test_cases]

@@ -1877,7 +1877,9 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
             limits: object,
             progress_stream: object = None,
             reasoning_effort: str | None = None,
+            timeout: float = 120.0,
         ) -> None:
+            _ = timeout
             captured.update(
                 {
                     "model": model,

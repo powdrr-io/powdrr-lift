@@ -170,6 +170,11 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationRunner,
     parse_validation_profile,
 )
+from powdrr_lift.workrr.credential_check import (
+    check_coding_executable,
+    check_model_access,
+    configured_model_mapping,
+)
 from powdrr_lift.workrr.deepswe_design_evaluation import (
     DEFAULT_STATE_DATA_RUBRIC,
     DeepSWEEvaluationError,
@@ -265,6 +270,32 @@ _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="powdrr-lift")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    credentials_parser = subparsers.add_parser(
+        "check-credentials",
+        help="Check configured planning and coding model access before a run.",
+    )
+    credentials_parser.add_argument("--repo-root", type=Path)
+    credentials_parser.add_argument(
+        "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    credentials_parser.add_argument("--planning-model")
+    credentials_parser.add_argument("--planning-api-key")
+    credentials_parser.add_argument("--planning-base-url")
+    credentials_parser.add_argument(
+        "--coding-provider", default="deepinfra", choices=ALL_PROVIDERS
+    )
+    credentials_parser.add_argument(
+        "--coding-model", default="deepseek-ai/DeepSeek-V4-Flash-0731"
+    )
+    credentials_parser.add_argument(
+        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
+    )
+    credentials_parser.add_argument("--opencode-executable", default="opencode")
+    credentials_parser.add_argument("--minisweagent-executable", default="mini")
+    credentials_parser.add_argument("--open-pr", action="store_true")
+    credentials_parser.add_argument("--json", action="store_true")
+    credentials_parser.set_defaults(func=_run_check_credentials)
 
     repository_state_parser = subparsers.add_parser(
         "repository-state",
@@ -3152,6 +3183,123 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
             f"{summary['source_anchor_count']} source anchors.",
         )
     return 0
+
+
+def _run_check_credentials(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    results = []
+    for role, provider, model, api_key, base_url in (
+        (
+            "planning",
+            args.planning_provider,
+            args.planning_model,
+            args.planning_api_key,
+            args.planning_base_url,
+        ),
+        (
+            "coding",
+            args.coding_provider,
+            args.coding_model,
+            None,
+            None,
+        ),
+    ):
+        try:
+            mapping = configured_model_mapping(provider, model)
+        except PowdrrExecutionError as error:
+            results.append(
+                {
+                    "role": role,
+                    "provider": provider,
+                    "model": model or "<unspecified>",
+                    "status": "configuration_error",
+                    "message": str(error),
+                }
+            )
+            continue
+        results.append(
+            check_model_access(
+                role=role,
+                provider=provider,
+                mapping=mapping,
+                repo_root=repo_root,
+                api_key=api_key,
+                base_url=base_url,
+            ).to_data()
+        )
+
+    executable = (
+        args.opencode_executable
+        if args.code_agent == "opencode"
+        else args.minisweagent_executable
+    )
+    results.append(check_coding_executable(executable, role="coding-agent").to_data())
+
+    if args.open_pr:
+        github_result: dict[str, str] = {
+            "role": "github-publication",
+            "provider": "gh",
+            "model": "GitHub CLI and repository permissions",
+            "status": "unavailable",
+        }
+        try:
+            auth = subprocess.run(
+                ["gh", "auth", "status"],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+            if auth.returncode == 0:
+                repository = subprocess.run(
+                    ["gh", "repo", "view", "--json", "nameWithOwner,viewerPermission"],
+                    cwd=repo_root,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=10,
+                )
+                if repository.returncode == 0:
+                    details = json.loads(repository.stdout)
+                    permission = details.get("viewerPermission")
+                    github_result.update(
+                        status=(
+                            "passed"
+                            if permission in {"WRITE", "MAINTAIN", "ADMIN"}
+                            else "insufficient_repository_permission"
+                        ),
+                        repository=details.get("nameWithOwner", "unknown"),
+                        permission=str(permission or "unknown"),
+                    )
+                else:
+                    github_result["message"] = (
+                        repository.stderr.strip()[-500:]
+                        or "Could not identify the GitHub repository."
+                    )
+            else:
+                github_result["message"] = (
+                    auth.stderr.strip()[-500:] or "GitHub authentication failed."
+                )
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
+            github_result["message"] = str(error)[:500]
+        results.append(github_result)
+
+    success = all(item["status"] == "passed" for item in results)
+    report = {"passed": success, "checks": results}
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        for item in results:
+            print(
+                f"{item['role']}: {item['status']} "
+                f"({item['provider']} / {item['model']})"
+            )
+            if item.get("message"):
+                print(f"  {item['message']}")
+            if item.get("credential_source"):
+                print(f"  Credential source: {item['credential_source']}")
+    return 0 if success else 1
 
 
 def _run_verification_health(args: argparse.Namespace) -> int:

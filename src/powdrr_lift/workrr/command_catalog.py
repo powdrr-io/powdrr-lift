@@ -99,6 +99,7 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
 )
 from powdrr_lift.workrr.uncertainty_decisions import (
     records_for_scenario,
+    records_for_worker_events,
     update_decision_artifact,
 )
 from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
@@ -983,6 +984,66 @@ def feature_command_catalog(
         ),
     }
     return CommandCatalog(tuple(commands.values()))
+
+
+def _persist_worker_uncertainty_events(
+    result: Mapping[str, Any],
+    *,
+    state: Mapping[str, Any],
+    uncertainty_policy: str,
+) -> None:
+    """Validate and persist the worker's explicit uncertainty event records."""
+    attempt_values = result.get("attempts", [])
+    if not isinstance(attempt_values, list):
+        attempt_values = []
+    attempt = result.get("attempt")
+    if isinstance(attempt, Mapping):
+        attempt_values = [*attempt_values, attempt]
+    events = [
+        event
+        for item in attempt_values
+        if isinstance(item, Mapping)
+        for event in item.get("events", [])
+        if isinstance(event, Mapping)
+    ]
+    if not any(event.get("type") == "uncertainty_decision" for event in events):
+        return
+    ledger_path = state.get("instruction_ledger_path")
+    decisions_path = state.get("uncertainty_decisions_path")
+    if not isinstance(ledger_path, Path) or not isinstance(decisions_path, Path):
+        raise PowdrrExecutionError(
+            "worker uncertainty decisions cannot be persisted without "
+            "the instruction ledger"
+        )
+    try:
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        if not isinstance(ledger, Mapping):
+            raise ValueError("instruction ledger artifact is malformed")
+        source = ledger.get("source")
+        clauses = ledger.get("clauses")
+        if not isinstance(source, Mapping) or not isinstance(source.get("text"), str):
+            raise ValueError("instruction ledger source text is missing")
+        if not isinstance(clauses, list) or not all(
+            isinstance(item, Mapping) for item in clauses
+        ):
+            raise ValueError("instruction ledger clauses are malformed")
+        records = records_for_worker_events(
+            events, clauses, source["text"], phase="implementation"
+        )
+        update_decision_artifact(
+            decisions_path,
+            records,
+            uncertainty_policy=uncertainty_policy,
+            instruction_ledger_fingerprint=(
+                str(ledger["fingerprint"])
+                if isinstance(ledger.get("fingerprint"), str)
+                else None
+            ),
+        )
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"worker uncertainty decision could not be validated or persisted: {error}"
+        ) from error
 
 
 @dataclass(slots=True)
@@ -3140,7 +3201,7 @@ class FeatureCommandRuntime:
                 parameters, state=state
             )
         if name == "run_code_agent":
-            return feature_endpoint._run_code_agent_phase(
+            result = feature_endpoint._run_code_agent_phase(
                 config,
                 runner=runner,
                 worktree=worktree,
@@ -3150,6 +3211,12 @@ class FeatureCommandRuntime:
                 state=state,
                 parameters=parameters,
             )
+            _persist_worker_uncertainty_events(
+                result,
+                state=state,
+                uncertainty_policy=uncertainty_policy(),
+            )
+            return result
         if name in {
             "compile_obligation_verification_plans",
             "resolve_obligation_populations",

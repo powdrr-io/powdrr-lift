@@ -1,0 +1,98 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 916
+title: Capture uncertainty decisions from coding workers
+intent:
+  problem: Defaults discovered during implementation are visible only in worker prose and are absent from the durable uncertainty ledger.
+  goal: Let coding workers emit structured uncertainty decisions and persist only records validated against the instruction ledger.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 119, end_line: 125}
+    summary: Ask coding workers to emit JSONL uncertainty decision events with required provenance.
+    rationale: Make implementation-time defaults machine-readable instead of relying on prose.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 249, end_line: 254}
+    summary: Define the structured decision event in normal worker requests.
+    rationale: Ensure coding workers receive the event format outside repair workflows.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2608, end_line: 2640}
+    summary: Include stable instruction clause IDs and text in worker context.
+    rationale: Give workers valid source references for structured uncertainty decisions.
+  - path: src/powdrr_lift/workrr/uncertainty_decisions.py
+    type: modified
+    span: {start_line: 106, end_line: 191}
+    summary: Validate worker events and bind each decision to its exact instruction clause span.
+    rationale: Reject unknown sources and preserve decision provenance in the existing ledger format.
+  - path: src/powdrr_lift/workrr/uncertainty_decisions.py
+    type: modified
+    span: {start_line: 293, end_line: 298}
+    summary: Export the worker event record builder.
+    rationale: Make worker decision validation available to the workflow orchestrator.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 102, end_line: 102}
+    summary: Import the worker uncertainty event record builder.
+    rationale: Connect structured worker events to the shared ledger implementation.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 989, end_line: 1048}
+    summary: Persist validated worker decisions into the uncertainty decision artifact.
+    rationale: Retain implementation and repair defaults with existing decision history.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3204, end_line: 3204}
+    summary: Capture uncertainty events after a coding worker attempt completes.
+    rationale: Connect worker output to the durable ledger at the orchestration boundary.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3214, end_line: 3219}
+    summary: Persist worker decision events before returning the attempt result.
+    rationale: Ensure worker choices enter the ledger as soon as the event is observed.
+  - path: tests/test_uncertainty_decisions.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import the worker event conversion helper for focused validation.
+    rationale: Exercise the structured decision path in unit tests.
+  - path: tests/test_uncertainty_decisions.py
+    type: modified
+    span: {start_line: 160, end_line: 220}
+    summary: Verify exact clause binding and rejection of unknown worker source references.
+    rationale: Protect structured worker provenance from malformed or unsupported references.
+entities:
+  - id: worker-uncertainty-decision-event
+    type: Event schema
+    action: added
+  - id: worker-uncertainty-decision-recorder
+    type: Function
+    action: added
+  - id: worker-uncertainty-decision-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: worker-event-recorded-by-recorder
+    type: records
+    source: worker-uncertainty-decision-recorder
+    target: worker-uncertainty-decision-event
+    action: added
+    description: The workflow validates and persists explicitly emitted uncertainty decision events.
+  - id: tests-verify-worker-provenance
+    type: verifies
+    source: worker-uncertainty-decision-regression-tests
+    target: worker-uncertainty-decision-recorder
+    action: added
+    description: Tests verify exact instruction source binding and rejection of unknown clause IDs.
+invariants:
+  - id: worker-defaults-have-valid-instruction-source
+    description: A worker uncertainty decision is persisted only when it references a known instruction clause and provides all required provenance fields.
+    action: added
+  - id: implementation-decisions-share-ledger
+    description: Coding worker decisions use the same uncertainty artifact and revision history as planning decisions.
+    action: added
+guidance:
+  - id: emit-structured-worker-defaults
+    description: Coding workers should emit a JSONL uncertainty_decision event when they select a normative default for behavior left undefined by the request.
+    action: added

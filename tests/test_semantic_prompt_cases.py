@@ -236,11 +236,12 @@ class _VariantGenerator:
 class _VariantReviewer:
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         payload = json.loads(messages[1]["content"])
+        source_text = payload["candidate"]["source_text"]
         if payload["kind"] == "paraphrase":
             return {
                 "accepted": True,
                 "rationale": "The candidate preserves the joint requirement.",
-                "evidence_quote": "both the current user and selected workspace",
+                "evidence_quote": source_text,
             }
         decisions = dict(payload["base"]["expected_decisions"])
         current_relation = decisions.get("requirement_relation")
@@ -252,7 +253,8 @@ class _VariantReviewer:
         return {
             "accepted": True,
             "rationale": "Either is explicitly permitted in this contrast.",
-            "evidence_quote": "either the current user or selected workspace",
+            "evidence_quote": source_text,
+            "target_proposition": "Either field is sufficient.",
             "expected_decisions": decisions,
             "explicitly_unspecified": [],
             "required_prompt_claims": ["Either field is sufficient."],
@@ -281,6 +283,76 @@ def test_variant_generation_reviews_candidates_and_preserves_split_groups() -> N
         case["split"] == "held_out"
         for case in generated
         if case["domain"] == "configuration_cache"
+    )
+    paraphrases = [case for case in generated if "variant_of" in case]
+    assert all(
+        case["target_proposition"]
+        == bases_by_id[case["variant_of"]]["target_proposition"]
+        for case in paraphrases
+    )
+
+
+def test_variant_generator_normalizes_model_kind_names_and_candidate_targets() -> None:
+    class SynonymGenerator:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            case = json.loads(messages[1]["content"])["case"]
+            return {
+                "variants": [
+                    {
+                        "kind": "faithful_paraphrase",
+                        "source_text": case["source_text"] + " It keeps both.",
+                        "target_proposition": "A model-written alternate target.",
+                    },
+                    {
+                        "kind": "minimal_contrast",
+                        "source_text": "Only one of these fields is stored.",
+                        "target_proposition": "One field is sufficient.",
+                    },
+                ]
+            }
+
+    cases = load_semantic_prompt_cases(CASE_PATH)
+    result = generate_semantic_prompt_variants(
+        cases,
+        generator=SynonymGenerator(),
+        reviewer=_VariantReviewer(),
+    )
+
+    assert len(result["cases"]) == 2 * len(cases)
+    assert not result["rejected"]
+
+
+def test_variant_generation_rejects_unchanged_source_for_contrast() -> None:
+    class UnchangedContrastGenerator:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            case = json.loads(messages[1]["content"])["case"]
+            return {
+                "variants": [
+                    {
+                        "kind": "paraphrase",
+                        "source_text": case["source_text"] + " Both are kept.",
+                        "target_proposition": case["target_proposition"],
+                    },
+                    {
+                        "kind": "minimal_contrast",
+                        "source_text": case["source_text"],
+                        "target_proposition": "An unsupported contrast.",
+                    },
+                ]
+            }
+
+    cases = load_semantic_prompt_cases(CASE_PATH)
+    result = generate_semantic_prompt_variants(
+        cases,
+        generator=UnchangedContrastGenerator(),
+        reviewer=_VariantReviewer(),
+    )
+
+    assert len(result["cases"]) == len(cases)
+    assert len(result["rejected"]) == len(cases)
+    assert all(
+        item["reason"] == "variant source_text is unchanged from its base case"
+        for item in result["rejected"]
     )
 
 

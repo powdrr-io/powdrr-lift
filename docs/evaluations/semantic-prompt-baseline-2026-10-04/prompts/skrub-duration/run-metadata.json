@@ -1,0 +1,12 @@
+{
+  "opencode_version": null,
+  "output_root": "/tmp/powdrr-semantic-capture-skrub-20261004-01",
+  "powdrr_direct_url": "{\"url\": \"https://github.com/powdrr-io/powdrr-lift.git\", \"vcs_info\": {\"commit_id\": \"ff7348ed6204617b379c499e3d1d6bdd587ee3b3\", \"requested_revision\": \"ff7348ed\", \"vcs\": \"git\"}}",
+  "powdrr_install_spec": "git+https://github.com/powdrr-io/powdrr-lift.git@ff7348ed",
+  "powdrr_revision": null,
+  "powdrr_version": "0.1.0",
+  "repo_root": "/app",
+  "schema_version": "powdrr-run-metadata-v1",
+  "submission_base": "24c4466fea94f551fb73d21eba54038dc5b346d3",
+  "task_id": "skrub-duration-encoding"
+}

@@ -1,0 +1,17 @@
+{
+  "accepted_variant_count": 0,
+  "base_case_count": 72,
+  "generated_at": "2026-10-04T11:18:06.646493+00:00",
+  "generator": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "provider": "deepinfra-cheap"
+  },
+  "generator_calls": 72,
+  "rejected_variant_count": 144,
+  "reviewer": {
+    "model": "deepseek-ai/DeepSeek-V4-Pro",
+    "provider": "deepinfra"
+  },
+  "reviewer_calls": 0,
+  "source_revision": "4b0e0a1b812b4cdabea894c4ff04cd1d578ab41b"
+}

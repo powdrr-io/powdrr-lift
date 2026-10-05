@@ -52,7 +52,8 @@ def generate_semantic_prompt_variants(
                 )
                 continue
             kind = proposal.get("kind")
-            if kind not in {"paraphrase", "contrast"}:
+            kind = _normalize_kind(kind)
+            if kind is None:
                 rejected.append(
                     {"case_id": str(base["case_id"]), "reason": "unknown variant kind"}
                 )
@@ -91,7 +92,9 @@ def generate_semantic_prompt_variants(
                     "case_id": candidate_id,
                     "source_text": source_text.strip(),
                     "target_proposition": str(
-                        proposal.get("target_proposition", source_text)
+                        base["target_proposition"]
+                        if kind == "paraphrase"
+                        else review["target_proposition"]
                     ).strip(),
                     "expected_decisions": dict(base["expected_decisions"])
                     if kind == "paraphrase"
@@ -127,10 +130,13 @@ def _propose(client: JsonCompletionClient, base: Mapping[str, Any]) -> Any:
         {
             "role": "system",
             "content": (
-                "Create two candidate variants of the evaluation case: "
-                "one faithful paraphrase and one minimal contrast that changes one "
-                "semantic decision. Return JSON with a variants array. Do not provide "
-                "gold labels or change the domain. Keep wording natural and concise."
+                "Create two candidate variants of the evaluation case: one paraphrase "
+                "and one minimal contrast that changes one semantic decision. Return "
+                'kind exactly as "paraphrase" or "contrast". Each candidate '
+                "source_text "
+                "must differ from the base source_text. Return JSON with a variants "
+                "array. Do not provide gold labels or change the domain. Keep wording "
+                "natural and concise."
             ),
         },
         {
@@ -162,6 +168,7 @@ def _review(
         required.extend(
             [
                 "expected_decisions",
+                "target_proposition",
                 "explicitly_unspecified",
                 "required_prompt_claims",
                 "forbidden_prompt_claims",
@@ -209,12 +216,16 @@ def _review_rejection(
         return "review evidence_quote is not an exact source_text substring"
     if not isinstance(review.get("rationale"), str) or not review["rationale"].strip():
         return "review is missing a rationale"
-    if kind == "paraphrase":
-        if _normalize(str(proposal.get("target_proposition", ""))) != _normalize(
-            str(base["target_proposition"])
+    if _normalize(str(proposal.get("source_text", ""))) == _normalize(
+        str(base["source_text"])
+    ):
+        return "variant source_text is unchanged from its base case"
+    if kind == "contrast":
+        if (
+            not isinstance(review.get("target_proposition"), str)
+            or not review["target_proposition"].strip()
         ):
-            return "paraphrase changes target_proposition"
-    else:
+            return "contrast is missing target_proposition"
         if (
             not isinstance(review.get("expected_decisions"), Mapping)
             or not review["expected_decisions"]
@@ -243,6 +254,17 @@ def _candidate_id(base: Mapping[str, Any], kind: str, index: int) -> str:
     suffix = "para" if kind == "paraphrase" else "contrast"
     safe_id = re.sub(r"[^a-zA-Z0-9-]+", "-", str(base["case_id"])).strip("-")
     return f"{safe_id}-{suffix}-{index:02d}"
+
+
+def _normalize_kind(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.casefold().replace("_", " ").split())
+    if normalized in {"paraphrase", "faithful", "faithful paraphrase"}:
+        return "paraphrase"
+    if normalized in {"contrast", "minimal contrast"}:
+        return "contrast"
+    return None
 
 
 def _normalize(value: str) -> str:

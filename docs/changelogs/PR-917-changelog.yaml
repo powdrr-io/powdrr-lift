@@ -1,0 +1,179 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 917
+title: Capture semantic prompt quality baseline
+intent:
+  problem: The expanded semantic case generator had not been exercised against a real corpus, and the three benchmark prompts had not been scored together against source-anchored criteria.
+  goal: Preserve the reviewed case expansion and prompt-only baseline, fix candidate normalization uncovered by the run, and ensure the skrub rubric evaluates exact source behaviors.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+    type: modified
+    span: {start_line: 55, end_line: 56}
+    summary: Normalize equivalent model kind labels, retain base gold meaning for paraphrases, and reject unchanged candidates or incomplete contrasts.
+    rationale: Prevent semantically invalid proposals and false rejections from model-specific label wording.
+  - path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+    type: modified
+    span: {start_line: 95, end_line: 97}
+    summary: Preserve the original target proposition for paraphrase variants and use reviewer-confirmed targets for contrasts.
+    rationale: Keep generated paraphrases from drifting away from their parent meaning.
+  - path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+    type: modified
+    span: {start_line: 133, end_line: 139}
+    summary: Specify exact candidate kind labels and require changed source wording.
+    rationale: Reduce avoidable model response variation and unchanged candidates.
+  - path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+    type: modified
+    span: {start_line: 171, end_line: 171}
+    summary: Ask the reviewer to return a contrast target proposition.
+    rationale: Require an explicit semantic claim before accepting a contrast.
+  - path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+    type: modified
+    span: {start_line: 219, end_line: 226}
+    summary: Reject unchanged source wording and contrasts without a reviewer target proposition.
+    rationale: Prevent variants that do not exercise the intended decision boundary.
+  - path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+    type: modified
+    span: {start_line: 228, end_line: 228}
+    summary: Return an explicit rejection reason when a contrast lacks its target proposition.
+    rationale: Keep invalid candidate feedback actionable.
+  - path: src/powdrr_lift/workrr/semantic_prompt_variants.py
+    type: modified
+    span: {start_line: 259, end_line: 269}
+    summary: Normalize known paraphrase and contrast kind aliases.
+    rationale: Accept semantically equivalent model labels without weakening review rules.
+  - path: tests/test_semantic_prompt_cases.py
+    type: modified
+    span: {start_line: 239, end_line: 239}
+    summary: Cover equivalent kind labels, paraphrase gold preservation, and unchanged-source rejection.
+    rationale: Keep the live-run failure modes covered by deterministic regression tests.
+  - path: tests/test_semantic_prompt_cases.py
+    type: modified
+    span: {start_line: 244, end_line: 244}
+    summary: Use the candidate's exact source wording as review evidence.
+    rationale: Ensure evidence validation exercises the same quoting rule used for generated variants.
+  - path: tests/test_semantic_prompt_cases.py
+    type: modified
+    span: {start_line: 256, end_line: 257}
+    summary: Return a reviewer-confirmed target for contrast candidates.
+    rationale: Keep test reviewers aligned with the contrast acceptance contract.
+  - path: tests/test_semantic_prompt_cases.py
+    type: modified
+    span: {start_line: 287, end_line: 356}
+    summary: Cover paraphrase gold preservation, kind aliases, and unchanged-source rejection.
+    rationale: Keep the live-run failure modes covered by deterministic regression tests.
+  - path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+    type: modified
+    span: {start_line: 58, end_line: 58}
+    summary: Separate duration dtype support, non-duration rejection, and selector behavior into exact source-anchored criteria.
+    rationale: Ensure prompt evaluation evidence is checked against the behavior each criterion actually names.
+  - path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+    type: modified
+    span: {start_line: 60, end_line: 75}
+    summary: Define separate source excerpts and verifier tests for type support, rejection, and selector behavior.
+    rationale: Avoid false missing-evidence findings caused by a rubric quote unrelated to its criterion.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/README.md
+    type: added
+    span: {start_line: 1, end_line: 63}
+    summary: Summarize the three prompt evaluations, generation cost, rubric correction, limitations, and artifact provenance.
+    rationale: Make conclusions and their evidence boundaries clear to future evaluation work.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/state-machine/implementation-prompt.md
+    type: added
+    span: {start_line: 1, end_line: 111}
+    summary: Preserve the exact state-machine worker prompt captured in prompt-only mode.
+    rationale: Allow inspection of what the downstream coding worker would receive.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/state-machine/prompt-quality-evaluation.json
+    type: added
+    span: {start_line: 1, end_line: 616}
+    summary: Preserve criterion-level judge decisions and evidence for the state-machine prompt.
+    rationale: Make the 20/20 coverage result auditable.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/state-machine/run-metadata.json
+    type: added
+    span: {start_line: 1, end_line: 12}
+    summary: Record the state-machine capture task identity.
+    rationale: Keep the prompt paired with its benchmark task.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/ytt-jsonpath/implementation-prompt.md
+    type: added
+    span: {start_line: 1, end_line: 121}
+    summary: Preserve the exact ytt-jsonpath worker prompt captured in prompt-only mode.
+    rationale: Allow inspection of what the downstream coding worker would receive.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/ytt-jsonpath/prompt-quality-evaluation.json
+    type: added
+    span: {start_line: 1, end_line: 392}
+    summary: Preserve criterion-level judge decisions and evidence for the ytt-jsonpath prompt.
+    rationale: Make the 12/12 coverage result auditable.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/ytt-jsonpath/run-metadata.json
+    type: added
+    span: {start_line: 1, end_line: 12}
+    summary: Record the ytt-jsonpath capture task identity.
+    rationale: Keep the prompt paired with its benchmark task.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/skrub-duration/implementation-prompt.md
+    type: added
+    span: {start_line: 1, end_line: 104}
+    summary: Preserve the exact skrub worker prompt captured in prompt-only mode.
+    rationale: Allow inspection of what the downstream coding worker would receive.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/skrub-duration/prompt-quality-evaluation.json
+    type: added
+    span: {start_line: 1, end_line: 489}
+    summary: Preserve corrected criterion-level judge decisions and evidence for the skrub prompt.
+    rationale: Make the corrected 14/14 coverage result auditable.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/prompts/skrub-duration/run-metadata.json
+    type: added
+    span: {start_line: 1, end_line: 12}
+    summary: Record the skrub capture task identity.
+    rationale: Keep the prompt paired with its benchmark task.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/variants/semantic-prompt-cases-v2.jsonl
+    type: added
+    span: {start_line: 1, end_line: 181}
+    summary: Add 109 accepted paraphrase and contrast variants to the 72 base semantic cases.
+    rationale: Expand automated classifier evaluation while preserving lineage and held-out split constraints.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/variants/rejected-variants.json
+    type: added
+    span: {start_line: 1, end_line: 142}
+    summary: Record candidate variants rejected by source checks or independent review.
+    rationale: Preserve evidence of the quality gate rather than retaining accepted examples alone.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/variants/metadata.json
+    type: added
+    span: {start_line: 1, end_line: 18}
+    summary: Record reviewer model, call count, and accepted corpus provenance.
+    rationale: Make the review pass reproducible and attributable.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/variants/proposal-run-metadata.json
+    type: added
+    span: {start_line: 1, end_line: 17}
+    summary: Record the initial candidate-generation run and its zero-acceptance result.
+    rationale: Explain why recorded proposal texts were reused after fixing normalization.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/variants/variant-generation-exchanges.jsonl
+    type: added
+    span: {start_line: 1, end_line: 72}
+    summary: Preserve all 72 model-generated proposal exchanges.
+    rationale: Make the automated candidate wording traceable to its input cases.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/variants/variant-review-exchanges.jsonl
+    type: added
+    span: {start_line: 1, end_line: 144}
+    summary: Preserve the 144 independent review exchanges.
+    rationale: Keep accepted and rejected variant decisions auditable.
+entities:
+  - id: semantic-prompt-variant-corpus-v2
+    type: Dataset
+    action: added
+  - id: three-task-prompt-quality-baseline
+    type: Dataset
+    action: added
+  - id: semantic-prompt-variant-generator
+    type: Function
+    action: modified
+  - id: semantic-variant-normalization-regression-test
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: paraphrases-preserve-base-gold
+    action: altered
+    description: A paraphrase keeps its source case's target proposition and gold decisions; a contrast must change at least one expected decision.
+  - id: prompt-rubric-quotes-anchor-the-claim
+    action: added
+    description: Each prompt quality criterion uses a source excerpt that directly states the behavior being evaluated.
+guidance:
+  - id: prompt-coverage-is-not-solution-success
+    action: added
+    description: Prompt-only judge coverage measures the presence and consistency of rubric behaviors in worker prompts; it does not establish that a coding worker will implement them.

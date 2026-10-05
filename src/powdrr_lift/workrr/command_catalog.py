@@ -3422,7 +3422,12 @@ class FeatureCommandRuntime:
                 return None
             try:
                 state["pull_request_url"] = feature_endpoint._open_pull_request(
-                    runner, worktree, feature_config, branch
+                    runner,
+                    worktree,
+                    feature_config,
+                    branch,
+                    output_root=output_root,
+                    validation=state.get("validation"),
                 )
             except Exception:
                 publication["pull_request"] = "failed"
@@ -3470,6 +3475,8 @@ class FeatureCommandRuntime:
                     pull_request_value,
                     config,
                     Path(changelog).relative_to(worktree),
+                    output_root=output_root,
+                    validation=state.get("validation"),
                 )
             return pull_request_value
         raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")

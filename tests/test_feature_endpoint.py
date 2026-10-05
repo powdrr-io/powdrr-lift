@@ -82,6 +82,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _plan_text_items,
     _proposal_execution_units,
     _remove_temporary_feature_artifacts,
+    _render_pull_request_body,
     _resolve_bootstrap_subject_binding,
     _run_code_task_agent,
     _task_structrr_changes,
@@ -1251,6 +1252,76 @@ def test_feature_endpoint_result_preserves_early_failure_without_checkpoints(
     assert result.baseline_path == tmp_path
     assert result.plan_path == tmp_path
     assert result.review == {"passed": False}
+
+
+def test_pull_request_body_updates_keep_uncertainty_decisions(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "run-42"
+    output_root.mkdir()
+    (output_root / "uncertainty-decisions.json").write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    {
+                        "id": "uncertainty:instruction-001:format",
+                        "source_ref": "instruction-001",
+                        "source_quote": "Export the data.",
+                        "uncertainty": "The format is unspecified.",
+                        "selected_default": "Use JSON.",
+                        "rationale": "Match existing project artifacts.",
+                        "basis": "repository_convention",
+                        "basis_reference": "Existing project JSON artifacts.",
+                        "confidence": "high",
+                        "revision_history": [],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        del kwargs
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="src/export.py\n"
+            if command[:3] == ["git", "diff", "--name-only"]
+            else "",
+            stderr="",
+        )
+
+    config = FeatureEndpointConfig(
+        feature_description="Add export support.",
+        work_item_name="export-support",
+        repo_root=tmp_path,
+        allowed_paths=("src/export.py",),
+        base_branch="main",
+    )
+    created_body = _render_pull_request_body(
+        runner,
+        tmp_path,
+        config,
+        output_root=output_root,
+        validation={"status": "passed", "commands": [["pytest"]]},
+    )
+    updated_body = _render_pull_request_body(
+        runner,
+        tmp_path,
+        config,
+        output_root=output_root,
+        validation={"status": "passed", "commands": [["pytest"]]},
+        changelog_relative_path=Path("docs/changelogs/PR-42-changelog.yaml"),
+    )
+
+    assert "## Uncertainty decisions" in created_body
+    assert "Use JSON." in created_body
+    assert "## Uncertainty decisions" in updated_body
+    assert "Use JSON." in updated_body
+    assert "PR-42-changelog.yaml" in updated_body
+    assert "## Validation" in created_body
+    assert "`run-42/report.md`" in created_body
 
 
 def test_run_feature_in_place_reuses_core_without_git_publication(

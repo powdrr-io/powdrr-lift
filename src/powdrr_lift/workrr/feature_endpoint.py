@@ -5069,11 +5069,17 @@ def _update_pull_request_description(
     pull_request_url: str,
     config: FeatureEndpointConfig,
     changelog_relative_path: Path,
+    *,
+    output_root: Path | None = None,
+    validation: Any = None,
 ) -> None:
-    body = (
-        f"## Feature\n\n{config.feature_description}\n\n"
-        f"PR changelog descriptor: `{changelog_relative_path}`\n"
-        "Implemented by the bounded Workrr/OpenCode handoff and reviewed before commit."
+    body = _render_pull_request_body(
+        runner,
+        worktree,
+        config,
+        output_root=output_root,
+        validation=validation,
+        changelog_relative_path=changelog_relative_path,
     )
     _run(
         runner,
@@ -5087,10 +5093,16 @@ def _open_pull_request(
     worktree: Path,
     config: FeatureEndpointConfig,
     branch: str,
+    *,
+    output_root: Path | None = None,
+    validation: Any = None,
 ) -> str:
-    body = (
-        f"## Feature\n\n{config.feature_description}\n\n"
-        "Implemented by the bounded Workrr/OpenCode handoff and reviewed before commit."
+    body = _render_pull_request_body(
+        runner,
+        worktree,
+        config,
+        output_root=output_root,
+        validation=validation,
     )
     result = _run(
         runner,
@@ -5110,6 +5122,105 @@ def _open_pull_request(
         ],
     )
     return result.stdout.strip().splitlines()[-1]
+
+
+def _render_pull_request_body(
+    runner: Runner,
+    worktree: Path,
+    config: FeatureEndpointConfig,
+    *,
+    output_root: Path | None,
+    validation: Any,
+    changelog_relative_path: Path | None = None,
+) -> str:
+    base_ref = f"origin/{config.base_branch}...HEAD"
+    try:
+        changed_paths = _git_output(
+            runner, worktree, ["git", "diff", "--name-only", base_ref]
+        ).splitlines()
+    except PowdrrExecutionError:
+        changed_paths = []
+    change_lines = (
+        "\n".join(f"- `{path}`" for path in changed_paths)
+        if changed_paths
+        else "- Change list unavailable."
+    )
+    decisions: list[Mapping[str, Any]] = []
+    if output_root is not None:
+        try:
+            decision_document = json.loads(
+                (output_root / "uncertainty-decisions.json").read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            decision_document = {}
+        raw_decisions = (
+            decision_document.get("decisions")
+            if isinstance(decision_document, Mapping)
+            else None
+        )
+        if isinstance(raw_decisions, list):
+            decisions = [item for item in raw_decisions if isinstance(item, Mapping)]
+    uncertainty_section = _render_pull_request_uncertainties(decisions)
+    validation_data = (
+        validation.to_data()
+        if callable(getattr(validation, "to_data", None))
+        else validation
+        if isinstance(validation, Mapping)
+        else None
+    )
+    validation_section = (
+        json.dumps(validation_data, indent=2, sort_keys=True, default=str)
+        if validation_data is not None
+        else "Validation evidence unavailable."
+    )
+    report_location = (
+        f"Full local reports: `{output_root.name}/report.md` and "
+        f"`{output_root.name}/report.json` (the CLI prints their paths)."
+        if output_root is not None
+        else (
+            "Run reports are saved locally with the run artifacts; "
+            "the CLI prints their paths."
+        )
+    )
+    changelog_section = (
+        f"\n\nPR changelog descriptor: `{changelog_relative_path}`"
+        if changelog_relative_path is not None
+        else ""
+    )
+    return (
+        f"## Feature\n\n{config.feature_description}\n\n"
+        f"## Change summary\n\n{change_lines}\n\n"
+        f"## Validation\n\n```json\n{validation_section}\n```\n\n"
+        f"## Uncertainty decisions\n\n{uncertainty_section}\n\n"
+        f"{report_location}{changelog_section}\n\n"
+        "Implemented by the bounded Workrr/OpenCode handoff and reviewed before commit."
+    )
+
+
+def _render_pull_request_uncertainties(
+    decisions: Sequence[Mapping[str, Any]],
+) -> str:
+    if not decisions:
+        return "No uncertainty decisions were recorded."
+    rendered: list[str] = []
+    for decision in decisions:
+        rendered.extend(
+            [
+                f"### {decision.get('id', 'unknown decision')}",
+                f"- **Where:** {decision.get('source_ref', 'unavailable')} — "
+                f"{decision.get('source_quote', 'source quote unavailable')}",
+                f"- **Uncertainty:** {decision.get('uncertainty', 'unavailable')}",
+                f"- **Default:** {decision.get('selected_default', 'unavailable')}",
+                f"- **Rationale:** {decision.get('rationale', 'unavailable')}",
+                f"- **Basis:** {decision.get('basis', 'unavailable')} — "
+                f"{decision.get('basis_reference', 'unavailable')}",
+                f"- **Confidence:** {decision.get('confidence', 'unavailable')}",
+                f"- **Revisions:** "
+                f"{json.dumps(decision.get('revision_history', []), sort_keys=True)}",
+                "",
+            ]
+        )
+    return "\n".join(rendered).rstrip()
 
 
 def _run(

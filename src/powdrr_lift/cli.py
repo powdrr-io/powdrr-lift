@@ -16,6 +16,7 @@ from typing import Any
 
 import yaml
 
+from powdrr_lift.agent_bootstrap import BootstrapTaskConfig, run_bootstrap_task
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
@@ -406,6 +407,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the validated bootstrap summary as JSON.",
     )
     bootstrap_structrr_parser.set_defaults(func=_run_bootstrap_structrr)
+
+    bootstrap_parser = subparsers.add_parser(
+        "bootstrap",
+        help="Create a validated project context snapshot in an agent worktree.",
+    )
+    bootstrap_parser.add_argument("--repo-root", type=Path)
+    bootstrap_parser.add_argument("--work-item-name", default="repository-bootstrap")
+    bootstrap_parser.add_argument("--base-ref", default="HEAD")
+    bootstrap_parser.add_argument("--base-branch")
+    bootstrap_parser.add_argument("--remote", default="origin")
+    bootstrap_parser.add_argument("--output-root", type=Path)
+    bootstrap_parser.add_argument(
+        "--taxonomy",
+        type=Path,
+        default=Path("software_development_entity_taxonomy.md"),
+    )
+    bootstrap_parser.add_argument("--open-pr", action="store_true")
+    bootstrap_parser.add_argument("--json", action="store_true")
+    bootstrap_parser.set_defaults(func=_run_bootstrap)
 
     verification_health_parser = subparsers.add_parser(
         "verification-health",
@@ -3183,6 +3203,41 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
             f"{summary['source_anchor_count']} source anchors.",
         )
     return 0
+
+
+def _run_bootstrap(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    result = run_bootstrap_task(
+        BootstrapTaskConfig(
+            repo_root=repo_root,
+            task_name=args.work_item_name,
+            base_ref=args.base_ref,
+            remote=args.remote,
+            base_branch=args.base_branch,
+            open_pr=args.open_pr,
+            output_root=args.output_root,
+            taxonomy_path=args.taxonomy,
+        )
+    )
+    data = result.to_data()
+    if args.json:
+        print(json.dumps(data, sort_keys=True))
+    else:
+        print(f"Bootstrap status: {result.status}")
+        if result.task is not None:
+            print(f"Branch: {result.task.branch}")
+            print(f"Worktree: {result.task.worktree}")
+        if result.bootstrap is not None:
+            print(f"Snapshot: {result.bootstrap.output_path}")
+            if result.bootstrap.manifest_path is not None:
+                print(f"Manifest: {result.bootstrap.manifest_path}")
+        if result.pull_request_url:
+            print(f"Pull request: {result.pull_request_url}")
+        if result.report_markdown_path:
+            print(f"Report: {result.report_markdown_path}")
+        if result.error:
+            print(f"Error: {result.error}", file=sys.stderr)
+    return 0 if result.status in {"completed_local", "pr_opened", "no_op"} else 1
 
 
 def _run_check_credentials(args: argparse.Namespace) -> int:

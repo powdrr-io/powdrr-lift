@@ -122,6 +122,7 @@ def bootstrap_structrr(
     include_untracked: bool = False,
     artifact_exclusions: Sequence[str] = (),
     submission_base: str | None = None,
+    repository_name: str | None = None,
 ) -> BootstrapResult:
     """Build and validate a Structrr snapshot from tracked repository evidence.
 
@@ -148,6 +149,7 @@ def bootstrap_structrr(
         change_id=change_id,
         title=title or f"Bootstrap Structrr for {root.name}",
         benchmark_mode=benchmark_mode,
+        repository_name=repository_name,
     )
     validation = validate_bootstrap_document(document, root=root, taxonomy=taxonomy)
     source_revision_result = subprocess.run(
@@ -1057,6 +1059,7 @@ def _build_document(
     change_id: str,
     title: str,
     benchmark_mode: bool = False,
+    repository_name: str | None = None,
 ) -> dict[str, Any]:
     from powdrr_lift.structrr.active_intent import active_intent_section
     from powdrr_lift.structrr.validation import (
@@ -1073,7 +1076,7 @@ def _build_document(
     tools: dict[str, dict[str, Any]] = {}
     statements: dict[str, dict[str, Any]] = {}
 
-    repository_id = f"repository:{root.name}"
+    repository_id = f"repository:{repository_name or root.name}"
     entities[repository_id] = {
         "id": repository_id,
         "type": "Repository",

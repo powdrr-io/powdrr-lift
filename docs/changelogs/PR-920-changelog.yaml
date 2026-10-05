@@ -1,0 +1,129 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 920
+title: Add agent-owned bootstrap worktree lifecycle
+intent:
+  problem: Repository bootstrap only generated a snapshot in the caller checkout and required a project taxonomy.
+  goal: Provide isolated local and PR bootstrap through the agent runtime, with packaged defaults and durable run evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/agent_runtime.py
+    type: added
+    span: {start_line: 1, end_line: 254}
+    summary: Add agent-owned task worktree, branch, commit, and publication helpers.
+    rationale: Keep repository lifecycle outside Procedrr flows and give each attempt an isolated retained checkout.
+  - path: src/powdrr_lift/agent_bootstrap.py
+    type: added
+    span: {start_line: 1, end_line: 413}
+    summary: Add the agent bootstrap task lifecycle with validation, reports, taxonomy fallback, and optional PR publication.
+    rationale: Make repository onboarding usable without model credentials or Powdrr-specific project files.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 19, end_line: 19}
+    summary: Import the agent bootstrap entry point.
+    rationale: Route the public command through the agent runtime.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 411, end_line: 429}
+    summary: Add the bootstrap command and local/publication options.
+    rationale: Expose isolated bootstrap for local use and explicit PR publishing.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3208, end_line: 3242}
+    summary: Return a single JSON result or concise text status for bootstrap runs.
+    rationale: Make result, worktree, PR, and report locations accessible to callers.
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    span: {start_line: 125, end_line: 125}
+    summary: Accept a stable project repository name when snapshotting a candidate worktree.
+    rationale: Avoid worktree attempt identifiers changing the repository entity identity.
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    span: {start_line: 152, end_line: 152}
+    summary: Pass the stable repository name into snapshot construction.
+    rationale: Keep source-derived snapshots stable across isolated attempts.
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    span: {start_line: 1062, end_line: 1062}
+    summary: Add the optional repository name to snapshot construction.
+    rationale: Preserve existing default behavior while supporting agent worktrees.
+  - path: src/powdrr_lift/structrr/bootstrap.py
+    type: modified
+    span: {start_line: 1079, end_line: 1079}
+    summary: Use the provided repository identity when building the snapshot.
+    rationale: Ensure bootstrap output does not encode its temporary worktree name.
+  - path: src/powdrr_lift/resources/__init__.py
+    type: added
+    span: {start_line: 1, end_line: 1}
+    summary: Define packaged agent resources.
+    rationale: Make default onboarding resources available through importlib.resources.
+  - path: src/powdrr_lift/resources/software_development_entity_taxonomy.md
+    type: added
+    span: {start_line: 1, end_line: 467}
+    summary: Package a default software development entity taxonomy.
+    rationale: Let fresh projects bootstrap without hand-creating a Powdrr taxonomy.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Update the expected bootstrap module span.
+    rationale: Keep the golden source inventory aligned with the changed bootstrap implementation.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Update the expected bootstrap function span.
+    rationale: Keep the golden source inventory aligned with the changed function signature.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 21, end_line: 22}
+    summary: Update the expected Python source extractor span.
+    rationale: Keep the golden source inventory aligned with the shifted implementation lines.
+  - path: tests/test_agent_bootstrap.py
+    type: added
+    span: {start_line: 1, end_line: 209}
+    summary: Cover local bootstrap, no-op, taxonomy preservation, PR publication, reports, and CLI output.
+    rationale: Protect the agent onboarding contract and ensure publication includes only bootstrap artifacts.
+  - path: tests/test_agent_runtime.py
+    type: added
+    span: {start_line: 1, end_line: 61}
+    summary: Cover dedicated worktree creation and clean-checkout refusal.
+    rationale: Protect user changes and ensure each task starts on its own branch.
+entities:
+  - id: agent-task-worktree-lifecycle
+    type: Function
+    action: added
+  - id: agent-bootstrap-command
+    type: CLI app
+    action: added
+  - id: bootstrap-lifecycle-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: bootstrap-command-uses-agent-lifecycle
+    type: uses
+    source: agent-bootstrap-command
+    target: agent-task-worktree-lifecycle
+    action: added
+    description: The bootstrap entry point prepares its task branch and worktree through agent runtime helpers.
+  - id: regression-tests-protect-bootstrap-lifecycle
+    type: verifies
+    source: bootstrap-lifecycle-regression-tests
+    target: agent-task-worktree-lifecycle
+    action: added
+    description: Tests verify isolation, no-op behavior, taxonomy handling, report output, and PR publication.
+invariants:
+  - id: bootstrap-never-mutates-caller-checkout
+    description: Bootstrap work is created and committed in a retained task worktree after the caller checkout passes a clean check.
+    action: added
+  - id: bootstrap-commits-only-onboarding-artifacts
+    description: The bootstrap task stages only the snapshot, source manifest, and packaged taxonomy when used.
+    action: added
+  - id: project-taxonomy-is-preserved
+    description: A project taxonomy is used as-is; the packaged taxonomy is copied only when the default taxonomy is absent.
+    action: added
+guidance:
+  - id: run-agent-bootstrap
+    description: Use powdrr-lift bootstrap --repo-root . for a local isolated bootstrap and add --open-pr to publish validated onboarding artifacts.
+    action: added
+  - id: inspect-bootstrap-reports
+    description: The command result includes JSON and Markdown report paths, the retained worktree, taxonomy provenance, and publication outcome.
+    action: added

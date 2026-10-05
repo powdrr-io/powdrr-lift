@@ -4872,8 +4872,8 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             file=console,
         )
         print(f"Latest request: {result.request_path}", file=console)
-        else:
-            print(f"Review passed: {result.review['passed']}", file=console)
+    else:
+        print(f"Review passed: {result.review['passed']}", file=console)
     print(f"Run logs: {output_root}", file=console)
     report_json_path = getattr(result, "report_json_path", None)
     report_markdown_path = getattr(result, "report_markdown_path", None)

@@ -120,6 +120,7 @@ from powdrr_lift.workrr.run_artifacts import (
     RunFailureStage,
     collect_run_metadata,
     write_json_artifact,
+    write_run_report,
 )
 from powdrr_lift.workrr.verification_evidence import VerificationEvidenceRunner
 from powdrr_lift.workrr.verification_provider import (
@@ -178,6 +179,9 @@ class FeatureEndpointResult:
     failure: RunFailure | None = None
     prompt_path: Path | None = None
     structrr_diff_path: Path | None = None
+    report_json_path: Path | None = None
+    report_markdown_path: Path | None = None
+    publication: dict[str, Any] | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -203,6 +207,13 @@ class FeatureEndpointResult:
             "structrr_diff_path": (
                 str(self.structrr_diff_path) if self.structrr_diff_path else None
             ),
+            "report_json_path": (
+                str(self.report_json_path) if self.report_json_path else None
+            ),
+            "report_markdown_path": (
+                str(self.report_markdown_path) if self.report_markdown_path else None
+            ),
+            "publication": self.publication,
         }
 
 
@@ -260,9 +271,9 @@ def run_feature_endpoint(
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     _write_run_metadata(config, root, output_root)
-    _exclude_telemetry_from_patch(root, output_root)
 
     try:
+        _exclude_telemetry_from_patch(root, output_root)
         _require_clean_root(root, runner)
         _run(runner, root, ["git", "fetch", "origin", config.base_branch])
         _run(
@@ -297,6 +308,20 @@ def run_feature_endpoint(
                 error=error,
                 failure=failure,
             )
+        result = _feature_endpoint_result(
+            {}, branch, worktree, "failed", failure=failure
+        )
+        _write_run_result(output_root, result)
+        raise
+    except KeyboardInterrupt as error:
+        failure = _failure_for_exception(error, output_root, config)
+        _write_failure_artifact(output_root, failure)
+        _write_run_result(
+            output_root,
+            _feature_endpoint_result(
+                {}, branch, worktree, "interrupted", failure=failure
+            ),
+        )
         raise
 
 
@@ -313,7 +338,7 @@ def run_feature_in_place(
     The flow still commits the completed implementation to the current
     checkout so the harness can collect it.
     """
-    config = replace(config, benchmark_mode=True)
+    config = replace(config, benchmark_mode=True, open_pr=False, push_changes=False)
     if not config.feature_description.strip():
         raise ValueError("feature_description must not be empty")
     if not config.allowed_paths:
@@ -324,10 +349,10 @@ def run_feature_in_place(
         config.output_root or root / ".powdrr" / "feature-runs" / slug
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
-    _exclude_telemetry_from_patch(root, output_root)
     branch = "HEAD"
     initial_head: str | None = None
     try:
+        _exclude_telemetry_from_patch(root, output_root)
         _require_clean_root(root, runner)
         branch = _git_output(runner, root, ["git", "branch", "--show-current"])
         if not branch:
@@ -364,6 +389,14 @@ def run_feature_in_place(
             error=error,
             failure=failure,
         )
+    except KeyboardInterrupt as error:
+        failure = _failure_for_exception(error, output_root, config)
+        _write_failure_artifact(output_root, failure)
+        _write_run_result(
+            output_root,
+            _feature_endpoint_result({}, branch, root, "interrupted", failure=failure),
+        )
+        raise
 
 
 def _execute_procedrr_flow(
@@ -390,6 +423,12 @@ def _execute_procedrr_flow(
         "benchmark_gate_warnings": [],
         "submission_base": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
     }
+    _write_run_metadata(
+        config,
+        config.repo_root.resolve(),
+        output_root,
+        submission_base=state["submission_base"],
+    )
     flow_path = (
         _validate_design_interview_flow(worktree)
         if config.design_only
@@ -658,8 +697,7 @@ def _execute_procedrr_flow(
                 else "completed"
             ),
         )
-    _write_run_result(output_root, result)
-    return result
+    return _write_run_result(output_root, result)
 
 
 def _prepare_proposal_review(
@@ -3561,6 +3599,9 @@ def _feature_endpoint_result(
         failure,
         state.get("implementation_prompt_path"),
         state.get("structrr_diff_path"),
+        None,
+        None,
+        state.get("publication"),
     )
 
 
@@ -3594,19 +3635,21 @@ def _benchmark_issues_result(
         "completed_with_issues",
         failure=failure,
     )
-    _write_run_result(output_root, result)
-    return result
+    return _write_run_result(output_root, result)
 
 
-def _write_run_result(output_root: Path, result: FeatureEndpointResult) -> Path:
-    """Persist one stable summary alongside the detailed run telemetry."""
-    path = output_root / "run-result.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(result.to_data(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+def _write_run_result(
+    output_root: Path, result: FeatureEndpointResult
+) -> FeatureEndpointResult:
+    """Persist stable run results and the canonical JSON/Markdown report pair."""
+    result = replace(
+        result,
+        report_json_path=output_root / "report.json",
+        report_markdown_path=output_root / "report.md",
     )
-    return path
+    write_json_artifact(output_root, "run-result.json", result.to_data())
+    write_run_report(output_root, result=result.to_data())
+    return result
 
 
 def _write_run_metadata(
@@ -3617,16 +3660,64 @@ def _write_run_metadata(
     submission_base: str | None = None,
 ) -> Path:
     task_id = config.task_id or config.work_item_name
+    metadata = collect_run_metadata(
+        task_id=task_id,
+        repo_root=repo_root,
+        output_root=output_root,
+        submission_base=submission_base,
+    )
+    planning_client = config.planning_client
+    metadata.update(
+        {
+            "request": config.feature_description,
+            "allowed_paths": list(config.allowed_paths),
+            "uncertainty_policy": (
+                "normative_default"
+                if config.benchmark_mode
+                else config.uncertainty_policy
+            ),
+            "publication_requested": bool(config.open_pr or config.push_changes),
+            "publication_options": {
+                "push_branch": config.push_changes,
+                "open_pull_request": config.open_pr,
+            },
+            "effective_profile": {
+                "planning": {
+                    "provider": (
+                        type(planning_client).__name__
+                        if planning_client is not None
+                        else None
+                    ),
+                    "model": _profile_text(
+                        getattr(planning_client, "model", None)
+                        or getattr(planning_client, "model_name", None)
+                    ),
+                },
+                "coding": {
+                    "provider": config.code_agent,
+                    "model": (
+                        config.minisweagent_model
+                        if config.code_agent == "minisweagent"
+                        else config.opencode_model
+                    ),
+                    "executable": (
+                        config.minisweagent_executable
+                        if config.code_agent == "minisweagent"
+                        else config.opencode_executable
+                    ),
+                },
+            },
+        }
+    )
     return write_json_artifact(
         output_root,
         "run-metadata.json",
-        collect_run_metadata(
-            task_id=task_id,
-            repo_root=repo_root,
-            output_root=output_root,
-            submission_base=submission_base,
-        ),
+        metadata,
     )
+
+
+def _profile_text(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
 
 
 def _write_failure_artifact(output_root: Path, failure: RunFailure) -> Path:
@@ -3634,7 +3725,7 @@ def _write_failure_artifact(output_root: Path, failure: RunFailure) -> Path:
 
 
 def _failure_for_exception(
-    error: Exception, output_root: Path, config: FeatureEndpointConfig
+    error: BaseException, output_root: Path, config: FeatureEndpointConfig
 ) -> RunFailure:
     return RunFailure(
         RunFailureStage.UNKNOWN,

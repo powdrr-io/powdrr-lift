@@ -93,6 +93,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _write_structrr_plan,
     _write_structrr_plan_from_obligations,
     review_feature_diff,
+    run_feature_endpoint,
     run_feature_in_place,
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
@@ -1161,6 +1162,84 @@ def test_in_place_failure_is_reported_without_failing_run(tmp_path: Path) -> Non
     assert result.review["potential_issues"][0]["type"] == "PowdrrExecutionError"
     run_result = json.loads((output_root / "run-result.json").read_text())
     assert run_result["status"] == "completed_with_issues"
+    report = json.loads((output_root / "report.json").read_text())
+    assert report["status"] == "completed_with_issues"
+    assert report["operational_failures"][0]["error_type"] == "PowdrrExecutionError"
+    assert run_result["report_json_path"] == str(output_root / "report.json")
+    assert result.report_markdown_path == output_root / "report.md"
+
+
+def test_preflight_failure_writes_report_before_reraising(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    (repo / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "initial")
+    output_root = tmp_path / "run"
+
+    def fail_preflight(*args: Any, **kwargs: Any) -> None:
+        raise PowdrrExecutionError("working tree is dirty")
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._require_clean_root", fail_preflight
+    )
+    with pytest.raises(PowdrrExecutionError, match="working tree is dirty"):
+        run_feature_endpoint(
+            FeatureEndpointConfig(
+                feature_description="Add a greeting.",
+                work_item_name="preflight-failure",
+                repo_root=repo,
+                allowed_paths=("hello_world.py",),
+                output_root=output_root,
+            )
+        )
+
+    run_result = json.loads((output_root / "run-result.json").read_text())
+    report = json.loads((output_root / "report.json").read_text())
+    assert run_result["status"] == "failed"
+    assert run_result["report_markdown_path"] == str(output_root / "report.md")
+    assert report["status"] == "failed"
+    assert report["operational_failures"][0]["message"] == "working tree is dirty"
+
+
+def test_handled_interrupt_writes_report_then_propagates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    (repo / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "initial")
+    output_root = tmp_path / "interrupted-run"
+
+    def interrupt(*args: Any, **kwargs: Any) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint._require_clean_root", interrupt
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_feature_endpoint(
+            FeatureEndpointConfig(
+                feature_description="Add a greeting.",
+                work_item_name="interrupted-run",
+                repo_root=repo,
+                allowed_paths=("hello_world.py",),
+                output_root=output_root,
+            )
+        )
+
+    report = json.loads((output_root / "report.json").read_text())
+    assert report["status"] == "interrupted"
+    assert report["operational_failures"][0]["error_type"] == "KeyboardInterrupt"
 
 
 def test_feature_endpoint_result_preserves_early_failure_without_checkpoints(

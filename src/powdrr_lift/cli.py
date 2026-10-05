@@ -4764,31 +4764,43 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             model_cache_dir=repo_root / ".powdrr" / "models",
             progress_stream=sys.stderr,
         )
-    result = run_feature_endpoint(
-        FeatureEndpointConfig(
-            feature_description=args.feature_description,
-            work_item_name=args.work_item_name,
-            repo_root=repo_root,
-            allowed_paths=tuple(args.allowed_paths),
-            validation_command=(
-                tuple(shlex.split(args.validation_command))
-                if args.validation_command
-                else ()
-            ),
-            base_branch=args.base_branch,
-            code_agent=args.code_agent,
-            opencode_executable=args.opencode_executable,
-            opencode_model=args.opencode_model,
-            minisweagent_executable=args.minisweagent_executable,
-            minisweagent_model=args.minisweagent_model,
-            code_agent_prompt_prefix=args.code_agent_prompt_prefix,
-            code_agent_prompt_suffix=args.code_agent_prompt_suffix,
-            output_root=args.output_root,
-            open_pr=not args.no_open_pr,
-            planning_client=planning_client,
-            task_id=args.task_id or args.work_item_name,
+    output_root = (
+        args.output_root
+        or repo_root
+        / ".powdrr"
+        / "feature-runs"
+        / slugify_workflow_id(args.work_item_name)
+    ).resolve()
+    try:
+        result = run_feature_endpoint(
+            FeatureEndpointConfig(
+                feature_description=args.feature_description,
+                work_item_name=args.work_item_name,
+                repo_root=repo_root,
+                allowed_paths=tuple(args.allowed_paths),
+                validation_command=(
+                    tuple(shlex.split(args.validation_command))
+                    if args.validation_command
+                    else ()
+                ),
+                base_branch=args.base_branch,
+                code_agent=args.code_agent,
+                opencode_executable=args.opencode_executable,
+                opencode_model=args.opencode_model,
+                minisweagent_executable=args.minisweagent_executable,
+                minisweagent_model=args.minisweagent_model,
+                code_agent_prompt_prefix=args.code_agent_prompt_prefix,
+                code_agent_prompt_suffix=args.code_agent_prompt_suffix,
+                output_root=args.output_root,
+                open_pr=not args.no_open_pr,
+                planning_client=planning_client,
+                task_id=args.task_id or args.work_item_name,
+            )
         )
-    )
+    except Exception:
+        print(f"Run report JSON: {output_root / 'report.json'}", file=sys.stderr)
+        print(f"Run report Markdown: {output_root / 'report.md'}", file=sys.stderr)
+        raise
     if args.json:
         print(json.dumps(result.to_data(), indent=2, sort_keys=True))
     else:
@@ -4800,6 +4812,10 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             print(f"Pull request: {result.pull_request_url}")
         if result.changelog_path:
             print(f"Changelog: {result.changelog_path}")
+        if result.report_json_path:
+            print(f"Run report JSON: {result.report_json_path}")
+        if result.report_markdown_path:
+            print(f"Run report Markdown: {result.report_markdown_path}")
     return 0 if result.status in {"completed", "pr_opened"} else 1
 
 
@@ -4856,9 +4872,15 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             file=console,
         )
         print(f"Latest request: {result.request_path}", file=console)
-    else:
-        print(f"Review passed: {result.review['passed']}", file=console)
+        else:
+            print(f"Review passed: {result.review['passed']}", file=console)
     print(f"Run logs: {output_root}", file=console)
+    report_json_path = getattr(result, "report_json_path", None)
+    report_markdown_path = getattr(result, "report_markdown_path", None)
+    if report_json_path:
+        print(f"Run report JSON: {report_json_path}", file=console)
+    if report_markdown_path:
+        print(f"Run report Markdown: {report_markdown_path}", file=console)
     return (
         0
         if result.status

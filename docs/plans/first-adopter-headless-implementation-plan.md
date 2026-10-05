@@ -15,6 +15,21 @@ interface, not commands that are already available. The implementing agent
 should follow the phases in order and use the acceptance criteria to determine
 completion.
 
+## Architecture boundary
+
+Git is the execution substrate for this agent. The agent runtime owns repository
+inspection, clean-checkout enforcement, starting-commit resolution, dedicated
+branch and worktree creation, retention, local commits, and optional publication.
+This lifecycle applies to every project task, including bootstrap and feature
+implementation.
+
+Procedrr flows remain repository-operation agnostic. They receive the prepared
+candidate worktree, its resolved base and scope, and the requested publication
+mode as validated runtime context. They own planning, uncertainty decisions,
+implementation, verification, and review. They must not create or manage Git
+branches or worktrees, push commits, or open pull requests. Keep the lifecycle
+at the agent/runtime boundary and pass its outcomes into the shared report.
+
 ## Accepted product decisions
 
 - Headless execution does not stop to ask product clarification questions.
@@ -44,9 +59,10 @@ Read these files before editing:
 | Area | Existing implementation | Gap to address |
 | --- | --- | --- |
 | CLI | `src/powdrr_lift/cli.py`: `workrr-feature`, `harbor-feature`, `bootstrap-structrr` | Add the three adopter entry points and shared options. |
-| Feature orchestration | `src/powdrr_lift/workrr/feature_endpoint.py`: `FeatureEndpointConfig`, `run_feature_endpoint`, `run_feature_in_place` | Ordinary execution fetches `origin/<base_branch>`; default configuration pushes and opens a PR. Support a local start ref and independent publishing. |
+| Agent/runtime lifecycle | Agent integration and shared runtime entry points | Make Git and worktree handling a built-in agent responsibility for every task. Support a local start ref and independent publishing; pass prepared candidate context into Procedrr. |
+| Feature orchestration | `src/powdrr_lift/workrr/feature_endpoint.py`: `FeatureEndpointConfig`, `run_feature_endpoint`, `run_feature_in_place` | Adapt the feature entry point to consume agent-prepared candidate context and return execution evidence. Keep Git lifecycle and publication out of Procedrr flows. |
 | Shared flow | `docs/procedrr/skill-definitions/implement-feature.yaml` and `design-interview.yaml` | Normative defaults currently depend on `benchmark_mode`. Separate the uncertainty policy from benchmark behavior. |
-| Flow commands | `src/powdrr_lift/workrr/command_catalog.py` | Default validation, consistency updates, and `normative-assumptions.json` are coupled to benchmark mode. Publication commits and pushes before checking `open_pr`. |
+| Procedrr flow commands | `src/powdrr_lift/workrr/command_catalog.py` | Default validation, consistency updates, and `normative-assumptions.json` are coupled to benchmark mode. Move Git effects out of flow commands; keep workflow operations focused on evidence and gates. |
 | Typed defaults | `src/powdrr_lift/core/behavior_contract.py` | Reuse existing `validate_normative_assumptions`; add provenance without weakening the contract. |
 | Bootstrap | `src/powdrr_lift/structrr/bootstrap.py` | Generates and validates a snapshot but does not provide a complete isolated bootstrap-to-PR lifecycle. |
 | Existing bootstrap/publication skills | `skill-definitions/bootstrap-code-structure.yaml`, `create-pull-request.yaml` | Audit reusable discovery and publishing behavior; these older skills use a different artifact/flow contract from deterministic Structrr bootstrap. |
@@ -187,10 +203,11 @@ nonzero for required failures, and perform no target-repository mutation.
 
 ## Phase 3: isolated Git lifecycle and bootstrap-to-PR
 
-Extract or extend reusable lifecycle helpers rather than duplicating Git command
-sequences across bootstrap and feature execution.
+Implement or extend the agent/runtime lifecycle so Git behavior is built into
+the agent and shared across bootstrap and feature execution. Do not implement
+branch, worktree, commit, push, or PR operations in Procedrr flows.
 
-1. Resolve the repository and starting commit. Require a clean starting checkout;
+1. The agent resolves the repository and starting commit. Require a clean starting checkout;
    report the offending paths without cleaning or stashing user changes.
 2. Validate run identifiers and branch/worktree collisions. Never overwrite or
    remove prior work automatically. Each attempt gets its own run directory.
@@ -198,9 +215,9 @@ sequences across bootstrap and feature execution.
    Local execution must work without `origin`, GitHub credentials, or fetching.
 4. Keep telemetry outside the candidate diff using the existing exclusion
    mechanism. Do not add unrelated ignore-file edits.
-5. Validate and commit only the intended artifacts. Retain the worktree for review
+5. The agent validates and commits only the intended artifacts. Retain the worktree for review
    on success and failure; print its location.
-6. Publish only when requested and after required gates pass. Push the feature
+6. The agent publishes only when requested and after required gates pass. Push the feature
    branch and open a PR against the selected base. Never merge it.
 
 Bootstrap wraps `bootstrap_structrr`: generate the source-anchored snapshot,
@@ -290,7 +307,8 @@ Wire `implement --headless` into the existing feature endpoint and shared
 - On verified success, commit locally. With `--open-pr`, publish and include the
   report details. If publishing fails, retain the verified local change and
   return a distinct failed publication result; do not describe the run as fully
-  completed with a PR.
+  completed with a PR. The agent runtime performs commits and publication after
+  the flow returns its verified candidate and review evidence.
 
 Define and document result statuses for completed local work, PR opened, no-op,
 failed execution, failed publication, timed out, and interrupted. Exit zero only

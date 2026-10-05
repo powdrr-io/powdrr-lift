@@ -1,0 +1,271 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 918
+title: Add evidence-based run reports
+intent:
+  problem: Feature run evidence is spread across artifacts, and handled failures may lack a final summary.
+  goal: Write a versioned JSON report and deterministic Markdown projection for completed and handled unsuccessful runs.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import temporary file support for atomic report writes.
+    rationale: Avoid exposing partially written reports.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 53, end_line: 96}
+    summary: Add the typed versioned RunReport model.
+    rationale: Define a stable machine-readable report for execution context and evidence.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 128, end_line: 128}
+    summary: Make JSON artifact writes atomic.
+    rationale: Keep persisted evidence complete if a write is interrupted.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 132, end_line: 383}
+    summary: Build reports from persisted evidence and render deterministic Markdown.
+    rationale: Present the same decisions, validation, failures, usage, and artifact references in both formats.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 401, end_line: 401}
+    summary: Export the RunReport type.
+    rationale: Make the shared report schema available to integrations.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 405, end_line: 406}
+    summary: Export report rendering and persistence functions.
+    rationale: Provide a shared report writing boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 123, end_line: 123}
+    summary: Import the shared report writer.
+    rationale: Connect feature execution to report persistence.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 182, end_line: 184}
+    summary: Add report paths and publication metadata to endpoint results.
+    rationale: Return report artifact locations and publication outcomes.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 210, end_line: 216}
+    summary: Serialize report paths and publication result.
+    rationale: Expose final report locations through run-result.json.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 263, end_line: 263}
+    summary: Move telemetry exclusion into the guarded lifecycle.
+    rationale: Let handled setup failures receive reports.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 276, end_line: 276}
+    summary: Guard endpoint preflight and setup.
+    rationale: Ensure setup failures are finalized consistently.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 311, end_line: 324}
+    summary: Persist failed and interrupted endpoint reports before raising.
+    rationale: Preserve final status and available evidence on unsuccessful runs.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 341, end_line: 341}
+    summary: Disable publication in the in-place runner configuration.
+    rationale: Record the actual local execution mode accurately.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 327, end_line: 327}
+    summary: Guard in-place telemetry exclusion.
+    rationale: Finalize reports when setup fails.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 355, end_line: 355}
+    summary: Run in-place preflight inside the finalization boundary.
+    rationale: Preserve failure evidence for local executions.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 392, end_line: 399}
+    summary: Persist an interrupted in-place report on KeyboardInterrupt.
+    rationale: Leave a final report while preserving interrupt propagation.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 426, end_line: 431}
+    summary: Refresh metadata with the resolved starting commit.
+    rationale: Bind reports to the commit used by the candidate worktree.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 700, end_line: 700}
+    summary: Return the finalized result containing report paths.
+    rationale: Keep caller results aligned with run-result.json.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3602, end_line: 3604}
+    summary: Include publication outcome in the endpoint result.
+    rationale: Report branch push and pull request state from execution evidence.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3638, end_line: 3638}
+    summary: Return the finalized result from benchmark issue reporting.
+    rationale: Keep in-place callers informed of report paths.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3641, end_line: 3648}
+    summary: Write run-result.json and both final report artifacts.
+    rationale: Produce one canonical report and consistent result pointers.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3650, end_line: 3652}
+    summary: Return the report-bearing result.
+    rationale: Expose persisted report paths to CLI callers.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3663, end_line: 3711}
+    summary: Record request, scope, uncertainty policy, publication options, and effective planning and coding routes.
+    rationale: Make execution context available to report construction.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3715, end_line: 3715}
+    summary: Add safe conversion for optional profile text.
+    rationale: Avoid serializing provider internals into run metadata.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3719, end_line: 3722}
+    summary: Treat interrupts as reportable failures.
+    rationale: Persist interruption type and message without swallowing KeyboardInterrupt.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3728, end_line: 3728}
+    summary: Accept BaseException in failure serialization.
+    rationale: Support durable reporting for handled interrupts.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5072, end_line: 5074}
+    summary: Render uncertainty decisions in pull request bodies.
+    rationale: Make remembered uncertainty and normative defaults reviewable with the proposed change.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5076, end_line: 5082}
+    summary: Render validation evidence and report retrieval details in pull request bodies.
+    rationale: Give reviewers validation context and a path to the complete local report.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5096, end_line: 5098}
+    summary: Include uncertainty evidence when creating a pull request.
+    rationale: Publish the decisions made while running headlessly.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5100, end_line: 5105}
+    summary: Attach validation context and report location when creating a pull request.
+    rationale: Make execution evidence accessible to reviewers.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 5127, end_line: 5225}
+    summary: Add uncertainty and validation sections to pull request body creation and updates.
+    rationale: Preserve evidence across initial publication and subsequent body refreshes.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3405, end_line: 3409}
+    summary: Track pending branch and pull request publication outcomes.
+    rationale: Distinguish requested actions from completed publication.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3411, end_line: 3424}
+    summary: Mark branch push success or failure.
+    rationale: Report the observed remote branch outcome.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3427, end_line: 3430}
+    summary: Mark pull request success or failure.
+    rationale: Report the observed pull request outcome.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3432, end_line: 3435}
+    summary: Pass run artifacts and validation evidence into pull request body rendering.
+    rationale: Include the generated report and validation context in published pull requests.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3478, end_line: 3479}
+    summary: Pass updated evidence when refreshing pull request bodies.
+    rationale: Preserve report references and uncertainty context after publication updates.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4767, end_line: 4798}
+    summary: Print report locations for successful and handled endpoint errors.
+    rationale: Make local reports discoverable from the existing feature command.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4800, end_line: 4803}
+    summary: Print report paths in feature command text output.
+    rationale: Surface both final report artifacts after execution.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4815, end_line: 4818}
+    summary: Print Harbor report paths in all run modes.
+    rationale: Make report artifacts visible after benchmark, design, and prompt capture runs.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4878, end_line: 4883}
+    summary: Print report paths when provided by the result.
+    rationale: Support report-bearing results and existing test doubles.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 85, end_line: 85}
+    summary: Import the public feature endpoint for failure finalization tests.
+    rationale: Exercise reporting through endpoint lifecycle boundaries.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 97, end_line: 97}
+    summary: Import helpers used by report publication tests.
+    rationale: Exercise the pull request evidence rendering contract.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1166, end_line: 1243}
+    summary: Verify failure reports, result paths, and propagated interruptions.
+    rationale: Protect finalization behavior for unsuccessful runs.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 1257, end_line: 1326}
+    summary: Verify uncertainty and validation evidence in pull request bodies.
+    rationale: Protect reviewer visibility of decisions and report retrieval instructions.
+  - path: tests/test_run_artifacts.py
+    type: added
+    span: {start_line: 1, end_line: 114}
+    summary: Verify report evidence, unknown cost, and deterministic Markdown.
+    rationale: Ensure reports remain complete, traceable, and stable.
+entities:
+  - id: canonical-run-report-schema
+    type: Schema
+    action: added
+  - id: deterministic-run-report-renderer
+    type: Function
+    action: added
+  - id: run-report-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: renderer-serializes-canonical-report
+    type: renders
+    source: deterministic-run-report-renderer
+    target: canonical-run-report-schema
+    action: added
+    description: The Markdown renderer projects the typed JSON report into a deterministic readable document.
+  - id: tests-verify-report-contract
+    type: verifies
+    source: run-report-regression-tests
+    target: canonical-run-report-schema
+    action: added
+    description: Tests verify persisted evidence, explicit unknowns, failure records, and stable rendering.
+invariants:
+  - id: report-pair-has-shared-source
+    description: report.json is canonical and report.md is rendered from the same typed report data.
+    action: added
+  - id: handled-failures-are-finalized
+    description: Handled failures and KeyboardInterrupt write run-result.json and both report artifacts before control returns or interruption propagates.
+    action: added
+  - id: unknown-cost-is-not-inferred
+    description: Usage and cost unavailable from persisted provider evidence are reported as unknown.
+    action: added
+guidance:
+  - id: inspect-local-run-report
+    description: Use report.json for machine-readable evidence and report.md for the readable summary; both paths appear in run-result.json and CLI text output.
+    action: added

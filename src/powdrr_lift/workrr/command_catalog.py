@@ -3402,17 +3402,37 @@ class FeatureCommandRuntime:
                 ),
             )
             feature_endpoint._commit(runner, worktree, f"Implement {work_item_name}")
+            publication = {
+                "branch_push": "pending" if config.push_changes else "not_requested",
+                "pull_request": "pending" if config.open_pr else "not_requested",
+            }
+            state["publication"] = publication
             if config.push_changes:
-                feature_endpoint._run(
-                    runner,
-                    worktree,
-                    ["git", "push", "--set-upstream", "origin", branch],
-                )
+                try:
+                    feature_endpoint._run(
+                        runner,
+                        worktree,
+                        ["git", "push", "--set-upstream", "origin", branch],
+                    )
+                except Exception:
+                    publication["branch_push"] = "failed"
+                    raise
+                publication["branch_push"] = "pushed"
             if not config.open_pr:
                 return None
-            state["pull_request_url"] = feature_endpoint._open_pull_request(
-                runner, worktree, feature_config, branch
-            )
+            try:
+                state["pull_request_url"] = feature_endpoint._open_pull_request(
+                    runner,
+                    worktree,
+                    feature_config,
+                    branch,
+                    output_root=output_root,
+                    validation=state.get("validation"),
+                )
+            except Exception:
+                publication["pull_request"] = "failed"
+                raise
+            publication["pull_request"] = "opened"
             return state["pull_request_url"]
         if name == "create_pr_changelog":
             pull_request_value = parameters.get("pull_request")
@@ -3455,6 +3475,8 @@ class FeatureCommandRuntime:
                     pull_request_value,
                     config,
                     Path(changelog).relative_to(worktree),
+                    output_root=output_root,
+                    validation=state.get("validation"),
                 )
             return pull_request_value
         raise PowdrrExecutionError(f"feature flow requested unknown operation {name!r}")

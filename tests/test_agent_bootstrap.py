@@ -22,7 +22,7 @@ def _git(root: Path, *args: str) -> str:
 
 def _repository(root: Path) -> Path:
     root.mkdir()
-    _git(root, "init", "-q")
+    _git(root, "init", "-q", "--initial-branch=main")
     _git(root, "config", "user.email", "test@example.com")
     _git(root, "config", "user.name", "Test")
     (root / "src").mkdir()

@@ -1,0 +1,616 @@
+{
+  "candidate_fingerprints": {
+    "instruction_ledger": "sha256:1f0630cb3222b2f5d7f986dff07f827c772a92474e70fbd81cd8af54c58deb4e",
+    "prompt_index": "sha256:7d55395a76944905f8ba7ea384bb8554860d731b3cec2b4f7c2925fbb2c8cc3f"
+  },
+  "findings": [
+    {
+      "criterion_id": "state-data-constructor",
+      "decision": "supported",
+      "evidence_quote": "State accepts a data keyword mapping string keys to default values.",
+      "importance": "critical",
+      "instruction_excerpt": "State accepts a data keyword mapping string keys to default values.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states 'State accepts a data keyword mapping string keys to default values.' in the first sentence, and the validation contract scenario 1 repeats this exact requirement. The prompt also elaborates on the behavior with 'On entry, data initializes as a fresh copy of the defaults' and 'Data is stored per instance, not on the shared State class,' which aligns with the expected behavior of per-state data defaults exposed on entry. No section of the prompt contradicts, narrows, or excludes this requirement.",
+      "reference_solution_evidence": [
+        "def _init_state_data(self, state: State):",
+        "def _cleanup_state_data(self, state: State):",
+        "_(\"State '{}' data must be a dict, got {}.\").format(",
+        "_(\"State '{}' data keys must be strings, got {!r}.\").format(state.id, key)",
+        "from .state import State",
+        "def init_state(self, state: \"State\"):",
+        "def resolve_scope(sm: \"StateChart\", state: \"State\") -> DataScope:",
+        "def _merge_ancestor_data(sm: \"StateChart\", state: \"State\") -> Dict[str, Any]:",
+        "def resolve_state_data(sm: \"StateChart\", state: \"State\") -> dict:",
+        "_(\"State '{}' data key '{}': cannot specify both 'default' and 'factory'.\").format(",
+        "\"State '{}' data key '{}':\"",
+        "_(\"State '{}' data key '{}': type must be a type, got {!r}.\").format("
+      ],
+      "solution_symbols": [
+        "State",
+        "data"
+      ],
+      "verifier_tests": [
+        "test_state_with_data_initializes_on_entry",
+        "test_data_with_different_types"
+      ]
+    },
+    {
+      "criterion_id": "state-data-lifecycle",
+      "decision": "supported",
+      "evidence_quote": "On entry, data initializes as a fresh copy of the defaults. On exit, data is removed. Re-entering a state resets data to the original defaults.",
+      "importance": "critical",
+      "instruction_excerpt": "On entry, data initializes as a fresh copy of the defaults. On exit, data is removed. Re-entering a state resets data to the original defaults.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states all three required behaviors: fresh copy on entry, removal on exit, and reset to original defaults on re-entry. The validation contract further reinforces these as required behavior checks (scenarios instruction-003, instruction-004, instruction-005). No other section of the prompt weakens, excludes, narrows, or contradicts these requirements. The additional details about DataVar, factories, and scoping do not alter the core lifecycle behavior.",
+      "reference_solution_evidence": [
+        "store.init_state(state)",
+        "def init_state(self, state: \"State\"):",
+        "self.sm._data_store.clear_state(state.id)",
+        "def clear_state(self, state_id: str):"
+      ],
+      "solution_symbols": [
+        "init_state",
+        "clear_state"
+      ],
+      "verifier_tests": [
+        "test_state_with_data_initializes_on_entry",
+        "test_data_cleaned_up_after_exit",
+        "test_reenter_state_reinitializes_data"
+      ]
+    },
+    {
+      "criterion_id": "per-instance-ownership",
+      "decision": "supported",
+      "evidence_quote": "Data is stored per instance, not on the shared State class.",
+      "importance": "critical",
+      "instruction_excerpt": "Data is stored per instance, not on the shared State class.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states 'Data is stored per instance, not on the shared State class.' This directly preserves the source requirement that data storage is per-instance rather than on the shared State class, which ensures two state-machine instances do not share mutations to a declared state's data. The validation contract also includes this as scenario:instruction-006, reinforcing the requirement. No other section of the prompt weakens, excludes, narrows, or contradicts this behavior.",
+      "reference_solution_evidence": [
+        "from .state_data import StateDataStore",
+        "\"StateDataStore\",",
+        "class StateDataStore:",
+        "self._data_store: StateDataStore = StateDataStore()",
+        "def _state_data(self) -> Dict[str, Dict[str, Any]]:"
+      ],
+      "solution_symbols": [
+        "StateDataStore",
+        "_state_data"
+      ],
+      "verifier_tests": [
+        "test_state_with_data_initializes_on_entry",
+        "test_state_data_modified_in_callback_persists_within_state"
+      ]
+    },
+    {
+      "criterion_id": "datavar-default-factory-type",
+      "decision": "supported",
+      "evidence_quote": "DataVar can replace plain defaults in the data dict, supporting optional type enforcement and factory callables.",
+      "importance": "critical",
+      "instruction_excerpt": "DataVar can replace plain defaults in the data dict, supporting optional type enforcement and factory callables.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states the full source requirement verbatim: 'DataVar can replace plain defaults in the data dict, supporting optional type enforcement and factory callables.' This covers all three aspects of the requirement: DataVar replacing plain defaults, optional type enforcement, and factory callables. The prompt also includes additional supporting details such as 'Plain callables in data are also treated as factories producing fresh values per entry' and 'DataVar rejects simultaneous default and factory,' which reinforce rather than contradict the requirement. No other section of the prompt weakens, excludes, narrows, or contradicts this behavior.",
+      "reference_solution_evidence": [
+        "from .state_data import DataVar",
+        "\"DataVar\",",
+        "if isinstance(val, DataVar):",
+        "class DataVar:",
+        "def validate_data_var(state_id: str, key: str, var: DataVar):",
+        "factory: \"Callable[[], Any] | None\" = None",
+        "if val.factory is not None:",
+        "data[key] = val.factory()",
+        "if var.factory is not None and var.default is not None:",
+        "_(\"State '{}' data key '{}': cannot specify both 'default' and 'factory'.\").format(",
+        "actions.append(DiagramAction(type=ActionType.DATA, body=\", \".join(data_vars)))",
+        "if action.type == ActionType.DATA:"
+      ],
+      "solution_symbols": [
+        "DataVar",
+        "factory",
+        "type"
+      ],
+      "verifier_tests": [
+        "test_datavar_with_default_and_type",
+        "test_datavar_factory_creates_fresh_list_on_each_entry",
+        "test_datavar_type_validation_on_set_state_data"
+      ]
+    },
+    {
+      "criterion_id": "plain-callable-defaults",
+      "decision": "supported",
+      "evidence_quote": "Plain callables in data are also treated as factories producing fresh values per entry.",
+      "importance": "important",
+      "instruction_excerpt": "Plain callables in data are also treated as factories producing fresh values per entry.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states the required behavior verbatim: 'Plain callables in data are also treated as factories producing fresh values per entry.' This statement is unambiguous and is not contradicted or weakened by any other part of the prompt. The validation contract also includes a scenario (scenario:instruction-010) that repeats the same requirement, reinforcing that the behavior must be implemented. No other instruction in the prompt narrows, excludes, or modifies this behavior. Therefore, the source requirement is fully supported.",
+      "reference_solution_evidence": [
+        "factory: \"Callable[[], Any] | None\" = None",
+        "if val.factory is not None:",
+        "data[key] = val.factory()",
+        "if var.factory is not None and var.default is not None:",
+        "_(\"State '{}' data key '{}': cannot specify both 'default' and 'factory'.\").format(",
+        "elif callable(val.default):",
+        "elif callable(val):"
+      ],
+      "solution_symbols": [
+        "factory",
+        "callable"
+      ],
+      "verifier_tests": [
+        "test_callable_default_creates_fresh_instance_on_each_entry"
+      ]
+    },
+    {
+      "criterion_id": "public-data-types",
+      "decision": "supported",
+      "evidence_quote": "DataVar and DataChangeInfo are importable from the statemachine package.",
+      "importance": "critical",
+      "instruction_excerpt": "DataVar and DataChangeInfo are importable from the statemachine package.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states: 'DataVar and DataChangeInfo are importable from the statemachine package.' This directly preserves the source requirement that both public data types are importable from the top-level statemachine package. The validation contract further reinforces this with scenarios 10 and 11, which require 'DataVar is importable from the statemachine package' and 'DataChangeInfo is importable from the statemachine package', respectively. No other part of the prompt contradicts, narrows, or weakens this requirement. The prompt does not introduce alternative modes or conditions that would make the import optional, and the requirement is stated as a mandatory product behavior.",
+      "reference_solution_evidence": [
+        "from .state_data import DataVar",
+        "\"DataVar\",",
+        "if isinstance(val, DataVar):",
+        "class DataVar:",
+        "def validate_data_var(state_id: str, key: str, var: DataVar):",
+        "from .state_data import DataChangeInfo",
+        "\"DataChangeInfo\",",
+        "class DataChangeInfo:",
+        "self._changes: List[DataChangeInfo] = []",
+        "def set_value(self, state_id: str, key: str, value: Any) -> \"DataChangeInfo | None\":",
+        "change = DataChangeInfo(",
+        "def get_changes(self) -> List[DataChangeInfo]:"
+      ],
+      "solution_symbols": [
+        "DataVar",
+        "DataChangeInfo"
+      ],
+      "verifier_tests": [
+        "test_datavar_with_default_and_type",
+        "test_get_data_changes_returns_changes_after_set"
+      ]
+    },
+    {
+      "criterion_id": "callback-scope-merge",
+      "decision": "supported",
+      "evidence_quote": "Hierarchical scoping merges ancestor data into child callbacks, child shadowing parent on collision.",
+      "importance": "critical",
+      "instruction_excerpt": "Hierarchical scoping merges ancestor data into child callbacks, child shadowing parent on collision.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states the required behavior: 'Hierarchical scoping merges ancestor data into child callbacks, child shadowing parent on collision.' This exact sentence is included in the product contract section, and the validation contract includes a corresponding required behavior check (scenario:instruction-013) that repeats the same requirement. No other part of the prompt weakens, excludes, narrows, or contradicts this behavior. The prompt does not introduce alternative modes or conditions that would make the requirement optional. Therefore, the source requirement is explicitly preserved.",
+      "reference_solution_evidence": [
+        "merged = _merge_ancestor_data(sm, state)",
+        "def _merge_ancestor_data(sm: \"StateChart\", state: \"State\") -> Dict[str, Any]:",
+        "for ancestor in reversed(ancestors):",
+        "ancestor_data = sm._data_store._data.get(ancestor.id)",
+        "def resolve_scope(sm: \"StateChart\", state: \"State\") -> DataScope:",
+        "scope = resolve_scope(sm, state)"
+      ],
+      "solution_symbols": [
+        "_merge_ancestor_data",
+        "ancestor",
+        "resolve_scope"
+      ],
+      "verifier_tests": [
+        "test_child_inherits_parent_compound_data",
+        "test_child_data_shadows_parent_data",
+        "test_callback_in_child_sees_merged_data"
+      ]
+    },
+    {
+      "criterion_id": "parallel-scope-isolation",
+      "decision": "supported",
+      "evidence_quote": "Parallel regions isolate scopes.",
+      "importance": "important",
+      "instruction_excerpt": "Parallel regions isolate scopes.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly includes the exact source requirement sentence 'Parallel regions isolate scopes.' in the feature description, and the validation contract includes scenario:instruction-014 which requires this behavior to be implemented. No other instruction in the prompt contradicts, weakens, or narrows this requirement.",
+      "reference_solution_evidence": [
+        "from .state_data import DataChangeInfo",
+        "from .state_data import DataScope",
+        "from .state_data import DataVar",
+        "from .state_data import StateDataStore",
+        "from ..state_data import resolve_state_data",
+        "kwargs[\"state_data\"] = resolve_state_data(self.sm, info.state)",
+        "kwargs[\"state_data\"] = resolve_state_data(self.sm, target)",
+        "from ..state_data import save_history_data",
+        "from .state_data import resolve_state_data",
+        "kwargs[\"state_data\"] = self._resolve_state_data()",
+        "from .state_data import validate_data_var",
+        "from .state_data import collect_data_variable_names"
+      ],
+      "solution_symbols": [
+        "parallel",
+        "state_data"
+      ],
+      "verifier_tests": [
+        "test_parallel_regions_have_isolated_data"
+      ]
+    },
+    {
+      "criterion_id": "callback-injection",
+      "decision": "supported",
+      "evidence_quote": "state_data is injected into callbacks alongside existing parameters like source, target, and event_data.",
+      "importance": "critical",
+      "instruction_excerpt": "state_data is injected into callbacks alongside existing parameters like source, target, and event_data.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states the required behavior: 'state_data is injected into callbacks alongside existing parameters like source, target, and event_data.' This exact sentence is present in the prompt and is not contradicted or weakened by any other instruction. The validation contract also includes a check (scenario:instruction-015) that repeats the same requirement, reinforcing it. No other part of the prompt narrows, excludes, or contradicts this behavior. Therefore, the requirement is clearly and unambiguously supported.",
+      "reference_solution_evidence": [
+        "from .state_data import DataChangeInfo",
+        "from .state_data import DataScope",
+        "from .state_data import DataVar",
+        "from .state_data import StateDataStore",
+        "from ..state_data import resolve_state_data",
+        "kwargs[\"state_data\"] = resolve_state_data(self.sm, info.state)",
+        "kwargs[\"state_data\"] = resolve_state_data(self.sm, target)",
+        "from ..state_data import save_history_data",
+        "from .state_data import resolve_state_data",
+        "kwargs[\"state_data\"] = self._resolve_state_data()",
+        "from .state_data import validate_data_var",
+        "from .state_data import collect_data_variable_names"
+      ],
+      "solution_symbols": [
+        "state_data",
+        "source",
+        "target",
+        "event_data"
+      ],
+      "verifier_tests": [
+        "test_state_data_accessible_via_callback_parameter",
+        "test_callback_in_child_sees_merged_data"
+      ]
+    },
+    {
+      "criterion_id": "callback-mutation-persistence",
+      "decision": "supported",
+      "evidence_quote": "Data persists through on_enter and on_exit callbacks.",
+      "importance": "critical",
+      "instruction_excerpt": "Data persists through on_enter and on_exit callbacks.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states the source requirement verbatim: 'Data persists through on_enter and on_exit callbacks.' The surrounding prompt does not weaken, exclude, narrow, or contradict this behavior. Although the prompt also describes data removal on exit and reset on re-entry, these are consistent with the expected behavior that persistence applies while the state remains active (i.e., during the callbacks), and the reference solution confirms mutations persist within the active state. No conflicting instruction is present.",
+      "reference_solution_evidence": [
+        "self._init_state_data(target)",
+        "def _init_state_data(self, state: State):",
+        "self._cleanup_state_data(info.state)",
+        "def _cleanup_state_data(self, state: State):",
+        "def set_value(self, state_id: str, key: str, value: Any) -> \"DataChangeInfo | None\":",
+        "change = self._data_store.set_value(state_id, key, value)"
+      ],
+      "solution_symbols": [
+        "_init_state_data",
+        "_cleanup_state_data",
+        "set_value"
+      ],
+      "verifier_tests": [
+        "test_data_initialized_before_on_enter",
+        "test_data_accessible_during_on_exit",
+        "test_state_data_modified_in_callback_persists_within_state"
+      ]
+    },
+    {
+      "criterion_id": "history-depth",
+      "decision": "supported",
+      "evidence_quote": "History recall restores saved data snapshots -- deep for full descendants, shallow for direct children.",
+      "importance": "critical",
+      "instruction_excerpt": "History recall restores saved data snapshots -- deep for full descendants, shallow for direct children.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states the history-depth requirement in the exact source wording: 'History recall restores saved data snapshots -- deep for full descendants, shallow for direct children.' The validation contract further elaborates the expected behavior in scenarios 16 and 17: 'History recall restores saved data snapshots as deep copies for full descendants.' and 'History recall restores saved data snapshots as shallow copies for direct children.' These statements clearly preserve the externally observable behavior that deep history restores full descendants and shallow history restores direct children. No other section of the prompt weakens, excludes, narrows, or contradicts this requirement. The prompt's 'Deletions: - None declared' and 'Do not invent additional product changes' do not conflict with the requirement. Therefore, the behavior is explicitly supported.",
+      "reference_solution_evidence": [
+        "from ..state_data import save_history_data",
+        "history_data = save_history_data(",
+        "def save_history_data(",
+        "self.sm, state, self.sm.configuration, history.type.is_deep",
+        "is_deep: bool,",
+        "if is_deep:"
+      ],
+      "solution_symbols": [
+        "save_history_data",
+        "is_deep"
+      ],
+      "verifier_tests": [
+        "test_deep_history_restores_data",
+        "test_shallow_history_restores_data"
+      ]
+    },
+    {
+      "criterion_id": "owned-state-query",
+      "decision": "supported",
+      "evidence_quote": "get_state_data(state) returns active data dict or None. state_data_values property snapshots all active data by state identifier.",
+      "importance": "critical",
+      "instruction_excerpt": "get_state_data(state) returns active data dict or None. state_data_values property snapshots all active data by state identifier.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states both required behaviors: get_state_data(state) returns active data dict or None, and state_data_values property snapshots all active data by state identifier. The prompt does not contain any instruction that would weaken, exclude, narrow, or contradict these behaviors. The expected behavior that queries expose each state's own data (not merged views) and that inactive/undeclared states return None while empty declarations return an empty dict is consistent with the stated 'active data dict or None' behavior, as the prompt does not suggest any merging or alternative return values. The prompt's mention of hierarchical scoping merging ancestor data into child callbacks applies to callbacks, not to the query methods, so it does not contradict the requirement.",
+      "reference_solution_evidence": [
+        "def get_state_data(self, state_id: str) -> \"Dict[str, Any] | None\":",
+        "def get_state_data(self, state: \"State\") -> \"Dict[str, Any] | None\":",
+        "return self._data_store.get_state_data(state_id)",
+        "def state_data_values(self) -> Dict[str, Dict[str, Any]]:"
+      ],
+      "solution_symbols": [
+        "get_state_data",
+        "state_data_values"
+      ],
+      "verifier_tests": [
+        "test_get_state_data_returns_dict_for_active",
+        "test_get_state_data_returns_none_for_inactive",
+        "test_empty_dict_data_is_valid",
+        "test_state_without_data_backward_compat"
+      ]
+    },
+    {
+      "criterion_id": "state-data-mutation-api",
+      "decision": "supported",
+      "evidence_quote": "set_state_data(state, key, value) validates active state, declared key, and DataVar type constraints, raising InvalidDefinition on violation.",
+      "importance": "critical",
+      "instruction_excerpt": "set_state_data(state, key, value) validates active state, declared key, and DataVar type constraints, raising InvalidDefinition on violation.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states the exact behavior required by the source instruction: 'set_state_data(state, key, value) validates active state, declared key, and DataVar type constraints, raising InvalidDefinition on violation.' This sentence is present verbatim in the prompt. The validation contract further reinforces this by listing three separate checks (scenarios 21, 22, 23) that require the same behavior, and the relationships section requires all three checks to pass in the same scenario. No other part of the prompt weakens, excludes, narrows, or contradicts this requirement. The prompt does not introduce any alternative modes or conditions that would make the validation optional. Therefore, the behavior is fully supported.",
+      "reference_solution_evidence": [
+        "def set_state_data(self, state: \"State\", key: str, value: Any):",
+        "raise InvalidDefinition(",
+        "from .exceptions import InvalidDefinition"
+      ],
+      "solution_symbols": [
+        "set_state_data",
+        "InvalidDefinition"
+      ],
+      "verifier_tests": [
+        "test_set_state_data_updates_value",
+        "test_set_state_data_on_inactive_state_raises",
+        "test_set_state_data_with_undeclared_key_raises",
+        "test_datavar_type_validation_on_set_state_data"
+      ]
+    },
+    {
+      "criterion_id": "data-change-records",
+      "decision": "supported",
+      "evidence_quote": "get_data_changes() returns DataChangeInfo records accumulated during the current macrostep, cleared at each macrostep boundary, with state_id, key, old_value, new_value attributes.",
+      "importance": "important",
+      "instruction_excerpt": "get_data_changes() returns DataChangeInfo records accumulated during the current macrostep, cleared at each macrostep boundary, with state_id, key, old_value, new_value attributes.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states the full requirement: 'get_data_changes() returns DataChangeInfo records accumulated during the current macrostep, cleared at each macrostep boundary, with state_id, key, old_value, new_value attributes.' This exact sentence preserves all externally observable behavior from the source instruction, including the accumulation during the current macrostep, clearing at macrostep boundaries, and the four required attributes. The validation contract further reinforces this with scenarios 24, 25, and 26, which separately check accumulation, clearing, and attribute presence, and the relationship note requires all three checks to pass in the same scenario. No other section of the prompt weakens, excludes, narrows, or contradicts this requirement.",
+      "reference_solution_evidence": [
+        "def get_data_changes(self) -> list:",
+        "from .state_data import DataChangeInfo",
+        "\"DataChangeInfo\",",
+        "class DataChangeInfo:",
+        "self._changes: List[DataChangeInfo] = []",
+        "def set_value(self, state_id: str, key: str, value: Any) -> \"DataChangeInfo | None\":",
+        "change = DataChangeInfo(",
+        "def get_changes(self) -> List[DataChangeInfo]:",
+        "old_value: Any",
+        "old_value = state_data.get(key)",
+        "old_value=old_value,",
+        "new_value: Any"
+      ],
+      "solution_symbols": [
+        "get_data_changes",
+        "DataChangeInfo",
+        "old_value",
+        "new_value"
+      ],
+      "verifier_tests": [
+        "test_get_data_changes_returns_changes_after_set",
+        "test_changes_cleared_between_macrosteps"
+      ]
+    },
+    {
+      "criterion_id": "declaration-validation",
+      "decision": "supported",
+      "evidence_quote": "Invalid declarations raise InvalidDefinition -- data requires dict with string keys, DataVar rejects simultaneous default and factory.",
+      "importance": "critical",
+      "instruction_excerpt": "Invalid declarations raise InvalidDefinition -- data requires dict with string keys, DataVar rejects simultaneous default and factory.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly states the exact source requirement: 'Invalid declarations raise InvalidDefinition -- data requires dict with string keys, DataVar rejects simultaneous default and factory.' This sentence directly preserves the externally observable behavior that non-dict data, non-string keys, and DataVar with both default and factory are rejected with InvalidDefinition. The validation contract further reinforces this with scenarios 26-29, which restate the requirement and its sub-behaviors. No other part of the prompt weakens, excludes, narrows, or contradicts this requirement. The prompt does not introduce any alternative modes or conditions that would make the rejection optional.",
+      "reference_solution_evidence": [
+        "raise InvalidDefinition(",
+        "from .exceptions import InvalidDefinition",
+        "from .state_data import DataVar",
+        "\"DataVar\",",
+        "if isinstance(val, DataVar):",
+        "class DataVar:",
+        "def validate_data_var(state_id: str, key: str, var: DataVar):"
+      ],
+      "solution_symbols": [
+        "InvalidDefinition",
+        "DataVar"
+      ],
+      "verifier_tests": [
+        "test_non_dict_data_raises_invalid_definition",
+        "test_non_string_keys_raise_invalid_definition",
+        "test_datavar_default_and_factory_raises_invalid_definition"
+      ]
+    },
+    {
+      "criterion_id": "pickle-persistence",
+      "decision": "supported",
+      "evidence_quote": "Data survives pickle.",
+      "importance": "important",
+      "instruction_excerpt": "Data survives pickle.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly includes the exact source requirement sentence 'Data survives pickle.' in its list of behaviors to implement, and the validation contract includes a corresponding scenario (scenario:instruction-030) that requires this behavior. No other section of the prompt weakens, excludes, narrows, or contradicts this requirement.",
+      "reference_solution_evidence": [
+        "from .state_data import StateDataStore",
+        "\"StateDataStore\",",
+        "class StateDataStore:",
+        "self._data_store: StateDataStore = StateDataStore()"
+      ],
+      "solution_symbols": [
+        "StateDataStore"
+      ],
+      "verifier_tests": [
+        "test_pickle_round_trip_preserves_state_data"
+      ]
+    },
+    {
+      "criterion_id": "compound-parallel-declarations",
+      "decision": "supported",
+      "evidence_quote": "Compound and parallel states accept data as metaclass keyword.",
+      "importance": "important",
+      "instruction_excerpt": "Compound and parallel states accept data as metaclass keyword.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly includes the exact source requirement sentence: 'Compound and parallel states accept data as metaclass keyword.' This is also listed as required behavior check scenario:instruction-031, which states the expected behavior identically. No other part of the prompt contradicts, narrows, or weakens this requirement.",
+      "reference_solution_evidence": [
+        "from .statemachine import StateChart",
+        "def resolve_scope(sm: \"StateChart\", state: \"State\") -> DataScope:",
+        "def _merge_ancestor_data(sm: \"StateChart\", state: \"State\") -> Dict[str, Any]:",
+        "def resolve_state_data(sm: \"StateChart\", state: \"State\") -> dict:",
+        "sm: \"StateChart\",",
+        "return CallbackGroup.DATA_CHANGE.build_key(StateChart._specs)",
+        "DATA = \"data\"",
+        "return f\"data: {action.body}\"",
+        "f\"data: {data_text}</font>\"",
+        "f'<font point-size=\"{self.config.transition_font_size}\">data: {data_text}</font>'",
+        "_(\"State '{}' data must be a dict, got {}.\").format(",
+        "_(\"State '{}' data keys must be strings, got {!r}.\").format(state.id, key)"
+      ],
+      "solution_symbols": [
+        "StateChart",
+        "data"
+      ],
+      "verifier_tests": [
+        "test_compound_state_with_data",
+        "test_parallel_state_with_data"
+      ]
+    },
+    {
+      "criterion_id": "scxml-data",
+      "decision": "supported",
+      "evidence_quote": "SCXML datamodel and data elements with id and expr attributes are parsed as Python literals.",
+      "importance": "important",
+      "instruction_excerpt": "SCXML datamodel and data elements with id and expr attributes are parsed as Python literals.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly includes the exact source requirement sentence: 'SCXML datamodel and data elements with id and expr attributes are parsed as Python literals.' This sentence is also listed as required behavior check scenario:instruction-032, which states the same behavior. No other part of the prompt weakens, excludes, narrows, or contradicts this requirement. The prompt's validation contract requires implementing all listed behaviors, and the SCXML parsing requirement is among them. Therefore, the externally observable behavior is clearly preserved.",
+      "reference_solution_evidence": [
+        "def _datamodel_to_data(datamodel: DataModel) -> \"dict[str, Any] | None\":",
+        "data = self._datamodel_to_data(state.datamodel)",
+        "datamodel = parse_datamodel(state_elem)",
+        "if datamodel:",
+        "state.datamodel = datamodel",
+        "if not datamodel.data:",
+        "for item in datamodel.data:",
+        "if state.datamodel:",
+        "datamodel: \"DataModel | None\" = None",
+        "expr = item.expr or item.content",
+        "if expr is not None:",
+        "value = ast.literal_eval(expr)"
+      ],
+      "solution_symbols": [
+        "_datamodel_to_data",
+        "datamodel",
+        "expr"
+      ],
+      "verifier_tests": [
+        "test_scxml_datamodel_parsed_and_applied_to_state",
+        "test_scxml_state_data_works_like_python_api"
+      ]
+    },
+    {
+      "criterion_id": "diagram-data-annotations",
+      "decision": "supported",
+      "evidence_quote": "Diagrams annotate state data variables.",
+      "importance": "important",
+      "instruction_excerpt": "Diagrams annotate state data variables.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "The candidate prompt's product contract explicitly includes the exact source requirement sentence 'Diagrams annotate state data variables.' in the feature description, and the validation contract includes scenario:instruction-033 which restates the same behavior. No other section of the prompt weakens, excludes, narrows, or contradicts this requirement.",
+      "reference_solution_evidence": [
+        "data_vars = getattr(state, \"data_variable_names\", None)",
+        "data_vars = getattr(state, \"data_variable_names\", None) or []",
+        "def data_variable_names(self) -> \"list[str] | None\":",
+        "from .state_data import DataChangeInfo",
+        "from .state_data import DataScope",
+        "from .state_data import DataVar",
+        "from .state_data import StateDataStore",
+        "from ..state_data import resolve_state_data",
+        "kwargs[\"state_data\"] = resolve_state_data(self.sm, info.state)",
+        "kwargs[\"state_data\"] = resolve_state_data(self.sm, target)",
+        "from ..state_data import save_history_data",
+        "from .state_data import resolve_state_data"
+      ],
+      "solution_symbols": [
+        "data_variable_names",
+        "state_data"
+      ],
+      "verifier_tests": []
+    },
+    {
+      "criterion_id": "delivery-instructions-are-not-product-work",
+      "decision": "supported",
+      "evidence_quote": "",
+      "importance": "critical",
+      "instruction_excerpt": "IMPORTANT: Please work on this in a new branch from main and commit everything when you are done.",
+      "prompt_request_ids": [
+        "python-statemachine-state-data-scoping-implementation-1"
+      ],
+      "reason": "Process instruction was excluded from all worker prompts.",
+      "reference_solution_evidence": [],
+      "solution_symbols": [],
+      "verifier_tests": []
+    }
+  ],
+  "fingerprint": "sha256:638c96f5ccc1451d08499335e783471a7a3bcd52e3b892ee3c3ea2388fafa0d8",
+  "judge_id": "deepinfra-cheap/deepseek-ai/DeepSeek-V4-Flash-0731",
+  "reference_fingerprints": {
+    "instruction": "sha256:17e0781f9837bebd7304d5f1594dbf7de9a147a3ba8f03111e005f8376b3126a",
+    "rubric": "sha256:06b680ea64e215c314db9d9ffcbfda5f81cc9e1523c8f958c3c79c401868e574",
+    "solution_patch": "sha256:4197380535a2e67258afbdac3a7cb91d6a2c9ab1cd70c4cc09e973b739e4f81d",
+    "verifier_patch": "sha256:fcf7628db832d77da0f31fb287d5f016e27c02550ca54aa6fd19c9aa4d8bf0ec"
+  },
+  "schema_version": "deepswe-worker-prompt-evaluation-v1",
+  "summary": {
+    "criterion_count": 20,
+    "critical_failures": [],
+    "judge_calls": 20,
+    "passed": true,
+    "supported_count": 20,
+    "weighted_coverage": 1.0
+  },
+  "task_id": "python-statemachine-state-data-scoping",
+  "worker_prompts": [
+    {
+      "prompt_fingerprint": "42067fbf977296f32dafdbac28e7c072f692182fcfbc4d3532e63b2c97f81ea1",
+      "provider": "minisweagent",
+      "request_id": "python-statemachine-state-data-scoping-implementation-1"
+    }
+  ]
+}

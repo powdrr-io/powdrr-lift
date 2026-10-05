@@ -1,0 +1,142 @@
+[
+  {
+    "case_id": "joint-001-para-01",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-001-contrast-02",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-007-para-01",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-007-contrast-02",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-008-para-01",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-008-contrast-02",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-009-para-01",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-009-contrast-02",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-013-contrast-02",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-016-contrast-02",
+    "reason": "contrast does not change a gold decision"
+  },
+  {
+    "case_id": "joint-018-contrast-02",
+    "reason": "The candidate adds 'but the token is always the same regardless of the number of rows' and 'but the token encoding is fixed'. The base explicitly leaves token encoding unspecified, and the base's required prompt claim is to return a next-page token when rows remain. The candidate's addition contradicts the base's conditional behavior by implying a fixed token regardless of remaining rows, which violates the base's requirement and introduces a forbidden claim (always return one fixed outcome). This is not a valid minimal contrast because the change does not stem from a minimal source modification that supports a different gold decision while preserving the base's meaning, scope, and uncertainty."
+  },
+  {
+    "case_id": "joint-019-contrast-02",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "joint-020-contrast-02",
+    "reason": "contrast does not change a gold decision"
+  },
+  {
+    "case_id": "conditional-004-contrast-02",
+    "reason": "The base source states that data isolation applies to parallel states without any temporal condition. The candidate adds 'only when the state is active', introducing a new constraint that limits the scope of isolation to active states. This changes the meaning by adding an uncertainty/condition not present in the base, so it is not a valid contrast."
+  },
+  {
+    "case_id": "conditional-007-contrast-02",
+    "reason": "The base source states unconditional clearing on exit and initialization on entry. The candidate adds a condition 'only if the system is active', which introduces a restriction not present in the base. This changes the scope and uncertainty of the behavior, so the candidate does not preserve the original meaning and would support a different gold decision (e.g., the behavior is now conditional on system activity)."
+  },
+  {
+    "case_id": "conditional-008-contrast-02",
+    "reason": "contrast does not change a gold decision"
+  },
+  {
+    "case_id": "conditional-010-contrast-02",
+    "reason": "contrast does not change a gold decision"
+  },
+  {
+    "case_id": "scope-002-contrast-02",
+    "reason": "The candidate adds 'and all its child accounts', which expands the scope beyond the base's 'requested account only'. This changes the meaning and scope, so it is not a valid paraphrase. As a contrast, the source change supports a different gold decision: the scope is now broader, including child accounts, which contradicts the base's expected decision of 'requested_account'."
+  },
+  {
+    "case_id": "scope-003-contrast-02",
+    "reason": "contrast does not change a gold decision"
+  },
+  {
+    "case_id": "scope-005-para-01",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "scope-005-contrast-02",
+    "reason": "The candidate adds 'but administrators have broader visibility,' which introduces a contrast not supported by the source. The source only states that the export endpoint includes records visible to the authenticated user and does not mention administrators or broader visibility. The base explicitly marks 'whether administrators have broader visibility' as unspecified, so this addition contradicts the base's uncertainty."
+  },
+  {
+    "case_id": "scope-009-contrast-02",
+    "reason": "The candidate adds a shared cache that persists across requests, which introduces a new entity not present in the base. The base explicitly states that whether a separate shared cache also exists is unspecified. The candidate's target proposition claims 'while another cache is shared,' which contradicts the base's explicit uncertainty about a shared cache. The contrast is not minimal because the added shared cache is not a minimal source change that supports a different gold decision; it introduces an unspecified element as a certainty."
+  },
+  {
+    "case_id": "lifecycle-002-contrast-02",
+    "reason": "The candidate proposition changes the temporal scope from 'until the response is sent' to 'only after the response is sent', which reverses the lifecycle availability. The base source text specifies availability up to the point of response sending, not exclusively after it. This is a meaning-changing contrast that does not preserve the original decision."
+  },
+  {
+    "case_id": "lifecycle-010-para-01",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "lifecycle-010-contrast-02",
+    "reason": "The candidate adds 'but the data is retained for later re-entry', which contradicts the base proposition that exit removes the state's active data. The base explicitly states data is cleared on exit, and the base's explicitly_unspecified includes 'whether data is restored on re-entry', so asserting retention is not supported by the source. This is not a valid minimal contrast because the source text does not support the added claim."
+  },
+  {
+    "case_id": "copy-007-para-01",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "copy-007-contrast-02",
+    "reason": "variant source_text is unchanged from its base case"
+  },
+  {
+    "case_id": "copy-009-contrast-02",
+    "reason": "The base source text requires duplicating all nested cache values before returning them, with no mention of the top-level cache object. The candidate adds 'but keep references to the top-level cache object intact,' which introduces a new claim about the top-level cache object being returned by reference. This addition does not contradict the base requirement (nested values are still duplicated), but it changes the scope by specifying behavior for the top-level object that was previously unspecified. The base explicitly leaves 'copy behavior for opaque non-container objects' unspecified, and the top-level cache object could be considered such an object. By specifying that references are kept intact, the candidate reduces the uncertainty allowed by the base, thus failing to preserve the original scope and uncertainty. Therefore, the contrast is not valid."
+  },
+  {
+    "case_id": "validation-001-contrast-02",
+    "reason": "The base source states rejection only when *both* arguments are supplied, while the candidate source states rejection when *either* argument is provided. This is a minimal contrast because changing 'both' to 'either' alters the condition from conjunction to disjunction, which changes the gold decision: the base would not reject a declaration with only one argument, but the candidate would. The candidate does not preserve the meaning, scope, or uncertainty of the base."
+  },
+  {
+    "case_id": "validation-002-contrast-02",
+    "reason": "The candidate changes the behavior for explicit zero from 'requests no rows' to 'also uses 100', which directly contradicts the base source's distinction between omission and explicit zero. This fails the contrast requirement because the minimal source change does not support a different gold decision while preserving the base's meaning, scope, and uncertainty."
+  },
+  {
+    "case_id": "validation-003-contrast-02",
+    "reason": "The candidate adds an exception ('unless one of them is empty') that is not supported by the base source text. The base explicitly rejects any configuration that supplies both a file path and inline content, with no mention of emptiness as a factor. The candidate's target proposition changes the scope of invalidity to 'only when both are non-empty,' which is a different decision not entailed by the base. This is not a valid minimal contrast because the source change introduces a new condition without evidence."
+  },
+  {
+    "case_id": "validation-004-contrast-02",
+    "reason": "The candidate changes the behavior of explicit zero from disabling retries to also using the default. This is a minimal source change that supports a different gold decision: the original distinguishes absent from zero, while the candidate makes them equivalent. The contrast is valid because one minimal edit flips the expected decision."
+  },
+  {
+    "case_id": "validation-005-contrast-02",
+    "reason": "contrast does not change a gold decision"
+  },
+  {
+    "case_id": "validation-007-contrast-02",
+    "reason": "The candidate adds 'but an explicit null counts as a supplied value' and changes the target proposition to include an exception for explicit null. The base explicitly marks 'whether explicit null counts as a supplied default' as unspecified, so the candidate introduces a resolution that the base does not support. This changes the scope and uncertainty of the original rule, so it is not a valid minimal contrast."
+  },
+  {
+    "case_id": "validation-009-contrast-02",
+    "reason": "The candidate adds 'and null entries are treated as cache misses' to the source text, which directly contradicts the base proposition that stored null is distinct from a missing key. The base requires representing stored null separately from key absence, while the candidate equates null entries with cache misses, violating the required prompt claim and the expected decision that null is a valid, distinct value."
+  }
+]

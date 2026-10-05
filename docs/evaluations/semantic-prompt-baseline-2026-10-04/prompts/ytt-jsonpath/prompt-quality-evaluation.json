@@ -1,0 +1,392 @@
+{
+  "candidate_fingerprints": {
+    "instruction_ledger": "sha256:c9fab83c951c2a5a13b2f919a6216be9493e7fcce4dd446e9484350e1fa0b4cc",
+    "prompt_index": "sha256:021eda7fa2279090f03ef741100824c6e3b589de31c7dd670019a9b75a069d7f"
+  },
+  "findings": [
+    {
+      "criterion_id": "public-query-apis",
+      "decision": "supported",
+      "evidence_quote": "Add `Query(doc interface{}, path string) ([]interface{}, error)` and `QueryOne(doc interface{}, path string) (interface{}, bool, error)` to the `orderedmap` package for JSONPath querying.",
+      "importance": "critical",
+      "instruction_excerpt": "Add `Query(doc interface{}, path string) ([]interface{}, error)` and `QueryOne(doc interface{}, path string) (interface{}, bool, error)` to the `orderedmap` package for JSONPath querying.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt's Product contract section explicitly states the required function signatures for both `Query` and `QueryOne` in the `orderedmap` package. It also specifies that `Query` must return an empty slice if there are no matches and that `QueryOne` returns `(nil, false, nil)` when no match is found, which aligns with the expected behavior of reporting query errors and no-match results. The prompt does not contain any instructions that weaken, exclude, narrow, or contradict these requirements.",
+      "reference_solution_evidence": [
+        "func Query(doc interface{}, path string) ([]interface{}, error) {",
+        "results, err := Query(doc, path)",
+        "// Query",
+        "\"query\":     starlark.NewBuiltin(\"jsonpath.query\", core.ErrWrapper(jsonpathModule{}.Query)),",
+        "func (b jsonpathModule) Query(thread *starlark.Thread, f *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {",
+        "results, err := orderedmap.Query(docGoVal, pathStr)",
+        "func QueryOne(doc interface{}, path string) (interface{}, bool, error) {",
+        "\"query_one\": starlark.NewBuiltin(\"jsonpath.query_one\", core.ErrWrapper(jsonpathModule{}.QueryOne)),",
+        "func (b jsonpathModule) QueryOne(thread *starlark.Thread, f *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {",
+        "result, found, err := orderedmap.QueryOne(docGoVal, pathStr)"
+      ],
+      "solution_symbols": [
+        "Query",
+        "QueryOne"
+      ],
+      "verifier_tests": [
+        "TestJSONPathQueryOneReturnsNil",
+        "TestJSONPathStarlarkQueryOneNotFound"
+      ]
+    },
+    {
+      "criterion_id": "selector-coverage",
+      "decision": "supported",
+      "evidence_quote": "**Dot-notation** `.key`: identifiers may contain letters, digits, underscores, and hyphens (e.g. `$.my-key`). **Bracket-notation** `['key']` or `[\"key\"]` (supports escaping). **Index** `[N]`: negative indices count from the end. Out-of-range returns empty results.",
+      "importance": "critical",
+      "instruction_excerpt": "- **Dot-notation** `.key`: identifiers may contain letters, digits, underscores, and hyphens (e.g. `$.my-key`).\n- **Bracket-notation** `['key']` or `[\"key\"]` (supports escaping).\n- **Index** `[N]`: negative indices count from the end. Out-of-range returns empty results.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states all three selector behaviors: dot-notation with hyphens, bracket-notation with escaping, and index semantics including negative indices and out-of-range returning empty results. No other part of the prompt contradicts or narrows these requirements. The validation contract also lists these as required behavior checks, reinforcing the requirement.",
+      "reference_solution_evidence": [
+        "selectors, err := ParsePath(path)",
+        "func ParsePath(path string) ([]Selector, error) {",
+        "return applyChild(node, s.Name)",
+        "func applyChild(node interface{}, name string) []interface{} {",
+        "return applyIndex(node, s.Index)",
+        "func applyIndex(node interface{}, index int) []interface{} {",
+        "idx := normalizeIndex(index, len(arr))",
+        "func normalizeIndex(index, length int) int {",
+        "normalized := normalizeIndex(idx, len(arr))",
+        "idx := normalizeIndex(*seg.Index, len(arr))"
+      ],
+      "solution_symbols": [
+        "ParsePath",
+        "applyChild",
+        "applyIndex",
+        "normalizeIndex"
+      ],
+      "verifier_tests": [
+        "TestJSONPathDotNotationWithDigits",
+        "TestJSONPathUnionIndicesNegative",
+        "TestJSONPathUnionIndicesOutOfBounds"
+      ]
+    },
+    {
+      "criterion_id": "ordered-unions",
+      "decision": "supported",
+      "evidence_quote": "**Union**: Selects multiple children (`['key1','key2']`) or indices (`[1,2]`). Results are returned in the order specified.",
+      "importance": "critical",
+      "instruction_excerpt": "- **Union**: Selects multiple children (`['key1','key2']`) or indices (`[1,2]`). Results are returned in the order specified.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states the union behavior and the order requirement in the same sentence, matching the source instruction exactly. No other part of the prompt contradicts or weakens this requirement.",
+      "reference_solution_evidence": [
+        "return applyUnion(node, s)",
+        "results = append(results, applyUnion(node, s.Union)...)",
+        "*results = append(*results, applyUnion(v, s.Union)...)",
+        "*results = append(*results, applyUnion(item, s.Union)...)",
+        "func applyUnion(node interface{}, u UnionSelector) []interface{} {",
+        "case UnionSelector:",
+        "if us, ok := bracketSels[0].(UnionSelector); ok {",
+        "return []Selector{UnionSelector{Keys: keys}}, nil",
+        "return []Selector{UnionSelector{Indices: indices}}, nil",
+        "Union UnionSelector",
+        "type UnionSelector struct {",
+        "func (UnionSelector) selectorMarker() {}"
+      ],
+      "solution_symbols": [
+        "applyUnion",
+        "UnionSelector"
+      ],
+      "verifier_tests": [
+        "TestJSONPathUnionIndicesPreserveOrder",
+        "TestJSONPathUnionKeys",
+        "TestJSONPathUnionWithChild"
+      ]
+    },
+    {
+      "criterion_id": "recursive-descent",
+      "decision": "supported",
+      "evidence_quote": "**Recursive descent** `..key`, `..*`, or `..['key1','key2']`: searches all descendants depth-first. `$..*` yields results starting with the root document itself.",
+      "importance": "critical",
+      "instruction_excerpt": "- **Recursive descent** `..key`, `..*`, or `..['key1','key2']`: searches all descendants depth-first. `$..*` yields results starting with the root document itself.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states the recursive descent behavior, including depth-first search, the supported selector forms (`..key`, `..*`, `..['key1','key2']`), and the root-inclusion behavior for `$..*`. No other part of the prompt contradicts or narrows this requirement. The requirement is therefore fully preserved.",
+      "reference_solution_evidence": [
+        "return applyRecursive(node, s)",
+        "func applyRecursive(node interface{}, s RecursiveSelector) []interface{} {",
+        "collectRecursive(node, s, &results)",
+        "func collectRecursive(node interface{}, s RecursiveSelector, results *[]interface{}) {",
+        "collectRecursive(v, s, results)",
+        "collectRecursive(item, s, results)",
+        "return applyRecursiveUnion(node, s)",
+        "func applyRecursiveUnion(node interface{}, s RecursiveUnionSelector) []interface{} {"
+      ],
+      "solution_symbols": [
+        "applyRecursive",
+        "collectRecursive",
+        "applyRecursiveUnion"
+      ],
+      "verifier_tests": [
+        "TestJSONPathRecursiveWildcardIncludesRoot",
+        "TestJSONPathStarlarkRecursive"
+      ]
+    },
+    {
+      "criterion_id": "filters-and-truthiness",
+      "decision": "supported",
+      "evidence_quote": "**Filter** `[?(@.field op value)]`: ops are `==`, `!=`, `<`, `>`, `<=`, `>=`. Values: numbers, strings, booleans, `null`. Bare `[?(@.field)]` = truthiness check. Filter paths may be multi-level and include array indices.",
+      "importance": "critical",
+      "instruction_excerpt": "- **Filter** `[?(@.field op value)]`: ops are `==`, `!=`, `<`, `>`, `<=`, `>=`. Values: numbers, strings, booleans, `null`. Bare `[?(@.field)]` = truthiness check. Filter paths may be multi-level and include array indices.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states the filter operators (`==`, `!=`, `<`, `>`, `<=`, `>=`), the allowed value types (numbers, strings, booleans, `null`), the bare truthiness check (`[?(@.field)]`), and that filter paths may be multi-level and include array indices. This directly preserves the source requirement's externally observable behavior. No other part of the prompt contradicts or narrows this requirement.",
+      "reference_solution_evidence": [
+        "return applyFilterSelector(node, s.Expr)",
+        "func applyFilterSelector(node interface{}, expr FilterNode) []interface{} {",
+        "if evaluateFilterNode(item, expr) {",
+        "func evaluateFilterNode(item interface{}, node FilterNode) bool {",
+        "return evaluateFilterNode(item, n.Left) && evaluateFilterNode(item, n.Right)",
+        "return evaluateFilterNode(item, n.Left) || evaluateFilterNode(item, n.Right)",
+        "return evaluateLogical(item, n)",
+        "func evaluateLogical(item interface{}, n FilterLogical) bool {",
+        "return isTruthy(val)",
+        "func isTruthy(val interface{}) bool {"
+      ],
+      "solution_symbols": [
+        "applyFilterSelector",
+        "evaluateFilterNode",
+        "evaluateLogical",
+        "isTruthy"
+      ],
+      "verifier_tests": [
+        "TestJSONPathFilterNestedArrayIndex"
+      ]
+    },
+    {
+      "criterion_id": "logical-filter-precedence",
+      "decision": "supported",
+      "evidence_quote": "**Logical Filters**: Supports `&&` and `||` with standard precedence.",
+      "importance": "critical",
+      "instruction_excerpt": "- **Logical Filters**: Supports `&&` and `||` with standard precedence.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states that logical filters support `&&` and `||` with standard precedence, which directly matches the source instruction. The rest of the prompt does not contain any conflicting or narrowing instructions regarding logical filter precedence.",
+      "reference_solution_evidence": [
+        "return evaluateLogical(item, n)",
+        "func evaluateLogical(item interface{}, n FilterLogical) bool {"
+      ],
+      "solution_symbols": [
+        "evaluateLogical"
+      ],
+      "verifier_tests": [
+        "TestJSONPathFilterLogicalAndOrPrecedence"
+      ]
+    },
+    {
+      "criterion_id": "truthiness-rules",
+      "decision": "supported",
+      "evidence_quote": "**Truthiness**: standard falsy values (`nil`, `false`, `0`, `\"\"`, empty arrays, empty maps); everything else is truthy.",
+      "importance": "important",
+      "instruction_excerpt": "- **Truthiness**: standard falsy values (`nil`, `false`, `0`, `\"\"`, empty arrays, empty maps); everything else is truthy.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly includes the exact truthiness rule from the source instruction in its product contract section. The rule is stated clearly and completely, and no other part of the prompt contradicts, narrows, or weakens this requirement. The truthiness rule is also reinforced by the validation contract scenario (scenario:instruction-026) which repeats the same requirement.",
+      "reference_solution_evidence": [
+        "return isTruthy(val)",
+        "func isTruthy(val interface{}) bool {"
+      ],
+      "solution_symbols": [
+        "isTruthy"
+      ],
+      "verifier_tests": [
+        "TestJSONPathTruthinessEmptyArray",
+        "TestJSONPathTruthinessEmptyMap"
+      ]
+    },
+    {
+      "criterion_id": "length-selector-and-function",
+      "decision": "supported",
+      "evidence_quote": "**Length**: The `length()` function acts as a selector (`$.arr.length()`) or within filters. It applies to arrays, maps, and strings, and must return a Go `int`.",
+      "importance": "important",
+      "instruction_excerpt": "- **Length**: The `length()` function acts as a selector (`$.arr.length()`) or within filters. It applies to arrays, maps, and strings, and must return a Go `int`.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states that the `length()` function acts as a selector (`$.arr.length()`) or within filters, applies to arrays, maps, and strings, and must return a Go `int`. This directly preserves the source requirement's externally observable behavior. The validation contract further reinforces this with scenarios 18-23, which break down the requirement into its constituent parts (selector, within filters, arrays, maps, strings, Go int) and require all checks to pass in the same scenario. No other section of the prompt weakens, excludes, narrows, or contradicts this behavior.",
+      "reference_solution_evidence": [
+        "return applyLength(node)",
+        "func applyLength(node interface{}) []interface{} {",
+        "return getLength(current)",
+        "return getLength(val)",
+        "func getLength(val interface{}) interface{} {"
+      ],
+      "solution_symbols": [
+        "applyLength",
+        "getLength"
+      ],
+      "verifier_tests": [
+        "TestJSONPathLengthSelector",
+        "TestJSONPathLengthOnObject",
+        "TestJSONPathLengthOnString",
+        "TestJSONPathLengthReturnsInt"
+      ]
+    },
+    {
+      "criterion_id": "end-relative-script",
+      "decision": "supported",
+      "evidence_quote": "**Script**: Supports getting elements from the end of arrays using `[(@.length-N)]` expressions. Whitespace within the expression is permitted.",
+      "importance": "important",
+      "instruction_excerpt": "- **Script**: Supports getting elements from the end of arrays using `[(@.length-N)]` expressions. Whitespace within the expression is permitted.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states the end-relative script behavior and explicitly permits whitespace within the expression, matching the source requirement. No other part of the prompt contradicts or narrows this behavior.",
+      "reference_solution_evidence": [
+        "return applyScript(node, s)",
+        "func applyScript(node interface{}, s ScriptSelector) []interface{} {",
+        "case ScriptSelector:",
+        "return []Selector{ScriptSelector{Expr: expr}}, nil",
+        "type ScriptSelector struct {",
+        "func (ScriptSelector) selectorMarker() {}"
+      ],
+      "solution_symbols": [
+        "applyScript",
+        "ScriptSelector"
+      ],
+      "verifier_tests": [
+        "TestJSONPathScriptLastElement",
+        "TestJSONPathScriptSecondToLast",
+        "TestJSONPathScriptWithSpaces"
+      ]
+    },
+    {
+      "criterion_id": "result-and-type-failure-semantics",
+      "decision": "supported",
+      "evidence_quote": "`Query` must return an empty slice if there are no matches. `QueryOne` returns `(nil, false, nil)` when no match is found. Applying a selector to an incompatible type (e.g., index on a map, key on an array) returns empty results, not an error.",
+      "importance": "critical",
+      "instruction_excerpt": "- `Query` must return an empty slice if there are no matches. `QueryOne` returns `(nil, false, nil)` when no match is found.\n- Applying a selector to an incompatible type (e.g., index on a map, key on an array) returns empty results, not an error.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt's Product contract section contains the exact source instruction text verbatim: '`Query` must return an empty slice if there are no matches. `QueryOne` returns `(nil, false, nil)` when no match is found. Applying a selector to an incompatible type (e.g., index on a map, key on an array) returns empty results, not an error.' This statement clearly and unambiguously specifies the required externally observable behavior for both no-match cases and type-incompatible selector cases. The remainder of the prompt does not contain any instruction that weakens, excludes, narrows, or contradicts this behavior. The validation contract section also reinforces this by listing scenario:instruction-027, scenario:instruction-028, and scenario:instruction-029 as required behavior checks that must pass, with the same exact text quoted in each scenario. No conflicting instructions exist elsewhere in the prompt.",
+      "reference_solution_evidence": [
+        "func Query(doc interface{}, path string) ([]interface{}, error) {",
+        "results, err := Query(doc, path)",
+        "// Query",
+        "\"query\":     starlark.NewBuiltin(\"jsonpath.query\", core.ErrWrapper(jsonpathModule{}.Query)),",
+        "func (b jsonpathModule) Query(thread *starlark.Thread, f *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {",
+        "results, err := orderedmap.Query(docGoVal, pathStr)",
+        "func QueryOne(doc interface{}, path string) (interface{}, bool, error) {",
+        "\"query_one\": starlark.NewBuiltin(\"jsonpath.query_one\", core.ErrWrapper(jsonpathModule{}.QueryOne)),",
+        "func (b jsonpathModule) QueryOne(thread *starlark.Thread, f *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {",
+        "result, found, err := orderedmap.QueryOne(docGoVal, pathStr)",
+        "next = append(next, applySelector(node, sel)...)",
+        "func applySelector(node interface{}, sel Selector) []interface{} {"
+      ],
+      "solution_symbols": [
+        "Query",
+        "QueryOne",
+        "applySelector"
+      ],
+      "verifier_tests": [
+        "TestJSONPathEmptyResultIsNotNil",
+        "TestJSONPathQueryOneReturnsNil",
+        "TestJSONPathUnionIndicesOnObject",
+        "TestJSONPathUnionKeysOnArray"
+      ]
+    },
+    {
+      "criterion_id": "syntax-error-contract",
+      "decision": "supported",
+      "evidence_quote": "Any syntax error must return an `*orderedmap.SyntaxError` struct containing `Message` (string) and `Position` (int byte offset). The `Error()` method must format as `\"syntax error at position {Position}: {Message}\"`.",
+      "importance": "critical",
+      "instruction_excerpt": "- Any syntax error must return an `*orderedmap.SyntaxError` struct containing `Message` (string) and `Position` (int byte offset). The `Error()` method must format as `\"syntax error at position {Position}: {Message}\"`.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly states the required behavior in the product contract section: 'Any syntax error must return an `*orderedmap.SyntaxError` struct containing `Message` (string) and `Position` (int byte offset). The `Error()` method must format as `",
+      "reference_solution_evidence": [
+        "return nil, &SyntaxError{Message: \"empty path\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"path must start with '$'\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"unexpected end of path\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"unexpected end after '.'\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"expected property name\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: fmt.Sprintf(\"unknown function '%s'\", name), Position: p.pos}",
+        "return nil, &SyntaxError{Message: fmt.Sprintf(\"unexpected character '%c'\", ch), Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"unexpected end after '..'\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"expected property name after '..'\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"unexpected end after '['\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"expected quoted key in union\", Position: p.pos}",
+        "return nil, &SyntaxError{Message: \"unterminated script expression\", Position: p.pos}"
+      ],
+      "solution_symbols": [
+        "SyntaxError",
+        "ParsePath"
+      ],
+      "verifier_tests": [
+        "TestJSONPathSyntaxErrorType",
+        "TestJSONPathSyntaxErrorExactFormat"
+      ]
+    },
+    {
+      "criterion_id": "starlark-module-and-conversions",
+      "decision": "supported",
+      "evidence_quote": "The Go variable `JSONPathAPI` in the `yttlibrary` package must map `\"jsonpath\"` to a module exposing:\n- `query(doc, path)`: Returns a `starlark.List` of results. Returns an empty `starlark.List` if no matches. `query_one(doc, path)`: Returns a single value, or `starlark.None` if no match is found. These functions must accept `starlark.Dict` and `starlark.List` documents and perform the necessary Starlark/Go value conversions for querying.",
+      "importance": "critical",
+      "instruction_excerpt": "The Go variable `JSONPathAPI` in the `yttlibrary` package must map `\"jsonpath\"` to a module exposing:\n- `query(doc, path)`: Returns a `starlark.List` of results. Returns an empty `starlark.List` if no matches.\n- `query_one(doc, path)`: Returns a single value, or `starlark.None` if no match is found.\nThese functions must accept `starlark.Dict` and `starlark.List` documents and perform the necessary Starlark/Go value conversions for querying.",
+      "prompt_request_ids": [
+        "ytt-jsonpath-query-api-implementation-1"
+      ],
+      "reason": "The candidate prompt explicitly and completely states the required behavior for the JSONPathAPI module: it must map `'jsonpath'` to a module exposing `query` and `query_one` functions with the specified return types (starlark.List, empty starlark.List for no matches, single value or starlark.None for no match), and must accept starlark.Dict and starlark.List documents with necessary conversions. The prompt also includes these as explicit validation checks (scenarios 32-37) and does not contain any contradictory or weakening instructions regarding this specific requirement. The additional detailed JSONPath syntax requirements in the prompt do not conflict with the module-level behavior.",
+      "reference_solution_evidence": [
+        "\"jsonpath\": JSONPathAPI,",
+        "// JSONPathAPI contains the Starlark bindings for the jsonpath module.",
+        "var JSONPathAPI = starlark.StringDict{",
+        "\"query\":     starlark.NewBuiltin(\"jsonpath.query\", core.ErrWrapper(jsonpathModule{}.Query)),",
+        "return starlark.None, fmt.Errorf(\"jsonpath query error: %s\", err)",
+        "\"query_one\": starlark.NewBuiltin(\"jsonpath.query_one\", core.ErrWrapper(jsonpathModule{}.QueryOne)),"
+      ],
+      "solution_symbols": [
+        "JSONPathAPI",
+        "query",
+        "query_one"
+      ],
+      "verifier_tests": [
+        "TestJSONPathModuleExists",
+        "TestJSONPathStarlarkQueryChild",
+        "TestJSONPathStarlarkQueryOneNotFound",
+        "TestJSONPathStarlarkQueryError"
+      ]
+    }
+  ],
+  "fingerprint": "sha256:d5fee61e9bc004d0648d816d9832c150ff4c34eab245dad4c6036b9077eb1f80",
+  "judge_id": "deepinfra-cheap/deepseek-ai/DeepSeek-V4-Flash-0731",
+  "reference_fingerprints": {
+    "instruction": "sha256:249d64cf61565a515484993844adce0d9c16355c025edc10975d430bc8966286",
+    "rubric": "sha256:15ccbed8509b99cbc67ca0c16a13d0df7c3655271d0081f681bedf760fc3d867",
+    "solution_patch": "sha256:74a41e27b3ab71a72c93981c3417b5e7a3d66208f5ea5e2e1e4b3e0841e2c610",
+    "verifier_patch": "sha256:c78cbd11e4aff499b92f8feadebf4b1dafc9907ca8393b75685588335369ff9b"
+  },
+  "schema_version": "deepswe-worker-prompt-evaluation-v1",
+  "summary": {
+    "criterion_count": 12,
+    "critical_failures": [],
+    "judge_calls": 12,
+    "passed": true,
+    "supported_count": 12,
+    "weighted_coverage": 1.0
+  },
+  "task_id": "ytt-jsonpath-query-api",
+  "worker_prompts": [
+    {
+      "prompt_fingerprint": "0c28dfcbf8338bbfce809dfe5fc2f0da88553d3d2e6ad06823a51b448bcbc2d8",
+      "provider": "minisweagent",
+      "request_id": "ytt-jsonpath-query-api-implementation-1"
+    }
+  ]
+}

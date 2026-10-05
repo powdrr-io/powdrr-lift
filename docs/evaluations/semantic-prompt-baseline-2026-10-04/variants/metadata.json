@@ -1,0 +1,18 @@
+{
+  "accepted_variant_count": 109,
+  "base_case_count": 72,
+  "generated_at": "2026-10-04T11:29:26.615154+00:00",
+  "generator": {
+    "model": "DeepSeek-V4-Flash-0731",
+    "provider": "deepinfra-cheap"
+  },
+  "generator_calls": 0,
+  "proposal_source": "/private/tmp/semantic-prompt-variants-20261004-01/variant-generation-exchanges.jsonl",
+  "rejected_variant_count": 35,
+  "reviewer": {
+    "model": "deepseek-ai/DeepSeek-V4-Pro",
+    "provider": "deepinfra"
+  },
+  "reviewer_calls": 144,
+  "source_revision": "4b0e0a1b812b4cdabea894c4ff04cd1d578ab41b"
+}

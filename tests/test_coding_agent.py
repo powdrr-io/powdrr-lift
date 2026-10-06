@@ -165,9 +165,29 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     assert "[old-adapter] (removed)" in request.prompt
     assert "Validation profiles that will run: unit-tests" in request.prompt
     assert "Workrr" not in request.prompt
-    assert (
-        json.loads(request.to_json())["schema_version"] == "implementation-request-v2"
-    )
+    serialized = json.loads(request.to_json())
+    assert serialized["schema_version"] == "implementation-request-v3"
+    assert serialized["prompt_fingerprint"].startswith("sha256:")
+    assert ImplementationRequest.from_data(serialized) == request
+
+
+def test_request_prompt_fingerprint_covers_exact_text_and_reads_v2_artifacts() -> None:
+    request = _request()
+    serialized = request.to_data()
+    assert serialized["prompt_fingerprint"].startswith("sha256:")
+
+    stale = dict(serialized)
+    stale["prompt"] += " Altered after capture."
+    with pytest.raises(ValueError, match="prompt fingerprint is stale"):
+        ImplementationRequest.from_data(stale)
+
+    legacy = dict(serialized)
+    legacy["schema_version"] = "implementation-request-v2"
+    legacy.pop("prompt_fingerprint")
+    restored = ImplementationRequest.from_data(legacy)
+    assert restored.prompt == request.prompt
+    assert restored.schema_version == "implementation-request-v2"
+    assert "prompt_fingerprint" not in restored.to_data()
 
 
 def test_empty_product_change_lists_are_omitted_from_worker_prompt() -> None:
@@ -468,17 +488,9 @@ def test_worker_removes_declared_ephemeral_artifacts_before_final_diff(
 ) -> None:
     worktree = _git_repo(tmp_path)
     request = _request(_head(worktree))
-    request = ImplementationRequest(
-        **{
-            **request.to_data(),
-            "allowed_paths": list(request.allowed_paths),
-            "acceptance_criteria": list(request.acceptance_criteria),
-            "validation_profiles": list(request.validation_profiles),
-            "context_refs": list(request.context_refs),
-            "allowed_commands": list(request.allowed_commands),
-            "ephemeral_paths": ["test_helper.py"],
-        }
-    )
+    request_data = request.to_data()
+    request_data["ephemeral_paths"] = ["test_helper.py"]
+    request = ImplementationRequest.from_data(request_data)
 
     attempt = run_coding_agent(
         FakeProvider("ephemeral"),
@@ -641,9 +653,9 @@ def test_repair_attempt_can_continue_with_existing_in_scope_changes(
     tmp_path: Path,
 ) -> None:
     worktree = _git_repo(tmp_path)
-    request = ImplementationRequest(
-        **{**_request(_head(worktree)).to_data(), "allow_existing_changes": True}
-    )
+    request_data = _request(_head(worktree)).to_data()
+    request_data["allow_existing_changes"] = True
+    request = ImplementationRequest.from_data(request_data)
 
     class ExistingChangeProvider:
         provider_name = "fake"

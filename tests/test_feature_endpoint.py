@@ -85,6 +85,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _render_pull_request_body,
     _resolve_bootstrap_subject_binding,
     _run_code_task_agent,
+    _structrr_taxonomy_path,
     _task_structrr_changes,
     _update_plan_from_sentence_trace,
     _validate_procedrr_flow,
@@ -2745,6 +2746,17 @@ def test_feature_flow_falls_back_to_source_tree_for_external_target(
         / "skill-definitions"
         / "implement-feature.yaml"
     )
+
+
+def test_feature_taxonomy_falls_back_to_packaged_resource_for_external_target(
+    tmp_path: Path,
+) -> None:
+    taxonomy = _structrr_taxonomy_path(tmp_path)
+
+    assert taxonomy.name == "software_development_entity_taxonomy.md"
+    assert taxonomy.is_file()
+    assert "## " in taxonomy.read_text(encoding="utf-8")
+    assert "resources" in taxonomy.parts
 
 
 def test_required_test_obligation_compiles_against_discovered_inventory() -> None:

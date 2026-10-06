@@ -172,8 +172,8 @@ installed. Rerun the command to refresh Powdrr from `main`. Before running a
 workflow, configure credentials for the model provider you plan to use; installing
 the CLI does not configure a provider account or download optional local models.
 
-Before a feature run, check that Powdrr can reach its planning and coding model
-routes and find the selected coding-agent executable:
+Before bootstrapping or implementing a feature, check that Powdrr can reach its
+planning and coding model routes and find the selected coding-agent executable:
 
 ```bash
 powdrr-lift check-credentials --repo-root .
@@ -181,11 +181,56 @@ powdrr-lift check-credentials --repo-root .
 
 The check makes a small authenticated model request for each route. It reports
 the provider, model, credential source, and any access failure without printing
-credential values. If the run will create a pull request, include `--open-pr` to
-also check GitHub authentication and the current repository's write permission.
-Use `--json` for machine-readable results. Provider and model options are
-available through `--planning-provider`, `--planning-model`, `--coding-provider`,
-and `--coding-model`; use the same values for the corresponding feature run.
+credential values. Use `--json` for machine-readable results. Provider and
+model options are available through `--planning-provider`,
+`--planning-model`, `--coding-provider`, and `--coding-model`; use the same
+values for the corresponding feature run.
+
+### Try Powdrr on a project
+
+Powdrr uses Git to create a separate branch and worktree for each task. Start
+from a clean checkout. A bootstrap run creates a validated Structrr snapshot and
+opens a pull request containing the onboarding artifacts:
+
+```bash
+powdrr-lift bootstrap --repo-root . --open-pr
+```
+
+Review and merge that pull request, then update your local checkout before
+asking Powdrr to implement a feature. Put the request in a Markdown or text file
+so the full request is easy to review and retain:
+
+```bash
+powdrr-lift implement --repo-root . --headless \
+  --request-file feature.md \
+  --work-item-name add-project-feature
+```
+
+The implementation command runs locally and does not push or open a pull
+request. Add `--open-pr` to push the verified branch and open a reviewable PR.
+For PR creation, authenticate the `gh` CLI for the GitHub account that can write
+to the repository. Both bootstrap and implementation print their report paths,
+branch, and retained worktree; run artifacts and worktrees are stored under the
+repository's common Git directory in `powdrr-lift/runs/` and
+`powdrr-lift/worktrees/`.
+
+Implementation is limited to the repository by default. Use repeated
+`--allowed-path` options to narrow it, for example `--allowed-path src
+--allowed-path tests`. If the request leaves behavior undefined, headless mode
+continues with a normative default and records the uncertainty and selected
+default in the report. Failed verification prevents publication. The report
+includes validation, review findings, decisions, and publication status.
+
+Powdrr sends the feature request and the repository context needed for planning,
+implementation, and review to the configured planning and coding providers.
+Configure credentials for both routes before running; `check-credentials`
+confirms authenticated model access without printing credential values. With
+the default DeepInfra planning and coding routes, set `DEEPINFRA_API_TOKEN` or
+`DEEPINFRA_API_KEY`; use the provider/model options shown above for other
+configured routes. Local run reports, generated context, and retained worktrees
+remain in the Git common directory. Review and remove retained branches and
+worktrees when they are no longer needed; Powdrr does not automatically discard
+task evidence.
 
 ### For Codex Proxy Recording
 

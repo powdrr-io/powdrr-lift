@@ -159,6 +159,9 @@ class FeatureEndpointConfig:
     capture_worker_prompts_only: bool = False
     benchmark_mode: bool = False
     uncertainty_policy: str = "clarify"
+    prepared_worktree: Path | None = None
+    prepared_branch: str | None = None
+    agent_managed_git: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,8 +267,8 @@ def run_feature_endpoint(
         raise ValueError("at least one allowed path is required")
     root = config.repo_root.resolve()
     slug = slugify_workflow_id(config.work_item_name)
-    branch = integration_branch_name(config.work_item_name)
-    worktree = root / ".worktrees" / "powdrr" / slug
+    branch = config.prepared_branch or integration_branch_name(config.work_item_name)
+    worktree = config.prepared_worktree or root / ".worktrees" / "powdrr" / slug
     output_root = (
         config.output_root or root / ".powdrr" / "feature-runs" / slug
     ).resolve()
@@ -274,28 +277,50 @@ def run_feature_endpoint(
 
     try:
         _exclude_telemetry_from_patch(root, output_root)
-        _require_clean_root(root, runner)
-        _run(runner, root, ["git", "fetch", "origin", config.base_branch])
-        _run(
-            runner,
-            root,
-            [
-                "git",
-                "worktree",
-                "add",
-                "-b",
-                branch,
-                str(worktree),
-                f"origin/{config.base_branch}",
-            ],
+        initial_head = (
+            _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+            if config.prepared_worktree is not None
+            else None
         )
-        return _execute_procedrr_flow(
+        if config.prepared_worktree is None:
+            _require_clean_root(root, runner)
+            _run(runner, root, ["git", "fetch", "origin", config.base_branch])
+            _run(
+                runner,
+                root,
+                [
+                    "git",
+                    "worktree",
+                    "add",
+                    "-b",
+                    branch,
+                    str(worktree),
+                    f"origin/{config.base_branch}",
+                ],
+            )
+        if initial_head is None:
+            initial_head = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+        result = _execute_procedrr_flow(
             config,
             runner=runner,
             worktree=worktree,
             output_root=output_root,
             branch=branch,
         )
+        if (
+            config.agent_managed_git
+            and config.cleanup_temporary_artifacts
+            and not config.design_only
+            and not config.capture_worker_prompts_only
+        ):
+            _remove_temporary_feature_artifacts(
+                runner,
+                worktree,
+                slug=slug,
+                initial_head=initial_head,
+                commit_changes=False,
+            )
+        return result
     except Exception as error:
         failure = _failure_for_exception(error, output_root, config)
         _write_failure_artifact(output_root, failure)
@@ -759,7 +784,8 @@ def _prepare_proposal_review(
             json.dumps(proposal.to_data(), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        _commit(runner, worktree, "Record proposal revision")
+        if not config.agent_managed_git:
+            _commit(runner, worktree, "Record proposal revision")
     active_intent_clauses = _resolve_feature_intent(
         worktree,
         baseline_document=baseline_document,
@@ -2359,7 +2385,8 @@ def _run_code_agent_phase(
             json.dumps(proposal_revision.to_data(), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        _commit(runner, worktree, "Record proposal revision")
+        if not config.agent_managed_git:
+            _commit(runner, worktree, "Record proposal revision")
     else:
         try:
             validate_proposal_revision(proposal_revision_path, proposal_revision)
@@ -3776,6 +3803,7 @@ def _remove_temporary_feature_artifacts(
     *,
     slug: str,
     initial_head: str,
+    commit_changes: bool = True,
 ) -> None:
     """Remove generated planning files from an in-place candidate tree.
 
@@ -3835,7 +3863,8 @@ def _remove_temporary_feature_artifacts(
             elif target.exists() or target.is_symlink():
                 target.unlink()
     if (
-        generated_paths
+        commit_changes
+        and generated_paths
         and _git_output(runner, worktree, ["git", "status", "--porcelain"]).strip()
     ):
         _commit(runner, worktree, "Remove temporary feature planning artifacts")
@@ -4818,7 +4847,11 @@ def _feature_structrr_artifact_exclusions(
 
 
 def _ensure_current_baseline(
-    worktree: Path, runner: Runner, *, bootstrap_path: Path | None = None
+    worktree: Path,
+    runner: Runner,
+    *,
+    bootstrap_path: Path | None = None,
+    commit_changes: bool = True,
 ) -> Path:
     """Reuse a current baseline only when every bootstrap section is current."""
     current = _load_yaml_mapping(bootstrap_path) if bootstrap_path else None
@@ -4836,7 +4869,8 @@ def _ensure_current_baseline(
         )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
-        _commit(runner, worktree, "Bootstrap Structrr baseline")
+        if commit_changes:
+            _commit(runner, worktree, "Bootstrap Structrr baseline")
         return target
     if not relative_paths:
         baseline = bootstrap_structrr(
@@ -4846,7 +4880,8 @@ def _ensure_current_baseline(
             raise PowdrrExecutionError(
                 f"Structrr bootstrap validation failed: {baseline.validation.issues}"
             )
-        _commit(runner, worktree, "Bootstrap Structrr baseline")
+        if commit_changes:
+            _commit(runner, worktree, "Bootstrap Structrr baseline")
         return baseline.output_path
     ranked: list[tuple[int, str]] = []
     for relative_path in relative_paths:
@@ -4876,7 +4911,8 @@ def _ensure_current_baseline(
         )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
-        _commit(runner, worktree, "Refresh Structrr baseline")
+        if commit_changes:
+            _commit(runner, worktree, "Refresh Structrr baseline")
         return target
     baseline = bootstrap_structrr(
         worktree, taxonomy_path=_structrr_taxonomy_path(worktree)
@@ -4885,7 +4921,8 @@ def _ensure_current_baseline(
         raise PowdrrExecutionError(
             f"Structrr bootstrap regeneration failed: {baseline.validation.issues}"
         )
-    _commit(runner, worktree, "Refresh Structrr baseline sections")
+    if commit_changes:
+        _commit(runner, worktree, "Refresh Structrr baseline sections")
     return baseline.output_path
 
 

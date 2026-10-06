@@ -3,12 +3,14 @@ from __future__ import annotations
 import argparse
 import contextlib
 import difflib
+import io
 import json
 import os
 import re
 import shlex
 import subprocess
 import sys
+import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -16,7 +18,12 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.agent_bootstrap import BootstrapTaskConfig, run_bootstrap_task
+from powdrr_lift.agent_bootstrap import (
+    BootstrapTaskConfig,
+    _run_output_root,
+    run_bootstrap_task,
+)
+from powdrr_lift.agent_feature import run_agent_feature_task
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
@@ -248,6 +255,7 @@ from powdrr_lift.workrr.replay import (
 from powdrr_lift.workrr.repository_subject_binding import (
     replay_subject_binding_events,
 )
+from powdrr_lift.workrr.run_artifacts import write_json_artifact, write_run_report
 from powdrr_lift.workrr.scenario import (
     WorkflowScenarioError,
     extract_scripted_responses,
@@ -426,6 +434,52 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser.add_argument("--open-pr", action="store_true")
     bootstrap_parser.add_argument("--json", action="store_true")
     bootstrap_parser.set_defaults(func=_run_bootstrap)
+
+    implement_parser = subparsers.add_parser(
+        "implement",
+        help="Implement a feature headlessly in an isolated agent worktree.",
+    )
+    implement_parser.add_argument("--repo-root", type=Path)
+    feature_input = implement_parser.add_mutually_exclusive_group(required=True)
+    feature_input.add_argument("--request-file", type=Path)
+    feature_input.add_argument("--feature-description")
+    implement_parser.add_argument("--work-item-name", required=True)
+    implement_parser.add_argument("--headless", action="store_true", required=True)
+    implement_parser.add_argument(
+        "--allowed-path", action="append", default=[], dest="allowed_paths"
+    )
+    implement_parser.add_argument("--validation-command")
+    implement_parser.add_argument("--base-ref", default="HEAD")
+    implement_parser.add_argument("--base-branch")
+    implement_parser.add_argument("--remote", default="origin")
+    implement_parser.add_argument("--open-pr", action="store_true")
+    implement_parser.add_argument("--run-id")
+    implement_parser.add_argument("--output-root", type=Path)
+    implement_parser.add_argument(
+        "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    implement_parser.add_argument("--planning-model")
+    implement_parser.add_argument("--planning-api-key")
+    implement_parser.add_argument("--planning-base-url")
+    implement_parser.add_argument(
+        "--coding-provider", default="deepinfra", choices=ALL_PROVIDERS
+    )
+    implement_parser.add_argument(
+        "--coding-model", default="deepseek-ai/DeepSeek-V4-Flash-0731"
+    )
+    implement_parser.add_argument(
+        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
+    )
+    implement_parser.add_argument("--opencode-executable", default="opencode")
+    implement_parser.add_argument(
+        "--opencode-model", default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    )
+    implement_parser.add_argument("--minisweagent-executable", default="mini")
+    implement_parser.add_argument("--minisweagent-model")
+    implement_parser.add_argument("--code-agent-prompt-prefix", default="")
+    implement_parser.add_argument("--code-agent-prompt-suffix", default="")
+    implement_parser.add_argument("--json", action="store_true")
+    implement_parser.set_defaults(func=_run_implement)
 
     verification_health_parser = subparsers.add_parser(
         "verification-health",
@@ -4791,6 +4845,167 @@ def _run_agent_feature_e2e(args: argparse.Namespace) -> int:
         for phase in result.phases:
             print(f"{phase['name']}: returncode={phase['returncode']}")
     return 0 if result.status == "passed" else 1
+
+
+def _run_implement(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    run_id = args.run_id or uuid.uuid4().hex[:12]
+    try:
+        feature_description = (
+            args.request_file.read_text(encoding="utf-8")
+            if args.request_file is not None
+            else args.feature_description
+        )
+    except OSError as error:
+        print(f"Could not read feature request: {error}", file=sys.stderr)
+        return 2
+    if not isinstance(feature_description, str) or not feature_description.strip():
+        print("Feature request must not be empty.", file=sys.stderr)
+        return 2
+
+    check_args = argparse.Namespace(
+        repo_root=repo_root,
+        planning_provider=args.planning_provider,
+        planning_model=args.planning_model,
+        planning_api_key=args.planning_api_key,
+        planning_base_url=args.planning_base_url,
+        coding_provider=args.coding_provider,
+        coding_model=args.coding_model,
+        code_agent=args.code_agent,
+        opencode_executable=args.opencode_executable,
+        minisweagent_executable=args.minisweagent_executable,
+        open_pr=args.open_pr,
+        json=True,
+    )
+    preflight_output = io.StringIO()
+    with contextlib.redirect_stdout(preflight_output):
+        preflight_status = _run_check_credentials(check_args)
+    try:
+        preflight = json.loads(preflight_output.getvalue())
+    except json.JSONDecodeError:
+        preflight = {
+            "passed": False,
+            "checks": [],
+            "error": "Invalid preflight output.",
+        }
+
+    work_item_name = args.work_item_name
+    output_root = (
+        args.output_root
+        or _run_output_root(
+            subprocess.run,
+            repo_root,
+            run_id,
+        )
+    ).resolve()
+    if preflight_status != 0:
+        output_root.mkdir(parents=True, exist_ok=True)
+        preflight_result = {
+            "status": "failed",
+            "task_id": work_item_name,
+            "request": feature_description,
+            "allowed_paths": list(args.allowed_paths or ["."]),
+            "effective_profile": {
+                "planning_provider": args.planning_provider,
+                "planning_model": args.planning_model,
+                "coding_provider": args.coding_provider,
+                "coding_model": args.coding_model,
+                "code_agent": args.code_agent,
+            },
+            "preflight": preflight,
+            "operational_failures": [
+                {"stage": "preflight", "message": "Credential or access checks failed."}
+            ],
+            "uncertainty_decisions": [],
+            "publication": {"status": "not_reached"},
+        }
+        metadata = {
+            "request": feature_description,
+            "allowed_paths": list(args.allowed_paths or ["."]),
+            "effective_profile": preflight_result["effective_profile"],
+            "publication_requested": args.open_pr,
+        }
+        write_json_artifact(output_root, "run-metadata.json", metadata)
+        write_json_artifact(output_root, "preflight.json", preflight)
+        report_json, report_markdown = write_run_report(
+            output_root, result=preflight_result, metadata=metadata
+        )
+        preflight_result["report_json_path"] = str(report_json)
+        preflight_result["report_markdown_path"] = str(report_markdown)
+        if args.json:
+            print(json.dumps(preflight_result, indent=2, sort_keys=True))
+        else:
+            print("Headless feature preflight failed.")
+            print(f"Report: {report_markdown}")
+        return 1
+
+    planning_provider = resolve_workflow_provider(args.planning_provider)
+    planning_mapping = configured_model_mapping(planning_provider, args.planning_model)
+    planning_credentials = resolve_provider_credentials(
+        planning_mapping.provider,
+        args.planning_api_key,
+        args.planning_base_url,
+    )
+    planning_client = build_workflow_client(
+        planning_credentials,
+        model=planning_mapping.model,
+        model_cache_dir=repo_root / ".powdrr" / "models",
+        progress_stream=sys.stderr,
+    )
+    coding_model = args.minisweagent_model or (
+        f"{args.coding_provider}/{args.coding_model}"
+    )
+    if args.code_agent == "opencode":
+        coding_model = args.opencode_model
+    endpoint_config = FeatureEndpointConfig(
+        feature_description=feature_description,
+        work_item_name=work_item_name,
+        repo_root=repo_root,
+        allowed_paths=tuple(args.allowed_paths or ["."]),
+        validation_command=(
+            tuple(shlex.split(args.validation_command))
+            if args.validation_command
+            else ()
+        ),
+        base_branch=args.base_branch or "main",
+        code_agent=args.code_agent,
+        opencode_executable=args.opencode_executable,
+        opencode_model=args.opencode_model,
+        minisweagent_executable=args.minisweagent_executable,
+        minisweagent_model=coding_model,
+        code_agent_prompt_prefix=args.code_agent_prompt_prefix,
+        code_agent_prompt_suffix=args.code_agent_prompt_suffix,
+        output_root=output_root,
+        open_pr=False,
+        push_changes=False,
+        planning_client=planning_client,
+        task_id=work_item_name,
+        uncertainty_policy="normative_default",
+    )
+    result = run_agent_feature_task(
+        endpoint_config,
+        base_ref=args.base_ref,
+        remote=args.remote,
+        base_branch=args.base_branch,
+        open_pr=args.open_pr,
+        run_id=run_id,
+        output_root=output_root,
+        preflight=preflight,
+    )
+    if args.json:
+        print(json.dumps(result.to_data(), indent=2, sort_keys=True))
+    else:
+        print(f"Headless feature run {result.status}.")
+        if result.task:
+            print(f"Branch: {result.task.branch}")
+            print(f"Worktree: {result.task.worktree}")
+        if result.pull_request_url:
+            print(f"Pull request: {result.pull_request_url}")
+        print(f"Report JSON: {result.report_json_path}")
+        print(f"Report Markdown: {result.report_markdown_path}")
+        if result.error:
+            print(f"Error: {result.error}", file=sys.stderr)
+    return 0 if result.status in {"completed_local", "pr_opened", "no_op"} else 1
 
 
 def _run_workrr_feature(args: argparse.Namespace) -> int:

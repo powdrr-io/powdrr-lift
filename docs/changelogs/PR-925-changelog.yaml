@@ -9,7 +9,17 @@ structured_files: []
 files:
   - path: README.md
     type: modified
-    span: {start_line: 190, end_line: 236}
+    span: {start_line: 175, end_line: 176}
+    summary: Position credential and model-route checks before the first adopter task.
+    rationale: Make the recommended install, credential check, then bootstrap sequence explicit.
+  - path: README.md
+    type: modified
+    span: {start_line: 179, end_line: 179}
+    summary: Include the PR access check in the credential command used before bootstrap.
+    rationale: Confirm GitHub write access before publishing onboarding artifacts.
+  - path: README.md
+    type: modified
+    span: {start_line: 184, end_line: 234}
     summary: Document credential checks, bootstrap PR review, local and published headless implementation, scope, reports, provider data use, and retained artifacts.
     rationale: Give a new adopter a complete path from installation to a reviewed feature change.
   - path: src/powdrr_lift/workrr/feature_endpoint.py

@@ -1,0 +1,62 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 925
+title: Document headless adopter flow and verify installed resources
+intent:
+  problem: A person trying Powdrr on a fresh project lacks an end-to-end quickstart, and installed feature runs can fail when the target project has no taxonomy file.
+  goal: Document the adopter journey and verify packaged runtime resources outside the source checkout.
+human-decisions: []
+structured_files: []
+files:
+  - path: README.md
+    type: modified
+    span: {start_line: 190, end_line: 236}
+    summary: Document credential checks, bootstrap PR review, local and published headless implementation, scope, reports, provider data use, and retained artifacts.
+    rationale: Give a new adopter a complete path from installation to a reviewed feature change.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 11, end_line: 11}
+    summary: Import packaged-resource lookup for the feature bootstrap taxonomy.
+    rationale: Resolve installed runtime data without depending on the invoking repository.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4827, end_line: 4832}
+    summary: Resolve the packaged taxonomy resource before source-tree fallbacks when a project has no taxonomy.
+    rationale: Let installed feature runs bootstrap context in unfamiliar projects without a repository-local taxonomy.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 88, end_line: 88}
+    summary: Import the packaged taxonomy path helper for external-project coverage.
+    rationale: Exercise the resource fallback through the existing feature endpoint test suite.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2751, end_line: 2761}
+    summary: Verify taxonomy fallback for a project without a local taxonomy file.
+    rationale: Protect packaged default resource resolution for external projects.
+entities:
+  - id: headless-adopter-quickstart
+    type: README file
+    action: added
+  - id: packaged-taxonomy-fallback
+    type: Function
+    action: added
+  - id: installed-resource-regression-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-test-verifies-taxonomy-fallback
+    type: verifies
+    source: installed-resource-regression-test
+    target: packaged-taxonomy-fallback
+    action: added
+    description: The external-project test confirms the packaged taxonomy exists and can be read.
+invariants:
+  - id: feature-bootstrap-has-packaged-taxonomy
+    description: Feature bootstrap resolves an installed default taxonomy when no project taxonomy file exists.
+    action: added
+  - id: adopter-docs-show-review-before-implementation
+    description: The first-project quickstart directs adopters to review and merge bootstrap context before implementing a feature.
+    action: added
+guidance:
+  - id: follow-headless-adopter-quickstart
+    description: Use the README first-project steps to check provider access, bootstrap and review project context, then run a local or PR headless feature task.
+    action: added

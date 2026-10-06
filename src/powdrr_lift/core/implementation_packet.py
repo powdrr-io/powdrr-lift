@@ -259,8 +259,39 @@ class ImplementationPacket:
                 f"- T{index:02d} — add a focused test proving {description}"
             )
         test_lines = test_lines or ["- none"]
-        if self.behavior_scenarios:
-            behavior_text = render_behavior_matrix(self.behavior_scenarios)
+        accepted_criteria = tuple(
+            item
+            for item in self.acceptance_criteria
+            if item.quality.criterion_status == "checkable"
+        )
+        rendered_scenarios = self.behavior_scenarios
+        criterion_assumption_scenarios: tuple[BehaviorScenario, ...] = ()
+        if accepted_criteria:
+            criterion_sources = {
+                source_ref
+                for criterion in accepted_criteria
+                for source_ref in criterion.source_refs
+            }
+            matching_scenarios = tuple(
+                scenario
+                for scenario in self.behavior_scenarios
+                if scenario.criterion_status == "checkable"
+                and criterion_sources.intersection(
+                    {scenario.scenario_id, *scenario.related_requirements}
+                )
+            )
+            criterion_assumption_scenarios = tuple(
+                scenario for scenario in matching_scenarios if scenario.assumptions
+            )
+            matched_ids = {item.scenario_id for item in matching_scenarios}
+            rendered_scenarios = tuple(
+                scenario
+                for scenario in self.behavior_scenarios
+                if scenario.scenario_id not in matched_ids
+                and scenario.criterion_status != "unassessed"
+            )
+        if rendered_scenarios:
+            behavior_text = render_behavior_matrix(rendered_scenarios)
         else:
             behavior_text = "\n".join(
                 (
@@ -276,43 +307,28 @@ class ImplementationPacket:
                 )
             )
         sections = [behavior_text]
-        accepted_criteria = tuple(
+        if accepted_criteria:
+            sections.append(
+                _render_acceptance_criteria(
+                    accepted_criteria, criterion_assumption_scenarios
+                )
+            )
+        unresolved_criteria = tuple(
             item
             for item in self.acceptance_criteria
-            if item.quality.criterion_status == "checkable"
+            if item.quality.criterion_status == "unresolved"
+            and item.unresolved_questions
         )
-        if accepted_criteria:
-            proposed = [
-                "Reviewed observable acceptance criteria:",
-                "Implement these source-supported checks while preserving all "
-                "instruction requirements.",
-            ]
-            for criterion in accepted_criteria:
-                refs = ", ".join(criterion.source_refs)
-                proposed.append(
-                    f"- [{criterion.kind}; {criterion.criterion_id}; sources: {refs}] "
-                    f"{criterion.operation}"
-                )
-                proposed.append(
-                    "  Setup: "
-                    + json.dumps(criterion.setup, ensure_ascii=False, sort_keys=True)
-                )
-                for event in criterion.events:
-                    proposed.append(
-                        "  Event: "
-                        + json.dumps(event, ensure_ascii=False, sort_keys=True)
-                    )
-                for assertion in criterion.assertions:
-                    expected = json.dumps(
-                        assertion.expected, ensure_ascii=False, sort_keys=True
-                    )
-                    proposed.append(
-                        f"  Assert {assertion.observation} {assertion.relation} "
-                        f"{expected}"
-                    )
-                for question in criterion.unresolved_questions:
-                    proposed.append(f"  Open question: {question}")
-            sections.append("\n".join(proposed))
+        if unresolved_criteria:
+            questions = dict.fromkeys(
+                question
+                for criterion in unresolved_criteria
+                for question in criterion.unresolved_questions
+            )
+            sections.append(
+                "Material implementation questions left open:\n"
+                + "\n".join(f"- {question}" for question in questions)
+            )
         if self.obligation_evidence_contracts:
             rendered = ["Instruction obligation evidence expectations:"]
             for contract in self.obligation_evidence_contracts:
@@ -363,6 +379,68 @@ class ImplementationPacket:
         if self.contract_closure is not None:
             sections.append(render_contract_closure(self.contract_closure))
         return "\n\n".join(section for section in sections if section)
+
+
+def _render_acceptance_criteria(
+    criteria: Sequence[AcceptanceCriterion],
+    assumption_scenarios: Sequence[BehaviorScenario] = (),
+) -> str:
+    """Render reviewed criteria as readable checks grouped by source contract."""
+    grouped: dict[str, list[AcceptanceCriterion]] = {}
+    for criterion in criteria:
+        grouped.setdefault(criterion.contract_id, []).append(criterion)
+
+    lines = [
+        "Observable acceptance checks:",
+        "These reviewed checks express required behavior. Literal setup values "
+        "are examples unless an assertion states their significance; preserve "
+        "the stated relationships and outcomes.",
+    ]
+    for contract_ordinal, contract_criteria in enumerate(grouped.values(), start=1):
+        first = contract_criteria[0]
+        lines.extend(("", f"Contract {contract_ordinal}: {first.operation}"))
+        for index, criterion in enumerate(contract_criteria, start=1):
+            setup = json.dumps(
+                criterion.setup,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            description = f"{index}. Start with {setup}."
+            if criterion.operation != first.operation:
+                description += f" Perform {criterion.operation}."
+            for event in criterion.events:
+                description += (
+                    " Then apply "
+                    + json.dumps(
+                        event, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                    )
+                    + "."
+                )
+            lines.append(description)
+            for assertion in criterion.assertions:
+                expected = json.dumps(
+                    assertion.expected,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                lines.append(
+                    f"   Check that {assertion.observation} {assertion.relation} "
+                    f"{expected}."
+                )
+    assumptions = [
+        item for scenario in assumption_scenarios for item in scenario.assumptions
+    ]
+    if assumptions:
+        lines.extend(("", "Necessary implementation choices and assumptions:"))
+        for assumption in assumptions:
+            lines.append(
+                f"- {assumption['dimension']}: {assumption['resolution']} "
+                f"(basis: {assumption['basis']}; "
+                f"{assumption['rationale']})."
+            )
+    return "\n".join(lines)
 
 
 def compile_implementation_packet(

@@ -1,0 +1,59 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 929
+title: Preserve headless evidence on interruption
+intent:
+  problem: An interrupted headless run needs to stop owned workers and preserve uncertainty decisions already recorded by the feature flow.
+  goal: Finalize handled interruptions with a distinct failure stage, preserve evidence in the report, and verify worker cleanup.
+human-decisions: []
+structured_files: []
+files:
+  - path: README.md
+    type: modified
+    span: {start_line: 225, end_line: 228}
+    summary: Document interrupted-run reporting and preserved decisions.
+    rationale: Set expectations for evidence available after a handled cancellation.
+  - path: src/powdrr_lift/agent_feature.py
+    type: modified
+    span: {start_line: 245, end_line: 251}
+    summary: Record interruption as a distinct operational failure stage.
+    rationale: Distinguish cancellation from initialization failures in the run result.
+  - path: tests/test_agent_feature.py
+    type: modified
+    span: {start_line: 173, end_line: 220}
+    summary: Verify an interrupted feature run preserves recorded uncertainty decisions and writes its report.
+    rationale: Protect partial evidence finalization during cancellation.
+  - path: tests/test_minisweagent_monitor.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import timing support for worker-interruption coverage.
+    rationale: Check that a stopped worker does not continue after cancellation.
+  - path: tests/test_minisweagent_monitor.py
+    type: modified
+    span: {start_line: 168, end_line: 202}
+    summary: Verify an interrupted progress callback stops and reaps the mini-SWE-agent process.
+    rationale: Prevent worker subprocesses from outliving their headless run.
+entities:
+  - id: headless-interruption-reporting
+    type: Function
+    action: added
+  - id: headless-interruption-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: interruption-tests-verify-report-and-worker-cleanup
+    type: verifies
+    source: headless-interruption-regression-tests
+    target: headless-interruption-reporting
+    action: added
+    description: Regression tests verify decisions survive interruption and the worker process is stopped.
+invariants:
+  - id: handled-headless-interruption-preserves-recorded-decisions
+    description: A handled interruption writes an interrupted run report that includes uncertainty decisions already persisted by the feature flow.
+    action: added
+  - id: interrupted-mini-worker-does-not-outlive-run
+    description: Cancellation while monitoring mini-SWE-agent terminates and reaps its worker process.
+    action: added
+guidance:
+  - id: inspect-headless-interruption-report
+    description: When a headless run is interrupted, inspect the retained report for its status, available uncertainty decisions, and failure details.
+    action: added

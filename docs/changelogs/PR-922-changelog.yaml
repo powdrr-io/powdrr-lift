@@ -1,0 +1,174 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 922
+title: Add headless feature implementation command
+intent:
+  problem: Feature implementation currently requires the legacy interactive or benchmark command paths and does not use the agent-owned task worktree lifecycle.
+  goal: Provide a headless feature command that checks credentials, applies recorded normative defaults, runs existing review and validation gates, and optionally opens a PR from an isolated agent worktree.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/agent_feature.py
+    type: added
+    span: {start_line: 1, end_line: 327}
+    summary: Add the agent-owned feature task lifecycle for isolated local and PR runs.
+    rationale: Keep task worktree creation, final commit, reporting, and optional publication in the agent runtime.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Import the CLI output capture helper.
+    rationale: Keep credential preflight output from mixing with the requested JSON result.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Import UUID generation for unique task attempts.
+    rationale: Give separate headless runs unique default task identifiers.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 21, end_line: 26}
+    summary: Import the agent feature task runner and required lifecycle helpers.
+    rationale: Connect the public CLI to the agent-owned feature lifecycle.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 258, end_line: 258}
+    summary: Import run report writers for preflight failures.
+    rationale: Persist preflight failures in the same machine-readable report format.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 438, end_line: 483}
+    summary: Add the implement command, request inputs, profile options, and local or PR mode flags.
+    rationale: Expose the headless feature workflow with explicit input, scope, Git, provider, and output controls.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 4850, end_line: 5010}
+    summary: Resolve the request, run credential preflight, configure normative defaults, and emit the task result.
+    rationale: Fail before task setup when required access checks fail and keep JSON output machine-readable.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 162, end_line: 164}
+    summary: Add prepared agent worktree context and agent-managed Git mode to feature configuration.
+    rationale: Let the feature workflow consume the task worktree prepared by the agent.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 270, end_line: 271}
+    summary: Use the agent-prepared branch and worktree when provided.
+    rationale: Avoid creating a nested worktree for headless feature execution.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 280, end_line: 283}
+    summary: Read the prepared task starting revision for agent-managed runs.
+    rationale: Bound temporary artifact cleanup to the intended run.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 285, end_line: 303}
+    summary: Skip worktree creation when the agent supplied one.
+    rationale: Keep Git branch and worktree creation in the agent runtime.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 310, end_line: 323}
+    summary: Clean generated planning artifacts without committing them in agent-managed mode.
+    rationale: Leave final task commits to the agent while keeping runtime evidence out of the change.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 787, end_line: 788}
+    summary: Defer proposal revision commits in agent-managed mode.
+    rationale: Keep workflow evidence in the prepared candidate until agent-level commit handling.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2388, end_line: 2389}
+    summary: Defer implementation proposal revision commits in agent-managed mode.
+    rationale: Prevent the flow from publishing or finalizing task lifecycle state itself.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3806, end_line: 3806}
+    summary: Add an option to clean generated planning artifacts without committing them.
+    rationale: Keep non-product Structrr and proposal artifacts out of the final agent commit.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3866, end_line: 3867}
+    summary: Make temporary artifact commits conditional.
+    rationale: Let the agent consolidate intended changes after flow gates complete.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4850, end_line: 4854}
+    summary: Add the baseline setup commit policy parameter.
+    rationale: Preserve legacy commits while supporting agent-managed tasks.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4872, end_line: 4873}
+    summary: Make the first baseline commit conditional.
+    rationale: Defer commits to the agent when agent-managed Git is enabled.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4883, end_line: 4884}
+    summary: Make bootstrap baseline commits conditional.
+    rationale: Defer commits to the agent when agent-managed Git is enabled.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4914, end_line: 4915}
+    summary: Make refreshed baseline commits conditional.
+    rationale: Preserve legacy behavior while supporting headless task commits.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 4924, end_line: 4925}
+    summary: Make regenerated baseline commits conditional.
+    rationale: Keep agent-managed task commit handling outside the feature flow.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1091, end_line: 1091}
+    summary: Defer baseline commits in agent-managed mode.
+    rationale: Keep context preparation in the task worktree without flow-owned commits.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3171, end_line: 3174}
+    summary: Defer planned-diff commits in agent-managed mode.
+    rationale: Let the agent control final candidate commit handling.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 3401, end_line: 3406}
+    summary: Defer feature publication from the flow to the agent runtime.
+    rationale: Keep push and pull request operations outside Procedrr execution.
+  - path: tests/test_agent_feature.py
+    type: added
+    span: {start_line: 1, end_line: 199}
+    summary: Cover isolated local execution, opt-in PR publication, and headless CLI policy selection.
+    rationale: Protect task isolation, publication choice, result reports, and normative-default configuration.
+entities:
+  - id: headless-feature-task-lifecycle
+    type: Function
+    action: added
+  - id: headless-feature-command
+    type: CLI app
+    action: added
+  - id: headless-feature-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: implement-command-uses-agent-feature-lifecycle
+    type: uses
+    source: headless-feature-command
+    target: headless-feature-task-lifecycle
+    action: added
+    description: The implement command performs preflight and delegates isolated task execution and publication to the agent feature lifecycle.
+  - id: headless-feature-tests-verify-task-lifecycle
+    type: verifies
+    source: headless-feature-regression-tests
+    target: headless-feature-task-lifecycle
+    action: added
+    description: Regression tests verify isolated local completion, optional PR publication, and normative-default headless settings.
+invariants:
+  - id: headless-feature-uses-agent-owned-worktree
+    description: Every headless feature attempt runs in a dedicated branch and worktree prepared by the agent runtime.
+    action: added
+  - id: headless-feature-records-normative-defaults
+    description: Headless feature execution selects the normative-default uncertainty policy and includes persisted decisions in reports and PR details.
+    action: added
+  - id: headless-feature-publishes-only-on-request
+    description: Local headless execution does not push or open a PR; publication occurs only when the caller selects the PR option and review succeeds.
+    action: added
+guidance:
+  - id: run-headless-feature-locally
+    description: Run powdrr-lift implement --headless with exactly one of --request-file or --feature-description; add --allowed-path options to narrow the default repository scope.
+    action: added
+  - id: publish-headless-feature
+    description: Add --open-pr to run GitHub publication checks and open a PR only after the existing feature validation and review gates pass.
+    action: added

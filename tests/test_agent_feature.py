@@ -170,6 +170,54 @@ def test_agent_feature_timeout_writes_a_timed_out_report(
     assert failure["stage"] == "timeout"
 
 
+def test_agent_feature_interruption_preserves_decisions_and_report(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    root = _repository(tmp_path / "repo")
+    decisions = {
+        "decisions": [
+            {
+                "id": "decision-1",
+                "uncertainty": "Which greeting should be used?",
+                "selected_default": "Hello",
+            }
+        ]
+    }
+
+    def interrupt_feature(config: FeatureEndpointConfig, **kwargs: Any) -> None:
+        del kwargs
+        assert config.output_root is not None
+        config.output_root.mkdir(parents=True, exist_ok=True)
+        (config.output_root / "uncertainty-decisions.json").write_text(
+            json.dumps(decisions), encoding="utf-8"
+        )
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        "powdrr_lift.agent_feature.run_feature_endpoint", interrupt_feature
+    )
+
+    result = run_agent_feature_task(
+        _config(root),
+        run_id="interrupted-feature",
+        output_root=tmp_path / "reports",
+    )
+
+    report = json.loads(result.report_json_path.read_text(encoding="utf-8"))
+    run_result = json.loads(
+        (tmp_path / "reports" / "run-result.json").read_text(encoding="utf-8")
+    )
+    failure = json.loads(
+        (tmp_path / "reports" / "failure.json").read_text(encoding="utf-8")
+    )
+    assert result.status == "interrupted"
+    assert report["status"] == "interrupted"
+    assert report["uncertainty_decisions"][0]["id"] == "decision-1"
+    assert report["uncertainty_decisions"][0]["selected_default"] == "Hello"
+    assert run_result["operational_failures"][0]["stage"] == "interruption"
+    assert failure["stage"] == "execution"
+
+
 def test_implement_cli_forces_headless_normative_defaults(
     tmp_path: Path, monkeypatch: Any
 ) -> None:

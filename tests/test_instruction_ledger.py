@@ -227,6 +227,125 @@ def test_atomicity_split_preserves_joint_validation_relationships() -> None:
     assert restored.fingerprint == split.fingerprint
 
 
+def test_atomicity_split_preserves_scoped_relations_and_modifier_attachments() -> None:
+    ledger = compile_instruction_ledger(
+        "feature", "Support nested paths through list indexes and null values."
+    )
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [
+                    "Support nested paths through list indexes.",
+                    "Support nested paths through null values.",
+                ],
+                "validation_groups": [],
+                "semantic_relations": [
+                    "list_relation|independent_required|1,2|"
+                    "list indexes and null values"
+                ],
+                "modifier_attachments": [
+                    "modifier_attachment|entire_group|1,2|nested paths"
+                ],
+            }
+        },
+    )
+
+    assert [item.parent_clause_id for item in split.clauses] == [
+        "candidate:instruction-001",
+        "candidate:instruction-001",
+    ]
+    assert [item.source_span for item in split.clauses] == [
+        ledger.clauses[0].source_span,
+        ledger.clauses[0].source_span,
+    ]
+    for clause in split.clauses:
+        assert clause.semantic_relations[0].to_data() == {
+            "relation_type": "list_relation",
+            "label": "independent_required",
+            "child_clause_ids": ["instruction-001", "instruction-002"],
+            "evidence": "list indexes and null values",
+        }
+        assert clause.modifier_attachments[0].label == "entire_group"
+    assert InstructionLedger.from_data(split.to_data()).fingerprint == split.fingerprint
+
+
+@pytest.mark.parametrize(
+    ("child_indexes", "evidence"),
+    [([1, 3], "list indexes and null values"), ([1, 2], "invented source phrase")],
+)
+def test_invalid_scope_relation_keeps_original_unsplit_clause(
+    child_indexes: list[int], evidence: str
+) -> None:
+    ledger = compile_instruction_ledger(
+        "feature", "Support nested paths through list indexes and null values."
+    )
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": ["Support list indexes.", "Support null values."],
+                "validation_groups": [],
+                "semantic_relations": [
+                    {
+                        "relation_type": "list_relation",
+                        "label": "independent_required",
+                        "child_indexes": child_indexes,
+                        "evidence": evidence,
+                    }
+                ],
+            }
+        },
+    )
+
+    assert split.clauses == ledger.clauses
+    assert split.split_diagnostics[0].reason_code == "invalid_scope_relation"
+
+
+def test_graphql_navigation_modifier_does_not_attach_to_field_overwrites() -> None:
+    source = (
+        "Support nested paths navigating through lists by index, null values, "
+        "field overwrites, and concurrent deferred/streamed fields."
+    )
+    ledger = compile_instruction_ledger("graphql-delivery", source)
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [
+                    "Support nested paths navigating through lists by index.",
+                    "Support null values in nested paths.",
+                    "Support field overwrites.",
+                    "Support concurrent deferred/streamed fields.",
+                ],
+                "validation_groups": [],
+                "modifier_attachments": [
+                    {
+                        "relation_type": "modifier_attachment",
+                        "label": "one_child",
+                        "child_indexes": [1],
+                        "evidence": "navigating through lists by index",
+                    }
+                ],
+            }
+        },
+    )
+
+    overwrite_clause = split.clauses[2]
+    assert overwrite_clause.text == "Support field overwrites."
+    assert overwrite_clause.modifier_attachments[0].child_clause_ids == (
+        "instruction-001",
+    )
+    assert (
+        "instruction-003"
+        not in overwrite_clause.modifier_attachments[0].child_clause_ids
+    )
+
+
 def test_atomicity_merges_overlapping_all_together_validation_groups() -> None:
     ledger = compile_instruction_ledger("feature", "Add, validate, and commit safely.")
 

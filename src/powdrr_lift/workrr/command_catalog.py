@@ -1509,7 +1509,10 @@ class FeatureCommandRuntime:
             state["atomicity_decisions"] = decisions
             return {
                 "split_requests": [
-                    {"clause": clause.to_data()}
+                    {
+                        "clause": clause.to_data(),
+                        "context": _bounded_instruction_context(ledger, clause),
+                    }
                     for clause, is_multiple in zip(
                         ledger.clauses, multiple, strict=True
                     )
@@ -1545,14 +1548,21 @@ class FeatureCommandRuntime:
                 clause.clause_id: {"multiple": False} for clause in ledger.clauses
             }
             for clause_id, split in zip(multiple_ids, split_results, strict=True):
-                if set(split) != {"statements", "validation_groups"}:
+                if set(split) - {
+                    "statements",
+                    "validation_groups",
+                    "semantic_relations",
+                    "modifier_attachments",
+                } or not {"statements", "validation_groups"}.issubset(split):
                     raise PowdrrExecutionError(
-                        "atomicity split requires statements and validation_groups"
+                        "atomicity split has unknown or missing required fields"
                     )
                 compiler_decisions[clause_id] = {
                     "multiple": True,
                     "statements": split.get("statements"),
                     "validation_groups": split.get("validation_groups"),
+                    "semantic_relations": split.get("semantic_relations", []),
+                    "modifier_attachments": split.get("modifier_attachments", []),
                 }
             try:
                 refined = apply_atomicity_decisions(ledger, compiler_decisions)
@@ -4253,6 +4263,54 @@ def _validate_scenario_semantic_decisions(
         raise PowdrrExecutionError(
             "scenario marks a source-resolved semantic dimension unresolved"
         )
+
+
+def _bounded_instruction_context(
+    ledger: InstructionLedger, clause: Any
+) -> dict[str, Any]:
+    """Provide one parent sentence, its paragraph, and one neighbor each way."""
+    clauses = ledger.clauses
+    index = next(
+        i for i, item in enumerate(clauses) if item.clause_id == clause.clause_id
+    )
+    source_lines = ledger.source.text.splitlines(keepends=True)
+    start, end = clause.source_span
+    offset = 0
+    paragraph_start = 0
+    paragraph_end = len(ledger.source.text)
+    for line in source_lines:
+        line_end = offset + len(line)
+        if line_end <= start:
+            if not line.strip():
+                paragraph_start = line_end
+        elif offset >= end:
+            if not line.strip():
+                paragraph_end = offset
+                break
+        offset = line_end
+    previous = (
+        {"clause_id": clauses[index - 1].clause_id, "text": clauses[index - 1].text}
+        if index > 0
+        else None
+    )
+    following = (
+        {"clause_id": clauses[index + 1].clause_id, "text": clauses[index + 1].text}
+        if index + 1 < len(clauses)
+        else None
+    )
+    paragraph = ledger.source.text[paragraph_start:paragraph_end].strip()
+    truncated = len(paragraph) > 4000
+    if truncated:
+        relative_start = max(0, start - paragraph_start - 1500)
+        paragraph = paragraph[relative_start : relative_start + 3000]
+    return {
+        "parent_sentence": clause.text,
+        "parent_clause_id": clause.clause_id,
+        "containing_paragraph": paragraph,
+        "preceding_sentence": previous,
+        "following_sentence": following,
+        "paragraph_truncated": truncated,
+    }
 
 
 __all__ = ["FeatureCommandRuntime", "feature_command_catalog"]

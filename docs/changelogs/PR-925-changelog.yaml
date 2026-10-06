@@ -14,12 +14,7 @@ files:
     rationale: Make the recommended install, credential check, then bootstrap sequence explicit.
   - path: README.md
     type: modified
-    span: {start_line: 179, end_line: 179}
-    summary: Include the PR access check in the credential command used before bootstrap.
-    rationale: Confirm GitHub write access before publishing onboarding artifacts.
-  - path: README.md
-    type: modified
-    span: {start_line: 184, end_line: 234}
+    span: {start_line: 184, end_line: 233}
     summary: Document credential checks, bootstrap PR review, local and published headless implementation, scope, reports, provider data use, and retained artifacts.
     rationale: Give a new adopter a complete path from installation to a reviewed feature change.
   - path: src/powdrr_lift/workrr/feature_endpoint.py

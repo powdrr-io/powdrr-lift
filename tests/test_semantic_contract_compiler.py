@@ -226,6 +226,84 @@ def test_split_clause_classifier_receives_parent_sentence_as_context() -> None:
     assert request["spec"]["context_text"] == source
 
 
+def test_split_scope_relations_reach_source_semantic_decisions() -> None:
+    clause = {
+        **_clause("Support nested paths through list indexes."),
+        "semantic_relations": [
+            {
+                "relation_type": "list_relation",
+                "label": "independent_required",
+                "child_clause_ids": ["instruction-001", "instruction-002"],
+                "evidence": "list indexes and null values",
+            }
+        ],
+        "modifier_attachments": [
+            {
+                "relation_type": "modifier_attachment",
+                "label": "entire_group",
+                "child_clause_ids": ["instruction-001", "instruction-002"],
+                "evidence": "nested paths",
+            }
+        ],
+    }
+    root_request = prepare_source_semantic_decisions(clause, created_at=NOW)[
+        "pending_specs"
+    ][0]
+    root = bind_source_semantic_decisions(
+        resolved_decisions=[],
+        pending_specs=[root_request],
+        provider_results=[{"status": "resolved", "value": "include"}],
+        created_at=NOW,
+    )
+    child_requests = prepare_dependent_source_semantic_decisions(
+        clause, root, created_at=NOW
+    )["pending_specs"]
+
+    assert (
+        root_request["scope_relations"]["semantic_relations"]
+        == clause["semantic_relations"]
+    )
+    assert child_requests
+    assert all("scope_relations" in request for request in child_requests)
+
+
+def test_graphql_field_overwrite_classifier_has_no_list_navigation_attachment() -> None:
+    parent = (
+        "Support nested paths navigating through lists by index, null values, "
+        "field overwrites, and concurrent deferred/streamed fields."
+    )
+    clause = {
+        **_clause("Support field overwrites."),
+        "clause_id": "instruction-003",
+        "source_span": {"start": 0, "end": len(parent)},
+        "semantic_relations": [],
+        "modifier_attachments": [
+            {
+                "relation_type": "modifier_attachment",
+                "label": "one_child",
+                "child_clause_ids": ["instruction-001"],
+                "evidence": "navigating through lists by index",
+            }
+        ],
+    }
+
+    request = prepare_source_semantic_decisions(clause, source_text=parent)[
+        "pending_specs"
+    ][0]
+
+    assert request["spec"]["subject_ref"] == "instruction-003"
+    assert (
+        "Proposition to classify:\nSupport field overwrites." in request["subject_text"]
+    )
+    assert request["scope_relations"]["modifier_attachments"][0][
+        "child_clause_ids"
+    ] == ["instruction-001"]
+    assert (
+        "instruction-003"
+        not in request["scope_relations"]["modifier_attachments"][0]["child_clause_ids"]
+    )
+
+
 def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     clause = _clause("Archived records retain their original field values.")
     root_request = prepare_source_semantic_decisions(clause, created_at=NOW)[

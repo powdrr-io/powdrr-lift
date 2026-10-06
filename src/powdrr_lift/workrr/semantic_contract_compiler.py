@@ -930,9 +930,11 @@ def prepare_source_semantic_decisions(
     spec = _decision_spec(
         clause_id, text, source_fingerprint, "routing", context_text=context_text
     )
+    routing_request = _classifier_request(spec, CLASSIFIER_DEFINITIONS["routing"])
+    _attach_clause_scope_relations(routing_request, clause)
     return {
         "resolved_decisions": [],
-        "pending_specs": [_classifier_request(spec, CLASSIFIER_DEFINITIONS["routing"])],
+        "pending_specs": [routing_request],
     }
 
 
@@ -1121,7 +1123,21 @@ def prepare_dependent_source_semantic_decisions(
                 "open; it is not permission to invent a source guarantee."
             )
             pending.append(request)
+    for request in pending:
+        _attach_clause_scope_relations(request, clause)
     return {"resolved_decisions": resolved, "pending_specs": pending}
+
+
+def _attach_clause_scope_relations(
+    request: dict[str, Any], clause: Mapping[str, Any]
+) -> None:
+    semantic_relations = clause.get("semantic_relations", [])
+    modifier_attachments = clause.get("modifier_attachments", [])
+    if semantic_relations or modifier_attachments:
+        request["scope_relations"] = {
+            "semantic_relations": semantic_relations,
+            "modifier_attachments": modifier_attachments,
+        }
 
 
 def bind_source_semantic_decisions(

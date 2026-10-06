@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_lift.core.acceptance_contract import (
+    AcceptanceContractError,
+    AcceptanceCriterion,
+)
 from powdrr_lift.core.behavior_contract import (
     BehaviorScenario,
     compile_behavior_scenarios,
@@ -44,6 +49,7 @@ class ImplementationPacket:
     external_contract_requirements: tuple[Mapping[str, Any], ...] = ()
     external_contract_notes: tuple[Mapping[str, Any], ...] = ()
     obligation_evidence_contracts: tuple[ObligationEvidenceContract, ...] = ()
+    acceptance_criteria: tuple[AcceptanceCriterion, ...] = ()
 
     def for_obligation(self, ordinal: int) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
@@ -69,6 +75,7 @@ class ImplementationPacket:
             obligation_evidence_contracts=self.obligation_evidence_contracts[
                 index : index + 1
             ],
+            acceptance_criteria=self.acceptance_criteria,
         )
 
     def for_task(
@@ -98,11 +105,12 @@ class ImplementationPacket:
             external_contract_requirements=self.external_contract_requirements,
             external_contract_notes=self.external_contract_notes,
             obligation_evidence_contracts=self.obligation_evidence_contracts,
+            acceptance_criteria=self.acceptance_criteria,
         )
 
     def to_data(self) -> dict[str, Any]:
         data = {
-            "schema_version": "implementation-packet-v1",
+            "schema_version": "implementation-packet-v2",
             "objective": self.objective,
             "obligations": [
                 {"ordinal": index, "description": description}
@@ -117,6 +125,9 @@ class ImplementationPacket:
             ],
             "repository": self.repository.to_data(),
             "behavior_scenarios": [item.to_data() for item in self.behavior_scenarios],
+            "acceptance_criteria": [
+                item.to_data() for item in self.acceptance_criteria
+            ],
         }
         if self.contract_closure is not None:
             data["contract_closure"] = dict(self.contract_closure)
@@ -136,8 +147,16 @@ class ImplementationPacket:
 
     @classmethod
     def from_data(cls, raw: Mapping[str, Any]) -> ImplementationPacket:
-        if raw.get("schema_version") != "implementation-packet-v1":
+        schema_version = raw.get("schema_version")
+        if schema_version not in {
+            "implementation-packet-v1",
+            "implementation-packet-v2",
+        }:
             raise ValueError("unsupported implementation packet schema")
+        if schema_version == "implementation-packet-v2" and (
+            "acceptance_criteria" not in raw
+        ):
+            raise ValueError("implementation packet v2 requires acceptance criteria")
         raw_obligations = raw.get("obligations")
         raw_tests = raw.get("required_tests")
         repository = raw.get("repository")
@@ -183,6 +202,11 @@ class ImplementationPacket:
             isinstance(item, Mapping) for item in raw_evidence_contracts
         ):
             raise ValueError("implementation packet evidence contracts are malformed")
+        raw_criteria = raw.get("acceptance_criteria", [])
+        if not isinstance(raw_criteria, list) or not all(
+            isinstance(item, Mapping) for item in raw_criteria
+        ):
+            raise ValueError("implementation packet acceptance criteria are malformed")
         packet = cls(
             objective=str(raw.get("objective", "")).strip(),
             obligations=obligations,
@@ -209,6 +233,9 @@ class ImplementationPacket:
             obligation_evidence_contracts=tuple(
                 ObligationEvidenceContract.from_data(item)
                 for item in raw_evidence_contracts
+            ),
+            acceptance_criteria=tuple(
+                AcceptanceCriterion.from_data(item) for item in raw_criteria
             ),
         )
         if not packet.objective.strip() or not packet.obligations:
@@ -249,6 +276,43 @@ class ImplementationPacket:
                 )
             )
         sections = [behavior_text]
+        accepted_criteria = tuple(
+            item
+            for item in self.acceptance_criteria
+            if item.quality.criterion_status == "checkable"
+        )
+        if accepted_criteria:
+            proposed = [
+                "Reviewed observable acceptance criteria:",
+                "Implement these source-supported checks while preserving all "
+                "instruction requirements.",
+            ]
+            for criterion in accepted_criteria:
+                refs = ", ".join(criterion.source_refs)
+                proposed.append(
+                    f"- [{criterion.kind}; {criterion.criterion_id}; sources: {refs}] "
+                    f"{criterion.operation}"
+                )
+                proposed.append(
+                    "  Setup: "
+                    + json.dumps(criterion.setup, ensure_ascii=False, sort_keys=True)
+                )
+                for event in criterion.events:
+                    proposed.append(
+                        "  Event: "
+                        + json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    )
+                for assertion in criterion.assertions:
+                    expected = json.dumps(
+                        assertion.expected, ensure_ascii=False, sort_keys=True
+                    )
+                    proposed.append(
+                        f"  Assert {assertion.observation} {assertion.relation} "
+                        f"{expected}"
+                    )
+                for question in criterion.unresolved_questions:
+                    proposed.append(f"  Open question: {question}")
+            sections.append("\n".join(proposed))
         if self.obligation_evidence_contracts:
             rendered = ["Instruction obligation evidence expectations:"]
             for contract in self.obligation_evidence_contracts:
@@ -314,6 +378,7 @@ def compile_implementation_packet(
     external_contract_requirements: Sequence[Mapping[str, Any]] = (),
     external_contract_notes: Sequence[Mapping[str, Any]] = (),
     obligation_evidence_contracts: Sequence[Mapping[str, Any]] = (),
+    acceptance_criteria: Sequence[Mapping[str, Any]] = (),
 ) -> ImplementationPacket:
     """Normalize worker inputs and reject incomplete executable contracts."""
     if not objective.strip():
@@ -351,6 +416,14 @@ def compile_implementation_packet(
         raise ValueError(
             "implementation packet evidence contracts must cover every obligation"
         )
+    try:
+        criteria = tuple(
+            AcceptanceCriterion.from_data(item) for item in acceptance_criteria
+        )
+    except AcceptanceContractError as error:
+        raise ValueError(
+            f"implementation packet acceptance criteria are invalid: {error}"
+        ) from error
     return ImplementationPacket(
         objective=objective.strip(),
         obligations=normalized_obligations,
@@ -380,6 +453,7 @@ def compile_implementation_packet(
         ),
         external_contract_notes=tuple(dict(item) for item in external_contract_notes),
         obligation_evidence_contracts=evidence_contracts,
+        acceptance_criteria=criteria,
     )
 
 

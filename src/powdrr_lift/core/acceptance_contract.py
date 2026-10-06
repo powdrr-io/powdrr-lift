@@ -8,7 +8,23 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_lift.core.behavior_contract import CriterionQuality
+
 BEHAVIORAL_CONTRACT_SCHEMA_VERSION = "behavioral-contract-v1"
+ACCEPTANCE_CRITERION_SCHEMA_VERSION = "acceptance-criterion-v1"
+CRITERION_KINDS = frozenset(
+    {
+        "interface",
+        "transformation",
+        "state_transition",
+        "invariant",
+        "rejection",
+        "compatibility",
+    }
+)
+ASSERTION_RELATIONS = frozenset(
+    {"equals", "contains", "absent", "raises", "satisfies", "unchanged"}
+)
 RELATIONSHIP_KINDS = frozenset(
     {
         "defines_interface",
@@ -232,6 +248,285 @@ def validate_contracts(
                 )
     if covered != required:
         raise AcceptanceContractError("behavioral contracts omit product requirements")
+
+
+@dataclass(frozen=True, slots=True)
+class CriterionAssertion:
+    """One source-linked observation and expected relationship."""
+
+    assertion_id: str
+    observation: str
+    relation: str
+    expected: Any
+    source_refs: tuple[str, ...]
+    basis: str
+
+    def __post_init__(self) -> None:
+        if not self.assertion_id.strip() or not self.observation.strip():
+            raise AcceptanceContractError("criterion assertion identity is empty")
+        if self.relation not in ASSERTION_RELATIONS:
+            raise AcceptanceContractError("criterion assertion relation is invalid")
+        if self.expected is None:
+            raise AcceptanceContractError("criterion assertion expected value is empty")
+        if not self.source_refs or any(not item.strip() for item in self.source_refs):
+            raise AcceptanceContractError("criterion assertion source refs are empty")
+        if len(set(self.source_refs)) != len(self.source_refs):
+            raise AcceptanceContractError(
+                "criterion assertion source refs are duplicated"
+            )
+        if self.basis not in {"source_derived", "repository_supported"}:
+            raise AcceptanceContractError("criterion assertion basis is invalid")
+        if self.relation == "satisfies" and (
+            not isinstance(self.expected, str)
+            or not self.expected.strip()
+            or _is_vague_predicate(self.expected)
+        ):
+            raise AcceptanceContractError(
+                "satisfies assertion requires a concrete predicate"
+            )
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "assertion_id": self.assertion_id,
+            "observation": self.observation,
+            "relation": self.relation,
+            "expected": self.expected,
+            "source_refs": list(self.source_refs),
+            "basis": self.basis,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptanceCriterion:
+    """Typed observable behavior description; it is not executable test code."""
+
+    criterion_id: str
+    contract_id: str
+    kind: str
+    source_refs: tuple[str, ...]
+    setup: Any
+    operation: str
+    events: tuple[Any, ...]
+    assertions: tuple[CriterionAssertion, ...]
+    unresolved_questions: tuple[str, ...]
+    quality: CriterionQuality
+    fingerprint: str = ""
+    schema_version: str = ACCEPTANCE_CRITERION_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != ACCEPTANCE_CRITERION_SCHEMA_VERSION:
+            raise AcceptanceContractError("unsupported acceptance criterion schema")
+        if not self.criterion_id.strip() or not self.contract_id.strip():
+            raise AcceptanceContractError("criterion identity is empty")
+        if self.kind not in CRITERION_KINDS:
+            raise AcceptanceContractError("criterion kind is invalid")
+        if not self.source_refs or any(not item.strip() for item in self.source_refs):
+            raise AcceptanceContractError("criterion source refs are empty")
+        if len(set(self.source_refs)) != len(self.source_refs):
+            raise AcceptanceContractError("criterion source refs are duplicated")
+        if not isinstance(self.operation, str) or not self.operation.strip():
+            raise AcceptanceContractError("criterion operation is empty")
+        if self.quality.requirement_status != "preserved" or (
+            self.quality.criterion_status == "not_applicable"
+        ):
+            raise AcceptanceContractError("acceptance criterion quality is invalid")
+        if not self.assertions or len(self.assertions) > 4:
+            raise AcceptanceContractError("criterion needs one to four assertions")
+        assertion_ids = [item.assertion_id for item in self.assertions]
+        if len(set(assertion_ids)) != len(assertion_ids):
+            raise AcceptanceContractError("criterion assertion IDs are duplicated")
+        if any(
+            not set(item.source_refs).issubset(self.source_refs)
+            for item in self.assertions
+        ):
+            raise AcceptanceContractError("assertion source refs exceed criterion refs")
+        if set(self.source_refs) != {
+            source_id for item in self.assertions for source_id in item.source_refs
+        }:
+            raise AcceptanceContractError(
+                "criterion source refs must be exercised by its assertions"
+            )
+        if self.setup is None:
+            raise AcceptanceContractError("criterion setup is missing")
+        if self.kind in {
+            "transformation",
+            "state_transition",
+            "invariant",
+            "rejection",
+        } and (not isinstance(self.setup, (Mapping, list, str)) or not self.setup):
+            raise AcceptanceContractError(
+                f"{self.kind} criterion needs an observable setup or population"
+            )
+        if self.kind == "state_transition" and not self.events:
+            raise AcceptanceContractError("state transition criterion needs events")
+        if self.kind == "state_transition" and any(
+            not isinstance(item, Mapping) or not item for item in self.events
+        ):
+            raise AcceptanceContractError("state transition events must be objects")
+        if self.kind == "rejection" and not any(
+            item.relation == "raises" for item in self.assertions
+        ):
+            raise AcceptanceContractError(
+                "rejection criterion needs a source-specified failure assertion"
+            )
+        if any(
+            isinstance(item.expected, str)
+            and " ".join(item.expected.casefold().split())
+            == " ".join(item.observation.casefold().split())
+            for item in self.assertions
+        ):
+            raise AcceptanceContractError(
+                "criterion assertion is circular: expected repeats its observation"
+            )
+        if any(
+            not isinstance(item, str) or not item.strip()
+            for item in self.unresolved_questions
+        ):
+            raise AcceptanceContractError("criterion unresolved question is invalid")
+        try:
+            json.dumps(
+                self._payload(include_fingerprint=False),
+                sort_keys=True,
+                allow_nan=False,
+            )
+        except (TypeError, ValueError) as exc:
+            raise AcceptanceContractError("criterion contains non-JSON values") from exc
+
+    def _payload(self, *, include_fingerprint: bool) -> dict[str, Any]:
+        data = {
+            "schema_version": self.schema_version,
+            "criterion_id": self.criterion_id,
+            "contract_id": self.contract_id,
+            "kind": self.kind,
+            "source_refs": list(self.source_refs),
+            "setup": self.setup,
+            "operation": self.operation,
+            "events": list(self.events),
+            "assertions": [item.to_data() for item in self.assertions],
+            "unresolved_questions": list(self.unresolved_questions),
+            "quality": self.quality.to_data(),
+        }
+        if include_fingerprint:
+            data["fingerprint"] = self.fingerprint or self.calculate_fingerprint()
+        return data
+
+    def calculate_fingerprint(self) -> str:
+        encoded = json.dumps(
+            self._payload(include_fingerprint=False),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+    def to_data(self) -> dict[str, Any]:
+        return self._payload(include_fingerprint=True)
+
+    @classmethod
+    def from_data(cls, raw: Mapping[str, Any]) -> AcceptanceCriterion:
+        required = {
+            "schema_version",
+            "criterion_id",
+            "contract_id",
+            "kind",
+            "source_refs",
+            "setup",
+            "operation",
+            "events",
+            "assertions",
+            "unresolved_questions",
+            "quality",
+            "fingerprint",
+        }
+        if set(raw) != required:
+            raise AcceptanceContractError("criterion has unknown or missing fields")
+        assertions_raw = raw.get("assertions")
+        if not isinstance(assertions_raw, list):
+            raise AcceptanceContractError("criterion assertions are malformed")
+        assertions: list[CriterionAssertion] = []
+        for item in assertions_raw:
+            if not isinstance(item, Mapping) or set(item) != {
+                "assertion_id",
+                "observation",
+                "relation",
+                "expected",
+                "source_refs",
+                "basis",
+            }:
+                raise AcceptanceContractError(
+                    "criterion assertion fields are malformed"
+                )
+            assertions.append(
+                CriterionAssertion(
+                    assertion_id=_required_text(item, "assertion_id"),
+                    observation=_required_text(item, "observation"),
+                    relation=_required_text(item, "relation"),
+                    expected=item.get("expected"),
+                    source_refs=_text_tuple(
+                        item.get("source_refs"), "assertion source_refs"
+                    ),
+                    basis=_required_text(item, "basis"),
+                )
+            )
+        criterion = cls(
+            criterion_id=_required_text(raw, "criterion_id"),
+            contract_id=_required_text(raw, "contract_id"),
+            kind=_required_text(raw, "kind"),
+            source_refs=_text_tuple(raw.get("source_refs"), "criterion source_refs"),
+            setup=raw.get("setup"),
+            operation=_required_text(raw, "operation"),
+            events=_value_tuple(raw.get("events"), "criterion events"),
+            assertions=tuple(assertions),
+            unresolved_questions=_text_tuple(
+                raw.get("unresolved_questions"),
+                "unresolved_questions",
+                allow_empty=True,
+            ),
+            quality=(
+                CriterionQuality.from_data(raw["quality"])
+                if isinstance(raw.get("quality"), Mapping)
+                else _invalid_quality()
+            ),
+            fingerprint=_required_text(raw, "fingerprint"),
+            schema_version=_required_text(raw, "schema_version"),
+        )
+        if criterion.fingerprint != criterion.calculate_fingerprint():
+            raise AcceptanceContractError("criterion fingerprint is stale")
+        return criterion
+
+
+def _is_vague_predicate(value: str) -> bool:
+    normalized = " ".join(value.casefold().split())
+    return any(
+        phrase in normalized
+        for phrase in (
+            "works correctly",
+            "behaves correctly",
+            "as expected",
+            "is valid",
+        )
+    )
+
+
+def _text_tuple(raw: Any, name: str, *, allow_empty: bool = False) -> tuple[str, ...]:
+    if not isinstance(raw, list) or not all(
+        isinstance(item, str) and item.strip() for item in raw
+    ):
+        raise AcceptanceContractError(f"{name} must be a list of non-empty strings")
+    if not allow_empty and not raw:
+        raise AcceptanceContractError(f"{name} cannot be empty")
+    return tuple(raw)
+
+
+def _value_tuple(raw: Any, name: str) -> tuple[Any, ...]:
+    if not isinstance(raw, list):
+        raise AcceptanceContractError(f"{name} must be a list")
+    return tuple(raw)
+
+
+def _invalid_quality() -> CriterionQuality:
+    raise AcceptanceContractError("criterion quality is malformed")
 
 
 def _required_text(raw: Mapping[str, Any], name: str) -> str:

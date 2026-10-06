@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from powdrr_lift.core.acceptance_contract import (
     AcceptanceContractError,
+    AcceptanceCriterion,
     BehavioralContract,
     validate_contracts,
 )
@@ -72,6 +73,12 @@ from powdrr_lift.structrr.obligation_evidence import (
 from powdrr_lift.workrr.acceptance_contract_compiler import (
     bind_behavioral_contracts,
     prepare_behavioral_contracts,
+)
+from powdrr_lift.workrr.acceptance_criterion_compiler import (
+    bind_acceptance_criteria,
+    bind_acceptance_criterion_reviews,
+    prepare_acceptance_criteria,
+    prepare_acceptance_criterion_reviews,
 )
 from powdrr_lift.workrr.external_contract_research import (
     bind_external_contract_assessments,
@@ -688,6 +695,7 @@ def feature_command_catalog(
                     "work_item_name": {},
                     "design_decisions": {},
                     "behavioral_contracts": {},
+                    "acceptance_criteria": {},
                     "scenario_consistency_review": {},
                     "uncertainty_policy": {
                         "type": "string",
@@ -698,6 +706,7 @@ def feature_command_catalog(
                     "work_item_name",
                     "design_decisions",
                     "behavioral_contracts",
+                    "acceptance_criteria",
                     "scenario_consistency_review",
                 ),
                 additional_properties=False,
@@ -724,6 +733,46 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("bind_behavioral_contracts"),
+        ),
+        "prepare_acceptance_criteria": CommandSpec(
+            name="prepare_acceptance_criteria",
+            input_schema=object_schema(
+                {"behavioral_contracts": {}},
+                required=("behavioral_contracts",),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_acceptance_criteria"),
+        ),
+        "bind_acceptance_criteria": CommandSpec(
+            name="bind_acceptance_criteria",
+            input_schema=object_schema(
+                {"plan": {}, "results": {}},
+                required=("plan", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_acceptance_criteria"),
+        ),
+        "prepare_acceptance_criterion_reviews": CommandSpec(
+            name="prepare_acceptance_criterion_reviews",
+            input_schema=object_schema(
+                {"criteria": {}, "behavioral_contracts": {}},
+                required=("criteria", "behavioral_contracts"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_acceptance_criterion_reviews"),
+        ),
+        "bind_acceptance_criterion_reviews": CommandSpec(
+            name="bind_acceptance_criterion_reviews",
+            input_schema=object_schema(
+                {"plan": {}, "results": {}},
+                required=("plan", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_acceptance_criterion_reviews"),
         ),
         "assert_feature_design_ready_for_implementation": CommandSpec(
             name="assert_feature_design_ready_for_implementation",
@@ -2643,6 +2692,76 @@ class FeatureCommandRuntime:
                 "fingerprint": content_fingerprint(collection),
             }
 
+        def prepare_acceptance_criteria_operation() -> Any:
+            contract_collection = parameters.get("behavioral_contracts")
+            if not isinstance(contract_collection, Mapping):
+                raise PowdrrExecutionError("behavioral contracts are missing")
+            ledger = load_instruction_ledger()
+            try:
+                return prepare_acceptance_criteria(
+                    contract_collection,
+                    {item.clause_id: item.text for item in ledger.clauses},
+                )
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def bind_acceptance_criteria_operation() -> Any:
+            plan = parameters.get("plan")
+            results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(plan, Mapping) or results is None:
+                raise PowdrrExecutionError("acceptance criterion binding is malformed")
+            try:
+                collection = bind_acceptance_criteria(plan, results)
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            path = output_root / "acceptance-criteria.json"
+            path.write_text(
+                json.dumps(collection, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            return {
+                **collection,
+                "path": str(path),
+                "fingerprint": content_fingerprint(collection),
+            }
+
+        def prepare_acceptance_criterion_reviews_operation() -> Any:
+            criterion_collection = parameters.get("criteria")
+            contract_collection = parameters.get("behavioral_contracts")
+            if not isinstance(criterion_collection, Mapping) or not isinstance(
+                contract_collection, Mapping
+            ):
+                raise PowdrrExecutionError("criterion review inputs are missing")
+            ledger = load_instruction_ledger()
+            try:
+                return prepare_acceptance_criterion_reviews(
+                    criterion_collection,
+                    contract_collection,
+                    {item.clause_id: item.text for item in ledger.clauses},
+                )
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def bind_acceptance_criterion_reviews_operation() -> Any:
+            plan = parameters.get("plan")
+            results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(plan, Mapping) or results is None:
+                raise PowdrrExecutionError("criterion review binding is malformed")
+            try:
+                collection = bind_acceptance_criterion_reviews(plan, results)
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            path = output_root / "acceptance-criteria.json"
+            path.write_text(
+                json.dumps(collection, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            return {
+                **collection,
+                "path": str(path),
+                "fingerprint": content_fingerprint(collection),
+            }
+
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
             contract_collection = parameters.get("behavioral_contracts")
@@ -2705,6 +2824,108 @@ class FeatureCommandRuntime:
                 )
             except AcceptanceContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
+            criterion_collection = parameters.get("acceptance_criteria")
+            if not isinstance(criterion_collection, Mapping):
+                raise PowdrrExecutionError("acceptance criteria are missing")
+            raw_criteria = criterion_collection.get("criteria")
+            if (
+                criterion_collection.get("schema_version") != "acceptance-criterion-v1"
+                or criterion_collection.get("ledger_fingerprint") != ledger.fingerprint
+                or not isinstance(raw_criteria, list)
+            ):
+                raise PowdrrExecutionError("acceptance criteria are stale or malformed")
+            try:
+                acceptance_criteria = tuple(
+                    AcceptanceCriterion.from_data(item)
+                    for item in raw_criteria
+                    if isinstance(item, Mapping)
+                )
+                if len(acceptance_criteria) != len(raw_criteria):
+                    raise AcceptanceContractError("acceptance criterion is malformed")
+                contract_ids = {item.contract_id for item in behavioral_contracts}
+                contract_members = {
+                    item.contract_id: set(item.member_requirement_ids)
+                    for item in behavioral_contracts
+                }
+                seen_criterion_ids: set[str] = set()
+                for criterion in acceptance_criteria:
+                    if criterion.criterion_id in seen_criterion_ids:
+                        raise AcceptanceContractError(
+                            "acceptance criterion IDs are duplicated"
+                        )
+                    seen_criterion_ids.add(criterion.criterion_id)
+                    if criterion.contract_id not in contract_ids:
+                        raise AcceptanceContractError(
+                            "acceptance criterion references an unknown contract"
+                        )
+                    if not set(criterion.source_refs).issubset(
+                        contract_members[criterion.contract_id]
+                    ):
+                        raise AcceptanceContractError(
+                            "acceptance criterion sources are outside its contract"
+                        )
+                    if not set(criterion.source_refs).issubset(requirement_ids):
+                        raise AcceptanceContractError(
+                            "acceptance criterion references a nonrequirement"
+                        )
+                    if criterion.quality.criterion_status not in {
+                        "checkable",
+                        "source_only",
+                        "unresolved",
+                    }:
+                        raise AcceptanceContractError(
+                            "acceptance criterion status does not match review"
+                        )
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            criterion_coverage = criterion_collection.get("requirement_coverage")
+            if not isinstance(criterion_coverage, Mapping):
+                raise PowdrrExecutionError("acceptance criterion coverage is missing")
+            if set(criterion_coverage) != set(requirement_ids):
+                raise PowdrrExecutionError(
+                    "acceptance criterion coverage has missing or extra requirements"
+                )
+            actual_criterion_refs: dict[str, list[str]] = {
+                item: [] for item in requirement_ids
+            }
+            for criterion in acceptance_criteria:
+                for source_id in criterion.source_refs:
+                    actual_criterion_refs[source_id].append(criterion.criterion_id)
+            criterion_by_id = {item.criterion_id: item for item in acceptance_criteria}
+            for source_id in requirement_ids:
+                coverage = criterion_coverage.get(source_id)
+                if not isinstance(coverage, Mapping) or sorted(
+                    coverage.get("criterion_ids", [])
+                ) != sorted(actual_criterion_refs[source_id]):
+                    raise PowdrrExecutionError(
+                        f"acceptance criterion coverage is stale for {source_id}"
+                    )
+                quality = coverage.get("criterion_quality")
+                linked_criteria = [
+                    criterion_by_id[item] for item in actual_criterion_refs[source_id]
+                ]
+                if not linked_criteria:
+                    expected_status = "source_only"
+                elif all(
+                    item.quality.criterion_status == "checkable"
+                    for item in linked_criteria
+                ):
+                    expected_status = "checkable"
+                elif any(
+                    item.quality.criterion_status == "unresolved"
+                    for item in linked_criteria
+                ):
+                    expected_status = "unresolved"
+                else:
+                    expected_status = "source_only"
+                if (
+                    not isinstance(quality, Mapping)
+                    or quality.get("criterion_status") != expected_status
+                    or coverage.get("status") != expected_status
+                ):
+                    raise PowdrrExecutionError(
+                        f"acceptance criterion quality is stale for {source_id}"
+                    )
             raw_design_decisions = feature_endpoint._collected_results(
                 parameters.get("design_decisions")
             )
@@ -3003,6 +3224,36 @@ class FeatureCommandRuntime:
                             )
                         )
                         final_record["criterion_quality"] = criterion_quality.to_data()
+                        raw_acceptance_coverage = criterion_coverage.get(
+                            clause.clause_id
+                        )
+                        if expected_obligation:
+                            if not isinstance(raw_acceptance_coverage, Mapping):
+                                raise ValueError(
+                                    "acceptance criterion coverage is missing"
+                                )
+                            raw_quality = raw_acceptance_coverage.get(
+                                "criterion_quality"
+                            )
+                            if not isinstance(raw_quality, Mapping):
+                                raise ValueError(
+                                    "acceptance criterion quality is malformed"
+                                )
+                            acceptance_quality = CriterionQuality.from_data(raw_quality)
+                            final_record["acceptance_criterion_ids"] = list(
+                                raw_acceptance_coverage.get("criterion_ids", [])
+                            )
+                            final_record["acceptance_criterion_quality"] = (
+                                acceptance_quality.to_data()
+                            )
+                        else:
+                            final_record["acceptance_criterion_ids"] = []
+                            final_record["acceptance_criterion_quality"] = (
+                                CriterionQuality(
+                                    requirement_status="not_applicable",
+                                    criterion_status="not_applicable",
+                                ).to_data()
+                            )
                         if isinstance(scenario, Mapping) and expected_obligation:
                             raw_scenario_quality = scenario.get("criterion_quality")
                             scenario_status = (
@@ -3042,6 +3293,21 @@ class FeatureCommandRuntime:
                     "not_applicable",
                 )
             }
+            acceptance_criterion_counts = {
+                status: sum(
+                    isinstance(record.get("acceptance_criterion_quality"), Mapping)
+                    and record["acceptance_criterion_quality"].get("criterion_status")
+                    == status
+                    for record in coverage_records
+                )
+                for status in (
+                    "checkable",
+                    "source_only",
+                    "unresolved",
+                    "unassessed",
+                    "not_applicable",
+                )
+            }
             applicable_criteria = sum(
                 record.get("obligation_created") is True for record in coverage_records
             )
@@ -3068,6 +3334,10 @@ class FeatureCommandRuntime:
                         "criterion_coverage": {
                             "applicable_requirements": applicable_criteria,
                             **criterion_counts,
+                        },
+                        "acceptance_criterion_coverage": {
+                            "applicable_requirements": applicable_criteria,
+                            **acceptance_criterion_counts,
                         },
                         "records": coverage_records,
                         "errors": coverage_errors,
@@ -3242,6 +3512,9 @@ class FeatureCommandRuntime:
             canonical_document = design.to_data()
             canonical_document["behavioral_contracts"] = [
                 item.to_data() for item in behavioral_contracts
+            ]
+            canonical_document["acceptance_criteria"] = [
+                item.to_data() for item in acceptance_criteria
             ]
             for canonical_obligation in canonical_document["obligations"]:
                 clause_id = canonical_obligation.get("clause_id")
@@ -3434,6 +3707,18 @@ class FeatureCommandRuntime:
                 ),
                 "bind_behavioral_contracts": bind_handler(
                     bind_behavioral_contracts_operation
+                ),
+                "prepare_acceptance_criteria": bind_handler(
+                    prepare_acceptance_criteria_operation
+                ),
+                "bind_acceptance_criteria": bind_handler(
+                    bind_acceptance_criteria_operation
+                ),
+                "prepare_acceptance_criterion_reviews": bind_handler(
+                    prepare_acceptance_criterion_reviews_operation
+                ),
+                "bind_acceptance_criterion_reviews": bind_handler(
+                    bind_acceptance_criterion_reviews_operation
                 ),
                 "prepare_field_entailment_reviews": bind_handler(
                     prepare_field_entailment_reviews_operation

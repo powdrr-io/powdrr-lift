@@ -2488,6 +2488,27 @@ def _run_code_agent_phase(
             ),
         )
     try:
+        compiled_acceptance_criteria: tuple[Mapping[str, Any], ...] = ()
+        canonical_design_path = state.get("canonical_feature_design_path")
+        if isinstance(canonical_design_path, Path) and canonical_design_path.is_file():
+            try:
+                canonical_for_criteria = json.loads(
+                    canonical_design_path.read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError) as error:
+                raise ValueError(
+                    f"canonical feature design cannot be read: {error}"
+                ) from error
+            if not isinstance(canonical_for_criteria, Mapping):
+                raise ValueError("canonical feature design is malformed")
+            raw_acceptance_criteria = canonical_for_criteria.get(
+                "acceptance_criteria", []
+            )
+            if not isinstance(raw_acceptance_criteria, list) or not all(
+                isinstance(item, Mapping) for item in raw_acceptance_criteria
+            ):
+                raise ValueError("canonical acceptance criteria are malformed")
+            compiled_acceptance_criteria = tuple(raw_acceptance_criteria)
         implementation_packet = compile_implementation_packet(
             objective=feature_description,
             obligations=feature_obligations,
@@ -2508,6 +2529,7 @@ def _run_code_agent_phase(
             obligation_evidence_contracts=tuple(
                 item.to_data() for item in obligation_evidence_contracts
             ),
+            acceptance_criteria=compiled_acceptance_criteria,
         )
     except ValueError as error:
         raise PowdrrExecutionError(
@@ -5738,6 +5760,11 @@ def _compile_initial_worker_prompt(
                 change
             )
     try:
+        raw_acceptance_criteria = canonical_design.get("acceptance_criteria", [])
+        if not isinstance(raw_acceptance_criteria, list) or not all(
+            isinstance(item, Mapping) for item in raw_acceptance_criteria
+        ):
+            raise ValueError("canonical acceptance criteria are malformed")
         packet = compile_implementation_packet(
             objective=config.feature_description,
             obligations=descriptions,
@@ -5750,6 +5777,7 @@ def _compile_initial_worker_prompt(
                 for item in required_test_cases
                 if isinstance((scenario := item.get("behavior_scenario")), Mapping)
             ),
+            acceptance_criteria=tuple(raw_acceptance_criteria),
         )
         unit = ExecutionUnit(
             unit_id=f"{slugify_workflow_id(config.work_item_name)}-implementation",

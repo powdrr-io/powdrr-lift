@@ -121,6 +121,66 @@ class DeterministicPlanningClient:
                 "unresolved_questions": [],
             }
 
+        if required == {"criteria"}:
+            candidates = _find_json_value(text, "candidate_requirements")
+            return (
+                {
+                    "criteria": [
+                        json.dumps(
+                            {
+                                "kind": "transformation",
+                                "source_indexes": [0],
+                                "setup": {"input": "the requested input"},
+                                "operation": "apply the requested behavior",
+                                "events": [],
+                                "assertions": [
+                                    json.dumps(
+                                        {
+                                            "observation": "result",
+                                            "relation": "equals",
+                                            "expected": "the requested result",
+                                            "source_indexes": [0],
+                                            "basis": "source_derived",
+                                        }
+                                    )
+                                ],
+                                "unresolved_questions": [],
+                            }
+                        )
+                    ]
+                }
+                if candidates
+                else {"criteria": []}
+            )
+
+        if required == {
+            "assertion_reviews",
+            "adequate",
+            "plausible_incorrect_behavior",
+            "distinguishes",
+            "adequacy_reason",
+        }:
+            assertions = _find_json_value(text, "assertions") or []
+            source_clauses = _find_json_value(text, "source_clauses") or []
+            evidence = source_clauses[0]["text"]
+            return {
+                "assertion_reviews": [
+                    json.dumps(
+                        {
+                            "assertion_id": item["assertion_id"],
+                            "status": "supported",
+                            "source_evidence": evidence,
+                            "reason": "The source clause supports the assertion.",
+                        }
+                    )
+                    for item in assertions
+                ],
+                "adequate": True,
+                "plausible_incorrect_behavior": "the feature returns no result",
+                "distinguishes": True,
+                "adequacy_reason": "The observed result distinguishes this behavior.",
+            }
+
         if required == {"status", "value", "reason_code"} and (
             "scenario claim" in text
         ):
@@ -920,9 +980,11 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     packet = json.loads(
         (run_root / "implementation-packet.json").read_text(encoding="utf-8")
     )
-    assert packet["schema_version"] == "implementation-packet-v1"
+    assert packet["schema_version"] == "implementation-packet-v2"
+    assert packet["acceptance_criteria"]
     prompt = (run_root / "artifacts" / "prompts").glob("*.txt")
     prompt_text = next(prompt).read_text(encoding="utf-8")
+    assert "Reviewed observable acceptance criteria:" in prompt_text
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
     assert "Required behavior checks:" in prompt_text

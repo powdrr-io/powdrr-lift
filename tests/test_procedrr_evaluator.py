@@ -804,6 +804,41 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "contracts": [],
                     "covered_requirement_ids": ["instruction-001"],
                 }
+            if command[0] == "prepare_acceptance_criteria":
+                return {
+                    "schema_version": "acceptance-criterion-v1",
+                    "ledger_fingerprint": "sha256:ledger",
+                    "requirement_ids": ["instruction-001"],
+                    "requests": [],
+                }
+            if command[0] == "bind_acceptance_criteria":
+                return {
+                    "schema_version": "acceptance-criterion-v1",
+                    "ledger_fingerprint": "sha256:ledger",
+                    "criteria": [],
+                    "requirement_coverage": {},
+                    "counts": {
+                        "requirements": 1,
+                        "with_criteria": 0,
+                        "unassessed": 0,
+                        "source_only": 1,
+                    },
+                }
+            if command[0] == "prepare_acceptance_criterion_reviews":
+                return {
+                    "schema_version": "acceptance-criterion-review-plan-v1",
+                    "ledger_fingerprint": "sha256:ledger",
+                    "requests": [],
+                }
+            if command[0] == "bind_acceptance_criterion_reviews":
+                return {
+                    "schema_version": "acceptance-criterion-v1",
+                    "ledger_fingerprint": "sha256:ledger",
+                    "criteria": [],
+                    "requirement_coverage": {},
+                    "counts": {"requirements": 1, "with_criteria": 0},
+                    "reviews": [],
+                }
             if command[0] == "compile_partial_semantic_contract":
                 return {
                     "kind": "feature",

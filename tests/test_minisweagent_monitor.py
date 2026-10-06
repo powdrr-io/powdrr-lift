@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 from powdrr_lift.minisweagent_monitor import (
@@ -164,3 +165,38 @@ for index in range(6):
     assert result.returncode == 0
     records = [json.loads(line) for line in log.read_text().splitlines()]
     assert not any(record["kind"] == "minisweagent.timeout" for record in records)
+
+
+def test_runner_stops_process_when_snapshot_callback_is_interrupted(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "worker-finished"
+    script = """
+import pathlib
+import sys
+import time
+
+time.sleep(0.4)
+pathlib.Path(sys.argv[1]).write_text("done")
+"""
+
+    def interrupt(_snapshot: object) -> None:
+        raise KeyboardInterrupt
+
+    try:
+        run_minisweagent(
+            [sys.executable, "-c", script, str(marker)],
+            trajectory_path=None,
+            log_path=None,
+            cwd=tmp_path,
+            timeout_seconds=5,
+            poll_interval=0.01,
+            on_snapshot=interrupt,
+        )
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("snapshot interruption should propagate")
+
+    time.sleep(0.45)
+    assert not marker.exists()

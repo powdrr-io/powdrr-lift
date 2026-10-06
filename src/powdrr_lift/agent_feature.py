@@ -242,7 +242,13 @@ def run_agent_feature_task(
             },
             "operational_failures": [
                 {
-                    "stage": "timeout" if status == "timed_out" else "initialization",
+                    "stage": (
+                        "timeout"
+                        if status == "timed_out"
+                        else "interruption"
+                        if status == "interrupted"
+                        else "initialization"
+                    ),
                     "message": failure,
                 }
             ],

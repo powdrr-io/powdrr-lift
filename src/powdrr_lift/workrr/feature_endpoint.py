@@ -401,7 +401,6 @@ def run_feature_in_place(
                 root,
                 slug=slug,
                 initial_head=initial_head,
-                commit_changes=not config.agent_managed_git,
             )
         return result
     except Exception as error:

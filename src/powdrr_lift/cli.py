@@ -5,6 +5,7 @@ import contextlib
 import difflib
 import io
 import json
+import math
 import os
 import re
 import shlex
@@ -23,7 +24,10 @@ from powdrr_lift.agent_bootstrap import (
     _run_output_root,
     run_bootstrap_task,
 )
-from powdrr_lift.agent_feature import run_agent_feature_task
+from powdrr_lift.agent_feature import (
+    DEFAULT_FEATURE_TIMEOUT_SECONDS,
+    run_agent_feature_task,
+)
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
@@ -276,6 +280,16 @@ from powdrr_lift.workrr.tuning import (
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
 
+def _positive_finite_seconds(value: str) -> float:
+    try:
+        seconds = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a number of seconds") from error
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("must be a finite positive number of seconds")
+    return seconds
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="powdrr-lift")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -453,6 +467,22 @@ def build_parser() -> argparse.ArgumentParser:
     implement_parser.add_argument("--base-branch")
     implement_parser.add_argument("--remote", default="origin")
     implement_parser.add_argument("--open-pr", action="store_true")
+    implement_parser.add_argument(
+        "--timeout-seconds",
+        type=_positive_finite_seconds,
+        default=DEFAULT_FEATURE_TIMEOUT_SECONDS,
+        help=(
+            "Overall feature execution wall-clock limit after credential preflight "
+            f"(default: {DEFAULT_FEATURE_TIMEOUT_SECONDS} seconds)."
+        ),
+    )
+    implement_parser.add_argument(
+        "--max-repair-attempts",
+        type=int,
+        choices=range(1, 6),
+        default=2,
+        help="Maximum focused candidate repair attempts (default: 2; range: 1-5).",
+    )
     implement_parser.add_argument("--run-id")
     implement_parser.add_argument("--output-root", type=Path)
     implement_parser.add_argument(
@@ -4918,12 +4948,20 @@ def _run_implement(args: argparse.Namespace) -> int:
             ],
             "uncertainty_decisions": [],
             "publication": {"status": "not_reached"},
+            "limits": {
+                "timeout_seconds": args.timeout_seconds,
+                "max_repair_attempts": args.max_repair_attempts,
+            },
         }
         metadata = {
             "request": feature_description,
             "allowed_paths": list(args.allowed_paths or ["."]),
             "effective_profile": preflight_result["effective_profile"],
             "publication_requested": args.open_pr,
+            "limits": {
+                "timeout_seconds": args.timeout_seconds,
+                "max_repair_attempts": args.max_repair_attempts,
+            },
         }
         write_json_artifact(output_root, "run-metadata.json", metadata)
         write_json_artifact(output_root, "preflight.json", preflight)
@@ -4981,6 +5019,7 @@ def _run_implement(args: argparse.Namespace) -> int:
         planning_client=planning_client,
         task_id=work_item_name,
         uncertainty_policy="normative_default",
+        max_repair_attempts=args.max_repair_attempts,
     )
     result = run_agent_feature_task(
         endpoint_config,
@@ -4991,6 +5030,7 @@ def _run_implement(args: argparse.Namespace) -> int:
         run_id=run_id,
         output_root=output_root,
         preflight=preflight,
+        timeout_seconds=args.timeout_seconds,
     )
     if args.json:
         print(json.dumps(result.to_data(), indent=2, sort_keys=True))

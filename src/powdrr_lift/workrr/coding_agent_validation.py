@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import signal
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -276,22 +277,26 @@ class ValidationRunner:
                 returncode=None,
                 error="validation command is not allowed by the implementation request",
             )
+        process: subprocess.Popen[str] | None = None
         try:
             environment = os.environ.copy()
             # Validation runs in the worker worktree. Ignore any activated
             # environment belonging to the caller's checkout so uv resolves
             # the project from this worktree.
             environment.pop("VIRTUAL_ENV", None)
-            completed = subprocess.run(
+            process = subprocess.Popen(
                 list(profile.command),
                 cwd=worktree_root,
                 env=environment,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=self.timeout_seconds,
-                check=False,
+                start_new_session=True,
             )
+            stdout, stderr = process.communicate(timeout=self.timeout_seconds)
         except OSError as error:
+            if process is not None:
+                _stop_process_group(process)
             return ValidationResult(
                 profile=profile.name,
                 command=profile.command,
@@ -300,15 +305,26 @@ class ValidationRunner:
                 error=f"could not start validation command: {error}",
             )
         except subprocess.TimeoutExpired as error:
+            assert process is not None
+            _stop_process_group(process)
+            stdout, stderr = process.communicate()
             return ValidationResult(
                 profile=profile.name,
                 command=profile.command,
                 status=ValidationResultStatus.TIMED_OUT,
                 returncode=124,
-                stdout=_text(error.stdout),
-                stderr=_text(error.stderr),
+                stdout=_text(stdout) or _text(error.stdout),
+                stderr=_text(stderr) or _text(error.stderr),
                 error="validation command timed out",
             )
+        except BaseException:
+            if process is not None:
+                _stop_process_group(process)
+            raise
+        assert process is not None
+        completed = subprocess.CompletedProcess(
+            profile.command, process.returncode, stdout, stderr
+        )
         return ValidationResult(
             profile=profile.name,
             command=profile.command,
@@ -330,6 +346,17 @@ class ValidationRunner:
                 or "command exited with status " + str(completed.returncode)
             ),
         )
+
+
+def _stop_process_group(process: subprocess.Popen[str]) -> None:
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        elif process.poll() is None:
+            process.kill()
+    except ProcessLookupError:
+        pass
+    process.wait()
 
 
 def parse_validation_profile(value: str) -> ValidationProfile:

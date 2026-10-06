@@ -218,58 +218,75 @@ def run_minisweagent(
             on_snapshot(snapshot)
         return snapshot
 
-    while process.poll() is None:
-        now = time.monotonic()
-        remaining = timeout_seconds - (now - last_progress_at)
-        if remaining <= 0:
-            timed_out = True
-            break
-        for key, _ in selector.select(timeout=min(poll_interval, remaining)):
-            fileobj = key.fileobj
-            file_descriptor = fileobj if isinstance(fileobj, int) else fileobj.fileno()
-            chunk = os.read(file_descriptor, 65536)
-            if chunk:
-                output.extend(chunk)
-                last_progress_at = time.monotonic()
-                if log_path is not None:
-                    append_diagnostic(
-                        log_path,
-                        "minisweagent.stdout",
-                        captured_at=time.monotonic(),
-                        chars=len(chunk),
-                    )
-        if time.monotonic() - last_snapshot_at >= poll_interval:
-            observe()
+    try:
+        while process.poll() is None:
+            now = time.monotonic()
+            remaining = timeout_seconds - (now - last_progress_at)
+            if remaining <= 0:
+                timed_out = True
+                break
+            for key, _ in selector.select(timeout=min(poll_interval, remaining)):
+                fileobj = key.fileobj
+                file_descriptor = (
+                    fileobj if isinstance(fileobj, int) else fileobj.fileno()
+                )
+                chunk = os.read(file_descriptor, 65536)
+                if chunk:
+                    output.extend(chunk)
+                    last_progress_at = time.monotonic()
+                    if log_path is not None:
+                        append_diagnostic(
+                            log_path,
+                            "minisweagent.stdout",
+                            captured_at=time.monotonic(),
+                            chars=len(chunk),
+                        )
+            if time.monotonic() - last_snapshot_at >= poll_interval:
+                observe()
 
-    if timed_out:
-        if os.name == "posix":
-            os.killpg(process.pid, signal.SIGKILL)
+        if timed_out:
+            if os.name == "posix":
+                os.killpg(process.pid, signal.SIGKILL)
+            else:
+                process.kill()
+            process.wait()
+            final_snapshot = observe()
+            if log_path is not None:
+                append_diagnostic(
+                    log_path,
+                    "minisweagent.timeout",
+                    captured_at=time.monotonic(),
+                    timeout_seconds=timeout_seconds,
+                    snapshot=final_snapshot.to_data(),
+                )
+            returncode = 124
         else:
-            process.kill()
+            for key, _ in selector.select(timeout=0):
+                fileobj = key.fileobj
+                file_descriptor = (
+                    fileobj if isinstance(fileobj, int) else fileobj.fileno()
+                )
+                chunk = os.read(file_descriptor, 65536)
+                if chunk:
+                    output.extend(chunk)
+            returncode = process.wait()
+            observe(returncode=returncode)
+    finally:
+        if process.poll() is None:
+            if os.name == "posix":
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                process.kill()
+        selector.close()
         process.wait()
-        final_snapshot = observe()
-        if log_path is not None:
-            append_diagnostic(
-                log_path,
-                "minisweagent.timeout",
-                captured_at=time.monotonic(),
-                timeout_seconds=timeout_seconds,
-                snapshot=final_snapshot.to_data(),
-            )
-        return subprocess.CompletedProcess(
-            list(command), 124, output.decode(errors="replace"), ""
-        )
-
-    for key, _ in selector.select(timeout=0):
-        fileobj = key.fileobj
-        file_descriptor = fileobj if isinstance(fileobj, int) else fileobj.fileno()
-        chunk = os.read(file_descriptor, 65536)
-        if chunk:
-            output.extend(chunk)
-    returncode = process.wait()
-    observe(returncode=returncode)
     return subprocess.CompletedProcess(
-        list(command), returncode, output.decode(errors="replace"), ""
+        list(command),
+        returncode,
+        output.decode(errors="replace"),
+        "",
     )
 
 

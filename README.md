@@ -220,6 +220,11 @@ Implementation is limited to the repository by default. Use repeated
 continues with a normative default and records the uncertainty and selected
 default in the report. Failed verification prevents publication. The report
 includes validation, review findings, decisions, and publication status.
+The overall feature deadline defaults to four hours after credential preflight;
+set `--timeout-seconds` to change it. A timeout records a `timed_out` result and
+retains the report and worktree. Powdrr allows two focused candidate repair
+attempts by default; use `--max-repair-attempts` to choose a limit from one to
+five.
 
 Powdrr sends the feature request and the repository context needed for planning,
 implementation, and review to the configured planning and coding providers.

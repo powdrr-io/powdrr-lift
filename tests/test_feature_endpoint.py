@@ -2417,14 +2417,15 @@ def test_candidate_structural_gate_rejects_unexplained_observations() -> None:
 
 
 @pytest.mark.parametrize(
-    ("review_outcomes", "expected_agent_attempts"),
-    [([True], 1), ([False, False], 2)],
+    ("review_outcomes", "expected_agent_attempts", "repair_limit"),
+    [([True], 1, 2), ([False, False], 2, 2), ([False], 1, 1)],
 )
-def test_candidate_correction_retries_twice_then_continues(
+def test_candidate_correction_obeys_configured_repair_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     review_outcomes: list[bool],
     expected_agent_attempts: int,
+    repair_limit: int,
 ) -> None:
     import powdrr_lift.workrr.feature_endpoint as endpoint
 
@@ -2469,10 +2470,11 @@ def test_candidate_correction_retries_twice_then_continues(
         work_item_name="candidate-correction",
         repo_root=tmp_path,
         allowed_paths=("src",),
+        max_repair_attempts=repair_limit,
     )
 
     result: dict[str, Any] = {}
-    for _ in range(2):
+    for _ in range(repair_limit):
         result = _correct_candidate_from_structrr_diff(
             {"review": state["latest_candidate_review"]},
             config=config,
@@ -2488,9 +2490,7 @@ def test_candidate_correction_retries_twice_then_continues(
 
     assert len(agent_attempts) == expected_agent_attempts
     assert result["done"] is True
-    assert result["review"]["candidate_structural_gate_passed"] is (
-        expected_agent_attempts == 1
-    )
+    assert result["review"]["candidate_structural_gate_passed"] is (review_outcomes[-1])
 
 
 def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(

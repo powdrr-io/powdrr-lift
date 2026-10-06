@@ -17,8 +17,10 @@ from powdrr_lift.core.implementation_packet import (
 from powdrr_lift.workrr.acceptance_criterion_compiler import (
     MAX_CRITERION_REQUIREMENTS,
     bind_acceptance_criteria,
+    bind_acceptance_criterion_repairs,
     bind_acceptance_criterion_reviews,
     prepare_acceptance_criteria,
+    prepare_acceptance_criterion_repairs,
     prepare_acceptance_criterion_reviews,
 )
 
@@ -201,12 +203,23 @@ def test_review_requires_exact_assertion_evidence_and_adequacy() -> None:
                     json.dumps(
                         {
                             "assertion_id": assertion_id,
-                            "status": "supported",
+                            "category": "source_supported",
                             "source_evidence": "accumulates entries across payloads",
                             "reason": "The cited words support the accumulation rule.",
                         }
                     )
                 ],
+                "setup_review": json.dumps(
+                    {
+                        "category": "illustrative_setup",
+                        "source_evidence": source,
+                        "reason": (
+                            "Values are illustrative inputs without adding product "
+                            "constraints."
+                        ),
+                    }
+                ),
+                "decision_records": [],
                 "adequate": True,
                 "plausible_incorrect_behavior": "returns only the latest payload",
                 "distinguishes": True,
@@ -228,12 +241,23 @@ def test_review_requires_exact_assertion_evidence_and_adequacy() -> None:
                     json.dumps(
                         {
                             "assertion_id": assertion_id,
-                            "status": "supported",
+                            "category": "source_supported",
                             "source_evidence": "the system behaves correctly",
                             "reason": "unsupported quote",
                         }
                     )
                 ],
+                "setup_review": json.dumps(
+                    {
+                        "category": "illustrative_setup",
+                        "source_evidence": source,
+                        "reason": (
+                            "Values are illustrative inputs without adding product "
+                            "constraints."
+                        ),
+                    }
+                ),
+                "decision_records": [],
                 "adequate": True,
                 "plausible_incorrect_behavior": "returns only the latest payload",
                 "distinguishes": True,
@@ -244,6 +268,343 @@ def test_review_requires_exact_assertion_evidence_and_adequacy() -> None:
     assert (
         invalid_evidence["criteria"][0]["quality"]["criterion_status"] == "source_only"
     )
+
+
+def test_assertion_local_repair_retains_supported_claim_and_records_attempt() -> None:
+    source = "The result mapping forwards each payload and preserves its contents."
+    contract = _contract(("instruction-001",))
+    contracts = {
+        "schema_version": "behavioral-contract-collection-v1",
+        "ledger_fingerprint": "sha256:ledger",
+        "covered_requirement_ids": ["instruction-001"],
+        "contracts": [contract.to_data()],
+    }
+    source_by_id = {"instruction-001": source}
+    generation = prepare_acceptance_criteria(contracts, source_by_id)
+    generated_value = json.loads(_criterion([0]))
+    generated_value["assertions"].append(
+        json.dumps(
+            {
+                "observation": "result.cancelled",
+                "relation": "equals",
+                "expected": True,
+                "source_indexes": [0],
+                "basis": "source_derived",
+            }
+        )
+    )
+    generated_value["assertions"][0] = json.dumps(
+        {
+            "observation": "result.payload",
+            "relation": "equals",
+            "expected": "the forwarded payload",
+            "source_indexes": [0],
+            "basis": "source_derived",
+        }
+    )
+    generated = json.dumps(generated_value)
+    draft = bind_acceptance_criteria(generation, [{"criteria": [generated]}])
+    review_plan = prepare_acceptance_criterion_reviews(draft, contracts, source_by_id)
+    criterion = review_plan["requests"][0]["criterion"]
+    forwarding_id, cancellation_id = [
+        item["assertion_id"] for item in criterion["assertions"]
+    ]
+    reviewed = bind_acceptance_criterion_reviews(
+        review_plan,
+        [
+            {
+                "assertion_reviews": [
+                    json.dumps(
+                        {
+                            "assertion_id": forwarding_id,
+                            "category": "source_supported",
+                            "source_evidence": "forwards each payload",
+                            "reason": "Forwarding is explicitly required.",
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "assertion_id": cancellation_id,
+                            "category": "unsupported",
+                            "source_evidence": (
+                                "the request contains no cancellation rule"
+                            ),
+                            "reason": "Cancellation behavior is not specified.",
+                        }
+                    ),
+                ],
+                "setup_review": json.dumps(
+                    {
+                        "category": "illustrative_setup",
+                        "source_evidence": source,
+                        "reason": "The payload is an arbitrary example value.",
+                    }
+                ),
+                "decision_records": [],
+                "adequate": False,
+                "plausible_incorrect_behavior": "drops payload contents",
+                "distinguishes": False,
+                "adequacy_reason": (
+                    "The unsupported cancellation assertion is not evidence."
+                ),
+            }
+        ],
+    )
+    repair_state = prepare_acceptance_criterion_repairs(
+        reviewed, contracts, source_by_id
+    )
+    assert repair_state["done"] is False
+    repair_request = repair_state["requests"][0]
+    assert [
+        item["assertion_id"]
+        for item in repair_request["failed_criteria"][0]["accepted_assertions"]
+    ] == [forwarding_id]
+    repair_candidate = json.loads(_criterion([0]))
+    repair_candidate["assertions"] = [
+        json.dumps(
+            {
+                "observation": "result.payload",
+                "relation": "equals",
+                "expected": "the forwarded payload",
+                "source_indexes": [0],
+                "basis": "source_derived",
+            }
+        )
+    ]
+    repaired = bind_acceptance_criterion_repairs(
+        {**repair_state, "criterion_collection": reviewed},
+        [{"criteria": [json.dumps(repair_candidate)]}],
+    )
+    repaired_criterion = AcceptanceCriterion.from_data(
+        repaired["criterion_collection"]["criteria"][0]
+    )
+    assert repaired_criterion.quality.repair_attempts == 1
+    assert any(
+        item.assertion_id == forwarding_id for item in repaired_criterion.assertions
+    )
+    assert all(
+        item.assertion_id != cancellation_id for item in repaired_criterion.assertions
+    )
+    assert repaired["criterion_collection"]["repair_attempts"][0]["round"] == 1
+    repair_review_plan = prepare_acceptance_criterion_reviews(
+        repaired["criterion_collection"], contracts, source_by_id
+    )
+    repair_request = repair_review_plan["requests"][0]
+    repair_review = bind_acceptance_criterion_reviews(
+        repair_review_plan,
+        [
+            {
+                "assertion_reviews": [
+                    json.dumps(
+                        {
+                            "assertion_id": assertion["assertion_id"],
+                            "category": "source_supported",
+                            "source_evidence": "forwards each payload",
+                            "reason": "The source explicitly requires forwarding.",
+                        }
+                    )
+                    for assertion in repair_request["assertions"]
+                ],
+                "setup_review": json.dumps(
+                    {
+                        "category": "illustrative_setup",
+                        "source_evidence": source,
+                        "reason": "The payload is an arbitrary example value.",
+                    }
+                ),
+                "decision_records": [],
+                "adequate": True,
+                "plausible_incorrect_behavior": "drops the payload contents",
+                "distinguishes": True,
+                "adequacy_reason": "The expected forwarded payload differs.",
+            }
+        ],
+    )
+    reviewed_criterion = AcceptanceCriterion.from_data(repair_review["criteria"][0])
+    assert reviewed_criterion.quality.criterion_status == "checkable"
+    assert reviewed_criterion.quality.repair_attempts == 1
+    packet = compile_implementation_packet(
+        objective="Forward payloads.",
+        obligations=("Forward each payload.",),
+        required_tests=({"description": "observe the forwarded payload"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        acceptance_criteria=(reviewed_criterion.to_data(),),
+    )
+    worker_text = packet.render()
+    assert 'Assert result.payload equals "the forwarded payload"' in worker_text
+    assert "result.cancelled" not in worker_text
+
+
+def test_repository_claim_without_attached_evidence_is_not_accepted() -> None:
+    source = "The result contains both entries."
+    contract = _contract(("instruction-001",))
+    contracts = {
+        "schema_version": "behavioral-contract-collection-v1",
+        "ledger_fingerprint": "sha256:ledger",
+        "covered_requirement_ids": ["instruction-001"],
+        "contracts": [contract.to_data()],
+    }
+    generation = prepare_acceptance_criteria(contracts, {"instruction-001": source})
+    draft = bind_acceptance_criteria(generation, [{"criteria": [_criterion([0])]}])
+    review_plan = prepare_acceptance_criterion_reviews(
+        draft, contracts, {"instruction-001": source}
+    )
+    assertion_id = review_plan["requests"][0]["criterion"]["assertions"][0][
+        "assertion_id"
+    ]
+    reviewed = bind_acceptance_criterion_reviews(
+        review_plan,
+        [
+            {
+                "assertion_reviews": [
+                    json.dumps(
+                        {
+                            "assertion_id": assertion_id,
+                            "category": "repository_supported",
+                            "source_evidence": "",
+                            "repository_evidence": {
+                                "location": "src/example.py:12",
+                                "revision_or_fingerprint": "abc123",
+                                "excerpt": "some convention",
+                            },
+                            "reason": "A local convention supports this result.",
+                        }
+                    )
+                ],
+                "setup_review": json.dumps(
+                    {
+                        "category": "illustrative_setup",
+                        "source_evidence": source,
+                        "reason": "Illustrative values.",
+                    }
+                ),
+                "decision_records": [],
+                "adequate": True,
+                "plausible_incorrect_behavior": "returns only one entry",
+                "distinguishes": True,
+                "adequacy_reason": "The expected entries are both observed.",
+            }
+        ],
+    )
+    assert reviewed["criteria"][0]["quality"]["criterion_status"] == "source_only"
+    assert reviewed["reviews"][0]["assertion_reviews"][0]["category"] == "unsupported"
+
+
+def test_unresolved_material_choice_is_labeled_assumption() -> None:
+    source = "The mapping is updated when a payload arrives."
+    contract = _contract(("instruction-001",))
+    contracts = {
+        "schema_version": "behavioral-contract-collection-v1",
+        "ledger_fingerprint": "sha256:ledger",
+        "covered_requirement_ids": ["instruction-001"],
+        "contracts": [contract.to_data()],
+    }
+    generation = prepare_acceptance_criteria(contracts, {"instruction-001": source})
+    draft = bind_acceptance_criteria(generation, [{"criteria": [_criterion([0])]}])
+    review_plan = prepare_acceptance_criterion_reviews(
+        draft, contracts, {"instruction-001": source}
+    )
+    assertion_id = review_plan["requests"][0]["criterion"]["assertions"][0][
+        "assertion_id"
+    ]
+    decision = {
+        "question": "Does updating preserve aliases held by callers?",
+        "affected_ids": ["instruction-001", assertion_id],
+        "alternatives": [
+            "mutate the existing mapping",
+            "replace it with a fresh mapping",
+        ],
+        "selected_interpretation": "Use the existing mapping.",
+        "source_constraints": ["The mapping is updated when a payload arrives."],
+        "basis": "assumption",
+        "basis_evidence": (
+            "The source and permitted evidence do not settle alias behavior."
+        ),
+        "confidence": "low",
+        "residual_uncertainty": "Alias behavior remains unverified.",
+        "dimension_state": "needed_for_implementation",
+    }
+    reviewed = bind_acceptance_criterion_reviews(
+        review_plan,
+        [
+            {
+                "assertion_reviews": [
+                    json.dumps(
+                        {
+                            "assertion_id": assertion_id,
+                            "category": "source_supported",
+                            "source_evidence": "mapping is updated",
+                            "reason": "The behavior is explicit.",
+                        }
+                    )
+                ],
+                "setup_review": json.dumps(
+                    {
+                        "category": "illustrative_setup",
+                        "source_evidence": source,
+                        "reason": "Arbitrary mapping values.",
+                    }
+                ),
+                "decision_records": [json.dumps(decision)],
+                "adequate": True,
+                "plausible_incorrect_behavior": "the mapping remains unchanged",
+                "distinguishes": True,
+                "adequacy_reason": "The updated mapping is observable.",
+            }
+        ],
+    )
+    assert reviewed["criteria"][0]["quality"]["criterion_status"] == "unresolved"
+    record = reviewed["reviews"][0]["decision_records"][0]
+    assert record["dimension_state"] == "needed_for_implementation"
+    assert record["evidence_status"] == "assumption"
+    assert record["is_assumption"] is True
+
+
+def test_repair_stops_after_two_rounds_with_source_only_coverage() -> None:
+    source = "The result contains both entries."
+    contract = _contract(("instruction-001",))
+    contracts = {
+        "schema_version": "behavioral-contract-collection-v1",
+        "ledger_fingerprint": "sha256:ledger",
+        "covered_requirement_ids": ["instruction-001"],
+        "contracts": [contract.to_data()],
+    }
+    source_by_id = {"instruction-001": source}
+    generation = prepare_acceptance_criteria(contracts, source_by_id)
+    draft = bind_acceptance_criteria(generation, [{"criteria": []}])
+    reviewed = bind_acceptance_criterion_reviews(
+        prepare_acceptance_criterion_reviews(draft, contracts, source_by_id), []
+    )
+    normative_plan = prepare_acceptance_criterion_repairs(
+        reviewed, contracts, source_by_id, uncertainty_policy="normative_default"
+    )
+    assert normative_plan["requests"][0]["uncertainty_policy"] == "normative_default"
+    assert any(
+        "evidenced local convention" in item
+        for item in normative_plan["requests"][0]["repair_instructions"]
+    )
+    for repair_round in (1, 2):
+        repair_state = prepare_acceptance_criterion_repairs(
+            reviewed, contracts, source_by_id
+        )
+        assert repair_state["done"] is False
+        assert repair_state["requests"][0]["repair_round"] == repair_round
+        assert repair_state["requests"][0]["uncertainty_policy"] == "clarify"
+        repair_draft = bind_acceptance_criterion_repairs(
+            {**repair_state, "criterion_collection": reviewed},
+            [{"criteria": []}],
+        )
+        repair_review_plan = prepare_acceptance_criterion_reviews(
+            repair_draft["criterion_collection"], contracts, source_by_id
+        )
+        reviewed = bind_acceptance_criterion_reviews(repair_review_plan, [])
+
+    assert reviewed["counts"]["needs_repair"] == 0
+    coverage = reviewed["requirement_coverage"]["instruction-001"]
+    assert coverage["status"] == "source_only"
+    assert coverage["repair_attempts"] == 2
+    assert len(reviewed["repair_attempts"]) == 2
 
 
 @pytest.mark.parametrize(

@@ -76,8 +76,10 @@ from powdrr_lift.workrr.acceptance_contract_compiler import (
 )
 from powdrr_lift.workrr.acceptance_criterion_compiler import (
     bind_acceptance_criteria,
+    bind_acceptance_criterion_repairs,
     bind_acceptance_criterion_reviews,
     prepare_acceptance_criteria,
+    prepare_acceptance_criterion_repairs,
     prepare_acceptance_criterion_reviews,
 )
 from powdrr_lift.workrr.external_contract_research import (
@@ -773,6 +775,30 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("bind_acceptance_criterion_reviews"),
+        ),
+        "prepare_acceptance_criterion_repairs": CommandSpec(
+            name="prepare_acceptance_criterion_repairs",
+            input_schema=object_schema(
+                {
+                    "criteria": {},
+                    "behavioral_contracts": {},
+                    "uncertainty_policy": {"type": "string"},
+                },
+                required=("criteria", "behavioral_contracts", "uncertainty_policy"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_acceptance_criterion_repairs"),
+        ),
+        "bind_acceptance_criterion_repairs": CommandSpec(
+            name="bind_acceptance_criterion_repairs",
+            input_schema=object_schema(
+                {"plan": {}, "results": {}},
+                required=("plan", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_acceptance_criterion_repairs"),
         ),
         "assert_feature_design_ready_for_implementation": CommandSpec(
             name="assert_feature_design_ready_for_implementation",
@@ -2762,6 +2788,36 @@ class FeatureCommandRuntime:
                 "fingerprint": content_fingerprint(collection),
             }
 
+        def prepare_acceptance_criterion_repairs_operation() -> Any:
+            criterion_collection = parameters.get("criteria")
+            contract_collection = parameters.get("behavioral_contracts")
+            if not isinstance(criterion_collection, Mapping) or not isinstance(
+                contract_collection, Mapping
+            ):
+                raise PowdrrExecutionError("criterion repair inputs are missing")
+            ledger = load_instruction_ledger()
+            try:
+                repair_state = prepare_acceptance_criterion_repairs(
+                    criterion_collection,
+                    contract_collection,
+                    {item.clause_id: item.text for item in ledger.clauses},
+                    str(parameters.get("uncertainty_policy", "clarify")),
+                )
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            repair_state["criterion_collection"] = dict(criterion_collection)
+            return repair_state
+
+        def bind_acceptance_criterion_repairs_operation() -> Any:
+            plan = parameters.get("plan")
+            results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(plan, Mapping) or results is None:
+                raise PowdrrExecutionError("criterion repair binding is malformed")
+            try:
+                return bind_acceptance_criterion_repairs(plan, results)
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
             contract_collection = parameters.get("behavioral_contracts")
@@ -3719,6 +3775,12 @@ class FeatureCommandRuntime:
                 ),
                 "bind_acceptance_criterion_reviews": bind_handler(
                     bind_acceptance_criterion_reviews_operation
+                ),
+                "prepare_acceptance_criterion_repairs": bind_handler(
+                    prepare_acceptance_criterion_repairs_operation
+                ),
+                "bind_acceptance_criterion_repairs": bind_handler(
+                    bind_acceptance_criterion_repairs_operation
                 ),
                 "prepare_field_entailment_reviews": bind_handler(
                     prepare_field_entailment_reviews_operation

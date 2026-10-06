@@ -836,9 +836,30 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "ledger_fingerprint": "sha256:ledger",
                     "criteria": [],
                     "requirement_coverage": {},
-                    "counts": {"requirements": 1, "with_criteria": 0},
+                    "counts": {
+                        "requirements": 1,
+                        "with_criteria": 0,
+                        "needs_repair": 0,
+                    },
                     "reviews": [],
                 }
+            if command[0] == "prepare_acceptance_criterion_repairs":
+                return {
+                    "done": True,
+                    "criterion_collection": parameters["criteria"],
+                    "plan": {
+                        "schema_version": "acceptance-criterion-repair-plan-v1",
+                        "ledger_fingerprint": "sha256:ledger",
+                        "requirement_ids": [],
+                        "contracts": [],
+                        "requests": [],
+                        "replaces": {},
+                    },
+                    "requests": [],
+                }
+            if command[0] == "bind_acceptance_criterion_repairs":
+                collection = parameters["plan"]["criterion_collection"]
+                return {"criterion_collection": collection, "criteria": []}
             if command[0] == "compile_partial_semantic_contract":
                 return {
                     "kind": "feature",

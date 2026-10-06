@@ -3000,13 +3000,24 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                         json.dumps(
                             {
                                 "assertion_id": assertion["assertion_id"],
-                                "status": "supported",
+                                "category": "source_supported",
                                 "source_evidence": evidence,
                                 "reason": "The source clause states the behavior.",
                             }
                         )
                         for assertion in request["assertions"]
                     ],
+                    "setup_review": json.dumps(
+                        {
+                            "category": "illustrative_setup",
+                            "source_evidence": evidence,
+                            "reason": (
+                                "Fixture values are illustrative and remain within "
+                                "the source-supported input domain."
+                            ),
+                        }
+                    ),
+                    "decision_records": [],
                     "adequate": True,
                     "plausible_incorrect_behavior": "the feature returns no result",
                     "distinguishes": True,

@@ -1293,17 +1293,36 @@ steps:
                 clauses and assembled contract. Context can explain wording but cannot
                 create a product requirement.
               - >-
-                For each assertion return exactly one assertion review with its exact
-                assertion ID, a status, one verbatim supporting source excerpt, and a
-                short reason. Use unresolved when the source does not settle meaning;
-                use unsupported when the assertion adds behavior.
+                For each whole behavioral assertion return exactly one assertion
+                review with its exact assertion ID and one category:
+                source_supported, repository_supported, illustrative_setup,
+                decision_required, unsupported, or contradicts_source. Do not review
+                individual literal leaves of a fixture as separate claims.
               - >-
-                Supporting evidence must be copied exactly from one of the cited
-                source clauses. Do not treat illustrative setup values as requirements.
+                source_supported requires one verbatim source excerpt from a cited
+                clause. repository_supported requires an exact repository location,
+                revision or content fingerprint, and excerpt. This request supplies
+                no repository evidence unless explicitly listed. Values such as names
+                and ages may be illustrative_setup only with a rationale that the
+                setup remains in the supported domain and adds no product constraint.
+              - >-
+                Review setup separately and return one setup_review category plus a
+                rationale. Cite a verbatim source excerpt for source_supported or
+                illustrative_setup. An illustrative setup is acceptable only when
+                its domain is source-supported and the chosen literal values are
+                arbitrary; explain why those values add no product constraint.
               - >-
                 Then propose one plausible incorrect behavior and say whether the
                 assertions distinguish it. Adequacy requires a concrete observation
                 that would fail for that incorrect behavior.
+              - >-
+                Record material unspecified dimensions only when implementation must
+                choose among materially different outcomes. Use dimension_state
+                specified, unspecified, not_applicable, or needed_for_implementation.
+                Include decision records with question, affected requirement/assertion
+                IDs, alternatives, selected interpretation, source constraints,
+                basis/evidence, confidence, and residual uncertainty. Choices without
+                evidence remain assumptions and never count as source-supported.
               - >-
                 Do not endorse criteria that turn context, examples, or unresolved
                 questions into required behavior.
@@ -1312,13 +1331,18 @@ steps:
               name: acceptance_criterion_review_result
               schema:
                 type: object
-                required: [assertion_reviews, adequate, plausible_incorrect_behavior, distinguishes, adequacy_reason]
+                required: [assertion_reviews, setup_review, decision_records, adequate, plausible_incorrect_behavior, distinguishes, adequacy_reason]
                 additionalProperties: false
                 properties:
                   assertion_reviews:
                     type: array
                     maxItems: 4
                     items: {type: string, minLength: 1, maxLength: 1600}
+                  setup_review: {type: string, minLength: 1, maxLength: 1000}
+                  decision_records:
+                    type: array
+                    maxItems: 8
+                    items: {type: string, minLength: 1, maxLength: 1800}
                   adequate: {type: boolean}
                   plausible_incorrect_behavior: {type: string, minLength: 1, maxLength: 500}
                   distinguishes: {type: boolean}
@@ -1343,6 +1367,125 @@ steps:
           path: {type: string}
           fingerprint: {type: string}
       bind: acceptance_criteria
+  - repeat:
+      max_iterations: 2
+      until: {subject: acceptance_criteria.counts.needs_repair, equals: 0}
+      body:
+        - operation:
+            tool: internal
+            command: [prepare_acceptance_criterion_repairs]
+            parameters:
+              criteria: {type: reference, value: acceptance_criteria}
+              behavioral_contracts: {type: reference, value: behavioral_contracts}
+              uncertainty_policy: {type: reference, value: uncertainty_policy}
+            returns:
+              type: object
+              required: [done, plan, requests]
+              properties:
+                done: {type: boolean}
+                plan: {type: object}
+                requests: {type: array, maxItems: 512}
+            bind: acceptance_criterion_repair_state
+        - for_each:
+            snapshot: {name: acceptance_criterion_repair_state.requests, max_items: 512}
+            max_parallel: 8
+            item_binding: acceptance_criterion_repair_request
+            collect: {binding: acceptance_criterion_repair_results, mode: list, value: acceptance_criterion_repair_result}
+            body:
+              - judge:
+                  kind: construct_one
+                  provider: planning
+                  question: Repair only the failed acceptance assertions and missing coverage.
+                  subject: acceptance_criterion_repair_request.request_id
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Use only source clauses, the assembled contract, and the exact review findings in this request. Reference solutions and validation patches are unavailable to production generation.
+                    - Retain accepted assertions unchanged when possible. Remove or revise unsupported and contradictory assertions without losing the requirement itself.
+                    - Resolve an unspecified dimension only when implementation must choose among materially different outcomes and the request provides evidence. Otherwise keep the uncertainty explicit.
+                    - >-
+                      Respect the request uncertainty_policy: clarify leaves
+                      unevidenced choices open; normative_default may use only an
+                      evidenced local convention and labels that choice as an
+                      assumption.
+                    - Return at most four criteria and four assertions per criterion. Use local source indexes; the compiler binds IDs and fingerprints.
+                    - Describe observable behavior only; never emit executable tests, imports, commands, test selectors, or invented defaults.
+                    - Return criterion objects as JSON strings with exactly kind, source_indexes, setup, operation, events, assertions, unresolved_questions. Assertion objects use exactly observation, relation, expected, source_indexes, basis.
+                  context: [acceptance_criterion_repair_request]
+                  output:
+                    name: acceptance_criterion_repair_result
+                    schema:
+                      type: object
+                      required: [criteria]
+                      additionalProperties: false
+                      properties:
+                        criteria:
+                          type: array
+                          maxItems: 4
+                          items: {type: string, minLength: 1, maxLength: 12000}
+                  validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [bind_acceptance_criterion_repairs]
+            parameters:
+              plan: {type: reference, value: acceptance_criterion_repair_state}
+              results: {type: reference, value: acceptance_criterion_repair_results}
+            returns: {type: object}
+            bind: acceptance_criterion_repair_draft
+        - operation:
+            tool: internal
+            command: [prepare_acceptance_criterion_reviews]
+            parameters:
+              criteria: {type: reference, value: acceptance_criterion_repair_draft.criterion_collection}
+              behavioral_contracts: {type: reference, value: behavioral_contracts}
+            returns: {type: object}
+            bind: acceptance_criterion_repair_review_plan
+        - for_each:
+            snapshot: {name: acceptance_criterion_repair_review_plan.requests, max_items: 512}
+            max_parallel: 8
+            item_binding: acceptance_criterion_review_request
+            collect: {binding: acceptance_criterion_repair_review_results, mode: list, value: acceptance_criterion_review_result}
+            body:
+              - judge:
+                  kind: classify_one
+                  provider: planning
+                  question: Does each assertion follow from cited source evidence, and does it distinguish a plausible incorrect behavior?
+                  subject: acceptance_criterion_review_request.criterion_id
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - Apply the same assertion-level category rules as the initial review, and review setup independently.
+                    - Review every changed and new assertion. Reuse no earlier review for a changed criterion fingerprint.
+                    - Keep each assertion linked to exact source evidence or an evidenced repository location and revision. Choices without proof remain assumptions.
+                    - Do not mark a failed repair resolved; identify unresolved material choices and concrete remaining insufficiencies.
+                  context: [acceptance_criterion_review_request]
+                  output:
+                    name: acceptance_criterion_review_result
+                    schema:
+                      type: object
+                      required: [assertion_reviews, setup_review, decision_records, adequate, plausible_incorrect_behavior, distinguishes, adequacy_reason]
+                      additionalProperties: false
+                      properties:
+                        assertion_reviews:
+                          type: array
+                          maxItems: 4
+                          items: {type: string, minLength: 1, maxLength: 1600}
+                        setup_review: {type: string, minLength: 1, maxLength: 1000}
+                        decision_records:
+                          type: array
+                          maxItems: 8
+                          items: {type: string, minLength: 1, maxLength: 1800}
+                        adequate: {type: boolean}
+                        plausible_incorrect_behavior: {type: string, minLength: 1, maxLength: 500}
+                        distinguishes: {type: boolean}
+                        adequacy_reason: {type: string, minLength: 1, maxLength: 700}
+                  validation: {kind: json_schema}
+        - operation:
+            tool: internal
+            command: [bind_acceptance_criterion_reviews]
+            parameters:
+              plan: {type: reference, value: acceptance_criterion_repair_review_plan}
+              results: {type: reference, value: acceptance_criterion_repair_review_results}
+            returns: {type: object}
+            bind: acceptance_criteria
   - judge:
       kind: construct_one
       provider: planning

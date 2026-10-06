@@ -15,6 +15,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_lift.core.behavior_contract import CriterionQuality
 from powdrr_lift.core.instruction_ledger import InstructionLedger
 from powdrr_lift.core.semantic_contract import PartialSemanticContract
 
@@ -56,6 +57,11 @@ class DesignProjection:
     acceptance_criterion: str
     expected_test: str
     behavior_scenario: Mapping[str, Any] | None = None
+    criterion_quality: CriterionQuality = CriterionQuality()
+
+    @property
+    def criterion_status(self) -> str:
+        return self.criterion_quality.criterion_status
 
     @property
     def design_id(self) -> str:
@@ -73,6 +79,7 @@ class DesignProjection:
             "description": self.description,
             "acceptance_criterion": self.acceptance_criterion,
             "expected_test": self.expected_test,
+            "criterion_quality": self.criterion_quality.to_data(),
         }
         if self.behavior_scenario is not None:
             data["behavior_scenario"] = dict(self.behavior_scenario)
@@ -103,6 +110,7 @@ class FeatureObligation:
             "description": self.projection.description,
             "acceptance_criterion": self.projection.acceptance_criterion,
             "expected_test": self.projection.expected_test,
+            "criterion_quality": self.projection.criterion_quality.to_data(),
         }
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
@@ -194,6 +202,9 @@ class CanonicalFeatureDesign:
                         "id": f"acceptance:{item.obligation_id}",
                         "description": item.projection.acceptance_criterion,
                         "source_ref": item.obligation_id,
+                        "criterion_quality": (
+                            item.projection.criterion_quality.to_data()
+                        ),
                     }
                     for item in self.obligations
                 ],
@@ -302,17 +313,43 @@ def compile_feature_design(
             kind = "feature"
         if source_contract is None and _is_nonactionable_clause(clause.text):
             kind = "nonactionable"
+        behavior_scenario = (
+            dict(design["behavior_scenario"])
+            if isinstance(design.get("behavior_scenario"), Mapping)
+            else None
+        )
+        if kind in {"context", "nonactionable"}:
+            criterion_quality = CriterionQuality(
+                requirement_status="not_applicable",
+                criterion_status="not_applicable",
+            )
+        elif behavior_scenario is not None:
+            raw_quality = behavior_scenario.get("criterion_quality", {})
+            if not isinstance(raw_quality, Mapping):
+                raise FeatureObligationError(
+                    f"criterion quality for {clause.clause_id} is malformed"
+                )
+            try:
+                criterion_quality = CriterionQuality.from_data(raw_quality)
+            except ValueError as error:
+                raise FeatureObligationError(
+                    f"criterion quality for {clause.clause_id} is invalid: {error}"
+                ) from error
+        else:
+            criterion_quality = CriterionQuality(
+                requirement_status="preserved",
+                criterion_status="source_only",
+                failure_stage="scenario_generation",
+                failure_reason="no behavior scenario was produced",
+            )
         projection = DesignProjection(
             clause_id=clause.clause_id,
             kind=kind,
             description=_required_text(design, "description"),
             acceptance_criterion=_required_text(design, "acceptance_criterion"),
             expected_test=_required_text(design, "expected_test"),
-            behavior_scenario=(
-                dict(design["behavior_scenario"])
-                if isinstance(design.get("behavior_scenario"), Mapping)
-                else None
-            ),
+            behavior_scenario=behavior_scenario,
+            criterion_quality=criterion_quality,
         )
         projections.append(projection)
         semantic_projections[clause.clause_id] = projection

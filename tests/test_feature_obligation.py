@@ -57,6 +57,43 @@ def test_feature_design_compiler_owns_ids_references_and_test_name_hints() -> No
     assert all("id" not in item for item in data["obligations"])
 
 
+def test_criteria_without_derived_scenarios_are_marked_source_only() -> None:
+    ledger = compile_instruction_ledger("feature", "A result accumulates values.")
+
+    design = compile_feature_design(ledger, "feature", _semantic(1))
+    data = design.to_data()
+
+    assert design.projections[0].criterion_status == "source_only"
+    assert (
+        design.obligations[0].to_data()["criterion_quality"]["criterion_status"]
+        == "source_only"
+    )
+    assert (
+        data["structrr"]["acceptance_criteria"][0]["criterion_quality"][
+            "criterion_status"
+        ]
+        == "source_only"
+    )
+
+
+def test_context_projection_is_not_counted_as_an_acceptance_criterion() -> None:
+    ledger = compile_instruction_ledger(
+        "feature", "Implement a new API. The old API is slow."
+    )
+    semantic = _semantic(2)
+    semantic[1]["design"] = {
+        "kind": "context",
+        "description": "The old API is slow.",
+        "acceptance_criterion": "No change is required by this context.",
+        "expected_test": "This statement is explanatory context.",
+    }
+
+    design = compile_feature_design(ledger, "feature", semantic)
+
+    assert design.projections[1].criterion_status == "not_applicable"
+    assert [item.clause_id for item in design.obligations] == ["instruction-001"]
+
+
 def test_feature_design_compiler_rejects_missing_clause_projection() -> None:
     ledger = compile_instruction_ledger("feature", "First behavior. Second behavior.")
 

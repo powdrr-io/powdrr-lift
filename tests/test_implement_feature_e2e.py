@@ -861,6 +861,10 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     )
     assert len(canonical_design["projections"]) == 4
     assert len(canonical_design["obligations"]) == 4
+    assert all(
+        item["criterion_quality"]["criterion_status"] == "unassessed"
+        for item in canonical_design["obligations"]
+    )
     packet = json.loads(
         (run_root / "implementation-packet.json").read_text(encoding="utf-8")
     )
@@ -870,7 +874,7 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
     assert "Required behavior checks:" in prompt_text
-    assert "expect the stated acceptance outcome is observed" in prompt_text
+    assert "expect the stated acceptance outcome is observed" not in prompt_text
     assert "Run the tests before reporting completion." in prompt_text
     assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text
@@ -1051,7 +1055,7 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
         )
     )
 
-    assert result.status == "completed", planner.proposal_decision_ids
+    assert result.status == "completed", (planner.proposal_decision_ids, result.failure)
     assert result.plan_path.is_file()
     ledger_path = (
         repo
@@ -1087,17 +1091,47 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
     assert coverage_path.is_file()
     coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
     assert coverage["status"] == "complete"
+    assert coverage["schema_version"] == "instruction-coverage-audit-v2"
     assert coverage["instruction_ledger_fingerprint"] == ledger["fingerprint"]
     assert [item["clause_id"] for item in coverage["records"]] == [
         item["clause_id"] for item in ledger["clauses"]
     ]
     for record in coverage["records"]:
         assert record["status"] == "covered"
+        assert record["requirement_status"] == "covered"
         assert record["source_contract_fingerprint"]
         assert Path(record["source_contract_artifact"]).is_file()
         assert record["obligation_created"] is (
             record["routing"] in {"include", "include_prohibition"}
         )
+        assert record["criterion_quality"]["requirement_status"] in {
+            "preserved",
+            "not_applicable",
+        }
+        assert record["criterion_quality"]["criterion_status"] in {
+            "source_only",
+            "unresolved",
+            "unassessed",
+            "not_applicable",
+        }
+        assert record["criterion_quality"]["repair_attempts"] == 0
+    criterion_coverage = coverage["criterion_coverage"]
+    assert criterion_coverage["applicable_requirements"] == sum(
+        record["obligation_created"] for record in coverage["records"]
+    )
+    assert criterion_coverage["checkable"] == 0
+    assert (
+        sum(
+            criterion_coverage[key]
+            for key in ("source_only", "unresolved", "unassessed")
+        )
+        == criterion_coverage["applicable_requirements"]
+    )
+    assert coverage["requirement_coverage"] == {
+        "total": len(coverage["records"]),
+        "covered": len(coverage["records"]),
+        "failed": 0,
+    }
     assert [item["obligation_id"] for item in canonical_design["obligations"]] == [
         f"obligation:instruction-{index:03d}"
         for index in range(1, len(canonical_design["obligations"]) + 1)

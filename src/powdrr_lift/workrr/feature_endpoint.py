@@ -8,6 +8,7 @@ import shutil
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast
 
@@ -4823,6 +4824,12 @@ def _structrr_taxonomy_path(worktree: Path) -> Path:
     repository_path = worktree / "software_development_entity_taxonomy.md"
     if repository_path.is_file():
         return repository_path
+    packaged_resource = files("powdrr_lift.resources").joinpath(
+        "software_development_entity_taxonomy.md"
+    )
+    packaged_path = Path(str(packaged_resource))
+    if packaged_path.is_file():
+        return packaged_path
     package_data_path = (
         Path(__file__).resolve().parents[2] / "software_development_entity_taxonomy.md"
     )

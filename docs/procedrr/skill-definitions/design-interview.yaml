@@ -1078,6 +1078,86 @@ steps:
                 expected_test: {type: string}
                 behavior_scenario: {type: object}
             bind: semantic_design
+  - operation:
+      tool: internal
+      command: [prepare_behavioral_contracts]
+      parameters:
+        design_decisions: {type: reference, value: semantic_designs}
+      returns:
+        type: object
+        required: [ledger_fingerprint, requirement_ids, context_ids, role_interpretations, requests]
+        properties:
+          ledger_fingerprint: {type: string}
+          requirement_ids: {type: array, items: {type: string}}
+          context_ids: {type: array, items: {type: string}}
+          role_interpretations: {type: object}
+          requests: {type: array, maxItems: 128}
+      bind: behavioral_contract_plan
+  - for_each:
+      snapshot: {name: behavioral_contract_plan.requests, max_items: 128}
+      max_parallel: 8
+      item_binding: behavioral_contract_request
+      collect: {binding: behavioral_contract_results, mode: list, value: behavioral_contract_result}
+      body:
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: Which candidate requirements form one behavioral contract, and what source relationships connect them?
+            subject: behavioral_contract_request.request_id
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Use only the candidate requirements, their source role interpretations, explicit ledger relations, and listed context items.
+              - Confirm a group only when the sources establish a shared operation contract; shared terminology or subsystem alone is insufficient.
+              - Keep independent requirements separate. Group membership does not mean their tests must run in one scenario.
+              - Context items can support interpretation but never select them as contract members.
+              - Return local candidate indexes, not source IDs. The compiler owns all IDs and fingerprints.
+              - Encode each relationship as one JSON object string with exactly kind, source_evidence, and target_indexes. Use only local target indexes and exact source evidence.
+              - Reject uncertain or unsupported relationships by omitting them and adding an unresolved question.
+              - Select only a relationship kind whose meaning is explicitly supported; do not infer that a constraint applies to every mode or integration.
+            context: [behavioral_contract_request]
+            output:
+              name: behavioral_contract_result
+              schema:
+                type: object
+                required: [member_indexes, context_indexes, relationships, unresolved_questions]
+                additionalProperties: false
+                properties:
+                  member_indexes:
+                    type: array
+                    maxItems: 16
+                    uniqueItems: true
+                    items: {type: integer, minimum: 0, maximum: 15}
+                  context_indexes:
+                    type: array
+                    maxItems: 8
+                    uniqueItems: true
+                    items: {type: integer, minimum: 0, maximum: 7}
+                  relationships:
+                    type: array
+                    maxItems: 16
+                    items: {type: string, minLength: 1, maxLength: 700}
+                  unresolved_questions:
+                    type: array
+                    maxItems: 8
+                    items: {type: string, minLength: 1, maxLength: 500}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [bind_behavioral_contracts]
+      parameters:
+        plan: {type: reference, value: behavioral_contract_plan}
+        results: {type: reference, value: behavioral_contract_results}
+      returns:
+        type: object
+        required: [schema_version, ledger_fingerprint, contracts, covered_requirement_ids]
+        properties:
+          schema_version: {type: string}
+          ledger_fingerprint: {type: string}
+          contracts: {type: array}
+          covered_requirement_ids: {type: array, items: {type: string}}
+          path: {type: string}
+          fingerprint: {type: string}
+      bind: behavioral_contracts
   - judge:
       kind: construct_one
       provider: planning
@@ -1093,7 +1173,7 @@ steps:
         - When uncertainty_policy is clarify, return no updates; do not invent or reconcile assumptions on the user's behalf.
         - For each changed assumption, quote the target scenario's subject, given, when, then, dimension, and previous resolution exactly so the compiler can bind the update without model-generated IDs.
         - Return an empty updates list when the recorded assumptions are already coherent.
-      context: [work_item_name, atomic_instruction_ledger, semantic_designs, uncertainty_policy]
+      context: [work_item_name, atomic_instruction_ledger, semantic_designs, behavioral_contracts, uncertainty_policy]
       output:
         name: scenario_consistency_review
         schema:
@@ -1131,6 +1211,7 @@ steps:
       parameters:
         work_item_name: {type: reference, value: work_item_name}
         design_decisions: {type: reference, value: semantic_designs}
+        behavioral_contracts: {type: reference, value: behavioral_contracts}
         scenario_consistency_review: {type: reference, value: scenario_consistency_review}
         uncertainty_policy: {type: reference, value: uncertainty_policy}
       returns:

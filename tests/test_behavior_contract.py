@@ -228,6 +228,27 @@ def test_worker_prompt_preserves_joint_validation_groups() -> None:
     assert "status-200, contains-account-id" in rendered
 
 
+def test_worker_prompt_keeps_contract_context_for_unassessed_scenarios() -> None:
+    scenario = _scenario()
+    scenario["related_requirements"] = [
+        "Related requirement instruction-002: payload data accumulates.",
+        "Context only; this is not an implementation requirement: earlier behavior.",
+    ]
+    packet = compile_implementation_packet(
+        objective="Process delivery payloads.",
+        obligations=("Process delivery payloads.",),
+        required_tests=({"description": "process delivery payloads"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+
+    assert "Related requirement instruction-002" in rendered
+    assert "Context only; this is not an implementation requirement" in rendered
+
+
 def test_unclear_routes_continue_with_conservative_headless_assumption() -> None:
     scenario = _scenario()
     scenario["routing"] = "unclear"

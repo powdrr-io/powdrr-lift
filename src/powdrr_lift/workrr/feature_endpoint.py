@@ -160,6 +160,7 @@ class FeatureEndpointConfig:
     capture_worker_prompts_only: bool = False
     benchmark_mode: bool = False
     uncertainty_policy: str = "clarify"
+    max_repair_attempts: int = 2
     prepared_worktree: Path | None = None
     prepared_branch: str | None = None
     agent_managed_git: bool = False
@@ -437,6 +438,8 @@ def _execute_procedrr_flow(
         raise ValueError("design-only and worker-prompt capture modes are exclusive")
     if config.uncertainty_policy not in {"clarify", "normative_default"}:
         raise ValueError("uncertainty_policy must be 'clarify' or 'normative_default'")
+    if not 1 <= config.max_repair_attempts <= 5:
+        raise ValueError("max_repair_attempts must be between 1 and 5")
     slug = slugify_workflow_id(config.work_item_name)
     state: dict[str, Any] = {
         "task_id": config.task_id or config.work_item_name,
@@ -3704,6 +3707,7 @@ def _write_run_metadata(
                 if config.benchmark_mode
                 else config.uncertainty_policy
             ),
+            "max_repair_attempts": config.max_repair_attempts,
             "publication_requested": bool(config.open_pr or config.push_changes),
             "publication_options": {
                 "push_branch": config.push_changes,
@@ -6660,7 +6664,8 @@ def _prepare_final_implementation_review(
                 "decision_id": "final:structrr-comparison",
                 "check": "candidate_comparison_resolved_or_retries_exhausted",
                 "passed": comparison_passed
-                or int(state.get("candidate_correction_attempts", 0)) >= 2,
+                or int(state.get("candidate_correction_attempts", 0))
+                >= config.max_repair_attempts,
                 "blockers": comparison_blockers,
             },
         ],
@@ -6682,6 +6687,7 @@ def _prepare_final_implementation_review(
         "candidate_correction_attempts": int(
             state.get("candidate_correction_attempts", 0)
         ),
+        "candidate_correction_limit": config.max_repair_attempts,
         "proposal_fingerprint": proposal.fingerprint,
         "diff_fingerprint": diff_fingerprint,
         "observed_diff": diff,
@@ -6933,7 +6939,7 @@ def _correct_candidate_from_structrr_diff(
     if not isinstance(review, Mapping):
         raise PowdrrExecutionError("candidate correction has no structural review")
     attempts = int(state.get("candidate_correction_attempts", 0))
-    if attempts >= 2:
+    if attempts >= config.max_repair_attempts:
         return {"done": True, "review": dict(review)}
 
     coverage_specs = _flow_items(
@@ -6968,7 +6974,7 @@ def _correct_candidate_from_structrr_diff(
         "the feature. Equivalent implementations and behavior already present in "
         "the candidate do not need to be changed. After focused corrections, run "
         "the relevant validation commands.\n\n"
-        f"Attempt {attempts + 1} of 2.\n"
+        f"Attempt {attempts + 1} of {config.max_repair_attempts}.\n"
         f"Comparison artifact: {review.get('candidate_comparison_path', '')}\n"
         f"Actual diff artifact: {review.get('actual_diff_path', '')}\n"
         "Reported gaps:\n" + "\n".join(f"- {item}" for item in correction_items)
@@ -7007,8 +7013,8 @@ def _correct_candidate_from_structrr_diff(
     )
     state["latest_candidate_review"] = refreshed
     # Coverage is judged again from the refreshed worklist on the next loop
-    # iteration. Stop only when both review routes pass, or after two repairs.
-    done = attempts + 1 >= 2
+    # iteration. Stop when both review routes pass or the repair budget is spent.
+    done = attempts + 1 >= config.max_repair_attempts
     return {
         "done": done,
         "review": refreshed,
@@ -7111,9 +7117,12 @@ def _finalize_implementation_review(
     )
     if len(specifications) != len(semantic):
         raise PowdrrExecutionError("actualization decisions are incomplete")
+    correction_limit = review.get("candidate_correction_limit", 2)
+    if not isinstance(correction_limit, int) or isinstance(correction_limit, bool):
+        raise PowdrrExecutionError("candidate correction limit is malformed")
     correction_exhausted = (
         review.get("candidate_structural_gate_passed") is not True
-        and int(review.get("candidate_correction_attempts", 0)) >= 2
+        and int(review.get("candidate_correction_attempts", 0)) >= correction_limit
     )
     raw_structural_ids = review.get("structural_operation_ids")
     unresolved_structural_ids = (
@@ -7245,6 +7254,7 @@ def _finalize_implementation_review(
     result["candidate_correction_attempts"] = int(
         review.get("candidate_correction_attempts", 0)
     )
+    result["candidate_correction_limit"] = correction_limit
     bound_decisions = [
         {
             "decision_id": specification.get("decision_id"),

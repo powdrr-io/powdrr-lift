@@ -1,0 +1,512 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 927
+title: Bound headless feature run duration and repairs
+intent:
+  problem: Headless feature runs can continue indefinitely, and focused candidate
+    repairs use a fixed retry count that callers cannot tune.
+  goal: Bound overall execution time, expose repair limits, and report configured
+    limits and timeout outcomes.
+human-decisions: []
+structured_files: []
+files:
+- path: README.md
+  type: modified
+  span:
+    start_line: 223
+    end_line: 227
+  summary: Document headless execution bounds and repair attempts.
+  rationale: Explain default and configurable limits to adopters.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 7
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 69
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 81
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 96
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 111
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 123
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 125
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 205
+    end_line: 207
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 215
+    end_line: 217
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 230
+    end_line: 248
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 252
+    end_line: 265
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 271
+    end_line: 271
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 289
+    end_line: 292
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 301
+    end_line: 307
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 322
+    end_line: 323
+  summary: Enforce the headless task deadline and report timeout outcomes.
+  rationale: Stop unattended tasks at a finite limit and retain actionable reports.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 30
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 283
+    end_line: 292
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 485
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4951
+    end_line: 4954
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4961
+    end_line: 4964
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5022
+    end_line: 5022
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5033
+    end_line: 5033
+  summary: Expose and forward headless timeout and repair-limit options.
+  rationale: Let callers tune bounded execution per run.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 221
+    end_line: 245
+  summary: Clean up the mini-SWE-agent child process on cancellation.
+  rationale: Keep subprocesses within the headless task lifecycle.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 262
+  summary: Clean up the mini-SWE-agent child process on cancellation.
+  rationale: Keep subprocesses within the headless task lifecycle.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 283
+  summary: Clean up the mini-SWE-agent child process on cancellation.
+  rationale: Keep subprocesses within the headless task lifecycle.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 270
+  summary: Clean up the mini-SWE-agent child process on cancellation.
+  rationale: Keep subprocesses within the headless task lifecycle.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 286
+    end_line: 289
+  summary: Clean up the mini-SWE-agent child process on cancellation.
+  rationale: Keep subprocesses within the headless task lifecycle.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 280
+    end_line: 280
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 287
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 291
+    end_line: 292
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 294
+    end_line: 294
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 296
+    end_line: 296
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 298
+    end_line: 299
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 308
+    end_line: 310
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 316
+    end_line: 317
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 320
+    end_line: 327
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 351
+    end_line: 361
+  summary: Terminate validation process groups on timeout or cancellation.
+  rationale: Prevent validation children from outliving the bounded task.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 163
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 441
+    end_line: 442
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3710
+    end_line: 3710
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6667
+    end_line: 6668
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6690
+    end_line: 6690
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6942
+    end_line: 6942
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6977
+    end_line: 6977
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7016
+    end_line: 7017
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7120
+    end_line: 7122
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7125
+    end_line: 7125
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7257
+    end_line: 7257
+  summary: Apply a configurable cap to candidate repair attempts.
+  rationale: Keep correction and review behavior aligned with the caller-selected
+    limit.
+- path: tests/test_agent_feature.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Verify the CLI forwards the selected run limits.
+  rationale: Protect user-configured limit handling.
+- path: tests/test_agent_feature.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 172
+  summary: Verify the CLI forwards the selected run limits.
+  rationale: Protect user-configured limit handling.
+- path: tests/test_agent_feature.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 229
+  summary: Verify the CLI forwards the selected run limits.
+  rationale: Protect user-configured limit handling.
+- path: tests/test_agent_feature.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 241
+  summary: Verify the CLI forwards the selected run limits.
+  rationale: Protect user-configured limit handling.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 795
+    end_line: 814
+  summary: Verify timed-out validation commands are stopped and reported.
+  rationale: Protect bounded validation execution.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2420
+    end_line: 2421
+  summary: Verify candidate correction obeys configured repair limits.
+  rationale: Protect the repair budget, including a one-attempt limit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2423
+    end_line: 2423
+  summary: Verify candidate correction obeys configured repair limits.
+  rationale: Protect the repair budget, including a one-attempt limit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2428
+    end_line: 2428
+  summary: Verify candidate correction obeys configured repair limits.
+  rationale: Protect the repair budget, including a one-attempt limit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2473
+    end_line: 2473
+  summary: Verify candidate correction obeys configured repair limits.
+  rationale: Protect the repair budget, including a one-attempt limit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2477
+    end_line: 2477
+  summary: Verify candidate correction obeys configured repair limits.
+  rationale: Protect the repair budget, including a one-attempt limit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2493
+    end_line: 2493
+  summary: Verify candidate correction obeys configured repair limits.
+  rationale: Protect the repair budget, including a one-attempt limit.
+entities:
+- id: headless-feature-timeout
+  type: Class
+  action: added
+- id: headless-run-limits
+  type: Configuration key
+  action: added
+- id: validation-timeout-regression-test
+  type: Regression test
+  action: added
+- id: candidate-repair-limit-regression-test
+  type: Regression test
+  action: added
+entity_relationships:
+- id: timeout-is-enforced-by-headless-lifecycle
+  type: constrains
+  source: headless-feature-timeout
+  target: headless-run-limits
+  action: added
+  description: The headless feature lifecycle applies the configured timeout and records
+    its outcome.
+- id: validation-test-verifies-process-timeout
+  type: verifies
+  source: validation-timeout-regression-test
+  target: headless-feature-timeout
+  action: added
+  description: The validation regression test confirms an over-budget command is stopped
+    and reported.
+- id: repair-test-verifies-configured-limit
+  type: verifies
+  source: candidate-repair-limit-regression-test
+  target: headless-run-limits
+  action: added
+  description: The candidate correction regression test confirms the configured repair
+    cap is obeyed.
+invariants:
+- id: headless-feature-run-has-overall-time-limit
+  description: Headless feature execution has a configurable finite overall wall-clock
+    deadline and reports when it expires.
+  action: added
+- id: candidate-repair-attempts-are-bounded
+  description: Candidate correction attempts respect the configured limit, which defaults
+    to two and accepts values from one through five.
+  action: added
+guidance:
+- id: configure-headless-run-limits
+  description: Use --timeout-seconds and --max-repair-attempts to set the headless
+    feature deadline and candidate correction budget.
+  action: added

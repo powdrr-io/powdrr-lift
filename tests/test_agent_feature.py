@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import subprocess
+import time
 from collections.abc import Sequence
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -134,6 +135,41 @@ def test_agent_feature_opens_pr_only_when_requested(
     assert _git(root, "status", "--porcelain") == ""
 
 
+def test_agent_feature_timeout_writes_a_timed_out_report(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    root = _repository(tmp_path / "repo")
+
+    def slow_feature(*args: Any, **kwargs: Any) -> FeatureEndpointResult:
+        del args, kwargs
+        time.sleep(1)
+        raise AssertionError("feature workflow should be interrupted by its deadline")
+
+    monkeypatch.setattr("powdrr_lift.agent_feature.run_feature_endpoint", slow_feature)
+
+    result = run_agent_feature_task(
+        _config(root),
+        run_id="timed-feature",
+        output_root=tmp_path / "reports",
+        timeout_seconds=0.05,
+    )
+
+    report = json.loads(result.report_json_path.read_text(encoding="utf-8"))
+    metadata = json.loads(
+        (tmp_path / "reports" / "run-metadata.json").read_text(encoding="utf-8")
+    )
+    failure = json.loads(
+        (tmp_path / "reports" / "failure.json").read_text(encoding="utf-8")
+    )
+    assert result.status == "timed_out"
+    assert report["status"] == "timed_out"
+    assert metadata["limits"] == {
+        "timeout_seconds": 0.05,
+        "max_repair_attempts": 2,
+    }
+    assert failure["stage"] == "timeout"
+
+
 def test_implement_cli_forces_headless_normative_defaults(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
@@ -187,6 +223,10 @@ def test_implement_cli_forces_headless_normative_defaults(
                 "--work-item-name",
                 "greeting",
                 "--headless",
+                "--timeout-seconds",
+                "37",
+                "--max-repair-attempts",
+                "4",
                 "--json",
             ]
         )
@@ -197,3 +237,5 @@ def test_implement_cli_forces_headless_normative_defaults(
     assert observed["config"].open_pr is False
     assert observed["config"].push_changes is False
     assert observed["config"].allowed_paths == (".",)
+    assert observed["config"].max_repair_attempts == 4
+    assert observed["kwargs"]["timeout_seconds"] == 37

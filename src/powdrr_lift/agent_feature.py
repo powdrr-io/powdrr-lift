@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import math
+import signal
 import subprocess
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
+from threading import current_thread, main_thread
 from typing import Any
 
 from powdrr_lift.agent_bootstrap import _run_output_root
@@ -25,6 +28,45 @@ from powdrr_lift.workrr.feature_endpoint import (
 )
 from powdrr_lift.workrr.run_artifacts import write_json_artifact
 
+DEFAULT_FEATURE_TIMEOUT_SECONDS = 14_400
+
+
+class HeadlessFeatureTimeout(TimeoutError):
+    """The overall wall-clock budget for a headless feature run expired."""
+
+
+def _start_overall_timeout(timeout_seconds: float) -> Any:
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be a finite positive number")
+    if current_thread() is not main_thread():
+        raise ValueError("overall timeout must be installed from the main thread")
+    if not hasattr(signal, "setitimer"):
+        raise ValueError("overall timeouts require POSIX interval timer support")
+    previous_timer = signal.getitimer(signal.ITIMER_REAL)
+    if previous_timer != (0.0, 0.0):
+        raise ValueError(
+            "cannot start a headless run while another real-time timer is active"
+        )
+    previous_handler = signal.getsignal(signal.SIGALRM)
+
+    def timeout_handler(_signum: int, _frame: Any) -> None:
+        raise HeadlessFeatureTimeout(
+            f"Overall feature timeout of {timeout_seconds:g} seconds exceeded."
+        )
+
+    signal.signal(signal.SIGALRM, timeout_handler)
+    try:
+        signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    except BaseException:
+        signal.signal(signal.SIGALRM, previous_handler)
+        raise
+    return previous_handler
+
+
+def _stop_overall_timeout(previous_handler: Any) -> None:
+    signal.setitimer(signal.ITIMER_REAL, 0)
+    signal.signal(signal.SIGALRM, previous_handler)
+
 
 @dataclass(frozen=True, slots=True)
 class AgentFeatureTaskResult:
@@ -35,6 +77,8 @@ class AgentFeatureTaskResult:
     report_markdown_path: Path
     pull_request_url: str | None = None
     error: str | None = None
+    timeout_seconds: float = DEFAULT_FEATURE_TIMEOUT_SECONDS
+    max_repair_attempts: int = 2
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -46,6 +90,10 @@ class AgentFeatureTaskResult:
             "report_json_path": str(self.report_json_path),
             "report_markdown_path": str(self.report_markdown_path),
             "error": self.error,
+            "limits": {
+                "timeout_seconds": self.timeout_seconds,
+                "max_repair_attempts": self.max_repair_attempts,
+            },
             "feature": self.feature.to_data() if self.feature else None,
         }
 
@@ -60,6 +108,7 @@ def run_agent_feature_task(
     run_id: str | None = None,
     output_root: Path | None = None,
     preflight: dict[str, Any] | None = None,
+    timeout_seconds: float = DEFAULT_FEATURE_TIMEOUT_SECONDS,
     runner: Any = subprocess.run,
 ) -> AgentFeatureTaskResult:
     """Prepare an isolated task tree, run feature gates, and publish on request."""
@@ -71,7 +120,9 @@ def run_agent_feature_task(
     result: FeatureEndpointResult | None = None
     pull_request_url: str | None = None
     status = "failed"
+    previous_timeout_handler: Any = None
     try:
+        previous_timeout_handler = _start_overall_timeout(timeout_seconds)
         task = prepare_agent_worktree(
             repo_root,
             config.work_item_name,
@@ -151,6 +202,9 @@ def run_agent_feature_task(
     except KeyboardInterrupt:
         status = "interrupted"
         failure = "Headless feature execution was interrupted."
+    except HeadlessFeatureTimeout as error:
+        status = "timed_out"
+        failure = str(error)
     except Exception as error:
         status = (
             "failed_publication"
@@ -158,6 +212,9 @@ def run_agent_feature_task(
             else "failed"
         )
         failure = f"{type(error).__name__}: {error}"
+    finally:
+        if previous_timeout_handler is not None:
+            _stop_overall_timeout(previous_timeout_handler)
 
     if result is None:
         selected_output.mkdir(parents=True, exist_ok=True)
@@ -170,21 +227,48 @@ def run_agent_feature_task(
             "starting_commit": task.starting_commit if task else None,
             "allowed_paths": list(config.allowed_paths),
             "uncertainty_decisions": [],
-            "publication": {"status": "failed" if open_pr else "not_requested"},
-            "operational_failures": [{"stage": "initialization", "message": failure}],
+            "publication": {
+                "status": (
+                    "not_reached"
+                    if open_pr and status in {"timed_out", "interrupted"}
+                    else "failed"
+                    if open_pr
+                    else "not_requested"
+                )
+            },
+            "limits": {
+                "timeout_seconds": timeout_seconds,
+                "max_repair_attempts": config.max_repair_attempts,
+            },
+            "operational_failures": [
+                {
+                    "stage": "timeout" if status == "timed_out" else "initialization",
+                    "message": failure,
+                }
+            ],
         }
         write_json_artifact(selected_output, "run-result.json", result_data)
     else:
+        publication = (
+            {
+                "status": "timed_out",
+                "branch_push": "unknown" if open_pr else "not_requested",
+                "pull_request": "unknown" if open_pr else "not_requested",
+                "pull_request_url": None,
+            }
+            if status == "timed_out"
+            else {
+                **(result.publication or {}),
+                "status": status,
+                "pull_request_url": pull_request_url,
+            }
+        )
         result = _write_run_result(
             selected_output,
             replace(
                 result,
                 status=status,
-                publication={
-                    **(result.publication or {}),
-                    "status": status,
-                    "pull_request_url": pull_request_url,
-                },
+                publication=publication,
             ),
         )
         result_data = result.to_data()
@@ -202,6 +286,10 @@ def run_agent_feature_task(
             "worktree": str(task.worktree) if task else None,
             "publication_requested": open_pr,
             "preflight": preflight or {"passed": True, "checks": []},
+            "limits": {
+                "timeout_seconds": timeout_seconds,
+                "max_repair_attempts": config.max_repair_attempts,
+            },
         }
     )
     write_json_artifact(selected_output, "run-metadata.json", metadata)
@@ -210,9 +298,13 @@ def run_agent_feature_task(
             selected_output,
             "failure.json",
             {
-                "stage": "publication"
-                if status == "failed_publication"
-                else "execution",
+                "stage": (
+                    "timeout"
+                    if status == "timed_out"
+                    else "publication"
+                    if status == "failed_publication"
+                    else "execution"
+                ),
                 "message": failure,
             },
         )
@@ -227,6 +319,8 @@ def run_agent_feature_task(
         report_markdown,
         pull_request_url,
         failure,
+        timeout_seconds,
+        config.max_repair_attempts,
     )
 
 

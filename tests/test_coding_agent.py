@@ -792,6 +792,26 @@ def test_validation_runner_blocks_after_worker_failure(tmp_path: Path) -> None:
     assert report.results[0].status is ValidationResultStatus.BLOCKED
 
 
+def test_validation_runner_stops_command_at_timeout(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request = _request(_head(worktree))
+    attempt = run_coding_agent(
+        FakeProvider("allowed"), request, worktree_root=worktree, attempt_id="attempt-6"
+    )
+    report = ValidationRunner(
+        {
+            "python": ValidationProfile(
+                "python", ("python3", "-c", "import time; time.sleep(5)")
+            )
+        },
+        timeout_seconds=0.05,
+    ).run(request, attempt, worktree_root=worktree)
+
+    assert report.status is ValidationReportStatus.FAILED
+    assert report.results[0].status is ValidationResultStatus.TIMED_OUT
+    assert report.results[0].returncode == 124
+
+
 def test_parse_validation_profile_uses_argv_not_shell() -> None:
     profile = parse_validation_profile("unit-tests=python -m pytest tests -q")
 

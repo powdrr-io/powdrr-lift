@@ -81,6 +81,9 @@ not a working classifier or a substitute for requirement relationships.
 
 Related design documents:
 
+- [Checkable acceptance criteria implementation handoff](checkable-acceptance-criteria-implementation-handoff.md)
+  specifies the next implementation sequence for observable criteria, honest
+  fallback quality, grouped contracts, and bounded assertion repair.
 - [`source-anchored-semantic-contract-compilation.md`](../design/source-anchored-semantic-contract-compilation.md)
 - [`local-semantic-classifier-implementation-plan.md`](local-semantic-classifier-implementation-plan.md)
 - [`prompt-formatting-structure-handoff.md`](../evaluations/prompt-formatting-structure-handoff.md)

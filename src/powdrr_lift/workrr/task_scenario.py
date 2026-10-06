@@ -30,8 +30,12 @@ class WorkflowTaskScenarioError(ValueError):
 class LiveWorkflowTaskExchangeRecorder:
     """Capture complete exchanges while delegating to a real LLM client."""
 
-    def __init__(self, client: Any) -> None:
+    def __init__(
+        self, client: Any, *, provider: str | None = None, model: str | None = None
+    ) -> None:
         self._client = client
+        self.provider = provider or getattr(client, "_provider", None)
+        self.model = model or getattr(client, "_model", None)
         self.exchanges: list[dict[str, Any]] = []
 
     @property
@@ -42,6 +46,8 @@ class LiveWorkflowTaskExchangeRecorder:
         record: dict[str, Any] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "input": [dict(message) for message in messages],
+            "provider": self.provider,
+            "model": self.model,
         }
         try:
             response = self._client.complete_json(messages)
@@ -213,23 +219,25 @@ def run_workflow_task_scenario(
                 (item for item in source_tasks if item.task_id == target_task_id),
                 source_tasks[-1],
             )
+            live_client = _build_workflow_client(
+                WorkflowTaskAgentConfig(
+                    workflow_dir=workflow_dir,
+                    repo_root=repo_root,
+                    provider=live_provider,
+                    api_key=api_key,
+                    base_url=base_url,
+                    max_roundtrips=max_roundtrips,
+                    max_stalled_roundtrips=max_stalled_roundtrips,
+                    verbose=verbose,
+                    allow_unmanaged_git=True,
+                    run_deterministic_invoke_tool_pre_steps=live_provider is not None,
+                ),
+                source_task_for_client,
+            )
             recorder = LiveWorkflowTaskExchangeRecorder(
-                _build_workflow_client(
-                    WorkflowTaskAgentConfig(
-                        workflow_dir=workflow_dir,
-                        repo_root=repo_root,
-                        provider=live_provider,
-                        api_key=api_key,
-                        base_url=base_url,
-                        max_roundtrips=max_roundtrips,
-                        max_stalled_roundtrips=max_stalled_roundtrips,
-                        verbose=verbose,
-                        allow_unmanaged_git=True,
-                        run_deterministic_invoke_tool_pre_steps=live_provider
-                        is not None,
-                    ),
-                    source_task_for_client,
-                )
+                live_client,
+                provider=live_provider,
+                model=getattr(live_client, "_model", None),
             )
             client = recorder
         stdout = io.StringIO()
@@ -281,6 +289,11 @@ def run_workflow_task_scenario(
             "roundtrips": len(client.messages),
             "exchanges": (
                 recorder.exchanges if recorder is not None else client.messages
+            ),
+            "usage_summary": summarize_run_usage(
+                recorder.exchanges if recorder is not None else [],
+                provider=recorder.provider if recorder is not None else live_provider,
+                model=recorder.model if recorder is not None else None,
             ),
             "all_tasks_completed": all(
                 item.status.value == "completed" for item in final_tasks
@@ -383,4 +396,69 @@ def _analyze_live_run(
         "action_kinds": action_kinds,
         "roundtrip_limit_reached": "reached the configured roundtrip limit" in stderr,
         "human_handoff": "Workflow blocked on human task" in stdout,
+    }
+
+
+def summarize_run_usage(
+    exchanges: Sequence[Mapping[str, Any]],
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Summarize provider usage, retaining unknown cost as null."""
+    totals: dict[str, dict[str, Any]] = {}
+    for exchange in exchanges:
+        exchange_model = str(exchange.get("model") or model or "unknown")
+        exchange_provider = str(exchange.get("provider") or provider or "unknown")
+        key = f"{exchange_provider}/{exchange_model}"
+        entry = totals.setdefault(
+            key,
+            {
+                "provider": exchange_provider,
+                "model": exchange_model,
+                "calls": 0,
+                "tokens_sent": 0,
+                "tokens_received": 0,
+                "cost_usd": 0.0,
+                "cost_known": True,
+            },
+        )
+        entry["calls"] += 1
+        usage = exchange.get("usage")
+        if not isinstance(usage, Mapping):
+            entry["cost_known"] = False
+            continue
+        sent = usage.get("prompt_tokens", usage.get("input_tokens"))
+        received = usage.get("completion_tokens", usage.get("output_tokens"))
+        if isinstance(sent, int):
+            entry["tokens_sent"] += sent
+        if isinstance(received, int):
+            entry["tokens_received"] += received
+        cost = next(
+            (
+                usage[name]
+                for name in ("cost", "total_cost", "cost_usd")
+                if isinstance(usage.get(name), (int, float))
+            ),
+            None,
+        )
+        if isinstance(cost, (int, float)):
+            entry["cost_usd"] += float(cost)
+        else:
+            entry["cost_known"] = False
+    models = []
+    for entry in totals.values():
+        entry["cost_usd"] = (
+            round(entry["cost_usd"], 10) if entry.pop("cost_known") else None
+        )
+        models.append(entry)
+    known = bool(models) and all(item["cost_usd"] is not None for item in models)
+    return {
+        "calls": sum(item["calls"] for item in models),
+        "tokens_sent": sum(item["tokens_sent"] for item in models),
+        "tokens_received": sum(item["tokens_received"] for item in models),
+        "cost_usd": (
+            round(sum(item["cost_usd"] for item in models), 10) if known else None
+        ),
+        "models": models,
     }

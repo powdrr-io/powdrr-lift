@@ -316,6 +316,43 @@ class DeterministicPlanningClient:
             if not isinstance(proposition, str) or not proposition:
                 raise AssertionError("source extraction has no proposition")
             return {"quote": proposition, "occurrence": None}
+        if required == {
+            "subject",
+            "operation",
+            "affected_value",
+            "rule",
+            "contrast",
+            "behavior_form",
+            "result_presence",
+            "event_scope",
+            "contrast_presence",
+            "unresolved_fields",
+            "field_evidence",
+        }:
+            source = _find_json_value(text, "source_text")
+            if not isinstance(source, str) or not source:
+                raise AssertionError("source interpretation has no proposition")
+            sequence = any(
+                marker in source.casefold()
+                for marker in ("across payloads", "successive", "each event")
+            )
+            return {
+                "subject": source,
+                "operation": source,
+                "affected_value": None,
+                "rule": source,
+                "contrast": None,
+                "behavior_form": "state_transition" if sequence else "invariant",
+                "result_presence": "unspecified",
+                "event_scope": "event_sequence" if sequence else "unspecified",
+                "contrast_presence": "absent",
+                "unresolved_fields": ["affected_value|source_underspecified"],
+                "field_evidence": [
+                    f"subject|{source}",
+                    f"operation|{source}",
+                    f"rule|{source}",
+                ],
+            }
         if required == {"action"}:
             if "required_test_cases" in text:
                 return {

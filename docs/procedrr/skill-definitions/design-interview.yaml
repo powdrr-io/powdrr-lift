@@ -556,6 +556,59 @@ steps:
             validation: {kind: json_schema}
         - operation:
             tool: internal
+            command: [prepare_source_interpretation]
+            parameters:
+              clause: {type: reference, value: instruction_clause}
+              decisions: {type: reference, value: bound_semantic_decisions.decisions}
+              extractions: {type: reference, value: bound_source_extractions.extractions}
+              behavior_family_request: {type: reference, value: behavior_family_request}
+              behavior_family_result: {type: reference, value: behavior_family_result}
+            returns:
+              type: object
+              required: [request, behavior_family_decision]
+              properties:
+                request: {type: object}
+                behavior_family_decision: {type: object}
+            bind: source_interpretation_plan
+        - judge:
+            kind: construct_one
+            provider: planning
+            question: What source-supported operation and behavior rule does this instruction express?
+            subject: source_interpretation_plan.request.subject_text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Follow the request's instructions and use only the source proposition, exact extracted spans, and already resolved source decisions.
+              - Return semantic interpretations, not copied quotations; attach exact supporting quotations in field_evidence.
+              - Use null for unstated fields and include field|reason_code in unresolved_fields whenever a meaning field is unresolved; contrast may be null without an unresolved reason only when contrast_presence is absent.
+              - Do not add repository identities, implementation details, defaults, error policies, null behavior, or guarantees absent from the source.
+              - A known operation with an unknown behavior-family label remains interpretable; the compiler records the registry gap separately.
+              - Preserve stronger explicit copy, identity, mutation, persistence, and error requirements. Do not weaken them to generic behavior.
+            context: [source_interpretation_plan.request, instruction_clause]
+            output:
+              name: source_interpretation_result
+              schema:
+                type: object
+                required: [subject, operation, affected_value, rule, contrast, behavior_form, result_presence, event_scope, contrast_presence, unresolved_fields, field_evidence]
+                additionalProperties: false
+                properties:
+                  subject: {type: [string, 'null'], maxLength: 240}
+                  operation: {type: [string, 'null'], maxLength: 300}
+                  affected_value: {type: [string, 'null'], maxLength: 200}
+                  rule: {type: [string, 'null'], maxLength: 500}
+                  contrast: {type: [string, 'null'], maxLength: 400}
+                  behavior_form: {type: string, enum: [interface, transformation, state_transition, invariant, rejection, compatibility, guidance, unclear]}
+                  result_presence: {type: string, enum: [explicit, entailed, unspecified]}
+                  event_scope: {type: string, enum: [single_event, event_sequence, continuous, unspecified]}
+                  contrast_presence: {type: string, enum: [explicit, absent]}
+                  unresolved_fields:
+                    type: array
+                    items: {type: string, minLength: 1, maxLength: 120}
+                  field_evidence:
+                    type: array
+                    items: {type: string, minLength: 1, maxLength: 320}
+            validation: {kind: json_schema}
+        - operation:
+            tool: internal
             command: [compile_partial_semantic_contract]
             parameters:
               clause: {type: reference, value: instruction_clause}
@@ -563,6 +616,9 @@ steps:
               extractions: {type: reference, value: bound_source_extractions.extractions}
               behavior_family_request: {type: reference, value: behavior_family_request}
               behavior_family_result: {type: reference, value: behavior_family_result}
+              behavior_family_decision: {type: reference, value: source_interpretation_plan.behavior_family_decision}
+              source_interpretation_request: {type: reference, value: source_interpretation_plan.request}
+              source_interpretation_result: {type: reference, value: source_interpretation_result}
             returns:
               type: object
               required: [kind, description, acceptance_criterion, expected_test, population, operation, oracle, evidence_case, partial_contract_path, partial_contract_fingerprint, partial_contract]

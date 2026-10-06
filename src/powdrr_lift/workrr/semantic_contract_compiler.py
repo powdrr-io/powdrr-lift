@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -34,6 +35,10 @@ from powdrr_lift.core.semantic_faithfulness import (
 )
 from powdrr_lift.core.semantic_faithfulness import (
     prepare_field_entailment_reviews as prepare_field_reviews,
+)
+from powdrr_lift.core.source_interpretation import (
+    SourceInterpretation,
+    SourceInterpretationError,
 )
 from powdrr_lift.workrr.semantic_classifier import (
     has_explicit_prohibition_directive,
@@ -1637,12 +1642,153 @@ def bind_behavior_family_decision(
     )
 
 
+def prepare_source_interpretation(
+    clause: Mapping[str, Any],
+    decisions: Sequence[SemanticDecision | Mapping[str, Any]],
+    extractions: Sequence[BoundSourceExtraction],
+    behavior_family: SemanticDecision | Mapping[str, Any],
+) -> dict[str, Any]:
+    """Prepare one bounded interpretation request from source-only evidence."""
+    clause_id, text, source_fingerprint = _clause_fields(clause)
+    bound_decisions = [
+        item if isinstance(item, SemanticDecision) else SemanticDecision.from_data(item)
+        for item in decisions
+    ]
+    family = (
+        behavior_family
+        if isinstance(behavior_family, SemanticDecision)
+        else SemanticDecision.from_data(behavior_family)
+    )
+    extractions_by_kind: dict[str, list[str]] = {}
+    for item in extractions:
+        extractions_by_kind.setdefault(item.extraction_kind, []).append(item.span.text)
+    values = {
+        item.decision_kind: item.result.value for item in (*bound_decisions, family)
+    }
+    return {
+        "source_ref": clause_id,
+        "source_fingerprint": source_fingerprint,
+        "source_text": text,
+        "subject_text": (
+            "Interpret this source behavior using only the supplied source and "
+            "already resolved source decisions.\n"
+            f"Source proposition: {text}\n"
+            f"Exact subject span: {extractions_by_kind.get('subject', [])}\n"
+            f"Exact behavior span: {extractions_by_kind.get('behavior', [])}\n"
+            f"Exact result span: {extractions_by_kind.get('explicit_result', [])}\n"
+            f"Exact precondition spans: {extractions_by_kind.get('precondition', [])}\n"
+            f"Exact exception spans: {extractions_by_kind.get('exception', [])}\n"
+            f"Resolved source decisions: {json.dumps(values, sort_keys=True)}\n"
+            f"Behavior family label: {family.result.value}"
+        ),
+        "instructions": [
+            "Describe source meaning, not repository implementation or a likely API.",
+            (
+                "Use null when the source does not state a field, and add "
+                "field|reason_code to unresolved_fields for every null or "
+                "unclear field."
+            ),
+            (
+                "Do not infer null handling, defaults, identity, ownership, error "
+                "behavior, or persistence unless source decisions state it."
+            ),
+            (
+                "Use event_sequence only for behavior across multiple events or "
+                "payloads; otherwise choose the supported scope or unspecified."
+            ),
+            (
+                "Set contrast_presence to explicit only when the source states a "
+                "competing behavior; do not invent one."
+            ),
+            (
+                "For each non-null field, return field|exact source words as "
+                "field_evidence. Evidence absent from the source is rejected."
+            ),
+            (
+                "Keep source meaning separate from repository binding and family "
+                "registry coverage. An unknown family does not make a clear "
+                "operation or rule unclear."
+            ),
+        ],
+    }
+
+
+def bind_source_interpretation(
+    request: Mapping[str, Any],
+    provider_result: Mapping[str, Any],
+    decisions: Sequence[SemanticDecision | Mapping[str, Any]],
+    extractions: Sequence[BoundSourceExtraction],
+    behavior_family: SemanticDecision | Mapping[str, Any],
+    *,
+    benchmark_mode: bool = False,
+) -> SourceInterpretation:
+    source_ref = request.get("source_ref")
+    source_text = request.get("source_text")
+    if not isinstance(source_ref, str) or not isinstance(source_text, str):
+        raise SourceInterpretationError("source interpretation request is malformed")
+    bound_decisions = [
+        item if isinstance(item, SemanticDecision) else SemanticDecision.from_data(item)
+        for item in decisions
+    ]
+    family = (
+        behavior_family
+        if isinstance(behavior_family, SemanticDecision)
+        else SemanticDecision.from_data(behavior_family)
+    )
+    decision_fingerprints = {
+        item.decision_kind: item.input_fingerprint
+        for item in (*bound_decisions, family)
+    }
+    conditions = tuple(
+        item.span.text for item in extractions if item.extraction_kind == "precondition"
+    )
+    exceptions = tuple(
+        item.span.text for item in extractions if item.extraction_kind == "exception"
+    )
+    try:
+        return SourceInterpretation.bind(
+            provider_result,
+            source_ref=source_ref,
+            source_text=source_text,
+            conditions=conditions,
+            exceptions=exceptions,
+            decision_fingerprints=decision_fingerprints,
+        )
+    except SourceInterpretationError:
+        if not benchmark_mode:
+            raise
+        return SourceInterpretation(
+            source_refs=(source_ref,),
+            subject=None,
+            operation=None,
+            affected_value=None,
+            rule=None,
+            contrast=None,
+            behavior_form="unclear",
+            result_presence="unspecified",
+            event_scope="unspecified",
+            contrast_presence="absent",
+            conditions=conditions,
+            exceptions=exceptions,
+            unresolved_fields=(
+                ("subject", "invalid_response"),
+                ("operation", "invalid_response"),
+                ("affected_value", "invalid_response"),
+                ("rule", "invalid_response"),
+                ("behavior_form", "invalid_response"),
+            ),
+            field_evidence=(),
+            decision_fingerprints=tuple(sorted(decision_fingerprints.items())),
+        )
+
+
 def compile_source_contract(
     *,
     clause: Mapping[str, Any],
     decisions: Sequence[SemanticDecision],
     extractions: Sequence[BoundSourceExtraction],
     behavior_family: SemanticDecision,
+    source_interpretation: SourceInterpretation | None = None,
 ) -> PartialSemanticContract:
     clause_id, text, source_fingerprint = _clause_fields(clause)
     all_decisions = (*decisions, behavior_family)
@@ -1653,6 +1799,7 @@ def compile_source_contract(
         proposition_text=text,
         decisions=all_decisions,
         extractions=extractions,
+        source_interpretation=source_interpretation,
     )
 
 
@@ -1660,6 +1807,43 @@ def project_partial_contract_to_legacy_design(
     contract: PartialSemanticContract,
 ) -> dict[str, str]:
     """Render a deterministic, disposable view for legacy consumers."""
+    interpretation = contract.source_interpretation
+    if (
+        interpretation is not None
+        and interpretation.rule is not None
+        and interpretation.operation is not None
+    ):
+        criterion = f"Preserve the rule that {interpretation.rule}."
+        if interpretation.contrast is not None:
+            criterion += f" Do not substitute {interpretation.contrast}."
+        test_guidance = (
+            f"Exercise {interpretation.operation}"
+            + (
+                " across successive events"
+                if interpretation.event_scope == "event_sequence"
+                else ""
+            )
+            + f" and verify that {interpretation.rule}"
+            + (
+                f", rather than {interpretation.contrast}"
+                if interpretation.contrast is not None
+                else ""
+            )
+            + "."
+        )
+        return {
+            "kind": contract.disposition,
+            "description": (
+                f"{interpretation.subject or contract.subject.span.text}: "
+                f"{interpretation.operation}; {interpretation.rule}."
+            ),
+            "acceptance_criterion": criterion,
+            "expected_test": test_guidance,
+            "population": _render_population(contract),
+            "operation": interpretation.operation,
+            "oracle": criterion,
+            "evidence_case": _render_evidence_case(contract),
+        }
     result_text = _render_result(contract)
     return {
         "kind": contract.disposition,
@@ -1846,6 +2030,7 @@ __all__ = [
     "bind_behavior_family_decision",
     "bind_field_entailment_reviews",
     "bind_source_extractions",
+    "bind_source_interpretation",
     "bind_source_semantic_decisions",
     "compile_deterministic_source_extractions",
     "compile_source_contract",
@@ -1853,6 +2038,7 @@ __all__ = [
     "prepare_dependent_source_semantic_decisions",
     "prepare_field_entailment_reviews",
     "prepare_source_extractions",
+    "prepare_source_interpretation",
     "prepare_source_semantic_decisions",
     "project_partial_contract_to_legacy_design",
     "finalize_source_faithfulness",

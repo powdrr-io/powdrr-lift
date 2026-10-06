@@ -123,6 +123,7 @@ class WorkflowScenarioResult:
     audit_events: tuple[dict[str, Any], ...]
     roundtrips: int
     llm_exchanges: tuple[Any, ...] = ()
+    usage_summary: dict[str, Any] | None = None
     analysis: dict[str, Any] | None = None
     stdout: str = ""
     stderr: str = ""
@@ -139,6 +140,7 @@ class WorkflowScenarioResult:
             "audit_events": list(self.audit_events),
             "roundtrips": self.roundtrips,
             "llm_exchanges": list(self.llm_exchanges),
+            "usage_summary": self.usage_summary,
             "analysis": self.analysis,
             "stdout": self.stdout,
             "stderr": self.stderr,
@@ -352,6 +354,7 @@ def run_workflow_scenario(
             audit_events=(),
             roundtrips=int(result["roundtrips"]),
             llm_exchanges=tuple(result.get("exchanges", ())),
+            usage_summary=result.get("usage_summary"),
             analysis=result.get("analysis"),
             stdout=str(result.get("stdout", "")),
             stderr=str(result.get("stderr", "")),

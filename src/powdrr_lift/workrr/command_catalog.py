@@ -1088,6 +1088,7 @@ class FeatureCommandRuntime:
                 worktree,
                 runner,
                 bootstrap_path=output_root / "validation-bootstrap.yaml",
+                commit_changes=not bool(getattr(config, "agent_managed_git", False)),
             )
             return {"path": str(state["baseline_path"])}
         if name == "discover_validation_profiles":
@@ -3167,7 +3168,10 @@ class FeatureCommandRuntime:
                 inventory=tuple(state.get("provider_inventory", ())),
                 validation_profiles=tuple(state.get("validation_profiles", ())),
             )
-            feature_endpoint._commit(runner, worktree, "Record Structrr feature diff")
+            if not bool(getattr(config, "agent_managed_git", False)):
+                feature_endpoint._commit(
+                    runner, worktree, "Record Structrr feature diff"
+                )
             return {"path": str(state["plan_path"])}
         if name == "prepare_proposal_review":
             return feature_endpoint._prepare_proposal_review(
@@ -3394,6 +3398,12 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "PR input plan does not match the planned diff"
                 )
+            if bool(getattr(config, "agent_managed_git", False)):
+                state["publication"] = {
+                    "branch_push": "deferred_to_agent",
+                    "pull_request": "deferred_to_agent",
+                }
+                return None
             feature_config = replace(
                 config,
                 work_item_name=work_item_name,

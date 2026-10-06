@@ -176,14 +176,13 @@ Before bootstrapping or implementing a feature, check that Powdrr can reach its
 planning and coding model routes and find the selected coding-agent executable:
 
 ```bash
-powdrr-lift check-credentials --repo-root . --open-pr
+powdrr-lift check-credentials --repo-root .
 ```
 
 The check makes a small authenticated model request for each route. It reports
 the provider, model, credential source, and any access failure without printing
-credential values. `--open-pr` also checks GitHub authentication and the current
-repository's write permission. Use `--json` for machine-readable results.
-Provider and model options are available through `--planning-provider`,
+credential values. Use `--json` for machine-readable results. Provider and
+model options are available through `--planning-provider`,
 `--planning-model`, `--coding-provider`, and `--coding-model`; use the same
 values for the corresponding feature run.
 

@@ -10,6 +10,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_lift.core.acceptance_contract import (
+    AcceptanceContractError,
+    BehavioralContract,
+    validate_contracts,
+)
 from powdrr_lift.core.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
     SUPPORTED_ASSUMPTION_DIMENSIONS,
@@ -63,6 +68,10 @@ from powdrr_lift.structrr.obligation_evidence import (
     ObligationEvidenceContract,
     assert_obligation_evidence_complete,
     compile_obligation_evidence_contract,
+)
+from powdrr_lift.workrr.acceptance_contract_compiler import (
+    bind_behavioral_contracts,
+    prepare_behavioral_contracts,
 )
 from powdrr_lift.workrr.external_contract_research import (
     bind_external_contract_assessments,
@@ -678,6 +687,7 @@ def feature_command_catalog(
                 {
                     "work_item_name": {},
                     "design_decisions": {},
+                    "behavioral_contracts": {},
                     "scenario_consistency_review": {},
                     "uncertainty_policy": {
                         "type": "string",
@@ -687,12 +697,33 @@ def feature_command_catalog(
                 required=(
                     "work_item_name",
                     "design_decisions",
+                    "behavioral_contracts",
                     "scenario_consistency_review",
                 ),
                 additional_properties=False,
             ),
             output_schema={},
             logic=implementations.get("compile_canonical_feature_design"),
+        ),
+        "prepare_behavioral_contracts": CommandSpec(
+            name="prepare_behavioral_contracts",
+            input_schema=object_schema(
+                {"design_decisions": {}},
+                required=("design_decisions",),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("prepare_behavioral_contracts"),
+        ),
+        "bind_behavioral_contracts": CommandSpec(
+            name="bind_behavioral_contracts",
+            input_schema=object_schema(
+                {"plan": {}, "results": {}},
+                required=("plan", "results"),
+                additional_properties=False,
+            ),
+            output_schema={},
+            logic=implementations.get("bind_behavioral_contracts"),
         ),
         "assert_feature_design_ready_for_implementation": CommandSpec(
             name="assert_feature_design_ready_for_implementation",
@@ -2579,8 +2610,101 @@ class FeatureCommandRuntime:
             )
             return {"passed": True}
 
+        def prepare_behavioral_contracts_operation() -> Any:
+            decisions = feature_endpoint._collected_results(
+                parameters.get("design_decisions")
+            )
+            if decisions is None:
+                raise PowdrrExecutionError("semantic designs are missing or malformed")
+            try:
+                return prepare_behavioral_contracts(
+                    load_instruction_ledger().to_data(), decisions
+                )
+            except (AcceptanceContractError, SemanticContractError) as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+
+        def bind_behavioral_contracts_operation() -> Any:
+            plan = parameters.get("plan")
+            results = feature_endpoint._collected_results(parameters.get("results"))
+            if not isinstance(plan, Mapping) or results is None:
+                raise PowdrrExecutionError("behavioral contract binding is malformed")
+            try:
+                collection = bind_behavioral_contracts(plan, results)
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
+            path = output_root / "behavioral-contracts.json"
+            path.write_text(
+                json.dumps(collection, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            return {
+                **collection,
+                "path": str(path),
+                "fingerprint": content_fingerprint(collection),
+            }
+
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
+            contract_collection = parameters.get("behavioral_contracts")
+            if not isinstance(contract_collection, Mapping):
+                raise PowdrrExecutionError("behavioral contracts are missing")
+            raw_contracts = contract_collection.get("contracts")
+            if contract_collection.get(
+                "ledger_fingerprint"
+            ) != ledger.fingerprint or not isinstance(raw_contracts, list):
+                raise PowdrrExecutionError(
+                    "behavioral contracts are stale or malformed"
+                )
+            try:
+                behavioral_contracts = tuple(
+                    BehavioralContract.from_data(item)
+                    for item in raw_contracts
+                    if isinstance(item, Mapping)
+                )
+                if len(behavioral_contracts) != len(raw_contracts):
+                    raise AcceptanceContractError(
+                        "behavioral contract entry is malformed"
+                    )
+                decisions_for_contracts = feature_endpoint._collected_results(
+                    parameters.get("design_decisions")
+                )
+                if decisions_for_contracts is None:
+                    raise AcceptanceContractError("semantic designs are malformed")
+                requirement_ids: list[str] = []
+                context_ids: list[str] = []
+                for clause, decision in zip(
+                    ledger.clauses, decisions_for_contracts, strict=True
+                ):
+                    raw_contract = (
+                        decision.get("partial_contract")
+                        if isinstance(decision, Mapping)
+                        else None
+                    )
+                    if not isinstance(raw_contract, Mapping):
+                        raise AcceptanceContractError(
+                            f"source contract missing for {clause.clause_id}"
+                        )
+                    partial = PartialSemanticContract.from_data(raw_contract)
+                    if partial.routing in {
+                        "include",
+                        "include_prohibition",
+                    } and partial.disposition not in {
+                        "context",
+                        "nonactionable",
+                    }:
+                        requirement_ids.append(clause.clause_id)
+                    elif partial.disposition == "context":
+                        context_ids.append(clause.clause_id)
+                validate_contracts(
+                    behavioral_contracts,
+                    requirement_ids=requirement_ids,
+                    context_ids=context_ids,
+                    source_text_by_id={
+                        item.clause_id: item.text for item in ledger.clauses
+                    },
+                )
+            except AcceptanceContractError as exc:
+                raise PowdrrExecutionError(str(exc)) from exc
             raw_design_decisions = feature_endpoint._collected_results(
                 parameters.get("design_decisions")
             )
@@ -2589,6 +2713,9 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "canonical design decisions are missing or malformed"
                 )
+            raw_design_decisions = _attach_behavioral_contract_context(
+                ledger, raw_design_decisions, behavioral_contracts
+            )
             consistency_review = parameters.get("scenario_consistency_review")
             if not isinstance(consistency_review, Mapping):
                 raise PowdrrExecutionError(
@@ -2638,8 +2765,7 @@ class FeatureCommandRuntime:
                     for clause, decision in zip(
                         ledger.clauses, raw_design_decisions, strict=True
                     )
-                    if clause.clause_id not in decisions_by_clause_id
-                    and isinstance(decision, Mapping)
+                    if isinstance(decision, Mapping)
                 }
             )
             coverage_path = output_root / "instruction-coverage-audit.json"
@@ -2994,7 +3120,7 @@ class FeatureCommandRuntime:
 
             for item in design.obligations:
                 decision = decisions_by_clause_id.get(item.clause_id)
-                partial = (
+                raw_partial_contract = (
                     decision.get("partial_contract")
                     if isinstance(decision, Mapping)
                     else None
@@ -3010,10 +3136,10 @@ class FeatureCommandRuntime:
                     clause_id=item.clause_id,
                     design_kind=item.projection.kind,
                     partial_contract_path=partial_contract_path,
-                    partial_contract=partial,
+                    partial_contract=raw_partial_contract,
                 )
                 evidence_provenance_by_clause[item.clause_id] = provenance
-                if not isinstance(partial, Mapping):
+                if not isinstance(raw_partial_contract, Mapping):
                     provenance["status"] = "failed"
                     provenance["error"] = "source semantic contract is missing"
                     write_evidence_provenance()
@@ -3026,10 +3152,10 @@ class FeatureCommandRuntime:
                         obligation_id=item.obligation_id,
                         clause_id=item.clause_id,
                         requirement_strength=str(
-                            partial.get("requirement_strength", "")
+                            raw_partial_contract.get("requirement_strength", "")
                         ),
                         kind=item.projection.kind,
-                        polarity=str(partial.get("polarity", "")),
+                        polarity=str(raw_partial_contract.get("polarity", "")),
                     )
                 except ValueError as exc:
                     provenance["status"] = "failed"
@@ -3114,6 +3240,9 @@ class FeatureCommandRuntime:
                     }
                 )
             canonical_document = design.to_data()
+            canonical_document["behavioral_contracts"] = [
+                item.to_data() for item in behavioral_contracts
+            ]
             for canonical_obligation in canonical_document["obligations"]:
                 clause_id = canonical_obligation.get("clause_id")
                 if isinstance(clause_id, str):
@@ -3299,6 +3428,12 @@ class FeatureCommandRuntime:
                 ),
                 "compile_partial_semantic_contract": bind_handler(
                     compile_partial_semantic_contract_operation
+                ),
+                "prepare_behavioral_contracts": bind_handler(
+                    prepare_behavioral_contracts_operation
+                ),
+                "bind_behavioral_contracts": bind_handler(
+                    bind_behavioral_contracts_operation
                 ),
                 "prepare_field_entailment_reviews": bind_handler(
                     prepare_field_entailment_reviews_operation
@@ -3791,6 +3926,64 @@ def _obligation_evidence_provenance_record(
         "requirement_strength": contract.get("requirement_strength"),
         "polarity": contract.get("polarity"),
     }
+
+
+def _attach_behavioral_contract_context(
+    ledger: InstructionLedger,
+    semantic_designs: Sequence[Mapping[str, Any]],
+    contracts: Sequence[BehavioralContract],
+) -> list[dict[str, Any]]:
+    """Render validated group relationships into worker-facing scenario context."""
+    clauses = {item.clause_id: item for item in ledger.clauses}
+    output: list[dict[str, Any]] = []
+    for design in semantic_designs:
+        if not isinstance(design, Mapping):
+            raise PowdrrExecutionError("semantic design entry is malformed")
+        copied = dict(design)
+        contract_raw = copied.get("partial_contract")
+        clause_id = (
+            contract_raw.get("source_ref")
+            if isinstance(contract_raw, Mapping)
+            else None
+        )
+        scenario_raw = copied.get("behavior_scenario")
+        if not isinstance(clause_id, str) or not isinstance(scenario_raw, Mapping):
+            output.append(copied)
+            continue
+        scenario = dict(scenario_raw)
+        existing = scenario.get("related_requirements", [])
+        if not isinstance(existing, list):
+            existing = []
+        related = [item for item in existing if isinstance(item, str)]
+        for contract in contracts:
+            if clause_id not in contract.member_requirement_ids:
+                continue
+            for member_id in contract.member_requirement_ids:
+                if member_id != clause_id and member_id in clauses:
+                    related.append(
+                        f"Related requirement {member_id}: {clauses[member_id].text}"
+                    )
+            for edge in contract.relationships:
+                if clause_id in edge.target_requirement_ids:
+                    targets = ", ".join(edge.target_requirement_ids)
+                    related.append(
+                        f"Contract relation {edge.kind} applies to {targets}; "
+                        f"source evidence: {edge.source_evidence}"
+                    )
+            related.extend(
+                f"Shared contract constraint across partition: {constraint}"
+                for constraint in contract.shared_constraints
+            )
+            for context_id in contract.supporting_context_ids:
+                if context_id in clauses:
+                    related.append(
+                        "Context only; this is not an implementation requirement "
+                        f"[{context_id}]: {clauses[context_id].text}"
+                    )
+        scenario["related_requirements"] = list(dict.fromkeys(related))
+        copied["behavior_scenario"] = scenario
+        output.append(copied)
+    return output
 
 
 def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, str]:

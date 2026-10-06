@@ -8,6 +8,8 @@ from typing import Any
 
 import pytest
 
+from powdrr_lift.core.acceptance_contract import BehavioralContract
+from powdrr_lift.core.instruction_ledger import compile_instruction_ledger
 from powdrr_lift.core.semantic_contract import (
     BoundSourceExtraction,
     PartialSemanticContract,
@@ -30,8 +32,15 @@ from powdrr_lift.core.source_interpretation import (
     SourceInterpretation,
     SourceInterpretationError,
 )
+from powdrr_lift.workrr.acceptance_contract_compiler import (
+    MAX_CONTRACT_GROUP_SIZE,
+    _partition,
+    bind_behavioral_contracts,
+    prepare_behavioral_contracts,
+)
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
+    _attach_behavioral_contract_context,
     feature_command_catalog,
 )
 from powdrr_lift.workrr.semantic_contract_compiler import (
@@ -1134,6 +1143,261 @@ def test_unknown_family_keeps_interpreted_rule_in_contract_and_projection() -> N
     assert restored.fingerprint == contract.fingerprint
     assert "across successive events" in projection["expected_test"]
     assert "rather than raw deltas" in projection["expected_test"]
+
+
+def test_behavioral_contracts_group_explicit_roles_and_keep_context_separate() -> None:
+    ledger = compile_instruction_ledger(
+        "demo",
+        "The result mapping accumulates entries across payloads.\n"
+        "The result mapping exposes accumulated entries after each payload.\n"
+        "Current transport context is multipart.",
+    )
+    semantic_designs = []
+    for clause, disposition, operation, rule, evidence in (
+        (
+            ledger.clauses[0].to_data(),
+            "feature",
+            "accumulate entries",
+            "entries accumulate across payloads",
+            "accumulates entries across payloads",
+        ),
+        (
+            ledger.clauses[1].to_data(),
+            "feature",
+            "accumulate entries",
+            "expose accumulated entries after each payload",
+            "exposes accumulated entries after each payload",
+        ),
+        (ledger.clauses[2].to_data(), "context", "", "", ""),
+    ):
+        decisions = _bind_source_decisions(
+            clause,
+            disposition=disposition,
+            overrides={"source_predicate": "explicit"},
+        )
+        extractions = compile_deterministic_source_extractions(
+            clause, decisions, ledger.source.text, created_at=NOW
+        )
+        family_request = prepare_behavior_family_decision(
+            clause,
+            next(item for item in extractions if item.extraction_kind == "behavior"),
+            decisions,
+        )
+        family = bind_behavior_family_decision(
+            family_request,
+            {"status": "resolved", "value": "serialize", "reason_code": None},
+            created_at=NOW,
+        )
+        interpretation = None
+        if operation:
+            interpretation = SourceInterpretation.bind(
+                {
+                    "subject": "result mapping",
+                    "operation": operation,
+                    "affected_value": "entries",
+                    "rule": rule,
+                    "contrast": None,
+                    "behavior_form": "state_transition",
+                    "result_presence": "explicit",
+                    "event_scope": "event_sequence",
+                    "contrast_presence": "absent",
+                    "unresolved_fields": [],
+                    "field_evidence": [
+                        "subject|result mapping",
+                        f"operation|{evidence}",
+                        "affected_value|entries",
+                        f"rule|{evidence}",
+                    ],
+                },
+                source_ref=clause["clause_id"],
+                source_text=clause["text"],
+                conditions=(),
+                exceptions=(),
+                decision_fingerprints={},
+            )
+        contract = compile_source_contract(
+            clause=clause,
+            decisions=decisions,
+            extractions=extractions,
+            behavior_family=family,
+            source_interpretation=interpretation,
+        )
+        semantic_designs.append({"partial_contract": contract.to_data()})
+
+    plan = prepare_behavioral_contracts(ledger.to_data(), semantic_designs)
+    assert len(plan["requests"]) == 1
+    result = bind_behavioral_contracts(
+        plan,
+        [
+            {
+                "member_indexes": [0, 1],
+                "context_indexes": [0],
+                "relationships": [
+                    {
+                        "kind": "constrains_output",
+                        "source_evidence": "accumulates entries across payloads",
+                        "target_indexes": [0, 1],
+                    }
+                ],
+                "unresolved_questions": [],
+            }
+        ],
+    )
+
+    behavioral_contract = BehavioralContract.from_data(result["contracts"][0])
+    assert behavioral_contract.member_requirement_ids == tuple(
+        clause.clause_id for clause in ledger.clauses[:2]
+    )
+    assert behavioral_contract.supporting_context_ids == (ledger.clauses[2].clause_id,)
+    assert behavioral_contract.relationships[0].kind == "constrains_output"
+    assert ledger.clauses[2].clause_id not in behavioral_contract.member_requirement_ids
+    attached = _attach_behavioral_contract_context(
+        ledger,
+        [
+            {
+                "partial_contract": {"source_ref": clause.clause_id},
+                "behavior_scenario": {"related_requirements": []},
+            }
+            for clause in ledger.clauses[:2]
+        ],
+        (behavioral_contract,),
+    )
+    first_context = attached[0]["behavior_scenario"]["related_requirements"]
+    assert any(ledger.clauses[1].text in item for item in first_context)
+    assert any(
+        "Context only; this is not an implementation requirement" in item
+        and ledger.clauses[2].text in item
+        for item in first_context
+    )
+
+
+def test_invalid_behavioral_group_indexes_fall_back_without_dropping_requirements() -> (
+    None
+):
+    ledger = compile_instruction_ledger(
+        "demo",
+        "The result mapping accumulates entries across payloads.\n"
+        "The result mapping exposes accumulated entries after each payload.",
+    )
+    semantic_designs = []
+    for clause, evidence, rule in (
+        (
+            ledger.clauses[0].to_data(),
+            "accumulates entries across payloads",
+            "accumulate",
+        ),
+        (
+            ledger.clauses[1].to_data(),
+            "exposes accumulated entries after each payload",
+            "expose",
+        ),
+    ):
+        decisions = _bind_source_decisions(
+            clause,
+            disposition="feature",
+            overrides={"source_predicate": "explicit"},
+        )
+        extractions = compile_deterministic_source_extractions(
+            clause, decisions, ledger.source.text, created_at=NOW
+        )
+        family_request = prepare_behavior_family_decision(
+            clause,
+            next(item for item in extractions if item.extraction_kind == "behavior"),
+            decisions,
+        )
+        family = bind_behavior_family_decision(
+            family_request,
+            {"status": "resolved", "value": "serialize", "reason_code": None},
+            created_at=NOW,
+        )
+        interpretation = SourceInterpretation.bind(
+            {
+                "subject": "result mapping",
+                "operation": "share result mapping behavior",
+                "affected_value": "entries",
+                "rule": rule,
+                "contrast": None,
+                "behavior_form": "state_transition",
+                "result_presence": "explicit",
+                "event_scope": "event_sequence",
+                "contrast_presence": "absent",
+                "unresolved_fields": [],
+                "field_evidence": [
+                    "subject|result mapping",
+                    f"operation|{evidence}",
+                    "affected_value|entries",
+                    f"rule|{evidence}",
+                ],
+            },
+            source_ref=clause["clause_id"],
+            source_text=clause["text"],
+            conditions=(),
+            exceptions=(),
+            decision_fingerprints={},
+        )
+        semantic_designs.append(
+            {
+                "partial_contract": compile_source_contract(
+                    clause=clause,
+                    decisions=decisions,
+                    extractions=extractions,
+                    behavior_family=family,
+                    source_interpretation=interpretation,
+                ).to_data()
+            }
+        )
+    plan = prepare_behavioral_contracts(ledger.to_data(), semantic_designs)
+    result = bind_behavioral_contracts(
+        plan,
+        [
+            {
+                "member_indexes": [0, 99],
+                "context_indexes": [],
+                "relationships": [],
+                "unresolved_questions": [],
+            }
+        ],
+    )
+
+    contracts = [BehavioralContract.from_data(item) for item in result["contracts"]]
+    assert set(result["covered_requirement_ids"]) == {
+        clause.clause_id for clause in ledger.clauses
+    }
+    assert len(contracts) == 2
+    assert all(contract.unresolved_questions for contract in contracts)
+
+    rejected_edge_result = bind_behavioral_contracts(
+        plan,
+        [
+            {
+                "member_indexes": [0, 1],
+                "context_indexes": [],
+                "relationships": ["not a serialized relationship"],
+                "unresolved_questions": [],
+            }
+        ],
+    )
+    grouped = BehavioralContract.from_data(rejected_edge_result["contracts"][0])
+    assert grouped.member_requirement_ids == tuple(
+        clause.clause_id for clause in ledger.clauses
+    )
+    assert grouped.relationships == ()
+    assert any(
+        "relationship edges were discarded" in question
+        for question in grouped.unresolved_questions
+    )
+
+
+def test_behavioral_contract_partitioning_is_bounded_and_covers_all_members() -> None:
+    members = tuple(f"instruction-{index:02d}" for index in range(17))
+
+    partitions = _partition(members, MAX_CONTRACT_GROUP_SIZE)
+
+    assert all(
+        1 < len(partition) <= MAX_CONTRACT_GROUP_SIZE for partition in partitions
+    )
+    assert set().union(*(set(partition) for partition in partitions)) == set(members)
+    assert set(partitions[0]).intersection(partitions[1])
 
 
 def test_field_faithfulness_rejects_invented_candidate() -> None:

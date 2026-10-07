@@ -14,7 +14,7 @@ files:
     rationale: Prevent the historical implementation sequence from obscuring the current next steps.
   - path: docs/plans/prompt-quality-recovery-implementation-handoff.md
     type: added
-    span: {start_line: 1, end_line: 690}
+    span: {start_line: 1, end_line: 701}
     summary: Specify five ordered implementation PRs with source maps, typed wire contracts, regression cases, prompt-only commands, and evaluation acceptance criteria.
     rationale: Give an implementing agent concrete steps and stopping conditions grounded in the captured failures and current implementation.
 entities:

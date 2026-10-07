@@ -5,10 +5,13 @@ from typing import Any, cast
 
 from powdrr_lift.structrr.validation import discover_validation_profiles
 from powdrr_lift.structrr.validation_tasks import (
+    discover_just_configuration,
     discover_make_configuration,
     discover_pre_commit_configuration,
+    discover_task_configuration,
     discover_tox_configuration,
     make_target_closure,
+    task_runner_closure,
 )
 
 
@@ -594,3 +597,121 @@ def test_pre_commit_cli_config_and_files_arguments_are_not_hook_ids(
     assert profile.settings is not None
     hook_list = cast(list[dict[str, object]], profile.settings["hooks"])
     assert hook_list[0]["id"] == "lint"
+
+
+def test_just_ci_invocation_preserves_dependencies_and_recipes(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "Justfile").write_text(
+        "lint:\n\truff check src\n\n"
+        "test:\n\tpytest tests -m 'not integration'\n\n"
+        "ci: lint test\n\tjust lint\n\tjust test\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.ruff]\nline-length = 88\n", encoding="utf-8"
+    )
+    (tmp_path / "tests").mkdir()
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n      - run: just ci\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_just_configuration(tmp_path)
+    profiles = discover_validation_profiles(tmp_path)
+    profile = next(item for item in profiles if item.name == "just-ci")
+
+    assert configuration is not None
+    closure, diagnostics = task_runner_closure(configuration, ("ci",))
+    assert [task.name for task in closure] == ["ci", "lint", "test"]
+    assert not diagnostics
+    assert profile.provider == "aggregate"
+    assert profile.command == ("just", "ci")
+    assert profile.settings is not None
+    settings = cast(dict[str, Any], profile.settings)
+    assert settings["tasks"]["test"]["commands"] == [
+        "pytest tests -m 'not integration'"
+    ]
+    assert "ruff-check" not in [item.name for item in profiles]
+    assert "pytest" not in [item.name for item in profiles]
+
+
+def test_taskfile_configuration_and_invocation_keep_native_context(
+    tmp_path: Path,
+) -> None:
+    taskfile = tmp_path / "Taskfile.yml"
+    taskfile.write_text(
+        "version: '3'\n"
+        "tasks:\n"
+        "  lint:\n"
+        "    cmds: [ruff check src]\n"
+        "  test:\n"
+        "    cmds:\n"
+        "      - cmd: pytest tests -m 'not integration'\n"
+        "        silent: true\n"
+        "  check:\n"
+        "    deps: [lint, test]\n"
+        "    dir: backend\n"
+        "    cmds: [task lint, task test]\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n"
+        "      - run: task --taskfile Taskfile.yml check\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_task_configuration(tmp_path)
+    profiles = discover_validation_profiles(tmp_path)
+    profile = next(item for item in profiles if item.name == "task-check")
+
+    assert configuration is not None
+    closure, diagnostics = task_runner_closure(configuration, ("check",))
+    assert [task.name for task in closure] == ["check", "lint", "test"]
+    assert any("modifiers" in item for item in diagnostics)
+    assert any("dir" in item for item in diagnostics)
+    assert profile.provider == "aggregate"
+    assert profile.command == ("task", "--taskfile", "Taskfile.yml", "check")
+    assert profile.selectors == ("check",)
+    assert profile.config_files == ("Taskfile.yml",)
+    assert any("modifiers" in item for item in profile.unresolved)
+    assert profile.settings is not None
+    task_settings = cast(dict[str, Any], profile.settings["tasks"])
+    assert task_settings["check"]["execution_settings"]["dir"] == "backend"
+
+
+def test_just_parameter_and_taskfile_include_remain_unresolved(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "justfile").write_text(
+        "set shell := ['bash', '-cu']\n"
+        "alias check := test\n"
+        "test *args:\n\tpytest {{args}}\n",
+        encoding="utf-8",
+    )
+    taskfile = tmp_path / "Taskfile.yaml"
+    taskfile.write_text(
+        "version: '3'\n"
+        "includes: {shared: ./tasks/Taskfile.yaml}\n"
+        "tasks: {check: {deps: ['shared:test']}}\n",
+        encoding="utf-8",
+    )
+
+    just_configuration = discover_just_configuration(tmp_path)
+    task_configuration = discover_task_configuration(tmp_path)
+
+    assert just_configuration is not None
+    assert any(
+        "Parameterized Just recipe" in item
+        for item in just_configuration.tasks["test"].unresolved
+    )
+    assert any("Just alias" in item for item in just_configuration.unresolved)
+    assert any(
+        "Just setting/variable" in item for item in just_configuration.unresolved
+    )
+    assert task_configuration is not None
+    assert any("includes" in item for item in task_configuration.unresolved)

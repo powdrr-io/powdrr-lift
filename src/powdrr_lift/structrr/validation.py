@@ -20,17 +20,22 @@ from powdrr_lift.structrr.validation_models import (
 from powdrr_lift.structrr.validation_tasks import (
     MakeConfiguration,
     NoxConfiguration,
+    TaskRunnerConfiguration,
     ToxConfiguration,
+    discover_just_configuration,
     discover_make_configuration,
     discover_nox_configuration,
     discover_pre_commit_configuration,
+    discover_task_configuration,
     discover_tox_configuration,
     likely_make_validation_targets,
+    likely_task_targets,
     make_ci_invocations,
     make_target_closure,
     make_workflow_invocations,
     nox_ci_invocations,
     nox_workflow_invocations,
+    task_runner_closure,
     tox_ci_invocations,
     tox_workflow_invocations,
 )
@@ -225,6 +230,18 @@ def discover_validation_profiles(
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
     profiles.extend(_discover_nox_profiles(root_path, ci_commands))
     profiles.extend(_discover_make_profiles(root_path, ci_commands))
+    just_configuration = discover_just_configuration(root_path)
+    task_configuration = discover_task_configuration(root_path)
+    profiles.extend(
+        _discover_task_runner_profiles(
+            root_path, ci_commands, "just", just_configuration
+        )
+    )
+    profiles.extend(
+        _discover_task_runner_profiles(
+            root_path, ci_commands, "task", task_configuration
+        )
+    )
     profiles.extend(_discover_pre_commit_profiles(root_path, ci_commands))
     tox_configuration = discover_tox_configuration(root_path)
     nox_configuration = discover_nox_configuration(root_path)
@@ -232,7 +249,12 @@ def discover_validation_profiles(
     task_child_tools = {
         token
         for command_set in _task_runner_commands(
-            tox_configuration, nox_configuration, make_configuration, profiles
+            tox_configuration,
+            nox_configuration,
+            make_configuration,
+            just_configuration,
+            task_configuration,
+            profiles,
         )
         for command in command_set
         for token in command
@@ -246,6 +268,8 @@ def discover_validation_profiles(
             or profile.name.startswith("nox-")
             or profile.name.startswith("make-")
             or profile.name.startswith("pre-commit-")
+            or profile.name.startswith("just-")
+            or profile.name.startswith("task-")
         )
         for profile in profiles
     )
@@ -525,6 +549,8 @@ def _task_runner_commands(
     tox_configuration: object,
     nox_configuration: object,
     make_configuration: object,
+    just_configuration: object,
+    task_configuration: object,
     profiles: Sequence[DiscoveredValidationProfile],
 ) -> tuple[tuple[tuple[str, ...], ...], ...]:
     commands: list[tuple[tuple[str, ...], ...]] = []
@@ -541,6 +567,16 @@ def _task_runner_commands(
     make_config = (
         cast(MakeConfiguration, make_configuration)
         if make_configuration is not None
+        else None
+    )
+    just_config = (
+        cast(TaskRunnerConfiguration, just_configuration)
+        if just_configuration is not None
+        else None
+    )
+    task_config = (
+        cast(TaskRunnerConfiguration, task_configuration)
+        if task_configuration is not None
         else None
     )
     for profile in profiles:
@@ -572,11 +608,27 @@ def _task_runner_commands(
                     ):
                         commands.append((tuple(args),))
         elif profile.name.startswith("make-") and make_config and profile.selectors:
-            closure, _ = make_target_closure(make_config, profile.selectors)
-            for target in closure:
+            make_targets, _ = make_target_closure(make_config, profile.selectors)
+            for target in make_targets:
                 for recipe in target.recipes:
                     try:
                         commands.append((tuple(shlex.split(recipe, posix=True)),))
+                    except ValueError:
+                        continue
+        elif profile.name.startswith("just-") and just_config and profile.selectors:
+            just_tasks, _ = task_runner_closure(just_config, profile.selectors)
+            for task in just_tasks:
+                for command in task.commands:
+                    try:
+                        commands.append((tuple(shlex.split(command, posix=True)),))
+                    except ValueError:
+                        continue
+        elif profile.name.startswith("task-") and task_config and profile.selectors:
+            task_tasks, _ = task_runner_closure(task_config, profile.selectors)
+            for task in task_tasks:
+                for command in task.commands:
+                    try:
+                        commands.append((tuple(shlex.split(command, posix=True)),))
                     except ValueError:
                         continue
     return tuple(commands)
@@ -704,6 +756,173 @@ def _discover_make_profiles(
             )
         )
     return tuple(profiles)
+
+
+def _discover_task_runner_profiles(
+    root: Path,
+    ci_commands: Sequence[tuple[str, ...]],
+    runner: str,
+    configuration: TaskRunnerConfiguration | None,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    invocations = tuple(
+        command
+        for command in ci_commands
+        if any(Path(token).name == runner for token in command)
+    )
+    if configuration is None and not invocations:
+        return ()
+    if invocations:
+        selections = tuple(
+            (command, _task_runner_selectors(command, runner))
+            for command in invocations
+        )
+        declaration = "declared"
+    elif configuration:
+        selections = tuple(
+            ((runner, target), (target,))
+            for target in likely_task_targets(configuration)
+        )
+        declaration = "inferred"
+    else:
+        return ()
+    config_files = configuration.config_files if configuration else ()
+    validation_names = {
+        "check",
+        "ci",
+        "format",
+        "format-check",
+        "lint",
+        "test",
+        "tests",
+        "typecheck",
+        "type-check",
+        "validate",
+        "verify",
+    }
+    workflow_paths = tuple(
+        path
+        for path in sorted((root / ".github" / "workflows").glob("*.y*ml"))
+        if re.search(rf"\b{re.escape(runner)}\b", _read_text(path))
+    )
+    profiles: list[DiscoveredValidationProfile] = []
+    for index, (command, selectors) in enumerate(selections, start=1):
+        if configuration and selectors:
+            tasks, diagnostics = task_runner_closure(configuration, selectors)
+        else:
+            tasks, diagnostics = (), ()
+        unresolved = list(configuration.unresolved if configuration else ())
+        unresolved.extend(diagnostics)
+        if not selectors:
+            unresolved.append(
+                f"{runner} was invoked without a static task selector; default task "
+                "behavior is unresolved."
+            )
+        explicit_config = _task_runner_config_argument(command, runner)
+        if explicit_config and configuration and explicit_config not in config_files:
+            unresolved.append(
+                f"{runner} selects {explicit_config!r}, which differs from the "
+                "discovered root task file."
+            )
+        if configuration is None:
+            unresolved.append(f"No {runner} task file was found for this invocation.")
+        for task in tasks:
+            unresolved.extend(task.unresolved)
+            for recipe in task.commands:
+                if any(marker in recipe for marker in ("{{", "${", "&&", "||", "|")):
+                    unresolved.append(
+                        f"Dynamic expansion or shell composition in {task.source} "
+                        f"task {task.name!r} is preserved without interpretation."
+                    )
+        known_validation = bool(selectors) and all(
+            name in validation_names
+            or name.startswith(("check-", "lint-", "test-", "typecheck-", "validate-"))
+            for name in selectors
+        )
+        target_settings = {
+            task.name: {
+                "prerequisites": list(task.prerequisites),
+                "commands": list(task.commands),
+                "source": task.source,
+                "execution_settings": dict(task.execution_settings or {}),
+            }
+            for task in tasks
+        }
+        target_names = ",".join(selectors) or "default"
+        evidence_paths = [*config_files]
+        evidence_paths.extend(
+            path.relative_to(root).as_posix() for path in workflow_paths
+        )
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=f"{runner}-{target_names}"
+                if len(selections) == 1
+                else f"{runner}-{index}-{target_names}",
+                command=command,
+                source=f"{runner} task file/GitHub Actions",
+                provider_name="aggregate" if known_validation else "custom",
+                purpose=f"Run native {runner} task(s) recorded in the project.",
+                roles=("validation",) if known_validation else (),
+                selectors=selectors,
+                config_files=config_files,
+                settings={"tasks": target_settings},
+                declaration=declaration,
+                evidence=tuple(
+                    f"validation-input:{path}" for path in dict.fromkeys(evidence_paths)
+                ),
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
+
+
+def _task_runner_selectors(command: Sequence[str], runner: str) -> tuple[str, ...]:
+    executable_index = next(
+        (index for index, token in enumerate(command) if Path(token).name == runner),
+        None,
+    )
+    if executable_index is None:
+        return ()
+    value_options = (
+        {"--justfile", "-f", "--working-directory", "-d"}
+        if runner == "just"
+        else {"--taskfile", "-t", "--dir", "-d"}
+    )
+    skip_next = False
+    for token in command[executable_index + 1 :]:
+        if skip_next:
+            skip_next = False
+            continue
+        if token in value_options:
+            skip_next = True
+            continue
+        if token.startswith("-") or "=" in token:
+            continue
+        return (token,)
+    return ()
+
+
+def _task_runner_config_argument(command: Sequence[str], runner: str) -> str | None:
+    executable_index = next(
+        (index for index, token in enumerate(command) if Path(token).name == runner),
+        None,
+    )
+    if executable_index is None:
+        return None
+    options = {"--justfile", "-f"} if runner == "just" else {"--taskfile", "-t"}
+    skip_next = False
+    for token in command[executable_index + 1 : -1]:
+        if skip_next:
+            return token
+        if token in options:
+            skip_next = True
+    return None
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
 
 
 def _discover_pre_commit_profiles(
@@ -970,6 +1189,8 @@ def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
                         "nox ",
                         "make ",
                         "gmake ",
+                        "just ",
+                        "task ",
                     )
                 ):
                     commands.append(_split_shell_arguments(stripped))

@@ -114,6 +114,7 @@ class BootstrapResult:
     evidence_files: tuple[str, ...] = field(default_factory=tuple)
     source_manifest: SourceManifest | None = None
     manifest_path: Path | None = None
+    validation_evidence_files: tuple[str, ...] = field(default_factory=tuple)
 
 
 def bootstrap_structrr(
@@ -143,6 +144,12 @@ def bootstrap_structrr(
         include_untracked=include_untracked,
         artifact_exclusions=artifact_exclusions,
     )
+    validation_files = _tracked_files(
+        root,
+        include_untracked=include_untracked,
+        artifact_exclusions=artifact_exclusions,
+        include_validation_metadata=True,
+    )
     spec_paths = tuple(path for path in tracked_files if is_specification_path(path))
     spec_documents = _load_spec_documents(root, spec_paths)
     document = _build_document(
@@ -155,6 +162,7 @@ def bootstrap_structrr(
         title=title or f"Bootstrap Structrr for {root.name}",
         benchmark_mode=benchmark_mode,
         repository_name=repository_name,
+        validation_files=validation_files,
     )
     validation = validate_bootstrap_document(document, root=root, taxonomy=taxonomy)
     source_revision_result = subprocess.run(
@@ -205,6 +213,11 @@ def bootstrap_structrr(
         evidence_files=tracked_files,
         source_manifest=source_manifest,
         manifest_path=manifest_path,
+        validation_evidence_files=tuple(
+            str(item["path"])
+            for item in document.get("validation_context", {}).get("evidence", ())
+            if isinstance(item, Mapping) and isinstance(item.get("path"), str)
+        ),
     )
 
 
@@ -815,6 +828,7 @@ def _tracked_files(
     *,
     include_untracked: bool = False,
     artifact_exclusions: Sequence[str] = (),
+    include_validation_metadata: bool = False,
 ) -> tuple[str, ...]:
     arguments = ["git", "-C", str(root), "ls-files"]
     if include_untracked:
@@ -835,7 +849,9 @@ def _tracked_files(
         sorted(
             path
             for path in paths
-            if _is_bootstrap_file(path)
+            if _is_bootstrap_file(
+                path, include_validation_metadata=include_validation_metadata
+            )
             and not _is_artifact_excluded(path, artifact_exclusions)
             and (root / path).is_file()
         )
@@ -851,10 +867,15 @@ def _is_artifact_excluded(path: str, exclusions: Sequence[str]) -> bool:
     )
 
 
-def _is_bootstrap_file(path: str) -> bool:
+def _is_bootstrap_file(path: str, *, include_validation_metadata: bool = False) -> bool:
+    ignored_prefixes = tuple(
+        prefix
+        for prefix in _IGNORED_PREFIXES
+        if not (include_validation_metadata and prefix == ".github/")
+    )
     return (
         path not in _IGNORED_FILES
-        and not path.startswith(_IGNORED_PREFIXES)
+        and not path.startswith(ignored_prefixes)
         and not path.startswith("docs/changelogs/")
     )
 
@@ -1037,9 +1058,12 @@ def _build_document(
     title: str,
     benchmark_mode: bool = False,
     repository_name: str | None = None,
+    validation_files: Sequence[str] = (),
 ) -> dict[str, Any]:
     from powdrr_lift.structrr.active_intent import active_intent_section
+    from powdrr_lift.structrr.python_topology import discover_python_topology
     from powdrr_lift.structrr.validation import (
+        assign_python_topology,
         discover_validation_profiles,
         validation_inventory,
     )
@@ -1121,8 +1145,11 @@ def _build_document(
         )
         _collect_statements(statements, "approach", spec.get("approach"), spec_path)
 
-    validation_source = _validation_tool_source(root, tracked_files)
+    validation_paths = validation_files or tracked_files
+    validation_source = _validation_tool_source(root, validation_paths)
     validation_profiles = discover_validation_profiles(root)
+    topology = discover_python_topology(root, validation_paths)
+    validation_profiles = assign_python_topology(validation_profiles, topology)
     if benchmark_mode and validation_source is None:
         validation_profiles = ()
     for profile in validation_profiles:
@@ -1227,7 +1254,7 @@ def _build_document(
         ],
         "tools": [tools[key] for key in sorted(tools)],
         "validation_inventory": list(validation_inventory(validation_profiles)),
-        "validation_context": validation_context(validation_profiles),
+        "validation_context": validation_context(validation_profiles, topology),
         "statements": [statements[key] for key in sorted(statements)],
         "features": [],
         "proposed_prs": [],

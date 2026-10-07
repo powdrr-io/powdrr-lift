@@ -108,6 +108,57 @@ steps:
     assert result.llm_activations == 2
 
 
+def test_parallel_judge_failures_preserve_each_failed_item_event() -> None:
+    class FailingLLM:
+        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
+            raise RuntimeError("empty provider stream")
+
+    document = {
+        "name": "parallel-failure-events",
+        "steps": [
+            {
+                "for_each": {
+                    "snapshot": {"name": "clauses", "max_items": 2},
+                    "item_binding": "clause",
+                    "max_parallel": 2,
+                    "body": [
+                        {
+                            "judge": {
+                                "provider": "planning",
+                                "prompt_system": "JSON only",
+                                "instructions": [],
+                                "question": "Classify this clause",
+                                "context": ["clause"],
+                                "output": {
+                                    "name": "classification",
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"ok": {"type": "boolean"}},
+                                        "required": ["ok"],
+                                    },
+                                },
+                            }
+                        }
+                    ],
+                }
+            }
+        ],
+    }
+    events: list[EvaluationEvent] = []
+
+    with pytest.raises(EvaluationError, match="empty provider stream"):
+        Evaluator(FailingLLM(), lambda *_: None, event_sink=events.append).evaluate(
+            document, {"clauses": ["first", "second"]}
+        )
+
+    failed = [event for event in events if event.kind == "judge_failed"]
+    assert [event.path for event in failed] == [
+        "steps[0].for_each[0][0][0]",
+        "steps[0].for_each[0][1][0]",
+    ]
+    assert len({event.data["trace_id"] for event in failed}) == 2
+
+
 def test_evaluator_enforces_declared_operation_return_schema() -> None:
     from procedrr import parse_and_validate
 

@@ -766,20 +766,28 @@ class Evaluator:
 
             def evaluate_item(
                 index: int, item: Any
-            ) -> tuple[dict[str, Any], list[EvaluationEvent], dict[str, int]]:
+            ) -> tuple[
+                dict[str, Any],
+                list[EvaluationEvent],
+                dict[str, int],
+                Exception | None,
+            ]:
                 item_state = dict(state)
                 item_state[binding] = item
                 item_events: list[EvaluationEvent] = []
                 item_usage = {"llm": 0, "tools": 0}
-                self._steps(
-                    body,
-                    item_state,
-                    item_events,
-                    item_usage,
-                    limits,
-                    f"{path}.{kind}[0][{index}]",
-                )
-                return item_state, item_events, item_usage
+                try:
+                    self._steps(
+                        body,
+                        item_state,
+                        item_events,
+                        item_usage,
+                        limits,
+                        f"{path}.{kind}[0][{index}]",
+                    )
+                except Exception as exc:  # preserve each item's failure event
+                    return item_state, item_events, item_usage, exc
+                return item_state, item_events, item_usage, None
 
             start = 0
             while start < len(items):
@@ -796,15 +804,17 @@ class Evaluator:
                     ]
                     parallel_results = [future.result() for future in futures]
 
-                for item, (item_state, item_events, item_usage) in zip(
+                item_errors: list[Exception] = []
+                for item, (item_state, item_events, item_usage, item_error) in zip(
                     chunk, parallel_results, strict=True
                 ):
                     usage["llm"] += item_usage["llm"]
                     usage["tools"] += item_usage["tools"]
-                    self._limit(usage, limits, "llm_activations", "LLM activations")
-                    self._limit(usage, limits, "tool_calls", "tool calls")
                     for event in item_events:
                         events.append(event)
+                    if item_error is not None:
+                        item_errors.append(item_error)
+                        continue
                     if isinstance(collect, Mapping):
                         value_binding = collect.get("value")
                         output = (
@@ -820,6 +830,10 @@ class Evaluator:
                                 )
                             else:
                                 collected[str(item)] = output
+                self._limit(usage, limits, "llm_activations", "LLM activations")
+                self._limit(usage, limits, "tool_calls", "tool calls")
+                if item_errors:
+                    raise item_errors[0]
                 start += len(chunk)
             if isinstance(collect, Mapping) and isinstance(collect.get("binding"), str):
                 state[collect["binding"]] = (

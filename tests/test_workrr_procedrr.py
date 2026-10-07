@@ -7,6 +7,7 @@ from powdrr_lift.workrr.procedrr import (
     ProcedrrResponseError,
     StructuredToolExecutor,
     WorkrrProcedrrClient,
+    _is_retryable_provider_failure,
 )
 
 
@@ -27,6 +28,50 @@ SCHEMA = {
     "required": ["complete"],
     "properties": {"complete": {"type": "boolean"}},
 }
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Temporary failure in name resolution",
+        "OpenAI streaming response content was empty.",
+    ],
+)
+def test_procedrr_recognizes_transient_provider_errors(message: str) -> None:
+    assert _is_retryable_provider_failure(RuntimeError(message))
+
+
+def test_procedrr_retries_http_429(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class RateLimitedThenSuccess:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                error = RuntimeError("provider is busy")
+                error.status_code = 429  # type: ignore[attr-defined]
+                raise error
+            return {"complete": True}
+
+    provider = RateLimitedThenSuccess()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider),
+        skills_dir=tmp_path,
+        provider_retry_delay_seconds=2.0,
+    )
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+
+    assert client.complete_json(
+        [{"role": "user", "content": "judge this"}],
+        response_schema=SCHEMA,
+    ) == {"complete": True}
+    assert provider.calls == 2
+    assert delays == [2.0]
 
 
 def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:

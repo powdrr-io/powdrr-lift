@@ -154,6 +154,7 @@ from powdrr_lift.workrr.execution_state import (
 from powdrr_lift.workrr.llm import (
     ProviderExecutionError,
     WorkflowAction,
+    is_retryable_provider_error,
     workflow_action_summary,
 )
 from powdrr_lift.workrr.llm import WorkflowEdit as SkillChatEdit
@@ -7755,6 +7756,17 @@ def test_openai_empty_stream_is_a_retryable_provider_failure() -> None:
         match="streaming response did not include any events",
     ):
         _read_openai_response(_FakeResponse(), progress_stream=None)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Temporary failure in name resolution",
+        "OpenAI streaming response content was empty.",
+    ],
+)
+def test_transient_provider_errors_are_retryable(message: str) -> None:
+    assert is_retryable_provider_error(RuntimeError(message))
 
 
 def _build_skill() -> Skill:

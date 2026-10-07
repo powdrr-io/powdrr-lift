@@ -9,7 +9,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION = "verification-provider-inventory-v1"
+from powdrr_lift.structrr.validation_models import (
+    VALIDATION_INVENTORY_SCHEMA_VERSION,
+    ValidationCheck,
+    ValidationContext,
+)
+
+VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION = VALIDATION_INVENTORY_SCHEMA_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,27 +25,101 @@ class DiscoveredValidationProfile:
     name: str
     command: tuple[str, ...]
     source: str
+    provider_name: str | None = None
+    component: str | None = None
+    environment_id: str | None = None
+    purpose: str = ""
+    roles: tuple[str, ...] = ()
+    cwd: str = "."
+    shell: str | None = None
+    script: str | None = None
+    execution_kind: str | None = None
+    selectors: tuple[str, ...] = ()
+    config_files: tuple[str, ...] = ()
+    settings: dict[str, object] | None = None
+    applicability: dict[str, object] | None = None
+    ci_origins: tuple[dict[str, object], ...] = ()
+    requiredness: dict[str, object] | None = None
+    declaration: str = "inferred"
+    evidence: tuple[str, ...] = ()
+    confirmation: dict[str, object] | None = None
+    depends_on: tuple[str, ...] = ()
+    local_reproducibility: str = "unknown"
+    baseline: dict[str, object] | None = None
+    unresolved: tuple[str, ...] = ()
 
     @property
     def provider(self) -> str:
-        """Return the provider namespace represented by this profile."""
-        return self.name.split("-", 1)[0]
+        """Return the explicitly assigned provider or a legacy fallback."""
+        return self.provider_name or self.name.split("-", 1)[0]
 
 
 def validation_inventory(
     profiles: Sequence[DiscoveredValidationProfile],
 ) -> tuple[dict[str, object], ...]:
     """Build the provider-neutral bootstrap inventory before Workrr collection."""
-    return tuple(
-        {
-            "schema_version": VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
-            "provider": profile.provider,
-            "profile": profile.name,
-            "command": list(profile.command),
-            "selectors": [],
-            "source": profile.source,
-        }
-        for profile in profiles
+    return tuple(_profile_record(profile).to_data() for profile in profiles)
+
+
+def validation_context(
+    profiles: Sequence[DiscoveredValidationProfile],
+) -> dict[str, object]:
+    """Describe discovery coverage without claiming the search is exhaustive."""
+    return ValidationContext(
+        discovery_status="partial",
+        coverage=("currently implemented validation detectors",),
+        diagnostics=(
+            (
+                {
+                    "code": "discovery_scope_limited",
+                    "message": (
+                        "Validation discovery is limited to the detectors currently "
+                        "implemented; absence of a check is not proof that none exists."
+                    ),
+                },
+            )
+            if not profiles
+            else ()
+        ),
+    ).to_data()
+
+
+def _profile_record(profile: DiscoveredValidationProfile) -> ValidationCheck:
+    kind = profile.execution_kind or (
+        "shell" if profile.shell or profile.script else "argv"
+    )
+    command = profile.command if kind == "argv" else ()
+    return ValidationCheck(
+        id=f"validation:{profile.name}",
+        provider=profile.provider,
+        profile=profile.name,
+        command=command,
+        source=profile.source,
+        environment=profile.environment_id,
+        execution={
+            "kind": kind,
+            "cwd": profile.cwd,
+            "shell": profile.shell,
+            "script": profile.script,
+        },
+        component=profile.component,
+        purpose=profile.purpose,
+        roles=profile.roles,
+        selectors=profile.selectors,
+        config_files=profile.config_files,
+        settings=profile.settings or {},
+        applicability=profile.applicability or {"local": True, "evaluation": "unknown"},
+        ci_origins=profile.ci_origins,
+        requiredness=profile.requiredness or {"status": "unknown", "evidence": []},
+        provenance={
+            "declaration": profile.declaration,
+            "evidence": list(profile.evidence),
+        },
+        confirmation=profile.confirmation or {"level": "static", "observations": []},
+        depends_on=profile.depends_on,
+        local_reproducibility=profile.local_reproducibility,
+        baseline=profile.baseline or {"status": "not_run", "observation": None},
+        unresolved=profile.unresolved,
     )
 
 

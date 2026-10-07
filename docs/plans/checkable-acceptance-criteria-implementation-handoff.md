@@ -8,6 +8,13 @@ criterion identifies what to exercise and what to inspect, and distinguishes a
 correct implementation from a plausible incorrect implementation. Merely repeating
 a requirement in Given/when/then syntax does not meet that standard.
 
+The next implementation work following the observed post-implementation failures
+is specified in the
+[prompt quality recovery handoff](prompt-quality-recovery-implementation-handoff.md).
+That handoff supplies captured failures, current interfaces, and prompt-only
+acceptance checks. Inspect the current implementation before using this document's
+historical seven-PR sequence.
+
 This is an implementation specification, not an implemented feature. Execute the
 seven PRs below in order. Each PR must integrate its changes into the real workflow
 and demonstrate its stated prompt effect; adding unused schemas or classifier

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 from powdrr_lift.structrr.validation import discover_validation_profiles
 from powdrr_lift.structrr.validation_tasks import discover_tox_configuration
@@ -163,3 +164,130 @@ def test_tox_factor_expressions_are_preserved_as_unresolved(tmp_path: Path) -> N
 
     assert profile.selectors == ("py{311,312}-lint",)
     assert any("retained symbolically" in item for item in profile.unresolved)
+
+
+def test_discovers_nox_sessions_from_ast_without_running_noxfile(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "executed"
+    (tmp_path / "noxfile.py").write_text(
+        """
+from pathlib import Path
+Path("executed").write_text("no")
+import nox
+
+nox.options.sessions = ["lint", "tests"]
+
+@nox.session(name="lint", python=["3.11", "3.12"])
+def lint(session):
+    session.install("ruff")
+    session.run("ruff", "check", "src")
+
+@nox.session
+@nox.parametrize("python", ["3.11", "3.12"])
+def tests(session):
+    session.install("pytest")
+    session.run("pytest", "-m", "not integration")
+""",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+
+    assert [profile.name for profile in profiles] == ["nox-lint", "nox-tests"]
+    assert profiles[0].command == ("nox", "-s", "lint")
+    assert profiles[0].settings is not None
+    lint_settings = cast(dict[str, Any], profiles[0].settings)
+    assert lint_settings["sessions"]["lint"]["python"] == ["3.11", "3.12"]
+    assert lint_settings["sessions"]["lint"]["calls"] == [
+        {
+            "method": "install",
+            "arguments": ["ruff"],
+            "keyword_arguments": {},
+            "line": 10,
+            "dynamic": False,
+        },
+        {
+            "method": "run",
+            "arguments": ["ruff", "check", "src"],
+            "keyword_arguments": {},
+            "line": 11,
+            "dynamic": False,
+        },
+    ]
+    assert profiles[1].settings is not None
+    test_settings = cast(dict[str, Any], profiles[1].settings)
+    assert test_settings["sessions"]["tests"]["parameters"] == {
+        "python": ["3.11", "3.12"]
+    }
+    assert not marker.exists()
+
+
+def test_nox_ci_command_retains_arguments_and_workflow_evidence(tmp_path: Path) -> None:
+    (tmp_path / "noxfile.py").write_text(
+        'import nox\n@nox.session\ndef tests(session):\n    session.run("pytest")\n',
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/tests.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  test:\n    steps:\n"
+        '      - run: uv run nox -s tests -- -k "edge case"\n',
+        encoding="utf-8",
+    )
+
+    profile = next(
+        item
+        for item in discover_validation_profiles(tmp_path)
+        if item.provider == "aggregate"
+    )
+
+    assert profile.command == (
+        "uv",
+        "run",
+        "nox",
+        "-s",
+        "tests",
+        "--",
+        "-k",
+        "edge case",
+    )
+    assert profile.selectors == ("tests",)
+    assert profile.evidence == ("noxfile.py", ".github/workflows/tests.yml")
+
+
+def test_nox_dynamic_session_arguments_remain_unresolved(tmp_path: Path) -> None:
+    (tmp_path / "noxfile.py").write_text(
+        """
+import nox
+
+@nox.session
+def tests(session):
+    command = "pytest"
+    session.run(command, "tests")
+""",
+        encoding="utf-8",
+    )
+
+    profile = discover_validation_profiles(tmp_path)[0]
+
+    assert profile.command == ("nox", "-s", "tests")
+    assert profile.unresolved == (
+        "Session tests contains dynamic install/run arguments.",
+    )
+    assert profile.settings is not None
+    dynamic_settings = cast(dict[str, Any], profile.settings)
+    call = dynamic_settings["sessions"]["tests"]["calls"][0]
+    assert call["dynamic"] is True
+    assert call["arguments"] == ["command", "tests"]
+
+
+def test_noxfile_parse_failure_emits_unresolved_check(tmp_path: Path) -> None:
+    (tmp_path / "noxfile.py").write_text("import nox\ndef broken(:\n", encoding="utf-8")
+
+    profile = discover_validation_profiles(tmp_path)[0]
+
+    assert profile.name == "nox-all"
+    assert profile.execution_kind == "unresolved"
+    assert profile.command == ()
+    assert "Could not statically parse noxfile.py" in profile.unresolved[0]

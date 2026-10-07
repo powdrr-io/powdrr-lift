@@ -81,3 +81,42 @@ def test_bootstrap_keeps_github_workflows_as_validation_only_evidence(
         item["path"] == ".github/workflows/ci.yml"
         for item in result.document["validation_context"]["input_fingerprints"]
     )
+
+
+def test_bootstrap_normalizes_tox_evidence_references(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    taxonomy = Path(__file__).parents[1] / "software_development_entity_taxonomy.md"
+    (repo / taxonomy.name).write_text(taxonomy.read_text(encoding="utf-8"))
+    (repo / "src").mkdir()
+    (repo / "src/app.py").write_text("value = 1\n", encoding="utf-8")
+    (repo / "tox.ini").write_text(
+        "[tox]\nenvlist = lint\n\n[testenv:lint]\ncommands = python -m pytest\n",
+        encoding="utf-8",
+    )
+    workflow = repo / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "name: CI\njobs:\n  test:\n    steps:\n      - run: tox -e lint\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+
+    result = bootstrap_structrr(repo, output_path=tmp_path / "result.yaml")
+
+    assert result.validation.successful
+    context_ids = {
+        item["id"] for item in result.document["validation_context"]["evidence"]
+    }
+    tox_checks = [
+        item
+        for item in result.document["validation_inventory"]
+        if item["provider"] == "aggregate"
+    ]
+    assert tox_checks
+    assert all(
+        evidence in context_ids
+        for check in tox_checks
+        for evidence in check["provenance"]["evidence"]
+    )

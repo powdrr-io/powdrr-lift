@@ -441,6 +441,12 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser.add_argument("--remote", default="origin")
     bootstrap_parser.add_argument("--output-root", type=Path)
     bootstrap_parser.add_argument(
+        "--validation-timeout-seconds",
+        type=float,
+        default=600.0,
+        help="Maximum time for each discovered validation command (default: 600).",
+    )
+    bootstrap_parser.add_argument(
         "--taxonomy",
         type=Path,
         default=Path("software_development_entity_taxonomy.md"),
@@ -3271,6 +3277,7 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
         return 1
     summary = {
         "output_path": str(result.output_path),
+        "baseline_status": "not_run",
         "entity_count": len(result.document["entities"]),
         "relationship_count": len(result.document["entity_relationships"]),
         "source_anchor_count": len(result.document["files"]),
@@ -3286,6 +3293,7 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
             f"{summary['relationship_count']} relationships, and "
             f"{summary['source_anchor_count']} source anchors.",
         )
+        print("Repository validation commands were discovered but not run.")
     return 0
 
 
@@ -3301,6 +3309,7 @@ def _run_bootstrap(args: argparse.Namespace) -> int:
             open_pr=args.open_pr,
             output_root=args.output_root,
             taxonomy_path=args.taxonomy,
+            validation_timeout_seconds=args.validation_timeout_seconds,
         )
     )
     data = result.to_data()
@@ -3308,6 +3317,8 @@ def _run_bootstrap(args: argparse.Namespace) -> int:
         print(json.dumps(data, sort_keys=True))
     else:
         print(f"Bootstrap status: {result.status}")
+        if result.validation_status:
+            print(f"Validation status: {result.validation_status}")
         if result.task is not None:
             print(f"Branch: {result.task.branch}")
             print(f"Worktree: {result.task.worktree}")

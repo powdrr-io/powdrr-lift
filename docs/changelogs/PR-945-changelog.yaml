@@ -1,0 +1,35 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 945
+title: Specify prompt quality recovery implementation
+intent:
+  problem: A completed prompt capture lost acceptance checks and contradicted explicit requirements after structured output and classification failures.
+  goal: Provide an executable implementation handoff that repairs observed boundaries and measures improvements in actual worker prompts without launching coding benchmarks.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/checkable-acceptance-criteria-implementation-handoff.md
+    type: modified
+    span: {start_line: 11, end_line: 17}
+    summary: Point implementing agents to the current recovery handoff for post-implementation failures.
+    rationale: Prevent the historical implementation sequence from obscuring the current next steps.
+  - path: docs/plans/prompt-quality-recovery-implementation-handoff.md
+    type: added
+    span: {start_line: 1, end_line: 690}
+    summary: Specify five ordered implementation PRs with source maps, typed wire contracts, regression cases, prompt-only commands, and evaluation acceptance criteria.
+    rationale: Give an implementing agent concrete steps and stopping conditions grounded in the captured failures and current implementation.
+entities:
+  - id: prompt-quality-recovery-implementation-handoff
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: recovery-handoff-keeps-reference-material-offline
+    description: The handoff requires solution patches and verifier patches to remain offline evaluation inputs rather than production generation inputs.
+    action: added
+  - id: recovery-handoff-requires-prompt-only-capture
+    description: The handoff requires the existing worker prompt capture mode and zero coding-agent invocations during prompt evaluation.
+    action: added
+guidance:
+  - id: implement-recovery-prs-in-order
+    description: Execute the documented PRs on merged predecessors and show actual final-prompt improvements with honest processing and coverage reports.
+    action: added

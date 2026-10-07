@@ -23,6 +23,7 @@ from powdrr_lift.structrr.validation_tasks import (
     ToxConfiguration,
     discover_make_configuration,
     discover_nox_configuration,
+    discover_pre_commit_configuration,
     discover_tox_configuration,
     likely_make_validation_targets,
     make_ci_invocations,
@@ -224,6 +225,7 @@ def discover_validation_profiles(
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
     profiles.extend(_discover_nox_profiles(root_path, ci_commands))
     profiles.extend(_discover_make_profiles(root_path, ci_commands))
+    profiles.extend(_discover_pre_commit_profiles(root_path, ci_commands))
     tox_configuration = discover_tox_configuration(root_path)
     nox_configuration = discover_nox_configuration(root_path)
     make_configuration = discover_make_configuration(root_path)
@@ -236,12 +238,14 @@ def discover_validation_profiles(
         for token in command
         if token in {"pytest", "ruff", "mypy", "black", "flake8", "pyright"}
     }
+    task_child_tools.update(_pre_commit_child_tools(profiles))
     has_task_aggregate = any(
         profile.provider == "aggregate"
         and (
             profile.name.startswith("tox-")
             or profile.name.startswith("nox-")
             or profile.name.startswith("make-")
+            or profile.name.startswith("pre-commit-")
         )
         for profile in profiles
     )
@@ -700,6 +704,200 @@ def _discover_make_profiles(
             )
         )
     return tuple(profiles)
+
+
+def _discover_pre_commit_profiles(
+    root: Path, ci_commands: Sequence[tuple[str, ...]]
+) -> tuple[DiscoveredValidationProfile, ...]:
+    invocations = tuple(
+        command
+        for command in ci_commands
+        if any(Path(token).name == "pre-commit" for token in command)
+    )
+    if not invocations:
+        return ()
+    profiles: list[DiscoveredValidationProfile] = []
+    workflow_paths = tuple(
+        path
+        for path in sorted((root / ".github" / "workflows").glob("*.y*ml"))
+        if _workflow_mentions(path, "pre-commit")
+    )
+    for index, command in enumerate(invocations, start=1):
+        config = discover_pre_commit_configuration(
+            root, _pre_commit_config_argument(command)
+        )
+        config_file = config.config_file if config else None
+        hook_ids = {hook.id for hook in config.hooks} if config else set()
+        selectors = _pre_commit_hook_selectors(command, hook_ids)
+        selected_hooks = tuple(
+            hook
+            for hook in (config.hooks if config else ())
+            if not selectors or hook.id in selectors
+        )
+        settings: dict[str, object] = {
+            "defaults": dict(config.settings) if config else {},
+            "hooks": [
+                {
+                    "id": hook.id,
+                    "name": hook.name,
+                    "repo": hook.repo,
+                    "rev": hook.rev,
+                    "entry": hook.entry,
+                    "language": hook.language,
+                    "args": list(hook.args),
+                    "files": hook.files,
+                    "exclude": hook.exclude,
+                    "types": list(hook.types),
+                    "stages": list(hook.stages),
+                    "additional_dependencies": list(hook.additional_dependencies),
+                    "pass_filenames": hook.pass_filenames,
+                    "always_run": hook.always_run,
+                    "require_serial": hook.require_serial,
+                }
+                for hook in selected_hooks
+            ],
+        }
+        unresolved = list(config.unresolved if config else ())
+        unknown_selectors = sorted(set(selectors) - hook_ids) if config else []
+        if not config:
+            unresolved.append(
+                "pre-commit is invoked by CI, but no supported pre-commit config "
+                "was found."
+            )
+        if unknown_selectors:
+            unresolved.append(
+                "CI selects hook ids absent from the discovered configuration: "
+                + ", ".join(unknown_selectors)
+                + "."
+            )
+        if not selectors:
+            unresolved.append(
+                "The invocation does not select a hook id; hook selection follows "
+                "the installed pre-commit version, configured stages, files, "
+                "and options."
+            )
+        evidence_paths = [config_file] if config_file else []
+        evidence_paths.extend(
+            path.relative_to(root).as_posix() for path in workflow_paths
+        )
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=(
+                    f"pre-commit-{index}-{','.join(selectors)}"
+                    if selectors and len(invocations) > 1
+                    else f"pre-commit-{','.join(selectors)}"
+                    if selectors
+                    else f"pre-commit-{index}"
+                ),
+                command=command,
+                source="pre-commit configuration/GitHub Actions",
+                provider_name="aggregate",
+                purpose="Run configured pre-commit hooks selected by CI.",
+                roles=("validation",),
+                selectors=selectors,
+                config_files=(config_file,) if config_file else (),
+                settings=settings,
+                declaration="declared",
+                evidence=tuple(f"validation-input:{path}" for path in evidence_paths),
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
+
+
+def _pre_commit_hook_selectors(
+    command: Sequence[str], known_hook_ids: set[str]
+) -> tuple[str, ...]:
+    executable_index = next(
+        (
+            index
+            for index, token in enumerate(command)
+            if Path(token).name == "pre-commit"
+        ),
+        None,
+    )
+    if executable_index is None:
+        return ()
+    tail = command[executable_index + 1 :]
+    if not tail or tail[0] != "run":
+        return ()
+    selectors: list[str] = []
+    skip_next = False
+    skip_files = False
+    for token in tail[1:]:
+        if skip_next:
+            skip_next = False
+            continue
+        if token in {"--config", "-c", "--hook-stage", "--color"}:
+            skip_next = True
+            continue
+        if token == "--files":
+            skip_files = True
+            continue
+        if token.startswith("-"):
+            skip_files = False
+            continue
+        if skip_files:
+            continue
+        if "=" in token or token.startswith((".", "/")):
+            continue
+        if token in known_hook_ids or not selectors:
+            selectors.append(token)
+            if token not in known_hook_ids:
+                break
+    return tuple(selectors)
+
+
+def _pre_commit_config_argument(command: Sequence[str]) -> str | None:
+    executable_index = next(
+        (
+            index
+            for index, token in enumerate(command)
+            if Path(token).name == "pre-commit"
+        ),
+        None,
+    )
+    if executable_index is None:
+        return None
+    for index, token in enumerate(command[executable_index + 1 : -1]):
+        if token in {"--config", "-c"}:
+            return command[executable_index + index + 2]
+    return None
+
+
+def _pre_commit_child_tools(
+    profiles: Sequence[DiscoveredValidationProfile],
+) -> set[str]:
+    tools = {"pytest", "ruff", "mypy", "black", "flake8", "pyright"}
+    found: set[str] = set()
+    for profile in profiles:
+        if not profile.name.startswith("pre-commit-") or not profile.settings:
+            continue
+        hooks = profile.settings.get("hooks")
+        if not isinstance(hooks, list):
+            continue
+        for hook in hooks:
+            if not isinstance(hook, dict):
+                continue
+            entry = hook.get("entry")
+            if not isinstance(entry, str):
+                continue
+            try:
+                tokens = shlex.split(entry, posix=True)
+            except ValueError:
+                continue
+            found.update(tools.intersection(tokens))
+            for index, token in enumerate(tokens[:-1]):
+                if token == "-m" and tokens[index + 1] in tools:
+                    found.add(tokens[index + 1])
+    return found
+
+
+def _workflow_mentions(path: Path, marker: str) -> bool:
+    try:
+        return marker in path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
 
 
 def _load_pyproject(root: Path) -> dict[str, object]:

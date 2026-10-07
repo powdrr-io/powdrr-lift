@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 938
+title: Surface structured provider errors in judge streams
+intent:
+  problem: DeepInfra reports unsupported JSON Schema keywords as error events inside HTTP 200 streams, which the client currently misreports as empty model output.
+  goal: Keep the behavioral-contract response schema compatible with the provider, retain deterministic duplicate-index validation, and surface provider error details without retrying a permanent request error.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1128, end_line: 1128}
+    summary: Remove uniqueItems from behavioral-contract member indexes.
+    rationale: The compiler validates index uniqueness locally, so the remote schema does not need this unsupported keyword.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1133, end_line: 1133}
+    summary: Remove uniqueItems from behavioral-contract context indexes.
+    rationale: The compiler validates index uniqueness locally, so the remote schema does not need this unsupported keyword.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 479, end_line: 479}
+    summary: Surface API error objects found in non-streamed OpenAI-compatible responses.
+    rationale: Avoid reporting provider errors as missing choices or empty completions.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 573, end_line: 573}
+    summary: Check each SSE event for provider errors before treating it as a completion chunk.
+    rationale: DeepInfra can send request errors inside HTTP 200 event streams.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 646, end_line: 669}
+    summary: Format bounded provider error details from error events.
+    rationale: Preserve the provider error type, code, parameter, and message instead of mislabeling the response as empty.
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 645, end_line: 674}
+    summary: Check that the behavioral-contract provider schema avoids unsupported uniqueness constraints.
+    rationale: Prevent reintroducing the schema keyword that caused deterministic request rejection.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 1390, end_line: 1410}
+    summary: Verify duplicate member indexes are rejected during deterministic contract binding.
+    rationale: Keep uniqueness enforcement after removing the provider-side schema constraint.
+  - path: tests/test_workflow_chat_agent.py
+    type: modified
+    span: {start_line: 7772, end_line: 7793}
+    summary: Verify a provider error event in an HTTP 200 SSE stream reports its diagnostic.
+    rationale: Prevent API errors from being mistaken for empty model responses.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Import the typed provider error used in the no-retry regression test.
+    rationale: Assert deterministic provider rejections retain their type.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 239, end_line: 270}
+    summary: Verify explicit provider request errors are not retried.
+    rationale: Avoid repeating deterministic invalid requests with the same schema.
+entities:
+  - id: openai-compatible-provider-error-handling
+    type: Function
+    action: added
+  - id: behavioral-contract-judge-response-schema
+    type: Configuration file
+    action: added
+  - id: provider-error-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: provider-error-tests-verify-provider-error-handling
+    type: verifies
+    source: provider-error-regression-tests
+    target: openai-compatible-provider-error-handling
+    action: added
+    description: Regression tests verify HTTP 200 stream errors retain provider diagnostics and are not retried.
+  - id: schema-tests-verify-response-schema-compatibility
+    type: verifies
+    source: provider-error-regression-tests
+    target: behavioral-contract-judge-response-schema
+    action: added
+    description: Regression tests verify the provider schema omits uniqueItems while the compiler still rejects duplicate indexes.
+invariants:
+  - id: explicit-provider-errors-are-not-empty-content
+    description: An OpenAI-compatible error event is reported with its provider diagnostic and is not converted into an empty-content failure.
+    action: added
+  - id: behavioral-contract-index-uniqueness-remains-enforced
+    description: Duplicate behavioral-contract indexes are rejected by local contract binding even though uniqueItems is omitted from the provider schema.
+    action: added
+guidance:
+  - id: diagnose-structured-provider-errors
+    description: When a streamed judge call fails, inspect the provider error type, code, parameter, and message before changing retry behavior.
+    action: added

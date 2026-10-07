@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 import subprocess
+import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from importlib.resources import files
@@ -482,6 +483,7 @@ def _execute_procedrr_flow(
     procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
     replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
     procedrr_event_path.touch()
+    procedrr_event_lock = threading.Lock()
     external_search_event_state = {"pending": False}
     benchmark_gate_warnings: list[dict[str, Any]] = []
 
@@ -509,7 +511,10 @@ def _execute_procedrr_flow(
         }
         if replay_key is not None:
             record["replay_key"] = replay_key
-        with procedrr_event_path.open("a", encoding="utf-8") as stream:
+        with (
+            procedrr_event_lock,
+            procedrr_event_path.open("a", encoding="utf-8") as stream,
+        ):
             stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
         if config.progress_callback is not None:
             label = event.path.rsplit(".", 1)[-1].replace("_", " ")
@@ -530,6 +535,13 @@ def _execute_procedrr_flow(
             else:
                 message = f"Workflow update: {label}"
             config.progress_callback(message)
+
+    def record_provider_attempt(record: Mapping[str, Any]) -> None:
+        with (
+            procedrr_event_lock,
+            procedrr_event_path.open("a", encoding="utf-8") as stream,
+        ):
+            stream.write(json.dumps(dict(record), sort_keys=True, default=str) + "\n")
 
     validation_profiles = _bootstrap_validation_profiles(
         worktree,
@@ -621,11 +633,13 @@ def _execute_procedrr_flow(
             config.planning_client,
             skills_dir=flow_directory,
             replay_responses=replay_responses,
+            telemetry_sink=record_provider_attempt,
         )
         jev_classifier_client = WorkrrProcedrrClient(
             JevSemanticClassifierClient(config.planning_client),
             skills_dir=flow_directory,
             replay_responses=replay_responses,
+            telemetry_sink=record_provider_attempt,
         )
         evaluator = Evaluator(
             planning_client,
@@ -653,7 +667,7 @@ def _execute_procedrr_flow(
         )
     except EvaluationError as error:
         failure = RunFailure(
-            RunFailureStage.REVIEW,
+            RunFailureStage.PLANNING,
             type(error).__name__,
             str(error),
             model_response_path=_latest_model_response_path(state),

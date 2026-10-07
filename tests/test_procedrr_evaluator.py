@@ -163,6 +163,40 @@ steps:
     assert operation.data["output"] == {"seen": "hello"}
 
 
+def test_evaluator_records_failed_judge_path_and_request_trace() -> None:
+    class FailingClient:
+        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
+            raise RuntimeError("empty provider stream")
+
+    judge = {
+        "provider": "planning",
+        "prompt_system": "JSON only",
+        "instructions": [],
+        "question": "Classify the input",
+        "context": [],
+        "output": {
+            "name": "classification",
+            "schema": {
+                "type": "object",
+                "properties": {"ok": {"type": "boolean"}},
+                "required": ["ok"],
+            },
+        },
+    }
+    events: list[EvaluationEvent] = []
+    evaluator = Evaluator(FailingClient(), lambda *_: None, event_sink=events.append)
+
+    with pytest.raises(EvaluationError, match="empty provider stream"):
+        evaluator._judge(judge, {}, events, {"llm": 0, "tools": 0}, {}, "steps[2]")
+
+    failure = events[-1]
+    assert failure.kind == "judge_failed"
+    assert failure.path == "steps[2]"
+    assert failure.data["provider"] == "planning"
+    assert failure.data["output"] == "classification"
+    assert len(failure.data["trace_id"]) == 64
+
+
 def test_evaluator_calls_a_named_procedrr_process(tmp_path: Path) -> None:
     from procedrr import parse_and_validate
 

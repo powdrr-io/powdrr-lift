@@ -476,6 +476,7 @@ class OpenAIChatClient:
             raw_response,
             "OpenAI response",
         )
+        _raise_openai_provider_error(loaded_response)
         usage = loaded_response.get("usage")
         self.last_usage = dict(usage) if isinstance(usage, dict) else {}
         choices = loaded_response.get("choices")
@@ -569,6 +570,7 @@ def _read_openai_response(
             ) from exc
         if not isinstance(event, dict):
             continue
+        _raise_openai_provider_error(event)
         if response_metadata is None:
             response_metadata = event
         choices = event.get("choices")
@@ -639,6 +641,30 @@ def _read_openai_response(
             capture.write(f"\n---STREAM-END id={capture_id}---\n")
             capture.flush()
     return json.dumps(response_metadata)
+
+
+def _raise_openai_provider_error(response: Mapping[str, Any]) -> None:
+    """Surface OpenAI-compatible API errors returned inside HTTP 200 bodies."""
+    error = response.get("error")
+    if error is None and response.get("type") == "error":
+        error = response
+    if error is None:
+        return
+
+    if isinstance(error, Mapping):
+        details = {
+            key: error[key]
+            for key in ("type", "code", "param", "message")
+            if error.get(key) not in (None, "")
+        }
+    else:
+        details = {"message": str(error)}
+    rendered = json.dumps(details, ensure_ascii=False, default=str)
+    if len(rendered) > 1500:
+        rendered = rendered[:1497] + "..."
+    raise ProviderExecutionError(
+        f"OpenAI-compatible provider returned an error event: {rendered}"
+    )
 
 
 def _stream_excerpt(content_parts: Sequence[str]) -> str:

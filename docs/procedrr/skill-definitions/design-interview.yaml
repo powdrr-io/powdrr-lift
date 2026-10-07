@@ -1125,12 +1125,10 @@ steps:
                   member_indexes:
                     type: array
                     maxItems: 16
-                    uniqueItems: true
                     items: {type: integer, minimum: 0, maximum: 15}
                   context_indexes:
                     type: array
                     maxItems: 8
-                    uniqueItems: true
                     items: {type: integer, minimum: 0, maximum: 7}
                   relationships:
                     type: array

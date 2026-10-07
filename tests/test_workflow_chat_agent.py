@@ -7769,6 +7769,28 @@ def test_transient_provider_errors_are_retryable(message: str) -> None:
     assert is_retryable_provider_error(RuntimeError(message))
 
 
+def test_openai_streaming_provider_error_event_preserves_diagnostic() -> None:
+    class _FakeResponse:
+        headers = {"Content-Type": "text/event-stream"}
+        _lines = iter(
+            [
+                b'data: {"error":{"message":"Grammar error: Unimplemented keys: [\\"uniqueItems\\"]", "type":"invalid_request_error", "code":400}}\n',
+                b"\n",
+                b"data: [DONE]\n",
+                b"\n",
+            ]
+        )
+
+        def readline(self) -> bytes:
+            return next(self._lines, b"")
+
+    with pytest.raises(
+        PowdrrExecutionError,
+        match=r"provider returned an error event: .*invalid_request_error.*uniqueItems",
+    ):
+        _read_openai_response(_FakeResponse(), progress_stream=None)
+
+
 def _build_skill() -> Skill:
     return Skill(
         name="specify-a-feature",

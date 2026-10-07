@@ -3271,6 +3271,7 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
         return 1
     summary = {
         "output_path": str(result.output_path),
+        "report_path": str(result.report_path) if result.report_path else None,
         "entity_count": len(result.document["entities"]),
         "relationship_count": len(result.document["entity_relationships"]),
         "source_anchor_count": len(result.document["files"]),
@@ -3281,6 +3282,8 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
         print(json.dumps(summary, sort_keys=True))
     else:
         print(result.output_path)
+        if result.report_path:
+            print(result.report_path)
         print(
             f"Validated {summary['entity_count']} entities, "
             f"{summary['relationship_count']} relationships, and "

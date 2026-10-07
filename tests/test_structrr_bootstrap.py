@@ -129,6 +129,10 @@ def test_bootstrap_writes_validated_source_anchored_snapshot(tmp_path: Path) -> 
         f"docs/structrr/current/baseline-{short_hash}.yaml"
     )
     assert result.output_path.is_file()
+    assert result.report_path == result.output_path.with_suffix(".md")
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "## Code structure" in report
+    assert "## Validation commands" in report
     assert {entity["id"] for entity in result.document["entities"]} >= {
         "product",
         "app",

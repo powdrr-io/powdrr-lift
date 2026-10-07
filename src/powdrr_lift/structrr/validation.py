@@ -11,6 +11,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import cast
 
+import yaml
+
 from powdrr_lift.structrr.python_topology import PythonTopology
 from powdrr_lift.structrr.validation_models import (
     VALIDATION_INVENTORY_SCHEMA_VERSION,
@@ -236,7 +238,12 @@ def discover_validation_profiles(
         )
 
     pyproject = _load_pyproject(root_path)
-    ci_commands = _ci_commands(root_path)
+    ci_origins = _github_validation_origins(root_path)
+    ci_commands = tuple(
+        command
+        for origin in ci_origins
+        for command in _commands_from_script(str(origin.get("run", "")))
+    )
     uv_prefix = ("uv", "run") if (root_path / "pyproject.toml").exists() else ()
     text = _repository_text(root_path)
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
@@ -390,7 +397,21 @@ def discover_validation_profiles(
     unique: dict[str, DiscoveredValidationProfile] = {}
     for profile in profiles:
         unique.setdefault(profile.name, profile)
-    return tuple(unique.values())
+    profiles = list(unique.values())
+    enriched: list[DiscoveredValidationProfile] = []
+    for profile in profiles:
+        markers = _profile_markers(profile)
+        matches = tuple(
+            origin
+            for origin in ci_origins
+            if markers
+            and any(
+                _contains_marker(command, markers)
+                for command in _commands_from_script(str(origin.get("run", "")))
+            )
+        )
+        enriched.append(replace(profile, ci_origins=matches) if matches else profile)
+    return tuple(enriched)
 
 
 def _profile(
@@ -1860,41 +1881,126 @@ def _mentions_tool(tool: str, pyproject: dict[str, object], text: str) -> bool:
     return tool in serialized
 
 
-def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
-    commands: list[tuple[str, ...]] = []
+def _github_validation_origins(root: Path) -> tuple[dict[str, object], ...]:
+    """Read GitHub Actions run steps with their declared execution context."""
+    origins: list[dict[str, object]] = []
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         try:
-            content = path.read_text(encoding="utf-8")
-        except OSError:
+            data = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        except (OSError, yaml.YAMLError):
             continue
-        for line in content.splitlines():
-            match = re.search(r"\brun:\s*(.+)$", line)
-            if match:
-                commands.append(_split_shell_arguments(match.group(1).strip()))
-            else:
-                stripped = line.strip()
-                if stripped.startswith(
-                    (
-                        "uv run ",
-                        "python -m ",
-                        "pytest ",
-                        "ruff ",
-                        "mypy ",
-                        "tox ",
-                        "nox ",
-                        "make ",
-                        "gmake ",
-                        "just ",
-                        "task ",
-                        "pdm ",
-                        "pipenv ",
-                        "poe ",
-                        "poetry poe ",
-                        "poetry run poe ",
-                    )
-                ):
-                    commands.append(_split_shell_arguments(stripped))
+        if not isinstance(data, dict):
+            continue
+        triggers = data.get("on", {})
+        workflow_defaults = _nested_mapping(data, "defaults", "run")
+        jobs = data.get("jobs", {})
+        if not isinstance(jobs, dict):
+            continue
+        for job_id, job in jobs.items():
+            if not isinstance(job, dict):
+                continue
+            job_defaults = _nested_mapping(job, "defaults", "run") or workflow_defaults
+            steps = job.get("steps", [])
+            if not isinstance(steps, list):
+                continue
+            for index, step in enumerate(steps):
+                if not isinstance(step, dict) or not isinstance(step.get("run"), str):
+                    continue
+                origins.append(
+                    {
+                        "workflow": path.relative_to(root).as_posix(),
+                        "triggers": triggers,
+                        "job_id": str(job_id),
+                        "job_name": str(job.get("name", job_id)),
+                        "job_if": job.get("if"),
+                        "needs": job.get("needs", []),
+                        "matrix": _nested_mapping(job, "strategy", "matrix"),
+                        "step_index": index,
+                        "step_name": str(step.get("name", f"step {index + 1}")),
+                        "step_if": step.get("if"),
+                        "run": step["run"],
+                        "shell": step.get("shell", job_defaults.get("shell")),
+                        "working_directory": step.get(
+                            "working-directory",
+                            job_defaults.get("working-directory", "."),
+                        ),
+                        "evidence": "GitHub Actions workflow jobs[].steps[].run",
+                    }
+                )
+    return tuple(origins)
+
+
+def _nested_mapping(value: dict[str, object], *keys: str) -> dict[str, object]:
+    current: object = value
+    for key in keys:
+        if not isinstance(current, dict):
+            return {}
+        current = current.get(key, {})
+    return current if isinstance(current, dict) else {}
+
+
+def _commands_from_script(script: str) -> tuple[tuple[str, ...], ...]:
+    commands: list[tuple[str, ...]] = []
+    for line in script.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "if ", "then", "fi", "set ")):
+            continue
+        for segment in re.split(r"\s*(?:&&|\|\||;)\s*", stripped):
+            try:
+                tokens = tuple(shlex.split(segment, posix=True))
+            except ValueError:
+                continue
+            if tokens and tokens[0] in {
+                "uv",
+                "python",
+                "python3",
+                "pytest",
+                "ruff",
+                "mypy",
+                "tox",
+                "nox",
+                "make",
+                "gmake",
+                "just",
+                "task",
+                "pdm",
+                "pipenv",
+                "poe",
+                "poetry",
+                "npm",
+                "pre-commit",
+                "hatch",
+                "go",
+                "cargo",
+            }:
+                commands.append(tokens)
     return tuple(commands)
+
+
+def _profile_markers(profile: DiscoveredValidationProfile) -> tuple[str, ...]:
+    command = tuple(part.removeprefix("uv") for part in profile.command)
+    for marker in (
+        ("ruff", "format"),
+        ("ruff", "check"),
+        ("mypy",),
+        ("pytest",),
+        ("tox",),
+        ("nox",),
+        ("pre-commit",),
+        ("hatch",),
+        ("pdm",),
+        ("pipenv",),
+        ("make",),
+        ("just",),
+        ("task",),
+        ("poe",),
+        ("npm", "test"),
+        ("go", "test"),
+        ("cargo", "test"),
+    ):
+        if _contains_marker(command, marker):
+            return marker
+    return command[:1]
 
 
 def _split_shell_arguments(command: str) -> tuple[str, ...]:

@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 945
+change_id: 946
 title: Specify prompt quality recovery implementation
 intent:
   problem: A completed prompt capture lost acceptance checks and contradicted explicit requirements after structured output and classification failures.

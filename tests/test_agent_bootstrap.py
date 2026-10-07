@@ -8,6 +8,8 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from powdrr_lift.agent_bootstrap import BootstrapTaskConfig, run_bootstrap_task
 from powdrr_lift.cli import main
 
@@ -43,7 +45,8 @@ def test_bootstrap_uses_packaged_taxonomy_and_retains_local_worktree(
         BootstrapTaskConfig(repo_root=root, run_id="bootstrap-one")
     )
 
-    assert result.status == "completed_local"
+    assert result.status == "completed_unverified"
+    assert result.validation_status == "no_checks"
     assert result.task is not None
     assert result.bootstrap is not None
     assert result.bootstrap.validation.successful
@@ -65,6 +68,108 @@ def test_bootstrap_uses_packaged_taxonomy_and_retains_local_worktree(
     )
 
 
+def test_bootstrap_runs_discovered_validation_and_records_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _repository(tmp_path / "repo")
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "sample"\nversion = "0.1.0"\n'
+        "[tool.ruff]\nline-length = 88\n",
+        encoding="utf-8",
+    )
+    workflow = root / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "name: CI\njobs:\n  lint:\n    steps:\n      - run: ruff check .\n",
+        encoding="utf-8",
+    )
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "declare ruff validation")
+    monkeypatch.setenv("TEST_API_KEY", "do-not-pass")
+    commands: list[list[str]] = []
+
+    def runner(
+        command: Sequence[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        args = list(command)
+        if args and args[0] in {"ruff", "uv"}:
+            commands.append(args)
+            environment = kwargs["env"]
+            assert isinstance(environment, dict)
+            assert "TEST_API_KEY" not in environment
+            assert "VIRTUAL_ENV" not in environment
+            assert "PYTHONPATH" not in environment
+            if args[0] == "uv":
+                assert environment["UV_PROJECT_ENVIRONMENT"] == str(
+                    kwargs["cwd"] / ".venv"
+                )
+            return subprocess.CompletedProcess(args, 0, "All checks passed.\n", "")
+        return subprocess.run(args, **kwargs)
+
+    result = run_bootstrap_task(
+        BootstrapTaskConfig(repo_root=root, run_id="bootstrap-validation-pass"),
+        runner=runner,
+    )
+
+    assert result.status == "completed_local"
+    assert result.validation_status == "passed"
+    assert ["ruff", "check", "."] in commands
+    assert any(command[:3] == ["uv", "run", "ruff"] for command in commands)
+    assert result.bootstrap is not None
+    check = next(
+        item
+        for item in result.bootstrap.document["validation_inventory"]
+        if item["profile"] == "ruff-check"
+    )
+    assert check["baseline"]["status"] == "passed"
+    assert check["confirmation"]["level"] == "execution"
+
+
+def test_bootstrap_reports_validation_failure_and_keeps_snapshot(
+    tmp_path: Path,
+) -> None:
+    root = _repository(tmp_path / "repo")
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "sample"\nversion = "0.1.0"\n'
+        "[tool.ruff]\nline-length = 88\n",
+        encoding="utf-8",
+    )
+    workflow = root / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "name: CI\njobs:\n  lint:\n    steps:\n      - run: ruff check .\n",
+        encoding="utf-8",
+    )
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "declare ruff validation")
+
+    def runner(
+        command: Sequence[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        args = list(command)
+        if args and args[0] == "ruff":
+            return subprocess.CompletedProcess(args, 2, "", "lint failed\n")
+        return subprocess.run(args, **kwargs)
+
+    result = run_bootstrap_task(
+        BootstrapTaskConfig(repo_root=root, run_id="bootstrap-validation-fail"),
+        runner=runner,
+    )
+
+    assert result.status == "validation_failed"
+    assert result.validation_status == "failed"
+    assert result.bootstrap is not None
+    assert result.bootstrap.output_path.is_file()
+    check = next(
+        item
+        for item in result.bootstrap.document["validation_inventory"]
+        if item["profile"] == "ruff-check"
+    )
+    assert check["baseline"]["status"] == "failed"
+    assert check["baseline"]["observation"]["returncode"] == 2
+    assert "stderr_sha256" in check["baseline"]["observation"]
+
+
 def test_bootstrap_reports_no_op_when_bootstrapping_existing_context(
     tmp_path: Path,
 ) -> None:
@@ -82,7 +187,7 @@ def test_bootstrap_reports_no_op_when_bootstrapping_existing_context(
         )
     )
 
-    assert second.status == "no_op"
+    assert second.status == "completed_unverified"
     assert second.task is not None
     assert _git(second.task.worktree, "log", "-1", "--format=%s") == (
         "Bootstrap repository structure"
@@ -104,7 +209,7 @@ def test_bootstrap_preserves_a_project_taxonomy(tmp_path: Path) -> None:
         BootstrapTaskConfig(repo_root=root, run_id="bootstrap-project-taxonomy")
     )
 
-    assert result.status == "completed_local"
+    assert result.status == "completed_unverified"
     assert result.taxonomy_provenance == "project_taxonomy"
     assert result.task is not None
     assert (result.task.worktree / "software_development_entity_taxonomy.md").read_text(
@@ -148,9 +253,9 @@ def test_bootstrap_cli_emits_one_json_result(tmp_path: Path) -> None:
             ]
         )
 
-    assert exit_code == 0
+    assert exit_code == 1
     result = json.loads(stdout.getvalue())
-    assert result["status"] == "completed_local"
+    assert result["status"] == "completed_unverified"
     assert result["branch"].startswith("powdrr/sample-onboarding-")
     assert result["worktree"]
     assert result["report_json_path"]
@@ -158,6 +263,19 @@ def test_bootstrap_cli_emits_one_json_result(tmp_path: Path) -> None:
 
 def test_bootstrap_open_pr_publishes_only_onboarding_changes(tmp_path: Path) -> None:
     root = _repository(tmp_path / "repo")
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "sample"\nversion = "0.1.0"\n'
+        "[tool.ruff]\nline-length = 88\n",
+        encoding="utf-8",
+    )
+    workflow = root / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "name: CI\njobs:\n  lint:\n    steps:\n      - run: ruff check .\n",
+        encoding="utf-8",
+    )
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "declare ruff validation")
     remote = tmp_path / "origin.git"
     subprocess.run(
         ["git", "init", "--bare", "--initial-branch=main", str(remote)],
@@ -179,6 +297,8 @@ def test_bootstrap_open_pr_publishes_only_onboarding_changes(tmp_path: Path) -> 
             return subprocess.CompletedProcess(
                 args, 0, "https://github.com/acme/repo/pull/42\n", ""
             )
+        if args[0] in {"ruff", "uv"}:
+            return subprocess.CompletedProcess(args, 0, "checks passed\n", "")
         return subprocess.run(args, **kwargs)
 
     result = run_bootstrap_task(

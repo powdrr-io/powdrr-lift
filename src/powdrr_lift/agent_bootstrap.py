@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import signal
 import subprocess
+import time
 from dataclasses import dataclass, replace
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from powdrr_lift.agent_runtime import (
     AgentWorktree,
@@ -15,12 +21,20 @@ from powdrr_lift.agent_runtime import (
     prepare_agent_worktree,
     publish_pull_request,
 )
+from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.bootstrap import BootstrapResult, bootstrap_structrr
+from powdrr_lift.structrr.bootstrap import (
+    BootstrapResult,
+    bootstrap_structrr,
+    validate_bootstrap_document,
+)
 from powdrr_lift.workrr.run_artifacts import (
     write_json_artifact,
     write_run_report,
 )
+
+_VALIDATION_BUDGET_SECONDS = 1800.0
+_PROCESS_CLEANUP_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +48,7 @@ class BootstrapTaskConfig:
     output_root: Path | None = None
     taxonomy_path: Path = Path("software_development_entity_taxonomy.md")
     run_id: str | None = None
+    validation_timeout_seconds: float = 600.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +63,7 @@ class BootstrapTaskResult:
     error: str | None = None
     failure_stage: str | None = None
     taxonomy_provenance: str | None = None
+    validation_status: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -73,6 +89,7 @@ class BootstrapTaskResult:
             "error": self.error,
             "failure_stage": self.failure_stage,
             "taxonomy_provenance": self.taxonomy_provenance,
+            "validation_status": self.validation_status,
         }
 
 
@@ -90,6 +107,7 @@ def run_bootstrap_task(
     output_root: Path | None = config.output_root
     failure_stage = "initialization"
     taxonomy_provenance: str | None = None
+    validation_status: str | None = None
     try:
         task = prepare_agent_worktree(
             repo_root,
@@ -154,6 +172,32 @@ def run_bootstrap_task(
             raise PowdrrExecutionError(
                 "Structrr bootstrap validation failed: " + "; ".join(issues)
             )
+        baseline_result = _run_validation_baseline(
+            task.worktree,
+            bootstrap.document,
+            runner=runner,
+            timeout_seconds=config.validation_timeout_seconds,
+        )
+        validation_status = str(baseline_result["status"])
+        if baseline_result["checks"]:
+            report = validate_bootstrap_document(
+                bootstrap.document,
+                root=task.worktree,
+                taxonomy=load_entity_taxonomy(task.worktree, selected_taxonomy),
+            )
+            if not report.successful:
+                issues = [f"{issue.code}: {issue.message}" for issue in report.issues]
+                raise PowdrrExecutionError(
+                    "Validation results made the Structrr snapshot invalid: "
+                    + "; ".join(issues)
+                )
+            bootstrap = replace(bootstrap, validation=report)
+            bootstrap.output_path.write_text(
+                yaml.safe_dump(
+                    bootstrap.document, sort_keys=False, allow_unicode=False
+                ),
+                encoding="utf-8",
+            )
         if (
             previous_snapshot is not None
             and previous_snapshot == bootstrap.output_path.read_bytes()
@@ -180,9 +224,17 @@ def run_bootstrap_task(
             "Bootstrap repository structure",
             runner=runner,
         )
-        if not has_commit:
-            status = "no_op"
-        elif config.open_pr:
+        if validation_status in {
+            "failed",
+            "blocked",
+            "timed_out",
+        }:
+            status = "validation_failed"
+            failure_stage = "validation"
+        elif config.open_pr and validation_status != "passed":
+            status = "validation_incomplete"
+            failure_stage = "validation"
+        elif config.open_pr and has_commit:
             failure_stage = "publication"
             pull_request_url = publish_pull_request(
                 task,
@@ -193,6 +245,11 @@ def run_bootstrap_task(
                 runner=runner,
             )
             status = "pr_opened"
+        elif validation_status == "no_checks":
+            status = "completed_unverified"
+            failure_stage = "validation"
+        elif not has_commit:
+            status = "no_op"
         else:
             status = "completed_local"
         result = BootstrapTaskResult(
@@ -203,8 +260,18 @@ def run_bootstrap_task(
             pull_request_url,
             None,
             None,
-            failure_stage=None,
+            failure_stage=(
+                failure_stage
+                if status
+                in {
+                    "validation_failed",
+                    "validation_incomplete",
+                    "completed_unverified",
+                }
+                else None
+            ),
             taxonomy_provenance=taxonomy_provenance,
+            validation_status=validation_status,
         )
         return _persist_result(
             result, output_root, publication_requested=config.open_pr
@@ -228,6 +295,7 @@ def run_bootstrap_task(
             f"{type(error).__name__}: {error}",
             failure_stage,
             taxonomy_provenance,
+            validation_status,
         )
         return _persist_result(
             result, output_root, publication_requested=config.open_pr
@@ -280,21 +348,7 @@ def _persist_result(
         "branch": data["branch"],
         "worktree": data["worktree"],
         "attempt": {"changed_paths": list(result.changed_paths)},
-        "validation": (
-            result.bootstrap.validation.__dict__
-            if result.bootstrap and hasattr(result.bootstrap.validation, "__dict__")
-            else {
-                "successful": bool(
-                    result.bootstrap and result.bootstrap.validation.successful
-                ),
-                "issues": [
-                    {"code": issue.code, "message": issue.message}
-                    for issue in result.bootstrap.validation.issues
-                ]
-                if result.bootstrap
-                else [],
-            }
-        ),
+        "validation": _validation_report_data(result),
         "publication": {
             "status": "opened"
             if result.pull_request_url
@@ -303,10 +357,17 @@ def _persist_result(
             else "no_op"
             if result.status == "no_op"
             else "failed"
-            if result.status == "failed"
+            if result.status
+            in {
+                "failed",
+                "validation_failed",
+                "validation_incomplete",
+                "completed_unverified",
+            }
             else "not_reached",
             "pull_request_url": result.pull_request_url,
         },
+        "validation_status": result.validation_status,
     }
     report_json, report_markdown = write_run_report(
         output_root,
@@ -318,6 +379,247 @@ def _persist_result(
         report_json_path=report_json,
         report_markdown_path=report_markdown,
     )
+
+
+def _validation_report_data(result: BootstrapTaskResult) -> dict[str, Any]:
+    bootstrap = result.bootstrap
+    checks = bootstrap.document.get("validation_inventory", []) if bootstrap else []
+    return {
+        "snapshot_successful": bool(bootstrap and bootstrap.validation.successful),
+        "snapshot_issues": [
+            {"code": issue.code, "message": issue.message}
+            for issue in bootstrap.validation.issues
+        ]
+        if bootstrap
+        else [],
+        "baseline_status": result.validation_status,
+        "checks": [
+            {
+                "profile": check.get("profile"),
+                "command": check.get("command", []),
+                "status": check.get("baseline", {}).get("status")
+                if isinstance(check.get("baseline"), dict)
+                else None,
+            }
+            for check in checks
+            if isinstance(check, dict)
+        ]
+        if isinstance(checks, list)
+        else [],
+    }
+
+
+def _run_validation_baseline(
+    worktree: Path,
+    document: dict[str, Any],
+    *,
+    runner: Any,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """Run discovered local argv checks and store bounded baseline outcomes."""
+    inventory = document.get("validation_inventory", [])
+    if not isinstance(inventory, list):
+        return {"status": "blocked", "checks": 0}
+
+    applicable = [
+        check
+        for check in inventory
+        if isinstance(check, dict)
+        and isinstance(check.get("applicability"), dict)
+        and check["applicability"].get("local", True) is not False
+    ]
+    if not applicable:
+        return {"status": "no_checks", "checks": 0}
+
+    deadline = time.monotonic() + _VALIDATION_BUDGET_SECONDS
+    statuses: list[str] = []
+    for check in applicable:
+        command = check.get("command", [])
+        execution = check.get("execution", {})
+        cwd_value = execution.get("cwd", ".") if isinstance(execution, dict) else "."
+        status: str
+        returncode: int | None = None
+        stdout = ""
+        stderr = ""
+        error: str | None = None
+        cwd = (worktree / str(cwd_value)).resolve()
+        remaining_seconds = deadline - time.monotonic()
+        try:
+            cwd.relative_to(worktree.resolve())
+        except ValueError:
+            cwd = worktree
+            status = "blocked"
+            error = "validation working directory escapes the task worktree"
+        else:
+            if remaining_seconds <= 0:
+                status = "timed_out"
+                error = "aggregate validation time budget was exhausted"
+            elif (
+                not isinstance(command, list)
+                or not command
+                or not all(isinstance(item, str) and item for item in command)
+                or not isinstance(execution, dict)
+                or execution.get("kind") != "argv"
+            ):
+                status = "blocked"
+                error = "validation check has no supported argv command"
+            elif not cwd.is_dir():
+                status = "blocked"
+                error = f"validation working directory does not exist: {cwd_value}"
+            else:
+                environment = {
+                    key: value
+                    for key, value in os.environ.items()
+                    if not any(
+                        marker in key.upper()
+                        for marker in (
+                            "TOKEN",
+                            "KEY",
+                            "SECRET",
+                            "PASSWORD",
+                            "CREDENTIAL",
+                            "AUTH",
+                            "PRIVATE_KEY",
+                        )
+                    )
+                }
+                environment.pop("VIRTUAL_ENV", None)
+                environment.pop("PYTHONPATH", None)
+                environment.pop("UV_NO_SYNC", None)
+                environment.pop("UV_PROJECT_ENVIRONMENT", None)
+                if command[0] == "uv":
+                    environment["UV_PROJECT_ENVIRONMENT"] = str(worktree / ".venv")
+                try:
+                    completed = _run_validation_command(
+                        runner,
+                        command,
+                        cwd=cwd,
+                        env=environment,
+                        timeout_seconds=min(timeout_seconds, remaining_seconds),
+                    )
+                    returncode = completed.returncode
+                    stdout = completed.stdout or ""
+                    stderr = completed.stderr or ""
+                    status, error = _command_outcome(returncode, stdout, stderr)
+                except subprocess.TimeoutExpired:
+                    status = "timed_out"
+                    error = f"validation command exceeded {timeout_seconds:g}s"
+                except FileNotFoundError as command_error:
+                    status = "blocked"
+                    error = str(command_error)
+                except OSError as command_error:
+                    status = "blocked"
+                    error = str(command_error)
+
+        observation = {
+            "kind": "bootstrap_baseline",
+            "status": status,
+            "command": command if isinstance(command, list) else [],
+            "returncode": returncode,
+            "stdout_sha256": _output_digest(stdout),
+            "stderr_sha256": _output_digest(stderr),
+            "error": error,
+        }
+        check["confirmation"] = {
+            "level": "execution",
+            "observations": [observation],
+        }
+        check["baseline"] = {"status": status, "observation": observation}
+        statuses.append(status)
+
+    if "timed_out" in statuses:
+        overall = "timed_out"
+    elif "failed" in statuses:
+        overall = "failed"
+    elif "blocked" in statuses:
+        overall = "blocked"
+    else:
+        overall = "passed"
+    return {"status": overall, "checks": len(statuses)}
+
+
+def _output_digest(value: object) -> str:
+    if isinstance(value, bytes):
+        text = value.decode("utf-8", errors="replace")
+    else:
+        text = str(value or "")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _run_validation_command(
+    runner: Any,
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    timeout_seconds: float,
+) -> subprocess.CompletedProcess[str]:
+    kwargs = {
+        "cwd": cwd,
+        "env": env,
+        "capture_output": True,
+        "text": True,
+        "timeout": timeout_seconds,
+        "check": False,
+    }
+    if runner is not subprocess.run or os.name != "posix":
+        return runner(command, **kwargs)
+
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as timeout_error:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            stdout, stderr = process.communicate(
+                timeout=_PROCESS_CLEANUP_TIMEOUT_SECONDS
+            )
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = process.communicate()
+        raise subprocess.TimeoutExpired(
+            command,
+            timeout_seconds,
+            output=stdout or timeout_error.stdout,
+            stderr=stderr or timeout_error.stderr,
+        ) from None
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def _command_outcome(
+    returncode: int, stdout: str, stderr: str
+) -> tuple[str, str | None]:
+    if returncode == 0:
+        return "passed", None
+    output = f"{stdout}\n{stderr}".lower()
+    if any(
+        phrase in output
+        for phrase in (
+            "command not found",
+            "executable not found",
+            "no module named",
+            "no such file or directory",
+            "could not find",
+            "failed to spawn",
+            "not installed",
+        )
+    ):
+        return "blocked", "a required validation tool or dependency is unavailable"
+    return "failed", f"validation command exited with status {returncode}"
 
 
 def _render_bootstrap_pr_body(
@@ -343,6 +645,15 @@ def _render_bootstrap_pr_body(
         )
         if checks
         else "- No repository validation commands were discovered."
+    )
+    outcomes = [
+        f"- `{item['profile']}`: `{item.get('baseline', {}).get('status', 'not_run')}`"
+        for item in checks
+    ]
+    baseline_text = (
+        "All discovered local checks passed.\n\n" + "\n".join(outcomes)
+        if checks
+        else "No local validation checks were discovered; bootstrap is unverified."
     )
     extraction_errors = (
         manifest.get("extraction_errors", []) if isinstance(manifest, dict) else []
@@ -380,6 +691,10 @@ def _render_bootstrap_pr_body(
             "## Validation/check discovery",
             "",
             checks_text,
+            "",
+            "Baseline execution:",
+            "",
+            baseline_text,
             "",
             "## Generated files",
             "",

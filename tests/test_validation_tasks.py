@@ -10,6 +10,7 @@ from powdrr_lift.structrr.validation_tasks import (
     discover_make_configuration,
     discover_pdm_configuration,
     discover_pipenv_configuration,
+    discover_poe_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
@@ -17,6 +18,7 @@ from powdrr_lift.structrr.validation_tasks import (
     make_target_closure,
     pdm_script_closure,
     pipenv_script_closure,
+    poe_task_closure,
     task_runner_closure,
 )
 
@@ -943,3 +945,54 @@ def test_pipenv_shell_composition_and_call_remain_unresolved(tmp_path: Path) -> 
     assert inline_commands == ()
     assert any("shell composition" in item for item in inline_diagnostics)
     assert any("call script" in item for item in call_diagnostics)
+
+
+def test_poe_sequence_tasks_expand_refs_and_preserve_workflow_command(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.poe]\ninclude = ['tasks/common.toml']\n"
+        "[tool.poe.tasks]\n"
+        "lint = 'ruff check src'\n"
+        "test = {cmd = 'pytest tests', env = {MODE = 'ci'}}\n"
+        "check = ['lint', 'test']\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n"
+        "      - run: poetry run poe --directory . check\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_poe_configuration(tmp_path)
+    assert configuration is not None
+    commands, diagnostics = poe_task_closure(configuration, "check")
+    assert commands == (("ruff", "check", "src"), ("pytest", "tests"))
+    assert any("included task files" in item for item in diagnostics)
+    assert any("env settings" in item for item in diagnostics)
+
+    profiles = discover_validation_profiles(tmp_path)
+    profile = next(item for item in profiles if item.name == "poe-check")
+    assert profile.command == ("poetry", "run", "poe", "--directory", ".", "check")
+    assert profile.provider == "aggregate"
+    assert profile.evidence == (
+        "validation-input:pyproject.toml",
+        "validation-input:.github/workflows/ci.yml",
+    )
+
+
+def test_poe_alternate_config_and_dynamic_task_forms_are_reported(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "poe_tasks.yaml").write_text(
+        "tasks:\n  check:\n    parallel: [lint, test]\n",
+        encoding="utf-8",
+    )
+    configuration = discover_poe_configuration(tmp_path)
+    assert configuration is not None
+    assert configuration.config_file == "poe_tasks.yaml"
+    commands, diagnostics = poe_task_closure(configuration, "check")
+    assert commands == ()
+    assert any("parallel task" in item for item in diagnostics)

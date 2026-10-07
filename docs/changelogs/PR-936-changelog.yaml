@@ -19,9 +19,14 @@ files:
     rationale: Keep the workflow path and trace ID emitted by a failed judge.
   - path: src/procedrr_evaluator/evaluator.py
     type: modified
-    span: {start_line: 804, end_line: 805}
+    span: {start_line: 807, end_line: 808}
     summary: Collect errors while iterating completed parallel judge items.
     rationale: Delay propagation until all item events have been forwarded.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 804, end_line: 805}
+    summary: Prepare a collection for parallel item errors.
+    rationale: Record batch failures and propagate them after buffered events are delivered.
   - path: src/procedrr_evaluator/evaluator.py
     type: modified
     span: {start_line: 815, end_line: 817}

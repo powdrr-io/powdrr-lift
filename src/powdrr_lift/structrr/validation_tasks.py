@@ -44,6 +44,43 @@ class NoxConfiguration:
     unresolved: tuple[str, ...] = ()
 
 
+_MAKE_VALIDATION_TARGETS = {
+    "check",
+    "ci",
+    "format",
+    "format-check",
+    "lint",
+    "pre-commit",
+    "test",
+    "tests",
+    "typecheck",
+    "type-check",
+    "validate",
+    "verify",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class MakeTargetDeclaration:
+    """A Make target with source-backed prerequisites and recipe text."""
+
+    name: str
+    prerequisites: tuple[str, ...]
+    recipes: tuple[str, ...]
+    source: str
+    phony: bool = False
+    unresolved: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class MakeConfiguration:
+    """Literal targets collected from Makefiles and recursively included files."""
+
+    config_files: tuple[str, ...]
+    targets: Mapping[str, MakeTargetDeclaration]
+    unresolved: tuple[str, ...] = ()
+
+
 def discover_tox_configuration(root: str | Path) -> ToxConfiguration | None:
     """Read tox 3/4 configuration without importing or executing project code."""
     root_path = Path(root).resolve()
@@ -228,6 +265,314 @@ def nox_workflow_invocations(
                     (invocation, sessions, path.relative_to(root_path).as_posix())
                 )
     return tuple(found)
+
+
+def discover_make_configuration(root: str | Path) -> MakeConfiguration | None:
+    """Parse Make rules and literal includes without expanding or running them."""
+    root_path = Path(root).resolve()
+    entry = next(
+        (
+            path
+            for name in ("GNUmakefile", "Makefile", "makefile")
+            if (path := root_path / name).is_file()
+        ),
+        None,
+    )
+    if entry is None:
+        return None
+    targets: dict[str, MakeTargetDeclaration] = {}
+    config_files: list[str] = []
+    unresolved: list[str] = []
+    _read_makefile(root_path, entry, targets, config_files, unresolved, (), 0)
+    return MakeConfiguration(
+        tuple(dict.fromkeys(config_files)),
+        targets,
+        tuple(dict.fromkeys(unresolved)),
+    )
+
+
+def likely_make_validation_targets(
+    configuration: MakeConfiguration,
+) -> tuple[str, ...]:
+    """Return likely validation entrypoints, leaving their inferred status intact."""
+    candidates = {
+        name
+        for name in configuration.targets
+        if name in _MAKE_VALIDATION_TARGETS
+        or name.startswith(("check-", "lint-", "test-", "typecheck-", "validate-"))
+    }
+    nested = {
+        prerequisite
+        for name in candidates
+        for prerequisite in configuration.targets[name].prerequisites
+        if prerequisite in candidates
+    }
+    roots = tuple(sorted(candidates - nested))
+    return roots or tuple(sorted(candidates))
+
+
+def make_ci_invocations(
+    commands: Sequence[tuple[str, ...]],
+) -> tuple[tuple[tuple[str, ...], tuple[str, ...]], ...]:
+    """Select literal Make command lines and explicit target arguments."""
+    found: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+    for command in commands:
+        executable_index = next(
+            (
+                index
+                for index, token in enumerate(command)
+                if Path(token).name in {"make", "gmake"}
+            ),
+            None,
+        )
+        if executable_index is None:
+            continue
+        targets: list[str] = []
+        skip_next = False
+        for token in command[executable_index + 1 :]:
+            if skip_next:
+                skip_next = False
+                continue
+            if token in {"-C", "--directory", "-f", "--file", "-j", "--jobs"}:
+                skip_next = True
+                continue
+            if token.startswith("--target="):
+                targets.extend(
+                    part for part in token.split("=", 1)[1].split(",") if part
+                )
+                continue
+            if token.startswith(("-", "--")) or "=" in token or token.startswith("${{"):
+                continue
+            targets.append(token)
+        found.append((command, tuple(targets)))
+    return tuple(found)
+
+
+def make_target_closure(
+    configuration: MakeConfiguration,
+    selected: Sequence[str],
+    *,
+    max_depth: int = 16,
+) -> tuple[tuple[MakeTargetDeclaration, ...], tuple[str, ...]]:
+    """Return selected targets and literal prerequisite declarations in order."""
+    collected: list[MakeTargetDeclaration] = []
+    diagnostics: list[str] = []
+    visited: set[str] = set()
+
+    def visit(name: str, stack: tuple[str, ...], depth: int) -> None:
+        if name in stack:
+            diagnostics.append(
+                f"Make prerequisite cycle detected: {' -> '.join((*stack, name))}."
+            )
+            return
+        if name in visited:
+            return
+        if depth > max_depth:
+            diagnostics.append(f"Make prerequisite depth exceeded at target {name!r}.")
+            return
+        declaration = configuration.targets.get(name)
+        if declaration is None:
+            diagnostics.append(
+                f"Make prerequisite {name!r} has no static rule in discovered files."
+            )
+            return
+        visited.add(name)
+        collected.append(declaration)
+        diagnostics.extend(declaration.unresolved)
+        for prerequisite in declaration.prerequisites:
+            if "$" in prerequisite or "%" in prerequisite:
+                diagnostics.append(
+                    f"Dynamic Make prerequisite retained for {name!r}: {prerequisite}."
+                )
+            else:
+                visit(prerequisite, (*stack, name), depth + 1)
+
+    for target in selected:
+        visit(target, (), 0)
+    diagnostics.extend(configuration.unresolved)
+    return tuple(collected), tuple(dict.fromkeys(diagnostics))
+
+
+def make_workflow_invocations(
+    root: str | Path,
+) -> tuple[tuple[tuple[str, ...], tuple[str, ...], str], ...]:
+    """Read inline Make run steps with their workflow paths."""
+    root_path = Path(root).resolve()
+    found: list[tuple[tuple[str, ...], tuple[str, ...], str]] = []
+    for path in sorted((root_path / ".github" / "workflows").glob("*.y*ml")):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            match = re.search(r"\brun:\s*(.+)$", line)
+            if not match:
+                continue
+            try:
+                command = tuple(shlex.split(match.group(1).strip(), posix=True))
+            except ValueError:
+                continue
+            for invocation, targets in make_ci_invocations((command,)):
+                found.append(
+                    (invocation, targets, path.relative_to(root_path).as_posix())
+                )
+    return tuple(found)
+
+
+def _read_makefile(
+    root: Path,
+    path: Path,
+    targets: dict[str, MakeTargetDeclaration],
+    config_files: list[str],
+    unresolved: list[str],
+    stack: tuple[Path, ...],
+    depth: int,
+) -> None:
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        unresolved.append(f"Make include escapes the repository: {path}.")
+        return
+    if depth > 16:
+        unresolved.append(f"Make include depth exceeded at {path.relative_to(root)}.")
+        return
+    if resolved in stack:
+        unresolved.append(f"Make include cycle detected at {path.relative_to(root)}.")
+        return
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        unresolved.append(f"Could not read Makefile {path.relative_to(root)}: {error}")
+        return
+    try:
+        relative = path.relative_to(root).as_posix()
+    except ValueError:
+        unresolved.append(f"Make include escapes the repository: {path}.")
+        return
+    config_files.append(relative)
+    lines = _make_logical_lines(content)
+    phony: set[str] = set()
+    include_paths: list[Path] = []
+    active_targets: tuple[str, ...] = ()
+    for line in lines:
+        include_match = re.match(r"^\s*(-?include|sinclude)\s+(.+?)\s*$", line)
+        if include_match:
+            declaration = include_match.group(2)
+            if "$" in declaration or "`" in declaration:
+                unresolved.append(f"Dynamic Make include in {relative}: {declaration}.")
+            else:
+                for filename in shlex.split(declaration):
+                    include_paths.extend(
+                        _make_include_paths(root, path.parent, filename)
+                    )
+            continue
+        phony_match = re.match(r"^\.PHONY\s*:\s*(.*)$", line)
+        if phony_match:
+            phony.update(phony_match.group(1).split())
+            continue
+        if line.startswith("\t") or not line.strip() or line.lstrip().startswith("#"):
+            if line.startswith("\t") and active_targets:
+                for target in active_targets:
+                    previous = targets.get(target)
+                    if previous:
+                        targets[target] = MakeTargetDeclaration(
+                            previous.name,
+                            previous.prerequisites,
+                            (*previous.recipes, line[1:]),
+                            previous.source,
+                            previous.phony,
+                            previous.unresolved,
+                        )
+            continue
+        rule = _parse_make_rule(line)
+        if rule is None:
+            active_targets = ()
+            continue
+        target_names, prerequisites, inline_recipe = rule
+        active_targets = target_names
+        for name in target_names:
+            dynamic = "$" in name or "%" in name
+            target_unresolved = (
+                (f"Dynamic Make target or pattern retained: {name}.",)
+                if dynamic
+                else ()
+            )
+            previous = targets.get(name)
+            targets[name] = MakeTargetDeclaration(
+                name=name,
+                prerequisites=(previous.prerequisites if previous else ())
+                + prerequisites,
+                recipes=(previous.recipes if previous else ())
+                + ((inline_recipe,) if inline_recipe else ()),
+                source=relative,
+                phony=name in phony or bool(previous and previous.phony),
+                unresolved=(previous.unresolved if previous else ())
+                + target_unresolved,
+            )
+    for target_name, declaration in tuple(targets.items()):
+        if declaration.source == relative:
+            targets[target_name] = MakeTargetDeclaration(
+                declaration.name,
+                declaration.prerequisites,
+                declaration.recipes,
+                declaration.source,
+                target_name in phony,
+                declaration.unresolved,
+            )
+    for include_path in include_paths:
+        _read_makefile(
+            root,
+            include_path,
+            targets,
+            config_files,
+            unresolved,
+            (*stack, resolved),
+            depth + 1,
+        )
+
+
+def _make_logical_lines(content: str) -> tuple[str, ...]:
+    result: list[str] = []
+    pending = ""
+    for line in content.splitlines():
+        if pending:
+            pending += line.lstrip()
+        else:
+            pending = line
+        if pending.endswith("\\"):
+            pending = pending[:-1] + " "
+            continue
+        result.append(pending)
+        pending = ""
+    if pending:
+        result.append(pending)
+    return tuple(result)
+
+
+def _parse_make_rule(
+    line: str,
+) -> tuple[tuple[str, ...], tuple[str, ...], str | None] | None:
+    match = re.match(r"^([^#\t][^:]*?)\s*::?\s*([^;#]*)(?:;\s*(.*))?$", line)
+    if not match or re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*[:?+!]?=", line):
+        return None
+    target_names = tuple(name for name in match.group(1).split() if name)
+    if not target_names:
+        return None
+    prerequisites = tuple(match.group(2).split())
+    inline_recipe = match.group(3).strip() if match.group(3) else None
+    return target_names, prerequisites, inline_recipe
+
+
+def _make_include_paths(root: Path, parent: Path, declaration: str) -> tuple[Path, ...]:
+    paths: list[Path] = []
+    for base in (parent, root):
+        candidate = base / declaration
+        if any(character in declaration for character in "*?["):
+            paths.extend(sorted(candidate.parent.glob(candidate.name)))
+        elif candidate.is_file():
+            paths.append(candidate)
+    return tuple(dict.fromkeys(path.resolve() for path in paths))
 
 
 def _session_from_function(

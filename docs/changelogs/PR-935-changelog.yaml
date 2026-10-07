@@ -9,38 +9,133 @@ structured_files: []
 files:
   - path: src/procedrr_evaluator/evaluator.py
     type: modified
-    span: {start_line: 657, end_line: 684}
+    span: {start_line: 11, end_line: 12}
+    summary: Import hashing and JSON serialization for request trace identifiers.
+    rationale: Generate stable request IDs without recording prompt contents.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 657, end_line: 659}
+    summary: Compute a hashed trace ID for each judge request.
+    rationale: Correlate judge failures with provider attempt records.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 661, end_line: 684}
     summary: Record failed judge events with workflow path, provider, output name, and a hashed trace ID.
     rationale: Preserve the identity of a failed classification call before propagating its exception.
   - path: src/powdrr_lift/workrr/procedrr.py
     type: modified
-    span: {start_line: 160, end_line: 220}
-    summary: Record each provider attempt with trace ID, attempt number, client/model, duration, outcome, retryability, and error type.
-    rationale: Show whether each request failed, retried, or succeeded without writing prompt contents to telemetry.
+    span: {start_line: 8, end_line: 8}
+    summary: Import callable telemetry typing from collections.abc.
+    rationale: Type the optional provider-attempt telemetry callback.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 144, end_line: 144}
+    summary: Accept an optional telemetry sink in the Procedrr provider adapter.
+    rationale: Allow endpoint runs to persist attempt-level provider diagnostics.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 152, end_line: 152}
+    summary: Retain the provider telemetry sink on the adapter.
+    rationale: Emit retry records from the provider call boundary.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 164, end_line: 164}
+    summary: Pass the call trace ID through the provider attempt loop.
+    rationale: Link every retry attempt to its judge call.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 167, end_line: 167}
+    summary: Start timing each provider attempt.
+    rationale: Record provider latency per request attempt.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 169, end_line: 169}
+    summary: Capture successful provider completions for telemetry.
+    rationale: Distinguish successful calls from failed or retried calls.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 172, end_line: 175}
+    summary: Emit telemetry for successful provider attempts.
+    rationale: Provide a final outcome record for each completed provider request.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 177, end_line: 187}
+    summary: Classify each provider failure and record whether it will be retried.
+    rationale: Make retry decisions visible in the run trace.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 189, end_line: 189}
+    summary: Stop retrying once the configured attempt limit is reached.
+    rationale: Retain the bounded retry policy while preserving the terminal failure record.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 194, end_line: 221}
+    summary: Serialize attempt metadata with trace ID, retry outcome, timing, and model identifiers.
+    rationale: Diagnose failing provider calls without storing request messages.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 280, end_line: 282}
+    summary: Attach the request trace ID to provider attempts.
+    rationale: Correlate provider retry telemetry with the failed judge event.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 483, end_line: 543}
-    summary: Serialize concurrent Procedrr step and provider-attempt events through one locked JSONL sink.
-    rationale: Keep concurrent event records complete and machine-readable in the run artifact.
+    span: {start_line: 9, end_line: 9}
+    summary: Import a lock for concurrent telemetry writes.
+    rationale: Prevent interleaving JSONL event writes from parallel judge calls.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 630, end_line: 677}
-    summary: Connect provider telemetry sinks and classify evaluator failures as planning failures.
-    rationale: Make provider attempt records available in run artifacts and report their failure stage accurately.
+    span: {start_line: 486, end_line: 486}
+    summary: Create a shared lock for Procedrr event writes.
+    rationale: Keep concurrent workflow and provider event records intact.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 514, end_line: 517}
+    summary: Lock writes of evaluator step events to the JSONL run artifact.
+    rationale: Avoid corrupted event records when parallel judges complete together.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 539, end_line: 545}
+    summary: Add a locked sink for provider attempt telemetry.
+    rationale: Persist retry outcomes in the same run artifact as evaluator events.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 636, end_line: 636}
+    summary: Attach the provider telemetry sink to the planning client adapter.
+    rationale: Capture attempts for planning judges.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 642, end_line: 642}
+    summary: Attach the provider telemetry sink to the classifier client adapter.
+    rationale: Capture attempts for classifier judges and their fallback calls.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 670, end_line: 670}
+    summary: Report Procedrr evaluation failures at the planning stage.
+    rationale: Identify the phase that failed during prompt generation.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 43, end_line: 43}
+    summary: Update the golden end line for the expanded Procedrr client class.
+    rationale: Keep the symbol snapshot aligned with the current source span.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 49, end_line: 50}
+    summary: Update the golden span for the Procedrr client completion method.
+    rationale: Keep the symbol snapshot aligned with the expanded telemetry implementation.
   - path: tests/test_procedrr_evaluator.py
     type: modified
-    span: {start_line: 166, end_line: 197}
+    span: {start_line: 166, end_line: 199}
     summary: Verify failed judge events retain the workflow path, provider, output, and trace ID.
     rationale: Prevent regressions that would again leave a failing judge unidentified.
   - path: tests/test_workrr_procedrr.py
     type: modified
-    span: {start_line: 77, end_line: 110}
+    span: {start_line: 77, end_line: 112}
     summary: Verify retry telemetry is correlated across attempts and excludes prompt content.
     rationale: Ensure provider failures can be traced without persisting sensitive prompt text.
 entities:
   - id: procedrr-failed-judge-event
     type: Function
-    action: modified
+    action: added
   - id: procedrr-provider-attempt-telemetry
     type: Function
     action: added

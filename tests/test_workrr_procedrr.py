@@ -74,6 +74,42 @@ def test_procedrr_retries_http_429(
     assert delays == [2.0]
 
 
+def test_procedrr_records_provider_retry_attempts_without_prompt_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class RetryOnce:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                error = RuntimeError("upstream unavailable")
+                error.status_code = 503  # type: ignore[attr-defined]
+                raise error
+            return {"complete": True}
+
+    events: list[dict[str, Any]] = []
+    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", lambda _: None)
+    client = WorkrrProcedrrClient(
+        cast(Any, RetryOnce()),
+        skills_dir=tmp_path,
+        telemetry_sink=lambda record: events.append(dict(record)),
+    )
+
+    client.complete_json(
+        [{"role": "user", "content": "secret prompt text"}],
+        response_schema=SCHEMA,
+    )
+
+    assert [event["outcome"] for event in events] == ["retrying", "succeeded"]
+    assert [event["attempt"] for event in events] == [1, 2]
+    assert events[0]["retryable"] is True
+    assert events[0]["trace_id"] == events[1]["trace_id"]
+    assert "secret prompt text" not in str(events)
+
+
 def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:
     provider = RepairingClient([{}, {"complete": True}])
     client = WorkrrProcedrrClient(provider, skills_dir=tmp_path)

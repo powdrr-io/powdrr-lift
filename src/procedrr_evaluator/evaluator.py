@@ -8,6 +8,8 @@ prompt construction, schema validation, and bounded control traversal.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -652,10 +654,34 @@ class Evaluator:
         self._limit(usage, limits, "llm_activations", "LLM activations")
         schema = judge["output"]["schema"]
         client = self.judge_clients.get(str(judge.get("provider", "")), self.llm)
+        trace_id = hashlib.sha256(
+            json.dumps(messages, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
         try:
-            output = client.complete_json(messages, response_schema=schema)  # type: ignore[call-arg]
-        except TypeError:
-            output = client.complete_json(messages)
+            try:
+                output = client.complete_json(  # type: ignore[call-arg]
+                    messages, response_schema=schema
+                )
+            except TypeError:
+                output = client.complete_json(messages)
+        except Exception as exc:
+            events.append(
+                EvaluationEvent(
+                    "judge_failed",
+                    path,
+                    {
+                        "provider": str(judge.get("provider", "default")),
+                        "output": str(judge["output"]["name"]),
+                        "trace_id": trace_id,
+                        "error_type": type(exc).__name__,
+                    },
+                )
+            )
+            raise EvaluationError(
+                f"{path}.judge provider={judge.get('provider', 'default')} "
+                f"output={judge['output']['name']} trace_id={trace_id} "
+                f"failed with {type(exc).__name__}: {exc}"
+            ) from exc
         validate_json(output, judge["output"]["schema"])
         state[judge["output"]["name"]] = output
         self._schemas_for_state(state)[judge["output"]["name"]] = dict(schema)

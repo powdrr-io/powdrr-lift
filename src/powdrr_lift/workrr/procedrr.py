@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -141,6 +141,7 @@ class WorkrrProcedrrClient:
         provider_retry_attempts: int = 3,
         provider_retry_delay_seconds: float = 1.0,
         replay_responses: Mapping[str, Mapping[str, Any]] | None = None,
+        telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
         self._client = client
         self._skills_dir = skills_dir
@@ -148,6 +149,7 @@ class WorkrrProcedrrClient:
         self._provider_retry_attempts = provider_retry_attempts
         self._provider_retry_delay_seconds = provider_retry_delay_seconds
         self._replay_responses = dict(replay_responses or {})
+        self._telemetry_sink = telemetry_sink
 
     @staticmethod
     def replay_key(messages: list[dict[str, str]]) -> str:
@@ -159,19 +161,63 @@ class WorkrrProcedrrClient:
         self,
         messages: list[dict[str, str]],
         response_schema: Mapping[str, Any],
+        trace_id: str,
     ) -> dict[str, Any]:
         for attempt in range(self._provider_retry_attempts + 1):
+            started = time.monotonic()
             try:
-                return cast(Any, self._client).complete_json(
+                result = cast(Any, self._client).complete_json(
                     messages, response_schema=response_schema
                 )
+                self._record_provider_attempt(
+                    trace_id, attempt, started, outcome="succeeded"
+                )
+                return result
             except Exception as exc:  # noqa: BLE001 - classify provider failures below
-                if not _is_retryable_provider_failure(exc):
+                retryable = _is_retryable_provider_failure(exc)
+                will_retry = retryable and attempt < self._provider_retry_attempts
+                self._record_provider_attempt(
+                    trace_id,
+                    attempt,
+                    started,
+                    outcome="retrying" if will_retry else "failed",
+                    error_type=type(exc).__name__,
+                    retryable=retryable,
+                )
+                if not retryable:
                     raise
-                if attempt >= self._provider_retry_attempts:
+                if not will_retry:
                     raise
                 time.sleep(self._provider_retry_delay_seconds * (2**attempt))
         raise AssertionError("provider retry loop exited without a result")
+
+    def _record_provider_attempt(
+        self,
+        trace_id: str,
+        attempt: int,
+        started: float,
+        *,
+        outcome: str,
+        error_type: str | None = None,
+        retryable: bool | None = None,
+    ) -> None:
+        if self._telemetry_sink is None:
+            return
+        client = self._client
+        self._telemetry_sink(
+            {
+                "record_type": "procedrr.provider_attempt",
+                "trace_id": trace_id,
+                "attempt": attempt + 1,
+                "provider_client": type(client).__name__,
+                "model": getattr(client, "model_name", None)
+                or getattr(client, "_model", None),
+                "duration_ms": round((time.monotonic() - started) * 1000),
+                "outcome": outcome,
+                "error_type": error_type,
+                "retryable": retryable,
+            }
+        )
 
     def complete_json(
         self,
@@ -231,7 +277,9 @@ class WorkrrProcedrrClient:
                     },
                 ]
             try:
-                payload = self._complete_from_provider(messages, response_schema)
+                payload = self._complete_from_provider(
+                    messages, response_schema, replay_key
+                )
                 return parse(payload)
             except JsonSchemaError as exc:
                 last_error = str(exc)

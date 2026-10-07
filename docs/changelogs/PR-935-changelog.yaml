@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 935
+title: Trace failing Procedrr provider calls
+intent:
+  problem: Procedrr recorded completed workflow events but omitted failed judge calls and individual provider retry attempts, leaving prompt-generation failures with an unknown stage and no call-level diagnostics.
+  goal: Persist linked, prompt-safe telemetry for failed judges and provider attempts so each failure can be traced to its workflow path, judge output, and retry outcome.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 657, end_line: 684}
+    summary: Record failed judge events with workflow path, provider, output name, and a hashed trace ID.
+    rationale: Preserve the identity of a failed classification call before propagating its exception.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 160, end_line: 220}
+    summary: Record each provider attempt with trace ID, attempt number, client/model, duration, outcome, retryability, and error type.
+    rationale: Show whether each request failed, retried, or succeeded without writing prompt contents to telemetry.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 483, end_line: 543}
+    summary: Serialize concurrent Procedrr step and provider-attempt events through one locked JSONL sink.
+    rationale: Keep concurrent event records complete and machine-readable in the run artifact.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 630, end_line: 677}
+    summary: Connect provider telemetry sinks and classify evaluator failures as planning failures.
+    rationale: Make provider attempt records available in run artifacts and report their failure stage accurately.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 166, end_line: 197}
+    summary: Verify failed judge events retain the workflow path, provider, output, and trace ID.
+    rationale: Prevent regressions that would again leave a failing judge unidentified.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 77, end_line: 110}
+    summary: Verify retry telemetry is correlated across attempts and excludes prompt content.
+    rationale: Ensure provider failures can be traced without persisting sensitive prompt text.
+entities:
+  - id: procedrr-failed-judge-event
+    type: Function
+    action: modified
+  - id: procedrr-provider-attempt-telemetry
+    type: Function
+    action: added
+  - id: procedrr-call-trace-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: failed-judge-event-identifies-provider-attempts
+    type: verifies
+    source: procedrr-call-trace-regression-tests
+    target: procedrr-failed-judge-event
+    action: added
+    description: Tests verify failed judge events carry the workflow call identity and matching trace ID.
+  - id: provider-attempts-correlate-with-failed-judge
+    type: supports
+    source: procedrr-provider-attempt-telemetry
+    target: procedrr-failed-judge-event
+    action: added
+    description: Retry attempt records use the same request trace ID as the failed judge event.
+invariants:
+  - id: provider-attempt-records-omit-prompt-content
+    description: Provider telemetry contains correlation and outcome metadata but does not persist request messages or prompt content.
+    action: added
+  - id: evaluator-provider-failures-identify-planning-stage
+    description: Failures during Procedrr evaluation are reported with the planning stage and carry the judge path and trace ID in the error message.
+    action: added
+guidance:
+  - id: trace-procedrr-provider-failures
+    description: Use the judge_failed record in procedrr-events.jsonl to identify the failed workflow path and trace ID, then match it to procedrr.provider_attempt records to inspect retries and outcomes.
+    action: added

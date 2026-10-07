@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import configparser
+import json
 import re
 import shlex
 import tomllib
@@ -82,6 +83,208 @@ class PipenvConfiguration:
     config_file: str
     scripts: Mapping[str, Mapping[str, object]]
     unresolved: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PoeConfiguration:
+    """Poe tasks and global execution settings from a supported config file."""
+
+    config_file: str
+    tasks: Mapping[str, object]
+    settings: Mapping[str, object]
+    unresolved: tuple[str, ...] = ()
+
+
+def discover_poe_configuration(root: str | Path) -> PoeConfiguration | None:
+    """Read Poe's preferred project config without loading includes or Python code."""
+    root_path = Path(root).resolve()
+    candidates = (
+        "pyproject.toml",
+        "poe_tasks.toml",
+        "poe_tasks.yaml",
+        "poe_tasks.json",
+    )
+    for filename in candidates:
+        path = root_path / filename
+        if not path.is_file():
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+            if filename.endswith(".toml"):
+                document = tomllib.loads(content)
+            elif filename.endswith(".yaml"):
+                document = yaml.safe_load(content)
+            else:
+                document = json.loads(content)
+        except (OSError, UnicodeError, ValueError, yaml.YAMLError) as error:
+            return PoeConfiguration(
+                filename, {}, {}, (f"Could not parse Poe input {filename}: {error}.",)
+            )
+        if not isinstance(document, Mapping):
+            return PoeConfiguration(
+                filename, {}, {}, (f"Poe input {filename} is not a mapping.",)
+            )
+        poe = _nested(document, ("tool", "poe"))
+        if filename == "pyproject.toml" and not isinstance(poe, Mapping):
+            continue
+        if not isinstance(poe, Mapping):
+            poe = document
+        tasks = poe.get("tasks", {})
+        if not isinstance(tasks, Mapping):
+            return PoeConfiguration(
+                filename,
+                {},
+                dict(poe),
+                (f"Poe tasks in {filename} are not a mapping.",),
+            )
+        settings = {key: value for key, value in poe.items() if key != "tasks"}
+        unresolved: list[str] = []
+        if settings.get("include"):
+            unresolved.append("Poe included task files were recorded but not followed.")
+        if settings.get("include_script"):
+            unresolved.append("Poe include_script dynamically generates tasks.")
+        if settings.get("default_task_type") not in {
+            None,
+            "cmd",
+            "expr",
+            "ref",
+            "script",
+            "shell",
+        }:
+            unresolved.append("Poe default_task_type is unsupported or invalid.")
+        if settings.get("default_array_task_type") not in {
+            None,
+            "sequence",
+            "parallel",
+        }:
+            unresolved.append("Poe default_array_task_type is unsupported or invalid.")
+        return PoeConfiguration(filename, dict(tasks), settings, tuple(unresolved))
+    return None
+
+
+def poe_task_closure(
+    configuration: PoeConfiguration, name: str
+) -> tuple[tuple[tuple[str, ...], ...], tuple[str, ...]]:
+    """Collect literal Poe cmd tasks from references and sequential tasks."""
+    commands: list[tuple[str, ...]] = []
+    diagnostics: list[str] = list(configuration.unresolved)
+    visiting: list[str] = []
+    default_task_type = configuration.settings.get("default_task_type", "cmd")
+    default_array_type = configuration.settings.get(
+        "default_array_task_type", "sequence"
+    )
+    default_item_type = configuration.settings.get(
+        "default_array_item_task_type", "ref"
+    )
+
+    def visit(
+        task_name: str, declaration: object | None = None, item_type: str | None = None
+    ) -> None:
+        if task_name in visiting:
+            diagnostics.append(
+                f"Poe task cycle detected: {' -> '.join((*visiting, task_name))}."
+            )
+            return
+        if declaration is None:
+            declaration = configuration.tasks.get(task_name)
+        if declaration is None:
+            diagnostics.append(
+                f"Poe task reference {task_name!r} has no static declaration."
+            )
+            return
+        visiting.append(task_name)
+        if isinstance(declaration, str):
+            kind = item_type or str(default_task_type)
+            value: object = declaration
+        elif isinstance(declaration, list):
+            kind = str(default_array_type)
+            value = declaration
+        elif isinstance(declaration, Mapping):
+            kinds = (
+                "cmd",
+                "expr",
+                "ref",
+                "script",
+                "shell",
+                "sequence",
+                "parallel",
+                "switch",
+            )
+            kind = next((key for key in kinds if key in declaration), "")
+            value = declaration.get(kind)
+            if not kind:
+                diagnostics.append(
+                    f"Poe task {task_name!r} has no recognized task type."
+                )
+        else:
+            diagnostics.append(
+                f"Poe task {task_name!r} has unsupported declaration syntax."
+            )
+            visiting.pop()
+            return
+        if kind == "cmd" and isinstance(value, str):
+            if any(marker in value for marker in ("$", "{{", "}}")):
+                diagnostics.append(
+                    f"Poe cmd task {task_name!r} uses dynamic expansion."
+                )
+            else:
+                try:
+                    commands.append(tuple(shlex.split(value, posix=True)))
+                except ValueError:
+                    diagnostics.append(
+                        f"Poe cmd task {task_name!r} has malformed quoting."
+                    )
+        elif kind == "ref" and isinstance(value, str):
+            parts = value.split()
+            if parts:
+                visit(parts[0])
+                if len(parts) > 1:
+                    diagnostics.append(
+                        f"Arguments on Poe ref task {task_name!r} remain unresolved."
+                    )
+        elif kind == "sequence" and isinstance(value, list):
+            array_item_type = (
+                declaration.get("default_item_type", default_item_type)
+                if isinstance(declaration, Mapping)
+                else default_item_type
+            )
+            for index, item in enumerate(value):
+                if isinstance(item, str):
+                    visit(
+                        f"{task_name}[{index}]",
+                        declaration=item,
+                        item_type=str(array_item_type),
+                    )
+                elif isinstance(item, Mapping):
+                    visit(f"{task_name}[{index}]", item)
+                else:
+                    diagnostics.append(
+                        f"Poe sequence task {task_name!r} has a dynamic item."
+                    )
+        elif kind == "parallel":
+            diagnostics.append(
+                f"Poe parallel task {task_name!r} is retained without ordering "
+                "its subtasks."
+            )
+        elif kind:
+            diagnostics.append(
+                f"Poe {kind} task {task_name!r} was retained without interpretation."
+            )
+        else:
+            diagnostics.append(
+                f"Poe task {task_name!r} has no supported static command."
+            )
+        if isinstance(declaration, Mapping):
+            for option in ("env", "envfile", "cwd", "deps", "args", "uses", "executor"):
+                if option in declaration:
+                    diagnostics.append(
+                        f"Poe task {task_name!r} uses {option} settings retained "
+                        "in configuration."
+                    )
+        visiting.pop()
+
+    visit(name)
+    return tuple(commands), tuple(dict.fromkeys(diagnostics))
 
 
 def discover_pipenv_configuration(root: str | Path) -> PipenvConfiguration | None:

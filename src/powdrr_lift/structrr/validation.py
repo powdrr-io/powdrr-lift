@@ -23,6 +23,7 @@ from powdrr_lift.structrr.validation_tasks import (
     NoxConfiguration,
     PdmConfiguration,
     PipenvConfiguration,
+    PoeConfiguration,
     TaskRunnerConfiguration,
     ToxConfiguration,
     discover_hatch_configuration,
@@ -31,6 +32,7 @@ from powdrr_lift.structrr.validation_tasks import (
     discover_nox_configuration,
     discover_pdm_configuration,
     discover_pipenv_configuration,
+    discover_poe_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
@@ -44,6 +46,7 @@ from powdrr_lift.structrr.validation_tasks import (
     nox_workflow_invocations,
     pdm_script_closure,
     pipenv_script_closure,
+    poe_task_closure,
     task_runner_closure,
     tox_ci_invocations,
     tox_workflow_invocations,
@@ -243,6 +246,8 @@ def discover_validation_profiles(
     profiles.extend(
         _discover_pipenv_profiles(root_path, ci_commands, pipenv_configuration)
     )
+    poe_configuration = discover_poe_configuration(root_path)
+    profiles.extend(_discover_poe_profiles(root_path, ci_commands, poe_configuration))
     pdm_configuration = discover_pdm_configuration(root_path)
     profiles.extend(_discover_pdm_profiles(root_path, ci_commands, pdm_configuration))
     hatch_configuration = discover_hatch_configuration(root_path)
@@ -274,6 +279,7 @@ def discover_validation_profiles(
             hatch_configuration,
             pdm_configuration,
             pipenv_configuration,
+            poe_configuration,
             just_configuration,
             task_configuration,
             profiles,
@@ -295,6 +301,7 @@ def discover_validation_profiles(
             or profile.name.startswith("hatch-")
             or profile.name.startswith("pdm-")
             or profile.name.startswith("pipenv-")
+            or profile.name.startswith("poe-")
         )
         for profile in profiles
     )
@@ -577,6 +584,7 @@ def _task_runner_commands(
     hatch_configuration: object,
     pdm_configuration: object,
     pipenv_configuration: object,
+    poe_configuration: object,
     just_configuration: object,
     task_configuration: object,
     profiles: Sequence[DiscoveredValidationProfile],
@@ -615,6 +623,11 @@ def _task_runner_commands(
     pipenv_config = (
         cast(PipenvConfiguration, pipenv_configuration)
         if pipenv_configuration is not None
+        else None
+    )
+    poe_config = (
+        cast(PoeConfiguration, poe_configuration)
+        if poe_configuration is not None
         else None
     )
     task_config = (
@@ -686,6 +699,9 @@ def _task_runner_commands(
                 pipenv_config, profile.selectors[0]
             )
             commands.extend((command,) for command in pipenv_commands)
+        elif profile.name.startswith("poe-") and poe_config and profile.selectors:
+            poe_commands, _ = poe_task_closure(poe_config, profile.selectors[0])
+            commands.extend((command,) for command in poe_commands)
         elif profile.name.startswith("task-") and task_config and profile.selectors:
             task_tasks, _ = task_runner_closure(task_config, profile.selectors)
             for task in task_tasks:
@@ -936,6 +952,159 @@ def _discover_task_runner_profiles(
             )
         )
     return tuple(profiles)
+
+
+def _discover_poe_profiles(
+    root: Path,
+    ci_commands: Sequence[tuple[str, ...]],
+    configuration: PoeConfiguration | None,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    invocations = tuple(
+        (command, _poe_task_selector(command))
+        for command in ci_commands
+        if _is_poe_invocation(command)
+    )
+    if configuration is None and not invocations:
+        return ()
+    validation_names = {
+        "check",
+        "ci",
+        "format",
+        "format-check",
+        "lint",
+        "test",
+        "tests",
+        "typecheck",
+        "type-check",
+        "validate",
+        "verify",
+    }
+    if invocations:
+        selections = invocations
+        declaration = "declared"
+    elif configuration:
+        names = tuple(
+            name
+            for name in configuration.tasks
+            if name in validation_names
+            or name.startswith(
+                (
+                    "check-",
+                    "check_",
+                    "lint-",
+                    "lint_",
+                    "test-",
+                    "test_",
+                    "typecheck-",
+                    "validate-",
+                )
+            )
+        )
+        selections = tuple((("poe", name), name) for name in names)
+        declaration = "inferred"
+    else:
+        return ()
+    workflow_paths = tuple(
+        path.relative_to(root).as_posix()
+        for path in sorted((root / ".github" / "workflows").glob("*.y*ml"))
+        if re.search(r"\bpoe\b|poethepoet", _read_text(path))
+    )
+    profiles: list[DiscoveredValidationProfile] = []
+    for index, (command, selector) in enumerate(selections, start=1):
+        unresolved = list(configuration.unresolved if configuration else ())
+        task = configuration.tasks.get(selector) if configuration and selector else None
+        expanded: tuple[tuple[str, ...], ...] = ()
+        if configuration and selector:
+            expanded, diagnostics = poe_task_closure(configuration, selector)
+            unresolved.extend(diagnostics)
+        elif selector:
+            unresolved.append("Poe invocation has no static task configuration.")
+        if selector is None:
+            unresolved.append("Poe invocation has no statically selected task.")
+        known_validation = selector is not None and (
+            selector in validation_names
+            or selector.startswith(
+                (
+                    "check-",
+                    "check_",
+                    "lint-",
+                    "lint_",
+                    "test-",
+                    "test_",
+                    "typecheck-",
+                    "validate-",
+                )
+            )
+        )
+        evidence_paths = (
+            (configuration.config_file,) if configuration else ()
+        ) + workflow_paths
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=f"poe-{selector or 'default'}"
+                if len(selections) == 1
+                else f"poe-{index}-{selector or 'default'}",
+                command=command,
+                source="Poe tasks/GitHub Actions",
+                provider_name="aggregate" if known_validation else "custom",
+                purpose="Run the native Poe task recorded in the project.",
+                roles=("validation",) if known_validation else (),
+                selectors=(selector,) if selector else (),
+                config_files=(configuration.config_file,) if configuration else (),
+                settings={
+                    "task": task,
+                    "global": dict(configuration.settings) if configuration else {},
+                    "expanded_commands": [list(item) for item in expanded],
+                },
+                declaration=declaration,
+                evidence=tuple(
+                    f"validation-input:{path}" for path in dict.fromkeys(evidence_paths)
+                ),
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
+
+
+def _poe_task_selector(command: Sequence[str]) -> str | None:
+    index: int | None = None
+    for position, token in enumerate(command):
+        if Path(token).name == "poe":
+            index = position + 1
+            break
+        if (
+            token == "-m"
+            and position + 1 < len(command)
+            and command[position + 1] == "poethepoet"
+        ):
+            index = position + 2
+            break
+    if index is None:
+        return None
+    tail = list(command[index:])
+    value_options = {"-C", "--directory", "--executor", "--executor-opt"}
+    position = 0
+    while position < len(tail):
+        token = tail[position]
+        if token in value_options:
+            position += 2
+        elif token.startswith("-"):
+            position += 1
+        else:
+            return token
+    return None
+
+
+def _is_poe_invocation(command: Sequence[str]) -> bool:
+    return any(
+        Path(token).name == "poe"
+        or (
+            token == "-m"
+            and index + 1 < len(command)
+            and command[index + 1] == "poethepoet"
+        )
+        for index, token in enumerate(command)
+    )
 
 
 def _discover_pipenv_profiles(
@@ -1719,6 +1888,9 @@ def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
                         "task ",
                         "pdm ",
                         "pipenv ",
+                        "poe ",
+                        "poetry poe ",
+                        "poetry run poe ",
                     )
                 ):
                     commands.append(_split_shell_arguments(stripped))

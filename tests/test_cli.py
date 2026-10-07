@@ -252,6 +252,7 @@ def test_cli_bootstrap_structrr_json_reports_validated_summary(tmp_path: Path) -
 
     summary = json.loads(stdout.getvalue())
     assert summary == {
+        "baseline_status": "not_run",
         "entity_count": 3,
         "relationship_count": 0,
         "source_anchor_count": 2,

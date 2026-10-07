@@ -140,22 +140,23 @@ def validation_context(
 def assign_python_topology(
     profiles: Sequence[DiscoveredValidationProfile], topology: PythonTopology
 ) -> tuple[DiscoveredValidationProfile, ...]:
-    """Attach the repository Python component/environment to Python checks."""
+    """Attach Python topology and canonical validation evidence references."""
     root_component = next(
         (item for item in topology.components if item.get("path") == "."), None
     )
-    if root_component is None:
-        return tuple(profiles)
-    component_id = str(root_component["id"])
-    environment = next(
-        (
-            item
-            for item in topology.environments
-            if item.get("component") == component_id
-        ),
-        None,
-    )
-    environment_id = str(environment["id"]) if environment else None
+    component_id = str(root_component["id"]) if root_component else None
+    environment_id: str | None = None
+    if component_id:
+        environment = next(
+            (
+                item
+                for item in topology.environments
+                if item.get("component") == component_id
+            ),
+            None,
+        )
+        environment_id = str(environment["id"]) if environment else None
+    evidence_ids = {f"validation-input:{path}" for path in topology.evidence_files}
     python_providers = {
         "ruff",
         "mypy",
@@ -165,16 +166,30 @@ def assign_python_topology(
         "flake8",
         "black",
     }
-    return tuple(
-        replace(
-            profile,
-            component=profile.component or component_id,
-            environment_id=profile.environment_id or environment_id,
+    normalized_profiles: list[DiscoveredValidationProfile] = []
+    for profile in profiles:
+        normalized_evidence = tuple(
+            evidence
+            if evidence in evidence_ids
+            else f"validation-input:{evidence}"
+            if f"validation-input:{evidence}" in evidence_ids
+            else evidence
+            for evidence in profile.evidence
         )
-        if profile.provider in python_providers
-        else profile
-        for profile in profiles
-    )
+        python_profile = profile.provider in python_providers and component_id
+        normalized_profiles.append(
+            replace(
+                profile,
+                evidence=normalized_evidence,
+                component=(profile.component or component_id)
+                if python_profile
+                else profile.component,
+                environment_id=(profile.environment_id or environment_id)
+                if python_profile
+                else profile.environment_id,
+            )
+        )
+    return tuple(normalized_profiles)
 
 
 def _profile_record(profile: DiscoveredValidationProfile) -> ValidationCheck:

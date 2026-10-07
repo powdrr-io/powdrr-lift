@@ -1,6 +1,8 @@
 # Bootstrap Structure and Validation Discovery Implementation Plan
 
-Status: proposed; implementation has not started.
+Status: proposed; implementation is in progress. Validation discovery adapters
+and context records are present, but the end-to-end bootstrap contract and
+acceptance gate below remain incomplete.
 
 ## Objective and delivery contract
 
@@ -39,6 +41,14 @@ Resolve symbols by name if line numbers or file layout have changed.
 | `workrr/verification_provider.py::PytestVerificationProvider.inventory` | Imports pytest into Powdrr and changes process-wide cwd | Collect in a subprocess using the target environment |
 | `workrr/feature_endpoint.py::_ensure_current_baseline` | Checks section versions and optional snapshot digest | Also check validation inputs and companion artifact freshness |
 | `skill-definitions/bootstrap-code-structure.yaml` | Reuses an existing artifact immediately; requires successful tool invocations | Check freshness; distinguish invocation confirmation from validation success |
+
+An end-to-end trial on cachetools exposed a concrete evidence integration
+failure: tox profiles currently put raw paths such as `tox.ini` and
+`.github/workflows/ci.yml` in `provenance.evidence`, while `validation_context`
+indexes those same inputs as `validation-input:<path>`. Strict reference
+validation therefore rejects the generated snapshot even though both files
+are present. Normalize adapter evidence through the shared evidence index
+before serializing profiles; do not weaken dangling-reference validation.
 
 Discovery on this repository currently returns Ruff format, Ruff lint, mypy,
 and pytest. `.github/workflows/ci.yml` also invokes workflow-definition
@@ -230,7 +240,9 @@ Steps:
 
 Acceptance: v2 round-trip; v1 reads without overstated confidence; shell and
 unresolved records survive serialization; duplicate ids and dangling evidence
-fail validation; two pytest variants survive. Existing polyglot tests pass.
+fail validation; two pytest variants survive. Every adapter evidence path
+resolves to exactly one context evidence ID after normalization, including
+tox configuration and workflow inputs. Existing polyglot tests pass.
 
 ## Work package 2: Evidence and Python project topology
 
@@ -265,6 +277,9 @@ uv workspace, requirements-only, nested monorepo, namespace, legacy setup,
 Conda, native-extension, and shared-environment fixtures have correct scope.
 Changing a workflow or included requirements file changes the validation
 fingerprint. Generated bootstrap artifacts never become their own evidence.
+Bootstrapping cachetools (tox config plus GitHub Actions evidence) produces a
+valid snapshot whose tox provenance references IDs present in
+`validation_context.evidence`.
 
 ## Work package 3: Task runners, hooks, and scripts
 
@@ -384,9 +399,15 @@ Files: shared execution and probe modules; runner/provider integration tests.
 
 CLI policy, also available as typed API options:
 
-- `--probe none|inspect|collect|baseline`, default `none` for deterministic
-  compatibility. The workflow may select `inspect` under its existing command
-  policy. Collect/baseline require the corresponding execution capability.
+- The `bootstrap` task workflow runs baseline checks by default. It attempts
+  each applicable discovered local validation command in its recorded context
+  and records the outcome. `--validation-timeout-seconds` bounds each command;
+  the aggregate budget is 1800 seconds. A future explicit opt-out must leave
+  every result visibly `not_run` and must never claim validation was confirmed.
+  The lower-level `bootstrap-structrr` command remains a snapshot generator and
+  reports `baseline_status: not_run` rather than implying it ran project checks.
+  Inspect and collection probes remain available for targeted diagnostics as
+  their execution support is implemented.
 - `--github offline|connected`, default `offline`.
 - `--report-output PATH`, optional; default YAML path with `.md` suffix.
 - Bound probe timeout, aggregate time, output size, and graph expansion in a
@@ -422,8 +443,13 @@ Steps:
    prove the original CI environment has been reproduced.
 7. Compare source state before/after probes, bound processes, terminate process
    groups on timeout, and preserve logs/results. Do not run publish/deploy
-   steps as discovery. Automatic dependency installation requires an explicit
-   setup policy and isolated target environment.
+   steps as discovery. Prepare declared dependencies only inside the isolated
+   task worktree; uv commands use that worktree's `.venv`, never the caller's
+   environment. Remove caller `VIRTUAL_ENV`, `PYTHONPATH`, uv environment
+   overrides, and secret-bearing variables before execution. Report missing
+   tools, dependencies, services, or credentials as `blocked`. A command is
+   confirmed only when its native validation invocation completes successfully
+   in the recorded context.
 8. On syntax/path errors, inspect output and make bounded, evidence-supported
    corrections. Keep original declarations and correction history. Missing
    services/secrets/dependencies are blocked prerequisites; do not remove
@@ -436,6 +462,11 @@ Acceptance: help success never becomes suite success; collection uses the
 target pytest version; caller cwd/env never change; missing plugin and missing
 database are distinguished; source mutation is detected; timeouts kill child
 processes; secrets stay out of artifacts; failed baselines remain visible.
+Default bootstrap executes every applicable discovered local validation
+command and records `passed`, `failed`, `blocked`, or `timed_out`; it leaves no
+applicable executable command at `not_run`. If no checks were discovered, the
+task is marked unverified and cannot open a bootstrap PR. Any future explicit
+skip mode must also be marked unverified.
 
 ## Work package 7: Structrr and Markdown output
 
@@ -457,10 +488,14 @@ Steps:
 4. Add CLI options above and JSON fields for report path, check counts,
    completeness, unresolved count, and probe mode. Preserve existing JSON
    keys. Output no progress/log text to stdout when `--json` is selected.
-5. Keep CLI exit code 1 for invalid documents or failed artifact writes. Exit
-   0 means valid artifacts were emitted; discovery and baseline statuses
-   remain explicit. PR readiness is enforced downstream, not inferred from
-   bootstrap exit code. Explain this behavior in CLI help and documentation.
+5. Keep CLI exit code 1 for invalid documents or failed artifact writes, and
+   return a distinct nonzero result when default baseline execution has failed
+   or blocked checks. Still persist the valid discovery snapshot and its
+   results. Exit 0 means artifacts are valid and all applicable local checks
+   passed; an empty inventory or explicit probe skip must be labeled
+   unverified. PR readiness is
+   enforced downstream, not inferred from bootstrap exit code. Explain this
+   behavior in CLI help and documentation.
 6. Update the skill to inspect freshness before reuse, request supported
    probes, retain failed/unrunnable checks with reasons, and emit both outputs.
    It must not claim help confirmed validation or require a passing baseline

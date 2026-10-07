@@ -289,7 +289,15 @@ def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
     )
     assert inventory["provider"] == "pytest"
     assert inventory["selectors"] == []
-    assert inventory["schema_version"] == "verification-provider-inventory-v1"
+    assert inventory["schema_version"] == "verification-provider-inventory-v2"
+    assert inventory["execution"] == {
+        "kind": "argv",
+        "cwd": ".",
+        "shell": None,
+        "script": None,
+    }
+    assert inventory["confirmation"]["level"] == "static"
+    assert result.document["validation_context"]["discovery_status"] == "partial"
 
 
 def test_bootstrap_sections_require_validation_inventory() -> None:

@@ -11,6 +11,8 @@ from typing import Any
 
 from powdrr_lift.core.acceptance_contract import (
     ACCEPTANCE_CRITERION_SCHEMA_VERSION,
+    ASSERTION_RELATIONS,
+    CRITERION_KINDS,
     AcceptanceContractError,
     AcceptanceCriterion,
     BehavioralContract,
@@ -21,6 +23,11 @@ from powdrr_lift.core.behavior_contract import CriterionQuality
 MAX_CRITERION_REQUIREMENTS = 4
 MAX_CRITERIA_PER_REQUEST = 4
 MAX_CRITERION_REPAIR_ROUNDS = 2
+ACCEPTANCE_CRITERION_WIRE_REVISION = "acceptance-criterion-wire-v2"
+MAX_CRITERION_TEXT_LENGTH = 1000
+MAX_CRITERION_OPERATION_LENGTH = 500
+MAX_CRITERION_EVENT_LENGTH = 500
+MAX_CRITERION_QUESTION_LENGTH = 500
 ACCEPTANCE_REVIEW_SCHEMA_VERSION = "acceptance-criterion-review-plan-v2"
 ACCEPTANCE_REPAIR_SCHEMA_VERSION = "acceptance-criterion-repair-plan-v1"
 ASSERTION_REVIEW_CATEGORIES = frozenset(
@@ -101,6 +108,7 @@ def prepare_acceptance_criteria(
             requests.append(
                 {
                     "request_id": f"criterion-request-{len(requests) + 1:04d}",
+                    "wire_revision": ACCEPTANCE_CRITERION_WIRE_REVISION,
                     "contract_id": contract.contract_id,
                     "contract_operation": contract.operation_description,
                     "candidate_requirements": [
@@ -206,7 +214,12 @@ def bind_acceptance_criteria(
                 )
         for raw_criterion in encoded_criteria:
             try:
-                value = _decode_object(raw_criterion, "criterion")
+                if not isinstance(raw_criterion, Mapping):
+                    raise AcceptanceContractError(
+                        "criterion must be an object under "
+                        f"{ACCEPTANCE_CRITERION_WIRE_REVISION}"
+                    )
+                value = raw_criterion
                 criterion = _bind_criterion(value, contract, candidate_ids)
             except AcceptanceContractError as exc:
                 for source_id in candidate_ids:
@@ -243,6 +256,7 @@ def bind_acceptance_criteria(
             else item
             for item in criteria
         ]
+    criteria = _deduplicate_criteria(criteria)
     criterion_ids_by_requirement: dict[str, set[str]] = defaultdict(set)
     for criterion in criteria:
         for source_id in criterion.source_refs:
@@ -1018,6 +1032,7 @@ def prepare_acceptance_criterion_repairs(
             requests.append(
                 {
                     "request_id": request_id,
+                    "wire_revision": ACCEPTANCE_CRITERION_WIRE_REVISION,
                     "contract_id": contract.contract_id,
                     "repair_round": max(
                         (
@@ -1214,6 +1229,7 @@ def bind_acceptance_criterion_repairs(
         except (AcceptanceContractError, TypeError, ValueError):
             continue
         criteria.append(repaired)
+    criteria = _deduplicate_criteria(criteria)
     merged = {
         **dict(prior),
         "criteria": [item.to_data() for item in criteria],
@@ -1282,14 +1298,46 @@ def _bind_criterion(
     if not source_indexes:
         raise AcceptanceContractError("criterion has no source requirements")
     source_refs = tuple(candidate_ids[index] for index in source_indexes)
+    kind = _required_text(raw, "kind")
+    if kind not in CRITERION_KINDS:
+        raise AcceptanceContractError("criterion kind is invalid")
+    setup = raw.get("setup")
+    if setup is not None and (
+        not isinstance(setup, str)
+        or not setup.strip()
+        or len(setup) > MAX_CRITERION_TEXT_LENGTH
+    ):
+        raise AcceptanceContractError(
+            "criterion needs an observable setup as a bounded string or null"
+        )
+    operation = _required_text(raw, "operation")
+    if len(operation) > MAX_CRITERION_OPERATION_LENGTH:
+        raise AcceptanceContractError("criterion operation exceeds the length limit")
+    events = raw.get("events")
+    if (
+        not isinstance(events, list)
+        or len(events) > 8
+        or any(
+            not isinstance(item, str)
+            or not item.strip()
+            or len(item) > MAX_CRITERION_EVENT_LENGTH
+            for item in events
+        )
+    ):
+        raise AcceptanceContractError("criterion events are malformed or exceed limits")
+    # Persist the historical event-object shape while keeping the provider wire
+    # contract simple and typed as a bounded list of descriptions.
+    persisted_events = [{"description": item.strip()} for item in events]
     assertion_values = raw.get("assertions")
-    if not isinstance(assertion_values, list) or len(assertion_values) > 4:
+    if not isinstance(assertion_values, list) or not 1 <= len(assertion_values) <= 4:
         raise AcceptanceContractError(
             "criterion assertions must contain at most four items"
         )
     assertions: list[CriterionAssertion] = []
     for index, item in enumerate(assertion_values, start=1):
-        assertion_data = _decode_object(item, "assertion")
+        if not isinstance(item, Mapping):
+            raise AcceptanceContractError("assertion must be an object")
+        assertion_data = item
         if set(assertion_data) != {
             "observation",
             "relation",
@@ -1307,21 +1355,45 @@ def _bind_criterion(
             raise AcceptanceContractError(
                 "assertion references an unrelated requirement"
             )
+        observation = _required_text(assertion_data, "observation")
+        expected = assertion_data.get("expected")
+        if (
+            len(observation) > MAX_CRITERION_TEXT_LENGTH
+            or not isinstance(expected, str)
+            or not expected.strip()
+            or len(expected) > MAX_CRITERION_TEXT_LENGTH
+        ):
+            raise AcceptanceContractError(
+                "assertion observation and expected must be bounded non-empty strings"
+            )
+        relation = _required_text(assertion_data, "relation")
+        if relation not in ASSERTION_RELATIONS:
+            raise AcceptanceContractError("assertion relation is invalid")
+        basis = _required_text(assertion_data, "basis")
+        if basis not in {"source_derived", "repository_supported"}:
+            raise AcceptanceContractError("assertion basis is invalid")
         assertions.append(
             CriterionAssertion(
                 assertion_id=f"assertion-{index:02d}",
-                observation=_required_text(assertion_data, "observation"),
-                relation=_required_text(assertion_data, "relation"),
-                expected=assertion_data.get("expected"),
+                observation=observation,
+                relation=relation,
+                expected=expected.strip(),
                 source_refs=tuple(candidate_ids[value] for value in assertion_indexes),
-                basis=_required_text(assertion_data, "basis"),
+                basis=basis,
             )
         )
     if not assertions:
         raise AcceptanceContractError("criterion needs at least one assertion")
     questions = raw.get("unresolved_questions")
-    if not isinstance(questions, list) or not all(
-        isinstance(item, str) and item.strip() for item in questions
+    if (
+        not isinstance(questions, list)
+        or len(questions) > 8
+        or not all(
+            isinstance(item, str)
+            and item.strip()
+            and len(item) <= MAX_CRITERION_QUESTION_LENGTH
+            for item in questions
+        )
     ):
         raise AcceptanceContractError("criterion unresolved questions are malformed")
     if any(
@@ -1330,11 +1402,11 @@ def _bind_criterion(
         raise AcceptanceContractError("criterion references a nonmember requirement")
     material = {
         "contract_id": contract.contract_id,
-        "kind": raw.get("kind"),
+        "kind": kind,
         "source_refs": source_refs,
-        "setup": raw.get("setup"),
-        "operation": raw.get("operation"),
-        "events": raw.get("events"),
+        "setup": setup.strip() if isinstance(setup, str) else None,
+        "operation": operation,
+        "events": persisted_events,
         "assertions": [item.to_data() for item in assertions],
         "unresolved_questions": questions,
     }
@@ -1358,11 +1430,11 @@ def _bind_criterion(
     criterion = AcceptanceCriterion(
         criterion_id=criterion_id,
         contract_id=contract.contract_id,
-        kind=_required_text(raw, "kind"),
+        kind=kind,
         source_refs=source_refs,
-        setup=raw.get("setup"),
-        operation=_required_text(raw, "operation"),
-        events=_value_tuple(raw.get("events"), "criterion events"),
+        setup=setup.strip() if isinstance(setup, str) else None,
+        operation=operation,
+        events=tuple(persisted_events),
         assertions=tuple(assertions),
         unresolved_questions=tuple(questions),
         quality=CriterionQuality(criterion_status="unassessed"),
@@ -1379,6 +1451,47 @@ def _decode_object(raw: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(raw, Mapping):
         raise AcceptanceContractError(f"{label} must be a JSON object")
     return raw
+
+
+def _deduplicate_criteria(
+    criteria: Sequence[AcceptanceCriterion],
+) -> list[AcceptanceCriterion]:
+    """Collapse identical compiler-owned criterion IDs, preferring later repairs."""
+    unique: dict[str, AcceptanceCriterion] = {}
+    for criterion in criteria:
+        previous = unique.get(criterion.criterion_id)
+        if previous is None:
+            unique[criterion.criterion_id] = criterion
+            continue
+        if _criterion_content(previous) != _criterion_content(criterion):
+            raise AcceptanceContractError(
+                "acceptance criterion ID collision has different content"
+            )
+        if criterion.quality.repair_attempts >= previous.quality.repair_attempts:
+            unique[criterion.criterion_id] = criterion
+    return list(unique.values())
+
+
+def _criterion_content(criterion: AcceptanceCriterion) -> tuple[Any, ...]:
+    return (
+        criterion.contract_id,
+        criterion.kind,
+        criterion.source_refs,
+        criterion.setup,
+        criterion.operation,
+        criterion.events,
+        tuple(
+            (
+                item.observation,
+                item.relation,
+                item.expected,
+                item.source_refs,
+                item.basis,
+            )
+            for item in criterion.assertions
+        ),
+        criterion.unresolved_questions,
+    )
 
 
 def _indexes(raw: Any, size: int, name: str) -> tuple[int, ...]:

@@ -126,27 +126,23 @@ class DeterministicPlanningClient:
             return (
                 {
                     "criteria": [
-                        json.dumps(
-                            {
-                                "kind": "transformation",
-                                "source_indexes": [0],
-                                "setup": {"input": "the requested input"},
-                                "operation": "apply the requested behavior",
-                                "events": [],
-                                "assertions": [
-                                    json.dumps(
-                                        {
-                                            "observation": "result",
-                                            "relation": "equals",
-                                            "expected": "the requested result",
-                                            "source_indexes": [0],
-                                            "basis": "source_derived",
-                                        }
-                                    )
-                                ],
-                                "unresolved_questions": [],
-                            }
-                        )
+                        {
+                            "kind": "transformation",
+                            "source_indexes": [0],
+                            "setup": "The requested input.",
+                            "operation": "apply the requested behavior",
+                            "events": [],
+                            "assertions": [
+                                {
+                                    "observation": "result",
+                                    "relation": "equals",
+                                    "expected": "the requested result",
+                                    "source_indexes": [0],
+                                    "basis": "source_derived",
+                                }
+                            ],
+                            "unresolved_questions": [],
+                        }
                     ]
                 }
                 if candidates

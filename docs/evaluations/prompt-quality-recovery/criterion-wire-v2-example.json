@@ -1,0 +1,26 @@
+{
+  "fixture_kind": "hand-authored-schema-example-not-live-quality-evidence",
+  "wire_revision": "acceptance-criterion-wire-v2",
+  "criteria": [
+    {
+      "kind": "state_transition",
+      "source_indexes": [0],
+      "setup": "An incremental execution with two payloads contributing different fields.",
+      "operation": "Consume session.execute_incremental(query).",
+      "events": [
+        "Receive a first payload contributing field a.",
+        "Receive a second payload contributing field b."
+      ],
+      "assertions": [
+        {
+          "observation": "The second yielded result's data.",
+          "relation": "satisfies",
+          "expected": "Contains contributions a and b, rather than only b.",
+          "source_indexes": [0],
+          "basis": "source_derived"
+        }
+      ],
+      "unresolved_questions": []
+    }
+  ]
+}

@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
-from powdrr_lift.structrr.validation import discover_validation_profiles
+from powdrr_lift.structrr.validation import (
+    discover_validation_profiles,
+    validation_context,
+    validation_inventory,
+)
+from powdrr_lift.structrr.validation_models import validate_validation_records
 
 
 def test_discovers_project_checks_from_configuration_and_ci(tmp_path: Path) -> None:
@@ -106,3 +112,27 @@ def test_returns_no_profiles_when_repository_declares_no_validator(
     profiles = discover_validation_profiles(tmp_path)
 
     assert profiles == ()
+
+
+def test_validation_context_catalogs_files_cited_by_discovered_profiles(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tox.ini").write_text(
+        "[testenv]\ncommands = pytest tests\n", encoding="utf-8"
+    )
+    workflow = tmp_path / ".github" / "workflows"
+    workflow.mkdir(parents=True)
+    (workflow / "tests.yml").write_text(
+        "jobs:\n  test:\n    steps:\n      - run: tox\n",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+    inventory = validation_inventory(profiles)
+    context = validation_context(profiles)
+
+    assert validate_validation_records(inventory, context) == ()
+    evidence = cast(list[dict[str, str]], context["evidence"])
+    cataloged_paths = {item["path"] for item in evidence}
+    assert "tox.ini" in cataloged_paths
+    assert ".github/workflows/tests.yml" in cataloged_paths

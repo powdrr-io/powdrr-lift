@@ -1,0 +1,8 @@
+{
+  "capture_revision": "4394a2c88d0c76cf4b121df1212ee713bcbceeff",
+  "task_id": "gql-incremental-graphql-delivery",
+  "source_excerpt": "The .data dict is accumulated across payloads, not raw deltas.",
+  "wire_schema": "criteria: array of strings",
+  "raw_criterion_sha256": "52fae32699d37258880d934292673f5b08a1ad7f171bfd07b3c24bbedaf54eb5",
+  "raw_criterion": "interface: session.execute_incremental(query) is an async generator; calling it returns an async generator object; source_indexes [0]; setup: a session object with execute_incremental method; operation: call session.execute_incremental(query); events: none; assertions: [observation: type of returned object, relation: equals, expected: async_generator, source_indexes [0], basis: source_derived]"
+}

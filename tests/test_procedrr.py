@@ -395,7 +395,7 @@ def test_single_decision_verifier_flags_multi_action_judges() -> None:
             ]
         }
     )
-    assert any("bounded loop" in diagnostic.message for diagnostic in diagnostics)
+    assert any("declare maxItems" in diagnostic.message for diagnostic in diagnostics)
 
 
 def test_compiler_proves_bounded_sequence_and_counts_repairs() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -23,6 +24,7 @@ from powdrr_lift.workrr.acceptance_criterion_compiler import (
     prepare_acceptance_criterion_repairs,
     prepare_acceptance_criterion_reviews,
 )
+from procedrr import parse_and_validate
 
 
 def _contract(
@@ -42,28 +44,24 @@ def _contract(
     )
 
 
-def _criterion(source_indexes: list[int], *, kind: str = "transformation") -> str:
-    return json.dumps(
-        {
-            "kind": kind,
-            "source_indexes": source_indexes,
-            "setup": {"initial": []},
-            "operation": "process the supplied payload",
-            "events": [],
-            "assertions": [
-                json.dumps(
-                    {
-                        "observation": "result.items",
-                        "relation": "equals",
-                        "expected": ["A", "B"],
-                        "source_indexes": source_indexes,
-                        "basis": "source_derived",
-                    }
-                )
-            ],
-            "unresolved_questions": [],
-        }
-    )
+def _criterion(source_indexes: list[int], *, kind: str = "transformation") -> dict:
+    return {
+        "kind": kind,
+        "source_indexes": source_indexes,
+        "setup": "An initial result mapping.",
+        "operation": "process the supplied payload",
+        "events": [],
+        "assertions": [
+            {
+                "observation": "result.items",
+                "relation": "equals",
+                "expected": "Contains entries A and B.",
+                "source_indexes": source_indexes,
+                "basis": "source_derived",
+            }
+        ],
+        "unresolved_questions": [],
+    }
 
 
 def test_typed_criterion_round_trips_and_fingerprints() -> None:
@@ -112,7 +110,7 @@ def test_typed_criterion_round_trips_and_fingerprints() -> None:
     rendered = restored.render()
     assert restored.acceptance_criteria[0].criterion_id == criterion.criterion_id
     assert "Observable acceptance checks:" in rendered
-    assert 'Check that result.items equals ["A","B"].' in rendered
+    assert 'Check that result.items equals "Contains entries A and B."' in rendered
     legacy_data = packet.to_data()
     legacy_data["schema_version"] = "implementation-packet-v1"
     legacy_data.pop("acceptance_criteria")
@@ -144,6 +142,10 @@ def test_criterion_request_partition_preserves_requirements_and_context() -> Non
         2,
     ]
     assert all(
+        request["wire_revision"] == "acceptance-criterion-wire-v2"
+        for request in plan["requests"]
+    )
+    assert all(
         item["classification"] == "context_only_not_a_requirement"
         for request in plan["requests"]
         for item in request["supporting_context"]
@@ -171,6 +173,140 @@ def test_requirements_without_valid_assertions_remain_source_only() -> None:
     assert result["requirement_coverage"]["instruction-001"]["status"] == "unassessed"
     assert result["requirement_coverage"]["instruction-002"]["status"] == "source_only"
     assert result["counts"]["source_only"] == 1
+
+
+def test_legacy_prose_criterion_is_not_accepted_as_wire_v2() -> None:
+    contract = _contract(("instruction-001",))
+    plan = prepare_acceptance_criteria(
+        {
+            "schema_version": "behavioral-contract-collection-v1",
+            "ledger_fingerprint": "sha256:ledger",
+            "covered_requirement_ids": ["instruction-001"],
+            "contracts": [contract.to_data()],
+        },
+        {"instruction-001": "The result accumulates entries."},
+    )
+    fixture_path = (
+        Path(__file__).parent
+        / "fixtures/prompt_quality_recovery/captured-prose-criterion.json"
+    )
+    captured_prose = json.loads(fixture_path.read_text())["raw_criterion"]
+
+    result = bind_acceptance_criteria(plan, [{"criteria": [captured_prose]}])
+
+    coverage = result["requirement_coverage"]["instruction-001"]
+    assert coverage["status"] == "source_only"
+    assert (
+        "acceptance-criterion-wire-v2"
+        in coverage["criterion_quality"]["failure_reason"]
+    )
+
+
+def test_hand_authored_wire_v2_example_binds_as_a_structural_fixture() -> None:
+    contract = _contract(("instruction-001",))
+    plan = prepare_acceptance_criteria(
+        {
+            "schema_version": "behavioral-contract-collection-v1",
+            "ledger_fingerprint": "sha256:ledger",
+            "covered_requirement_ids": ["instruction-001"],
+            "contracts": [contract.to_data()],
+        },
+        {"instruction-001": "The result mapping accumulates entries."},
+    )
+    fixture_path = (
+        Path(__file__).parents[1]
+        / "docs/evaluations/prompt-quality-recovery/criterion-wire-v2-example.json"
+    )
+    fixture = json.loads(fixture_path.read_text())
+
+    result = bind_acceptance_criteria(plan, [{"criteria": fixture["criteria"]}])
+
+    assert result["counts"]["with_criteria"] == 1, result["requirement_coverage"]
+    assert result["requirement_coverage"]["instruction-001"]["status"] == ("unassessed")
+    assert result["criteria"][0]["assertions"][0]["expected"].startswith("Contains")
+    assert result["criteria"][0]["events"] == [
+        {"description": "Receive a first payload contributing field a."},
+        {"description": "Receive a second payload contributing field b."},
+    ]
+
+
+def test_typed_criterion_rejects_encoded_assertion_and_unbounded_values() -> None:
+    contract = _contract(("instruction-001",))
+    plan = prepare_acceptance_criteria(
+        {
+            "schema_version": "behavioral-contract-collection-v1",
+            "ledger_fingerprint": "sha256:ledger",
+            "covered_requirement_ids": ["instruction-001"],
+            "contracts": [contract.to_data()],
+        },
+        {"instruction-001": "The result accumulates entries."},
+    )
+    encoded_assertion = _criterion([0])
+    encoded_assertion["assertions"] = [json.dumps(encoded_assertion["assertions"][0])]
+    too_long = _criterion([0])
+    too_long["operation"] = "x" * 501
+
+    for malformed in (encoded_assertion, too_long):
+        result = bind_acceptance_criteria(plan, [{"criteria": [malformed]}])
+        assert result["requirement_coverage"]["instruction-001"]["status"] == (
+            "source_only"
+        )
+
+
+def test_duplicate_generated_criteria_are_collapsed_by_compiler_id() -> None:
+    contract = _contract(("instruction-001",))
+    plan = prepare_acceptance_criteria(
+        {
+            "schema_version": "behavioral-contract-collection-v1",
+            "ledger_fingerprint": "sha256:ledger",
+            "covered_requirement_ids": ["instruction-001"],
+            "contracts": [contract.to_data()],
+        },
+        {"instruction-001": "The result accumulates entries."},
+    )
+    criterion = _criterion([0])
+
+    result = bind_acceptance_criteria(
+        plan, [{"criteria": [criterion, criterion.copy()]}]
+    )
+
+    assert len(result["criteria"]) == 1
+    assert result["counts"]["with_criteria"] == 1
+
+
+def test_generation_and_repair_use_same_schema_after_workflow_loading() -> None:
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "docs/procedrr/skill-definitions/design-interview.yaml"
+    )
+    workflow = parse_and_validate(workflow_path.read_text())
+    schemas: dict[str, object] = {}
+
+    def collect(value: object) -> None:
+        if isinstance(value, dict):
+            judge = value.get("judge")
+            if isinstance(judge, dict):
+                output = judge.get("output")
+                if isinstance(output, dict) and output.get("name") in {
+                    "acceptance_criterion_result",
+                    "acceptance_criterion_repair_result",
+                }:
+                    schemas[output["name"]] = output["schema"]
+            for item in value.values():
+                collect(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+
+    collect(workflow)
+    assert set(schemas) == {
+        "acceptance_criterion_result",
+        "acceptance_criterion_repair_result",
+    }
+    assert (
+        schemas["acceptance_criterion_result"]
+        == schemas["acceptance_criterion_repair_result"]
+    )
 
 
 def test_review_requires_exact_assertion_evidence_and_adequacy() -> None:
@@ -281,28 +417,24 @@ def test_assertion_local_repair_retains_supported_claim_and_records_attempt() ->
     }
     source_by_id = {"instruction-001": source}
     generation = prepare_acceptance_criteria(contracts, source_by_id)
-    generated_value = json.loads(_criterion([0]))
+    generated_value = _criterion([0])
     generated_value["assertions"].append(
-        json.dumps(
-            {
-                "observation": "result.cancelled",
-                "relation": "equals",
-                "expected": True,
-                "source_indexes": [0],
-                "basis": "source_derived",
-            }
-        )
-    )
-    generated_value["assertions"][0] = json.dumps(
         {
-            "observation": "result.payload",
+            "observation": "result.cancelled",
             "relation": "equals",
-            "expected": "the forwarded payload",
+            "expected": "is cancelled",
             "source_indexes": [0],
             "basis": "source_derived",
         }
     )
-    generated = json.dumps(generated_value)
+    generated_value["assertions"][0] = {
+        "observation": "result.payload",
+        "relation": "equals",
+        "expected": "the forwarded payload",
+        "source_indexes": [0],
+        "basis": "source_derived",
+    }
+    generated = generated_value
     draft = bind_acceptance_criteria(generation, [{"criteria": [generated]}])
     review_plan = prepare_acceptance_criterion_reviews(draft, contracts, source_by_id)
     criterion = review_plan["requests"][0]["criterion"]
@@ -355,26 +487,29 @@ def test_assertion_local_repair_retains_supported_claim_and_records_attempt() ->
     )
     assert repair_state["done"] is False
     repair_request = repair_state["requests"][0]
+    assert repair_request["wire_revision"] == "acceptance-criterion-wire-v2"
     assert [
         item["assertion_id"]
         for item in repair_request["failed_criteria"][0]["accepted_assertions"]
     ] == [forwarding_id]
-    repair_candidate = json.loads(_criterion([0]))
+    repair_candidate = _criterion([0])
     repair_candidate["assertions"] = [
-        json.dumps(
-            {
-                "observation": "result.payload",
-                "relation": "equals",
-                "expected": "the forwarded payload",
-                "source_indexes": [0],
-                "basis": "source_derived",
-            }
-        )
+        {
+            "observation": "result.payload",
+            "relation": "equals",
+            "expected": "the forwarded payload",
+            "source_indexes": [0],
+            "basis": "source_derived",
+        }
     ]
     repaired = bind_acceptance_criterion_repairs(
         {**repair_state, "criterion_collection": reviewed},
-        [{"criteria": [json.dumps(repair_candidate)]}],
+        [{"criteria": [repair_candidate, repair_candidate.copy()]}],
     )
+    repaired_ids = [
+        item["criterion_id"] for item in repaired["criterion_collection"]["criteria"]
+    ]
+    assert len(repaired_ids) == len(set(repaired_ids))
     repaired_criterion = AcceptanceCriterion.from_data(
         repaired["criterion_collection"]["criteria"][0]
     )
@@ -624,17 +759,19 @@ def test_repair_stops_after_two_rounds_with_source_only_coverage() -> None:
 def test_typed_criterion_rejects_unobservable_or_circular_forms(
     update: dict[str, object], message: str
 ) -> None:
-    criterion_raw = json.loads(_criterion([0]))
+    criterion_raw = _criterion([0])
     if "relation" in update or "expected" in update or "observation" in update:
-        criterion_raw["assertions"][0] = json.dumps(
-            {**json.loads(criterion_raw["assertions"][0]), **update}
-        )
+        criterion_raw["assertions"][0] = {
+            **criterion_raw["assertions"][0],
+            **update,
+        }
     else:
         criterion_raw.update(update)
         if update.get("kind") == "rejection":
-            criterion_raw["assertions"][0] = json.dumps(
-                {**json.loads(criterion_raw["assertions"][0]), "relation": "equals"}
-            )
+            criterion_raw["assertions"][0] = {
+                **criterion_raw["assertions"][0],
+                "relation": "equals",
+            }
     contract = _contract(("instruction-001",))
     plan = prepare_acceptance_criteria(
         {
@@ -646,7 +783,7 @@ def test_typed_criterion_rejects_unobservable_or_circular_forms(
         {"instruction-001": "Source requirement."},
     )
 
-    result = bind_acceptance_criteria(plan, [{"criteria": [json.dumps(criterion_raw)]}])
+    result = bind_acceptance_criteria(plan, [{"criteria": [criterion_raw]}])
     assert result["criteria"] == []
     assert result["requirement_coverage"]["instruction-001"]["status"] == "source_only"
     assert (

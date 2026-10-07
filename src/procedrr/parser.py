@@ -1674,10 +1674,16 @@ def _decision_complexity(schema: Any) -> tuple[str, ...]:
                 and isinstance(child.get("items"), Mapping)
                 and child["items"].get("type") == "object"
             ):
-                reasons.append(
-                    f"property {name!r} returns multiple values; move it to a "
-                    "bounded loop"
-                )
+                max_items = child.get("maxItems")
+                if (
+                    not isinstance(max_items, int)
+                    or isinstance(max_items, bool)
+                    or not 1 <= max_items <= 64
+                ):
+                    reasons.append(
+                        f"property {name!r} returns an unbounded collection of "
+                        "objects; declare maxItems from 1 to 64"
+                    )
     return tuple(reasons)
 
 

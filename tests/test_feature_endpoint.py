@@ -2987,27 +2987,23 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                 request = context["acceptance_criterion_request"]
                 return {
                     "criteria": [
-                        json.dumps(
-                            {
-                                "kind": "transformation",
-                                "source_indexes": [0],
-                                "setup": {"input": "an instruction-supported value"},
-                                "operation": "apply the requested behavior",
-                                "events": [],
-                                "assertions": [
-                                    json.dumps(
-                                        {
-                                            "observation": "result",
-                                            "relation": "equals",
-                                            "expected": "the specified result",
-                                            "source_indexes": [0],
-                                            "basis": "source_derived",
-                                        }
-                                    )
-                                ],
-                                "unresolved_questions": [],
-                            }
-                        )
+                        {
+                            "kind": "transformation",
+                            "source_indexes": [0],
+                            "setup": "An instruction-supported input value.",
+                            "operation": "apply the requested behavior",
+                            "events": [],
+                            "assertions": [
+                                {
+                                    "observation": "result",
+                                    "relation": "equals",
+                                    "expected": "the specified result",
+                                    "source_indexes": [0],
+                                    "basis": "source_derived",
+                                }
+                            ],
+                            "unresolved_questions": [],
+                        }
                     ]
                 }
             if "Does each assertion follow from cited source evidence" in question:

@@ -110,17 +110,32 @@ def validation_context(
         ),
         components=topology.components if topology else (),
         environments=topology.environments if topology else (),
-        evidence=(
-            tuple(
-                {"id": f"validation-input:{path}", "path": path}
-                for path in topology.evidence_files
-            )
-            if topology
-            else ()
-        ),
+        evidence=_validation_context_evidence(profiles, topology),
         diagnostics=tuple(diagnostics),
         input_fingerprints=topology.input_fingerprints if topology else (),
     ).to_data()
+
+
+def _validation_context_evidence(
+    profiles: Sequence[DiscoveredValidationProfile],
+    topology: PythonTopology | None,
+) -> tuple[dict[str, str], ...]:
+    """Include every recorded validation-input reference in the context catalog."""
+    evidence_by_id = {
+        f"validation-input:{path}": path
+        for path in (topology.evidence_files if topology else ())
+    }
+    for profile in profiles:
+        for evidence_id in profile.evidence:
+            prefix, separator, path = evidence_id.partition(":")
+            if prefix == "validation-input" and separator and path:
+                evidence_by_id[evidence_id] = path
+            elif evidence_id:
+                evidence_by_id[evidence_id] = evidence_id
+    return tuple(
+        {"id": evidence_id, "path": path}
+        for evidence_id, path in evidence_by_id.items()
+    )
 
 
 def assign_python_topology(
